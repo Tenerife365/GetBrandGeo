@@ -38,16 +38,19 @@ import logging
 import os
 import pandas as pd
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─────────────────────────────────────────────
-# API KEY  ← paste your OpenRouter key here
+# API KEYS — loaded from .env file
 # ─────────────────────────────────────────────
 
-OPENROUTER_API_KEY   = "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"
-BRAVE_SEARCH_API_KEY = "BSAFVn809D-PxfhRmuXEKZjTG-a3yKS"
-GEMINI_API_KEY       = "AQ.Ab8RN6Kb0HDdX3J1ioN5mV5zfw44-oQtN1fLeBzlHyVJ2Viz9Q"
-ANTHROPIC_API_KEY    = "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"
-OPENAI_API_KEY       = "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"
+OPENROUTER_API_KEY   = os.getenv("OPENROUTER_API_KEY", "")
+BRAVE_SEARCH_API_KEY = os.getenv("BRAVE_SEARCH_API_KEY", "")
+GEMINI_API_KEY       = os.getenv("GEMINI_API_KEY", "")
+ANTHROPIC_API_KEY    = os.getenv("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY       = os.getenv("OPENAI_API_KEY", "")
 
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS CONFIG  ← update SHEET_ID
