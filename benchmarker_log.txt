@@ -1,0 +1,37 @@
+08:36:13 [INFO] GEO/AEO Benchmarker  |  2026-06-17T07:36:13.176026+00:00
+08:36:13 [INFO] Agents (6): ChatGPT, Claude, Gemini, Perplexity, Copilot, Meta
+08:36:13 [INFO] Loading questions from Google Sheets...
+08:36:16 [INFO] Loaded 233 questions from 'GEO Priority Matrix'
+08:36:16 [INFO] Run #3 | rotation shift=78 | 233 questions total
+08:36:16 [INFO]   ChatGPT     : 80 questions
+08:36:16 [INFO]   Claude      : 10 questions
+08:36:16 [INFO]   Gemini      : 5 questions
+08:36:16 [INFO]   Perplexity  : 50 questions
+08:36:16 [INFO]   Copilot     : 60 questions
+08:36:16 [INFO]   Meta        : 28 questions
+08:36:16 [INFO] Total API calls planned: 233
+^C08:32:58 [INFO] GEO/AEO Benchmarker  |  2026-06-29T07:32:58.939602+00:00
+08:32:58 [INFO] Agents (6): ChatGPT, Claude, Gemini, Perplexity, Copilot, Meta
+08:32:58 [INFO] Loading questions from Google Sheets...
+08:33:02 [INFO] Loaded 230 questions from 'GEO Priority Matrix'
+08:33:02 [INFO] Run #4 | rotation shift=117 | 230 questions total
+08:33:02 [INFO]   ChatGPT     : 80 questions
+08:33:02 [INFO]   Claude      : 10 questions
+08:33:02 [INFO]   Gemini      : 5 questions
+08:33:02 [INFO]   Perplexity  : 50 questions
+08:33:02 [INFO]   Copilot     : 60 questions
+08:33:02 [INFO]   Meta        : 25 questions
+08:33:02 [INFO] Total API calls planned: 230
+^C08:33:37 [INFO] GEO/AEO Benchmarker  |  2026-06-29T07:33:37.508675+00:00
+08:33:37 [INFO] Agents (6): ChatGPT, Claude, Gemini, Perplexity, Copilot, Meta
+08:33:37 [INFO] Loading questions from Google Sheets...
+08:33:39 [INFO] Loaded 230 questions from 'GEO Priority Matrix'
+08:33:39 [INFO] Run #4 | rotation shift=117 | 230 questions total
+08:33:39 [INFO]   ChatGPT     : 80 questions
+08:33:39 [INFO]   Claude      : 10 questions
+08:33:39 [INFO]   Gemini      : 5 questions
+08:33:39 [INFO]   Perplexity  : 50 questions
+08:33:39 [INFO]   Copilot     : 60 questions
+08:33:39 [INFO]   Meta        : 25 questions
+08:33:39 [INFO] Total API calls planned: 230
+^C
