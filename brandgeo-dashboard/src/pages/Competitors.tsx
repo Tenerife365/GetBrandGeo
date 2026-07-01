@@ -121,19 +121,31 @@ export default function Competitors() {
   const autoDiscover = async () => {
     if (isDemoMode) return
     setDiscovering(true)
-    const { data: analysisData } = await supabase.from('page_analysis').select('competitors')
+
+    // Read from both page_analysis.competitors AND ai_results.competitors_mentioned
+    const [{ data: analysisData }, { data: aiData }] = await Promise.all([
+      supabase.from('page_analysis').select('competitors'),
+      supabase.from('ai_results').select('competitors_mentioned'),
+    ])
+
     const existing = new Set(competitors.map(c => c.name.toLowerCase()))
     const discovered: string[] = []
+
+    const addIfNew = (name: string) => {
+      const trimmed = name.trim()
+      if (trimmed.length < 2) return
+      if (!existing.has(trimmed.toLowerCase()) && !discovered.map(d => d.toLowerCase()).includes(trimmed.toLowerCase())) {
+        discovered.push(trimmed)
+      }
+    }
+
     ;(analysisData ?? []).forEach((r: any) => {
-      try {
-        const comps: string[] = JSON.parse(r.competitors || '[]')
-        comps.forEach(name => {
-          if (!existing.has(name.toLowerCase()) && !discovered.includes(name)) {
-            discovered.push(name)
-          }
-        })
-      } catch {}
+      try { (JSON.parse(r.competitors || '[]') as string[]).forEach(addIfNew) } catch {}
     })
+    ;(aiData ?? []).forEach((r: any) => {
+      try { (JSON.parse(r.competitors_mentioned || '[]') as string[]).forEach(addIfNew) } catch {}
+    })
+
     if (discovered.length > 0) {
       await supabase.from('competitors').insert(discovered.map(name => ({ name, source: 'auto', website: null })))
     }
@@ -180,7 +192,6 @@ export default function Competitors() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
@@ -190,7 +201,7 @@ export default function Competitors() {
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-0.5">
-            {competitors.length} competitors tracked - comparison with BpR presence
+            {competitors.length} competitors tracked — top Bucharest catering & events brands
           </p>
         </div>
         <div className="flex gap-2">
@@ -209,7 +220,6 @@ export default function Competitors() {
         </div>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">BpR - Web pages</div>
@@ -225,7 +235,7 @@ export default function Competitors() {
           <div className="text-2xl font-bold text-emerald-400 tabular-nums">
             {competitors.filter(c => c.source === 'auto').length}
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">from web analyses</div>
+          <div className="text-xs text-slate-500 mt-0.5">from web + AI analyses</div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Added manually</div>
@@ -235,14 +245,13 @@ export default function Competitors() {
         </div>
       </div>
 
-      {/* Manual add form */}
       {showAdd && (
         <div className="mb-5 bg-dark-800 border border-brand-500/30 rounded-xl p-4 flex gap-3 items-end">
           <div className="flex-1 space-y-2">
             <div>
               <label className="text-xs text-slate-500 mb-1 block">Competitor name *</label>
               <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. CaterPro"
+                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. Flavours"
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
             </div>
             <div>
@@ -265,7 +274,6 @@ export default function Competitors() {
         </div>
       )}
 
-      {/* Charts */}
       {competitors.length > 0 && (
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
@@ -304,7 +312,6 @@ export default function Competitors() {
         </div>
       )}
 
-      {/* Competitor table */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
         <div className="grid border-b border-dark-700 bg-dark-700/40" style={{ gridTemplateColumns: '1fr 8rem 6rem 6rem 1fr 2.5rem' }}>
           <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Competitor</div>
@@ -315,7 +322,6 @@ export default function Competitors() {
           <div />
         </div>
 
-        {/* BpR row */}
         <div className="grid border-b border-dark-700/50 bg-brand-500/5" style={{ gridTemplateColumns: '1fr 8rem 6rem 6rem 1fr 2.5rem' }}>
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-sm font-semibold text-brand-300">Bucate pe Roate</span>

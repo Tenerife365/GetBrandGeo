@@ -9,7 +9,7 @@ export type Sentiment = 'positive' | 'neutral' | 'negative' | 'none'
 
 export type PromptCategory = 'mid' | 'large' | 'very_large' | 'general'
 
-export type LLMName = 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'grok'
+export type LLMName = 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
 
 export interface SearchResult {
   id: number

@@ -10,7 +10,7 @@ const LLMS: { id: LLMName; label: string; color: string; bg: string }[] = [
   { id: 'gemini',     label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-400/10'    },
   { id: 'claude',     label: 'Claude',     color: 'text-purple-400',  bg: 'bg-purple-400/10'  },
   { id: 'perplexity', label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
-  { id: 'grok',       label: 'Grok',       color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
+  { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
 ]
 
 const CATEGORY_LABEL: Record<PromptCategory, string> = {
