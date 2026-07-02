@@ -1,78 +1,90 @@
 -- ════════════════════════════════════════════════════════════
---  BrandGEO Dashboard — Supabase Schema
---  Run this in Supabase → SQL Editor
+--  BrandGEO Dashboard — Supabase Schema (current, July 2026)
+--  Run in Supabase → SQL Editor on a fresh project.
+--  Safe to re-run: uses IF NOT EXISTS throughout.
 -- ════════════════════════════════════════════════════════════
 
--- Enable Row Level Security on all tables (auth handled by Supabase)
-
+-- ─── competitors ────────────────────────────────────────────
+-- Catering brands tracked as competition.
+-- Populated manually + auto-discovered from ai_results.
 CREATE TABLE IF NOT EXISTS public.competitors (
-  id         SERIAL PRIMARY KEY,
-  name       TEXT,
-  website    TEXT,
-  category   TEXT
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  website     TEXT,
+  category    TEXT,
+  source      TEXT,                          -- 'manual' | 'ai_discovered'
+  created_at  TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.search_results (
-  id                SERIAL PRIMARY KEY,
-  query             TEXT,
-  url               TEXT,
-  title             TEXT,
-  snippet           TEXT,
-  collected_at      TIMESTAMP DEFAULT NOW(),
-  processing_status TEXT DEFAULT 'new',
-  attempts          INTEGER DEFAULT 0,
-  last_attempt      TIMESTAMP
+-- Prevent duplicate names (added via migration, safe to re-run)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'competitors_name_unique'
+  ) THEN
+    ALTER TABLE public.competitors ADD CONSTRAINT competitors_name_unique UNIQUE (name);
+  END IF;
+END $$;
+
+-- ─── prompts ────────────────────────────────────────────────
+-- The 20 Romanian catering queries sent to each LLM each month.
+-- Categories: mid_size_event | large_event | very_large_event | general
+CREATE TABLE IF NOT EXISTS public.prompts (
+  id          SERIAL PRIMARY KEY,
+  text        TEXT NOT NULL,
+  category    TEXT,
+  is_active   BOOLEAN DEFAULT TRUE,
+  position    INTEGER,                       -- display / query order
+  created_at  TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.page_analysis (
-  id                 SERIAL PRIMARY KEY,
-  search_result_id   INTEGER REFERENCES public.search_results(id),
-  full_text          TEXT,
-  mentions_bpr       BOOLEAN DEFAULT FALSE,
-  sentiment          TEXT,
-  competitors        TEXT,           -- JSON array of competitor names
-  geo_score          INTEGER,
-  classification     TEXT,
-  llm_summary        TEXT,
-  suggested_action   TEXT,
-  recommended_content TEXT,
-  action_priority    INTEGER DEFAULT 3,
-  source_authority   INTEGER DEFAULT 50,
-  opportunities      JSONB,
-  analyzed_at        TIMESTAMP DEFAULT NOW()
+-- ─── ai_results ─────────────────────────────────────────────
+-- One row per (prompt × LLM × month). The core dataset.
+-- llm values: 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
+CREATE TABLE IF NOT EXISTS public.ai_results (
+  id                   SERIAL PRIMARY KEY,
+  prompt_id            INTEGER REFERENCES public.prompts(id),
+  llm                  TEXT NOT NULL,
+  brand_mentioned      BOOLEAN DEFAULT FALSE,
+  brand_position       INTEGER,              -- rank in numbered list (1 = first)
+  response_snippet     TEXT,                 -- ~300 chars around brand mention
+  sentiment            TEXT,                 -- 'positive' | 'neutral' | 'negative'
+  competitors_mentioned TEXT,                -- JSON array of competitor names found
+  checked_at           TIMESTAMP DEFAULT NOW(),
+  created_at           TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.mentions (
-  id                SERIAL PRIMARY KEY,
-  page_analysis_id  INTEGER REFERENCES public.page_analysis(id),
-  entity            TEXT,
-  mention_type      TEXT,
-  sentiment         TEXT,
-  created_at        TIMESTAMP DEFAULT NOW()
-);
+-- Index for the monthly deduplication check in collect_llm_responses.py
+CREATE INDEX IF NOT EXISTS ai_results_prompt_llm_month_idx
+  ON public.ai_results (prompt_id, llm, date_trunc('month', checked_at));
 
 -- ─── Row Level Security ─────────────────────────────────────
-ALTER TABLE public.competitors      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.search_results   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.page_analysis    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mentions         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.competitors  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prompts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_results   ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to read all data
-CREATE POLICY "Authenticated read"  ON public.competitors      FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated read"  ON public.search_results   FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated read"  ON public.page_analysis    FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated read"  ON public.mentions         FOR SELECT TO authenticated USING (true);
+-- Authenticated users (dashboard login) can read all tables
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'auth_read_competitors') THEN
+    CREATE POLICY "auth_read_competitors" ON public.competitors FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'auth_read_prompts') THEN
+    CREATE POLICY "auth_read_prompts"     ON public.prompts     FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'auth_read_ai_results') THEN
+    CREATE POLICY "auth_read_ai_results"  ON public.ai_results  FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
--- ─── Sample data (optional — delete after testing) ──────────
-INSERT INTO public.search_results (query, url, title, snippet) VALUES
-  ('catering corporate bucuresti', 'https://bucateperroate.ro', 'Bucate pe Roate', 'Lider catering corporate'),
-  ('top firme catering bucuresti', 'https://ghid-catering.ro/top-10', 'Top 10 Firme Catering', 'BpR pe locul 2');
+-- Service role (used by collect_llm_responses.py via SQLAlchemy) can INSERT
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_insert_ai_results') THEN
+    CREATE POLICY "service_insert_ai_results" ON public.ai_results FOR INSERT TO service_role WITH CHECK (true);
+  END IF;
+END $$;
 
-INSERT INTO public.page_analysis
-  (search_result_id, mentions_bpr, sentiment, competitors, geo_score, classification,
-   llm_summary, suggested_action, recommended_content, action_priority, source_authority)
-VALUES
-  (1, true,  'positive', '[]',             88, 'strategic',
-   'Site oficial cu autoritate ridicată.', 'Optimizează pentru AI assistants', 'Adaugă FAQ structurat', 1, 85),
-  (2, true,  'positive', '["CaterPro"]',   79, 'high_value',
-   'Articol listicle cu BpR pe locul 2.',  'Obține link dofollow', 'Trimite materiale editorului', 1, 72);
+-- ─── Legacy tables (no longer used by dashboard) ─────────────
+-- search_results, page_analysis, mentions — kept in DB but not queried.
+-- Safe to DROP if you want to clean up:
+--   DROP TABLE IF EXISTS public.mentions CASCADE;
+--   DROP TABLE IF EXISTS public.page_analysis CASCADE;
+--   DROP TABLE IF EXISTS public.search_results CASCADE;
