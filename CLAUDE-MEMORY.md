@@ -36,6 +36,9 @@ Before suggesting any build, tool, or spend: ask "Does this generate a paying cl
 - Data collector: Python (bpr-geo-monitor repo)
 - DB: Supabase
 - Netlify Site ID: d51674f3-9579-4208-8b1b-90fc16d64df4
+- Netlify site name: dreamy-raindrop-4f29d5
+- GitHub repo: https://github.com/Tenerife365/GetBrandGeo (public, was BpR)
+- Netlify auto-deploys from main branch; base dir = brandgeo-dashboard, build = npm install && npm run build, publish = dist
 - cPanel host: cloud608.c-f.ro:2083, user getbran1, domain root /home/getbran1/getbrandgeo.com
 
 ---
