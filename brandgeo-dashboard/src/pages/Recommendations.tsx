@@ -262,7 +262,7 @@ export default function Recommendations() {
     : 0
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 sm:p-6 md:p-8 max-w-3xl">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">

@@ -203,7 +203,7 @@ export default function Prompts() {
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading...</div>
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Monitored Prompts</h1>
@@ -231,7 +231,7 @@ export default function Prompts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {Object.entries(CATEGORY_META).map(([cat, meta]) => (
           <button
             key={cat}

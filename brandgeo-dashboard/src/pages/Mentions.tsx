@@ -134,7 +134,7 @@ export default function Mentions() {
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading mentions...</div>
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">AI Mentions</h1>
         <p className="text-sm text-slate-400 mt-0.5">
@@ -142,7 +142,7 @@ export default function Mentions() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
           <TrendingUp size={20} className="text-emerald-400 shrink-0" />
           <div>

@@ -157,7 +157,7 @@ const autoDiscover = async () => {
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading...</div>
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
@@ -186,7 +186,7 @@ const autoDiscover = async () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{bprStats.pages}</div>
@@ -241,7 +241,7 @@ const autoDiscover = async () => {
       )}
 
       {competitors.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
               Web search appearances

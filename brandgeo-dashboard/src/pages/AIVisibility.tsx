@@ -151,7 +151,7 @@ export default function AIVisibility() {
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading AI visibility data...</div>
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
@@ -178,7 +178,7 @@ export default function AIVisibility() {
         </button>
       </div>
 
-      <div className="grid grid-cols-6 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
         <div className="col-span-1 bg-dark-800 border border-dark-700 rounded-xl p-4 flex flex-col items-center justify-center">
           <TrendingUp size={18} className="text-brand-400 mb-2" />
           <div className={`text-3xl font-bold tabular-nums ${overallPct >= 50 ? 'text-emerald-400' : overallPct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
@@ -259,6 +259,8 @@ export default function AIVisibility() {
       </div>
 
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
         <div
           className="grid border-b border-dark-700 bg-dark-700/50"
           style={{ gridTemplateColumns: '2rem 1fr repeat(5, 8rem)' }}
@@ -340,7 +342,7 @@ export default function AIVisibility() {
 
               {isExpanded && (
                 <div className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
-                  <div className="grid grid-cols-5 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                     {LLMS.map(llm => {
                       const r = rowResults?.get(llm.id)
                       const competitors = r ? parseCompetitors(r.competitors_mentioned) : []
@@ -422,6 +424,8 @@ export default function AIVisibility() {
         {filtered.length === 0 && (
           <div className="text-center py-12 text-slate-500 text-sm">No prompts in this category.</div>
         )}
+        </div>
+        </div>
       </div>
 
       <div className="mt-4 flex gap-4 text-xs text-slate-600">
