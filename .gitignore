@@ -1,5 +1,6 @@
-# Project 3 — separate repo, do not track here
-brandgeo/
+# brandgeo/ — ignore everything except the public website files
+brandgeo/*
+!brandgeo/web/
 
 # Secrets — never commit these
 .env
@@ -192,3 +193,10 @@ cython_debug/
 
 # Build artifacts
 brandgeo-dist.zip
+brandgeo-dashboard/vite.config.ts.timestamp-*
+
+# Temp / experiment files
+geo-visibility-report-*.md
+name_intelligence.py
+name_results.json
+run_name_intelligence.bat
