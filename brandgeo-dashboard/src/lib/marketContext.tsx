@@ -6,17 +6,19 @@ export interface Region {
 }
 
 export interface Market {
-  id:      string
-  label:   string
-  flag:    string
-  regions: Region[]
+  id:       string
+  label:    string
+  flag:     string   // kept for fallback
+  flagCode: string   // ISO 3166-1 alpha-2 lowercase, used for flagcdn.com image
+  regions:  Region[]
 }
 
 export const MARKETS: Market[] = [
   {
-    id:    'RO',
-    label: 'Romania',
-    flag:  '🇷🇴',   // 🇷🇴
+    id:       'RO',
+    label:    'Romania',
+    flag:     '🇷🇴',
+    flagCode: 'ro',
     regions: [
       { id: 'ALL',  label: 'Toate regiunile' },
       { id: 'B',    label: 'București' },
@@ -27,8 +29,8 @@ export const MARKETS: Market[] = [
     ],
   },
   // Future markets — uncomment and add when onboarding new clients:
-  // { id: 'DE', label: 'Germany', flag: '🇩🇪', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }] },
-  // { id: 'GB', label: 'UK',      flag: '🇬🇧', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }] },
+  // { id: 'DE', label: 'Germany', flag: '🇩🇪', flagCode: 'de', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }] },
+  // { id: 'GB', label: 'UK',      flag: '🇬🇧', flagCode: 'gb', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }] },
 ]
 
 interface MarketCtx {
