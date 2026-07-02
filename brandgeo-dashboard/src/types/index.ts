@@ -8,8 +8,8 @@ export type Classification =
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'none'
 
 export type PromptCategory =
-  | 'mid' | 'large' | 'very_large' | 'general'           // BpR
-  | 'tool_discovery' | 'geo_category' | 'problem_based' | 'direct_brand'  // BrandGEO
+  | 'mid' | 'large' | 'very_large' | 'general'
+  | 'tool_discovery' | 'geo_category' | 'problem_based' | 'direct_brand'
 
 export type LLMName = 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
 
@@ -28,7 +28,7 @@ export interface PageAnalysis {
   search_result_id: number
   mentions_bpr: boolean
   sentiment: Sentiment
-  competitors: string   // JSON string []
+  competitors: string
   geo_score: number
   classification: Classification
   llm_summary: string
@@ -37,7 +37,6 @@ export interface PageAnalysis {
   action_priority: number
   source_authority: number
   analyzed_at: string
-  // joined
   url?: string
   title?: string
   snippet?: string

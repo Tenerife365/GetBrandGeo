@@ -8,37 +8,43 @@ export interface Region {
 export interface Market {
   id:       string
   label:    string
-  flag:     string   // kept for fallback
-  flagCode: string   // ISO 3166-1 alpha-2 lowercase, used for flagcdn.com image
+  flag:     string
+  flagCode: string
   regions:  Region[]
 }
 
 export const MARKETS: Market[] = [
   {
-    id:       'WW',
-    label:    'Worldwide',
-    flag:     '🌍',
-    flagCode: 'un',   // UN flag from flagcdn
-    regions:  [{ id: 'ALL', label: 'All regions' }],
+    id: 'WW', label: 'Worldwide', flag: '', flagCode: 'un',
+    regions: [{ id: 'ALL', label: 'All regions' }],
   },
   {
-    id:       'RO',
-    label:    'Romania',
-    flag:     '🇷🇴',
-    flagCode: 'ro',
+    id: 'RO', label: 'Romania', flag: '', flagCode: 'ro',
     regions: [
-      { id: 'ALL',  label: 'Toate regiunile' },
-      { id: 'B',    label: 'București' },
-      { id: 'SB',   label: 'Sibiu' },
-      { id: 'CJ',   label: 'Cluj-Napoca' },
-      { id: 'CT',   label: 'Constanța' },
-      { id: 'IS',   label: 'Iași' },
+      { id: 'ALL', label: 'Toate regiunile' },
+      { id: 'B',   label: 'Bucuresti' },
+      { id: 'SB',  label: 'Sibiu' },
+      { id: 'CJ',  label: 'Cluj-Napoca' },
+      { id: 'CT',  label: 'Constanta' },
+      { id: 'IS',  label: 'Iasi' },
     ],
   },
-  { id: 'DE', label: 'Germany', flag: '🇩🇪', flagCode: 'de', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }, { id: 'MU', label: 'Munich' }] },
-  { id: 'GB', label: 'UK',      flag: '🇬🇧', flagCode: 'gb', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }] },
-  { id: 'US', label: 'USA',     flag: '🇺🇸', flagCode: 'us', regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }] },
-  { id: 'ES', label: 'Spain',   flag: '🇪🇸', flagCode: 'es', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }] },
+  {
+    id: 'DE', label: 'Germany', flag: '', flagCode: 'de',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }, { id: 'MU', label: 'Munich' }],
+  },
+  {
+    id: 'GB', label: 'UK', flag: '', flagCode: 'gb',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }],
+  },
+  {
+    id: 'US', label: 'USA', flag: '', flagCode: 'us',
+    regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }],
+  },
+  {
+    id: 'ES', label: 'Spain', flag: '', flagCode: 'es',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }],
+  },
 ]
 
 interface MarketCtx {
