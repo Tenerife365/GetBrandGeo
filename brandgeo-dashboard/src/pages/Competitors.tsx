@@ -5,10 +5,10 @@ import {
 } from 'recharts'
 import { Plus, Trash2, Check, X, Sparkles, Globe, Tag } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { mockAnalyses, mockCompetitors } from '../lib/mockData'
+import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
-import type { Competitor, PageAnalysis } from '../types'
+import type { Competitor } from '../types'
 
 interface CompetitorStats extends Competitor {
   webPages: number
@@ -42,53 +42,41 @@ export default function Competitors() {
     setLoading(true)
 
     if (isDemoMode) {
-      const analyses = mockAnalyses
-      const bprPages = analyses.filter(a => a.mentions_bpr)
-      setBprStats({
-        pages:    bprPages.length,
-        avgScore: bprPages.length
-          ? Math.round(bprPages.reduce((s, a) => s + a.geo_score, 0) / bprPages.length)
-          : 0,
-      })
-      const occMap = buildOccMap(analyses)
+      setBprStats({ pages: 12, avgScore: 3 })
       setCompetitors(
         mockCompetitors.map(c => ({
           ...c,
-          webPages: occMap[c.name]?.count ?? 0,
-          avgScore: occMap[c.name]?.avgScore ?? 0,
-          queries:  occMap[c.name]?.queries ?? [],
+          webPages: 0,
+          avgScore: 0,
+          queries:  [],
         }))
       )
       setLoading(false)
       return
     }
 
-    const [{ data: compData }, { data: analysisData }] = await Promise.all([
+    const [{ data: compData }, { data: aiMentions }] = await Promise.all([
       supabase.from('competitors').select('*').eq('client_id', activeClientId).order('created_at'),
-      supabase.from('page_analysis').select('*, search_results(url, query)'),
+      supabase.from('ai_results').select('brand_mentioned, brand_position').eq('client_id', activeClientId).eq('brand_mentioned', true),
     ])
 
-    const analyses: PageAnalysis[] = (analysisData ?? []).map((r: any) => ({
-      ...r,
-      url:   r.search_results?.url,
-      query: r.search_results?.query,
-    }))
-
-    const bprPages = analyses.filter(a => a.mentions_bpr)
+    // bprStats now shows AI mentions for the active client (not legacy page_analysis)
+    const mentionCount = (aiMentions ?? []).length
     setBprStats({
-      pages:    bprPages.length,
-      avgScore: bprPages.length
-        ? Math.round(bprPages.reduce((s, a) => s + a.geo_score, 0) / bprPages.length)
+      pages:    mentionCount,
+      avgScore: mentionCount
+        ? Math.round(
+            (aiMentions ?? []).reduce((s: number, r: any) => s + (r.brand_position ?? 5), 0) / mentionCount
+          )
         : 0,
     })
 
-    const occMap = buildOccMap(analyses)
     setCompetitors(
       (compData ?? []).map((c: Competitor) => ({
         ...c,
-        webPages: occMap[c.name]?.count ?? 0,
-        avgScore: occMap[c.name]?.avgScore ?? 0,
-        queries:  occMap[c.name]?.queries ?? [],
+        webPages: 0,
+        avgScore: 0,
+        queries:  [],
       }))
     )
     setLoading(false)
@@ -96,32 +84,7 @@ export default function Competitors() {
 
   useEffect(() => { load() }, [activeClientId])
 
-  function buildOccMap(analyses: PageAnalysis[]) {
-    const map: Record<string, { count: number; scores: number[]; queries: Set<string> }> = {}
-    analyses.forEach(a => {
-      try {
-        const comps: string[] = JSON.parse(a.competitors || '[]')
-        comps.forEach(name => {
-          if (!map[name]) map[name] = { count: 0, scores: [], queries: new Set() }
-          map[name].count++
-          map[name].scores.push(a.geo_score)
-          if (a.query) map[name].queries.add(a.query)
-        })
-      } catch {}
-    })
-    return Object.fromEntries(
-      Object.entries(map).map(([name, d]) => [
-        name,
-        {
-          count:    d.count,
-          avgScore: Math.round(d.scores.reduce((s, v) => s + v, 0) / d.scores.length),
-          queries:  Array.from(d.queries),
-        },
-      ])
-    )
-  }
-
-  const autoDiscover = async () => {
+const autoDiscover = async () => {
     if (isDemoMode) return
     setDiscovering(true)
 
@@ -204,7 +167,7 @@ export default function Competitors() {
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-0.5">
-            {competitors.length} competitors tracked — top Bucharest catering & events brands
+            {competitors.length} competitors tracked for {brandName}
           </p>
         </div>
         <div className="flex gap-2">
@@ -225,9 +188,9 @@ export default function Competitors() {
 
       <div className="grid grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">{brandName} - Web pages</div>
+          <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{bprStats.pages}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Avg score {bprStats.avgScore}</div>
+          <div className="text-xs text-slate-500 mt-0.5">Avg position #{bprStats.avgScore || '—'}</div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Total competitors</div>

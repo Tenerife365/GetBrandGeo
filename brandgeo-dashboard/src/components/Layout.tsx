@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
@@ -108,7 +108,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => { setShowMarkets(v => !v); setShowRegions(false) }}
               className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-dark-700 hover:bg-dark-600 transition-colors"
             >
-              <img src={`https://flagcdn.com/w20/${market.flagCode}.png`} alt={market.label} className="w-5 h-auto rounded-sm flex-shrink-0" />
+              {market.flagCode === 'un'
+                ? <Globe2 size={18} className="text-slate-400 flex-shrink-0" />
+                : <img src={`https://flagcdn.com/w20/${market.flagCode}.png`} alt={market.label} className="w-5 h-auto rounded-sm flex-shrink-0" />
+              }
               <span className="flex-1 text-left">{market.label}</span>
               {MARKETS.length > 1 && <ChevronDown size={13} className="text-slate-500" />}
             </button>
@@ -118,7 +121,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <button key={m.id} onClick={() => { setMarket(m); setShowMarkets(false) }}
                     className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${m.id === market.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
                   >
-                    <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt={m.label} className="w-5 h-auto rounded-sm" />
+                    {m.flagCode === 'un'
+                      ? <Globe2 size={16} className="text-slate-400" />
+                      : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt={m.label} className="w-5 h-auto rounded-sm" />
+                    }
                     <span>{m.label}</span>
                   </button>
                 ))}

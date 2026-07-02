@@ -7,7 +7,9 @@ export type Classification =
 
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'none'
 
-export type PromptCategory = 'mid' | 'large' | 'very_large' | 'general'
+export type PromptCategory =
+  | 'mid' | 'large' | 'very_large' | 'general'           // BpR
+  | 'tool_discovery' | 'geo_category' | 'problem_based' | 'direct_brand'  // BrandGEO
 
 export type LLMName = 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
 

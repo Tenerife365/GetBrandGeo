@@ -15,6 +15,13 @@ export interface Market {
 
 export const MARKETS: Market[] = [
   {
+    id:       'WW',
+    label:    'Worldwide',
+    flag:     '🌍',
+    flagCode: 'un',   // UN flag from flagcdn
+    regions:  [{ id: 'ALL', label: 'All regions' }],
+  },
+  {
     id:       'RO',
     label:    'Romania',
     flag:     '🇷🇴',
@@ -28,9 +35,10 @@ export const MARKETS: Market[] = [
       { id: 'IS',   label: 'Iași' },
     ],
   },
-  // Future markets — uncomment and add when onboarding new clients:
-  // { id: 'DE', label: 'Germany', flag: '🇩🇪', flagCode: 'de', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }] },
-  // { id: 'GB', label: 'UK',      flag: '🇬🇧', flagCode: 'gb', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }] },
+  { id: 'DE', label: 'Germany', flag: '🇩🇪', flagCode: 'de', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }, { id: 'MU', label: 'Munich' }] },
+  { id: 'GB', label: 'UK',      flag: '🇬🇧', flagCode: 'gb', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }] },
+  { id: 'US', label: 'USA',     flag: '🇺🇸', flagCode: 'us', regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }] },
+  { id: 'ES', label: 'Spain',   flag: '🇪🇸', flagCode: 'es', regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }] },
 ]
 
 interface MarketCtx {
