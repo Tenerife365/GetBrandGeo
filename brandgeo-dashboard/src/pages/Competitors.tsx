@@ -7,6 +7,7 @@ import { Plus, Trash2, Check, X, Sparkles, Globe, Tag } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockAnalyses, mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
+import { useClient } from '../lib/clientContext'
 import type { Competitor, PageAnalysis } from '../types'
 
 interface CompetitorStats extends Competitor {
@@ -26,6 +27,7 @@ const SOURCE_LABEL: Record<Competitor['source'], string> = {
 
 export default function Competitors() {
   const { market } = useMarket()
+  const { activeClientId } = useClient()
   const [competitors, setCompetitors]   = useState<CompetitorStats[]>([])
   const [bprStats, setBprStats]         = useState({ pages: 0, avgScore: 0 })
   const [loading, setLoading]           = useState(true)
@@ -61,7 +63,7 @@ export default function Competitors() {
     }
 
     const [{ data: compData }, { data: analysisData }] = await Promise.all([
-      supabase.from('competitors').select('*').order('created_at'),
+      supabase.from('competitors').select('*').eq('client_id', activeClientId).order('created_at'),
       supabase.from('page_analysis').select('*, search_results(url, query)'),
     ])
 
@@ -91,7 +93,7 @@ export default function Competitors() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [activeClientId])
 
   function buildOccMap(analyses: PageAnalysis[]) {
     const map: Record<string, { count: number; scores: number[]; queries: Set<string> }> = {}
@@ -125,7 +127,7 @@ export default function Competitors() {
     // Read from both page_analysis.competitors AND ai_results.competitors_mentioned
     const [{ data: analysisData }, { data: aiData }] = await Promise.all([
       supabase.from('page_analysis').select('competitors'),
-      supabase.from('ai_results').select('competitors_mentioned'),
+      supabase.from('ai_results').select('competitors_mentioned').eq('client_id', activeClientId),
     ])
 
     const existing = new Set(competitors.map(c => c.name.toLowerCase()))
@@ -147,7 +149,7 @@ export default function Competitors() {
     })
 
     if (discovered.length > 0) {
-      await supabase.from('competitors').insert(discovered.map(name => ({ name, source: 'auto', website: null })))
+      await supabase.from('competitors').insert(discovered.map(name => ({ name, source: 'auto', website: null, client_id: activeClientId })))
     }
     await load()
     setDiscovering(false)

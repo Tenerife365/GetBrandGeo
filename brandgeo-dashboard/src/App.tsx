@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
+import { ClientProvider } from './lib/clientContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -45,6 +46,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <MarketProvider>
+        <ClientProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<DemoLoginInterceptor />} />
@@ -58,6 +60,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+        </ClientProvider>
       </MarketProvider>
     </ThemeProvider>
   )

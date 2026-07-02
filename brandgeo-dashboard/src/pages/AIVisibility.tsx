@@ -3,6 +3,7 @@ import { RefreshCw, TrendingUp, Bot, AlertTriangle, Target, ChevronDown, Chevron
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
+import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 
 const LLMS: { id: LLMName; label: string; color: string; bg: string }[] = [
@@ -36,6 +37,7 @@ function parseCompetitors(raw: string | null | undefined): string[] {
 
 export default function AIVisibility() {
   const { market } = useMarket()
+  const { activeClientId } = useClient()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [results, setResults] = useState<ResultMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -60,8 +62,8 @@ export default function AIVisibility() {
     }
 
     const [{ data: pData }, { data: rData }] = await Promise.all([
-      supabase.from('prompts').select('*').eq('is_active', true).order('position'),
-      supabase.from('ai_results').select('*').order('checked_at', { ascending: false }),
+      supabase.from('prompts').select('*').eq('is_active', true).eq('client_id', activeClientId).order('position'),
+      supabase.from('ai_results').select('*').eq('client_id', activeClientId).order('checked_at', { ascending: false }),
     ])
 
     const map: ResultMap = new Map()
@@ -83,7 +85,7 @@ export default function AIVisibility() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [activeClientId])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
 

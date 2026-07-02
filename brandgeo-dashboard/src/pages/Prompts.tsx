@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
+import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
 import type { Prompt, PromptCategory } from '../types'
 
@@ -37,6 +38,7 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
+  const { activeClientId } = useClient()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState<PromptCategory | 'all'>('all')
@@ -69,12 +71,13 @@ export default function Prompts() {
     const { data } = await supabase
       .from('prompts')
       .select('*')
+      .eq('client_id', activeClientId)
       .order('position', { ascending: true })
     if (data) setPrompts(data)
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [activeClientId])
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, suggestions])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
@@ -104,7 +107,7 @@ export default function Prompts() {
     if (!isDemoMode) {
       const { data } = await supabase
         .from('prompts')
-        .insert({ text: t, category: cat, position })
+        .insert({ text: t, category: cat, position, client_id: activeClientId })
         .select()
         .single()
       if (data) setPrompts(prev => [...prev, data])

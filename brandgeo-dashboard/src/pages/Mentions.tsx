@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bot, TrendingUp, Award, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
+import { useClient } from '../lib/clientContext'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
 import type { LLMName, PromptCategory } from '../types'
@@ -43,6 +44,7 @@ type FilterLLM = LLMName | 'all'
 type FilterCat = PromptCategory | 'all'
 
 export default function Mentions() {
+  const { activeClientId } = useClient()
   const [mentions, setMentions] = useState<MentionEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [filterLLM, setFilterLLM] = useState<FilterLLM>('all')
@@ -78,6 +80,7 @@ export default function Mentions() {
         .from('ai_results')
         .select('*, prompts(text, category, position)')
         .eq('brand_mentioned', true)
+        .eq('client_id', activeClientId)
         .order('checked_at', { ascending: false })
 
       if (data) {
@@ -96,7 +99,7 @@ export default function Mentions() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [activeClientId])
 
   const filtered = mentions.filter(m => {
     if (filterLLM !== 'all' && m.llm !== filterLLM) return false

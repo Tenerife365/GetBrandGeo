@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
-import { MapPin } from 'lucide-react'
+import { useClient } from '../lib/clientContext'
+import { MapPin, Building2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
 
 const nav = [
@@ -32,9 +33,11 @@ function BrandGeoLogo() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { market, setMarket, region, setRegion } = useMarket()
+  const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
   const { theme, toggle } = useTheme()
   const [showMarkets, setShowMarkets]   = useState(false)
   const [showRegions, setShowRegions]   = useState(false)
+  const [showClients, setShowClients]   = useState(false)
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -63,6 +66,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
+
+        {/* Client switcher — admin only */}
+        {isAdmin && clients.length > 0 && (
+          <div className="p-3 border-t border-dark-700">
+            <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">Client</div>
+            <div className="relative">
+              <button
+                onClick={() => { setShowClients(v => !v); setShowMarkets(false); setShowRegions(false) }}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
+              >
+                <Building2 size={13} className="text-brand-400 flex-shrink-0" />
+                <span className="flex-1 text-left truncate font-medium">
+                  {clients.find(c => c.id === activeClientId)?.name ?? 'Select client'}
+                </span>
+                <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+              </button>
+              {showClients && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                  {clients.map(c => (
+                    <button key={c.id}
+                      onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                    >
+                      <Building2 size={12} className="flex-shrink-0" />
+                      <span>{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="p-3 border-t border-dark-700 space-y-1.5">
           <div className="text-xs text-slate-600 uppercase tracking-wider px-1">Market</div>

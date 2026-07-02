@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target, TrendingUp } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
+import { useClient } from '../lib/clientContext'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -212,6 +213,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function Recommendations() {
+  const { activeClientId } = useClient()
   const [scores, setScores]   = useState<LLMScore[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -233,6 +235,7 @@ export default function Recommendations() {
       const { data } = await supabase
         .from('ai_results')
         .select('llm, brand_mentioned')
+        .eq('client_id', activeClientId)
 
       if (data) {
         const map: Record<string, { total: number; mentioned: number }> = {}
@@ -250,7 +253,7 @@ export default function Recommendations() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [activeClientId])
 
   const recs = relevantRecs(scores)
   const gapCount = scores.filter(s => s.rate < 0.5).length
