@@ -290,7 +290,7 @@ const autoDiscover = async () => {
 
         <div className="grid border-b border-dark-700/50 bg-brand-500/5" style={{ gridTemplateColumns: '1fr 8rem 6rem 6rem 1fr 2.5rem' }}>
           <div className="px-4 py-3 flex items-center gap-2">
-            <span className="text-sm font-semibold text-brand-300">Bucate pe Roate</span>
+            <span className="text-sm font-semibold text-brand-300">{brandName}</span>
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400">you</span>
           </div>
           <div className="px-3 py-3" />
