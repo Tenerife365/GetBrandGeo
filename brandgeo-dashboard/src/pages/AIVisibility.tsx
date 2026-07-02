@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, TrendingUp, Bot, AlertTriangle, Target, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 
-const LLMS: { id: LLMName; label: string; color: string; bg: string }[] = [
-  { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  { id: 'gemini',     label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-400/10'    },
-  { id: 'claude',     label: 'Claude',     color: 'text-purple-400',  bg: 'bg-purple-400/10'  },
-  { id: 'perplexity', label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
-  { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
+const LLMS: { id: LLMName; label: string; color: string; bg: string; logoUrl: string }[] = [
+  { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com'       },
+  { id: 'gemini',     label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com' },
+  { id: 'claude',     label: 'Claude',     color: 'text-purple-400',  bg: 'bg-purple-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai'         },
+  { id: 'perplexity', label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai'     },
+  { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-400/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai'            },
 ]
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -188,7 +188,7 @@ export default function AIVisibility() {
         </div>
         {llmStats.map(s => (
           <div key={s.id} className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex flex-col items-center justify-center">
-            <Bot size={14} className={`${s.color} mb-2`} />
+            <img src={s.logoUrl} alt={s.label} className="w-7 h-7 mb-2 rounded-md object-contain" />
             <div className={`text-2xl font-bold tabular-nums ${s.pct >= 50 ? 'text-emerald-400' : s.pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
               {s.pct}%
             </div>
@@ -347,7 +347,7 @@ export default function AIVisibility() {
                       return (
                         <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-emerald-500/5 border-emerald-500/20' : r ? 'bg-red-500/5 border-red-500/20' : 'bg-dark-800 border-dark-700'}`}>
                           <div className={`text-xs font-semibold ${llm.color} mb-2 flex items-center gap-1.5`}>
-                            <Bot size={11} />
+                            <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                             {llm.label}
                           </div>
                           {r ? (
