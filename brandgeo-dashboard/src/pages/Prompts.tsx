@@ -397,4 +397,22 @@ export default function Prompts() {
                   <span className="flex-1 text-sm text-slate-300">{p.text}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} classNam
+                    <button onClick={() => deletePrompt(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="text-center py-16 text-slate-500">
+          {prompts.length === 0
+            ? 'No prompts yet. Use "AI Discover" to generate suggestions or add manually.'
+            : 'No prompts match this category.'}
+        </div>
+      )}
+    </div>
+  )
+}
