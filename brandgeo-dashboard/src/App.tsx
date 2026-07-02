@@ -5,6 +5,7 @@ import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Mentions from './pages/Mentions'
 import Competitors from './pages/Competitors'
@@ -29,7 +30,6 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }, [])
 
   if (authed === null) return null
-
   return authed ? <>{children}</> : <Navigate to="/login" replace />
 }
 
@@ -43,19 +43,20 @@ function DemoLoginInterceptor() {
 export default function App() {
   return (
     <ThemeProvider>
-    <MarketProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<DemoLoginInterceptor />} />
-          <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
-          <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
-          <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
-          <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
-          <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </MarketProvider>
+      <MarketProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<DemoLoginInterceptor />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
+            <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
+            <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
+            <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
+            <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </MarketProvider>
     </ThemeProvider>
   )
 }
