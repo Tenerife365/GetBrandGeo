@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, ChevronDown, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useTheme } from '../lib/themeContext'
@@ -10,7 +10,8 @@ const nav = [
   { to: '/mentions',      icon: MessageSquare,   label: 'Mentions'      },
   { to: '/competitors',   icon: Users,           label: 'Competitors'   },
   { to: '/prompts',       icon: BookText,        label: 'Prompts'       },
-  { to: '/ai-visibility', icon: Bot,             label: 'AI Visibility' },
+  { to: '/ai-visibility',    icon: Bot,        label: 'AI Visibility'  },
+  { to: '/recommendations',  icon: Lightbulb,  label: 'Recomandări'    },
 ]
 
 function BrandGeoLogo() {

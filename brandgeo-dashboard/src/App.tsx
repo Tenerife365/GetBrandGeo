@@ -11,6 +11,7 @@ import Mentions from './pages/Mentions'
 import Competitors from './pages/Competitors'
 import Prompts from './pages/Prompts'
 import AIVisibility from './pages/AIVisibility'
+import Recommendations from './pages/Recommendations'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
             <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
             <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
+            <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
