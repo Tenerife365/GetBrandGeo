@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
+import { MapPin } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
 
 const nav = [
@@ -30,9 +31,10 @@ function BrandGeoLogo() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const { market, setMarket } = useMarket()
+  const { market, setMarket, region, setRegion } = useMarket()
   const { theme, toggle } = useTheme()
-  const [showMarkets, setShowMarkets] = useState(false)
+  const [showMarkets, setShowMarkets]   = useState(false)
+  const [showRegions, setShowRegions]   = useState(false)
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -62,10 +64,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-dark-700">
-          <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">Market</div>
+        <div className="p-3 border-t border-dark-700 space-y-1.5">
+          <div className="text-xs text-slate-600 uppercase tracking-wider px-1">Market</div>
+
+          {/* Country picker */}
           <div className="relative">
-            <button onClick={() => setShowMarkets(v => !v)} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-dark-700 hover:bg-dark-600 transition-colors">
+            <button
+              onClick={() => { setShowMarkets(v => !v); setShowRegions(false) }}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-dark-700 hover:bg-dark-600 transition-colors"
+            >
               <span className="text-base leading-none">{market.flag}</span>
               <span className="flex-1 text-left">{market.label}</span>
               {MARKETS.length > 1 && <ChevronDown size={13} className="text-slate-500" />}
@@ -78,6 +85,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <span>{m.flag}</span>
                     <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Region / city picker */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowRegions(v => !v); setShowMarkets(false) }}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            >
+              <MapPin size={13} className="text-slate-500 flex-shrink-0" />
+              <span className="flex-1 text-left truncate">{region.label}</span>
+              <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+            </button>
+            {showRegions && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                {market.regions.map(r => (
+                  <button key={r.id} onClick={() => { setRegion(r); setShowRegions(false) }}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${r.id === region.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                  >
+                    <MapPin size={12} className="flex-shrink-0" />
+                    <span>{r.label}</span>
                   </button>
                 ))}
               </div>
