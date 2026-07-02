@@ -9,6 +9,7 @@ export interface Client {
 
 interface ClientCtx {
   activeClientId: number
+  activeClient:   Client | null   // the currently selected client object
   setActiveClientId: (id: number) => void
   clients: Client[]       // populated only for admin
   isAdmin: boolean
@@ -17,6 +18,7 @@ interface ClientCtx {
 
 const Ctx = createContext<ClientCtx>({
   activeClientId:    1,
+  activeClient:      null,
   setActiveClientId: () => {},
   clients:           [],
   isAdmin:           false,
@@ -26,6 +28,7 @@ const Ctx = createContext<ClientCtx>({
 export function ClientProvider({ children }: { children: ReactNode }) {
   const saved = parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
   const [activeClientId, setActiveClientIdState] = useState<number>(saved)
+  const [activeClient, setActiveClient]           = useState<Client | null>(null)
   const [clients, setClients]   = useState<Client[]>([])
   const [isAdmin, setIsAdmin]   = useState(false)
   const [loading, setLoading]   = useState(true)
@@ -55,15 +58,21 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           .from('clients')
           .select('id, name, slug')
           .order('id')
-        if (allClients) setClients(allClients)
-        // Default to saved or first client
-        const validId = allClients?.find(c => c.id === saved)?.id ?? allClients?.[0]?.id ?? 1
-        setActiveClientIdState(validId)
+        if (allClients) {
+          setClients(allClients)
+          const validId = allClients.find(c => c.id === saved)?.id ?? allClients[0]?.id ?? 1
+          setActiveClientIdState(validId)
+          setActiveClient(allClients.find(c => c.id === validId) ?? allClients[0] ?? null)
+        }
       } else {
         // Regular viewer: locked to their client
         const cid = profile.client_id ?? 1
         setActiveClientIdState(cid)
         setClients([])
+        // Fetch this client's info
+        const { data: myClient } = await supabase
+          .from('clients').select('id, name, slug').eq('id', cid).single()
+        if (myClient) setActiveClient(myClient)
       }
       setLoading(false)
     }
@@ -74,10 +83,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const setActiveClientId = (id: number) => {
     localStorage.setItem('brandgeo_client', String(id))
     setActiveClientIdState(id)
+    setActiveClient(clients.find(c => c.id === id) ?? null)
   }
 
   return (
-    <Ctx.Provider value={{ activeClientId, setActiveClientId, clients, isAdmin, loading }}>
+    <Ctx.Provider value={{ activeClientId, activeClient, setActiveClientId, clients, isAdmin, loading }}>
       {children}
     </Ctx.Provider>
   )

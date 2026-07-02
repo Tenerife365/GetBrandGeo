@@ -14,19 +14,30 @@ const LLMS: { id: LLMName; label: string; color: string; bg: string }[] = [
   { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
 ]
 
-const CATEGORY_LABEL: Record<PromptCategory, string> = {
-  mid:        'Mid (100-200)',
-  large:      'Large (500+)',
-  very_large: 'Very Large (1k+)',
-  general:    'General',
+const CATEGORY_LABEL: Record<string, string> = {
+  mid:            'Mid (100-200)',
+  large:          'Large (500+)',
+  very_large:     'Very Large (1k+)',
+  general:        'General',
+  tool_discovery: 'Tool Discovery',
+  geo_category:   'GEO / AIO',
+  problem_based:  'Problem-based',
+  direct_brand:   'Direct Brand',
 }
 
-const CATEGORY_COLOR: Record<PromptCategory, string> = {
-  mid:        'bg-blue-500/20 text-blue-300',
-  large:      'bg-purple-500/20 text-purple-300',
-  very_large: 'bg-amber-500/20 text-amber-300',
-  general:    'bg-slate-500/20 text-slate-300',
+const CATEGORY_COLOR: Record<string, string> = {
+  mid:            'bg-blue-500/20 text-blue-300',
+  large:          'bg-purple-500/20 text-purple-300',
+  very_large:     'bg-amber-500/20 text-amber-300',
+  general:        'bg-slate-500/20 text-slate-300',
+  tool_discovery: 'bg-emerald-500/20 text-emerald-300',
+  geo_category:   'bg-blue-500/20 text-blue-300',
+  problem_based:  'bg-amber-500/20 text-amber-300',
+  direct_brand:   'bg-violet-500/20 text-violet-300',
 }
+
+const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? cat
+const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
 
 type ResultMap = Map<number, Map<LLMName, AIResult>>
 
@@ -37,7 +48,8 @@ function parseCompetitors(raw: string | null | undefined): string[] {
 
 export default function AIVisibility() {
   const { market } = useMarket()
-  const { activeClientId } = useClient()
+  const { activeClientId, activeClient } = useClient()
+  const brandName = activeClient?.name ?? 'your brand'
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [results, setResults] = useState<ResultMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -195,7 +207,7 @@ export default function AIVisibility() {
             <div className="flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-400" />
               <span className="text-sm font-semibold text-amber-300">
-                Competitor Intelligence - {gapCount} AI responses where BpR is absent
+                Competitor Intelligence - {gapCount} AI responses where {brandName} is absent
               </span>
             </div>
             {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
@@ -204,7 +216,7 @@ export default function AIVisibility() {
           {showInsights && (
             <div className="px-5 pb-4 border-t border-dark-700/50">
               <p className="text-xs text-slate-500 mt-3 mb-3">
-                When AI does not mention BpR, it recommends these competitors instead. These are your direct
+                When AI does not mention {brandName}, it recommends these competitors instead. These are your direct
                 AI visibility competitors - understanding them is the first step to outranking them.
               </p>
               {competitorFreq.length > 0 ? (
@@ -231,17 +243,17 @@ export default function AIVisibility() {
       )}
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        {(['all', 'mid', 'large', 'very_large', 'general'] as const).map(cat => (
+        {(['all', ...Object.keys(CATEGORY_LABEL)] as const).map(cat => (
           <button
             key={cat}
-            onClick={() => setFilterCat(cat)}
+            onClick={() => setFilterCat(cat as any)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               filterCat === cat
                 ? 'bg-brand-500/30 text-brand-300 border border-brand-500/40'
                 : 'bg-dark-800 text-slate-400 border border-dark-700 hover:border-dark-600 hover:text-slate-300'
             }`}
           >
-            {cat === 'all' ? 'All categories' : CATEGORY_LABEL[cat]}
+            {cat === 'all' ? 'All categories' : getCatLabel(cat)}
           </button>
         ))}
       </div>
@@ -277,8 +289,8 @@ export default function AIVisibility() {
 
                 <div className="px-4 py-3 self-center">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${CATEGORY_COLOR[prompt.category]}`}>
-                      {CATEGORY_LABEL[prompt.category]}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(prompt.category)}`}>
+                      {getCatLabel(prompt.category)}
                     </span>
                     {hasData && (
                       <span className={`text-xs font-semibold ${mentionCount >= 4 ? 'text-emerald-400' : mentionCount >= 2 ? 'text-amber-400' : 'text-red-400'}`}>
@@ -393,7 +405,7 @@ export default function AIVisibility() {
                     return (
                       <div className="mt-3 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                         <div className="text-xs text-amber-300 font-medium mb-0.5">
-                          Opportunity: BpR absent in {missing.map(l => l.label).join(', ')}
+                          Opportunity: {brandName} absent in {missing.map(l => l.label).join(', ')}
                         </div>
                         <div className="text-[11px] text-slate-500">
                           Publish an optimised article or structured Q&A targeting this prompt to improve AI inclusion.

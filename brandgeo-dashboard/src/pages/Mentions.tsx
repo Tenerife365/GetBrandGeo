@@ -26,25 +26,37 @@ const LLM_META: Record<string, { label: string; color: string; bg: string; dot: 
   meta:       { label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-500/15 border-amber-500/25',     dot: 'bg-amber-400'   },
 }
 
-const CATEGORY_LABEL: Record<PromptCategory, string> = {
-  mid:        'Mid (100-200)',
-  large:      'Large (500+)',
-  very_large: 'Very Large (1k+)',
-  general:    'General',
+const CATEGORY_LABEL: Record<string, string> = {
+  mid:            'Mid (100-200)',
+  large:          'Large (500+)',
+  very_large:     'Very Large (1k+)',
+  general:        'General',
+  tool_discovery: 'Tool Discovery',
+  geo_category:   'GEO / AIO',
+  problem_based:  'Problem-based',
+  direct_brand:   'Direct Brand',
 }
 
-const CATEGORY_COLOR: Record<PromptCategory, string> = {
-  mid:        'bg-blue-500/20 text-blue-300',
-  large:      'bg-purple-500/20 text-purple-300',
-  very_large: 'bg-amber-500/20 text-amber-300',
-  general:    'bg-slate-500/20 text-slate-300',
+const CATEGORY_COLOR: Record<string, string> = {
+  mid:            'bg-blue-500/20 text-blue-300',
+  large:          'bg-purple-500/20 text-purple-300',
+  very_large:     'bg-amber-500/20 text-amber-300',
+  general:        'bg-slate-500/20 text-slate-300',
+  tool_discovery: 'bg-emerald-500/20 text-emerald-300',
+  geo_category:   'bg-blue-500/20 text-blue-300',
+  problem_based:  'bg-amber-500/20 text-amber-300',
+  direct_brand:   'bg-violet-500/20 text-violet-300',
 }
+
+const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? cat
+const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
 
 type FilterLLM = LLMName | 'all'
 type FilterCat = PromptCategory | 'all'
 
 export default function Mentions() {
-  const { activeClientId } = useClient()
+  const { activeClientId, activeClient } = useClient()
+  const brandName = activeClient?.name ?? 'your brand'
   const [mentions, setMentions] = useState<MentionEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [filterLLM, setFilterLLM] = useState<FilterLLM>('all')
@@ -126,7 +138,7 @@ export default function Mentions() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">AI Mentions</h1>
         <p className="text-sm text-slate-400 mt-0.5">
-          Every time BpR was recommended by an AI engine and the prompt that triggered it
+          Every time {brandName} was recommended by an AI engine and the prompt that triggered it
         </p>
       </div>
 
@@ -179,14 +191,14 @@ export default function Mentions() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        {(['all', 'mid', 'large', 'very_large', 'general'] as const).map(cat => (
-          <button key={cat} onClick={() => setFilterCat(cat)}
+        {(['all', ...Object.keys(CATEGORY_LABEL)] as const).map(cat => (
+          <button key={cat} onClick={() => setFilterCat(cat as any)}
             className={`px-3 py-1 rounded-lg text-xs transition-colors border ${
               filterCat === cat
                 ? 'bg-slate-700 text-slate-200 border-slate-600'
                 : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
             }`}>
-            {cat === 'all' ? 'All categories' : CATEGORY_LABEL[cat]}
+            {cat === 'all' ? 'All categories' : getCatLabel(cat)}
           </button>
         ))}
       </div>
@@ -215,8 +227,8 @@ export default function Mentions() {
                       <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${llmMeta.bg} ${llmMeta.color}`}>
                         <Bot size={10} />{llmMeta.label}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[m.category]}`}>
-                        {CATEGORY_LABEL[m.category]}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCatColor(m.category)}`}>
+                        {getCatLabel(m.category)}
                       </span>
                       <span className="flex items-center gap-1 text-xs text-slate-400">
                         <SentimentDot value={m.sentiment as any} />{m.sentiment}

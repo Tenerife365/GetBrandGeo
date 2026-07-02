@@ -5,12 +5,21 @@ import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
 import type { Prompt, PromptCategory } from '../types'
 
-const CATEGORY_META: Record<PromptCategory, { label: string; color: string; desc: string }> = {
-  mid:        { label: 'Mid (100-200)',    color: 'bg-blue-500/20 text-blue-300',    desc: 'Events with 100-200 guests' },
-  large:      { label: 'Large (500+)',     color: 'bg-purple-500/20 text-purple-300', desc: 'Events with 500+ guests' },
-  very_large: { label: 'Very Large (1k+)', color: 'bg-amber-500/20 text-amber-300',  desc: 'Events with 1000+ guests' },
-  general:    { label: 'General',          color: 'bg-slate-500/20 text-slate-300',   desc: 'General discovery' },
+const CATEGORY_META: Record<string, { label: string; color: string; desc: string }> = {
+  // BpR categories
+  mid:            { label: 'Mid (100-200)',    color: 'bg-blue-500/20 text-blue-300',     desc: 'Events with 100-200 guests' },
+  large:          { label: 'Large (500+)',     color: 'bg-purple-500/20 text-purple-300', desc: 'Events with 500+ guests' },
+  very_large:     { label: 'Very Large (1k+)', color: 'bg-amber-500/20 text-amber-300',   desc: 'Events with 1000+ guests' },
+  general:        { label: 'General',          color: 'bg-slate-500/20 text-slate-300',   desc: 'General discovery' },
+  // BrandGEO categories
+  tool_discovery: { label: 'Tool Discovery',   color: 'bg-emerald-500/20 text-emerald-300', desc: 'Searching for monitoring tools' },
+  geo_category:   { label: 'GEO / AIO',        color: 'bg-blue-500/20 text-blue-300',       desc: 'GEO & AI optimization queries' },
+  problem_based:  { label: 'Problem-based',    color: 'bg-amber-500/20 text-amber-300',     desc: 'Pain point searches' },
+  direct_brand:   { label: 'Direct Brand',     color: 'bg-violet-500/20 text-violet-300',   desc: 'Searching for BrandGEO directly' },
 }
+
+const getCategoryMeta = (cat: string) =>
+  CATEGORY_META[cat] ?? { label: cat, color: 'bg-slate-500/20 text-slate-300', desc: '' }
 
 const SYSTEM_PROMPT = `You are an AI visibility monitoring expert. Your job is to generate prompts (search queries) that real people type into AI assistants like ChatGPT, Perplexity, or Gemini when looking for products or services.
 
@@ -223,10 +232,10 @@ export default function Prompts() {
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-6">
-        {(Object.entries(CATEGORY_META) as [PromptCategory, typeof CATEGORY_META[PromptCategory]][]).map(([cat, meta]) => (
+        {Object.entries(CATEGORY_META).map(([cat, meta]) => (
           <button
             key={cat}
-            onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}
+            onClick={() => setFilterCat(filterCat === cat ? 'all' : (cat as PromptCategory))}
             className={`rounded-xl border p-4 text-left transition-all ${
               filterCat === cat ? 'border-brand-500/50 bg-brand-500/10' : 'border-dark-700 bg-dark-800 hover:border-dark-600'
             }`}
@@ -286,8 +295,8 @@ export default function Prompts() {
                 <div key={i} className={`flex items-start gap-2 p-2 rounded-lg border transition-colors ${
                   s.added ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-dark-700/50 border-dark-600/50 hover:border-dark-500'
                 }`}>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${CATEGORY_META[s.category].color}`}>
-                    {CATEGORY_META[s.category].label}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${getCategoryMeta(s.category).color}`}>
+                    {getCategoryMeta(s.category).label}
                   </span>
                   <span className="text-xs text-slate-300 flex-1">{s.text}</span>
                   <button
@@ -342,7 +351,7 @@ export default function Prompts() {
               onChange={e => setNewCat(e.target.value as PromptCategory)}
               className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-brand-500"
             >
-              {(Object.entries(CATEGORY_META) as [PromptCategory, typeof CATEGORY_META[PromptCategory]][]).map(([cat, meta]) => (
+              {Object.entries(CATEGORY_META).map(([cat, meta]) => (
                 <option key={cat} value={cat}>{meta.label}</option>
               ))}
             </select>
@@ -356,7 +365,7 @@ export default function Prompts() {
 
       <div className="space-y-1.5">
         {filtered.map((p, i) => {
-          const meta = CATEGORY_META[p.category]
+          const meta = getCategoryMeta(p.category)
           const isEditing = editId === p.id
           return (
             <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-4 group hover:border-dark-600 transition-colors">
@@ -376,8 +385,8 @@ export default function Prompts() {
                     onChange={e => setEditCat(e.target.value as PromptCategory)}
                     className="bg-dark-700 border border-dark-600 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
                   >
-                    {(Object.keys(CATEGORY_META) as PromptCategory[]).map(cat => (
-                      <option key={cat} value={cat}>{CATEGORY_META[cat].label}</option>
+                    {Object.keys(CATEGORY_META).map(cat => (
+                      <option key={cat} value={cat}>{getCategoryMeta(cat).label}</option>
                     ))}
                   </select>
                   <button onClick={saveEdit} disabled={saving} className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>

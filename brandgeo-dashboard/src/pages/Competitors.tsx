@@ -27,7 +27,8 @@ const SOURCE_LABEL: Record<Competitor['source'], string> = {
 
 export default function Competitors() {
   const { market } = useMarket()
-  const { activeClientId } = useClient()
+  const { activeClientId, activeClient } = useClient()
+  const brandName = activeClient?.name ?? 'your brand'
   const [competitors, setCompetitors]   = useState<CompetitorStats[]>([])
   const [bprStats, setBprStats]         = useState({ pages: 0, avgScore: 0 })
   const [loading, setLoading]           = useState(true)
@@ -177,17 +178,17 @@ export default function Competitors() {
   }
 
   const barData = [
-    { name: 'BpR (you)', pages: bprStats.pages, fill: '#1f9baa' },
+    { name: `${brandName} (you)`, pages: bprStats.pages, fill: '#1f9baa' },
     ...competitors.map(c => ({ name: c.name, pages: c.webPages, fill: '#f59e0b' })),
   ]
 
   const radarData = ['Web Pages', 'Avg Score'].map((metric, i) => {
     const row: Record<string, string | number> = { metric }
-    row['BpR'] = i === 0 ? bprStats.pages : bprStats.avgScore
+    row[brandName] = i === 0 ? bprStats.pages : bprStats.avgScore
     competitors.slice(0, 3).forEach(c => { row[c.name] = i === 0 ? c.webPages : c.avgScore })
     return row
   })
-  const radarKeys  = ['BpR', ...competitors.slice(0, 3).map(c => c.name)]
+  const radarKeys  = [brandName, ...competitors.slice(0, 3).map(c => c.name)]
   const RADAR_COLORS = ['#1f9baa', '#f59e0b', '#ef4444', '#8b5cf6']
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading...</div>
@@ -224,7 +225,7 @@ export default function Competitors() {
 
       <div className="grid grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">BpR - Web pages</div>
+          <div className="text-xs text-slate-500 mb-1">{brandName} - Web pages</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{bprStats.pages}</div>
           <div className="text-xs text-slate-500 mt-0.5">Avg score {bprStats.avgScore}</div>
         </div>
@@ -297,7 +298,7 @@ export default function Competitors() {
 
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
-              Visibility radar (BpR vs top 3)
+              Visibility radar ({brandName} vs top 3)
             </h2>
             <ResponsiveContainer width="100%" height={180}>
               <RadarChart data={radarData}>
