@@ -6,35 +6,55 @@ import { mockPrompts } from '../lib/mockData'
 import type { Prompt, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 
-const CATEGORY_META: Record<string, { label: string; color: string; desc: string }> = {
-  // BpR categories
-  mid:            { label: 'Mid (100-200)',    color: 'bg-blue-500/20 text-blue-300',     desc: 'Events with 100-200 guests' },
-  large:          { label: 'Large (500+)',     color: 'bg-purple-500/20 text-purple-300', desc: 'Events with 500+ guests' },
-  very_large:     { label: 'Very Large (1k+)', color: 'bg-amber-500/20 text-amber-300',   desc: 'Events with 1000+ guests' },
-  general:        { label: 'General',          color: 'bg-slate-500/20 text-slate-300',   desc: 'General discovery' },
-  // BrandGEO categories
-  tool_discovery: { label: 'Tool Discovery',   color: 'bg-emerald-500/20 text-emerald-300', desc: 'Searching for monitoring tools' },
-  geo_category:   { label: 'GEO / AIO',        color: 'bg-blue-500/20 text-blue-300',       desc: 'GEO & AI optimization queries' },
-  problem_based:  { label: 'Problem-based',    color: 'bg-amber-500/20 text-amber-300',     desc: 'Pain point searches' },
-  direct_brand:   { label: 'Direct Brand',     color: 'bg-violet-500/20 text-violet-300',   desc: 'Searching for BrandGEO directly' },
+// Known category display map — any unknown category falls back to a generic style
+const CATEGORY_META: Record<string, { label: string; color: string }> = {
+  general:        { label: 'General',        color: 'bg-slate-500/20 text-slate-300'    },
+  local:          { label: 'Local',          color: 'bg-teal-500/20 text-teal-300'      },
+  comparison:     { label: 'Comparison',     color: 'bg-cyan-500/20 text-cyan-300'      },
+  use_case:       { label: 'Use Case',       color: 'bg-violet-500/20 text-violet-300'  },
+  // legacy BpR categories kept for display compat
+  mid:            { label: 'Mid (100-200)',   color: 'bg-blue-500/20 text-blue-300'     },
+  large:          { label: 'Large (500+)',    color: 'bg-purple-500/20 text-purple-300' },
+  very_large:     { label: 'Very Large (1k+)',color: 'bg-amber-500/20 text-amber-300'   },
+  large_scale:    { label: 'Large Scale',    color: 'bg-amber-500/20 text-amber-300'   },
+  events:         { label: 'Events',         color: 'bg-pink-500/20 text-pink-300'     },
+  delivery:       { label: 'Delivery',       color: 'bg-orange-500/20 text-orange-300' },
+  corporate:      { label: 'Corporate',      color: 'bg-indigo-500/20 text-indigo-300' },
+  // BrandGEO-specific kept for display compat
+  tool_discovery: { label: 'Tool Discovery', color: 'bg-emerald-500/20 text-emerald-300'},
+  geo_category:   { label: 'GEO / AIO',      color: 'bg-blue-500/20 text-blue-300'     },
+  problem_based:  { label: 'Problem-based',  color: 'bg-amber-500/20 text-amber-300'   },
+  direct_brand:   { label: 'Direct Brand',   color: 'bg-violet-500/20 text-violet-300' },
 }
 
 const getCategoryMeta = (cat: string) =>
-  CATEGORY_META[cat] ?? { label: cat, color: 'bg-slate-500/20 text-slate-300', desc: '' }
+  CATEGORY_META[cat] ?? { label: cat.replace(/_/g, ' '), color: 'bg-slate-500/20 text-slate-300' }
 
-const SYSTEM_PROMPT = `You are an AI visibility monitoring expert. Your job is to generate prompts (search queries) that real people type into AI assistants like ChatGPT, Perplexity, or Gemini when looking for products or services.
+function buildSystemPrompt(name?: string, website?: string) {
+  const brandLine = name    ? `Business: ${name}`       : ''
+  const siteLine  = website ? `Website: ${website}` : ''
+  return `You are an AI visibility monitoring expert. Your task: generate prompts (search queries) that real users type into AI assistants — ChatGPT, Perplexity, Gemini, Claude — when looking for products or services.
 
-Given a business description, generate 8-12 natural-sounding monitoring prompts. Each prompt should:
-- Sound exactly like something a real person would type into an AI chatbot
-- Be in the same language the user describes their business (if they write in Romanian, generate Romanian prompts)
-- Cover different angles: recommendations, price inquiries, comparisons, specific event types, locations
-- Include a category from exactly these four options: "mid" (events 100-500 people), "large" (events 500-1000 people), "very_large" (events 1000+ people), or "general" (brand discovery, comparisons, reviews)
+${brandLine}
+${siteLine}
 
-Respond with ONLY a valid JSON array, no markdown, no explanation, no extra text:
+Rules:
+1. Generate 8-12 prompts that sound like natural human searches, NOT marketing copy.
+2. Write in the language the business operates in (detect from brand name / website).
+3. Match the REAL scale and niche of this business — do NOT generate queries about Fortune 500 competitors unless this is that kind of business.
+4. Cover multiple angles: discovery ("best X in Y city"), comparison ("X vs alternatives"), use-case ("X for [scenario]"), local/geographic, price/value.
+5. Assign a category to each prompt:
+   - "general"    → discovery, recommendations, brand lookups
+   - "local"      → city/region/neighborhood-specific searches
+   - "comparison" → vs competitors, alternatives, ranking queries
+   - "use_case"   → specific scenarios, occasions, industries
+
+Respond with ONLY a valid JSON array — no markdown, no extra text:
 [
   { "text": "prompt text here", "category": "general" },
   ...
 ]`
+}
 
 interface SuggestedPrompt {
   text: string
@@ -71,7 +91,72 @@ export default function Prompts() {
   const [userInput, setUserInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<SuggestedPrompt[]>([])
+  const [clientConfig, setClientConfig] = useState<{ name: string; brand_website: string } | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Load client config and auto-generate prompts when AI Discover opens
+  useEffect(() => {
+    if (!showDiscover || isDemoMode) return
+    supabase
+      .from('clients')
+      .select('name, brand_website')
+      .eq('id', activeClientId)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        setClientConfig(data)
+        // Auto-trigger prompt generation using the client website
+        const autoMsg = data.brand_website
+          ? `Analyze this business and generate monitoring prompts: ${data.name} — website: ${data.brand_website}`
+          : `Generate monitoring prompts for: ${data.name}`
+        // Use a short delay so the panel renders first
+        setTimeout(() => {
+          const newMessages: ChatMessage[] = [
+            { role: 'assistant', content: `Hi! I can see this is for **${data.name}**. Let me generate the best monitoring prompts now…` },
+            { role: 'user', content: autoMsg },
+          ]
+          setChatMessages(newMessages)
+          autoGeneratePrompts(newMessages, data.name, data.brand_website)
+        }, 300)
+      })
+  }, [showDiscover, activeClientId])
+
+  const autoGeneratePrompts = async (messages: ChatMessage[], name: string, website: string) => {
+    setAiLoading(true)
+    setSuggestions([])
+    try {
+      const res = await fetch('/.netlify/functions/suggest-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: buildSystemPrompt(name, website) },
+            ...messages.map(m => ({ role: m.role, content: m.content })),
+          ],
+          max_tokens: 1500,
+        }),
+      })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      const data = await res.json()
+      const content = data.choices?.[0]?.message?.content ?? ''
+      const jsonMatch = content.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
+        setSuggestions(parsed.map(p => ({
+          text: p.text,
+          category: (p.category || 'general') as PromptCategory,
+          added: prompts.some(existing => existing.text === p.text),
+        })))
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Here are ${parsed.length} prompts tailored for ${name}. Add individually or click "Add all".`
+        }])
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Could not generate prompts. Please describe your business below.' }])
+    }
+    setAiLoading(false)
+  }
 
   const load = async () => {
     if (isDemoMode) {
@@ -161,7 +246,7 @@ export default function Prompts() {
         signal: controller.signal,
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: buildSystemPrompt(clientConfig?.name, clientConfig?.brand_website) },
             ...newMessages.map(m => ({ role: m.role, content: m.content })),
           ],
           max_tokens: 1500,
@@ -182,7 +267,7 @@ export default function Prompts() {
         const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
         setSuggestions(parsed.map(p => ({
           text: p.text,
-          category: (['mid', 'large', 'very_large', 'general'].includes(p.category) ? p.category : 'general') as PromptCategory,
+          category: (p.category || 'general') as PromptCategory,
           added: prompts.some(existing => existing.text === p.text),
         })))
         setChatMessages(prev => [...prev, {
@@ -200,7 +285,9 @@ export default function Prompts() {
     setAiLoading(false)
   }
 
-  const catCounts = (Object.keys(CATEGORY_META) as PromptCategory[]).reduce((acc, cat) => {
+  // Derive filter categories dynamically from actual prompts (works for any client)
+  const usedCategories = [...new Set(prompts.map(p => p.category))]
+  const catCounts = usedCategories.reduce((acc, cat) => {
     acc[cat] = prompts.filter(p => p.category === cat).length
     return acc
   }, {} as Record<string, number>)
@@ -218,7 +305,7 @@ export default function Prompts() {
           {isAdmin && (
             <>
           <button
-            onClick={() => { setShowDiscover(v => !v); setSuggestions([]) }}
+            onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
               showDiscover
                 ? 'bg-brand-500/30 text-brand-200 border border-brand-500/50'
@@ -240,21 +327,36 @@ export default function Prompts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {Object.entries(CATEGORY_META).map(([cat, meta]) => (
+      {/* Dynamic category filter — shows only categories that exist in this client's prompts */}
+      {usedCategories.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-6">
           <button
-            key={cat}
-            onClick={() => setFilterCat(filterCat === cat ? 'all' : (cat as PromptCategory))}
-            className={`rounded-xl border p-4 text-left transition-all ${
-              filterCat === cat ? 'border-brand-500/50 bg-brand-500/10' : 'border-dark-700 bg-dark-800 hover:border-dark-600'
+            onClick={() => setFilterCat('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              filterCat === 'all'
+                ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
+                : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
             }`}
           >
-            <div className="text-2xl font-bold text-white tabular-nums">{catCounts[cat]}</div>
-            <div className={`text-xs font-medium mt-1 inline-flex px-2 py-0.5 rounded-full ${meta.color}`}>{meta.label}</div>
-            <div className="text-xs text-slate-500 mt-1">{meta.desc}</div>
+            All · {prompts.length}
           </button>
-        ))}
-      </div>
+          {usedCategories.map(cat => {
+            const meta = getCategoryMeta(cat)
+            return (
+              <button
+                key={cat}
+                onClick={() => setFilterCat(filterCat === cat ? 'all' : (cat as PromptCategory))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  filterCat === cat ? 'border-brand-500/50 bg-brand-500/10 text-brand-300' : 'border-dark-700 bg-dark-800 hover:border-dark-600'
+                }`}
+              >
+                <span className={`${meta.color} px-1.5 py-0.5 rounded-full mr-1.5`}>{meta.label}</span>
+                <span className="text-slate-400">{catCounts[cat]}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {showDiscover && (
         <div className="mb-6 bg-dark-800 border border-brand-500/25 rounded-xl overflow-hidden">
