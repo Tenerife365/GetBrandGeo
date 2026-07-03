@@ -151,9 +151,13 @@ export default function Prompts() {
     setSuggestions([])
 
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 30000)
+
       const res = await fetch('/.netlify/functions/suggest-prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
@@ -162,9 +166,15 @@ export default function Prompts() {
           max_tokens: 1500,
         }),
       })
+      clearTimeout(timeout)
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Function error ${res.status}: ${errText.slice(0, 200)}`)
+      }
 
       const data = await res.json()
-      const content = data.choices?.[0]?.message?.content ?? ''
+      const content = data.choices?.[0]?.message?.content ?? data.error ?? ''
 
       const jsonMatch = content.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
