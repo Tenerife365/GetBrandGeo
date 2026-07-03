@@ -58,10 +58,19 @@ function detectListPosition(text, aliases, website) {
   return null
 }
 
+function normalizeText(t) {
+  // Collapse all whitespace variants (non-breaking space, thin space, zero-width, etc.)
+  // and normalize unicode so alias matching works across all LLM response formats
+  return t
+    .replace(/[\u00A0\u202F\u2009\u200B\u2060\uFEFF]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .normalize('NFC')
+}
+
 function analyseResponse(text, cfg) {
   const aliases = (cfg.brand_aliases || []).map(a => a.toLowerCase())
   const website = (cfg.brand_website || '').toLowerCase()
-  const lower   = text.toLowerCase()
+  const lower   = normalizeText(text).toLowerCase()
 
   // Extract actual ranked results from the response
   const topResults = extractTopRankedResults(text)
