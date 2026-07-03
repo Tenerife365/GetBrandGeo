@@ -16,6 +16,7 @@ interface Progress {
 interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
+  lastCompletedAt: number   // increments after each prompt — watch to reload data
   runCollection: (clientId: number) => Promise<void>
   stopCollection: () => void
 }
@@ -23,6 +24,7 @@ interface CollectionCtx {
 const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
+  lastCompletedAt: 0,
   runCollection: async () => {},
   stopCollection: () => {},
 })
@@ -30,6 +32,7 @@ const CollectionContext = createContext<CollectionCtx>({
 export function CollectionProvider({ children }: { children: React.ReactNode }) {
   const [collecting, setCollecting] = useState(false)
   const [progress, setProgress]     = useState<Progress | null>(null)
+  const [lastCompletedAt, setLastCompletedAt] = useState(0)
   const abortRef = useRef(false)
   // Track whether a collection is in flight (avoids stale closure on `collecting`)
   const runningRef = useRef(false)
@@ -87,6 +90,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
             }),
           })
         } catch { /* network blip — skip prompt, keep going */ }
+        setLastCompletedAt(Date.now())
       }
     } finally {
       runningRef.current = false
@@ -96,7 +100,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   return (
-    <CollectionContext.Provider value={{ collecting, progress, runCollection, stopCollection }}>
+    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, runCollection, stopCollection }}>
       {children}
     </CollectionContext.Provider>
   )

@@ -93,7 +93,7 @@ export default function AIVisibility() {
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
   const [refreshed, setRefreshed] = useState(false)
-  const { collecting, progress: collectProgress, runCollection: startCollection } = useCollection()
+  const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection } = useCollection()
 
   const runCollection = async () => {
     await startCollection(activeClientId)
@@ -142,6 +142,8 @@ export default function AIVisibility() {
   }
 
   useEffect(() => { load() }, [activeClientId])
+  // Reload whenever a prompt result lands during collection
+  useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
 
