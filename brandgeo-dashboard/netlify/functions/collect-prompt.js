@@ -9,35 +9,37 @@
 
 const { createClient } = require('@supabase/supabase-js')
 
-// ─── Analysis helpers (mirrors Python collector logic) ────────────────────────
+// ─── Analysis helpers ─────────────────────────────────────────────────────────
 
-function extractCompetitors(text, knownCompetitors = []) {
-  const lower = text.toLowerCase()
-  const found = []
+/**
+ * Extracts the top-5 ranked results from an LLM response.
+ * Parses only actual numbered lists from the response text — no config seeds.
+ * Returns [{pos, name}, ...] sorted by position (max 5).
+ */
+function extractTopRankedResults(text) {
+  const items = []
+  // Match "1. Name", "1) Name", "**1.** Name", "  1. Name"
+  const listRe = /(?:^|\n)\s*(?:\*{0,2})(\d+)[.)]\*{0,2}\s+([^\n]{2,120})/gm
+  let m
+  while ((m = listRe.exec(text)) !== null) {
+    const pos = parseInt(m[1], 10)
+    if (pos < 1 || pos > 10) continue
 
-  for (const comp of knownCompetitors) {
-    if (lower.includes(comp.toLowerCase())) {
-      const idx = lower.indexOf(comp.toLowerCase())
-      found.push(text.slice(idx, idx + comp.length))
+    let name = m[2].trim()
+      .replace(/\*\*/g, '')               // remove **bold**
+      .replace(/\*([^*]+)\*/g, '$1')      // remove *italic*
+      .split(/\s*[–—]\s+/)[0]            // strip "— description"
+      .split(/\s*:\s+/)[0]               // strip ": description"
+      .split(/\s*\((?!$)/)[0]            // strip "(details…"
+      .replace(/[.:,;!?\s]+$/, '')       // trailing punctuation
+      .trim()
+
+    if (name.length >= 2 && name.length <= 80 && !items.some(x => x.pos === pos)) {
+      items.push({ pos, name })
     }
   }
 
-  // Bold markdown items (e.g. **Company Name**)
-  const boldRe = /\*\*([A-Z][^*\n]{1,50}?)\*\*/g
-  let m
-  while ((m = boldRe.exec(text)) !== null) {
-    const name = m[1].trim().replace(/^[\s:.\-]+|[\s:.\-]+$/g, '')
-    if (name.length > 2 && name.length < 60) found.push(name)
-  }
-
-  const seen = new Set()
-  const skip = new Set(['best', 'top', 'the', 'and', 'for', 'not', 'see', 'all'])
-  return found.filter(f => {
-    const k = f.toLowerCase().trim()
-    if (skip.has(k) || seen.has(k)) return false
-    seen.add(k)
-    return true
-  }).slice(0, 8)
+  return items.sort((a, b) => a.pos - b.pos).slice(0, 5)
 }
 
 function detectListPosition(text, aliases, website) {
@@ -57,13 +59,32 @@ function detectListPosition(text, aliases, website) {
 }
 
 function analyseResponse(text, cfg) {
-  const aliases  = (cfg.brand_aliases || []).map(a => a.toLowerCase())
-  const website  = (cfg.brand_website || '').toLowerCase()
-  const lower    = text.toLowerCase()
+  const aliases = (cfg.brand_aliases || []).map(a => a.toLowerCase())
+  const website = (cfg.brand_website || '').toLowerCase()
+  const lower   = text.toLowerCase()
 
-  const mentioned = aliases.some(a => lower.includes(a)) || (website && lower.includes(website))
-  const position  = mentioned ? detectListPosition(text, aliases, website) : null
+  // Extract actual ranked results from the response
+  const topResults = extractTopRankedResults(text)
 
+  // Check if brand appears in the ranked list
+  const brandInList = topResults.find(item => {
+    const nameLower = item.name.toLowerCase()
+    return aliases.some(a => nameLower.includes(a)) || (website && nameLower.includes(website))
+  })
+
+  // Also check plain text mention (for non-list responses)
+  const mentionedInText = aliases.some(a => lower.includes(a)) || (website && lower.includes(website))
+  const mentioned = !!brandInList || mentionedInText
+
+  // Position: prefer ranked list, fall back to sentence position
+  let position = null
+  if (brandInList) {
+    position = brandInList.pos
+  } else if (mentioned) {
+    position = detectListPosition(text, aliases, website)
+  }
+
+  // Sentiment
   const posWords = ['recomandat','recomandam','recommend','best','top','excelen','calitat',
                     'profesional','lider','prima','leading','trusted','award']
   const negWords = ['evita','avoid','problema','complaint','slab','negativ','poor','worst']
@@ -73,6 +94,7 @@ function analyseResponse(text, cfg) {
     else if (negWords.some(w => lower.includes(w))) sentiment = 'negative'
   }
 
+  // Snippet around brand mention
   let snippet = null
   if (mentioned) {
     for (const a of aliases) {
@@ -82,12 +104,20 @@ function analyseResponse(text, cfg) {
   }
   if (!snippet) snippet = text.slice(0, 300).trim()
 
-  const competitors = extractCompetitors(text, cfg.known_competitors)
+  // Competitors = top-5 from ranked list, excluding our own brand
+  // Stored regardless of whether brand is mentioned — gives real market picture
+  const competitors = topResults
+    .filter(item => {
+      const nameLower = item.name.toLowerCase()
+      return !aliases.some(a => nameLower.includes(a)) && !(website && nameLower.includes(website))
+    })
+    .map(({ pos, name }) => ({ pos, name }))
+
   return {
-    brand_mentioned:      mentioned,
-    brand_position:       position,
+    brand_mentioned:       mentioned,
+    brand_position:        position,
     sentiment,
-    response_snippet:     snippet,
+    response_snippet:      snippet,
     competitors_mentioned: competitors.length ? JSON.stringify(competitors) : null,
   }
 }
@@ -211,12 +241,12 @@ exports.handler = async (event) => {
       prompt_id,
       llm,
       client_id,
-      brand_mentioned:      analysis.brand_mentioned,
-      brand_position:       analysis.brand_position,
-      sentiment:            analysis.sentiment,
-      response_snippet:     analysis.response_snippet,
+      brand_mentioned:       analysis.brand_mentioned,
+      brand_position:        analysis.brand_position,
+      sentiment:             analysis.sentiment,
+      response_snippet:      analysis.response_snippet,
       competitors_mentioned: analysis.competitors_mentioned,
-      checked_at:           new Date().toISOString(),
+      checked_at:            new Date().toISOString(),
     })
     summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
   }

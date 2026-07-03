@@ -16,17 +16,14 @@ const LLMS: { id: LLMName; label: string; color: string; bg: string; logoUrl: st
 ]
 
 const CATEGORY_LABEL: Record<string, string> = {
-  // BrandGEO categories
   mid:            'Mid (100-200)',
   large:          'Large (500+)',
   very_large:     'Very Large (1k+)',
   tool_discovery: 'Tool Discovery',
   geo_category:   'GEO / AIO',
   problem_based:  'Problem-based',
-  // Shared
   general:        'General',
   direct_brand:   'Direct Brand',
-  // BpR categories
   large_scale:    'Large Scale',
   corporate:      'Corporate',
   wedding:        'Wedding',
@@ -61,9 +58,25 @@ const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 tex
 
 type ResultMap = Map<number, Map<LLMName, AIResult>>
 
-function parseCompetitors(raw: string | null | undefined): string[] {
+/** Ranked entry from an LLM response: {pos, name} */
+type RankedEntry = { pos: number; name: string }
+
+/**
+ * Parse competitors_mentioned field.
+ * New format: [{pos, name}, ...] — actual positions from AI ranked list.
+ * Legacy format: string[] — converted with sequential positions.
+ */
+function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
   if (!raw) return []
-  try { return JSON.parse(raw) } catch { return [] }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) return []
+    if (typeof parsed[0] === 'object' && parsed[0] !== null && 'pos' in parsed[0]) {
+      return (parsed as RankedEntry[]).sort((a, b) => a.pos - b.pos)
+    }
+    // Legacy string[] — give sequential positions starting at 1
+    return (parsed as string[]).map((name, i) => ({ pos: i + 1, name }))
+  } catch { return [] }
 }
 
 export default function AIVisibility() {
@@ -188,22 +201,33 @@ export default function AIVisibility() {
     return total > 0 ? Math.round((mentioned / total) * 100) : 0
   })()
 
+  /**
+   * Aggregate competitors from ALL AI results (not just when brand is absent).
+   * Shows who actually appears most in AI top-5 rankings — real market data only.
+   */
   const competitorFreq = (() => {
-    const freq: Record<string, number> = {}
+    const freq: Record<string, { count: number; positions: number[] }> = {}
     results.forEach(llmMap => {
       llmMap.forEach(r => {
-        if (!r.brand_mentioned) {
-          parseCompetitors(r.competitors_mentioned).forEach(c => {
-            const key = c.toLowerCase()
-            freq[key] = (freq[key] || 0) + 1
-          })
-        }
+        parseCompetitors(r.competitors_mentioned).forEach(c => {
+          const key = c.name.toLowerCase().trim()
+          if (!key || key.length < 2) return
+          if (!freq[key]) freq[key] = { count: 0, positions: [] }
+          freq[key].count++
+          freq[key].positions.push(c.pos)
+        })
       })
     })
     return Object.entries(freq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([name, count]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), count }))
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 8)
+      .map(([name, { count, positions }]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        count,
+        avgPos: positions.length > 0
+          ? Math.round(positions.reduce((s, p) => s + p, 0) / positions.length * 10) / 10
+          : null,
+      }))
   })()
 
   const totalChecked = (() => {
@@ -289,7 +313,7 @@ export default function AIVisibility() {
         ))}
       </div>
 
-      {(competitorFreq.length > 0 || gapCount > 0) && (
+      {competitorFreq.length > 0 && (
         <div className="mb-4 bg-dark-800 border border-amber-500/30 rounded-xl overflow-hidden">
           <button
             className="w-full flex items-center justify-between px-5 py-3 text-left"
@@ -298,7 +322,12 @@ export default function AIVisibility() {
             <div className="flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-400" />
               <span className="text-sm font-semibold text-amber-300">
-                {fmt(t.aiv_compIntel, { n: gapCount, brand: brandName })}
+                Top competitors in AI recommendations
+                {gapCount > 0 && (
+                  <span className="ml-2 font-normal text-amber-500/70 text-xs">
+                    ({brandName} absent {gapCount} of {totalChecked} checks)
+                  </span>
+                )}
               </span>
             </div>
             {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
@@ -307,26 +336,23 @@ export default function AIVisibility() {
           {showInsights && (
             <div className="px-5 pb-4 border-t border-dark-700/50">
               <p className="text-xs text-slate-500 mt-3 mb-3">
-                {fmt(t.aiv_compDesc, { brand: brandName })}
+                Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
               </p>
-              {competitorFreq.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {competitorFreq.map(({ name, count }) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg"
-                    >
-                      <Target size={11} className="text-red-400" />
-                      <span className="text-sm font-medium text-red-300">{name}</span>
-                      <span className="text-xs text-red-500/70">{count}x</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-600 italic">
-                  {t.aiv_noCompetitors}
-                </p>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {competitorFreq.map(({ name, count, avgPos }) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg"
+                  >
+                    <Target size={11} className="text-red-400" />
+                    <span className="text-sm font-medium text-red-300">{name}</span>
+                    <span className="text-xs text-red-500/70">{count}x</span>
+                    {avgPos !== null && (
+                      <span className="text-xs text-slate-600">avg #{avgPos}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -350,7 +376,7 @@ export default function AIVisibility() {
           <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
-              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {LLMS.length} engines</span>
+              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts \xd7 {LLMS.length} engines</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {catStats.map(({ cat, label, pct, checked, mentioned }) => (
@@ -448,6 +474,7 @@ export default function AIVisibility() {
                     )
                   }
                   const competitors = parseCompetitors(r.competitors_mentioned)
+                  const topComp = competitors[0] ?? null
                   return (
                     <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
                       {r.brand_mentioned ? (
@@ -456,16 +483,24 @@ export default function AIVisibility() {
                           {r.brand_position && (
                             <span className="text-[10px] text-emerald-500 font-medium">pos #{r.brand_position}</span>
                           )}
+                          {topComp && r.brand_position && topComp.pos < r.brand_position && (
+                            <span
+                              className="text-[9px] text-slate-600 text-center leading-tight max-w-[70px] truncate"
+                              title={`#${topComp.pos} ${topComp.name}`}
+                            >
+                              #{topComp.pos} above
+                            </span>
+                          )}
                         </>
                       ) : (
                         <>
                           <span className="text-red-400 font-bold text-sm">{t.aiv_no}</span>
-                          {competitors.length > 0 && (
+                          {topComp && (
                             <span
                               className="text-[9px] text-red-400/70 text-center leading-tight max-w-[70px] truncate"
-                              title={competitors.join(', ')}
+                              title={`#${topComp.pos} ${topComp.name}`}
                             >
-                              {competitors[0]}
+                              #{topComp.pos} {topComp.name}
                             </span>
                           )}
                         </>
@@ -481,6 +516,15 @@ export default function AIVisibility() {
                     {LLMS.map(llm => {
                       const r = rowResults?.get(llm.id)
                       const competitors = r ? parseCompetitors(r.competitors_mentioned) : []
+
+                      // Build interleaved ranked list for display
+                      const rankedList: { pos: number; name: string; isBrand: boolean }[] = [
+                        ...competitors.map(c => ({ ...c, isBrand: false })),
+                        ...(r?.brand_mentioned && r.brand_position
+                          ? [{ pos: r.brand_position, name: brandName, isBrand: true }]
+                          : []),
+                      ].sort((a, b) => a.pos - b.pos)
+
                       return (
                         <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-emerald-500/5 border-emerald-500/20' : r ? 'bg-red-500/5 border-red-500/20' : 'bg-dark-800 border-dark-700'}`}>
                           <div className={`text-xs font-semibold ${llm.color} mb-2 flex items-center gap-1.5`}>
@@ -492,13 +536,27 @@ export default function AIVisibility() {
                               <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
                               </div>
-                              {r.brand_mentioned && r.brand_position && (
-                                <div className="text-[10px] text-slate-500 mb-1">
-                                  {fmt(t.aiv_position, { n: r.brand_position ?? '' })}
+
+                              {/* Ranked list from actual AI response */}
+                              {rankedList.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">
+                                    AI Top Results
+                                  </div>
+                                  {rankedList.map(entry => (
+                                    <div
+                                      key={`${entry.pos}-${entry.name}`}
+                                      className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}
+                                    >
+                                      <span className="font-mono text-slate-600 shrink-0 w-5">#{entry.pos}</span>
+                                      <span className="leading-tight">{entry.name}{entry.isBrand ? ' ✓' : ''}</span>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
+
                               {r.sentiment && r.brand_mentioned && (
-                                <div className={`text-[10px] font-medium mb-2 ${
+                                <div className={`text-[10px] font-medium mb-1 ${
                                   r.sentiment === 'positive' ? 'text-emerald-500'
                                   : r.sentiment === 'negative' ? 'text-red-500'
                                   : 'text-slate-500'
@@ -506,26 +564,13 @@ export default function AIVisibility() {
                                   {r.sentiment}
                                 </div>
                               )}
-                              {!r.brand_mentioned && competitors.length > 0 && (
-                                <div className="mb-2">
-                                  <div className="text-[10px] text-red-400/80 font-semibold mb-1 uppercase tracking-wide">
-                                    {t.aiv_recommendsInstead}
-                                  </div>
-                                  {competitors.slice(0, 4).map(c => (
-                                    <div key={c} className="text-[10px] text-red-300/70 flex items-center gap-1 mb-0.5">
-                                      <Target size={8} className="text-red-500/50 shrink-0" />
-                                      {c}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                               {r.checked_at && (
-                                <div className="text-[10px] text-slate-600 mt-1.5 font-mono">
+                                <div className="text-[10px] text-slate-600 font-mono">
                                   {new Date(r.checked_at).toLocaleDateString()}
                                 </div>
                               )}
                               {r.response_snippet && (
-                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-4 italic leading-relaxed">
+                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
                                   {r.response_snippet}
                                 </p>
                               )}
