@@ -1,44 +1,65 @@
 /**
  * collect-prompt.js
  * On-demand LLM collection for a single prompt across all 5 engines.
- * Called sequentially by the admin UI (one prompt at a time) with progress tracking.
- *
- * POST body: { prompt_id, prompt_text, client_id, client_config }
- * client_config: { brand_aliases: string[], brand_website: string, known_competitors: string[] }
+ * POST body: { prompt_id, prompt_text, client_id, client_config, force? }
+ * client_config: { brand_aliases, brand_website, known_competitors }
  */
 
 const { createClient } = require('@supabase/supabase-js')
 
+// ─── Geographic / language context ───────────────────────────────────────────
+// Without this, API calls from our US Netlify server return global/US-centric
+// results. Real users in Romania get location-aware results because search
+// engines see their IP. We replicate this by telling every LLM where to search.
+
+function buildSystemContext(cfg) {
+  const raw = (cfg.brand_website || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  const tld  = raw.split('.').pop()?.toLowerCase()
+  const countryMap = {
+    ro: 'Romania', uk: 'United Kingdom', de: 'Germany', fr: 'France',
+    es: 'Spain',   it: 'Italy',          nl: 'Netherlands', pl: 'Poland',
+    au: 'Australia', ca: 'Canada',       us: 'United States', pt: 'Portugal',
+    be: 'Belgium',   ch: 'Switzerland',  at: 'Austria',       hu: 'Hungary',
+    cz: 'Czech Republic', se: 'Sweden',  dk: 'Denmark',       fi: 'Finland',
+  }
+  const country = countryMap[tld] || 'the relevant local market'
+  return (
+    `You are simulating a real user searching from ${country}. ` +
+    `Use web search to find current, locally relevant results. ` +
+    `When asked about businesses, services, or providers, prioritise companies operating in ${country}. ` +
+    `Respond in the same language as the user's question.`
+  )
+}
+
+// ─── Text normalisation ───────────────────────────────────────────────────────
+
+function normalizeText(t) {
+  return t
+    .replace(/[   ​⁠﻿]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .normalize('NFC')
+}
+
 // ─── Analysis helpers ─────────────────────────────────────────────────────────
 
-/**
- * Extracts the top-5 ranked results from an LLM response.
- * Parses only actual numbered lists from the response text — no config seeds.
- * Returns [{pos, name}, ...] sorted by position (max 5).
- */
 function extractTopRankedResults(text) {
   const items = []
-  // Match "1. Name", "1) Name", "**1.** Name", "  1. Name"
   const listRe = /(?:^|\n)\s*(?:\*{0,2})(\d+)[.)]\*{0,2}\s+([^\n]{2,120})/gm
   let m
   while ((m = listRe.exec(text)) !== null) {
     const pos = parseInt(m[1], 10)
     if (pos < 1 || pos > 10) continue
-
     let name = m[2].trim()
-      .replace(/\*\*/g, '')               // remove **bold**
-      .replace(/\*([^*]+)\*/g, '$1')      // remove *italic*
-      .split(/\s*[–—]\s+/)[0]            // strip "— description"
-      .split(/\s*:\s+/)[0]               // strip ": description"
-      .split(/\s*\((?!$)/)[0]            // strip "(details…"
-      .replace(/[.:,;!?\s]+$/, '')       // trailing punctuation
+      .replace(/\*\*/g, '')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .split(/\s*[–—]\s+/)[0]
+      .split(/\s*:\s+/)[0]
+      .split(/\s*\((?!$)/)[0]
+      .replace(/[.:,;!?\s]+$/, '')
       .trim()
-
-    if (name.length >= 2 && name.length <= 80 && !items.some(x => x.pos === pos)) {
+    if (name.length >= 2 && name.length <= 80 && !items.some(x => x.pos === pos))
       items.push({ pos, name })
-    }
   }
-
   return items.sort((a, b) => a.pos - b.pos).slice(0, 5)
 }
 
@@ -46,7 +67,7 @@ function detectListPosition(text, aliases, website) {
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
   while ((m = listRe.exec(text)) !== null) {
-    const num = parseInt(m[1], 10)
+    const num     = parseInt(m[1], 10)
     const segment = m[2].toLowerCase()
     if (aliases.some(a => segment.includes(a)) || segment.includes(website)) return num
   }
@@ -58,42 +79,23 @@ function detectListPosition(text, aliases, website) {
   return null
 }
 
-function normalizeText(t) {
-  // Collapse all whitespace variants (non-breaking space, thin space, zero-width, etc.)
-  // and normalize unicode so alias matching works across all LLM response formats
-  return t
-    .replace(/[\u00A0\u202F\u2009\u200B\u2060\uFEFF]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .normalize('NFC')
-}
-
 function analyseResponse(text, cfg) {
   const aliases = (cfg.brand_aliases || []).map(a => a.toLowerCase())
   const website = (cfg.brand_website || '').toLowerCase()
   const lower   = normalizeText(text).toLowerCase()
 
-  // Extract actual ranked results from the response
-  const topResults = extractTopRankedResults(text)
-
-  // Check if brand appears in the ranked list
+  const topResults  = extractTopRankedResults(text)
   const brandInList = topResults.find(item => {
-    const nameLower = item.name.toLowerCase()
-    return aliases.some(a => nameLower.includes(a)) || (website && nameLower.includes(website))
+    const nl = item.name.toLowerCase()
+    return aliases.some(a => nl.includes(a)) || (website && nl.includes(website))
   })
-
-  // Also check plain text mention (for non-list responses)
   const mentionedInText = aliases.some(a => lower.includes(a)) || (website && lower.includes(website))
   const mentioned = !!brandInList || mentionedInText
 
-  // Position: prefer ranked list, fall back to sentence position
   let position = null
-  if (brandInList) {
-    position = brandInList.pos
-  } else if (mentioned) {
-    position = detectListPosition(text, aliases, website)
-  }
+  if (brandInList)  position = brandInList.pos
+  else if (mentioned) position = detectListPosition(text, aliases, website)
 
-  // Sentiment
   const posWords = ['recomandat','recomandam','recommend','best','top','excelen','calitat',
                     'profesional','lider','prima','leading','trusted','award']
   const negWords = ['evita','avoid','problema','complaint','slab','negativ','poor','worst']
@@ -103,7 +105,6 @@ function analyseResponse(text, cfg) {
     else if (negWords.some(w => lower.includes(w))) sentiment = 'negative'
   }
 
-  // Snippet around brand mention
   let snippet = null
   if (mentioned) {
     for (const a of aliases) {
@@ -113,12 +114,10 @@ function analyseResponse(text, cfg) {
   }
   if (!snippet) snippet = text.slice(0, 300).trim()
 
-  // Competitors = top-5 from ranked list, excluding our own brand
-  // Stored regardless of whether brand is mentioned — gives real market picture
   const competitors = topResults
     .filter(item => {
-      const nameLower = item.name.toLowerCase()
-      return !aliases.some(a => nameLower.includes(a)) && !(website && nameLower.includes(website))
+      const nl = item.name.toLowerCase()
+      return !aliases.some(a => nl.includes(a)) && !(website && nl.includes(website))
     })
     .map(({ pos, name }) => ({ pos, name }))
 
@@ -136,38 +135,35 @@ function analyseResponse(text, cfg) {
 function withTimeout(promise, ms) {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), ms)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms)),
   ])
 }
 
-// ChatGPT — Responses API with explicit web_search_preview tool
-// This is the correct OpenAI endpoint that guarantees web search fires every time,
-// unlike gpt-4o-search-preview in Chat Completions which only searches when it decides to.
-async function callChatGPT(prompt) {
+// ChatGPT — OpenAI Responses API with forced web_search_preview tool + geo context
+async function callChatGPT(prompt, ctx) {
   const r = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      tools: [{ type: 'web_search_preview' }],
-      input: prompt,
+      model:        'gpt-4o',
+      instructions: ctx,
+      tools:        [{ type: 'web_search_preview' }],
+      input:        prompt,
     }),
   })
   const d = await r.json()
-  if (d.error) {
-    console.error('[ChatGPT] Responses API error:', JSON.stringify(d.error))
-    return null
-  }
-  // Responses API returns output[] with mixed web_search_call and message blocks
+  if (d.error) { console.error('[ChatGPT]', JSON.stringify(d.error)); return null }
+  // Responses API: output[] contains web_search_call and message blocks
   const text = (d.output || [])
     .filter(o => o.type === 'message')
     .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
     .join('\n')
+  if (!text) console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
   return text || null
 }
 
-// Gemini — googleSearch tool enables Search grounding (matches Gemini product)
-async function callGemini(prompt) {
+// Gemini — Google Search grounding + systemInstruction for geo context
+async function callGemini(prompt, ctx) {
   const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
   for (const model of models) {
     try {
@@ -177,8 +173,9 @@ async function callGemini(prompt) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            tools: [{ googleSearch: {} }],
+            systemInstruction: { parts: [{ text: ctx }] },
+            contents:          [{ parts: [{ text: prompt }] }],
+            tools:             [{ googleSearch: {} }],
           }),
         }
       )
@@ -186,83 +183,81 @@ async function callGemini(prompt) {
       if (d.candidates?.[0]?.content?.parts?.[0]?.text) return d.candidates[0].content.parts[0].text
       if (r.status === 404 || d.error?.code === 404) continue
       if (d.error) {
-        console.warn(`[Gemini] ${model} search grounding failed (${d.error.message}), retrying without search`)
+        console.warn(`[Gemini] ${model} search failed (${d.error.message}), retrying without grounding`)
         const r2 = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: ctx }] },
+              contents:          [{ parts: [{ text: prompt }] }],
+            }) }
         )
         const d2 = await r2.json()
         if (d2.candidates?.[0]?.content?.parts?.[0]?.text) return d2.candidates[0].content.parts[0].text
         continue
       }
       break
-    } catch (e) {
-      console.error(`[Gemini] ${model} error:`, e.message)
-      continue
-    }
+    } catch (e) { console.error(`[Gemini] ${model}:`, e.message); continue }
   }
   return null
 }
 
-// Claude — Anthropic direct API with web_search beta tool (matches Claude.ai product)
-// Requires ANTHROPIC_API_KEY in Netlify env vars. Falls back to OpenRouter (no search) if not set.
-async function callClaude(prompt) {
+// Claude — Anthropic direct API with web search beta + system prompt
+// Falls back to OpenRouter (no web search) if ANTHROPIC_API_KEY is not set.
+async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (apiKey) {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
+          'Content-Type':    'application/json',
+          'x-api-key':       apiKey,
           'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'web-search-2025-03-05',
+          'anthropic-beta':  'web-search-2025-03-05',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
+          model:     'claude-sonnet-4-5',
           max_tokens: 1024,
-          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-          messages: [{ role: 'user', content: prompt }],
+          system:    ctx,
+          tools:     [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+          messages:  [{ role: 'user', content: prompt }],
         }),
       })
       const d = await r.json()
-      if (d.error) {
-        console.warn('[Claude] Anthropic API error:', d.error.message, '— falling back to OpenRouter')
-      } else {
-        // Response contains mixed blocks (text + tool_use); collect all text blocks
+      if (!d.error) {
         const textBlocks = (d.content || []).filter(b => b.type === 'text')
         if (textBlocks.length > 0) return textBlocks.map(b => b.text).join('\n')
+        console.warn('[Claude] no text blocks in response:', JSON.stringify(d).slice(0, 300))
+      } else {
+        console.warn('[Claude] API error:', d.error.message, '— falling back to OpenRouter')
       }
     } catch (e) {
-      console.warn('[Claude] Direct API failed:', e.message, '— falling back to OpenRouter')
+      console.warn('[Claude] request failed:', e.message, '— falling back to OpenRouter')
     }
   }
-  // Fallback: OpenRouter (training data only, no web search)
-  return callOpenRouter('anthropic/claude-sonnet-4-5', prompt)
+  return callOpenRouter('anthropic/claude-sonnet-4-5', prompt, ctx)
 }
 
-async function callOpenRouter(model, prompt) {
+// OpenRouter — Perplexity (web search built-in) and Meta (training data only)
+async function callOpenRouter(model, prompt, ctx) {
+  const messages = [
+    { role: 'system', content: ctx },
+    { role: 'user',   content: prompt },
+  ]
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      Authorization:  `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'HTTP-Referer': 'https://getbrandgeo.com',
-      'X-Title': 'BrandGEO Monitor',
+      'X-Title':      'BrandGEO Monitor',
     },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 1000 }),
+    body: JSON.stringify({ model, messages, max_tokens: 1000 }),
   })
   const d = await r.json()
+  if (d.error) { console.error(`[OpenRouter:${model}]`, JSON.stringify(d.error)); return null }
   return d.choices?.[0]?.message?.content ?? null
-}
-
-const LLM_CALLERS = {
-  chatgpt:    p => callChatGPT(p),                                          // ✅ web search via gpt-4o-search-preview
-  gemini:     p => callGemini(p),                                           // ✅ web search via Google Search grounding
-  claude:     p => callClaude(p),                                           // ✅ web search via Anthropic beta tool
-  perplexity: p => callOpenRouter('perplexity/sonar', p),                   // ✅ web search built-in (sonar)
-  meta:       p => callOpenRouter('meta-llama/llama-3.3-70b-instruct', p),  // ⚠️  training data only (no web search API for Meta AI)
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -274,42 +269,46 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
 
   const { prompt_id, prompt_text, client_id, client_config, force } = body
-
-  if (!prompt_id || !prompt_text || !client_id || !client_config) {
+  if (!prompt_id || !prompt_text || !client_id || !client_config)
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
-  }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+
+  // Build context once per request — derived from client's brand_website TLD
+  const ctx = buildSystemContext(client_config)
+
+  // LLM_CALLERS defined here so ctx is captured in closure
+  const LLM_CALLERS = {
+    chatgpt:    p => callChatGPT(p, ctx),                                          // web search via Responses API
+    gemini:     p => callGemini(p, ctx),                                           // web search via Google grounding
+    claude:     p => callClaude(p, ctx),                                           // web search via Anthropic beta
+    perplexity: p => callOpenRouter('perplexity/sonar', p, ctx),                   // web search built-in
+    meta:       p => callOpenRouter('meta-llama/llama-3.3-70b-instruct', p, ctx),  // training data only
+  }
 
   let toRun
 
   if (force) {
-    // Force refresh: wipe all existing results for this prompt and rerun everything
     await supabase.from('ai_results').delete().eq('prompt_id', prompt_id).eq('client_id', client_id)
     toRun = Object.keys(LLM_CALLERS)
   } else {
-    // Smart run: only collect LLMs that have no result yet this month
     const monthStart = new Date()
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-
     const { data: existing } = await supabase
       .from('ai_results')
       .select('llm')
       .eq('prompt_id', prompt_id)
       .eq('client_id', client_id)
       .gte('checked_at', monthStart.toISOString())
-
     const done = new Set((existing || []).map(r => r.llm))
     toRun = Object.keys(LLM_CALLERS).filter(llm => !done.has(llm))
-
-    if (toRun.length === 0) {
+    if (toRun.length === 0)
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
-    }
   }
 
-  // Call pending LLMs in parallel (30s timeout each)
+  // 22s per LLM — parallel, fits within Netlify's 26s function timeout
   const settled = await Promise.allSettled(
-    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 30000))
+    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 22000))
   )
 
   const summary = {}
@@ -318,12 +317,10 @@ exports.handler = async (event) => {
   for (let i = 0; i < toRun.length; i++) {
     const llm    = toRun[i]
     const result = settled[i]
-
     if (result.status === 'rejected' || !result.value) {
-      summary[llm] = 'failed'
+      summary[llm] = `failed: ${result.reason?.message || 'no response'}`
       continue
     }
-
     const analysis = analyseResponse(result.value, client_config)
     inserts.push({
       prompt_id,
@@ -347,6 +344,6 @@ exports.handler = async (event) => {
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ done: true, prompt_id, summary }),
+    body: JSON.stringify({ done: true, prompt_id, summary, ctx_country: ctx.split('from ')[1]?.split('.')[0] }),
   }
 }
