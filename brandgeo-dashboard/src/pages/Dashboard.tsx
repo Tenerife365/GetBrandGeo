@@ -6,6 +6,7 @@ import { TrendingUp, Eye, Target, Hash, RefreshCw } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
+import { useI18n, fmt } from '../lib/i18nContext'
 import type { LLMName, Sentiment } from '../types'
 
 const LLMS: { id: LLMName; label: string; color: string; chartColor: string }[] = [
@@ -53,6 +54,7 @@ function computeStats(rows: AIResultRow[]): OverviewStats {
 
 export default function Dashboard() {
   const { activeClientId, activeClient } = useClient()
+  const { t } = useI18n()
   const brandName = activeClient?.name ?? 'your brand'
 
   const [rows, setRows]       = useState<AIResultRow[]>([])
@@ -81,7 +83,7 @@ export default function Dashboard() {
       .select('*, prompts(text, category)')
       .eq('client_id', activeClientId)
       .order('checked_at', { ascending: false })
-      .limit(200)
+      .limit(1000)
 
     if (!error && data) {
       const r = data as AIResultRow[]
@@ -110,7 +112,7 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-slate-500 text-sm animate-pulse">Loading overview...</div>
+      <div className="text-slate-500 text-sm animate-pulse">{t.dash_loading}</div>
     </div>
   )
 
@@ -125,53 +127,52 @@ export default function Dashboard() {
         </div>
         <button onClick={load}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
-          <RefreshCw size={15} />Refresh
-        </button>
+          <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <KpiCard
             icon={<TrendingUp size={18} className="text-brand-400" />}
-            label="Mention Rate"
+            label={t.dash_statMentionRate}
             value={
               <div className={`text-2xl font-bold tabular-nums ${stats.mentionRate >= 50 ? 'text-emerald-400' : stats.mentionRate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
                 {stats.mentionRate}%
               </div>
             }
-            sub="of AI checks include brand"
+            sub={t.dash_statMentionRateSub}
           />
           <KpiCard
             icon={<Target size={18} className="text-cyan-400" />}
-            label="Avg Position"
+            label={t.dash_statAvgPos}
             value={
               <div className="text-2xl font-bold text-white tabular-nums">
                 {stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
               </div>
             }
-            sub="when brand is mentioned"
+            sub={t.dash_statAvgPosSub}
           />
           <KpiCard
             icon={<Hash size={18} className="text-blue-400" />}
-            label="Prompts Monitored"
+            label={t.dash_statPrompts}
             value={<div className="text-2xl font-bold text-white tabular-nums">{stats.promptCount}</div>}
-            sub="active queries tracked"
+            sub={t.dash_statPromptsSub}
           />
           <KpiCard
             icon={<Eye size={18} className="text-emerald-400" />}
-            label="Total Checks"
+            label={t.dash_statChecks}
             value={<div className="text-2xl font-bold text-white tabular-nums">{stats.totalChecks}</div>}
-            sub="LLM responses analyzed"
+            sub={t.dash_statChecksDesc}
           />
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 mb-1">Mention Rate by LLM</h2>
-          <p className="text-xs text-slate-500 mb-4">% of checks where {brandName} is mentioned</p>
+          <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_mentionRate}</h2>
+          <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionRateDesc, { brand: brandName })}</p>
           {llmData.length === 0 ? (
-            <p className="text-sm text-slate-500 py-8 text-center">No results yet — run the AI checker to populate data.</p>
+            <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noResults}</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={llmData} margin={{ left: -20, bottom: 0 }}>
@@ -202,7 +203,7 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 mb-4">Brand Visibility Overview</h2>
+          <h2 className="text-sm font-semibold text-slate-300 mb-4">{t.dash_brandVisibility}</h2>
           {stats && stats.totalChecks > 0 ? (
             <>
               <div className="mb-6">
@@ -230,17 +231,17 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500 py-8 text-center">No results yet.</p>
+            <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noResults}</p>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 mb-1">Recent Mentions</h2>
-          <p className="text-xs text-slate-500 mb-4">Latest AI responses where {brandName} appears</p>
+          <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
+          <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
           {recentMentioned.length === 0 ? (
-            <p className="text-sm text-slate-500 py-4">No mentions yet.</p>
+            <p className="text-sm text-slate-500 py-4">{t.dash_noMentions}</p>
           ) : (
             <div className="space-y-3">
               {recentMentioned.map(r => (
@@ -251,10 +252,10 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 mb-1">Recent Gaps</h2>
-          <p className="text-xs text-slate-500 mb-4">Latest AI responses where {brandName} is absent</p>
+          <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
+          <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
           {recentNotMentioned.length === 0 ? (
-            <p className="text-sm text-slate-500 py-4">No gaps found.</p>
+            <p className="text-sm text-slate-500 py-4">{t.dash_noGaps}</p>
           ) : (
             <div className="space-y-3">
               {recentNotMentioned.map(r => (
@@ -280,6 +281,7 @@ const LLM_LABEL: Record<string, string> = {
 }
 
 function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean }) {
+  const { t } = useI18n()
   return (
     <div className="flex items-start gap-3">
       <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${LLM_COLOR[row.llm] ?? 'text-slate-400 bg-slate-400/10'}`}>
@@ -295,7 +297,7 @@ function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean })
         </p>
       </div>
       <span className={`shrink-0 text-[10px] font-semibold ${mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
-        {mentioned ? 'YES' : 'NO'}
+        {mentioned ? t.aiv_yes : t.aiv_no}
       </span>
     </div>
   )

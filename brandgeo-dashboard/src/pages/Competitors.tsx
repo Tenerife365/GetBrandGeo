@@ -9,6 +9,7 @@ import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import type { Competitor } from '../types'
+import { useI18n, fmt } from '../lib/i18nContext'
 
 interface CompetitorStats extends Competitor {
   webPages: number
@@ -20,15 +21,13 @@ const SOURCE_BADGE: Record<Competitor['source'], string> = {
   auto:   'bg-emerald-500/15 text-emerald-400',
   manual: 'bg-slate-500/15 text-slate-400',
 }
-const SOURCE_LABEL: Record<Competitor['source'], string> = {
-  auto:   'Auto-discovered',
-  manual: 'Manual',
-}
+// SOURCE_LABEL is now rendered inline with translation keys
 
 export default function Competitors() {
   const { market } = useMarket()
   const { activeClientId, activeClient } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
+  const { t } = useI18n()
   const [competitors, setCompetitors]   = useState<CompetitorStats[]>([])
   const [bprStats, setBprStats]         = useState({ pages: 0, avgScore: 0 })
   const [loading, setLoading]           = useState(true)
@@ -122,7 +121,7 @@ const autoDiscover = async () => {
   const addCompetitor = async () => {
     if (!newName.trim()) return
     setSaving(true)
-    const entry = { name: newName.trim(), website: newWebsite.trim() || null, source: 'manual' as const }
+    const entry = { name: newName.trim(), website: newWebsite.trim() || null, source: 'manual' as const, client_id: activeClientId }
     if (isDemoMode) {
       setCompetitors(prev => [...prev, { ...entry, id: Date.now(), created_at: new Date().toISOString(), webPages: 0, avgScore: 0, queries: [] }])
     } else {
@@ -145,7 +144,7 @@ const autoDiscover = async () => {
     ...competitors.map(c => ({ name: c.name, pages: c.webPages, fill: '#f59e0b' })),
   ]
 
-  const radarData = ['Web Pages', 'Avg Score'].map((metric, i) => {
+  const radarData = [t.comp_webSearch, t.comp_score].map((metric, i) => {
     const row: Record<string, string | number> = { metric }
     row[brandName] = i === 0 ? bprStats.pages : bprStats.avgScore
     competitors.slice(0, 3).forEach(c => { row[c.name] = i === 0 ? c.webPages : c.avgScore })
@@ -154,20 +153,20 @@ const autoDiscover = async () => {
   const radarKeys  = [brandName, ...competitors.slice(0, 3).map(c => c.name)]
   const RADAR_COLORS = ['#1f9baa', '#f59e0b', '#ef4444', '#8b5cf6']
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading...</div>
+  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.comp_loading}</div>
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
-            <h1 className="text-2xl font-bold text-white">Competitors</h1>
+            <h1 className="text-2xl font-bold text-white">{t.comp_title}</h1>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
-              {market.flag} {market.id} results
+              {market.flag} {market.id} {t.comp_results}
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-0.5">
-            {competitors.length} competitors tracked for {brandName}
+            {fmt(t.comp_trackedFor, { n: competitors.length, brand: brandName })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -175,36 +174,36 @@ const autoDiscover = async () => {
             <button onClick={autoDiscover} disabled={discovering}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 transition-colors disabled:opacity-50">
               <Sparkles size={14} />
-              {discovering ? 'Scanning...' : 'Auto-discover'}
+              {discovering ? t.comp_scanning : t.comp_autoDiscover}
             </button>
           )}
           <button onClick={() => setShowAdd(v => !v)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 transition-colors">
             <Plus size={14} />
-            Add manually
+            {t.comp_addManually}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
+          <div className="text-xs text-slate-500 mb-1">{fmt(t.comp_aiMentions, { brand: brandName })}</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{bprStats.pages}</div>
-          <div className="text-xs text-slate-500 mt-0.5">Avg position #{bprStats.avgScore || '—'}</div>
+          <div className="text-xs text-slate-500 mt-0.5">{fmt(t.comp_avgPosition, { n: bprStats.avgScore || '—' })}</div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Total competitors</div>
+          <div className="text-xs text-slate-500 mb-1">{t.comp_totalCompetitors}</div>
           <div className="text-2xl font-bold text-white tabular-nums">{competitors.length}</div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Auto-discovered</div>
+          <div className="text-xs text-slate-500 mb-1">{t.comp_autoDiscovered}</div>
           <div className="text-2xl font-bold text-emerald-400 tabular-nums">
             {competitors.filter(c => c.source === 'auto').length}
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">from web + AI analyses</div>
+          <div className="text-xs text-slate-500 mt-0.5">{t.comp_fromAnalyses}</div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Added manually</div>
+          <div className="text-xs text-slate-500 mb-1">{t.comp_addedManually}</div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">
             {competitors.filter(c => c.source === 'manual').length}
           </div>
@@ -215,15 +214,15 @@ const autoDiscover = async () => {
         <div className="mb-5 bg-dark-800 border border-brand-500/30 rounded-xl p-4 flex gap-3 items-end">
           <div className="flex-1 space-y-2">
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Competitor name *</label>
+              <label className="text-xs text-slate-500 mb-1 block">{t.comp_competitorName}</label>
               <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. Flavours"
+                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder={t.comp_compPlaceholder}
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Website (optional)</label>
+              <label className="text-xs text-slate-500 mb-1 block">{t.comp_websiteOptional}</label>
               <input value={newWebsite} onChange={e => setNewWebsite(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="https://competitor.ro"
+                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder={t.comp_websitePlaceholder}
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
             </div>
           </div>
@@ -244,7 +243,7 @@ const autoDiscover = async () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
-              Web search appearances
+              {t.comp_webSearch}
             </h2>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={barData} margin={{ left: -20 }}>
@@ -252,7 +251,7 @@ const autoDiscover = async () => {
                 <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
                   labelStyle={{ color: '#cbd5e1' }} itemStyle={{ color: '#94a3b8' }} />
-                <Bar dataKey="pages" name="Pages" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="pages" name={t.comp_pages} radius={[4, 4, 0, 0]}>
                   {barData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Bar>
               </BarChart>
@@ -261,7 +260,7 @@ const autoDiscover = async () => {
 
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
-              Visibility radar ({brandName} vs top 3)
+              {fmt(t.comp_visibilityRadar, { brand: brandName })}
             </h2>
             <ResponsiveContainer width="100%" height={180}>
               <RadarChart data={radarData}>
@@ -280,18 +279,18 @@ const autoDiscover = async () => {
 
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
         <div className="grid border-b border-dark-700 bg-dark-700/40" style={{ gridTemplateColumns: '1fr 8rem 6rem 6rem 1fr 2.5rem' }}>
-          <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Competitor</div>
-          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Source</div>
-          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">Pages</div>
-          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">Score</div>
-          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Detected queries</div>
+          <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">{t.comp_title}</div>
+          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">{t.comp_source}</div>
+          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">{t.comp_pages}</div>
+          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">{t.comp_score}</div>
+          <div className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">{t.comp_detectedQueries}</div>
           <div />
         </div>
 
         <div className="grid border-b border-dark-700/50 bg-brand-500/5" style={{ gridTemplateColumns: '1fr 8rem 6rem 6rem 1fr 2.5rem' }}>
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-sm font-semibold text-brand-300">{brandName}</span>
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400">you</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400">{t.comp_you}</span>
           </div>
           <div className="px-3 py-3" />
           <div className="px-3 py-3 text-center font-bold text-emerald-400 tabular-nums">{bprStats.pages}</div>
@@ -314,7 +313,7 @@ const autoDiscover = async () => {
             </div>
             <div className="px-3 py-3 flex items-center">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_BADGE[c.source]}`}>
-                {SOURCE_LABEL[c.source]}
+                {c.source === 'auto' ? t.comp_autoDiscovered : t.comp_manual}
               </span>
             </div>
             <div className="px-3 py-3 text-center tabular-nums">
@@ -328,7 +327,7 @@ const autoDiscover = async () => {
             <div className="px-3 py-3 text-xs text-slate-500 truncate">
               {c.queries.length > 0
                 ? c.queries.slice(0, 2).join(' - ')
-                : <span className="text-slate-700">Not detected in web analyses</span>}
+                : <span className="text-slate-700">{t.comp_notDetected}</span>}
             </div>
             <div className="py-3 pr-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => deleteCompetitor(c.id)}
@@ -342,19 +341,19 @@ const autoDiscover = async () => {
         {competitors.length === 0 && (
           <div className="py-16 text-center">
             <Tag size={28} className="text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm mb-3">No competitors added yet.</p>
+            <p className="text-slate-500 text-sm mb-3">{t.comp_noCompetitors}</p>
             <div className="flex gap-2 justify-center">
               {!isDemoMode && (
                 <button onClick={autoDiscover} disabled={discovering}
                   className="px-4 py-2 rounded-lg text-sm bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 transition-colors flex items-center gap-2">
                   <Sparkles size={13} />
-                  Auto-discover from analyses
+                  {t.comp_autoDiscoverFrom}
                 </button>
               )}
               <button onClick={() => setShowAdd(true)}
                 className="px-4 py-2 rounded-lg text-sm bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 transition-colors flex items-center gap-2">
                 <Plus size={13} />
-                Add manually
+                {t.comp_addManually}
               </button>
             </div>
           </div>

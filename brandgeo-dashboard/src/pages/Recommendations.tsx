@@ -268,7 +268,7 @@ function RecCard({ rec, defaultOpen = false }: {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
-              {imp.icon}{imp.label}
+              {imp.icon}{rec.impact === 'critical' ? t.rec_impactCritical : rec.impact === 'high' ? t.rec_impactHigh : t.rec_impactMedium}
             </span>
             <span className={`text-xs ${rec.effort === 'low' ? 'text-emerald-400' : rec.effort === 'medium' ? 'text-amber-400' : 'text-slate-400'}`}>
               <Clock size={11} className="inline mr-0.5" />{rec.effort === 'low' ? t.rec_effortLow : rec.effort === 'medium' ? t.rec_effortMedium : t.rec_effortHigh} · {rec.timeEst}

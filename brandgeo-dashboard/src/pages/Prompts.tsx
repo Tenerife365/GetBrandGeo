@@ -4,6 +4,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
 import type { Prompt, PromptCategory } from '../types'
+import { useI18n, fmt } from '../lib/i18nContext'
 
 const CATEGORY_META: Record<string, { label: string; color: string; desc: string }> = {
   // BpR categories
@@ -48,6 +49,7 @@ interface ChatMessage {
 
 export default function Prompts() {
   const { activeClientId } = useClient()
+  const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState<PromptCategory | 'all'>('all')
@@ -108,20 +110,20 @@ export default function Prompts() {
   }
 
   const addPrompt = async (text?: string, category?: PromptCategory) => {
-    const t = (text ?? newText).trim()
+    const promptText = (text ?? newText).trim()
     const cat = category ?? newCat
-    if (!t) return
+    if (!promptText) return
     setSaving(true)
     const position = prompts.length + 1
     if (!isDemoMode) {
       const { data } = await supabase
         .from('prompts')
-        .insert({ text: t, category: cat, position, client_id: activeClientId })
+        .insert({ text: promptText, category: cat, position, client_id: activeClientId })
         .select()
         .single()
       if (data) setPrompts(prev => [...prev, data])
     } else {
-      setPrompts(prev => [...prev, { id: Date.now(), text: t, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
+      setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
@@ -149,23 +151,15 @@ export default function Prompts() {
     setSuggestions([])
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY
-      if (!apiKey) throw new Error('VITE_OPENAI_API_KEY not set')
-
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch('/.netlify/functions/suggest-prompts', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o',
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             ...newMessages.map(m => ({ role: m.role, content: m.content })),
           ],
           max_tokens: 1500,
-          temperature: 0.7,
         }),
       })
 
@@ -189,7 +183,7 @@ export default function Prompts() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${msg}. Check that VITE_OPENAI_API_KEY is set.` }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${msg}` }])
     }
 
     setAiLoading(false)
@@ -200,14 +194,14 @@ export default function Prompts() {
     return acc
   }, {} as Record<string, number>)
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading...</div>
+  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.pr_loading}</div>
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Monitored Prompts</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{prompts.length} prompts - checked across all major LLMs</p>
+          <h1 className="text-2xl font-bold text-white">{t.pr_title}</h1>
+          <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -219,14 +213,14 @@ export default function Prompts() {
             }`}
           >
             <Bot size={14} />
-            AI Discover
+            {t.pr_aiDiscover}
           </button>
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-dark-700 text-slate-300 hover:bg-dark-600 transition-colors border border-dark-600"
           >
             <Plus size={14} />
-            Add prompt
+            {t.pr_addPrompt}
           </button>
         </div>
       </div>
@@ -251,8 +245,8 @@ export default function Prompts() {
         <div className="mb-6 bg-dark-800 border border-brand-500/25 rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-dark-700/60 flex items-center gap-2">
             <Bot size={15} className="text-brand-400" />
-            <span className="text-sm font-semibold text-brand-300">AI Prompt Discovery</span>
-            <span className="text-xs text-slate-500 ml-auto">Powered by GPT-4o</span>
+            <span className="text-sm font-semibold text-brand-300">{t.pr_aiDiscoveryTitle}</span>
+            <span className="text-xs text-slate-500 ml-auto">{t.pr_poweredBy}</span>
           </div>
 
           <div className="px-4 py-4 space-y-3 max-h-64 overflow-y-auto">
@@ -270,7 +264,7 @@ export default function Prompts() {
             {aiLoading && (
               <div className="flex justify-start">
                 <div className="bg-dark-700 text-slate-400 px-3 py-2 rounded-xl text-sm animate-pulse">
-                  Generating prompts...
+                  {t.pr_generatingPrompts}
                 </div>
               </div>
             )}
@@ -281,14 +275,14 @@ export default function Prompts() {
             <div className="border-t border-dark-700/60 px-4 py-3 space-y-2">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  {suggestions.length} suggestions
+                  {fmt(t.pr_suggestions, { n: suggestions.length })}
                 </span>
                 <button
                   onClick={addAllSuggestions}
                   className="flex items-center gap-1.5 text-xs font-medium text-brand-300 hover:text-brand-200 transition-colors"
                 >
                   <PlusCircle size={12} />
-                  Add all
+                  {t.pr_addAll}
                 </button>
               </div>
               {suggestions.map((s, i) => (
@@ -320,7 +314,7 @@ export default function Prompts() {
               value={userInput}
               onChange={e => setUserInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="Describe your business, location, target clients..."
+              placeholder={t.pr_placeholder}
               className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
               disabled={aiLoading}
             />
@@ -343,7 +337,7 @@ export default function Prompts() {
               value={newText}
               onChange={e => setNewText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addPrompt()}
-              placeholder="e.g. catering eveniment 500 persoane Bucuresti..."
+              placeholder={t.pr_searchPlaceholder}
               className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
             />
             <select
@@ -409,8 +403,8 @@ export default function Prompts() {
       {filtered.length === 0 && (
         <div className="text-center py-16 text-slate-500">
           {prompts.length === 0
-            ? 'No prompts yet. Use "AI Discover" to generate suggestions or add manually.'
-            : 'No prompts match this category.'}
+            ? t.pr_noPrompts
+            : t.pr_noFilter}
         </div>
       )}
     </div>

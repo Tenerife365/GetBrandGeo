@@ -1,0 +1,882 @@
+======================================================================
+  BrandGEO — 50 Ready-to-Paste Prompts
+  Instructions: copy each block ▼ and paste directly into the AI chat
+======================================================================
+
+
+──────────────────────────────────────────────────────────────────────
+  [TOOL DISCOVERY]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 01
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What are the best tools to track if my brand appears in ChatGPT responses?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 02
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How can I monitor my brand mentions across AI chatbots?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 03
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Best software to measure AI visibility for my business in 2025
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 04
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Which platforms track brand mentions in Gemini, Claude, and Perplexity?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 05
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to know if ChatGPT recommends my product or service?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 06
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Tools to monitor what AI says about my company
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 07
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is the best AI brand monitoring tool for SaaS companies?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 08
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to track brand visibility in generative AI search results
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 09
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Platform to monitor brand presence across all major AI assistants
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 10
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How do I see where my brand ranks in AI chatbot recommendations?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [GEO / AEO]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 11
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is Generative Engine Optimization and which tools offer it?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 12
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Best GEO tools for brands in 2025
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 13
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is Answer Engine Optimization (AEO) and how does it work?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 14
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Difference between SEO and GEO — which matters more in 2025?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 15
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How do AI chatbots decide which brands to recommend?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 16
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is AI share of voice and how do you measure it?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 17
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to improve brand visibility in AI-generated answers
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 18
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Best practices for getting mentioned in ChatGPT responses
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 19
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What companies specialize in GEO and AI brand optimization?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 20
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to measure brand performance across multiple AI platforms
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [PROBLEM-BASED]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 21
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: My competitors appear in ChatGPT but my brand doesn't — what should I do?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 22
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Why is my business not mentioned in AI chatbot responses?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 23
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: My product isn't being recommended by Claude or Gemini — how to fix this?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 24
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to outrank competitors in AI assistant recommendations
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 25
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Why does Perplexity recommend my competitor instead of me?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 26
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What content strategy helps brands appear in LLM responses?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 27
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to compete with larger brands in AI search results
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 28
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to improve sentiment when AI mentions my brand negatively
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 29
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: My brand has no presence in Perplexity search results — what's wrong?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 30
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How do I get my B2B SaaS recommended by AI assistants?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [AGENCY & B2B]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 31
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How do marketing agencies track AI brand visibility for clients?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 32
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What tools do CMOs use to measure AI search performance?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 33
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to report AI brand visibility metrics to stakeholders
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 34
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: AI monitoring tools for digital marketing agencies managing multiple brands
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 35
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to build a reporting dashboard for AI brand mentions
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [COMPETITIVE]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 36
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: BrandGEO vs Peec AI — which is better for tracking AI mentions?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 37
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: BrandGEO vs BrightEdge for AI brand monitoring
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 38
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Alternatives to BrandGEO for monitoring brand mentions in AI
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 39
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Best alternative to Peec AI for AI brand visibility
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 40
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Semrush vs BrandGEO — which covers AI visibility better?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [DIRECT BRAND]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 41
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is BrandGEO and what does it do?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 42
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: BrandGEO review — is it worth it for AI visibility monitoring?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 43
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How does BrandGEO work — what data does it collect?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 44
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: BrandGEO pricing and features overview
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 45
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Is BrandGEO the best tool for monitoring ChatGPT brand mentions?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+──────────────────────────────────────────────────────────────────────
+  [ADVANCED]
+──────────────────────────────────────────────────────────────────────
+
+▼ PROMPT 46
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to use AI monitoring data to improve content strategy
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 47
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What metrics matter most for AI brand visibility?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 48
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: How to benchmark brand performance across ChatGPT, Gemini, Claude, Perplexity and Meta AI
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 49
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: What is LLM SEO and how do I optimize for it?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+▼ PROMPT 50
+You are an expert in AI marketing tools, brand monitoring, and Generative Engine Optimization (GEO). Answer the following question thoroughly and accurately based on what you actually know about tools and companies in this space.
+
+Question: Which industries benefit most from AI brand monitoring?
+
+After your answer, list the top 5 tools or companies most relevant to this question. Be specific — use real product/company names only. Format exactly like this, nothing else:
+
+TOP 5:
+1. [Tool/Company name] – [what it does and why it's the best answer to this question]
+2. [Tool/Company name] – [what it does and why it's relevant]
+3. [Tool/Company name] – [what it does and why it's relevant]
+4. [Tool/Company name] – [what it does and why it's relevant]
+5. [Tool/Company name] – [what it does and why it's relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

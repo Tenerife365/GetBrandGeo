@@ -5,6 +5,7 @@ import { useClient } from '../lib/clientContext'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
 import type { LLMName, PromptCategory } from '../types'
+import { useI18n, fmt } from '../lib/i18nContext'
 
 interface MentionEvent {
   id: number
@@ -55,6 +56,7 @@ type FilterLLM = LLMName | 'all'
 type FilterCat = PromptCategory | 'all'
 
 export default function Mentions() {
+  const { t } = useI18n()
   const { activeClientId, activeClient } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const [mentions, setMentions] = useState<MentionEvent[]>([])
@@ -131,14 +133,14 @@ export default function Mentions() {
     count: mentions.filter(m => m.llm === llm).length,
   })).sort((a, b) => b.count - a.count)
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading mentions...</div>
+  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.men_loading}</div>
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">AI Mentions</h1>
+        <h1 className="text-2xl font-bold text-white">{t.men_title}</h1>
         <p className="text-sm text-slate-400 mt-0.5">
-          Every time {brandName} was recommended by an AI engine and the prompt that triggered it
+          {fmt(t.men_subtitle, { brandName })}
         </p>
       </div>
 
@@ -147,21 +149,21 @@ export default function Mentions() {
           <TrendingUp size={20} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-white tabular-nums">{totalMentions}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Total AI mentions</div>
+            <div className="text-xs text-slate-500 mt-0.5">{t.men_totalMentions}</div>
           </div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
           <Award size={20} className="text-amber-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-white tabular-nums">#{avgPosition || '-'}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Avg mention position</div>
+            <div className="text-xs text-slate-500 mt-0.5">{t.men_avgPosition}</div>
           </div>
         </div>
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
           <Bot size={20} className="text-blue-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-emerald-400 tabular-nums">{positiveSentiment}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Positive sentiment</div>
+            <div className="text-xs text-slate-500 mt-0.5">{t.men_positiveSentiment}</div>
           </div>
         </div>
       </div>
@@ -173,7 +175,7 @@ export default function Mentions() {
               ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
               : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
           }`}>
-          All engines ({totalMentions})
+          {fmt(t.men_allEngines, { n: totalMentions })}
         </button>
         {engineCounts.map(({ llm, count }) => {
           const meta = LLM_META[llm]
@@ -198,7 +200,7 @@ export default function Mentions() {
                 ? 'bg-slate-700 text-slate-200 border-slate-600'
                 : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
             }`}>
-            {cat === 'all' ? 'All categories' : getCatLabel(cat)}
+            {cat === 'all' ? t.men_allCategories : getCatLabel(cat)}
           </button>
         ))}
       </div>
@@ -242,18 +244,18 @@ export default function Mentions() {
               </button>
               {isOpen && m.response_snippet && (
                 <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
-                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">AI Response Snippet</div>
+                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">{t.men_responseSnippet}</div>
                   <blockquote className="text-sm text-slate-300 italic leading-relaxed border-l-2 border-emerald-500/40 pl-3">
                     "{m.response_snippet}"
                   </blockquote>
                   <div className="mt-3 text-xs text-slate-600">
-                    Checked: {new Date(m.checked_at).toLocaleDateString('en-GB')}
+                    {t.men_checked} {new Date(m.checked_at).toLocaleDateString()}
                   </div>
                 </div>
               )}
               {isOpen && !m.response_snippet && (
                 <div className="border-t border-dark-700 px-5 py-3 bg-dark-700/20 text-xs text-slate-600 italic">
-                  No snippet captured for this mention.
+                  {t.men_noSnippet}
                 </div>
               )}
             </div>
@@ -264,8 +266,8 @@ export default function Mentions() {
       {filtered.length === 0 && (
         <div className="text-center py-16 text-slate-500">
           {totalMentions === 0
-            ? 'No AI mentions yet — run the collector to get real data.'
-            : 'No mentions match these filters.'}
+            ? t.men_noMentions
+            : t.men_noFilter}
         </div>
       )}
     </div>
