@@ -83,6 +83,7 @@ export default function Prompts() {
       .from('prompts')
       .select('*')
       .eq('client_id', activeClientId)
+      .eq('is_active', true)
       .order('position', { ascending: true })
     if (data) setPrompts(data)
     setLoading(false)
@@ -377,7 +378,7 @@ export default function Prompts() {
           const isEditing = editId === p.id
           return (
             <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-4 group hover:border-dark-600 transition-colors">
-              <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{p.position || i + 1}</span>
+              <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${meta.color}`}>{meta.label}</span>
               {isEditing ? (
                 <div className="flex-1 flex gap-2 items-center">

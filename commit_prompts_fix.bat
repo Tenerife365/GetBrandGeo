@@ -1,6 +1,5 @@
 @echo off
 cd /d C:\Users\const\Desktop\BpR\brandgeo-dashboard
-git add netlify/functions/suggest-prompts.js netlify.toml src/pages/Prompts.tsx
-git commit -m "fix: route AI Prompt Discovery through Netlify function (keep OpenAI key server-side)"
+git add -A
+git commit -m "fix: prompts page — show active only, use index for row numbers"
 git push origin main
-pause
