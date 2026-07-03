@@ -17,7 +17,7 @@ interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
   lastCompletedAt: number   // increments after each prompt — watch to reload data
-  runCollection: (clientId: number) => Promise<void>
+  runCollection: (clientId: number, force?: boolean) => Promise<void>
   stopCollection: () => void
 }
 
@@ -25,7 +25,7 @@ const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
   lastCompletedAt: 0,
-  runCollection: async () => {},
+  runCollection: async (_clientId: number, _force?: boolean) => {},
   stopCollection: () => {},
 })
 
@@ -41,7 +41,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     abortRef.current = true
   }, [])
 
-  const runCollection = useCallback(async (clientId: number) => {
+  const runCollection = useCallback(async (clientId: number, force = false) => {
     if (runningRef.current) return
     runningRef.current = true
     abortRef.current   = false
@@ -94,6 +94,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
               prompt_text:   prompts[i].text,
               client_id:     clientId,
               client_config: clientConfig,
+              force,
             }),
           })
           const json = await res.json().catch(() => null)

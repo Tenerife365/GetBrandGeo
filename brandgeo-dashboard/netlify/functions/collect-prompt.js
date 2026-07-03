@@ -264,7 +264,7 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
 
-  const { prompt_id, prompt_text, client_id, client_config } = body
+  const { prompt_id, prompt_text, client_id, client_config, force } = body
 
   if (!prompt_id || !prompt_text || !client_id || !client_config) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -272,16 +272,33 @@ exports.handler = async (event) => {
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-  // Always run all engines — delete stale results first so re-runs give fresh data
-  const toRun = Object.keys(LLM_CALLERS)
+  let toRun
 
-  await supabase
-    .from('ai_results')
-    .delete()
-    .eq('prompt_id', prompt_id)
-    .eq('client_id', client_id)
+  if (force) {
+    // Force refresh: wipe all existing results for this prompt and rerun everything
+    await supabase.from('ai_results').delete().eq('prompt_id', prompt_id).eq('client_id', client_id)
+    toRun = Object.keys(LLM_CALLERS)
+  } else {
+    // Smart run: only collect LLMs that have no result yet this month
+    const monthStart = new Date()
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
 
-  // Call all LLMs in parallel (30s timeout each)
+    const { data: existing } = await supabase
+      .from('ai_results')
+      .select('llm')
+      .eq('prompt_id', prompt_id)
+      .eq('client_id', client_id)
+      .gte('checked_at', monthStart.toISOString())
+
+    const done = new Set((existing || []).map(r => r.llm))
+    toRun = Object.keys(LLM_CALLERS).filter(llm => !done.has(llm))
+
+    if (toRun.length === 0) {
+      return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
+    }
+  }
+
+  // Call pending LLMs in parallel (30s timeout each)
   const settled = await Promise.allSettled(
     toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 30000))
   )
