@@ -233,25 +233,27 @@ export default function AIVisibility() {
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <button
-              onClick={runCollection}
-              disabled={collecting || loading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-brand-500/30 bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {collecting
-                ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
-                : <><Play size={14} /> Run Collection</>
-              }
-            </button>
-            <button
-              onClick={forceCollection}
-              disabled={collecting || loading}
-              title="Force Refresh — wipes existing results and re-runs all engines"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RotateCcw size={14} />
-              Force Refresh
-            </button>
+            <>
+              <button
+                onClick={runCollection}
+                disabled={collecting || loading}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-brand-500/30 bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {collecting
+                  ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
+                  : <><Play size={14} /> Run Collection</>
+                }
+              </button>
+              <button
+                onClick={forceCollection}
+                disabled={collecting || loading}
+                title="Force Refresh — wipes existing results and re-runs all engines"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw size={14} />
+                Force Refresh
+              </button>
+            </>
           )}
           <button
             onClick={load}
