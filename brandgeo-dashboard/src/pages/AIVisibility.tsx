@@ -218,7 +218,13 @@ export default function AIVisibility() {
               {s.pct}%
             </div>
             <div className="text-xs text-slate-400 font-medium mt-1">{s.label}</div>
-            <div className="text-xs text-slate-600">{s.mentioned}/{s.checked}</div>
+            <div className="w-full mt-2 h-1.5 rounded-full bg-dark-700 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${s.pct >= 50 ? 'bg-emerald-400' : s.pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`}
+                style={{ width: `${s.pct}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-600 mt-1">{s.mentioned}/{s.checked} prompts</div>
           </div>
         ))}
       </div>
@@ -265,6 +271,45 @@ export default function AIVisibility() {
           )}
         </div>
       )}
+
+      {(() => {
+        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
+        const catStats = activeCats.map(cat => {
+          const catPrompts = prompts.filter(p => p.category === cat)
+          let mentioned = 0, checked = 0
+          catPrompts.forEach(p => {
+            LLMS.forEach(llm => {
+              const r = results.get(p.id)?.get(llm.id)
+              if (r) { checked++; if (r.brand_mentioned) mentioned++ }
+            })
+          })
+          return { cat, label: getCatLabel(cat), pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0, checked, mentioned }
+        }).sort((a, b) => b.pct - a.pct)
+
+        if (catStats.length > 0) return (
+          <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
+              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {LLMS.length} engines</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {catStats.map(({ cat, label, pct, checked, mentioned }) => (
+                <div key={cat} className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`}>{label}</span>
+                    <span className={`text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
+                    <div className={`h-full rounded-full ${pct >= 50 ? 'bg-emerald-400' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[10px] text-slate-600">{mentioned}/{checked} checks</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+        return null
+      })()}
 
       {(() => {
         const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
@@ -414,8 +459,13 @@ export default function AIVisibility() {
                                   ))}
                                 </div>
                               )}
+                              {r.checked_at && (
+                                <div className="text-[10px] text-slate-600 mt-1.5 font-mono">
+                                  {new Date(r.checked_at).toLocaleDateString()}
+                                </div>
+                              )}
                               {r.response_snippet && (
-                                <p className="text-[10px] text-slate-500 mt-2 line-clamp-4 italic leading-relaxed">
+                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-4 italic leading-relaxed">
                                   {r.response_snippet}
                                 </p>
                               )}
