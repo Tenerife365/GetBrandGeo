@@ -131,34 +131,96 @@ function withTimeout(promise, ms) {
   ])
 }
 
+// ChatGPT — gpt-4o-search-preview performs real-time web search (matches ChatGPT product)
 async function callChatGPT(prompt) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], max_tokens: 1000, temperature: 0.3 }),
+    body: JSON.stringify({
+      model: 'gpt-4o-search-preview',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1000,
+      // temperature not supported by search-preview models
+    }),
   })
   const d = await r.json()
+  if (d.error) console.error('[ChatGPT] API error:', JSON.stringify(d.error))
   return d.choices?.[0]?.message?.content ?? null
 }
 
+// Gemini — googleSearch tool enables Search grounding (matches Gemini product)
 async function callGemini(prompt) {
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash']
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
   for (const model of models) {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
-    )
-    const d = await r.json()
-    if (d.candidates?.[0]?.content?.parts?.[0]?.text) return d.candidates[0].content.parts[0].text
-    if (r.status === 404) continue
-    break
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ googleSearch: {} }],
+          }),
+        }
+      )
+      const d = await r.json()
+      if (d.candidates?.[0]?.content?.parts?.[0]?.text) return d.candidates[0].content.parts[0].text
+      if (r.status === 404 || d.error?.code === 404) continue
+      if (d.error) {
+        console.warn(`[Gemini] ${model} search grounding failed (${d.error.message}), retrying without search`)
+        const r2 = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+        )
+        const d2 = await r2.json()
+        if (d2.candidates?.[0]?.content?.parts?.[0]?.text) return d2.candidates[0].content.parts[0].text
+        continue
+      }
+      break
+    } catch (e) {
+      console.error(`[Gemini] ${model} error:`, e.message)
+      continue
+    }
   }
   return null
 }
 
+// Claude — Anthropic direct API with web_search beta tool (matches Claude.ai product)
+// Requires ANTHROPIC_API_KEY in Netlify env vars. Falls back to OpenRouter (no search) if not set.
 async function callClaude(prompt) {
-  // Routed through OpenRouter — no separate Anthropic key needed
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (apiKey) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'web-search-2025-03-05',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 1024,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+      const d = await r.json()
+      if (d.error) {
+        console.warn('[Claude] Anthropic API error:', d.error.message, '— falling back to OpenRouter')
+      } else {
+        // Response contains mixed blocks (text + tool_use); collect all text blocks
+        const textBlocks = (d.content || []).filter(b => b.type === 'text')
+        if (textBlocks.length > 0) return textBlocks.map(b => b.text).join('\n')
+      }
+    } catch (e) {
+      console.warn('[Claude] Direct API failed:', e.message, '— falling back to OpenRouter')
+    }
+  }
+  // Fallback: OpenRouter (training data only, no web search)
   return callOpenRouter('anthropic/claude-sonnet-4-5', prompt)
 }
 
@@ -178,11 +240,11 @@ async function callOpenRouter(model, prompt) {
 }
 
 const LLM_CALLERS = {
-  chatgpt:    p => callChatGPT(p),
-  gemini:     p => callGemini(p),
-  claude:     p => callClaude(p),
-  perplexity: p => callOpenRouter('perplexity/sonar', p),
-  meta:       p => callOpenRouter('meta-llama/llama-3.3-70b-instruct', p),
+  chatgpt:    p => callChatGPT(p),                                          // ✅ web search via gpt-4o-search-preview
+  gemini:     p => callGemini(p),                                           // ✅ web search via Google Search grounding
+  claude:     p => callClaude(p),                                           // ✅ web search via Anthropic beta tool
+  perplexity: p => callOpenRouter('perplexity/sonar', p),                   // ✅ web search built-in (sonar)
+  meta:       p => callOpenRouter('meta-llama/llama-3.3-70b-instruct', p),  // ⚠️  training data only (no web search API for Meta AI)
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -221,7 +283,7 @@ exports.handler = async (event) => {
 
   // Call all pending LLMs in parallel (20s timeout each)
   const settled = await Promise.allSettled(
-    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 20000))
+    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 30000))
   )
 
   const summary = {}
