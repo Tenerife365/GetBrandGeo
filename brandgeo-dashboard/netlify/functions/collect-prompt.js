@@ -140,21 +140,30 @@ function withTimeout(promise, ms) {
   ])
 }
 
-// ChatGPT — gpt-4o-search-preview performs real-time web search (matches ChatGPT product)
+// ChatGPT — Responses API with explicit web_search_preview tool
+// This is the correct OpenAI endpoint that guarantees web search fires every time,
+// unlike gpt-4o-search-preview in Chat Completions which only searches when it decides to.
 async function callChatGPT(prompt) {
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: 'gpt-4o-search-preview',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000,
-      // temperature not supported by search-preview models
+      model: 'gpt-4o',
+      tools: [{ type: 'web_search_preview' }],
+      input: prompt,
     }),
   })
   const d = await r.json()
-  if (d.error) console.error('[ChatGPT] API error:', JSON.stringify(d.error))
-  return d.choices?.[0]?.message?.content ?? null
+  if (d.error) {
+    console.error('[ChatGPT] Responses API error:', JSON.stringify(d.error))
+    return null
+  }
+  // Responses API returns output[] with mixed web_search_call and message blocks
+  const text = (d.output || [])
+    .filter(o => o.type === 'message')
+    .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
+    .join('\n')
+  return text || null
 }
 
 // Gemini — googleSearch tool enables Search grounding (matches Gemini product)
