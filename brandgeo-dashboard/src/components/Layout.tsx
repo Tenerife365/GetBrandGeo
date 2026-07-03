@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2, StopCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { MapPin, Building2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
+import { useCollection } from '../lib/collectionContext'
 
 function BrandGeoLogo() {
   const { theme } = useTheme()
@@ -28,6 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
+  const { collecting, progress, stopCollection } = useCollection()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [showMarkets, setShowMarkets]   = useState(false)
   const [showRegions, setShowRegions]   = useState(false)
@@ -49,45 +51,69 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
-
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
+  const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
 
       {/* Mobile backdrop */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 md:hidden"
-          onClick={closeSidebar}
-        />
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
       )}
 
       {/* Sidebar */}
-      <aside
-        className={[
-          'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 flex flex-col',
-          'transition-transform duration-200 ease-in-out',
-          'md:relative md:w-56 md:flex-shrink-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        ].join(' ')}
-      >
-        {/* Sidebar header */}
+      <aside className={[
+        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 flex flex-col',
+        'transition-transform duration-200 ease-in-out',
+        'md:relative md:w-56 md:flex-shrink-0',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      ].join(' ')}>
+
+        {/* Logo */}
         <div className="px-4 py-4 border-b border-dark-700 flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo />
           <div className="flex items-center gap-2">
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
             )}
-            <button
-              onClick={closeSidebar}
-              className="md:hidden text-slate-400 hover:text-white transition-colors p-1"
-              aria-label="Close menu"
-            >
+            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-1" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
         </div>
+
+        {/* Collection progress — visible from any tab */}
+        {collecting && progress && (
+          <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Loader2 size={11} className="animate-spin text-brand-400" />
+                <span className="text-xs text-brand-300 font-medium truncate max-w-[120px]">
+                  {progress.clientName}
+                </span>
+              </div>
+              <button
+                onClick={stopCollection}
+                className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                title="Stop collection"
+              >
+                <StopCircle size={11} />
+                Stop
+              </button>
+            </div>
+            <div className="h-1 bg-dark-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-400 rounded-full transition-all duration-300"
+                style={{ width: `${collectPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-slate-600">{progress.done}/{progress.total} prompts</span>
+              <span className="text-[10px] text-slate-600">{collectPct}%</span>
+            </div>
+          </div>
+        )}
 
         {/* Nav links */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -136,7 +162,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Admin actions */}
+        {/* Onboard Client */}
         {isAdmin && (
           <div className="p-3 border-t border-dark-700 flex-shrink-0">
             <NavLink to="/onboard" onClick={closeSidebar}
@@ -209,7 +235,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Bottom actions */}
         <div className="p-3 border-t border-dark-700 space-y-0.5 flex-shrink-0">
-          {/* Language picker */}
           <div className="relative">
             <button
               onClick={() => { setShowLangs(v => !v); setShowMarkets(false); setShowRegions(false); setShowClients(false) }}
@@ -248,19 +273,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content area */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {/* Mobile top bar */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700 flex items-center px-4 gap-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-slate-400 hover:text-white transition-colors p-1"
-            aria-label="Open menu"
-          >
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-1" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
+          {collecting && progress && (
+            <div className="ml-auto flex items-center gap-1.5 text-xs text-brand-400">
+              <Loader2 size={12} className="animate-spin" />
+              <span>{progress.done}/{progress.total}</span>
+            </div>
+          )}
         </header>
 
         <main className="flex-1 overflow-auto scrollbar-thin">

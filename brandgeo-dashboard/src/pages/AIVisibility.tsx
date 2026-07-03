@@ -6,6 +6,7 @@ import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
+import { useCollection } from '../lib/collectionContext'
 
 const LLMS: { id: LLMName; label: string; color: string; bg: string; logoUrl: string }[] = [
   { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com'       },
@@ -92,50 +93,10 @@ export default function AIVisibility() {
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
   const [refreshed, setRefreshed] = useState(false)
-  const [collecting, setCollecting] = useState(false)
-  const [collectProgress, setCollectProgress] = useState<{ done: number; total: number } | null>(null)
+  const { collecting, progress: collectProgress, runCollection: startCollection } = useCollection()
 
   const runCollection = async () => {
-    if (collecting) return
-    setCollecting(true)
-    setCollectProgress({ done: 0, total: 0 })
-
-    const { data: clientRow } = await supabase
-      .from('clients')
-      .select('brand_aliases, brand_website, known_competitors')
-      .eq('id', activeClientId)
-      .single()
-
-    const clientConfig = {
-      brand_aliases:     clientRow?.brand_aliases     ?? [],
-      brand_website:     clientRow?.brand_website     ?? '',
-      known_competitors: clientRow?.known_competitors ?? [],
-    }
-
-    const { data: allPrompts } = await supabase
-      .from('prompts')
-      .select('id, text')
-      .eq('client_id', activeClientId)
-      .eq('is_active', true)
-      .order('position')
-
-    if (!allPrompts || allPrompts.length === 0) { setCollecting(false); return }
-    setCollectProgress({ done: 0, total: allPrompts.length })
-
-    for (let i = 0; i < allPrompts.length; i++) {
-      const p = allPrompts[i]
-      setCollectProgress({ done: i, total: allPrompts.length })
-      try {
-        await fetch('/.netlify/functions/collect-prompt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt_id: p.id, prompt_text: p.text, client_id: activeClientId, client_config: clientConfig }),
-        })
-      } catch { /* continue */ }
-    }
-
-    setCollecting(false)
-    setCollectProgress(null)
+    await startCollection(activeClientId)
     load()
   }
 

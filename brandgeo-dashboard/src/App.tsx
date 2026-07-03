@@ -5,6 +5,7 @@ import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
 import { ClientProvider } from './lib/clientContext'
 import { I18nProvider } from './lib/i18nContext'
+import { CollectionProvider } from './lib/collectionContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -50,20 +51,22 @@ export default function App() {
       <I18nProvider>
       <MarketProvider>
         <ClientProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<DemoLoginInterceptor />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
-            <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
-            <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
-            <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
-            <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
-            <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
-            <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+          <CollectionProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<DemoLoginInterceptor />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
+              <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
+              <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
+              <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
+              <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
+              <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
+              <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+          </CollectionProvider>
         </ClientProvider>
       </MarketProvider>
       </I18nProvider>
