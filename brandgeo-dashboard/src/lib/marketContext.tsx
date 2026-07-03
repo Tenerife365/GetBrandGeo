@@ -13,18 +13,23 @@ export interface Market {
   regions:  Region[]
 }
 
+export interface MarketSelection {
+  market: Market
+  region: Region
+}
+
 export const MARKETS: Market[] = [
   // ── Global & Regions ──────────────────────────────────────────────────────
   {
     id: 'WW', label: 'Worldwide', flag: '', flagCode: 'un',
     regions: [
-      { id: 'ALL',  label: 'All regions'       },
-      { id: 'EU',   label: 'Europe'            },
-      { id: 'NA',   label: 'North America'     },
-      { id: 'LATAM',label: 'Latin America'     },
-      { id: 'APAC', label: 'Asia Pacific'      },
-      { id: 'MEA',  label: 'Middle East & Africa' },
-      { id: 'OCE',  label: 'Oceania'           },
+      { id: 'ALL',   label: 'All regions'          },
+      { id: 'EU',    label: 'Europe'               },
+      { id: 'NA',    label: 'North America'        },
+      { id: 'LATAM', label: 'Latin America'        },
+      { id: 'APAC',  label: 'Asia Pacific'         },
+      { id: 'MEA',   label: 'Middle East & Africa' },
+      { id: 'OCE',   label: 'Oceania'              },
     ],
   },
   // ── Europe ────────────────────────────────────────────────────────────────
@@ -67,10 +72,34 @@ export const MARKETS: Market[] = [
     id: 'PL', label: 'Poland', flag: '', flagCode: 'pl',
     regions: [{ id: 'ALL', label: 'All regions' }, { id: 'WAW', label: 'Warsaw' }, { id: 'KRK', label: 'Krakow' }],
   },
+  {
+    id: 'PT', label: 'Portugal', flag: '', flagCode: 'pt',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LIS', label: 'Lisbon' }, { id: 'OPO', label: 'Porto' }],
+  },
+  {
+    id: 'BE', label: 'Belgium', flag: '', flagCode: 'be',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BRU', label: 'Brussels' }, { id: 'ANT', label: 'Antwerp' }],
+  },
+  {
+    id: 'CH', label: 'Switzerland', flag: '', flagCode: 'ch',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'ZRH', label: 'Zurich' }, { id: 'GVA', label: 'Geneva' }],
+  },
+  {
+    id: 'AT', label: 'Austria', flag: '', flagCode: 'at',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'VIE', label: 'Vienna' }],
+  },
+  {
+    id: 'SE', label: 'Sweden', flag: '', flagCode: 'se',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'STO', label: 'Stockholm' }],
+  },
+  {
+    id: 'DK', label: 'Denmark', flag: '', flagCode: 'dk',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'CPH', label: 'Copenhagen' }],
+  },
   // ── Americas ──────────────────────────────────────────────────────────────
   {
     id: 'US', label: 'USA', flag: '', flagCode: 'us',
-    regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }, { id: 'CHI', label: 'Chicago' }, { id: 'MIA', label: 'Miami' }],
+    regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }, { id: 'CHI', label: 'Chicago' }, { id: 'MIA', label: 'Miami' }, { id: 'HOU', label: 'Houston' }, { id: 'DAL', label: 'Dallas' }],
   },
   {
     id: 'CA', label: 'Canada', flag: '', flagCode: 'ca',
@@ -80,10 +109,14 @@ export const MARKETS: Market[] = [
     id: 'BR', label: 'Brazil', flag: '', flagCode: 'br',
     regions: [{ id: 'ALL', label: 'All regions' }, { id: 'SAO', label: 'São Paulo' }, { id: 'RIO', label: 'Rio de Janeiro' }],
   },
+  {
+    id: 'MX', label: 'Mexico', flag: '', flagCode: 'mx',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MEX', label: 'Mexico City' }, { id: 'GDL', label: 'Guadalajara' }],
+  },
   // ── APAC ──────────────────────────────────────────────────────────────────
   {
     id: 'AU', label: 'Australia', flag: '', flagCode: 'au',
-    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'SYD', label: 'Sydney' }, { id: 'MEL', label: 'Melbourne' }],
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'SYD', label: 'Sydney' }, { id: 'MEL', label: 'Melbourne' }, { id: 'BNE', label: 'Brisbane' }],
   },
   {
     id: 'SG', label: 'Singapore', flag: '', flagCode: 'sg',
@@ -108,41 +141,87 @@ export const MARKETS: Market[] = [
   },
 ]
 
-interface MarketCtx {
-  market:    Market
-  setMarket: (m: Market) => void
-  region:    Region
-  setRegion: (r: Region) => void
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MarketCtx {
+  selections:      MarketSelection[]
+  addSelection:    (market: Market, region?: Region) => void
+  removeSelection: (marketId: string) => void
+  updateRegion:    (marketId: string, region: Region) => void
+  /** First selection — used as geo context for collection */
+  primaryMarket:   Market | null
+  primaryRegion:   Region | null
 }
 
 const Ctx = createContext<MarketCtx>({
-  market:    MARKETS[0],
-  setMarket: () => {},
-  region:    MARKETS[0].regions[0],
-  setRegion: () => {},
+  selections:      [],
+  addSelection:    () => {},
+  removeSelection: () => {},
+  updateRegion:    () => {},
+  primaryMarket:   null,
+  primaryRegion:   null,
 })
 
+function loadSaved(): MarketSelection[] {
+  try {
+    // v2 multi-select storage
+    const v2 = localStorage.getItem('brandgeo_markets_v2')
+    if (v2) {
+      const parsed = JSON.parse(v2) as { marketId: string; regionId: string }[]
+      const result = parsed.flatMap(({ marketId, regionId }) => {
+        const market = MARKETS.find(m => m.id === marketId)
+        if (!market) return []
+        const region = market.regions.find(r => r.id === regionId) ?? market.regions[0]
+        return [{ market, region }] as MarketSelection[]
+      })
+      if (result.length > 0) return result
+    }
+  } catch {}
+  // Migrate from v1 single-market storage
+  const oldId = localStorage.getItem('brandgeo_market')
+  const oldReg = localStorage.getItem('brandgeo_region') ?? 'ALL'
+  const mkt = MARKETS.find(m => m.id === oldId) ?? MARKETS[1] // default RO
+  const reg = mkt.regions.find(r => r.id === oldReg) ?? mkt.regions[0]
+  return [{ market: mkt, region: reg }]
+}
+
 export function MarketProvider({ children }: { children: ReactNode }) {
-  const savedMarket = MARKETS.find(m => m.id === localStorage.getItem('brandgeo_market')) ?? MARKETS[0]
-  const savedRegionId = localStorage.getItem('brandgeo_region') ?? 'ALL'
-  const savedRegion = savedMarket.regions.find(r => r.id === savedRegionId) ?? savedMarket.regions[0]
+  const [selections, setSelections] = useState<MarketSelection[]>(loadSaved)
 
-  const [market, setMarketState] = useState<Market>(savedMarket)
-  const [region, setRegionState] = useState<Region>(savedRegion)
-
-  const setMarket = (m: Market) => {
-    localStorage.setItem('brandgeo_market', m.id)
-    localStorage.setItem('brandgeo_region', 'ALL')
-    setMarketState(m)
-    setRegionState(m.regions[0])
+  const persist = (sels: MarketSelection[]) => {
+    localStorage.setItem('brandgeo_markets_v2', JSON.stringify(
+      sels.map(s => ({ marketId: s.market.id, regionId: s.region.id }))
+    ))
+    setSelections(sels)
   }
 
-  const setRegion = (r: Region) => {
-    localStorage.setItem('brandgeo_region', r.id)
-    setRegionState(r)
+  const addSelection = (market: Market, region?: Region) => {
+    if (selections.some(s => s.market.id === market.id)) return
+    persist([...selections, { market, region: region ?? market.regions[0] }])
   }
 
-  return <Ctx.Provider value={{ market, setMarket, region, setRegion }}>{children}</Ctx.Provider>
+  const removeSelection = (marketId: string) => {
+    const next = selections.filter(s => s.market.id !== marketId)
+    if (next.length === 0) return // always keep at least one
+    persist(next)
+  }
+
+  const updateRegion = (marketId: string, region: Region) => {
+    persist(selections.map(s => s.market.id === marketId ? { ...s, region } : s))
+  }
+
+  return (
+    <Ctx.Provider value={{
+      selections,
+      addSelection,
+      removeSelection,
+      updateRegion,
+      primaryMarket: selections[0]?.market ?? null,
+      primaryRegion: selections[0]?.region ?? null,
+    }}>
+      {children}
+    </Ctx.Provider>
+  )
 }
 
 export function useMarket() {

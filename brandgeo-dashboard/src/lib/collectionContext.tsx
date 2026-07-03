@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabase'
+import type { MarketSelection } from './marketContext'
 
 interface Progress {
   done: number
@@ -17,7 +18,7 @@ interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
   lastCompletedAt: number   // increments after each prompt — watch to reload data
-  runCollection: (clientId: number, force?: boolean) => Promise<void>
+  runCollection: (clientId: number, force?: boolean, markets?: MarketSelection[]) => Promise<void>
   stopCollection: () => void
 }
 
@@ -25,7 +26,7 @@ const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
   lastCompletedAt: 0,
-  runCollection: async (_clientId: number, _force?: boolean) => {},
+  runCollection: async (_clientId: number, _force?: boolean, _markets?: MarketSelection[]) => {},
   stopCollection: () => {},
 })
 
@@ -41,7 +42,11 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     abortRef.current = true
   }, [])
 
-  const runCollection = useCallback(async (clientId: number, force = false) => {
+  const runCollection = useCallback(async (
+    clientId: number,
+    force = false,
+    markets?: MarketSelection[],
+  ) => {
     if (runningRef.current) return
     runningRef.current = true
     abortRef.current   = false
@@ -66,6 +71,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         brand_aliases: clientConfig.brand_aliases,
         brand_website: clientConfig.brand_website,
         aliases_empty: clientConfig.brand_aliases.length === 0,
+        markets: markets?.map(s => `${s.market.label} / ${s.region.label}`),
       })
 
       // Fetch active prompts only
@@ -79,6 +85,14 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       if (!prompts || prompts.length === 0) return
 
       setProgress({ done: 0, total: prompts.length, clientId, clientName: clientRow?.name ?? '' })
+
+      // Primary market drives the geo context for LLM calls.
+      // When multiple markets are selected, future versions can fan-out one
+      // collection job per market and store results tagged by market.
+      // For now, primary (first) selection is used.
+      const primaryMarket = markets?.[0]
+      const market_label  = primaryMarket?.market.label ?? null
+      const region_label  = primaryMarket?.region.label ?? null
 
       for (let i = 0; i < prompts.length; i++) {
         if (abortRef.current) break
@@ -95,6 +109,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
               client_id:     clientId,
               client_config: clientConfig,
               force,
+              market_label,
+              region_label,
             }),
           })
           const json = await res.json().catch(() => null)

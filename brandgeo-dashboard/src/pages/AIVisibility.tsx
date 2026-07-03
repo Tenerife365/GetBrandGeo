@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2 } from 'lucide-react'
+import { RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2, Globe2 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
@@ -81,7 +81,7 @@ function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
 }
 
 export default function AIVisibility() {
-  const { market } = useMarket()
+  const { selections, primaryMarket } = useMarket()
   const { activeClientId, activeClient, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
@@ -96,12 +96,12 @@ export default function AIVisibility() {
   const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection } = useCollection()
 
   const runCollection = async () => {
-    await startCollection(activeClientId, false)
+    await startCollection(activeClientId, false, selections)
     load()
   }
 
   const forceCollection = async () => {
-    await startCollection(activeClientId, true)
+    await startCollection(activeClientId, true, selections)
     load()
   }
 
@@ -216,11 +216,22 @@ export default function AIVisibility() {
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <h1 className="text-2xl font-bold text-white">{t.aiv_title}</h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
-              {market.flag} {market.id} {t.aiv_results}
-            </span>
+            {/* Show all selected markets as badges */}
+            {selections.map(sel => (
+              <span
+                key={sel.market.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50"
+              >
+                {sel.market.flagCode === 'un'
+                  ? <Globe2 size={11} className="text-slate-400" />
+                  : <img src={`https://flagcdn.com/w16/${sel.market.flagCode}.png`} alt="" className="w-3.5 h-auto rounded-sm" />
+                }
+                {sel.market.id}
+                {sel.region.id !== 'ALL' && <span className="text-slate-500">· {sel.region.label}</span>}
+              </span>
+            ))}
           </div>
           <p className="text-sm text-slate-400 mt-0.5">
             {t.aiv_subtitle}

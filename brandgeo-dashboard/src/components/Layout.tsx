@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2, StopCircle } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2, StopCircle, Plus } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
-import { MapPin, Building2 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
@@ -25,14 +25,13 @@ function BrandGeoLogo() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const { market, setMarket, region, setRegion } = useMarket()
+  const { selections, addSelection, removeSelection, updateRegion } = useMarket()
   const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [showMarkets, setShowMarkets]   = useState(false)
-  const [showRegions, setShowRegions]   = useState(false)
+  const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
 
@@ -53,6 +52,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const closeSidebar = () => setSidebarOpen(false)
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
+
+  // Markets not yet selected — available to add
+  const availableMarkets = MARKETS.filter(m => !selections.some(s => s.market.id === m.id))
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
@@ -136,7 +138,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative">
               <button
-                onClick={() => { setShowClients(v => !v); setShowMarkets(false); setShowRegions(false); setShowLangs(false) }}
+                onClick={() => { setShowClients(v => !v); setShowAddMarket(false); setShowLangs(false) }}
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
               >
                 <Building2 size={13} className="text-brand-400 flex-shrink-0" />
@@ -176,68 +178,87 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Market / Region pickers */}
+        {/* Market selector — multi-select with per-market region pickers */}
         <div className="p-3 border-t border-dark-700 space-y-1.5 flex-shrink-0">
           <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
 
-          <div className="relative">
-            <button
-              onClick={() => { setShowMarkets(v => !v); setShowRegions(false); setShowLangs(false) }}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-dark-700 hover:bg-dark-600 transition-colors"
-            >
-              {market.flagCode === 'un'
-                ? <Globe2 size={18} className="text-slate-400 flex-shrink-0" />
-                : <img src={`https://flagcdn.com/w20/${market.flagCode}.png`} alt={market.label} className="w-5 h-auto rounded-sm flex-shrink-0" />
-              }
-              <span className="flex-1 text-left">{market.label}</span>
-              {MARKETS.length > 1 && <ChevronDown size={13} className="text-slate-500" />}
-            </button>
-            {showMarkets && MARKETS.length > 1 && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-64 shadow-xl z-50">
-                {MARKETS.map(m => (
-                  <button key={m.id} onClick={() => { setMarket(m); setShowMarkets(false) }}
-                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${m.id === market.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
-                  >
-                    {m.flagCode === 'un'
-                      ? <Globe2 size={16} className="text-slate-400" />
-                      : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt={m.label} className="w-5 h-auto rounded-sm" />
-                    }
-                    <span>{m.label}</span>
-                  </button>
-                ))}
+          {/* Selected market chips */}
+          <div className="space-y-1">
+            {selections.map(sel => (
+              <div key={sel.market.id} className="bg-dark-700 rounded-lg overflow-hidden">
+                {/* Market header row */}
+                <div className="flex items-center gap-2 px-3 py-2">
+                  {sel.market.flagCode === 'un'
+                    ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                    : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
+                  }
+                  <span className="flex-1 text-sm text-slate-300 truncate">{sel.market.label}</span>
+                  {selections.length > 1 && (
+                    <button
+                      onClick={() => removeSelection(sel.market.id)}
+                      className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                      title={`Remove ${sel.market.label}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+                {/* Inline region selector — only shown when market has sub-regions */}
+                {sel.market.regions.length > 1 && (
+                  <div className="px-2 pb-2">
+                    <select
+                      value={sel.region.id}
+                      onChange={e => {
+                        const r = sel.market.regions.find(r => r.id === e.target.value)
+                        if (r) updateRegion(sel.market.id, r)
+                      }}
+                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                    >
+                      {sel.market.regions.map(r => (
+                        <option key={r.id} value={r.id}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => { setShowRegions(v => !v); setShowMarkets(false); setShowLangs(false) }}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
-            >
-              <MapPin size={13} className="text-slate-500 flex-shrink-0" />
-              <span className="flex-1 text-left truncate">{region.label}</span>
-              <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
-            </button>
-            {showRegions && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-56 shadow-xl z-50">
-                {market.regions.map(r => (
-                  <button key={r.id} onClick={() => { setRegion(r); setShowRegions(false) }}
-                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${r.id === region.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
-                  >
-                    <MapPin size={12} className="flex-shrink-0" />
-                    <span>{r.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Add market picker */}
+          {availableMarkets.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+              >
+                <Plus size={11} />
+                Add market
+              </button>
+              {showAddMarket && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-56 shadow-xl z-50">
+                  {availableMarkets.map(m => (
+                    <button key={m.id}
+                      onClick={() => { addSelection(m); setShowAddMarket(false) }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300 hover:bg-dark-600 transition-colors"
+                    >
+                      {m.flagCode === 'un'
+                        ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                        : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
+                      }
+                      <span>{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom actions */}
         <div className="p-3 border-t border-dark-700 space-y-0.5 flex-shrink-0">
           <div className="relative">
             <button
-              onClick={() => { setShowLangs(v => !v); setShowMarkets(false); setShowRegions(false); setShowClients(false) }}
+              onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
             >
               <Languages size={16} />

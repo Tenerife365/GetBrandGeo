@@ -1,32 +1,63 @@
 /**
  * collect-prompt.js
  * On-demand LLM collection for a single prompt across all 5 engines.
- * POST body: { prompt_id, prompt_text, client_id, client_config, force? }
+ *
+ * POST body:
+ *   { prompt_id, prompt_text, client_id, client_config, force?,
+ *     market_label?, region_label? }
+ *
+ * market_label / region_label — explicit geo context from the dashboard's
+ * market selector. When present, these take full priority over any TLD
+ * inference. This makes results correct for every client regardless of
+ * what domain they happen to use.
+ *
  * client_config: { brand_aliases, brand_website, known_competitors }
  */
 
 const { createClient } = require('@supabase/supabase-js')
 
 // ─── Geographic / language context ───────────────────────────────────────────
-// Without this, API calls from our US Netlify server return global/US-centric
-// results. Real users in Romania get location-aware results because search
-// engines see their IP. We replicate this by telling every LLM where to search.
+// Without geo context, API calls from our US Netlify server return US-centric
+// results. Real users in e.g. Romania get location-aware results because
+// search engines use their IP. We replicate this by telling every LLM exactly
+// where the end-user is searching from.
+//
+// Priority:
+//   1. market_label / region_label from POST body (explicit, always correct)
+//   2. TLD inference from brand_website (fallback only — unreliable for
+//      clients who target markets different from their domain's TLD)
 
-function buildSystemContext(cfg) {
-  const raw = (cfg.brand_website || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-  const tld  = raw.split('.').pop()?.toLowerCase()
-  const countryMap = {
-    ro: 'Romania', uk: 'United Kingdom', de: 'Germany', fr: 'France',
-    es: 'Spain',   it: 'Italy',          nl: 'Netherlands', pl: 'Poland',
-    au: 'Australia', ca: 'Canada',       us: 'United States', pt: 'Portugal',
-    be: 'Belgium',   ch: 'Switzerland',  at: 'Austria',       hu: 'Hungary',
-    cz: 'Czech Republic', se: 'Sweden',  dk: 'Denmark',       fi: 'Finland',
+function buildSystemContext(cfg, marketLabel, regionLabel) {
+  let location = 'the relevant local market'
+
+  if (marketLabel) {
+    // Explicit market from dashboard — always correct, use as-is
+    const hasSpecificRegion =
+      regionLabel &&
+      !regionLabel.startsWith('All ') &&
+      regionLabel !== 'All regions' &&
+      regionLabel !== 'All states' &&
+      regionLabel !== 'All provinces' &&
+      regionLabel !== 'All emirates'
+    location = hasSpecificRegion ? `${regionLabel}, ${marketLabel}` : marketLabel
+  } else {
+    // Fallback: infer from brand_website TLD (last resort only)
+    const raw = (cfg.brand_website || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    const tld  = raw.split('.').pop()?.toLowerCase()
+    const tldMap = {
+      ro: 'Romania',      uk: 'United Kingdom', de: 'Germany',    fr: 'France',
+      es: 'Spain',        it: 'Italy',           nl: 'Netherlands', pl: 'Poland',
+      au: 'Australia',    ca: 'Canada',          us: 'United States', pt: 'Portugal',
+      be: 'Belgium',      ch: 'Switzerland',     at: 'Austria',    hu: 'Hungary',
+      cz: 'Czech Republic', se: 'Sweden',        dk: 'Denmark',    fi: 'Finland',
+    }
+    location = tldMap[tld] || 'the relevant local market'
   }
-  const country = countryMap[tld] || 'the relevant local market'
+
   return (
-    `You are simulating a real user searching from ${country}. ` +
+    `You are simulating a real user searching from ${location}. ` +
     `Use web search to find current, locally relevant results. ` +
-    `When asked about businesses, services, or providers, prioritise companies operating in ${country}. ` +
+    `When asked about businesses, services, or providers, prioritise companies operating in ${location}. ` +
     `Respond in the same language as the user's question.`
   )
 }
@@ -35,7 +66,7 @@ function buildSystemContext(cfg) {
 
 function normalizeText(t) {
   return t
-    .replace(/[   ​⁠﻿]/g, ' ')
+    .replace(/[          ​﻿]/g, ' ')
     .replace(/\s+/g, ' ')
     .normalize('NFC')
 }
@@ -268,14 +299,14 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
 
-  const { prompt_id, prompt_text, client_id, client_config, force } = body
+  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label } = body
   if (!prompt_id || !prompt_text || !client_id || !client_config)
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-  // Build context once per request — derived from client's brand_website TLD
-  const ctx = buildSystemContext(client_config)
+  // Build geo context — explicit market takes priority over TLD inference
+  const ctx = buildSystemContext(client_config, market_label, region_label)
 
   // LLM_CALLERS defined here so ctx is captured in closure
   const LLM_CALLERS = {
@@ -341,9 +372,14 @@ exports.handler = async (event) => {
     if (error) return { statusCode: 500, body: JSON.stringify({ error: error.message }) }
   }
 
+  // ctx_geo: what location was actually used — helps debug collection results
+  const ctxGeo = market_label
+    ? (region_label && !region_label.startsWith('All ') ? `${region_label}, ${market_label}` : market_label)
+    : ctx.split('from ')[1]?.split('.')[0] ?? 'unknown'
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ done: true, prompt_id, summary, ctx_country: ctx.split('from ')[1]?.split('.')[0] }),
+    body: JSON.stringify({ done: true, prompt_id, summary, ctx_geo: ctxGeo }),
   }
 }
