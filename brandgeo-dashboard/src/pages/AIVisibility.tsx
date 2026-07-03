@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
@@ -68,7 +68,7 @@ function parseCompetitors(raw: string | null | undefined): string[] {
 
 export default function AIVisibility() {
   const { market } = useMarket()
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -79,6 +79,52 @@ export default function AIVisibility() {
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
   const [refreshed, setRefreshed] = useState(false)
+  const [collecting, setCollecting] = useState(false)
+  const [collectProgress, setCollectProgress] = useState<{ done: number; total: number } | null>(null)
+
+  const runCollection = async () => {
+    if (collecting) return
+    setCollecting(true)
+    setCollectProgress({ done: 0, total: 0 })
+
+    const { data: clientRow } = await supabase
+      .from('clients')
+      .select('brand_aliases, brand_website, known_competitors')
+      .eq('id', activeClientId)
+      .single()
+
+    const clientConfig = {
+      brand_aliases:     clientRow?.brand_aliases     ?? [],
+      brand_website:     clientRow?.brand_website     ?? '',
+      known_competitors: clientRow?.known_competitors ?? [],
+    }
+
+    const { data: allPrompts } = await supabase
+      .from('prompts')
+      .select('id, text')
+      .eq('client_id', activeClientId)
+      .eq('is_active', true)
+      .order('position')
+
+    if (!allPrompts || allPrompts.length === 0) { setCollecting(false); return }
+    setCollectProgress({ done: 0, total: allPrompts.length })
+
+    for (let i = 0; i < allPrompts.length; i++) {
+      const p = allPrompts[i]
+      setCollectProgress({ done: i, total: allPrompts.length })
+      try {
+        await fetch('/.netlify/functions/collect-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt_id: p.id, prompt_text: p.text, client_id: activeClientId, client_config: clientConfig }),
+        })
+      } catch { /* continue */ }
+    }
+
+    setCollecting(false)
+    setCollectProgress(null)
+    load()
+  }
 
   const load = async () => {
     setLoading(true)
@@ -193,14 +239,28 @@ export default function AIVisibility() {
             )}
           </p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-dark-700 text-slate-400 hover:text-slate-200"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          {refreshed ? <span className="text-emerald-400">{t.aiv_refreshed}</span> : t.aiv_reload}
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={runCollection}
+              disabled={collecting || loading}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-brand-500/30 bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {collecting
+                ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
+                : <><Play size={14} /> Run Collection</>
+              }
+            </button>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-dark-700 text-slate-400 hover:text-slate-200"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {refreshed ? <span className="text-emerald-400">{t.aiv_refreshed}</span> : t.aiv_reload}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">

@@ -48,7 +48,7 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId } = useClient()
+  const { activeClientId, isAdmin } = useClient()
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
@@ -214,6 +214,8 @@ export default function Prompts() {
           <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
         </div>
         <div className="flex gap-2">
+          {isAdmin && (
+            <>
           <button
             onClick={() => { setShowDiscover(v => !v); setSuggestions([]) }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
@@ -232,6 +234,8 @@ export default function Prompts() {
             <Plus size={14} />
             {t.pr_addPrompt}
           </button>
+            </>
+          )}
         </div>
       </div>
 

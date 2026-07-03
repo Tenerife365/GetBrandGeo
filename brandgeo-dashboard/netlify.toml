@@ -12,3 +12,9 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[functions."collect-prompt"]
+  timeout = 26
+
+[functions."onboard-client"]
+  timeout = 26

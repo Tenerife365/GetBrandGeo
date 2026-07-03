@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
@@ -133,6 +133,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Admin actions */}
+        {isAdmin && (
+          <div className="p-3 border-t border-dark-700 flex-shrink-0">
+            <NavLink to="/onboard" onClick={closeSidebar}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
+              }
+            >
+              <UserPlus size={16} />
+              Onboard Client
+            </NavLink>
           </div>
         )}
 
