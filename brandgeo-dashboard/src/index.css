@@ -43,6 +43,8 @@ html.light .text-slate-400   { color: rgb(71 85 105) !important; }
 html.light .text-slate-500   { color: rgb(100 116 139) !important; }
 html.light .text-slate-600   { color: rgb(148 163 184) !important; }
 
+html.light .text-brand-100   { color: rgb(15 23 42)   !important; }
+html.light .text-brand-200   { color: rgb(15 23 42)   !important; }
 html.light .text-brand-300   { color: rgb(27 125 142) !important; }
 html.light .text-brand-400   { color: rgb(27 125 142) !important; }
 html.light .text-emerald-400 { color: rgb(5 150 105) !important; }
