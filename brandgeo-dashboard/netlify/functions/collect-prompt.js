@@ -263,25 +263,16 @@ exports.handler = async (event) => {
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-  // Check which LLMs already have results this month (dedup guard)
-  const monthStart = new Date()
-  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+  // Always run all engines — delete stale results first so re-runs give fresh data
+  const toRun = Object.keys(LLM_CALLERS)
 
-  const { data: existing } = await supabase
+  await supabase
     .from('ai_results')
-    .select('llm')
+    .delete()
     .eq('prompt_id', prompt_id)
     .eq('client_id', client_id)
-    .gte('checked_at', monthStart.toISOString())
 
-  const done = new Set((existing || []).map(r => r.llm))
-  const toRun = Object.keys(LLM_CALLERS).filter(llm => !done.has(llm))
-
-  if (toRun.length === 0) {
-    return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
-  }
-
-  // Call all pending LLMs in parallel (20s timeout each)
+  // Call all LLMs in parallel (30s timeout each)
   const settled = await Promise.allSettled(
     toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 30000))
   )
