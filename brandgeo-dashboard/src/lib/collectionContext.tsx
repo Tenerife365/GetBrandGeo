@@ -60,6 +60,13 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         brand_website:     clientRow?.brand_website     ?? '',
         known_competitors: clientRow?.known_competitors ?? [],
       }
+      // Debug — visible in browser console (F12)
+      console.log('[Collection] client config loaded:', {
+        name: clientRow?.name,
+        brand_aliases: clientConfig.brand_aliases,
+        brand_website: clientConfig.brand_website,
+        aliases_empty: clientConfig.brand_aliases.length === 0,
+      })
 
       // Fetch active prompts only
       const { data: prompts } = await supabase
@@ -79,7 +86,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         setProgress({ done: i, total: prompts.length, clientId, clientName: clientRow?.name ?? '' })
 
         try {
-          await fetch('/.netlify/functions/collect-prompt', {
+          const res  = await fetch('/.netlify/functions/collect-prompt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -89,6 +96,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
               client_config: clientConfig,
             }),
           })
+          const json = await res.json().catch(() => null)
+          console.log(`[Collection] prompt ${i + 1}/${prompts.length} →`, json)
         } catch { /* network blip — skip prompt, keep going */ }
         setLastCompletedAt(Date.now())
       }
