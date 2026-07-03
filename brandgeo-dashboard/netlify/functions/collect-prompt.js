@@ -159,7 +159,7 @@ async function callGemini(prompt) {
 
 async function callClaude(prompt) {
   // Routed through OpenRouter — no separate Anthropic key needed
-  return callOpenRouter('anthropic/claude-haiku-4-5', prompt)
+  return callOpenRouter('anthropic/claude-sonnet-4-5', prompt)
 }
 
 async function callOpenRouter(model, prompt) {
