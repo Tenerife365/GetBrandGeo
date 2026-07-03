@@ -14,36 +14,97 @@ export interface Market {
 }
 
 export const MARKETS: Market[] = [
+  // ── Global & Regions ──────────────────────────────────────────────────────
   {
     id: 'WW', label: 'Worldwide', flag: '', flagCode: 'un',
-    regions: [{ id: 'ALL', label: 'All regions' }],
+    regions: [
+      { id: 'ALL',  label: 'All regions'       },
+      { id: 'EU',   label: 'Europe'            },
+      { id: 'NA',   label: 'North America'     },
+      { id: 'LATAM',label: 'Latin America'     },
+      { id: 'APAC', label: 'Asia Pacific'      },
+      { id: 'MEA',  label: 'Middle East & Africa' },
+      { id: 'OCE',  label: 'Oceania'           },
+    ],
   },
+  // ── Europe ────────────────────────────────────────────────────────────────
   {
     id: 'RO', label: 'Romania', flag: '', flagCode: 'ro',
     regions: [
-      { id: 'ALL', label: 'Toate regiunile' },
-      { id: 'B',   label: 'Bucuresti' },
-      { id: 'SB',  label: 'Sibiu' },
+      { id: 'ALL', label: 'All regions'  },
+      { id: 'B',   label: 'Bucharest'   },
+      { id: 'SB',  label: 'Sibiu'       },
       { id: 'CJ',  label: 'Cluj-Napoca' },
-      { id: 'CT',  label: 'Constanta' },
-      { id: 'IS',  label: 'Iasi' },
+      { id: 'CT',  label: 'Constanta'   },
+      { id: 'IS',  label: 'Iasi'        },
     ],
   },
   {
     id: 'DE', label: 'Germany', flag: '', flagCode: 'de',
-    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }, { id: 'MU', label: 'Munich' }],
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BE', label: 'Berlin' }, { id: 'MU', label: 'Munich' }, { id: 'HH', label: 'Hamburg' }, { id: 'FRA', label: 'Frankfurt' }],
   },
   {
     id: 'GB', label: 'UK', flag: '', flagCode: 'gb',
-    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }],
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }, { id: 'MAN', label: 'Manchester' }, { id: 'EDI', label: 'Edinburgh' }],
   },
   {
-    id: 'US', label: 'USA', flag: '', flagCode: 'us',
-    regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }],
+    id: 'FR', label: 'France', flag: '', flagCode: 'fr',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'PAR', label: 'Paris' }, { id: 'LYO', label: 'Lyon' }, { id: 'MRS', label: 'Marseille' }],
   },
   {
     id: 'ES', label: 'Spain', flag: '', flagCode: 'es',
-    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }],
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }, { id: 'VAL', label: 'Valencia' }],
+  },
+  {
+    id: 'NL', label: 'Netherlands', flag: '', flagCode: 'nl',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'AMS', label: 'Amsterdam' }, { id: 'RTM', label: 'Rotterdam' }],
+  },
+  {
+    id: 'IT', label: 'Italy', flag: '', flagCode: 'it',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MIL', label: 'Milan' }, { id: 'ROM', label: 'Rome' }],
+  },
+  {
+    id: 'PL', label: 'Poland', flag: '', flagCode: 'pl',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'WAW', label: 'Warsaw' }, { id: 'KRK', label: 'Krakow' }],
+  },
+  // ── Americas ──────────────────────────────────────────────────────────────
+  {
+    id: 'US', label: 'USA', flag: '', flagCode: 'us',
+    regions: [{ id: 'ALL', label: 'All states' }, { id: 'NYC', label: 'New York' }, { id: 'LA', label: 'Los Angeles' }, { id: 'CHI', label: 'Chicago' }, { id: 'MIA', label: 'Miami' }],
+  },
+  {
+    id: 'CA', label: 'Canada', flag: '', flagCode: 'ca',
+    regions: [{ id: 'ALL', label: 'All provinces' }, { id: 'TOR', label: 'Toronto' }, { id: 'VAN', label: 'Vancouver' }, { id: 'MTL', label: 'Montreal' }],
+  },
+  {
+    id: 'BR', label: 'Brazil', flag: '', flagCode: 'br',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'SAO', label: 'São Paulo' }, { id: 'RIO', label: 'Rio de Janeiro' }],
+  },
+  // ── APAC ──────────────────────────────────────────────────────────────────
+  {
+    id: 'AU', label: 'Australia', flag: '', flagCode: 'au',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'SYD', label: 'Sydney' }, { id: 'MEL', label: 'Melbourne' }],
+  },
+  {
+    id: 'SG', label: 'Singapore', flag: '', flagCode: 'sg',
+    regions: [{ id: 'ALL', label: 'Singapore' }],
+  },
+  {
+    id: 'IN', label: 'India', flag: '', flagCode: 'in',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'BOM', label: 'Mumbai' }, { id: 'BLR', label: 'Bangalore' }, { id: 'DEL', label: 'Delhi' }],
+  },
+  {
+    id: 'JP', label: 'Japan', flag: '', flagCode: 'jp',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'TYO', label: 'Tokyo' }, { id: 'OSA', label: 'Osaka' }],
+  },
+  // ── Middle East ───────────────────────────────────────────────────────────
+  {
+    id: 'AE', label: 'UAE', flag: '', flagCode: 'ae',
+    regions: [{ id: 'ALL', label: 'All emirates' }, { id: 'DXB', label: 'Dubai' }, { id: 'AUH', label: 'Abu Dhabi' }],
+  },
+  {
+    id: 'SA', label: 'Saudi Arabia', flag: '', flagCode: 'sa',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'RIY', label: 'Riyadh' }, { id: 'JED', label: 'Jeddah' }],
   },
 ]
 

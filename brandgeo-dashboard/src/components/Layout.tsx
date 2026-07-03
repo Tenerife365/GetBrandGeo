@@ -1,20 +1,12 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { MapPin, Building2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
-
-const nav = [
-  { to: '/',               icon: LayoutDashboard, label: 'Overview'      },
-  { to: '/mentions',       icon: MessageSquare,   label: 'Mentions'      },
-  { to: '/competitors',    icon: Users,           label: 'Competitors'   },
-  { to: '/prompts',        icon: BookText,        label: 'Prompts'       },
-  { to: '/ai-visibility',  icon: Bot,             label: 'AI Visibility' },
-  { to: '/recommendations',icon: Lightbulb,       label: 'Recomandări'   },
-]
+import { useI18n, LANGUAGES } from '../lib/i18nContext'
 
 function BrandGeoLogo() {
   const { theme } = useTheme()
@@ -35,10 +27,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { market, setMarket, region, setRegion } = useMarket()
   const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
   const { theme, toggle } = useTheme()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [showMarkets, setShowMarkets] = useState(false)
-  const [showRegions, setShowRegions] = useState(false)
-  const [showClients, setShowClients] = useState(false)
+  const { lang, setLang, t } = useI18n()
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [showMarkets, setShowMarkets]   = useState(false)
+  const [showRegions, setShowRegions]   = useState(false)
+  const [showClients, setShowClients]   = useState(false)
+  const [showLangs, setShowLangs]       = useState(false)
+
+  const nav = [
+    { to: '/',                icon: LayoutDashboard, label: t.nav_overview      },
+    { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions      },
+    { to: '/competitors',     icon: Users,           label: t.nav_competitors   },
+    { to: '/prompts',         icon: BookText,        label: t.nav_prompts       },
+    { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility  },
+    { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
+  ]
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -46,6 +49,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
+
+  const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
 
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
@@ -102,15 +107,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Client switcher — admin only */}
         {isAdmin && clients.length > 0 && (
           <div className="p-3 border-t border-dark-700 flex-shrink-0">
-            <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">Client</div>
+            <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative">
               <button
-                onClick={() => { setShowClients(v => !v); setShowMarkets(false); setShowRegions(false) }}
+                onClick={() => { setShowClients(v => !v); setShowMarkets(false); setShowRegions(false); setShowLangs(false) }}
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
               >
                 <Building2 size={13} className="text-brand-400 flex-shrink-0" />
                 <span className="flex-1 text-left truncate font-medium">
-                  {clients.find(c => c.id === activeClientId)?.name ?? 'Select client'}
+                  {clients.find(c => c.id === activeClientId)?.name ?? t.sidebar_selectClient}
                 </span>
                 <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
               </button>
@@ -133,11 +138,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Market / Region pickers */}
         <div className="p-3 border-t border-dark-700 space-y-1.5 flex-shrink-0">
-          <div className="text-xs text-slate-600 uppercase tracking-wider px-1">Market</div>
+          <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
 
           <div className="relative">
             <button
-              onClick={() => { setShowMarkets(v => !v); setShowRegions(false) }}
+              onClick={() => { setShowMarkets(v => !v); setShowRegions(false); setShowLangs(false) }}
               className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-dark-700 hover:bg-dark-600 transition-colors"
             >
               {market.flagCode === 'un'
@@ -148,7 +153,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {MARKETS.length > 1 && <ChevronDown size={13} className="text-slate-500" />}
             </button>
             {showMarkets && MARKETS.length > 1 && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-64 shadow-xl z-50">
                 {MARKETS.map(m => (
                   <button key={m.id} onClick={() => { setMarket(m); setShowMarkets(false) }}
                     className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${m.id === market.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
@@ -166,7 +171,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="relative">
             <button
-              onClick={() => { setShowRegions(v => !v); setShowMarkets(false) }}
+              onClick={() => { setShowRegions(v => !v); setShowMarkets(false); setShowLangs(false) }}
               className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
             >
               <MapPin size={13} className="text-slate-500 flex-shrink-0" />
@@ -174,7 +179,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
             </button>
             {showRegions && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-56 shadow-xl z-50">
                 {market.regions.map(r => (
                   <button key={r.id} onClick={() => { setRegion(r); setShowRegions(false) }}
                     className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${r.id === region.id ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
@@ -190,13 +195,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Bottom actions */}
         <div className="p-3 border-t border-dark-700 space-y-0.5 flex-shrink-0">
+          {/* Language picker */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowLangs(v => !v); setShowMarkets(false); setShowRegions(false); setShowClients(false) }}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            >
+              <Languages size={16} />
+              <span className="flex-1 text-left">
+                <img src={`https://flagcdn.com/w20/${currentLang.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm inline-block mr-1.5 -mt-0.5" />
+                {currentLang.label}
+              </span>
+              <ChevronDown size={13} className="text-slate-500" />
+            </button>
+            {showLangs && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                {LANGUAGES.map(l => (
+                  <button key={l.id}
+                    onClick={() => { setLang(l.id); setShowLangs(false) }}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                  >
+                    <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
+                    <span>{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button onClick={toggle} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            {theme === 'dark' ? t.sidebar_lightMode : t.sidebar_darkMode}
           </button>
           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             <LogOut size={16} />
-            Sign out
+            {t.sidebar_signOut}
           </button>
         </div>
       </aside>

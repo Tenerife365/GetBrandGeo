@@ -4,6 +4,7 @@ import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
 import { ClientProvider } from './lib/clientContext'
+import { I18nProvider } from './lib/i18nContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -45,6 +46,7 @@ function DemoLoginInterceptor() {
 export default function App() {
   return (
     <ThemeProvider>
+      <I18nProvider>
       <MarketProvider>
         <ClientProvider>
         <BrowserRouter>
@@ -62,6 +64,7 @@ export default function App() {
         </BrowserRouter>
         </ClientProvider>
       </MarketProvider>
+      </I18nProvider>
     </ThemeProvider>
   )
 }
