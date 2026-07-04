@@ -24,7 +24,7 @@ const SOURCE_BADGE: Record<Competitor['source'], string> = {
 // SOURCE_LABEL is now rendered inline with translation keys
 
 export default function Competitors() {
-  const { market } = useMarket()
+  const { primaryMarket } = useMarket()
   const { activeClientId, activeClient } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
@@ -162,7 +162,7 @@ const autoDiscover = async () => {
           <div className="flex items-center gap-3 mb-0.5">
             <h1 className="text-2xl font-bold text-white">{t.comp_title}</h1>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
-              {market.flag} {market.id} {t.comp_results}
+              {primaryMarket?.flag} {primaryMarket?.id} {t.comp_results}
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-0.5">

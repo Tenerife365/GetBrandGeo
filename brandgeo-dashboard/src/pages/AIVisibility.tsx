@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2, Globe2 } from 'lucide-react'
+import { RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2, Globe2, Copy, CheckCheck, Zap } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
@@ -75,7 +75,6 @@ function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
     if (typeof parsed[0] === 'object' && parsed[0] !== null && 'pos' in parsed[0]) {
       return (parsed as RankedEntry[]).sort((a, b) => a.pos - b.pos)
     }
-    // Legacy string[] — give sequential positions starting at 1
     return (parsed as string[]).map((name, i) => ({ pos: i + 1, name }))
   } catch { return [] }
 }
@@ -92,6 +91,8 @@ export default function AIVisibility() {
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
+  const [showFixHub, setShowFixHub] = useState(true)
+  const [copiedFix, setCopiedFix] = useState<number | null>(null)
   const [refreshed, setRefreshed] = useState(false)
   const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection } = useCollection()
 
@@ -147,7 +148,6 @@ export default function AIVisibility() {
   }
 
   useEffect(() => { load() }, [activeClientId])
-  // Reload whenever a prompt result lands during collection
   useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
@@ -169,10 +169,6 @@ export default function AIVisibility() {
     return total > 0 ? Math.round((mentioned / total) * 100) : 0
   })()
 
-  /**
-   * Aggregate competitors from ALL AI results (not just when brand is absent).
-   * Shows who actually appears most in AI top-5 rankings — real market data only.
-   */
   const competitorFreq = (() => {
     const freq: Record<string, { count: number; positions: number[] }> = {}
     results.forEach(llmMap => {
@@ -210,15 +206,167 @@ export default function AIVisibility() {
     return n
   })()
 
+  // ── AI Visibility Score computation ──────────────────────────────────────────
+
+  const dimensions = (() => {
+    // Recognition: overall brand mention rate across all prompt × engine combinations
+    const recognition = overallPct
+
+    // Knowledge: position quality — pos 1=100, pos 5=20, weighted average when mentioned
+    let posSum = 0, posCount = 0
+    results.forEach(llmMap => llmMap.forEach(r => {
+      if (r.brand_mentioned && r.brand_position) {
+        posSum += Math.max(20, 100 - ((r.brand_position - 1) / 4) * 80)
+        posCount++
+      }
+    }))
+    const knowledge = posCount > 0 ? Math.round(posSum / posCount) : 0
+
+    // Sentiment: positive=1, neutral=0.5, negative=0, avg among mentioned
+    let sentScore = 0, sentTotal = 0
+    results.forEach(llmMap => llmMap.forEach(r => {
+      if (r.brand_mentioned) {
+        sentTotal++
+        if (r.sentiment === 'positive') sentScore += 1
+        else if (r.sentiment === 'neutral') sentScore += 0.5
+      }
+    }))
+    const sentiment = sentTotal > 0 ? Math.round((sentScore / sentTotal) * 100) : (knowledge > 0 ? 55 : 0)
+
+    // Accuracy: % of mentions where brand lands in top-3 position
+    let topThree = 0, mentionedTotal = 0
+    results.forEach(llmMap => llmMap.forEach(r => {
+      if (r.brand_mentioned) {
+        mentionedTotal++
+        if (!r.brand_position || r.brand_position <= 3) topThree++
+      }
+    }))
+    const accuracy = mentionedTotal > 0 ? Math.round((topThree / mentionedTotal) * 100) : 0
+
+    // Reach: % of engines that mention brand in at least one prompt
+    const enginesWithMention = LLMS.filter(llm =>
+      prompts.some(p => results.get(p.id)?.get(llm.id)?.brand_mentioned)
+    ).length
+    const reach = LLMS.length > 0 ? Math.round((enginesWithMention / LLMS.length) * 100) : 0
+
+    // Consistency: % of prompts where brand appears in ≥60% of engines that checked
+    const consistentPrompts = prompts.filter(p => {
+      const checked = LLMS.filter(l => results.get(p.id)?.has(l.id)).length
+      const mentioned = LLMS.filter(l => results.get(p.id)?.get(l.id)?.brand_mentioned).length
+      return checked > 0 && mentioned / checked >= 0.6
+    }).length
+    const consistency = prompts.length > 0 ? Math.round((consistentPrompts / prompts.length) * 100) : 0
+
+    return { recognition, knowledge, sentiment, accuracy, reach, consistency }
+  })()
+
+  const aiScore = Math.round(
+    dimensions.recognition * 0.25 +
+    dimensions.knowledge   * 0.20 +
+    dimensions.sentiment   * 0.15 +
+    dimensions.accuracy    * 0.15 +
+    dimensions.reach       * 0.15 +
+    dimensions.consistency * 0.10
+  )
+
+  // ── Engine status grid ────────────────────────────────────────────────────────
+
+  const engineStatuses = llmStats.map(s => {
+    const status: 'KNOW' | 'PARTIAL' | 'MISSING' =
+      s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
+    let bestPos: number | null = null
+    prompts.forEach(p => {
+      const r = results.get(p.id)?.get(s.id)
+      if (r?.brand_mentioned && r.brand_position) {
+        if (bestPos === null || r.brand_position < bestPos) bestPos = r.brand_position
+      }
+    })
+    return { ...s, status, bestPos }
+  })
+
+  // ── Fix This hub ──────────────────────────────────────────────────────────────
+
+  const fixItems = (() => {
+    const items: { priority: 'P0' | 'P1' | 'P2'; title: string; description: string; fix: string }[] = []
+
+    engineStatuses.filter(e => e.status === 'MISSING' && e.checked > 0).forEach(e => {
+      items.push({
+        priority: 'P0',
+        title: `Not found in ${e.label}`,
+        description: `${brandName} appears in 0 of ${e.checked} ${e.label} responses. You have no presence here.`,
+        fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications ${e.label} training data trusts. Ensure your domain has schema.org/Organization structured data with complete fields.`,
+      })
+    })
+
+    engineStatuses.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
+      items.push({
+        priority: 'P1',
+        title: `Low visibility in ${e.label} (${e.pct}%)`,
+        description: `Brand appears inconsistently — in ${e.mentioned} of ${e.checked} prompts checked.`,
+        fix: `Strengthen brand authority signals for ${e.label}: publish 3+ long-form pages that directly answer your tracked queries, build backlinks from industry media mentioning ${brandName} in context, and add FAQ schema markup to your site's key landing pages.`,
+      })
+    })
+
+    if (competitorFreq[0] && gapCount > 0) {
+      items.push({
+        priority: 'P1',
+        title: `Outranked by ${competitorFreq[0].name} (avg #${competitorFreq[0].avgPos ?? '?'})`,
+        description: `${competitorFreq[0].name} appears ${competitorFreq[0].count}x across AI results while ${brandName} is absent in ${gapCount} checks.`,
+        fix: `Publish a detailed comparison page: "${brandName} vs ${competitorFreq[0].name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
+      })
+    }
+
+    if (dimensions.consistency < 40 && overallPct > 0) {
+      items.push({
+        priority: 'P2',
+        title: 'Inconsistent cross-prompt coverage',
+        description: `Brand appears in only ${dimensions.consistency}% of prompts with consistent multi-engine coverage. AI models know you selectively.`,
+        fix: `Map which prompt topics are missing and create dedicated content for each gap. Ensure every service category and location you serve has a standalone indexed page with your brand name in the H1 and title tag.`,
+      })
+    }
+
+    if (dimensions.knowledge > 0 && dimensions.knowledge < 50) {
+      items.push({
+        priority: 'P2',
+        title: 'Improve ranking position',
+        description: `When mentioned, ${brandName} averages a lower position. Competitors rank above you in shared responses.`,
+        fix: `Build topical authority by publishing a content cluster: one pillar page on your main category + 5 supporting posts on subtopics. Internal-link them together. This signals depth of expertise to AI training pipelines.`,
+      })
+    }
+
+    return items
+  })()
+
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.aiv_loading}</div>
+
+  const scoreColor = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
+  const circumference = 2 * Math.PI * 54 // r=54 → 339.3
+  const dashOffset = circumference - (aiScore / 100) * circumference
+
+  const dimConfig = [
+    { key: 'recognition', label: 'Recognition', value: dimensions.recognition, desc: 'Prompt coverage' },
+    { key: 'knowledge',   label: 'Knowledge',   value: dimensions.knowledge,   desc: 'Position quality' },
+    { key: 'sentiment',   label: 'Sentiment',   value: dimensions.sentiment,   desc: 'Tone when found' },
+    { key: 'accuracy',    label: 'Accuracy',    value: dimensions.accuracy,    desc: 'Top-3 placement' },
+    { key: 'reach',       label: 'Reach',       value: dimensions.reach,       desc: 'Engine coverage' },
+    { key: 'consistency', label: 'Consistency', value: dimensions.consistency, desc: 'Cross-prompt rate' },
+  ] as const
+
+  const copyFix = (idx: number, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedFix(idx)
+      setTimeout(() => setCopiedFix(null), 2000)
+    })
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <h1 className="text-2xl font-bold text-white">{t.aiv_title}</h1>
-            {/* Show all selected markets as badges */}
             {selections.map(sel => (
               <span
                 key={sel.market.id}
@@ -277,32 +425,164 @@ export default function AIVisibility() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
-        <div className="col-span-1 bg-dark-800 border border-dark-700 rounded-xl p-4 flex flex-col items-center justify-center">
-          <TrendingUp size={18} className="text-brand-400 mb-2" />
-          <div className={`text-3xl font-bold tabular-nums ${overallPct >= 50 ? 'text-emerald-400' : overallPct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
-            {overallPct}%
+      {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
+      <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
+
+        {/* Score ring */}
+        <div className="flex flex-col items-center gap-2">
+          <svg viewBox="0 0 120 120" className="w-36 h-36" style={{ overflow: 'visible' }}>
+            <defs>
+              <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#1f9baa" />
+                <stop offset="100%" stopColor="#6c63ff" />
+              </linearGradient>
+            </defs>
+            {/* Track */}
+            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="9" />
+            {/* Score arc */}
+            <circle
+              cx="60" cy="60" r="54"
+              fill="none"
+              stroke="url(#scoreRingGrad)"
+              strokeWidth="9"
+              strokeLinecap="round"
+              strokeDasharray={`${circumference}`}
+              strokeDashoffset={`${dashOffset}`}
+              transform="rotate(-90 60 60)"
+              style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+            />
+            {/* Score number */}
+            <text x="60" y="54" textAnchor="middle" fill="white" fontSize="28" fontWeight="800" fontFamily="Inter, sans-serif">{aiScore}</text>
+            <text x="60" y="70" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="11" fontFamily="Inter, sans-serif">/100</text>
+          </svg>
+          <div className="text-center">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Visibility Score</div>
+            <div className={`text-xs mt-0.5 font-medium ${aiScore >= 60 ? 'text-emerald-400' : aiScore >= 35 ? 'text-amber-400' : 'text-red-400'}`}>
+              {aiScore >= 60 ? '● Strong' : aiScore >= 35 ? '● Developing' : '● Needs Work'}
+            </div>
           </div>
-          <div className="text-xs text-slate-500 mt-1 text-center">{t.aiv_totalVisibility}</div>
         </div>
-        {llmStats.map(s => (
-          <div key={s.id} className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex flex-col items-center justify-center">
-            <img src={s.logoUrl} alt={s.label} className="w-7 h-7 mb-2 rounded-md object-contain" />
-            <div className={`text-2xl font-bold tabular-nums ${s.pct >= 50 ? 'text-emerald-400' : s.pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
-              {s.pct}%
+
+        {/* Dimension bars */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+          {dimConfig.map(d => (
+            <div key={d.key}>
+              <div className="flex justify-between items-center mb-1">
+                <div>
+                  <span className="text-sm font-medium text-slate-300">{d.label}</span>
+                  <span className="ml-2 text-xs text-slate-600">{d.desc}</span>
+                </div>
+                <span className={`text-sm font-bold tabular-nums ${d.value >= 60 ? 'text-emerald-400' : d.value >= 35 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {d.value}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${d.value >= 60 ? 'bg-emerald-400' : d.value >= 35 ? 'bg-amber-400' : 'bg-red-400'}`}
+                  style={{ width: `${d.value}%` }}
+                />
+              </div>
             </div>
-            <div className="text-xs text-slate-400 font-medium mt-1">{s.label}</div>
-            <div className="w-full mt-2 h-1.5 rounded-full bg-dark-700 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${s.pct >= 50 ? 'bg-emerald-400' : s.pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`}
-                style={{ width: `${s.pct}%` }}
-              />
-            </div>
-            <div className="text-xs text-slate-600 mt-1">{s.mentioned}/{s.checked} prompts</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
+      {/* ── Engine status grid ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
+        {engineStatuses.map(e => {
+          const statusStyles = {
+            KNOW:    { badge: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30', dot: 'bg-emerald-400', card: 'border-emerald-500/20' },
+            PARTIAL: { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',     dot: 'bg-amber-400',   card: 'border-amber-500/20'   },
+            MISSING: { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',           dot: 'bg-red-400',     card: 'border-red-500/20'     },
+          }[e.status]
+          return (
+            <div key={e.id} className={`bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
+              <img src={e.logoUrl} alt={e.label} className="w-8 h-8 rounded-lg object-contain" />
+              <div className="text-sm font-semibold text-white">{e.label}</div>
+              <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyles.badge}`}>
+                <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`} style={{ verticalAlign: 'middle' }} />
+                {e.status}
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold tabular-nums ${e.pct >= 50 ? 'text-emerald-400' : e.pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {e.pct}%
+                </div>
+                <div className="text-xs text-slate-600 mt-0.5">{e.mentioned}/{e.checked} prompts</div>
+                {e.bestPos !== null && (
+                  <div className="text-xs text-slate-500 mt-0.5">best pos #{e.bestPos}</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Fix This hub ─────────────────────────────────────────────────────── */}
+      {fixItems.length > 0 && (
+        <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-5 py-3.5 text-left"
+            onClick={() => setShowFixHub(v => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <Zap size={15} className="text-brand-400" />
+              <span className="text-sm font-semibold text-white">Fix This</span>
+              <span className="text-xs text-slate-500">— {fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
+              <div className="flex items-center gap-1 ml-1">
+                {(['P0','P1','P2'] as const).map(p => {
+                  const count = fixItems.filter(i => i.priority === p).length
+                  if (!count) return null
+                  const cls = p === 'P0' ? 'bg-red-500/20 text-red-300' : p === 'P1' ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'
+                  return <span key={p} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{count} {p}</span>
+                })}
+              </div>
+            </div>
+            {showFixHub ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
+          </button>
+
+          {showFixHub && (
+            <div className="border-t border-dark-700/50 divide-y divide-dark-700/50">
+              {fixItems.map((item, idx) => {
+                const pStyles = {
+                  P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'    },
+                  P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300'  },
+                  P2: { border: 'border-l-4 border-l-purple-500', badge: 'bg-purple-500/20 text-purple-300', title: 'text-slate-200'  },
+                }[item.priority]
+                return (
+                  <div key={idx} className={`px-5 py-4 ${pStyles.border}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className={`mt-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${pStyles.badge}`}>
+                          {item.priority}
+                        </span>
+                        <div className="min-w-0">
+                          <div className={`text-sm font-semibold ${pStyles.title} mb-0.5`}>{item.title}</div>
+                          <div className="text-xs text-slate-500 mb-2">{item.description}</div>
+                          <div className="text-xs text-slate-400 leading-relaxed bg-dark-700/40 rounded-lg px-3 py-2">
+                            <span className="text-slate-600 font-medium uppercase tracking-wide text-[9px] block mb-1">Recommended fix</span>
+                            {item.fix}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => copyFix(idx, item.fix)}
+                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-dark-600 text-slate-400 hover:text-slate-200 hover:border-dark-500 transition-colors"
+                      >
+                        {copiedFix === idx
+                          ? <><CheckCheck size={12} className="text-emerald-400" /> Copied</>
+                          : <><Copy size={12} /> Copy fix</>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Competitor insights ──────────────────────────────────────────────── */}
       {competitorFreq.length > 0 && (
         <div className="mb-4 bg-dark-800 border border-amber-500/30 rounded-xl overflow-hidden">
           <button
@@ -348,6 +628,7 @@ export default function AIVisibility() {
         </div>
       )}
 
+      {/* ── Category breakdown ───────────────────────────────────────────────── */}
       {(() => {
         const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
         const catStats = activeCats.map(cat => {
@@ -387,6 +668,7 @@ export default function AIVisibility() {
         return null
       })()}
 
+      {/* ── Category filter ──────────────────────────────────────────────────── */}
       {(() => {
         const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
         if (activeCats.length === 0) return null
@@ -409,6 +691,7 @@ export default function AIVisibility() {
         )
       })()}
 
+      {/* ── Prompt table ─────────────────────────────────────────────────────── */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
         <div className="min-w-[640px]">
@@ -507,7 +790,6 @@ export default function AIVisibility() {
                       const r = rowResults?.get(llm.id)
                       const competitors = r ? parseCompetitors(r.competitors_mentioned) : []
 
-                      // Build interleaved ranked list for display
                       const rankedList: { pos: number; name: string; isBrand: boolean }[] = [
                         ...competitors.map(c => ({ ...c, isBrand: false })),
                         ...(r?.brand_mentioned && r.brand_position
@@ -527,7 +809,6 @@ export default function AIVisibility() {
                                 {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
                               </div>
 
-                              {/* Ranked list from actual AI response */}
                               {rankedList.length > 0 && (
                                 <div className="mb-2">
                                   <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">
