@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useClient } from './clientContext'
 
 export interface Region {
   id:    string
@@ -162,12 +163,30 @@ const Ctx = createContext<MarketCtx>({
   primaryRegion:   null,
 })
 
-function loadSaved(): MarketSelection[] {
+/**
+ * Load saved market selections for a specific client.
+ * Storage key: brandgeo_markets_v2_${clientId}
+ * Falls back to the old global key for migration, then to RO default.
+ */
+function loadSaved(clientId: number): MarketSelection[] {
   try {
-    // v2 multi-select storage
-    const v2 = localStorage.getItem('brandgeo_markets_v2')
-    if (v2) {
-      const parsed = JSON.parse(v2) as { marketId: string; regionId: string }[]
+    // Per-client key (new)
+    const clientKey = `brandgeo_markets_v2_${clientId}`
+    const perClient = localStorage.getItem(clientKey)
+    if (perClient) {
+      const parsed = JSON.parse(perClient) as { marketId: string; regionId: string }[]
+      const result = parsed.flatMap(({ marketId, regionId }) => {
+        const market = MARKETS.find(m => m.id === marketId)
+        if (!market) return []
+        const region = market.regions.find(r => r.id === regionId) ?? market.regions[0]
+        return [{ market, region }] as MarketSelection[]
+      })
+      if (result.length > 0) return result
+    }
+    // Migrate from old global key (one-time, first client that loads)
+    const legacy = localStorage.getItem('brandgeo_markets_v2')
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as { marketId: string; regionId: string }[]
       const result = parsed.flatMap(({ marketId, regionId }) => {
         const market = MARKETS.find(m => m.id === marketId)
         if (!market) return []
@@ -177,19 +196,32 @@ function loadSaved(): MarketSelection[] {
       if (result.length > 0) return result
     }
   } catch {}
-  // Migrate from v1 single-market storage
-  const oldId = localStorage.getItem('brandgeo_market')
+  // v1 migration / default
+  const oldId  = localStorage.getItem('brandgeo_market')
   const oldReg = localStorage.getItem('brandgeo_region') ?? 'ALL'
   const mkt = MARKETS.find(m => m.id === oldId) ?? MARKETS[1] // default RO
   const reg = mkt.regions.find(r => r.id === oldReg) ?? mkt.regions[0]
   return [{ market: mkt, region: reg }]
 }
 
+/**
+ * MarketProvider must be nested INSIDE ClientProvider so it can call useClient().
+ * Each client gets its own market stored under brandgeo_markets_v2_${clientId}.
+ * Switching clients reloads that client's saved market instantly.
+ */
 export function MarketProvider({ children }: { children: ReactNode }) {
-  const [selections, setSelections] = useState<MarketSelection[]>(loadSaved)
+  const { activeClientId } = useClient()
+  const [selections, setSelections] = useState<MarketSelection[]>(() => loadSaved(activeClientId))
+
+  // Reload market whenever the active client changes
+  useEffect(() => {
+    setSelections(loadSaved(activeClientId))
+  }, [activeClientId])
+
+  const storageKey = `brandgeo_markets_v2_${activeClientId}`
 
   const persist = (sels: MarketSelection[]) => {
-    localStorage.setItem('brandgeo_markets_v2', JSON.stringify(
+    localStorage.setItem(storageKey, JSON.stringify(
       sels.map(s => ({ marketId: s.market.id, regionId: s.region.id }))
     ))
     setSelections(sels)

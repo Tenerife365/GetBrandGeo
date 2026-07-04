@@ -49,8 +49,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
-      <MarketProvider>
-        <ClientProvider>
+      <ClientProvider>
+        <MarketProvider>
           <CollectionProvider>
           <BrowserRouter>
             <Routes>
@@ -67,8 +67,8 @@ export default function App() {
             </Routes>
           </BrowserRouter>
           </CollectionProvider>
-        </ClientProvider>
-      </MarketProvider>
+        </MarketProvider>
+      </ClientProvider>
       </I18nProvider>
     </ThemeProvider>
   )
