@@ -248,8 +248,8 @@ async function callClaude(prompt, ctx) {
           'anthropic-beta':  'web-search-2025-03-05',
         },
         body: JSON.stringify({
-          model:     'claude-sonnet-4-5',
-          max_tokens: 1024,
+          model:     'claude-sonnet-4-6',
+          max_tokens: 2048,
           system:    ctx,
           tools:     [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
           messages:  [{ role: 'user', content: prompt }],
@@ -267,7 +267,7 @@ async function callClaude(prompt, ctx) {
       console.warn('[Claude] request failed:', e.message, '— falling back to OpenRouter')
     }
   }
-  return callOpenRouter('anthropic/claude-sonnet-4-5', prompt, ctx)
+  return callOpenRouter('anthropic/claude-sonnet-4-6', prompt, ctx)
 }
 
 // OpenRouter — Perplexity (web search built-in) and Meta (training data only)
