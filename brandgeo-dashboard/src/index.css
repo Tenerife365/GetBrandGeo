@@ -81,3 +81,9 @@ html.light .bg-brand-500\/20 {
     scrollbar-color: rgb(var(--dark-600)) transparent;
   }
 }
+
+/* Score ring SVG text — theme-aware fill */
+.score-ring-number { fill: rgb(255 255 255); }
+.score-ring-label  { fill: rgba(255 255 255, 0.45); }
+html.light .score-ring-number { fill: rgb(15 23 42) !important; }
+html.light .score-ring-label  { fill: rgba(15, 23, 42, 0.5) !important; }

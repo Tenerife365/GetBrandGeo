@@ -93,6 +93,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       const primaryMarket = markets?.[0]
       const market_label  = primaryMarket?.market.label ?? null
       const region_label  = primaryMarket?.region.label ?? null
+      const market_id     = primaryMarket?.market.id    ?? null   // ISO 3166-1 alpha-2 e.g. "RO"
 
       for (let i = 0; i < prompts.length; i++) {
         if (abortRef.current) break
@@ -111,6 +112,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
               force,
               market_label,
               region_label,
+              market_id,
             }),
           })
           const json = await res.json().catch(() => null)

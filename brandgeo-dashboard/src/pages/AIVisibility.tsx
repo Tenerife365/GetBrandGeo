@@ -452,8 +452,8 @@ export default function AIVisibility() {
               style={{ transition: 'stroke-dashoffset 0.8s ease' }}
             />
             {/* Score number */}
-            <text x="60" y="54" textAnchor="middle" fill="white" fontSize="28" fontWeight="800" fontFamily="Inter, sans-serif">{aiScore}</text>
-            <text x="60" y="70" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="11" fontFamily="Inter, sans-serif">/100</text>
+            <text x="60" y="54" textAnchor="middle" className="score-ring-number" fontSize="28" fontWeight="800" fontFamily="Inter, sans-serif">{aiScore}</text>
+            <text x="60" y="70" textAnchor="middle" className="score-ring-label" fontSize="11" fontFamily="Inter, sans-serif">/100</text>
           </svg>
           <div className="text-center">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Visibility Score</div>

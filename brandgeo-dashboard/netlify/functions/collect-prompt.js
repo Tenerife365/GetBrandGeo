@@ -4,12 +4,12 @@
  *
  * POST body:
  *   { prompt_id, prompt_text, client_id, client_config, force?,
- *     market_label?, region_label? }
+ *     market_label?, region_label?, market_id? }
  *
- * market_label / region_label — explicit geo context from the dashboard's
- * market selector. When present, these take full priority over any TLD
- * inference. This makes results correct for every client regardless of
- * what domain they happen to use.
+ * market_label / region_label — human-readable geo context (e.g. "Romania", "Bucharest")
+ * market_id — ISO 3166-1 alpha-2 country code (e.g. "RO", "DE", "GB").
+ *   Used to set ChatGPT's user_location so web_search_preview actually searches
+ *   from the client's market, not the US Netlify server.
  *
  * client_config: { brand_aliases, brand_website, known_competitors }
  */
@@ -190,15 +190,29 @@ function withTimeout(promise, ms) {
   ])
 }
 
-// ChatGPT — OpenAI Responses API with forced web_search_preview tool + geo context
-async function callChatGPT(prompt, ctx) {
+// ChatGPT — OpenAI Responses API with forced web_search_preview tool + geo context.
+// user_location makes web_search_preview actually query from the client's country,
+// not from the US Netlify server. marketId is ISO 3166-1 alpha-2 (e.g. "RO").
+async function callChatGPT(prompt, ctx, marketId, regionLabel) {
+  // Build user_location for truly geo-targeted search results.
+  // Without this, the search runs from the US regardless of the system prompt.
+  const isSpecificRegion = regionLabel &&
+    !regionLabel.startsWith('All ') &&
+    regionLabel !== 'All regions' &&
+    regionLabel !== 'All states' &&
+    regionLabel !== 'All provinces' &&
+    regionLabel !== 'All emirates'
+  const userLocation = (marketId && marketId !== 'WW')
+    ? { type: 'approximate', country: marketId, ...(isSpecificRegion ? { city: regionLabel } : {}) }
+    : null
+
   const r = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
       model:        'gpt-4o',
       instructions: ctx,
-      tools:        [{ type: 'web_search_preview' }],
+      tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
       input:        prompt,
     }),
   })
@@ -209,7 +223,11 @@ async function callChatGPT(prompt, ctx) {
     .filter(o => o.type === 'message')
     .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
     .join('\n')
-  if (!text) console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
+  if (text) {
+    console.log('[ChatGPT] location used:', userLocation || 'none (worldwide)', '| preview:', text.slice(0, 200))
+  } else {
+    console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
+  }
   return text || null
 }
 
@@ -231,7 +249,11 @@ async function callGemini(prompt, ctx) {
         }
       )
       const d = await r.json()
-      if (d.candidates?.[0]?.content?.parts?.[0]?.text) return d.candidates[0].content.parts[0].text
+      if (d.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const t = d.candidates[0].content.parts[0].text
+        console.log(`[Gemini] ${model} ok | preview:`, t.slice(0, 200))
+        return t
+      }
       if (r.status === 404 || d.error?.code === 404) continue
       if (d.error) {
         console.warn(`[Gemini] ${model} search failed (${d.error.message}), retrying without grounding`)
@@ -253,11 +275,18 @@ async function callGemini(prompt, ctx) {
   return null
 }
 
-// Claude — Anthropic direct API with web search beta + system prompt
-// Falls back to OpenRouter (no web search) if ANTHROPIC_API_KEY is not set.
+// Claude — Anthropic direct API with web search beta + system prompt.
+// If ANTHROPIC_API_KEY is not set in Netlify env vars, the engine is skipped.
+// Add it at: Netlify → Site → Site configuration → Environment variables
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (apiKey) {
+  if (!apiKey) {
+    console.error('[Claude] ANTHROPIC_API_KEY is not set in Netlify environment variables. ' +
+      'Add it at: Netlify → Site → Site configuration → Environment variables → Add a variable. ' +
+      'Engine skipped for this run.')
+    return null
+  }
+  {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -278,23 +307,29 @@ async function callClaude(prompt, ctx) {
       const d = await r.json()
       if (!d.error) {
         const textBlocks = (d.content || []).filter(b => b.type === 'text')
-        if (textBlocks.length > 0) return textBlocks.map(b => b.text).join('\n')
-        console.warn('[Claude] no text blocks in response:', JSON.stringify(d).slice(0, 300))
+        if (textBlocks.length > 0) {
+          const text = textBlocks.map(b => b.text).join('\n')
+          console.log('[Claude] ok | preview:', text.slice(0, 200))
+          return text
+        }
+        console.warn('[Claude] no text blocks in response:', JSON.stringify(d).slice(0, 500))
       } else {
-        console.warn('[Claude] API error:', d.error.message, '— falling back to OpenRouter')
+        console.error('[Claude] API error:', d.error.type, d.error.message)
       }
     } catch (e) {
-      console.warn('[Claude] request failed:', e.message, '— falling back to OpenRouter')
+      console.error('[Claude] request threw:', e.message)
     }
   }
-  // OpenRouter doesn't support Claude's web-search beta — skip rather than
-  // save a stale training-data answer that lacks real-time Romanian results
-  console.warn('[Claude] all paths failed — skipping this engine for this run')
+  console.warn('[Claude] skipping — no usable response from Anthropic API')
   return null
 }
 
 // OpenRouter — Perplexity (web search built-in) and Meta (training data only)
 async function callOpenRouter(model, prompt, ctx) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error(`[OpenRouter:${model}] OPENROUTER_API_KEY not set — engine skipped`)
+    return null
+  }
   const messages = [
     { role: 'system', content: ctx },
     { role: 'user',   content: prompt },
@@ -310,8 +345,17 @@ async function callOpenRouter(model, prompt, ctx) {
     body: JSON.stringify({ model, messages, max_tokens: 1000 }),
   })
   const d = await r.json()
-  if (d.error) { console.error(`[OpenRouter:${model}]`, JSON.stringify(d.error)); return null }
-  return d.choices?.[0]?.message?.content ?? null
+  if (d.error) {
+    console.error(`[OpenRouter:${model}] error:`, JSON.stringify(d.error))
+    return null
+  }
+  const text = d.choices?.[0]?.message?.content ?? null
+  if (text) {
+    console.log(`[OpenRouter:${model}] ok | preview:`, text.slice(0, 200))
+  } else {
+    console.warn(`[OpenRouter:${model}] empty response:`, JSON.stringify(d).slice(0, 300))
+  }
+  return text
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -322,7 +366,7 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
 
-  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label } = body
+  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label, market_id } = body
   if (!prompt_id || !prompt_text || !client_id || !client_config)
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
 
@@ -333,11 +377,11 @@ exports.handler = async (event) => {
 
   // LLM_CALLERS defined here so ctx is captured in closure
   const LLM_CALLERS = {
-    chatgpt:    p => callChatGPT(p, ctx),                                          // web search via Responses API
+    chatgpt:    p => callChatGPT(p, ctx, market_id, region_label),                 // web search via Responses API + geo-targeted
     gemini:     p => callGemini(p, ctx),                                           // web search via Google grounding
     claude:     p => callClaude(p, ctx),                                           // web search via Anthropic beta
     perplexity: p => callOpenRouter('perplexity/sonar', p, ctx),                   // web search built-in
-    meta:       p => callOpenRouter('meta-llama/llama-3.3-70b-instruct', p, ctx),  // training data only
+    meta:       p => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),  // training data only (no web search)
   }
 
   let toRun
