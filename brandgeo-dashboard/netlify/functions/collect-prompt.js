@@ -94,38 +94,59 @@ function extractTopRankedResults(text) {
   return items.sort((a, b) => a.pos - b.pos).slice(0, 5)
 }
 
-function detectListPosition(text, aliases, website) {
+function detectListPosition(text, aliases, aliasesStripped, website) {
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
   while ((m = listRe.exec(text)) !== null) {
     const num     = parseInt(m[1], 10)
-    const segment = m[2].toLowerCase()
-    if (aliases.some(a => segment.includes(a)) || segment.includes(website)) return num
+    const segment = m[2]
+    if (matchesAlias(segment, aliases, aliasesStripped, website)) return num
   }
   const sentences = text.split(/(?<=[.!?])\s+/)
   for (let i = 0; i < sentences.length; i++) {
-    const sl = sentences[i].toLowerCase()
-    if (aliases.some(a => sl.includes(a)) || sl.includes(website)) return i + 1
+    if (matchesAlias(sentences[i], aliases, aliasesStripped, website)) return i + 1
   }
   return null
 }
 
+/**
+ * Match a text segment against brand aliases.
+ * Checks both verbatim (lowercased) AND space-stripped forms so that
+ * "Bucate pe Roate" matches the alias "bucateperoate" and vice-versa.
+ */
+function matchesAlias(segment, aliases, aliasesStripped, website) {
+  const sl  = segment.toLowerCase()
+  const sls = sl.replace(/[\s\-_.]/g, '')
+  return aliases.some(a => sl.includes(a)) ||
+         aliasesStripped.some(a => a && sls.includes(a)) ||
+         (website && sl.includes(website))
+}
+
 function analyseResponse(text, cfg) {
-  const aliases = (cfg.brand_aliases || []).map(a => a.toLowerCase())
-  const website = (cfg.brand_website || '').toLowerCase()
-  const lower   = normalizeText(text).toLowerCase()
+  const aliases         = (cfg.brand_aliases || []).map(a => a.toLowerCase())
+  const aliasesStripped = aliases.map(a => a.replace(/[\s\-_.]/g, ''))
+  const website = ((cfg.brand_website || '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/^www\./, ''))
+  const lower      = normalizeText(text).toLowerCase()
+  const lowerStrip = lower.replace(/[\s\-_.]/g, '')
 
   const topResults  = extractTopRankedResults(text)
-  const brandInList = topResults.find(item => {
-    const nl = item.name.toLowerCase()
-    return aliases.some(a => nl.includes(a)) || (website && nl.includes(website))
-  })
-  const mentionedInText = aliases.some(a => lower.includes(a)) || (website && lower.includes(website))
+  const brandInList = topResults.find(item =>
+    matchesAlias(item.name, aliases, aliasesStripped, website)
+  )
+  const mentionedInText =
+    aliases.some(a => lower.includes(a)) ||
+    aliasesStripped.some(a => a && lowerStrip.includes(a)) ||
+    (website && lower.includes(website))
   const mentioned = !!brandInList || mentionedInText
 
   let position = null
   if (brandInList)  position = brandInList.pos
-  else if (mentioned) position = detectListPosition(text, aliases, website)
+  else if (mentioned) position = detectListPosition(text, aliases, aliasesStripped, website)
 
   const posWords = ['recomandat','recomandam','recommend','best','top','excelen','calitat',
                     'profesional','lider','prima','leading','trusted','award']
@@ -138,7 +159,9 @@ function analyseResponse(text, cfg) {
 
   let snippet = null
   if (mentioned) {
-    for (const a of aliases) {
+    // Try each alias verbatim first, then website domain
+    const searchTerms = [...aliases, website].filter(Boolean)
+    for (const a of searchTerms) {
       const idx = lower.indexOf(a)
       if (idx !== -1) { snippet = text.slice(Math.max(0, idx - 50), idx + 250).trim(); break }
     }
@@ -146,10 +169,7 @@ function analyseResponse(text, cfg) {
   if (!snippet) snippet = text.slice(0, 300).trim()
 
   const competitors = topResults
-    .filter(item => {
-      const nl = item.name.toLowerCase()
-      return !aliases.some(a => nl.includes(a)) && !(website && nl.includes(website))
-    })
+    .filter(item => !matchesAlias(item.name, aliases, aliasesStripped, website))
     .map(({ pos, name }) => ({ pos, name }))
 
   return {
@@ -267,7 +287,10 @@ async function callClaude(prompt, ctx) {
       console.warn('[Claude] request failed:', e.message, '— falling back to OpenRouter')
     }
   }
-  return callOpenRouter('anthropic/claude-sonnet-4-6', prompt, ctx)
+  // OpenRouter doesn't support Claude's web-search beta — skip rather than
+  // save a stale training-data answer that lacks real-time Romanian results
+  console.warn('[Claude] all paths failed — skipping this engine for this run')
+  return null
 }
 
 // OpenRouter — Perplexity (web search built-in) and Meta (training data only)
