@@ -276,52 +276,57 @@ async function callGemini(prompt, ctx) {
 }
 
 // Claude — Anthropic direct API with web search beta + system prompt.
-// If ANTHROPIC_API_KEY is not set in Netlify env vars, the engine is skipped.
-// Add it at: Netlify → Site → Site configuration → Environment variables
+// KEY TIMING NOTE: max_uses:5 means Claude can do 5 search rounds (~50s total)
+// which exceeds our 22s timeout. max_uses:1 → one search round (~8-12s), fits fine.
+// If ANTHROPIC_API_KEY is missing, engine is skipped with a clear error.
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    console.error('[Claude] ANTHROPIC_API_KEY is not set in Netlify environment variables. ' +
-      'Add it at: Netlify → Site → Site configuration → Environment variables → Add a variable. ' +
-      'Engine skipped for this run.')
+    console.error('[Claude] ANTHROPIC_API_KEY not set in Netlify env vars. ' +
+      'Add it at: Netlify → Site → Site configuration → Environment variables.')
     return null
   }
-  {
-    try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type':    'application/json',
-          'x-api-key':       apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta':  'web-search-2025-03-05',
-        },
-        body: JSON.stringify({
-          model:     'claude-sonnet-4-6',
-          max_tokens: 2048,
-          system:    ctx,
-          tools:     [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-          messages:  [{ role: 'user', content: prompt }],
-        }),
-      })
-      const d = await r.json()
-      if (!d.error) {
-        const textBlocks = (d.content || []).filter(b => b.type === 'text')
-        if (textBlocks.length > 0) {
-          const text = textBlocks.map(b => b.text).join('\n')
-          console.log('[Claude] ok | preview:', text.slice(0, 200))
-          return text
-        }
-        console.warn('[Claude] no text blocks in response:', JSON.stringify(d).slice(0, 500))
-      } else {
-        console.error('[Claude] API error:', d.error.type, d.error.message)
-      }
-    } catch (e) {
-      console.error('[Claude] request threw:', e.message)
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta':    'web-search-2025-03-05',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-6',
+        max_tokens: 1500,
+        system:     ctx,
+        // max_uses:1 = one search round (~8-12s). max_uses:5 = up to 50s → timeout.
+        tools:    [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+    const d = await r.json()
+    // Log stop_reason so we can diagnose in Netlify function logs
+    console.log('[Claude] stop_reason:', d.stop_reason,
+      '| blocks:', (d.content || []).map(b => b.type).join(','),
+      '| error:', d.error?.message ?? 'none')
+    if (d.error) {
+      console.error('[Claude] API error:', d.error.type, d.error.message)
+      return null
     }
+    const textBlocks = (d.content || []).filter(b => b.type === 'text')
+    if (textBlocks.length > 0) {
+      const text = textBlocks.map(b => b.text).join('\n')
+      console.log('[Claude] ok | preview:', text.slice(0, 200))
+      return text
+    }
+    // No text blocks: model may have only returned tool_use (search call) without
+    // the final answer. Shouldn't happen with server-side beta but log to confirm.
+    console.warn('[Claude] no text blocks — stop_reason was:', d.stop_reason)
+    return null
+  } catch (e) {
+    console.error('[Claude] request threw:', e.message)
+    return null
   }
-  console.warn('[Claude] skipping — no usable response from Anthropic API')
-  return null
 }
 
 // OpenRouter — Perplexity (web search built-in) and Meta (training data only)
