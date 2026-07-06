@@ -437,36 +437,68 @@ export default function AIVisibility() {
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
       <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
 
-        {/* Score ring */}
-        <div className="flex flex-col items-center gap-2">
-          <svg viewBox="0 0 120 120" className="w-36 h-36" style={{ overflow: 'visible' }}>
+        {/* Score ring — Apple-style */}
+        <div className="flex flex-col items-center gap-3">
+          <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
               <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#1f9baa" />
-                <stop offset="100%" stopColor="#6c63ff" />
+                <stop offset="0%" stopColor="#06b6d4" />
+                <stop offset="100%" stopColor="#818cf8" />
               </linearGradient>
+              {/* Glow bloom behind the arc */}
+              <filter id="scoreGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
             </defs>
-            {/* Track */}
-            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="9" />
-            {/* Score arc */}
+            {/* Track — barely visible */}
+            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+            {/* Glow halo layer */}
             <circle
               cx="60" cy="60" r="54"
               fill="none"
               stroke="url(#scoreRingGrad)"
-              strokeWidth="9"
+              strokeWidth="10"
               strokeLinecap="round"
               strokeDasharray={`${circumference}`}
               strokeDashoffset={`${dashOffset}`}
               transform="rotate(-90 60 60)"
-              style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+              filter="url(#scoreGlow)"
+              opacity="0.3"
+              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }}
             />
-            {/* Score number — centered, no /100 label */}
-            <text x="60" y="60" textAnchor="middle" dominantBaseline="central" className="score-ring-number" fontSize="34" fontWeight="800" fontFamily="Inter, sans-serif">{aiScore}%</text>
+            {/* Main arc */}
+            <circle
+              cx="60" cy="60" r="54"
+              fill="none"
+              stroke="url(#scoreRingGrad)"
+              strokeWidth="5.5"
+              strokeLinecap="round"
+              strokeDasharray={`${circumference}`}
+              strokeDashoffset={`${dashOffset}`}
+              transform="rotate(-90 60 60)"
+              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }}
+            />
+            {/* Score number with superscript % */}
+            <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
+              <tspan fontSize="38" fontWeight="800" fill="white" letterSpacing="-1.5">{aiScore}</tspan><tspan fontSize="14" fontWeight="500" fill="rgba(255,255,255,0.55)" dy="-14">%</tspan>
+            </text>
           </svg>
-          <div className="text-center">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI Visibility Score</div>
-            <div className={`text-xs mt-0.5 font-medium ${aiScore >= 60 ? 'text-emerald-400' : aiScore >= 35 ? 'text-amber-400' : 'text-red-400'}`}>
-              {aiScore >= 60 ? '● Strong' : aiScore >= 35 ? '● Developing' : '● Needs Work'}
+          {/* Label + status pill */}
+          <div className="text-center -mt-1">
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-2">AI Visibility Score</div>
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+              aiScore >= 60
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : aiScore >= 35
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-red-500/10 text-red-400 border-red-500/20'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-emerald-400' : aiScore >= 35 ? 'bg-amber-400' : 'bg-red-400'}`} />
+              {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
             </div>
           </div>
         </div>
