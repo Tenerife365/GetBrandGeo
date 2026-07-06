@@ -173,6 +173,23 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
     .sort((a, b) => a.rate - b.rate)
 
   // Competitors — from actual ranked results only
+  // Must match GENERIC_TOKENS in Competitors.tsx and NOT_A_COMPANY in collect functions
+  const GENERIC_TOKENS = [
+    'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
+    'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
+    'masiva', 'masivă', 'proprie', 'proprii',
+    ' pentru ', 'datorit', 'grație', 'gratie',
+    'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
+    'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
+    'firme de', 'si altele', 'și altele',
+  ]
+  const isCompanyName = (name: string) => {
+    if (!name || name.length < 2 || name.length > 60) return false
+    const lower = name.toLowerCase()
+    if (GENERIC_TOKENS.some(t => lower.includes(t))) return false
+    return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
+  }
+
   const compMap: Record<string, { count: number; positions: number[] }> = {}
   for (const r of aiResults) {
     try {
@@ -181,7 +198,7 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
       for (const c of comps) {
         const name = typeof c === 'string' ? c : c?.name
         const pos  = typeof c === 'object' ? c?.pos : null
-        if (!name || name.length < 2) continue
+        if (!isCompanyName(name)) continue
         const key = name.toLowerCase().trim()
         if (!compMap[key]) compMap[key] = { count: 0, positions: [] }
         compMap[key].count++
