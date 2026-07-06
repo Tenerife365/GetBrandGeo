@@ -488,7 +488,19 @@ export default function Recommendations() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data: any
+      try {
+        data = JSON.parse(text)
+      } catch {
+        // Netlify returned HTML (function timeout or crash)
+        console.error('[GenRec] non-JSON response:', res.status, text.slice(0, 300))
+        throw new Error(
+          res.status === 524 || res.status === 502
+            ? 'The analysis timed out — try again in a moment'
+            : `Function error (HTTP ${res.status}) — check Netlify logs`
+        )
+      }
       if (data.error) {
         setAiError(data.error)
       } else {
