@@ -18,16 +18,18 @@ interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
   lastCompletedAt: number   // increments after each prompt — watch to reload data
-  runCollection: (clientId: number, force?: boolean, markets?: MarketSelection[]) => Promise<void>
-  stopCollection: () => void
+  runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[]) => Promise<void>
+  runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[]) => Promise<void>
+  stopCollection:   () => void
 }
 
 const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
   lastCompletedAt: 0,
-  runCollection: async (_clientId: number, _force?: boolean, _markets?: MarketSelection[]) => {},
-  stopCollection: () => {},
+  runCollection:   async (_clientId: number, _force?: boolean, _markets?: MarketSelection[]) => {},
+  runSinglePrompt: async (_clientId: number, _promptId: number, _promptText: string, _markets?: MarketSelection[]) => {},
+  stopCollection:  () => {},
 })
 
 export function CollectionProvider({ children }: { children: React.ReactNode }) {
@@ -127,8 +129,51 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [])
 
+  const runSinglePrompt = useCallback(async (
+    clientId: number,
+    promptId: number,
+    promptText: string,
+    markets?: MarketSelection[],
+  ) => {
+    const { data: clientRow } = await supabase
+      .from('clients')
+      .select('brand_aliases, brand_website, known_competitors')
+      .eq('id', clientId)
+      .single()
+
+    const clientConfig = {
+      brand_aliases:     clientRow?.brand_aliases     ?? [],
+      brand_website:     clientRow?.brand_website     ?? '',
+      known_competitors: clientRow?.known_competitors ?? [],
+    }
+
+    const primaryMarket = markets?.[0]
+    const market_label  = primaryMarket?.market.label ?? null
+    const region_label  = primaryMarket?.region.label ?? null
+    const market_id     = primaryMarket?.market.id    ?? null
+
+    try {
+      await fetch('/.netlify/functions/collect-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt_id:     promptId,
+          prompt_text:   promptText,
+          client_id:     clientId,
+          client_config: clientConfig,
+          force:         true,   // always force — per-prompt refresh deletes & re-runs
+          market_label,
+          region_label,
+          market_id,
+        }),
+      })
+    } catch { /* network blip — caller handles UI reset */ }
+
+    setLastCompletedAt(Date.now())
+  }, [])
+
   return (
-    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, runCollection, stopCollection }}>
+    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, runCollection, runSinglePrompt, stopCollection }}>
       {children}
     </CollectionContext.Provider>
   )

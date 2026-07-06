@@ -94,7 +94,8 @@ export default function AIVisibility() {
   const [showFixHub, setShowFixHub] = useState(true)
   const [copiedFix, setCopiedFix] = useState<number | null>(null)
   const [refreshed, setRefreshed] = useState(false)
-  const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection } = useCollection()
+  const [refreshingPromptId, setRefreshingPromptId] = useState<number | null>(null)
+  const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection, runSinglePrompt } = useCollection()
 
   const runCollection = async () => {
     await startCollection(activeClientId, false, selections)
@@ -104,6 +105,14 @@ export default function AIVisibility() {
   const forceCollection = async () => {
     await startCollection(activeClientId, true, selections)
     load()
+  }
+
+  const handleRefreshPrompt = async (prompt: Prompt) => {
+    if (refreshingPromptId !== null || collecting) return
+    setRefreshingPromptId(prompt.id)
+    await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections)
+    await load()
+    setRefreshingPromptId(null)
   }
 
   const load = async () => {
@@ -716,8 +725,8 @@ export default function AIVisibility() {
 
           return (
             <div key={prompt.id} className="border-b border-dark-700 last:border-0">
-              <button
-                className="w-full grid hover:bg-dark-700/30 transition-colors text-left"
+              <div
+                className="w-full grid hover:bg-dark-700/30 transition-colors cursor-pointer"
                 style={{ gridTemplateColumns: '2rem 1fr repeat(5, 8rem)' }}
                 onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
               >
@@ -733,6 +742,14 @@ export default function AIVisibility() {
                         {mentionCount}/{LLMS.filter(l => rowResults?.has(l.id)).length} LLMs
                       </span>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRefreshPrompt(prompt) }}
+                      disabled={refreshingPromptId === prompt.id || collecting}
+                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                      title="Re-run this prompt on all engines"
+                    >
+                      <RotateCcw size={11} className={refreshingPromptId === prompt.id ? 'animate-spin' : ''} />
+                    </button>
                   </div>
                   <div className="text-sm text-slate-300 truncate max-w-md">{prompt.text}</div>
                 </div>
@@ -781,7 +798,7 @@ export default function AIVisibility() {
                     </div>
                   )
                 })}
-              </button>
+              </div>
 
               {isExpanded && (
                 <div className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
