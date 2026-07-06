@@ -6,6 +6,7 @@ import { ThemeProvider } from './lib/themeContext'
 import { ClientProvider } from './lib/clientContext'
 import { I18nProvider } from './lib/i18nContext'
 import { CollectionProvider } from './lib/collectionContext'
+import { TimeFilterProvider } from './lib/timeFilterContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -16,6 +17,7 @@ import Prompts from './pages/Prompts'
 import AIVisibility from './pages/AIVisibility'
 import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
+import Usage from './pages/Usage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -52,6 +54,7 @@ export default function App() {
       <ClientProvider>
         <MarketProvider>
           <CollectionProvider>
+          <TimeFilterProvider>
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<DemoLoginInterceptor />} />
@@ -63,9 +66,11 @@ export default function App() {
               <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
               <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
               <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
+              <Route path="/usage" element={<PrivateRoute><Layout><Usage /></Layout></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          </TimeFilterProvider>
           </CollectionProvider>
         </MarketProvider>
       </ClientProvider>

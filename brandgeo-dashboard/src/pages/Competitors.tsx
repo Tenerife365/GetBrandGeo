@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, Radar, Legend,
+  LineChart, Line, CartesianGrid,
 } from 'recharts'
 import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -138,6 +139,55 @@ function computeData(
   return { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap }
 }
 
+// --- Trend computation -------------------------------------------------------
+
+type TrendPeriod = 'weekly' | 'monthly' | 'quarterly'
+
+function computeTrend(
+  aiResults: any[],
+  brandName: string,
+  topCompetitors: CompetitorStat[],
+  period: TrendPeriod,
+): Record<string, string | number>[] {
+  if (!aiResults.length) return []
+
+  const getPeriodKey = (date: Date): string => {
+    if (period === 'weekly') {
+      const d = new Date(date)
+      d.setDate(d.getDate() - d.getDay())
+      return d.toISOString().slice(0, 10)
+    } else if (period === 'monthly') {
+      return date.toISOString().slice(0, 7)
+    } else {
+      const q = Math.floor(date.getMonth() / 3) + 1
+      return `${date.getFullYear()} Q${q}`
+    }
+  }
+
+  const compNames = topCompetitors.slice(0, 4).map(c => c.name)
+  const buckets: Record<string, Record<string, number>> = {}
+
+  for (const row of aiResults) {
+    const key = getPeriodKey(new Date(row.checked_at))
+    if (!buckets[key]) {
+      buckets[key] = { [brandName]: 0 }
+      for (const n of compNames) buckets[key][n] = 0
+    }
+    if (row.brand_mentioned) buckets[key][brandName]++
+    let comps: any[] = []
+    try { comps = JSON.parse(row.competitors_mentioned || '[]') } catch {}
+    for (const c of comps) {
+      const n = typeof c === 'string' ? c : c?.name
+      const match = compNames.find(cn => cn.toLowerCase() === n?.toLowerCase())
+      if (match) buckets[key][match]++
+    }
+  }
+
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([p, counts]) => ({ period: p, ...counts }))
+}
+
 // --- Charts ------------------------------------------------------------------
 
 const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
@@ -183,12 +233,14 @@ export default function Competitors() {
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [data, setData] = useState<ReturnType<typeof computeData> | null>(null)
+  const [allResults, setAllResults] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [newWebsite, setNewWebsite] = useState('')
   const [saving, setSaving] = useState(false)
   const [manualComps, setManualComps] = useState<any[]>([])
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly')
 
   const load = async () => {
     setLoading(true)
@@ -210,13 +262,14 @@ export default function Competitors() {
 
     const [{ data: aiResults }, { data: prompts }, { data: manual }] = await Promise.all([
       supabase.from('ai_results')
-        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id')
+        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, checked_at')
         .eq('client_id', activeClientId),
       supabase.from('prompts').select('id, text').eq('client_id', activeClientId).eq('is_active', true),
       supabase.from('competitors').select('*').eq('client_id', activeClientId).eq('source', 'manual'),
     ])
 
     setData(computeData(aiResults ?? [], prompts ?? [], brandName))
+    setAllResults(aiResults ?? [])
     setManualComps(manual ?? [])
     setLoading(false)
   }
@@ -246,6 +299,8 @@ export default function Competitors() {
   const barData    = buildBarData(brandName, brandMentions, topCompetitors)
   const radarData  = buildRadarData(brandName, engineStats, topCompetitors, totalResponses)
   const radarKeys  = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
+  const trendData  = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
+  const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
@@ -487,6 +542,80 @@ export default function Competitors() {
           ))}
         </div>
       )}
+
+      {/* Performance Over Time */}
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-5 mt-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-300">Performance Over Time</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              AI mention trends — {brandName} vs top competitors
+            </p>
+          </div>
+          <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
+            {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
+              <button key={p} onClick={() => setTrendPeriod(p)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
+                }`}>
+                {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {trendData.length < 2 ? (
+          <div className="py-12 text-center">
+            <p className="text-sm text-slate-500">Not enough data yet</p>
+            <p className="text-xs text-slate-600 mt-1">
+              Trend chart fills in as monthly collections accumulate
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trendData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
+              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="period"
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                labelStyle={{ color: '#cbd5e1', fontSize: 11 }}
+                itemStyle={{ fontSize: 11 }}
+              />
+              <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 8 }} />
+              <Line
+                type="monotone"
+                dataKey={brandName}
+                stroke="#1f9baa"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+              {topCompetitors.slice(0, 4).map((c, i) => (
+                <Line
+                  key={c.name}
+                  type="monotone"
+                  dataKey={c.name}
+                  stroke={trendColors[i]}
+                  strokeWidth={1.5}
+                  dot={false}
+                  activeDot={{ r: 3 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   )
 }

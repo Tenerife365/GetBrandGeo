@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2, StopCircle, Plus } from 'lucide-react'
+import {
+  LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
+  ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
+  StopCircle, Plus, DollarSign,
+} from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
@@ -8,6 +12,8 @@ import { Building2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
+import { useTimeFilter } from '../lib/timeFilterContext'
+import type { TimeRange } from '../lib/timeFilterContext'
 
 function BrandGeoLogo() {
   const { theme } = useTheme()
@@ -23,6 +29,13 @@ function BrandGeoLogo() {
   )
 }
 
+const TIME_LABELS: Record<TimeRange, string> = {
+  '7d': '7 days',
+  '30d': '30 days',
+  '90d': '90 days',
+  'all': 'All time',
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
@@ -30,18 +43,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
+  const { timeRange, setTimeRange } = useTimeFilter()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
 
+  // Nav order: AI Visibility → Recommendations → Competitors → AI Mentions → Overview → Prompts
   const nav = [
-    { to: '/',                icon: LayoutDashboard, label: t.nav_overview      },
-    { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions      },
-    { to: '/competitors',     icon: Users,           label: t.nav_competitors   },
-    { to: '/prompts',         icon: BookText,        label: t.nav_prompts       },
-    { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility  },
+    { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility    },
     { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
+    { to: '/competitors',     icon: Users,           label: t.nav_competitors     },
+    { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions        },
+    { to: '/',                icon: LayoutDashboard, label: t.nav_overview        },
+    { to: '/prompts',         icon: BookText,        label: t.nav_prompts         },
   ]
 
   const handleLogout = async () => {
@@ -66,14 +81,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       <aside className={[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 flex flex-col',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700/60 flex flex-col',
         'transition-transform duration-200 ease-in-out',
         'md:relative md:w-56 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ].join(' ')}>
 
         {/* Logo */}
-        <div className="px-4 py-4 border-b border-dark-700 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 py-4 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo />
           <div className="flex items-center gap-2">
             {isDemoMode && (
@@ -130,11 +145,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {label}
             </NavLink>
           ))}
+
+          {/* Admin: Usage & Costs link */}
+          {isAdmin && (
+            <NavLink to="/usage" onClick={closeSidebar}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
+              }
+            >
+              <DollarSign size={16} />
+              Usage &amp; Costs
+            </NavLink>
+          )}
         </nav>
 
         {/* Client switcher — admin only */}
         {isAdmin && clients.length > 0 && (
-          <div className="p-3 border-t border-dark-700 flex-shrink-0">
+          <div className="p-3 border-t border-dark-700/60 flex-shrink-0">
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative">
               <button
@@ -166,7 +193,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Onboard Client */}
         {isAdmin && (
-          <div className="p-3 border-t border-dark-700 flex-shrink-0">
+          <div className="p-3 border-t border-dark-700/60 flex-shrink-0">
             <NavLink to="/onboard" onClick={closeSidebar}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
@@ -179,7 +206,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Market selector — multi-select with per-market region pickers */}
-        <div className="p-3 border-t border-dark-700 space-y-1.5 flex-shrink-0">
+        <div className="p-3 border-t border-dark-700/60 space-y-1.5 flex-shrink-0">
           <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
 
           {/* Selected market chips */}
@@ -255,7 +282,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Bottom actions */}
-        <div className="p-3 border-t border-dark-700 space-y-0.5 flex-shrink-0">
+        <div className="p-3 border-t border-dark-700/60 space-y-0.5 flex-shrink-0">
           <div className="relative">
             <button
               onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
@@ -296,7 +323,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700 flex items-center px-4 gap-3">
+
+        {/* Mobile header */}
+        <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
           <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-1" aria-label="Open menu">
             <Menu size={20} />
           </button>
@@ -309,10 +338,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        <main className="flex-1 overflow-auto scrollbar-thin">
+        {/* Global time filter bar */}
+        <div className="flex-shrink-0 border-b border-dark-700/40 bg-dark-800/60 backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
+          {((['7d', '30d', '90d', 'all'] as const)).map(r => (
+            <button
+              key={r}
+              onClick={() => setTimeRange(r)}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                timeRange === r
+                  ? 'bg-brand-500/20 text-brand-300'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-dark-700/50'
+              }`}
+            >
+              {TIME_LABELS[r]}
+            </button>
+          ))}
+        </div>
+
+        <main className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom nav bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-dark-800/95 backdrop-blur-md border-t border-dark-700 flex items-stretch justify-around safe-area-pb">
+        {nav.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            onClick={closeSidebar}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center gap-0.5 px-2 py-2 flex-1 transition-colors min-w-0 ${
+                isActive ? 'text-brand-300' : 'text-slate-500 active:text-slate-300'
+              }`
+            }
+          >
+            <Icon size={19} />
+            <span className="text-[9px] font-medium leading-none truncate max-w-full">
+              {label.split(' ')[0]}
+            </span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

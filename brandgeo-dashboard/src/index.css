@@ -80,6 +80,11 @@ html.light .bg-brand-500\/20 {
     scrollbar-width: thin;
     scrollbar-color: rgb(var(--dark-600)) transparent;
   }
+
+  /* iOS safe-area padding for bottom nav */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Score ring SVG text — theme-aware fill */
@@ -87,3 +92,18 @@ html.light .bg-brand-500\/20 {
 .score-ring-label  { fill: rgba(255 255 255, 0.45); }
 html.light .score-ring-number { fill: rgb(15 23 42) !important; }
 html.light .score-ring-label  { fill: rgba(15, 23, 42, 0.5) !important; }
+
+/* Softer card depth — shadow instead of flat hard border */
+.bg-dark-800.border.border-dark-700,
+.bg-dark-800.border.border-dark-700\/60 {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.bg-dark-800.rounded-xl {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Light mode card softening */
+html.light .bg-dark-800.border,
+html.light .bg-dark-800.rounded-xl {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+}
