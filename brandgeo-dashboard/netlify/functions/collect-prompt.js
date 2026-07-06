@@ -450,7 +450,6 @@ exports.handler = async (event) => {
     toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), FAST_TIMEOUT))
   )
 
-  const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
   console.log(`[${invId}] settled:`,
     settled.map((r, i) => `${toRun[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
 
