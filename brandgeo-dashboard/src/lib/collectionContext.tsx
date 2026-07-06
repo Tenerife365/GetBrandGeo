@@ -2,10 +2,10 @@
  * collectionContext.tsx
  * Holds collection state at the App level so it survives tab navigation.
  *
- * Architecture:
- *   - collect-prompt.js  runs chatgpt/gemini/perplexity/meta (15s timeout each)
- *   - collect-claude.js  runs Claude only (full 26s Netlify window)
- *   Both are fired in parallel per prompt.
+ * Architecture (3 parallel Netlify functions per prompt):
+ *   - collect-prompt.js   gemini / perplexity / meta  (20s timeout, ~21s total)
+ *   - collect-claude.js   Claude only                  (full 26s window)
+ *   - collect-chatgpt.js  ChatGPT / gpt-5.5 only       (full 26s window)
  */
 
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
@@ -112,10 +112,12 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           market_id,
         }
 
-        // Fire fast engines and Claude in parallel.
-        // collect-claude.js has its own 26s Netlify timeout, separate from collect-prompt.
+        // Fire all 3 functions in parallel -- each has its own 26s Netlify timeout.
+        // collect-prompt: gemini + perplexity + meta
+        // collect-claude: Claude only
+        // collect-chatgpt: ChatGPT (gpt-5.5) only
         try {
-          const [fastRes, claudeRes] = await Promise.allSettled([
+          const [fastRes, claudeRes, chatgptRes] = await Promise.allSettled([
             fetch('/.netlify/functions/collect-prompt', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -126,11 +128,17 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             }).then(r => r.json().catch(() => null)),
+            fetch('/.netlify/functions/collect-chatgpt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }).then(r => r.json().catch(() => null)),
           ])
           console.log(
             `[Collection] prompt ${i + 1}/${prompts.length}`,
             '-> fast:', fastRes.status === 'fulfilled' ? fastRes.value : fastRes.reason,
             '-> claude:', claudeRes.status === 'fulfilled' ? claudeRes.value : claudeRes.reason,
+            '-> chatgpt:', chatgptRes.status === 'fulfilled' ? chatgptRes.value : chatgptRes.reason,
           )
         } catch { /* network blip -- skip prompt, keep going */ }
         setLastCompletedAt(Date.now())
@@ -176,9 +184,9 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       market_id,
     }
 
-    // Fire fast engines and Claude in parallel.
-    // collect-prompt (force=true) deletes all rows first, then saves 4 fast engines.
-    // collect-claude inserts Claude independently with its own 26s window.
+    // Fire all 3 functions in parallel.
+    // collect-prompt (force=true) deletes all rows first, then saves gemini/perplexity/meta.
+    // collect-claude and collect-chatgpt insert independently with their own 26s windows.
     try {
       await Promise.allSettled([
         fetch('/.netlify/functions/collect-prompt', {
@@ -187,6 +195,11 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           body: JSON.stringify(payload),
         }),
         fetch('/.netlify/functions/collect-claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+        fetch('/.netlify/functions/collect-chatgpt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

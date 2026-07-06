@@ -411,11 +411,11 @@ exports.handler = async (event) => {
   // Build geo context — explicit market takes priority over TLD inference
   const ctx = buildSystemContext(client_config, market_label, region_label)
 
-  // LLM_CALLERS defined here so ctx is captured in closure
-  // Claude runs in collect-claude.js (dedicated function with full 26s timeout).
-  // This function handles the 4 fast engines only.
+  // LLM_CALLERS defined here so ctx is captured in closure.
+  // Claude runs in collect-claude.js (dedicated 26s function).
+  // ChatGPT runs in collect-chatgpt.js (dedicated 26s function -- gpt-5.5 needs 20-25s).
+  // This function handles the 3 fast engines only.
   const LLM_CALLERS = {
-    chatgpt:    p => callChatGPT(p, ctx, market_id, region_label),   // web search + geo
     gemini:     p => callGemini(p, ctx),                              // web search via Google
     perplexity: p => callOpenRouter('perplexity/sonar', p, ctx),      // web search built-in
     meta:       p => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),  // training data
@@ -443,8 +443,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }
 
-  // Run 4 fast engines in parallel.
-  // Claude runs separately in collect-claude.js with its own 26s Netlify timeout.
+  // Run 3 fast engines in parallel (Claude and ChatGPT have their own dedicated functions).
   // 20s timeout: Meta/Llama via OpenRouter can be slow on some prompts; 20s fits
   // within the 26s function limit since we save immediately after (< 1s overhead).
   const FAST_TIMEOUT = 20000

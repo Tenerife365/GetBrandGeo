@@ -22,5 +22,8 @@
 [functions."collect-claude"]
   timeout = 26
 
+[functions."collect-chatgpt"]
+  timeout = 26
+
 [functions."onboard-client"]
   timeout = 26
