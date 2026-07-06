@@ -89,6 +89,23 @@ function matchesAlias(segment, aliases, aliasesStripped, website) {
          (website && sl.includes(website))
 }
 
+const NOT_A_COMPANY = [
+  'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
+  'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
+  'masiva', 'masivă', 'proprie', 'proprii',
+  ' pentru ', 'datorit', 'grație', 'gratie',
+  'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
+  'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
+  'firme de', 'si altele', 'și altele',
+]
+
+function isCompanyName(name) {
+  if (!name || name.length < 2 || name.length > 60) return false
+  const lower = name.toLowerCase()
+  if (NOT_A_COMPANY.some(t => lower.includes(t))) return false
+  return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
+}
+
 function detectListPosition(text, aliases, aliasesStripped, website) {
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
@@ -151,6 +168,7 @@ function analyseResponse(text, cfg) {
 
   const competitors = topResults
     .filter(item => !matchesAlias(item.name, aliases, aliasesStripped, website))
+    .filter(item => isCompanyName(item.name))
     .map(({ pos, name }) => ({ pos, name }))
 
   return {

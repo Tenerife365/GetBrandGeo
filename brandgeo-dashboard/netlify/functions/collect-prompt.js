@@ -130,6 +130,33 @@ function matchesAlias(segment, aliases, aliasesStripped, website) {
          (website && sl.includes(website))
 }
 
+/**
+ * Reject descriptive phrases that AI engines sometimes list as numbered items
+ * instead of actual company names (e.g. "Experiență Masivă", "Record De Capacitate").
+ * Applied before saving competitors_mentioned so the DB stays clean.
+ */
+const NOT_A_COMPANY = [
+  // Romanian abstract nouns — virtually never appear in real company names
+  'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
+  'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
+  'masiva', 'masivă', 'proprie', 'proprii',
+  // Mid-string Romanian prepositions that signal descriptive phrases
+  ' pentru ', 'datorit', 'grație', 'gratie',
+  // English generic terms
+  'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
+  // Romanian filler list phrases
+  'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
+  'firme de', 'si altele', 'și altele',
+]
+
+function isCompanyName(name) {
+  if (!name || name.length < 2 || name.length > 60) return false
+  const lower = name.toLowerCase()
+  if (NOT_A_COMPANY.some(t => lower.includes(t))) return false
+  // Must contain at least one letter
+  return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
+}
+
 function analyseResponse(text, cfg) {
   const aliases         = (cfg.brand_aliases || []).map(a => a.toLowerCase())
   const aliasesStripped = aliases.map(a => a.replace(/[\s\-_.]/g, ''))
@@ -178,6 +205,7 @@ function analyseResponse(text, cfg) {
 
   const competitors = topResults
     .filter(item => !matchesAlias(item.name, aliases, aliasesStripped, website))
+    .filter(item => isCompanyName(item.name))
     .map(({ pos, name }) => ({ pos, name }))
 
   return {

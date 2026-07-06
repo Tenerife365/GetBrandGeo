@@ -46,23 +46,23 @@ interface CompetitorStat {
 // "Other large-scale options", "Alte optiuni de volum mare"). Filter these out
 // so only real company names appear as competitors.
 
+// Must match NOT_A_COMPANY in the Netlify collect functions — single source of truth.
 const GENERIC_TOKENS = [
-  'opțiuni', 'optiuni', 'options', 'alte opț', 'alte opt', 'alte firm',
-  'alte comp', 'other option', 'other compan', 'alte variante', 'alte soluții',
-  'furnizori', 'companii de', 'firme de', 'providers', 'vendors',
-  'etc.', 'si altele', 'și altele', '...', 'alte locații',
+  'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
+  'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
+  'masiva', 'masivă', 'proprie', 'proprii',
+  ' pentru ', 'datorit', 'grație', 'gratie',
+  'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
+  'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
+  'firme de', 'si altele', 'și altele',
 ]
 
-// Reject strings that are clearly not company names.
-// NOTE: do NOT require uppercase start — AI engines often write names in lowercase.
 function isLikelyCompanyName(name: string): boolean {
-  if (name.length > 55) return false   // too long — likely a sentence fragment
-  if (name.length < 3)  return false
+  if (name.length > 60) return false
+  if (name.length < 2)  return false
   const lower = name.toLowerCase()
   if (GENERIC_TOKENS.some(t => lower.includes(t))) return false
-  // Reject pure numbers or strings with no letters
-  if (!/[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)) return false
-  return true
+  return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
 }
 
 // Title-case a competitor name for display (handles "flavours catering" → "Flavours Catering")
