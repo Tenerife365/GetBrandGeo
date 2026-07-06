@@ -283,18 +283,12 @@ async function callGemini(prompt, ctx) {
   return null
 }
 
-// Claude — Anthropic Streaming API with web search beta.
-// STREAMING avoids waiting for the full JSON response body (which includes
-// web_search_tool_result blocks with raw web page HTML — can be 200-500KB).
-// Non-streaming r.json() on a large response body consistently exceeds 20s,
-// causing the withTimeout to reject Claude's promise before it resolves.
-// With streaming, text tokens arrive in ~3-5s as Claude writes them.
+// Claude — streaming API with early abort.
+// Anthropic web search fetches Romanian pages before streaming starts (15-25s).
+// We abort after 2500 chars — enough for brand detection — so we finish in 8-15s.
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    console.error('[Claude] ANTHROPIC_API_KEY not set in Netlify env vars.')
-    return null
-  }
+  if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return null }
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -306,66 +300,60 @@ async function callClaude(prompt, ctx) {
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
-        max_tokens: 2048,
-        stream:     true,   // stream so text tokens arrive without waiting for full body
+        max_tokens: 1000,   // cap output — less to generate = faster streaming start
+        stream:     true,
         system:     ctx,
         tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
         messages:   [{ role: 'user', content: prompt }],
       }),
     })
-
     if (!r.ok) {
-      const errBody = await r.text().catch(() => '')
-      console.error('[Claude] HTTP error:', r.status, errBody.slice(0, 200))
+      console.error('[Claude] HTTP error:', r.status)
       return null
     }
 
-    // Parse SSE stream — collect only text_delta events, skip tool blocks
     const reader  = r.body.getReader()
     const decoder = new TextDecoder()
-    let buffer    = ''
-    let fullText  = ''
+    let buf       = ''
+    let text      = ''
     let stopReason = null
+    let partial   = false
+    const MAX_TEXT = 2500   // abort after this many chars — brand detection needs ~500-1000
 
-    while (true) {
+    outer: while (true) {
       const { done, value } = await reader.read()
       if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''   // keep any incomplete last line
-
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
-        if (!data || data === '[DONE]') continue
+        const raw = line.slice(6).trim()
+        if (!raw || raw === '[DONE]') continue
         try {
-          const ev = JSON.parse(data)
+          const ev = JSON.parse(raw)
           if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-            fullText += ev.delta.text ?? ''
+            text += ev.delta.text ?? ''
+            if (text.length >= MAX_TEXT) {
+              partial = true
+              reader.cancel('enough').catch(() => {})
+              break outer
+            }
           }
-          if (ev.type === 'message_delta' && ev.delta?.stop_reason) {
-            stopReason = ev.delta.stop_reason
-          }
-          if (ev.type === 'error') {
-            console.error('[Claude] stream error event:', JSON.stringify(ev.error))
-          }
-        } catch { /* skip malformed SSE line */ }
+          if (ev.type === 'message_delta') stopReason = ev.delta?.stop_reason ?? stopReason
+          if (ev.type === 'error') console.error('[Claude] stream error:', JSON.stringify(ev.error))
+        } catch { /* skip malformed SSE */ }
       }
     }
 
-    if (fullText) {
-      console.log('[Claude] ok (streaming) | stop_reason:', stopReason,
-        '| text length:', fullText.length,
-        '| preview:', fullText.slice(0, 200))
-      return fullText
+    if (text) {
+      console.log('[Claude] ok | stop:', partial ? 'partial' : stopReason,
+        '| len:', text.length, '| preview:', text.slice(0, 200))
+      return text
     }
-    console.warn('[Claude] stream complete but no text blocks received | stop_reason:', stopReason)
+    console.warn('[Claude] stream done but no text | stop_reason:', stopReason)
     return null
-  } catch (e) {
-    console.error('[Claude] request threw:', e.message)
-    return null
-  }
+  } catch (e) { console.error('[Claude] threw:', e.message); return null }
 }
 
 // OpenRouter — Perplexity (web search built-in) and Meta (training data only)
@@ -454,59 +442,76 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }
 
-  // 20s per LLM — parallel. Reduced from 22s to leave ≥4s for the Supabase insert
-  // within Netlify's 26s function timeout.
-  const settled = await Promise.allSettled(
-    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 20000))
-  )
+  // ── Two-phase collection ────────────────────────────────────────────────────
+  // Claude's web search takes 15-28s (Anthropic fetches Romanian pages before
+  // streaming starts). Running it in parallel with the fast engines but saving
+  // its result separately gives Claude up to 24s without blocking the others.
+  //
+  //  T=0        All 5 engines start simultaneously
+  //  T≈15s      Fast engines (chatgpt/gemini/perplexity/meta) hit their timeout
+  //             → save immediately so dashboard shows partial results
+  //  T≈24s      Claude deadline — save if ready, otherwise log timeout
+  //  T≈25s      Return — total ≤ 26s (Netlify hard limit)
 
-  const summary = {}
-  const inserts = []
+  const T0             = Date.now()
+  const FAST_TIMEOUT   = 15000   // 15s for chatgpt/gemini/perplexity/meta
+  const CLAUDE_DEADLINE = 24000  // 24s total for Claude (24 - elapsed at phase2 start)
 
-  // Log each engine's settled status — critical for diagnosing timeouts
-  console.log(`[${invId}] settled:`,
-    settled.map((r, i) => `${toRun[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
+  const summary       = {}
+  const claudeInToRun = toRun.includes('claude')
+  const fastLLMs      = toRun.filter(e => e !== 'claude')
 
-  for (let i = 0; i < toRun.length; i++) {
-    const llm    = toRun[i]
-    const result = settled[i]
+  // Start Claude immediately in background (if needed) — it runs in parallel
+  const claudePromise = claudeInToRun ? LLM_CALLERS.claude(prompt_text) : null
+
+  // ── Phase 1: fast engines ─────────────────────────────────────────────────
+  const fastSettled = fastLLMs.length > 0
+    ? await Promise.allSettled(fastLLMs.map(e => withTimeout(LLM_CALLERS[e](prompt_text), FAST_TIMEOUT)))
+    : []
+
+  console.log(`[${invId}] fast settled:`,
+    fastSettled.map((r, i) => `${fastLLMs[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
+
+  function buildRow(llm, result) {
     if (result.status === 'rejected' || !result.value) {
       summary[llm] = `failed: ${result.reason?.message || 'no response'}`
-      continue
+      return null
     }
     let analysis
-    try {
-      analysis = analyseResponse(result.value, client_config)
-    } catch (analysisErr) {
-      console.error(`[${llm}] analyseResponse threw:`, analysisErr.message,
-        '| text preview:', String(result.value).slice(0, 120))
-      summary[llm] = 'analysis_error'
-      continue
-    }
-    inserts.push({
-      prompt_id,
-      llm,
-      client_id,
+    try { analysis = analyseResponse(result.value, client_config) }
+    catch (e) { console.error(`[${llm}] analyseResponse threw:`, e.message); summary[llm] = 'analysis_error'; return null }
+    summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
+    return {
+      prompt_id, llm, client_id,
       brand_mentioned:       analysis.brand_mentioned,
       brand_position:        analysis.brand_position,
       sentiment:             analysis.sentiment,
       response_snippet:      analysis.response_snippet,
       competitors_mentioned: analysis.competitors_mentioned,
       checked_at:            new Date().toISOString(),
-    })
-    summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
+    }
   }
 
-  if (inserts.length > 0) {
-    console.log('[Insert] saving rows for:', inserts.map(r => r.llm).join(', '))
-    const { error: insertErr } = await supabase.from('ai_results').insert(inserts)
-    if (insertErr) {
-      console.error('[Insert] FAILED:', insertErr.message, '| code:', insertErr.code, '| hint:', insertErr.hint)
-      return { statusCode: 500, body: JSON.stringify({ error: insertErr.message }) }
-    }
-    console.log('[Insert] SUCCESS — saved', inserts.length, 'row(s)')
-  } else {
-    console.warn('[Insert] nothing to save — all engines failed or errored')
+  async function saveRows(rows, label) {
+    const valid = rows.filter(Boolean)
+    if (valid.length === 0) { console.warn(`[Insert:${label}] nothing to save`); return }
+    console.log(`[Insert:${label}] saving: ${valid.map(r => r.llm).join(', ')}`)
+    const { error } = await supabase.from('ai_results').insert(valid)
+    if (error) console.error(`[Insert:${label}] FAILED:`, error.message, '| code:', error.code)
+    else console.log(`[Insert:${label}] saved ${valid.length} row(s)`)
+  }
+
+  const fastRows = fastSettled.map((r, i) => buildRow(fastLLMs[i], r))
+  await saveRows(fastRows, 'fast')
+
+  // ── Phase 2: Claude ───────────────────────────────────────────────────────
+  if (claudeInToRun && claudePromise) {
+    const elapsed   = Date.now() - T0
+    const remaining = Math.max(2000, CLAUDE_DEADLINE - elapsed)
+    const [cr]      = await Promise.allSettled([withTimeout(claudePromise, remaining)])
+    console.log(`[${invId}] claude settled: ${cr.status === 'fulfilled' ? (cr.value ? 'ok' : 'null') : 'TIMEOUT'} (${Date.now() - T0}ms elapsed)`)
+    const claudeRow = buildRow('claude', cr)
+    await saveRows([claudeRow], 'claude')
   }
 
   // ctx_geo: what location was actually used — helps debug collection results
