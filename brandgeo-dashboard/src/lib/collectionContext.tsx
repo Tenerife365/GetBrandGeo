@@ -142,6 +142,10 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           )
         } catch { /* network blip -- skip prompt, keep going */ }
         setLastCompletedAt(Date.now())
+        // gpt-5.5 can take 30-40s -- Netlify closes the HTTP connection at 26s but the
+        // Lambda saves in the background. Schedule follow-up reloads to catch late saves.
+        setTimeout(() => setLastCompletedAt(Date.now()), 15000)
+        setTimeout(() => setLastCompletedAt(Date.now()), 40000)
       }
     } finally {
       runningRef.current = false
@@ -208,6 +212,9 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     } catch { /* network blip -- caller handles UI reset */ }
 
     setLastCompletedAt(Date.now())
+    // Follow-up reloads to catch ChatGPT background saves that land after 26s
+    setTimeout(() => setLastCompletedAt(Date.now()), 15000)
+    setTimeout(() => setLastCompletedAt(Date.now()), 40000)
   }, [])
 
   return (
