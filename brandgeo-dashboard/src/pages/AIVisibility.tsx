@@ -7,6 +7,7 @@ import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
+import { useTheme } from '../lib/themeContext'
 
 const LLMS: { id: LLMName; label: string; color: string; bg: string; logoUrl: string }[] = [
   { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com'       },
@@ -84,6 +85,7 @@ export default function AIVisibility() {
   const { activeClientId, activeClient, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
+  const { theme } = useTheme()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [results, setResults] = useState<ResultMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -351,6 +353,9 @@ export default function AIVisibility() {
   const scoreColor = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
   const circumference = 2 * Math.PI * 54 // r=54 → 339.3
   const dashOffset = circumference - (aiScore / 100) * circumference
+  // SVG text fill adapts to light/dark mode (fill="white" is invisible on light bg)
+  const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
+  const ringTextFillDim = theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'
 
   const dimConfig = [
     { key: 'recognition', label: 'Recognition', value: dimensions.recognition, desc: 'Prompt coverage' },
@@ -454,8 +459,8 @@ export default function AIVisibility() {
                 </feMerge>
               </filter>
             </defs>
-            {/* Track — barely visible */}
-            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+            {/* Track — adapts to light/dark */}
+            <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
             {/* Glow halo layer */}
             <circle
               cx="60" cy="60" r="54"
@@ -484,7 +489,7 @@ export default function AIVisibility() {
             />
             {/* Score number with superscript % */}
             <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              <tspan fontSize="38" fontWeight="800" fill="white" letterSpacing="-1.5">{aiScore}</tspan><tspan fontSize="14" fontWeight="500" fill="rgba(255,255,255,0.55)" dy="-14">%</tspan>
+              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{aiScore}</tspan><tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
             </text>
           </svg>
           {/* Label + status pill */}
