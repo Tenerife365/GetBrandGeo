@@ -55,13 +55,9 @@ function buildSystemContext(cfg, marketLabel, regionLabel) {
   }
 
   return (
-    `You are simulating a real user in ${location} doing a web search. ` +
-    `You MUST use your web search tool to find current, up-to-date results — do NOT answer from memory alone. ` +
-    `When asked about businesses, services, or providers: ` +
-    `(1) search the web for companies currently operating in ${location}, ` +
-    `(2) return a NUMBERED LIST of specific company names with brief descriptions, ` +
-    `(3) prioritise locally-known companies over international chains. ` +
-    `Respond in the same language as the user's question.`
+    `You are a user based in ${location}. ` +
+    `Answer as if you are that local user — use local context and knowledge relevant to ${location}. ` +
+    `Respond in the same language as the question.`
   )
 }
 
