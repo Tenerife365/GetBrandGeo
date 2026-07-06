@@ -283,10 +283,12 @@ async function callGemini(prompt, ctx) {
   return null
 }
 
-// Claude — Anthropic direct API with web search beta.
-// claude-sonnet-4-6 supports web_search_20250305 natively via the beta header.
-// max_uses:1 = one search round (~8-12s), safe within the 22s timeout.
-// Anthropic handles the search server-side — no multi-turn loop needed.
+// Claude — Anthropic Streaming API with web search beta.
+// STREAMING avoids waiting for the full JSON response body (which includes
+// web_search_tool_result blocks with raw web page HTML — can be 200-500KB).
+// Non-streaming r.json() on a large response body consistently exceeds 20s,
+// causing the withTimeout to reject Claude's promise before it resolves.
+// With streaming, text tokens arrive in ~3-5s as Claude writes them.
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -305,27 +307,60 @@ async function callClaude(prompt, ctx) {
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 2048,
+        stream:     true,   // stream so text tokens arrive without waiting for full body
         system:     ctx,
         tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
         messages:   [{ role: 'user', content: prompt }],
       }),
     })
-    const d = await r.json()
-    console.log('[Claude] stop_reason:', d.stop_reason,
-      '| blocks:', (d.content || []).map(b => b.type).join(','),
-      '| error:', d.error?.message ?? 'none')
-    if (d.error) {
-      console.error('[Claude] API error:', d.error.type, d.error.message)
+
+    if (!r.ok) {
+      const errBody = await r.text().catch(() => '')
+      console.error('[Claude] HTTP error:', r.status, errBody.slice(0, 200))
       return null
     }
-    const textBlocks = (d.content || []).filter(b => b.type === 'text')
-    if (textBlocks.length > 0) {
-      const text = textBlocks.map(b => b.text).join('\n')
-      console.log('[Claude] ok (web search) | preview:', text.slice(0, 200))
-      return text
+
+    // Parse SSE stream — collect only text_delta events, skip tool blocks
+    const reader  = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer    = ''
+    let fullText  = ''
+    let stopReason = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''   // keep any incomplete last line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const data = line.slice(6).trim()
+        if (!data || data === '[DONE]') continue
+        try {
+          const ev = JSON.parse(data)
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+            fullText += ev.delta.text ?? ''
+          }
+          if (ev.type === 'message_delta' && ev.delta?.stop_reason) {
+            stopReason = ev.delta.stop_reason
+          }
+          if (ev.type === 'error') {
+            console.error('[Claude] stream error event:', JSON.stringify(ev.error))
+          }
+        } catch { /* skip malformed SSE line */ }
+      }
     }
-    console.warn('[Claude] no text blocks | stop_reason:', d.stop_reason,
-      '| block types:', (d.content || []).map(b => b.type).join(','))
+
+    if (fullText) {
+      console.log('[Claude] ok (streaming) | stop_reason:', stopReason,
+        '| text length:', fullText.length,
+        '| preview:', fullText.slice(0, 200))
+      return fullText
+    }
+    console.warn('[Claude] stream complete but no text blocks received | stop_reason:', stopReason)
     return null
   } catch (e) {
     console.error('[Claude] request threw:', e.message)
@@ -372,6 +407,9 @@ async function callOpenRouter(model, prompt, ctx) {
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
 
+  // Unique ID per invocation — disambiguates interleaved logs from warm-start container reuse
+  const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
+
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
 
@@ -380,6 +418,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+  console.log(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
 
   // Build geo context — explicit market takes priority over TLD inference
   const ctx = buildSystemContext(client_config, market_label, region_label)
@@ -423,6 +462,10 @@ exports.handler = async (event) => {
 
   const summary = {}
   const inserts = []
+
+  // Log each engine's settled status — critical for diagnosing timeouts
+  console.log(`[${invId}] settled:`,
+    settled.map((r, i) => `${toRun[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
 
   for (let i = 0; i < toRun.length; i++) {
     const llm    = toRun[i]
