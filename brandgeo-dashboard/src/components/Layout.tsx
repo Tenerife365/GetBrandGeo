@@ -1,0 +1,318 @@
+import { useState } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb, ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2, StopCircle, Plus } from 'lucide-react'
+import { supabase, isDemoMode } from '../lib/supabase'
+import { useMarket, MARKETS } from '../lib/marketContext'
+import { useClient } from '../lib/clientContext'
+import { Building2 } from 'lucide-react'
+import { useTheme } from '../lib/themeContext'
+import { useI18n, LANGUAGES } from '../lib/i18nContext'
+import { useCollection } from '../lib/collectionContext'
+
+function BrandGeoLogo() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <div className="flex items-center gap-2">
+      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '32px', width: 'auto', display: 'block' }} />
+      <div className="leading-none">
+        <span className={`font-bold text-base tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Brand</span>
+        <span className="font-bold text-base tracking-tight" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
+      </div>
+    </div>
+  )
+}
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+  const { selections, addSelection, removeSelection, updateRegion } = useMarket()
+  const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
+  const { theme, toggle } = useTheme()
+  const { lang, setLang, t } = useI18n()
+  const { collecting, progress, stopCollection } = useCollection()
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [showAddMarket, setShowAddMarket] = useState(false)
+  const [showClients, setShowClients]   = useState(false)
+  const [showLangs, setShowLangs]       = useState(false)
+
+  const nav = [
+    { to: '/',                icon: LayoutDashboard, label: t.nav_overview      },
+    { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions      },
+    { to: '/competitors',     icon: Users,           label: t.nav_competitors   },
+    { to: '/prompts',         icon: BookText,        label: t.nav_prompts       },
+    { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility  },
+    { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
+  ]
+
+  const handleLogout = async () => {
+    if (!isDemoMode) await supabase.auth.signOut()
+    navigate('/login')
+  }
+
+  const closeSidebar = () => setSidebarOpen(false)
+  const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
+  const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
+
+  // Markets not yet selected — available to add
+  const availableMarkets = MARKETS.filter(m => !selections.some(s => s.market.id === m.id))
+
+  return (
+    <div className="flex h-screen bg-dark-900 overflow-hidden">
+
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={[
+        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700 flex flex-col',
+        'transition-transform duration-200 ease-in-out',
+        'md:relative md:w-56 md:flex-shrink-0',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      ].join(' ')}>
+
+        {/* Logo */}
+        <div className="px-4 py-4 border-b border-dark-700 flex items-center justify-between flex-shrink-0">
+          <BrandGeoLogo />
+          <div className="flex items-center gap-2">
+            {isDemoMode && (
+              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
+            )}
+            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-1" aria-label="Close menu">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Collection progress — visible from any tab */}
+        {collecting && progress && (
+          <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Loader2 size={11} className="animate-spin text-brand-400" />
+                <span className="text-xs text-brand-300 font-medium truncate max-w-[120px]">
+                  {progress.clientName}
+                </span>
+              </div>
+              <button
+                onClick={stopCollection}
+                className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                title="Stop collection"
+              >
+                <StopCircle size={11} />
+                Stop
+              </button>
+            </div>
+            <div className="h-1 bg-dark-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-400 rounded-full transition-all duration-300"
+                style={{ width: `${collectPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-slate-600">{progress.done}/{progress.total} prompts</span>
+              <span className="text-[10px] text-slate-600">{collectPct}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Nav links */}
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+          {nav.map(({ to, icon: Icon, label }) => (
+            <NavLink key={to} to={to} end={to === '/'}
+              onClick={closeSidebar}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
+              }
+            >
+              <Icon size={16} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Client switcher — admin only */}
+        {isAdmin && clients.length > 0 && (
+          <div className="p-3 border-t border-dark-700 flex-shrink-0">
+            <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
+            <div className="relative">
+              <button
+                onClick={() => { setShowClients(v => !v); setShowAddMarket(false); setShowLangs(false) }}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
+              >
+                <Building2 size={13} className="text-brand-400 flex-shrink-0" />
+                <span className="flex-1 text-left truncate font-medium">
+                  {clients.find(c => c.id === activeClientId)?.name ?? t.sidebar_selectClient}
+                </span>
+                <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+              </button>
+              {showClients && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                  {clients.map(c => (
+                    <button key={c.id}
+                      onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                    >
+                      <Building2 size={12} className="flex-shrink-0" />
+                      <span>{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Onboard Client */}
+        {isAdmin && (
+          <div className="p-3 border-t border-dark-700 flex-shrink-0">
+            <NavLink to="/onboard" onClick={closeSidebar}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
+              }
+            >
+              <UserPlus size={16} />
+              Onboard Client
+            </NavLink>
+          </div>
+        )}
+
+        {/* Market selector — multi-select with per-market region pickers */}
+        <div className="p-3 border-t border-dark-700 space-y-1.5 flex-shrink-0">
+          <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
+
+          {/* Selected market chips */}
+          <div className="space-y-1">
+            {selections.map(sel => (
+              <div key={sel.market.id} className="bg-dark-700 rounded-lg overflow-hidden">
+                {/* Market header row */}
+                <div className="flex items-center gap-2 px-3 py-2">
+                  {sel.market.flagCode === 'un'
+                    ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                    : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
+                  }
+                  <span className="flex-1 text-sm text-slate-300 truncate">{sel.market.label}</span>
+                  {selections.length > 1 && (
+                    <button
+                      onClick={() => removeSelection(sel.market.id)}
+                      className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                      title={`Remove ${sel.market.label}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+                {/* Inline region selector — only shown when market has sub-regions */}
+                {sel.market.regions.length > 1 && (
+                  <div className="px-2 pb-2">
+                    <select
+                      value={sel.region.id}
+                      onChange={e => {
+                        const r = sel.market.regions.find(r => r.id === e.target.value)
+                        if (r) updateRegion(sel.market.id, r)
+                      }}
+                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                    >
+                      {sel.market.regions.map(r => (
+                        <option key={r.id} value={r.id}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add market picker */}
+          {availableMarkets.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+              >
+                <Plus size={11} />
+                Add market
+              </button>
+              {showAddMarket && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-56 shadow-xl z-50">
+                  {availableMarkets.map(m => (
+                    <button key={m.id}
+                      onClick={() => { addSelection(m); setShowAddMarket(false) }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300 hover:bg-dark-600 transition-colors"
+                    >
+                      {m.flagCode === 'un'
+                        ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                        : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
+                      }
+                      <span>{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom actions */}
+        <div className="p-3 border-t border-dark-700 space-y-0.5 flex-shrink-0">
+          <div className="relative">
+            <button
+              onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            >
+              <Languages size={16} />
+              <span className="flex-1 text-left">
+                <img src={`https://flagcdn.com/w20/${currentLang.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm inline-block mr-1.5 -mt-0.5" />
+                {currentLang.label}
+              </span>
+              <ChevronDown size={13} className="text-slate-500" />
+            </button>
+            {showLangs && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                {LANGUAGES.map(l => (
+                  <button key={l.id}
+                    onClick={() => { setLang(l.id); setShowLangs(false) }}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                  >
+                    <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
+                    <span>{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={toggle} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'dark' ? t.sidebar_lightMode : t.sidebar_darkMode}
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+            <LogOut size={16} />
+            {t.sidebar_signOut}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700 flex items-center px-4 gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-1" aria-label="Open menu">
+            <Menu size={20} />
+          </button>
+          <BrandGeoLogo />
+          {collecting && progress && (
+            <div className="ml-auto flex items-center gap-1.5 text-xs text-brand-400">
+              <Loader2 size={12} className="animate-spin" />
+              <span>{progress.done}/{progress.total}</span>
+            </div>
+          )}
+        </header>
+
+        <main className="flex-1 overflow-auto scrollbar-thin">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
