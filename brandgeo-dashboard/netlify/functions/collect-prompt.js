@@ -443,9 +443,11 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }
 
-  // Run 4 fast engines in parallel (15s timeout each).
+  // Run 4 fast engines in parallel.
   // Claude runs separately in collect-claude.js with its own 26s Netlify timeout.
-  const FAST_TIMEOUT = 15000
+  // 20s timeout: Meta/Llama via OpenRouter can be slow on some prompts; 20s fits
+  // within the 26s function limit since we save immediately after (< 1s overhead).
+  const FAST_TIMEOUT = 20000
   const settled = await Promise.allSettled(
     toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), FAST_TIMEOUT))
   )
