@@ -1,6 +1,11 @@
 /**
  * collectionContext.tsx
  * Holds collection state at the App level so it survives tab navigation.
+ *
+ * Architecture:
+ *   - collect-prompt.js  runs chatgpt/gemini/perplexity/meta (15s timeout each)
+ *   - collect-claude.js  runs Claude only (full 26s Netlify window)
+ *   Both are fired in parallel per prompt.
  */
 
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
@@ -17,7 +22,7 @@ interface Progress {
 interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
-  lastCompletedAt: number   // increments after each prompt — watch to reload data
+  lastCompletedAt: number   // increments after each prompt -- watch to reload data
   runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[]) => Promise<void>
   runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[]) => Promise<void>
   stopCollection:   () => void
@@ -67,7 +72,6 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         brand_website:     clientRow?.brand_website     ?? '',
         known_competitors: clientRow?.known_competitors ?? [],
       }
-      // Debug — visible in browser console (F12)
       console.log('[Collection] client config loaded:', {
         name: clientRow?.name,
         brand_aliases: clientConfig.brand_aliases,
@@ -76,7 +80,6 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         markets: markets?.map(s => `${s.market.label} / ${s.region.label}`),
       })
 
-      // Fetch active prompts only
       const { data: prompts } = await supabase
         .from('prompts')
         .select('id, text')
@@ -88,38 +91,48 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
 
       setProgress({ done: 0, total: prompts.length, clientId, clientName: clientRow?.name ?? '' })
 
-      // Primary market drives the geo context for LLM calls.
-      // When multiple markets are selected, future versions can fan-out one
-      // collection job per market and store results tagged by market.
-      // For now, primary (first) selection is used.
       const primaryMarket = markets?.[0]
       const market_label  = primaryMarket?.market.label ?? null
       const region_label  = primaryMarket?.region.label ?? null
-      const market_id     = primaryMarket?.market.id    ?? null   // ISO 3166-1 alpha-2 e.g. "RO"
+      const market_id     = primaryMarket?.market.id    ?? null
 
       for (let i = 0; i < prompts.length; i++) {
         if (abortRef.current) break
 
         setProgress({ done: i, total: prompts.length, clientId, clientName: clientRow?.name ?? '' })
 
+        const payload = {
+          prompt_id:     prompts[i].id,
+          prompt_text:   prompts[i].text,
+          client_id:     clientId,
+          client_config: clientConfig,
+          force,
+          market_label,
+          region_label,
+          market_id,
+        }
+
+        // Fire fast engines and Claude in parallel.
+        // collect-claude.js has its own 26s Netlify timeout, separate from collect-prompt.
         try {
-          const res  = await fetch('/.netlify/functions/collect-prompt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt_id:     prompts[i].id,
-              prompt_text:   prompts[i].text,
-              client_id:     clientId,
-              client_config: clientConfig,
-              force,
-              market_label,
-              region_label,
-              market_id,
-            }),
-          })
-          const json = await res.json().catch(() => null)
-          console.log(`[Collection] prompt ${i + 1}/${prompts.length} →`, json)
-        } catch { /* network blip — skip prompt, keep going */ }
+          const [fastRes, claudeRes] = await Promise.allSettled([
+            fetch('/.netlify/functions/collect-prompt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }).then(r => r.json().catch(() => null)),
+            fetch('/.netlify/functions/collect-claude', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }).then(r => r.json().catch(() => null)),
+          ])
+          console.log(
+            `[Collection] prompt ${i + 1}/${prompts.length}`,
+            '-> fast:', fastRes.status === 'fulfilled' ? fastRes.value : fastRes.reason,
+            '-> claude:', claudeRes.status === 'fulfilled' ? claudeRes.value : claudeRes.reason,
+          )
+        } catch { /* network blip -- skip prompt, keep going */ }
         setLastCompletedAt(Date.now())
       }
     } finally {
@@ -152,22 +165,34 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     const region_label  = primaryMarket?.region.label ?? null
     const market_id     = primaryMarket?.market.id    ?? null
 
+    const payload = {
+      prompt_id:     promptId,
+      prompt_text:   promptText,
+      client_id:     clientId,
+      client_config: clientConfig,
+      force:         true,
+      market_label,
+      region_label,
+      market_id,
+    }
+
+    // Fire fast engines and Claude in parallel.
+    // collect-prompt (force=true) deletes all rows first, then saves 4 fast engines.
+    // collect-claude inserts Claude independently with its own 26s window.
     try {
-      await fetch('/.netlify/functions/collect-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt_id:     promptId,
-          prompt_text:   promptText,
-          client_id:     clientId,
-          client_config: clientConfig,
-          force:         true,   // always force — per-prompt refresh deletes & re-runs
-          market_label,
-          region_label,
-          market_id,
+      await Promise.allSettled([
+        fetch('/.netlify/functions/collect-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
         }),
-      })
-    } catch { /* network blip — caller handles UI reset */ }
+        fetch('/.netlify/functions/collect-claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+      ])
+    } catch { /* network blip -- caller handles UI reset */ }
 
     setLastCompletedAt(Date.now())
   }, [])

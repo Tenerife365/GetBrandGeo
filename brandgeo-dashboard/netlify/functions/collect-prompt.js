@@ -412,12 +412,13 @@ exports.handler = async (event) => {
   const ctx = buildSystemContext(client_config, market_label, region_label)
 
   // LLM_CALLERS defined here so ctx is captured in closure
+  // Claude runs in collect-claude.js (dedicated function with full 26s timeout).
+  // This function handles the 4 fast engines only.
   const LLM_CALLERS = {
-    chatgpt:    p => callChatGPT(p, ctx, market_id, region_label),                 // web search via Responses API + geo-targeted
-    gemini:     p => callGemini(p, ctx),                                           // web search via Google grounding
-    claude:     p => callClaude(p, ctx),                                           // web search via Anthropic beta
-    perplexity: p => callOpenRouter('perplexity/sonar', p, ctx),                   // web search built-in
-    meta:       p => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),  // training data only (no web search)
+    chatgpt:    p => callChatGPT(p, ctx, market_id, region_label),   // web search + geo
+    gemini:     p => callGemini(p, ctx),                              // web search via Google
+    perplexity: p => callOpenRouter('perplexity/sonar', p, ctx),      // web search built-in
+    meta:       p => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),  // training data
   }
 
   let toRun
@@ -442,46 +443,34 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }
 
-  // ── Two-phase collection ────────────────────────────────────────────────────
-  // Claude's web search takes 15-28s (Anthropic fetches Romanian pages before
-  // streaming starts). Running it in parallel with the fast engines but saving
-  // its result separately gives Claude up to 24s without blocking the others.
-  //
-  //  T=0        All 5 engines start simultaneously
-  //  T≈15s      Fast engines (chatgpt/gemini/perplexity/meta) hit their timeout
-  //             → save immediately so dashboard shows partial results
-  //  T≈24s      Claude deadline — save if ready, otherwise log timeout
-  //  T≈25s      Return — total ≤ 26s (Netlify hard limit)
+  // Run 4 fast engines in parallel (15s timeout each).
+  // Claude runs separately in collect-claude.js with its own 26s Netlify timeout.
+  const FAST_TIMEOUT = 15000
+  const settled = await Promise.allSettled(
+    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), FAST_TIMEOUT))
+  )
 
-  const T0             = Date.now()
-  const FAST_TIMEOUT   = 15000   // 15s for chatgpt/gemini/perplexity/meta
-  const CLAUDE_DEADLINE = 24000  // 24s total for Claude (24 - elapsed at phase2 start)
+  const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
+  console.log(`[${invId}] settled:`,
+    settled.map((r, i) => `${toRun[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
 
-  const summary       = {}
-  const claudeInToRun = toRun.includes('claude')
-  const fastLLMs      = toRun.filter(e => e !== 'claude')
-
-  // Start Claude immediately in background (if needed) — it runs in parallel
-  const claudePromise = claudeInToRun ? LLM_CALLERS.claude(prompt_text) : null
-
-  // ── Phase 1: fast engines ─────────────────────────────────────────────────
-  const fastSettled = fastLLMs.length > 0
-    ? await Promise.allSettled(fastLLMs.map(e => withTimeout(LLM_CALLERS[e](prompt_text), FAST_TIMEOUT)))
-    : []
-
-  console.log(`[${invId}] fast settled:`,
-    fastSettled.map((r, i) => `${fastLLMs[i]}=${r.status === 'fulfilled' ? (r.value ? 'ok' : 'null') : 'TIMEOUT'}`).join(' | '))
-
-  function buildRow(llm, result) {
+  const summary = {}
+  const inserts = []
+  for (let i = 0; i < toRun.length; i++) {
+    const llm    = toRun[i]
+    const result = settled[i]
     if (result.status === 'rejected' || !result.value) {
       summary[llm] = `failed: ${result.reason?.message || 'no response'}`
-      return null
+      continue
     }
     let analysis
     try { analysis = analyseResponse(result.value, client_config) }
-    catch (e) { console.error(`[${llm}] analyseResponse threw:`, e.message); summary[llm] = 'analysis_error'; return null }
-    summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
-    return {
+    catch (e) {
+      console.error(`[${llm}] analyseResponse threw:`, e.message)
+      summary[llm] = 'analysis_error'
+      continue
+    }
+    inserts.push({
       prompt_id, llm, client_id,
       brand_mentioned:       analysis.brand_mentioned,
       brand_position:        analysis.brand_position,
@@ -489,29 +478,17 @@ exports.handler = async (event) => {
       response_snippet:      analysis.response_snippet,
       competitors_mentioned: analysis.competitors_mentioned,
       checked_at:            new Date().toISOString(),
-    }
+    })
+    summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
   }
 
-  async function saveRows(rows, label) {
-    const valid = rows.filter(Boolean)
-    if (valid.length === 0) { console.warn(`[Insert:${label}] nothing to save`); return }
-    console.log(`[Insert:${label}] saving: ${valid.map(r => r.llm).join(', ')}`)
-    const { error } = await supabase.from('ai_results').insert(valid)
-    if (error) console.error(`[Insert:${label}] FAILED:`, error.message, '| code:', error.code)
-    else console.log(`[Insert:${label}] saved ${valid.length} row(s)`)
-  }
-
-  const fastRows = fastSettled.map((r, i) => buildRow(fastLLMs[i], r))
-  await saveRows(fastRows, 'fast')
-
-  // ── Phase 2: Claude ───────────────────────────────────────────────────────
-  if (claudeInToRun && claudePromise) {
-    const elapsed   = Date.now() - T0
-    const remaining = Math.max(2000, CLAUDE_DEADLINE - elapsed)
-    const [cr]      = await Promise.allSettled([withTimeout(claudePromise, remaining)])
-    console.log(`[${invId}] claude settled: ${cr.status === 'fulfilled' ? (cr.value ? 'ok' : 'null') : 'TIMEOUT'} (${Date.now() - T0}ms elapsed)`)
-    const claudeRow = buildRow('claude', cr)
-    await saveRows([claudeRow], 'claude')
+  if (inserts.length > 0) {
+    console.log('[Insert] saving:', inserts.map(r => r.llm).join(', '))
+    const { error } = await supabase.from('ai_results').insert(inserts)
+    if (error) console.error('[Insert] FAILED:', error.message)
+    else console.log('[Insert] saved', inserts.length, 'row(s)')
+  } else {
+    console.warn('[Insert] nothing to save')
   }
 
   // ctx_geo: what location was actually used — helps debug collection results
