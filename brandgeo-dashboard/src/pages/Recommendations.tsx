@@ -520,7 +520,7 @@ export default function Recommendations() {
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-3xl">
+    <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>

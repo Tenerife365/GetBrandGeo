@@ -116,9 +116,14 @@ Return ONLY this JSON (no markdown, no explanation outside it):
 
   // --- Call Claude --------------------------------------------------------
 
+  // Abort if Anthropic takes too long — ensures we return JSON before Netlify's 26s kill
+  const ctrl = new AbortController()
+  const killTimer = setTimeout(() => ctrl.abort(), 20000)
+
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: ctrl.signal,
       headers: {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
@@ -131,6 +136,7 @@ Return ONLY this JSON (no markdown, no explanation outside it):
         messages:   [{ role: 'user', content: userPrompt }],
       }),
     })
+    clearTimeout(killTimer)
     const msg = await r.json()
     if (msg.error) {
       console.error('[GenRec] Anthropic error:', JSON.stringify(msg.error))
@@ -154,7 +160,9 @@ Return ONLY this JSON (no markdown, no explanation outside it):
       body: JSON.stringify(parsed),
     }
   } catch (e) {
-    console.error('[GenRec] Claude threw:', e.message)
-    return { statusCode: 200, body: JSON.stringify({ error: e.message }) }
+    clearTimeout(killTimer)
+    const msg = e.name === 'AbortError' ? 'Request timed out — try again' : (e.message ?? 'unknown_error')
+    console.error('[GenRec] threw:', msg)
+    return { statusCode: 200, body: JSON.stringify({ error: msg }) }
   }
 }
