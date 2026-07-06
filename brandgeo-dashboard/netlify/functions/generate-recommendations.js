@@ -18,8 +18,6 @@
  *   { recommendations: [ { title, insight, action, engines, priority } ] }
  */
 
-const Anthropic = require('@anthropic-ai/sdk')
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
 
@@ -119,15 +117,27 @@ Return ONLY this JSON (no markdown, no explanation outside it):
   // --- Call Claude --------------------------------------------------------
 
   try {
-    const client = new Anthropic({ apiKey })
-    const msg = await client.messages.create({
-      model:      'claude-sonnet-4-6',
-      max_tokens: 1500,
-      system:     systemPrompt,
-      messages:   [{ role: 'user', content: userPrompt }],
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-6',
+        max_tokens: 1500,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: userPrompt }],
+      }),
     })
+    const msg = await r.json()
+    if (msg.error) {
+      console.error('[GenRec] Anthropic error:', JSON.stringify(msg.error))
+      return { statusCode: 200, body: JSON.stringify({ error: msg.error.message ?? 'anthropic_error' }) }
+    }
 
-    const raw = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : ''
+    const raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text.trim() : ''
     console.log('[GenRec] Claude raw output (first 400):', raw.slice(0, 400))
 
     // Strip markdown code fences if present
