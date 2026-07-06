@@ -109,6 +109,8 @@ function isCompanyName(name) {
   return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
 }
 
+const CATERING_STRIP_RE = /\b(catering|events?|restaurant|&)\b/gi
+
 function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStripped, website) {
   if (!Array.isArray(knownCompetitors) || knownCompetitors.length === 0) return []
   const lower = text.toLowerCase()
@@ -117,7 +119,11 @@ function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStrippe
     if (!comp || comp.length < 2) continue
     const compLower = comp.toLowerCase().trim()
     if (matchesAlias(compLower, aliases, aliasesStripped, website)) continue
-    if (lower.includes(compLower)) {
+    // Also try short form: "Fratelli Catering" → "fratelli"
+    const shortForm = compLower.replace(CATERING_STRIP_RE, ' ').replace(/\s+/g, ' ').trim()
+    const matched = lower.includes(compLower) ||
+      (shortForm.length >= 4 && shortForm !== compLower && lower.includes(shortForm))
+    if (matched) {
       found.push({ pos: 99, name: comp })
     }
   }

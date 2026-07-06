@@ -161,10 +161,12 @@ function isCompanyName(name) {
  * Secondary pass: scan the full response text for known competitor names that
  * may appear in prose rather than in a numbered list.
  * e.g. "...options like Flavours Catering or Elegant Catering..."
- * Uses case-insensitive substring match; requires the stored name (from
- * client_config.known_competitors) to appear verbatim in the text.
+ * Also tries a "short form" with generic catering words stripped so that
+ * "Fratelli Catering" matches responses that just say "Fratelli".
  * Assigned pos=99 so they sort after numbered-list entries.
  */
+const CATERING_STRIP_RE = /\b(catering|events?|restaurant|&)\b/gi
+
 function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStripped, website) {
   if (!Array.isArray(knownCompetitors) || knownCompetitors.length === 0) return []
   const lower = text.toLowerCase()
@@ -174,7 +176,11 @@ function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStrippe
     const compLower = comp.toLowerCase().trim()
     // Skip if this matches the brand itself
     if (matchesAlias(compLower, aliases, aliasesStripped, website)) continue
-    if (lower.includes(compLower)) {
+    // Also try short form: strip common catering words so "Fratelli Catering" → "fratelli"
+    const shortForm = compLower.replace(CATERING_STRIP_RE, ' ').replace(/\s+/g, ' ').trim()
+    const matched = lower.includes(compLower) ||
+      (shortForm.length >= 4 && shortForm !== compLower && lower.includes(shortForm))
+    if (matched) {
       found.push({ pos: 99, name: comp })
     }
   }

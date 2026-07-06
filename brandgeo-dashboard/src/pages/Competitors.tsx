@@ -116,9 +116,12 @@ function computeData(
       byEngine: v.byEngine,
       positions: v.positions,
       promptIds: Array.from(v.promptIds),
-      avgPos: v.positions.length > 0
-        ? Math.round(v.positions.reduce((a, b) => a + b, 0) / v.positions.length * 10) / 10
-        : null,
+      avgPos: (() => {
+        const real = v.positions.filter(p => p !== 99)
+        return real.length > 0
+          ? Math.round(real.reduce((a, b) => a + b, 0) / real.length * 10) / 10
+          : null
+      })(),
     }))
     .sort((a, b) => b.totalMentions - a.totalMentions)
     .slice(0, 5)
