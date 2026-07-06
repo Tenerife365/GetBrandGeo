@@ -64,17 +64,26 @@ function buildSystemContext(cfg, marketLabel, regionLabel) {
 // ─── Text normalisation ───────────────────────────────────────────────────────
 
 function normalizeText(t) {
-  return t
-    .replace(/[          ​﻿]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .normalize('NFC')
+  // Strip lone surrogates before normalising — web-scraped content (especially
+  // from non-UTF-8 pages that Claude's web search may include) can contain
+  // \uD800–\uDFFF code units that are not valid paired surrogates.
+  // String.prototype.normalize('NFC') throws a RangeError on lone surrogates,
+  // which crashes the handler silently and prevents the Supabase insert.
+  const safe = t.replace(/[\uD800-\uDFFF]/g, '')
+  try {
+    return safe
+      .replace(/\s+/g, ' ')
+      .normalize('NFC')
+  } catch {
+    return safe.replace(/\s+/g, ' ')
+  }
 }
-
 // ─── Analysis helpers ─────────────────────────────────────────────────────────
 
 function extractTopRankedResults(text) {
   const items = []
-  const listRe = /(?:^|\n)\s*(?:\*{0,2})(\d+)[.)]\*{0,2}\s+([^\n]{2,120})/gm
+  // Also matches emoji-prefixed lines: '🥇 1. **Name**' — common in Claude web-search responses
+  const listRe = /(?:^|\n)[^\d\n]{0,6}(\d+)[.)](?:\*{0,2})\s+([^\n]{2,120})/gm
   let m
   while ((m = listRe.exec(text)) !== null) {
     const pos = parseInt(m[1], 10)
@@ -387,7 +396,9 @@ exports.handler = async (event) => {
   let toRun
 
   if (force) {
-    await supabase.from('ai_results').delete().eq('prompt_id', prompt_id).eq('client_id', client_id)
+    const { error: delErr } = await supabase.from('ai_results').delete().eq('prompt_id', prompt_id).eq('client_id', client_id)
+    if (delErr) console.error('[Delete] failed:', delErr.message)
+    else console.log('[Delete] cleared prompt', prompt_id, 'for client', client_id)
     toRun = Object.keys(LLM_CALLERS)
   } else {
     const monthStart = new Date()
@@ -404,9 +415,10 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }
 
-  // 22s per LLM — parallel, fits within Netlify's 26s function timeout
+  // 20s per LLM — parallel. Reduced from 22s to leave ≥4s for the Supabase insert
+  // within Netlify's 26s function timeout.
   const settled = await Promise.allSettled(
-    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 22000))
+    toRun.map(llm => withTimeout(LLM_CALLERS[llm](prompt_text), 20000))
   )
 
   const summary = {}
@@ -419,7 +431,15 @@ exports.handler = async (event) => {
       summary[llm] = `failed: ${result.reason?.message || 'no response'}`
       continue
     }
-    const analysis = analyseResponse(result.value, client_config)
+    let analysis
+    try {
+      analysis = analyseResponse(result.value, client_config)
+    } catch (analysisErr) {
+      console.error(`[${llm}] analyseResponse threw:`, analysisErr.message,
+        '| text preview:', String(result.value).slice(0, 120))
+      summary[llm] = 'analysis_error'
+      continue
+    }
     inserts.push({
       prompt_id,
       llm,
@@ -435,8 +455,15 @@ exports.handler = async (event) => {
   }
 
   if (inserts.length > 0) {
-    const { error } = await supabase.from('ai_results').insert(inserts)
-    if (error) return { statusCode: 500, body: JSON.stringify({ error: error.message }) }
+    console.log('[Insert] saving rows for:', inserts.map(r => r.llm).join(', '))
+    const { error: insertErr } = await supabase.from('ai_results').insert(inserts)
+    if (insertErr) {
+      console.error('[Insert] FAILED:', insertErr.message, '| code:', insertErr.code, '| hint:', insertErr.hint)
+      return { statusCode: 500, body: JSON.stringify({ error: insertErr.message }) }
+    }
+    console.log('[Insert] SUCCESS — saved', inserts.length, 'row(s)')
+  } else {
+    console.warn('[Insert] nothing to save — all engines failed or errored')
   }
 
   // ctx_geo: what location was actually used — helps debug collection results
