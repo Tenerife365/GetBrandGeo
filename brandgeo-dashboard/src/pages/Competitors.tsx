@@ -41,6 +41,27 @@ interface CompetitorStat {
   avgPos: number | null
 }
 
+// --- Noise filter ------------------------------------------------------------
+// AI responses sometimes include generic phrases in numbered lists (e.g.
+// "Other large-scale options", "Alte optiuni de volum mare"). Filter these out
+// so only real company names appear as competitors.
+
+const GENERIC_TOKENS = [
+  'optiuni', 'opțiuni', 'options', 'alte ', 'other ', 'volum', 'altele',
+  'etc.', ' de ', ' si ', ' și ', 'alternative', 'furnizori', 'firme',
+  'companii', 'providers', 'vendors', 'services',
+]
+
+function isLikelyCompanyName(name: string): boolean {
+  if (name.length > 50) return false          // too long to be a company name
+  if (name.length < 3)  return false          // too short
+  const lower = name.toLowerCase()
+  if (GENERIC_TOKENS.some(t => lower.includes(t))) return false
+  // Must start with an uppercase letter (company names always do)
+  if (!/^[A-ZĂÂÎȘȚ"«]/.test(name.trimStart())) return false
+  return true
+}
+
 // --- Data computation --------------------------------------------------------
 
 function computeData(
@@ -68,6 +89,7 @@ function computeData(
     for (const c of comps) {
       const rawName = typeof c === 'string' ? c : c?.name
       if (!rawName || rawName.length < 2) continue
+      if (!isLikelyCompanyName(rawName)) continue   // skip generic phrases
       const key = rawName.toLowerCase().trim()
       if (!compMap[key]) compMap[key] = { totalMentions: 0, byEngine: {}, positions: [], promptIds: new Set() }
       const cm = compMap[key]
@@ -107,11 +129,13 @@ function computeData(
 
 // --- Charts ------------------------------------------------------------------
 
+const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
+
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
-    { name: brandName, mentions: brandMentions, fill: '#1f9baa', isYou: true },
+    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#1f9baa', isYou: true },
     ...topCompetitors.map((c, i) => ({
-      name: c.name.length > 18 ? c.name.slice(0, 16) + '…' : c.name,
+      name: short(c.name),
       fullName: c.name,
       mentions: c.totalMentions,
       fill: ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#10b981'][i],
@@ -307,14 +331,16 @@ export default function Competitors() {
               AI Mention Count
             </h2>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={barData} margin={{ left: -20, bottom: 20 }}>
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false}
-                  angle={-30} textAnchor="end" interval={0} />
+              <BarChart data={barData} margin={{ left: -20, bottom: 10, right: 8 }}>
+                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false}
+                  interval={0} />
                 <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                  labelStyle={{ color: '#cbd5e1' }}
-                  formatter={(v: any, _: any, props: any) => [v, props.payload.fullName ?? props.payload.name]}
+                  labelStyle={{ color: '#cbd5e1', fontSize: 12 }}
+                  itemStyle={{ color: '#94a3b8' }}
+                  labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName ?? ''}
+                  formatter={(v: any) => [v, 'AI mentions']}
                 />
                 <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]}>
                   {barData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
