@@ -5,10 +5,20 @@
  */
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target, TrendingUp, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target, TrendingUp, RefreshCw, Sparkles, Lightbulb } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import type { LLMName } from '../types'
+
+// --- AI insight types --------------------------------------------------------
+
+interface AiRec {
+  title: string
+  insight: string
+  action: string
+  engines: LLMName[]
+  priority: 'critical' | 'high' | 'medium'
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -395,9 +405,15 @@ export default function Recommendations() {
   const { activeClientId, activeClient } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
 
-  const [stats, setStats]   = useState<ReturnType<typeof computeStats> | null>(null)
-  const [recs, setRecs]     = useState<Rec[]>([])
+  const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
+  const [recs, setRecs]       = useState<Rec[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiRecs, setAiRecs]   = useState<AiRec[]>([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  // Store raw ai_results for passing to the AI function
+  const [rawResults, setRawResults] = useState<any[]>([])
+  const [rawPrompts, setRawPrompts] = useState<any[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -405,19 +421,83 @@ export default function Recommendations() {
     const [{ data: aiResults }, { data: prompts }] = await Promise.all([
       supabase
         .from('ai_results')
-        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id')
+        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, response_snippet')
         .eq('client_id', activeClientId),
       supabase
         .from('prompts')
-        .select('id, category')
+        .select('id, category, text')
         .eq('client_id', activeClientId)
         .eq('is_active', true),
     ])
 
+    setRawResults(aiResults ?? [])
+    setRawPrompts(prompts ?? [])
     const computed = computeStats(aiResults ?? [], prompts ?? [], brandName)
     setStats(computed)
     setRecs(generateRecs(computed))
     setLoading(false)
+  }
+
+  const generateAiInsights = async () => {
+    if (!stats || rawResults.length === 0) return
+    setAiLoading(true)
+    setAiError(null)
+
+    // Build engine_stats payload
+    const engineStats: Record<string, any> = {}
+    for (const s of stats.llmStats) {
+      engineStats[s.llm] = { total: s.total, mentioned: s.mentioned, rate: s.rate, avgPos: s.avgPos }
+    }
+
+    // Collect up to 4 snippets where brand was mentioned
+    const mentionedSnippets = rawResults
+      .filter(r => r.brand_mentioned && r.response_snippet)
+      .slice(0, 4)
+      .map(r => {
+        const prompt = rawPrompts.find((p: any) => p.id === r.prompt_id)
+        return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet }
+      })
+
+    // Collect up to 5 snippets where brand was absent — include top competitor name
+    const absentSnippets = rawResults
+      .filter(r => !r.brand_mentioned && r.response_snippet)
+      .slice(0, 5)
+      .map(r => {
+        const prompt = rawPrompts.find((p: any) => p.id === r.prompt_id)
+        let topComp: string | null = null
+        try {
+          const comps = JSON.parse(r.competitors_mentioned || '[]')
+          topComp = comps[0]?.name ?? comps[0] ?? null
+        } catch {}
+        return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet, topComp }
+      })
+
+    const payload = {
+      client_id:         activeClientId,
+      brand_name:        brandName,
+      engine_stats:      engineStats,
+      top_competitors:   stats.competitors,
+      mentioned_snippets: mentionedSnippets,
+      absent_snippets:   absentSnippets,
+      prompts:           rawPrompts.map((p: any) => ({ text: p.text, category: p.category })),
+    }
+
+    try {
+      const res = await fetch('/.netlify/functions/generate-recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setAiError(data.error)
+      } else {
+        setAiRecs(data.recommendations ?? [])
+      }
+    } catch (e: any) {
+      setAiError(e.message ?? 'Network error')
+    }
+    setAiLoading(false)
   }
 
   useEffect(() => { load() }, [activeClientId, brandName])
@@ -526,7 +606,87 @@ export default function Recommendations() {
             </div>
           ) : null}
 
-          {/* Recs */}
+          {/* AI-generated insights */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={15} className="text-violet-400" />
+                <span className="text-sm font-semibold text-slate-200">AI Analysis</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20">
+                  Claude
+                </span>
+              </div>
+              <button
+                onClick={generateAiInsights}
+                disabled={aiLoading || rawResults.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 transition-colors disabled:opacity-50"
+              >
+                <Sparkles size={12} className={aiLoading ? 'animate-spin' : ''} />
+                {aiLoading ? 'Analysing…' : aiRecs.length > 0 ? 'Regenerate' : 'Generate insights'}
+              </button>
+            </div>
+
+            {aiLoading && (
+              <div className="bg-dark-800 border border-violet-500/20 rounded-xl p-5 text-sm text-slate-400 animate-pulse">
+                Claude is reading your actual AI responses and competitor data…
+              </div>
+            )}
+
+            {aiError && !aiLoading && (
+              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 text-xs text-red-400">
+                Error generating insights: {aiError}
+              </div>
+            )}
+
+            {!aiLoading && aiRecs.length === 0 && !aiError && (
+              <div className="bg-dark-800 border border-dark-700 border-dashed rounded-xl p-5 text-center text-sm text-slate-600">
+                Click "Generate insights" — Claude will read your actual response snippets and competitor data to produce specific, evidence-based advice.
+              </div>
+            )}
+
+            {aiRecs.length > 0 && !aiLoading && (
+              <div className="space-y-3">
+                {aiRecs.map((rec, i) => {
+                  const imp = rec.priority === 'critical'
+                    ? { badge: 'bg-red-500/15 text-red-400 border border-red-500/20', label: 'Critical' }
+                    : rec.priority === 'high'
+                    ? { badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', label: 'High Impact' }
+                    : { badge: 'bg-blue-500/15 text-blue-400 border border-blue-500/20', label: 'Medium' }
+                  return (
+                    <div key={i} className="bg-dark-800 border border-violet-500/15 rounded-xl p-5">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
+                          {imp.label}
+                        </span>
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
+                          <Lightbulb size={9} className="inline mr-0.5" />AI insight
+                        </span>
+                        {(rec.engines ?? []).map(e => (
+                          <span key={e} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${LLM_COLOR[e] ?? ''}`}>
+                            {LLM_LABEL[e] ?? e}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="font-semibold text-slate-100 text-sm mb-3">{rec.title}</div>
+                      <div className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/40 mb-3">
+                        <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">What the data shows</div>
+                        <p className="text-sm text-slate-300 leading-relaxed">{rec.insight}</p>
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Action</div>
+                      <p className="text-sm text-slate-300 leading-relaxed">{rec.action}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Rule-based recs */}
+          <div className="flex items-center gap-2 mb-3">
+            <Target size={14} className="text-slate-500" />
+            <span className="text-sm font-semibold text-slate-400">Priority actions</span>
+          </div>
+
           {recs.length === 0 ? (
             <div className="text-center py-12 text-slate-500 text-sm">
               <CheckCircle size={32} className="mx-auto mb-3 opacity-30" />

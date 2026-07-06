@@ -25,5 +25,8 @@
 [functions."collect-chatgpt"]
   timeout = 26
 
+[functions."generate-recommendations"]
+  timeout = 26
+
 [functions."onboard-client"]
   timeout = 26
