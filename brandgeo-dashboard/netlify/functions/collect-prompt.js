@@ -218,7 +218,7 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model:        'gpt-4o',
+      model:        'gpt-5.5',
       instructions: ctx,
       tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
       input:        prompt,
