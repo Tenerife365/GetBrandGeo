@@ -144,14 +144,25 @@ Return ONLY this JSON (no markdown, no explanation outside it):
     }
 
     const raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text.trim() : ''
-    console.log('[GenRec] Claude raw output (first 400):', raw.slice(0, 400))
+    console.log('[GenRec] raw (first 500):', raw.slice(0, 500))
 
-    // Strip markdown code fences if present
-    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+    // Robust JSON extraction:
+    // 1. Strip code fences (```json ... ``` or ``` ... ```)
+    // 2. Slice from first { to last } to drop any surrounding prose
+    let jsonStr = raw
+      .replace(/^```(?:json)?\s*/im, '')
+      .replace(/```\s*$/m, '')
+      .trim()
+    const firstBrace = jsonStr.indexOf('{')
+    const lastBrace  = jsonStr.lastIndexOf('}')
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1)
+    }
+
     let parsed
     try { parsed = JSON.parse(jsonStr) } catch (e) {
-      console.error('[GenRec] JSON parse failed:', e.message, '| raw:', jsonStr.slice(0, 200))
-      return { statusCode: 200, body: JSON.stringify({ error: 'parse_failed', raw: jsonStr.slice(0, 500) }) }
+      console.error('[GenRec] parse failed:', e.message, '| extracted:', jsonStr.slice(0, 300))
+      return { statusCode: 200, body: JSON.stringify({ error: `JSON parse failed: ${e.message}. Raw starts: ${raw.slice(0, 120)}` }) }
     }
 
     return {
