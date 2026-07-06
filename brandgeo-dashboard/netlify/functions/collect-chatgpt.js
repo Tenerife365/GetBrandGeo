@@ -106,6 +106,21 @@ function isCompanyName(name) {
   return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
 }
 
+function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStripped, website) {
+  if (!Array.isArray(knownCompetitors) || knownCompetitors.length === 0) return []
+  const lower = text.toLowerCase()
+  const found = []
+  for (const comp of knownCompetitors) {
+    if (!comp || comp.length < 2) continue
+    const compLower = comp.toLowerCase().trim()
+    if (matchesAlias(compLower, aliases, aliasesStripped, website)) continue
+    if (lower.includes(compLower)) {
+      found.push({ pos: 99, name: comp })
+    }
+  }
+  return found
+}
+
 function detectListPosition(text, aliases, aliasesStripped, website) {
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
@@ -170,6 +185,16 @@ function analyseResponse(text, cfg) {
     .filter(item => !matchesAlias(item.name, aliases, aliasesStripped, website))
     .filter(item => isCompanyName(item.name))
     .map(({ pos, name }) => ({ pos, name }))
+
+  // Secondary pass: catch known competitors mentioned in prose (not just in lists)
+  const knownScan = scanForKnownCompetitors(text, cfg.known_competitors || [], aliases, aliasesStripped, website)
+  for (const kc of knownScan) {
+    const already = competitors.some(c =>
+      c.name.toLowerCase().includes(kc.name.toLowerCase()) ||
+      kc.name.toLowerCase().includes(c.name.toLowerCase())
+    )
+    if (!already) competitors.push(kc)
+  }
 
   return {
     brand_mentioned:       mentioned,
