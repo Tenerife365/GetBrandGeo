@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid,
+  LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
 import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -612,7 +612,7 @@ export default function Competitors() {
               <Line
                 type="monotone"
                 dataKey={brandName}
-                stroke="#1f9baa"
+                stroke="#8b5cf6"
                 strokeWidth={2.5}
                 dot={false}
                 activeDot={{ r: 4 }}
