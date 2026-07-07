@@ -17,6 +17,9 @@ const ENGINE_COST: Record<string, number> = {
   meta:       0.002,
 }
 
+// 50% overhead to cover platform costs (Supabase, Netlify, hosting, Plausible, domain, etc.)
+const OVERHEAD_MULTIPLIER = 1.5
+
 const ENGINE_COLOR: Record<string, string> = {
   chatgpt:    'text-emerald-400',
   gemini:     'text-blue-400',
@@ -64,7 +67,7 @@ export default function Usage() {
         const totalCost = Object.entries(engines).reduce(
           (sum, [llm, cnt]) => sum + cnt * (ENGINE_COST[llm] ?? 0),
           0
-        )
+        ) * OVERHEAD_MULTIPLIER
         return { clientId, clientName, byEngine: engines, totalResponses, totalCost }
       }).sort((a, b) => b.totalCost - a.totalCost)
 
@@ -189,7 +192,7 @@ export default function Usage() {
           ))}
         </div>
         <p className="text-xs text-slate-600 mt-2">
-          Based on average prompt + response token counts. Actual costs may vary.
+          API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Actual API costs may vary.
         </p>
       </div>
     </div>
