@@ -99,7 +99,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       // Get auth token once for all fetch calls
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token ?? ''
-      const authHeader = token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' }
+      const authHeader: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) authHeader['Authorization'] = `Bearer ${token}`
 
       for (let i = 0; i < prompts.length; i++) {
         if (abortRef.current) break
@@ -195,9 +196,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
 
     const { data: { session: singleSession } } = await supabase.auth.getSession()
     const singleToken = singleSession?.access_token ?? ''
-    const singleAuthHeader = singleToken
-      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${singleToken}` }
-      : { 'Content-Type': 'application/json' }
+    const singleAuthHeader: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (singleToken) singleAuthHeader['Authorization'] = `Bearer ${singleToken}`
 
     // Fire all 3 functions in parallel.
     // collect-prompt (force=true) deletes all rows first, then saves gemini/perplexity/meta.
