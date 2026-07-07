@@ -329,10 +329,17 @@ async function callGemini(prompt, ctx) {
       if (d.candidates?.[0]?.content?.parts?.[0]?.text) {
         const t = d.candidates[0].content.parts[0].text
         console.log(`[Gemini] ${model} ok | preview:`, t.slice(0, 200))
-        return t
+        return { text: t, errorCode: null }
       }
       if (r.status === 404 || d.error?.code === 404) continue
       if (d.error) {
+        // Detect quota / resource exhaustion
+        const isQuota = r.status === 429 || r.status === 402 ||
+          d.error.status === 'RESOURCE_EXHAUSTED' || d.error.code === 429
+        if (isQuota) {
+          console.error(`[Gemini] ${model} quota exceeded:`, d.error.message)
+          return { text: null, errorCode: 'quota_exceeded' }
+        }
         console.warn(`[Gemini] ${model} search failed (${d.error.message}), retrying without grounding`)
         const r2 = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -343,13 +350,15 @@ async function callGemini(prompt, ctx) {
             }) }
         )
         const d2 = await r2.json()
-        if (d2.candidates?.[0]?.content?.parts?.[0]?.text) return d2.candidates[0].content.parts[0].text
+        if (d2.candidates?.[0]?.content?.parts?.[0]?.text) {
+          return { text: d2.candidates[0].content.parts[0].text, errorCode: null }
+        }
         continue
       }
       break
     } catch (e) { console.error(`[Gemini] ${model}:`, e.message); continue }
   }
-  return null
+  return { text: null, errorCode: null }
 }
 
 // Claude — streaming API with early abort.
@@ -429,7 +438,7 @@ async function callClaude(prompt, ctx) {
 async function callOpenRouter(model, prompt, ctx) {
   if (!process.env.OPENROUTER_API_KEY) {
     console.error(`[OpenRouter:${model}] OPENROUTER_API_KEY not set — engine skipped`)
-    return null
+    return { text: null, errorCode: 'auth_error' }
   }
   const messages = [
     { role: 'system', content: ctx },
@@ -448,7 +457,9 @@ async function callOpenRouter(model, prompt, ctx) {
   const d = await r.json()
   if (d.error) {
     console.error(`[OpenRouter:${model}] error:`, JSON.stringify(d.error))
-    return null
+    const isQuota = r.status === 402 || r.status === 429 ||
+      d.error.code === 402 || (d.error.message || '').toLowerCase().includes('credit')
+    return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error' }
   }
   const text = d.choices?.[0]?.message?.content ?? null
   if (text) {
@@ -456,7 +467,7 @@ async function callOpenRouter(model, prompt, ctx) {
   } else {
     console.warn(`[OpenRouter:${model}] empty response:`, JSON.stringify(d).slice(0, 300))
   }
-  return text
+  return { text, errorCode: null }
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -532,6 +543,7 @@ exports.handler = async (event) => {
       .select('llm')
       .eq('prompt_id', prompt_id)
       .eq('client_id', client_id)
+      .neq('status', 'error')
       .gte('checked_at', monthStart.toISOString())
     const done = new Set((existing || []).map(r => r.llm))
     toRun = Object.keys(LLM_CALLERS).filter(llm => {
@@ -559,12 +571,34 @@ exports.handler = async (event) => {
   for (let i = 0; i < toRun.length; i++) {
     const llm    = toRun[i]
     const result = settled[i]
-    if (result.status === 'rejected' || !result.value) {
-      summary[llm] = `failed: ${result.reason?.message || 'no response'}`
+
+    // Timeout — transient, don't store
+    if (result.status === 'rejected') {
+      summary[llm] = `timeout: ${result.reason?.message || 'unknown'}`
       continue
     }
+
+    const { text, errorCode } = result.value ?? { text: null, errorCode: null }
+
+    // API/quota error — store error row so dashboard can show "unavailable"
+    if (errorCode) {
+      summary[llm] = errorCode
+      inserts.push({
+        prompt_id, llm, client_id,
+        status: 'error', error_code: errorCode,
+        brand_mentioned: false,
+        checked_at: new Date().toISOString(),
+      })
+      continue
+    }
+
+    if (!text) {
+      summary[llm] = 'no_response'
+      continue
+    }
+
     let analysis
-    try { analysis = analyseResponse(result.value, client_config) }
+    try { analysis = analyseResponse(text, client_config) }
     catch (e) {
       console.error(`[${llm}] analyseResponse threw:`, e.message)
       summary[llm] = 'analysis_error'
@@ -572,6 +606,7 @@ exports.handler = async (event) => {
     }
     inserts.push({
       prompt_id, llm, client_id,
+      status:                'ok',
       brand_mentioned:       analysis.brand_mentioned,
       brand_position:        analysis.brand_position,
       sentiment:             analysis.sentiment,

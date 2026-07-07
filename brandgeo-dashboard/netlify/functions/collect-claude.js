@@ -223,7 +223,7 @@ function analyseResponse(text, cfg) {
 
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return null }
+  if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error' } }
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -245,7 +245,8 @@ async function callClaude(prompt, ctx) {
     if (!r.ok) {
       const errText = await r.text().catch(() => '')
       console.error('[Claude] HTTP error:', r.status, errText.slice(0, 200))
-      return null
+      const isQuota = r.status === 429 || r.status === 402
+      return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error' }
     }
 
     const reader   = r.body.getReader()
@@ -285,11 +286,11 @@ async function callClaude(prompt, ctx) {
     if (text) {
       console.log('[Claude] ok | stop:', partial ? 'partial' : stopReason,
         '| len:', text.length, '| preview:', text.slice(0, 200))
-      return text
+      return { text, errorCode: null }
     }
     console.warn('[Claude] stream done but no text | stop_reason:', stopReason)
-    return null
-  } catch (e) { console.error('[Claude] threw:', e.message); return null }
+    return { text: null, errorCode: null }
+  } catch (e) { console.error('[Claude] threw:', e.message); return { text: null, errorCode: null } }
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -320,13 +321,14 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   console.log(`[Claude/${invId}] user:${auth.user.id} prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
 
-  // For non-force: skip if Claude already ran this month
+  // For non-force: skip if Claude already has a successful result this month
   if (!force) {
     const monthStart = new Date()
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
     const { data: existing } = await supabase
       .from('ai_results').select('llm')
       .eq('prompt_id', prompt_id).eq('client_id', client_id).eq('llm', 'claude')
+      .neq('status', 'error')
       .gte('checked_at', monthStart.toISOString())
     if (existing?.length > 0) {
       console.log(`[Claude/${invId}] already ran this month — skipping`)
@@ -336,15 +338,23 @@ exports.handler = async (event) => {
 
   // For force: collect-prompt.js has already deleted all rows for this prompt.
   // No need to delete here — just run and insert.
-  // (If collect-claude fires before collect-prompt's delete completes in a race,
-  //  the insert will simply be overwritten by a subsequent force call.)
 
   const ctx  = buildSystemContext(client_config, market_label, region_label)
   const T0   = Date.now()
-  const text = await callClaude(prompt_text, ctx)
+  const { text, errorCode } = await callClaude(prompt_text, ctx)
 
   const elapsed = Date.now() - T0
   console.log(`[Claude/${invId}] call finished in ${elapsed}ms`)
+
+  if (errorCode) {
+    console.warn(`[Claude/${invId}] API error: ${errorCode} — storing error state`)
+    await supabase.from('ai_results').insert([{
+      prompt_id, llm: 'claude', client_id,
+      status: 'error', error_code: errorCode,
+      brand_mentioned: false, checked_at: new Date().toISOString(),
+    }])
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'claude', reason: errorCode }) }
+  }
 
   if (!text) {
     console.warn(`[Claude/${invId}] no text — nothing saved`)
@@ -362,6 +372,7 @@ exports.handler = async (event) => {
     prompt_id,
     llm:                   'claude',
     client_id,
+    status:                'ok',
     brand_mentioned:       analysis.brand_mentioned,
     brand_position:        analysis.brand_position,
     sentiment:             analysis.sentiment,

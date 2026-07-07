@@ -238,7 +238,11 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     }),
   })
   const d = await r.json()
-  if (d.error) { console.error('[ChatGPT] API error:', JSON.stringify(d.error)); return null }
+  if (d.error) {
+    console.error('[ChatGPT] API error:', JSON.stringify(d.error))
+    const isQuota = r.status === 429 || r.status === 402 || d.error.code === 'insufficient_quota'
+    return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error' }
+  }
 
   const text = (d.output || [])
     .filter(o => o.type === 'message')
@@ -250,7 +254,7 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
   } else {
     console.warn('[ChatGPT] empty output -- full response:', JSON.stringify(d).slice(0, 500))
   }
-  return text || null
+  return { text: text || null, errorCode: null }
 }
 
 // --- Handler ----------------------------------------------------------------------
@@ -281,13 +285,14 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   console.log(`[ChatGPT/${invId}] user:${auth.user.id} prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
 
-  // For non-force: skip if ChatGPT already ran this month
+  // For non-force: skip if ChatGPT already has a successful result this month
   if (!force) {
     const monthStart = new Date()
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
     const { data: existing } = await supabase
       .from('ai_results').select('llm')
       .eq('prompt_id', prompt_id).eq('client_id', client_id).eq('llm', 'chatgpt')
+      .neq('status', 'error')
       .gte('checked_at', monthStart.toISOString())
     if (existing?.length > 0) {
       console.log(`[ChatGPT/${invId}] already ran this month -- skipping`)
@@ -300,10 +305,20 @@ exports.handler = async (event) => {
 
   const ctx = buildSystemContext(client_config, market_label, region_label)
   const T0  = Date.now()
-  const text = await callChatGPT(prompt_text, ctx, market_id, region_label)
+  const { text, errorCode } = await callChatGPT(prompt_text, ctx, market_id, region_label)
 
   const elapsed = Date.now() - T0
   console.log(`[ChatGPT/${invId}] call finished in ${elapsed}ms`)
+
+  if (errorCode) {
+    console.warn(`[ChatGPT/${invId}] API error: ${errorCode} — storing error state`)
+    await supabase.from('ai_results').insert([{
+      prompt_id, llm: 'chatgpt', client_id,
+      status: 'error', error_code: errorCode,
+      brand_mentioned: false, checked_at: new Date().toISOString(),
+    }])
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'chatgpt', reason: errorCode }) }
+  }
 
   if (!text) {
     console.warn(`[ChatGPT/${invId}] no text -- nothing saved`)
@@ -321,6 +336,7 @@ exports.handler = async (event) => {
     prompt_id,
     llm:                   'chatgpt',
     client_id,
+    status:                'ok',
     brand_mentioned:       analysis.brand_mentioned,
     brand_position:        analysis.brand_position,
     sentiment:             analysis.sentiment,

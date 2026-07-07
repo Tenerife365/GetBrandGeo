@@ -184,6 +184,7 @@ export default function AIVisibility() {
 
   const [prompts, setPrompts]           = useState<Prompt[]>([])
   const [results, setResults]           = useState<ResultMap>(new Map())
+  const [errorEngines, setErrorEngines] = useState<Set<LLMName>>(new Set())
   const [loading, setLoading]           = useState(true)
   const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
@@ -239,6 +240,8 @@ export default function AIVisibility() {
     ])
 
     const map: ResultMap = new Map()
+    const errEngines = new Set<LLMName>()
+    const okEngines  = new Set<LLMName>()
     let latestChecked = lastChecked
     if (rData) {
       rData.forEach((r: AIResult) => {
@@ -246,12 +249,21 @@ export default function AIVisibility() {
         if (!activeEngines.includes(r.llm as EngineId)) return
         if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
         const llmMap = map.get(r.prompt_id)!
-        if (!llmMap.has(r.llm as LLMName)) {
-          llmMap.set(r.llm as LLMName, r)
-          if (!latestChecked || r.checked_at > latestChecked) latestChecked = r.checked_at
+        const llm = r.llm as LLMName
+        if (!llmMap.has(llm)) {
+          if (r.status === 'error') {
+            // Track error but exclude from analysis — don't count as a real result
+            errEngines.add(llm)
+          } else {
+            llmMap.set(llm, r)
+            okEngines.add(llm)
+            if (!latestChecked || r.checked_at > latestChecked) latestChecked = r.checked_at
+          }
         }
       })
     }
+    // Engine is "unavailable" only when it has errors AND zero ok results
+    setErrorEngines(new Set([...errEngines].filter(e => !okEngines.has(e))))
 
     if (pData) setPrompts(pData)
     setResults(map)
@@ -379,11 +391,13 @@ export default function AIVisibility() {
     dimensions.consistency * 0.10
   )
 
-  // ── Engine status (active engines only, for KNOW/PARTIAL/MISSING) ─────────
+  // ── Engine status (active engines only, for KNOW/PARTIAL/MISSING/UNAVAILABLE) ─
 
   const engineStatusCards = llmStats.map(s => {
-    const status: 'KNOW' | 'PARTIAL' | 'MISSING' =
-      s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
+    const isUnavailable = errorEngines.has(s.id) && s.checked === 0
+    const status: 'KNOW' | 'PARTIAL' | 'MISSING' | 'UNAVAILABLE' = isUnavailable
+      ? 'UNAVAILABLE'
+      : s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
     let bestPos: number | null = null
     prompts.forEach(p => {
       const r = results.get(p.id)?.get(s.id)
@@ -391,7 +405,7 @@ export default function AIVisibility() {
         if (bestPos === null || r.brand_position < bestPos) bestPos = r.brand_position
       }
     })
-    return { ...s, status, bestPos }
+    return { ...s, status, bestPos, isUnavailable }
   })
 
   // Coming-soon and locked engines for the status grid
@@ -403,7 +417,7 @@ export default function AIVisibility() {
   const fixItems = (() => {
     const items: { priority: 'P0' | 'P1' | 'P2'; title: string; description: string; fix: string }[] = []
 
-    engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0).forEach(e => {
+    engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0 && !e.isUnavailable).forEach(e => {
       items.push({
         priority: 'P0',
         title: `Not found in ${e.label}`,
@@ -631,27 +645,37 @@ export default function AIVisibility() {
         {/* Active engine cards */}
         {engineStatusCards.map(e => {
           const statusStyles = {
-            KNOW:    { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400', card: 'border-brand-500/20' },
-            PARTIAL: { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400', card: 'border-amber-500/20' },
-            MISSING: { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',   card: 'border-red-500/20'   },
+            KNOW:        { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20' },
+            PARTIAL:     { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20' },
+            MISSING:     { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20'   },
+            UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
           }[e.status]
           return (
             <div key={e.id} className={`bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
-              <img src={e.logoUrl} alt={e.label} className="w-8 h-8 rounded-lg object-contain" />
-              <div className="text-sm font-semibold text-white">{e.label}</div>
+              <img src={e.logoUrl} alt={e.label} className={`w-8 h-8 rounded-lg object-contain ${e.isUnavailable ? 'opacity-40 grayscale' : ''}`} />
+              <div className={`text-sm font-semibold ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</div>
               <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyles.badge}`}>
-                <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`} style={{ verticalAlign: 'middle' }} />
-                {e.status}
+                {e.isUnavailable
+                  ? <><AlertTriangle size={9} className="inline mr-1" style={{ verticalAlign: 'middle' }} />UNAVAIL</>
+                  : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`} style={{ verticalAlign: 'middle' }} />{e.status}</>
+                }
               </div>
-              <div className="text-center">
-                <div className={`text-2xl font-bold tabular-nums ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>
-                  {e.pct}%
+              {e.isUnavailable ? (
+                <div className="text-center">
+                  <div className="text-xs text-amber-400/80 mt-1">Temporarily unavailable</div>
+                  <div className="text-[10px] text-slate-600 mt-1">Force Refresh to retry</div>
                 </div>
-                <div className="text-xs text-slate-600 mt-0.5">{e.mentioned}/{e.checked} prompts</div>
-                {e.bestPos !== null && (
-                  <div className="text-xs text-slate-500 mt-0.5">best pos #{e.bestPos}</div>
-                )}
-              </div>
+              ) : (
+                <div className="text-center">
+                  <div className={`text-2xl font-bold tabular-nums ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>
+                    {e.pct}%
+                  </div>
+                  <div className="text-xs text-slate-600 mt-0.5">{e.mentioned}/{e.checked} prompts</div>
+                  {e.bestPos !== null && (
+                    <div className="text-xs text-slate-500 mt-0.5">best pos #{e.bestPos}</div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

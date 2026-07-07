@@ -81,6 +81,8 @@ export interface AIResult {
   sentiment: Sentiment
   checked_at: string
   competitors_mentioned?: string | null
+  status?: 'ok' | 'error'
+  error_code?: string | null
 }
 
 export interface DashboardStats {
