@@ -6,7 +6,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
-  <script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>
+  <script src="plausible-init.js"></script>
   <title>BrandGEO — AI Visibility Intelligence</title>
   <meta name="description" content="Find out how visible your brand is across every major AI engine. BrandGEO monitors and scores your AI presence across ChatGPT, Gemini, Claude, Perplexity and Meta AI.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -749,7 +749,7 @@
     <a href="#pricing">Pricing</a>
     <a href="/faq.html">FAQ</a>
     <a href="/blog.html">Research</a>
-    <a href="#contact" class="nav-cta">Get started</a>
+    <a href="https://app.getbrandgeo.com/signup" class="nav-cta">Get started</a>
     <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
   </div>
 </nav>
@@ -763,7 +763,7 @@
   <div class="search-wrap">
     <div class="search-inner">
       <input type="text" id="brandInput" placeholder="yourcompany.com or brand name" aria-label="Enter your brand or domain">
-      <button class="search-btn" onclick="startAudit()">Run Free Audit &rarr;</button>
+      <button class="search-btn">Run Free Audit &rarr;</button>
     </div>
   </div>
   <div class="engine-chips">
@@ -933,7 +933,7 @@
   <!-- Monthly / Yearly toggle -->
   <div class="pricing-toggle-wrap">
     <span class="toggle-label" id="toggle-monthly-lbl" style="font-weight:700;color:var(--t);">Monthly</span>
-    <button class="pricing-toggle" id="billingToggle" aria-label="Toggle billing period" onclick="toggleBilling()">
+    <button class="pricing-toggle" id="billingToggle" aria-label="Toggle billing period">
       <span class="toggle-thumb" id="toggleThumb"></span>
     </button>
     <span class="toggle-label" id="toggle-yearly-lbl" style="color:var(--t2);">Yearly <span class="savings-pill">Save 17%</span></span>
@@ -951,7 +951,7 @@
       <div class="plan-sub-row">
         <div class="plan-sub">No credit card required</div>
       </div>
-      <a href="#contact" class="btn-plan">Start Free</a>
+      <a href="https://app.getbrandgeo.com/signup" class="btn-plan">Start Free</a>
       <div class="plan-features-label">This includes:</div>
       <ul class="pricing-features">
         <li>1 project</li>
@@ -1207,56 +1207,6 @@
   </div>
 </footer>
 
-<script>
-  (function() {
-    // Theme toggle
-    var btn = document.getElementById('themeBtn');
-    var saved = localStorage.getItem('bgTheme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
-    btn.innerHTML = saved === 'dark' ? '&#x1F319;' : '&#x2600;&#xFE0F;';
-    btn.addEventListener('click', function() {
-      var current = document.documentElement.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      btn.innerHTML = next === 'dark' ? '&#x1F319;' : '&#x2600;&#xFE0F;';
-      localStorage.setItem('bgTheme', next);
-    });
-
-    // Search bar: pre-fill contact form and scroll to it
-    window.startAudit = function() {
-      var val = document.getElementById('brandInput').value.trim();
-      if (val) {
-        var companyField = document.getElementById('company');
-        if (companyField) companyField.value = val;
-      }
-      document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
-    };
-
-    // Also allow pressing Enter in search bar
-    document.getElementById('brandInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') window.startAudit();
-    });
-
-    // Billing toggle
-    var billingYearly = false;
-    window.toggleBilling = function() {
-      billingYearly = !billingYearly;
-      var btn = document.getElementById('billingToggle');
-      var monthlyLbl = document.getElementById('toggle-monthly-lbl');
-      var yearlyLbl  = document.getElementById('toggle-yearly-lbl');
-      btn.classList.toggle('active', billingYearly);
-      monthlyLbl.style.fontWeight = billingYearly ? '' : '700';
-      monthlyLbl.style.color      = billingYearly ? '' : 'var(--t)';
-      yearlyLbl.style.fontWeight  = billingYearly ? '700' : '';
-      yearlyLbl.style.color       = billingYearly ? 'var(--t)' : '';
-      document.querySelectorAll('.billing-monthly').forEach(function(el) {
-        el.style.display = billingYearly ? 'none' : '';
-      });
-      document.querySelectorAll('.billing-yearly').forEach(function(el) {
-        el.style.display = billingYearly ? '' : 'none';
-      });
-    };
-  })();
-</script>
+<script src="site.js"></script>
 </body>
 </html>
