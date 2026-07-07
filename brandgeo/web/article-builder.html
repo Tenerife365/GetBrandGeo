@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrandGEO — Article Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
+
+    .app { display: grid; grid-template-columns: 420px 1fr; min-height: 100vh; }
+
+    /* ── Left panel ── */
+    .panel { background: #fff; border-right: 1px solid #e2e2ee; padding: 28px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 0; }
+    .panel-title { font-size: 1.15rem; font-weight: 800; color: #1a1a2e; margin-bottom: 4px; }
+    .panel-sub { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
+
+    .section { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
+    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 14px; }
+
+    .field { margin-bottom: 14px; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: #555; margin-bottom: 5px; }
+    input[type=text], input[type=date], textarea, select {
+      width: 100%; background: #f8f8fc; border: 1px solid #ddd; border-radius: 7px;
+      padding: 9px 12px; font-size: 0.88rem; font-family: inherit; color: #1a1a2e;
+      outline: none; transition: border-color .2s; resize: vertical;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #6c63ff; }
+    textarea { min-height: 80px; }
+
+    .field-hint { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
+
+    .finding-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 10px; align-items: start; }
+    .add-btn { background: none; border: 1.5px dashed #bbb; color: #888; border-radius: 7px; padding: 8px 12px; font-size: 0.8rem; cursor: pointer; width: 100%; margin-top: 4px; transition: border-color .2s, color .2s; }
+    .add-btn:hover { border-color: #6c63ff; color: #6c63ff; }
+    .remove-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 4px; transition: color .2s; }
+    .remove-btn:hover { color: #e55; }
+    .section-block { background: #f8f8fc; border: 1px solid #e8e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; position: relative; }
+    .section-block .remove-btn { position: absolute; top: 10px; right: 10px; }
+
+    .gen-btn { background: #6c63ff; color: #fff; border: none; border-radius: 9px; padding: 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 24px; transition: opacity .15s; }
+    .gen-btn:hover { opacity: .88; }
+
+    /* ── Right panel ── */
+    .output-panel { background: #f4f4f8; display: flex; flex-direction: column; }
+    .output-toolbar { background: #fff; border-bottom: 1px solid #e2e2ee; padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .output-toolbar h2 { font-size: 0.88rem; font-weight: 700; color: #1a1a2e; }
+
+    /* Tabs */
+    .tab-bar { display: flex; gap: 4px; flex: 1; }
+    .tab { background: #f0f0f8; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #888; transition: all .15s; }
+    .tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+
+    .copy-btn { background: #6c63ff; color: #fff; border: none; border-radius: 7px; padding: 8px 18px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+    .copy-btn:hover { opacity: .88; }
+    .copy-btn.copied { background: #00b894; }
+
+    .output-pane { display: none; flex: 1; flex-direction: column; }
+    .output-pane.active { display: flex; }
+
+    pre.code-out {
+      flex: 1; padding: 20px; overflow-y: auto;
+      font-family: 'Courier New', monospace; font-size: 0.78rem;
+      line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+      background: #1e1e2e; color: #cdd6f4;
+    }
+
+    .blog-card-pane { flex: 1; padding: 20px; overflow-y: auto; background: #1e1e2e; display: flex; flex-direction: column; gap: 20px; }
+    .blog-card-section { background: #13131f; border: 1px solid #2a2a40; border-radius: 8px; padding: 16px; }
+    .blog-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 10px; }
+    .blog-card-instructions { font-size: 0.78rem; color: #8888aa; line-height: 1.55; margin-bottom: 12px; }
+    .blog-card-instructions strong { color: #00d4aa; }
+    pre.blog-card-code { font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all; color: #cdd6f4; }
+
+    /* ── Steps hint ── */
+    .steps-hint { background: #f0f0ff; border: 1px solid #d8d8ff; border-radius: 8px; padding: 12px 14px; font-size: 0.76rem; color: #555; line-height: 1.6; margin-bottom: 20px; }
+    .steps-hint strong { color: #6c63ff; }
+    .steps-hint ol { padding-left: 16px; margin-top: 6px; }
+
+    @media(max-width: 900px) { .app { grid-template-columns: 1fr; } .output-panel { min-height: 50vh; } }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ══════════ LEFT: FORM ══════════ -->
+  <div class="panel">
+    <div class="panel-title">📝 Article Builder</div>
+    <div class="panel-sub">BrandGEO Research™ — fill in, generate, copy HTML + blog card.</div>
+
+    <div class="steps-hint">
+      <strong>How to publish:</strong>
+      <ol>
+        <li>Fill the form → <strong>Generate HTML</strong></li>
+        <li><strong>Article HTML tab</strong> → Copy → save as <code>bg-00X.html</code> → upload to cPanel</li>
+        <li><strong>Blog Card tab</strong> → Copy → paste into <code>blog.html</code> (replace the matching "coming soon" card)</li>
+        <li>Upload <code>blog.html</code> to cPanel too</li>
+      </ol>
+    </div>
+
+    <!-- Article Info -->
+    <div class="section-title">Article Info</div>
+    <div class="field">
+      <label>Article ID (e.g. BG-002)</label>
+      <input type="text" id="articleId" placeholder="BG-002" value="BG-002">
+    </div>
+    <div class="field">
+      <label>Publish Date</label>
+      <input type="date" id="pubDate" value="2026-07-07">
+    </div>
+    <div class="field">
+      <label>Category Tag (e.g. AI Search · Strategy)</label>
+      <input type="text" id="tag" placeholder="AI Search · Strategy">
+    </div>
+    <div class="field">
+      <label>Keywords (comma-separated, for SEO)</label>
+      <input type="text" id="keywords" placeholder="AI Visibility, GEO, ChatGPT, brand strategy">
+    </div>
+
+    <!-- Header -->
+    <div class="section">
+      <div class="section-title">Header</div>
+      <div class="field">
+        <label>Title (wrap *words* in asterisks for gradient colour)</label>
+        <textarea id="title" rows="2" placeholder="Why *AI Visibility* Is the New SEO"></textarea>
+      </div>
+      <div class="field">
+        <label>Subtitle / Excerpt</label>
+        <textarea id="subtitle" rows="2" placeholder="The shift that's rewriting how buyers discover brands."></textarea>
+      </div>
+      <div class="field">
+        <label>Read time</label>
+        <input type="text" id="readTime" placeholder="6 min read" value="6 min read">
+      </div>
+    </div>
+
+    <!-- Hero Image -->
+    <div class="section">
+      <div class="section-title">Hero Image (optional)</div>
+      <div class="field">
+        <label>Image URL</label>
+        <input type="text" id="heroImage" placeholder="https://getbrandgeo.com/images/bg-002-hero.jpg">
+        <div class="field-hint">Upload your image to cPanel → images/ folder first, then paste the full URL here.</div>
+      </div>
+      <div class="field">
+        <label>Alt text (for accessibility &amp; SEO)</label>
+        <input type="text" id="heroAlt" placeholder="Chart showing AI visibility scores by industry">
+      </div>
+    </div>
+
+    <!-- Key Findings -->
+    <div class="section">
+      <div class="section-title">Key Findings (stat + description each)</div>
+      <div id="findingsContainer"></div>
+      <button class="add-btn" onclick="addFinding()">+ Add Finding</button>
+    </div>
+
+    <!-- Body sections -->
+    <div class="section">
+      <div class="section-title">Article Sections</div>
+      <div id="sectionsContainer"></div>
+      <button class="add-btn" onclick="addSection()">+ Add Section</button>
+    </div>
+
+    <!-- Callout boxes -->
+    <div class="section">
+      <div class="section-title">Callout Boxes (optional)</div>
+      <div id="calloutsContainer"></div>
+      <button class="add-btn" onclick="addCallout()">+ Add Callout Box</button>
+    </div>
+
+    <button class="gen-btn" onclick="generate()">⚡ Generate HTML</button>
+  </div>
+
+  <!-- ══════════ RIGHT: OUTPUT ══════════ -->
+  <div class="output-panel">
+    <div class="output-toolbar">
+      <div class="tab-bar">
+        <button class="tab active" onclick="switchTab('article')">Article HTML</button>
+        <button class="tab" onclick="switchTab('blog')">Blog Card</button>
+      </div>
+      <button class="copy-btn" id="copyBtn" onclick="copyActive()">Copy</button>
+    </div>
+
+    <!-- Article HTML pane -->
+    <div class="output-pane active" id="pane-article">
+      <pre class="code-out" id="output">← Fill in the form and click Generate HTML</pre>
+    </div>
+
+    <!-- Blog Card pane -->
+    <div class="output-pane" id="pane-blog">
+      <div class="blog-card-pane">
+        <div class="blog-card-section">
+          <div class="blog-card-label">Grid Card — paste into blog.html</div>
+          <div class="blog-card-instructions">
+            Find the matching <strong>BG-00X "coming soon"</strong> card in blog.html and replace it with this block. If there's no placeholder for this ID yet, paste it inside the <code>&lt;div class="posts-grid"&gt;</code>.
+          </div>
+          <pre class="blog-card-code" id="blogCardCode">← Generate HTML first</pre>
+        </div>
+        <div class="blog-card-section">
+          <div class="blog-card-label">Featured Card — optional, replaces the top hero</div>
+          <div class="blog-card-instructions">
+            Only use this if you want to make the new article the <strong>Featured Research</strong> at the top of blog.html. Replace the existing <code>&lt;a href="..." class="featured-card"&gt;</code> block.
+          </div>
+          <pre class="blog-card-code" id="featuredCardCode">← Generate HTML first</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Dynamic rows ───────────────────────────────────────────────────────────
+function addFinding(stat='', desc='') {
+  const c = document.getElementById('findingsContainer');
+  const div = document.createElement('div');
+  div.className = 'finding-row';
+  div.innerHTML = `
+    <input type="text" placeholder="e.g. 74%" value="${stat}" class="finding-stat">
+    <div style="display:flex;gap:6px;align-items:flex-start">
+      <input type="text" placeholder="Description" value="${desc}" class="finding-desc" style="flex:1">
+      <button class="remove-btn" onclick="this.closest('.finding-row').remove()">✕</button>
+    </div>`;
+  c.appendChild(div);
+}
+
+function addSection(heading='', body='') {
+  const c = document.getElementById('sectionsContainer');
+  const div = document.createElement('div');
+  div.className = 'section-block';
+  div.innerHTML = `
+    <button class="remove-btn" onclick="this.closest('.section-block').remove()">✕</button>
+    <div class="field">
+      <label>Section Heading</label>
+      <input type="text" class="sec-heading" placeholder="e.g. The Shift Nobody Saw Coming" value="${heading}">
+    </div>
+    <div class="field">
+      <label>Body — new line = new paragraph · • for bullets · > for blockquote · *word* for bold</label>
+      <textarea class="sec-body" rows="6" placeholder="Paragraph one.\n\n• Bullet one\n• Bullet two\n\n> Key insight quote">${body}</textarea>
+    </div>`;
+  c.appendChild(div);
+}
+
+function addCallout(label='Key Insight', text='', style='purple') {
+  const c = document.getElementById('calloutsContainer');
+  const div = document.createElement('div');
+  div.className = 'section-block';
+  div.innerHTML = `
+    <button class="remove-btn" onclick="this.closest('.section-block').remove()">✕</button>
+    <div class="field"><label>Label</label><input type="text" class="co-label" value="${label}"></div>
+    <div class="field"><label>Text</label><textarea class="co-text" rows="3">${text}</textarea></div>
+    <div class="field"><label>Style</label>
+      <select class="co-style">
+        <option value="purple" ${style==='purple'?'selected':''}>Purple (default)</option>
+        <option value="teal"   ${style==='teal'  ?'selected':''}>Teal (positive)</option>
+      </select>
+    </div>`;
+  c.appendChild(div);
+}
+
+addFinding('', ''); addFinding('', '');
+addSection('', ''); addSection('', '');
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function formatTitle(raw) {
+  return esc(raw).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
+function formatBody(raw) {
+  const lines = (raw||'').split('\n');
+  let html = '', inList = false;
+  for (let line of lines) {
+    const t = line.trim();
+    if (!t) { if (inList) { html += '</ul>\n'; inList = false; } continue; }
+    if (t.startsWith('• ') || t.startsWith('- ')) {
+      if (!inList) { html += '<ul>\n'; inList = true; }
+      html += `  <li>${esc(t.slice(2)).replace(/\*([^*]+)\*/g,'<strong>$1</strong>')}</li>\n`;
+    } else if (t.startsWith('> ')) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<blockquote><p>${esc(t.slice(2))}</p></blockquote>\n`;
+    } else {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<p>${esc(t).replace(/\*([^*]+)\*/g,'<strong>$1</strong>')}</p>\n`;
+    }
+  }
+  if (inList) html += '</ul>\n';
+  return html;
+}
+
+function isoDate(d) { return d || new Date().toISOString().slice(0,10); }
+
+function friendlyDate(iso) {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y,m,d] = iso.split('-');
+  return `${months[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
+}
+
+function monthYear(iso) {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y,m] = iso.split('-');
+  return `${months[parseInt(m)-1]} ${y}`;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+let activeTab = 'article';
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().startsWith(tab)));
+  document.querySelectorAll('.output-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + tab));
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────
+function generate() {
+  const id        = (document.getElementById('articleId').value||'BG-002').trim().toUpperCase();
+  const pubDate   = isoDate(document.getElementById('pubDate').value);
+  const tag       = esc(document.getElementById('tag').value||'AI Search');
+  const keywords  = esc(document.getElementById('keywords').value||'AI Visibility, GEO, BrandGEO');
+  const rawTitle  = document.getElementById('title').value||'Article Title';
+  const subtitle  = esc(document.getElementById('subtitle').value||'');
+  const readTime  = esc(document.getElementById('readTime').value||'5 min read');
+  const heroImage = document.getElementById('heroImage').value.trim();
+  const heroAlt   = esc(document.getElementById('heroAlt').value||id + ' article hero image');
+
+  const findings = [...document.querySelectorAll('.finding-row')].map(r => ({
+    stat: esc(r.querySelector('.finding-stat').value),
+    desc: esc(r.querySelector('.finding-desc').value)
+  })).filter(f => f.stat || f.desc);
+
+  const sections = [...document.querySelectorAll('.section-block')].filter(b => b.querySelector('.sec-heading')).map(b => ({
+    heading: esc(b.querySelector('.sec-heading').value),
+    body: formatBody(b.querySelector('.sec-body').value)
+  })).filter(s => s.heading || s.body);
+
+  const callouts = [...document.querySelectorAll('.section-block')].filter(b => b.querySelector('.co-label')).map(b => ({
+    label: esc(b.querySelector('.co-label').value),
+    text:  esc(b.querySelector('.co-text').value),
+    style: b.querySelector('.co-style').value
+  })).filter(c => c.text);
+
+  const titleFormatted = formatTitle(rawTitle);
+  const titlePlain     = rawTitle.replace(/\*/g,'');
+  const filename       = id.toLowerCase() + '.html';
+  const idNum          = id.replace(/[^0-9]/g,'');
+
+  // ── Hero image block ──
+  const heroHtml = heroImage ? `
+  <div style="max-width:820px;margin:0 auto;padding:0 40px 48px;">
+    <img src="${esc(heroImage)}" alt="${heroAlt}" style="width:100%;max-height:480px;object-fit:cover;border-radius:16px;border:1px solid var(--border);display:block;">
+  </div>` : '';
+
+  // ── og:image meta ──
+  const ogImage = heroImage ? `\n  <meta property="og:image" content="${esc(heroImage)}">` : '';
+
+  // ── Findings bar ──
+  const findingsHtml = findings.length ? `
+  <div class="findings-bar">
+    <div class="findings-inner">
+      <div class="findings-label">Key Findings</div>
+      <div class="findings-grid">
+        ${findings.map(f => `<div class="finding">
+          <div class="finding-number">${f.stat}</div>
+          <div class="finding-desc">${f.desc}</div>
+        </div>`).join('\n        ')}
+      </div>
+    </div>
+  </div>` : '';
+
+  const sectionsHtml = sections.map(s => `
+    ${s.heading ? `<h2>${s.heading}</h2>` : ''}
+    ${s.body}`).join('\n');
+
+  const calloutsHtml = callouts.map(c => `
+    <div class="callout${c.style==='teal'?' teal':''}">
+      <div class="callout-label">${c.label}</div>
+      <p>${c.text}</p>
+    </div>`).join('\n');
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ARTICLE HTML
+  // ─────────────────────────────────────────────────────────────────────────
+  const articleHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>${id} — ${titlePlain} | BrandGEO Research™</title>
+  <meta name="description" content="${subtitle}">
+  <meta property="og:title" content="${id}: ${titlePlain} — BrandGEO Research™">
+  <meta property="og:description" content="${subtitle}">
+  <meta property="og:type" content="article">
+  <meta property="article:published_time" content="${pubDate}">${ogImage}
+  <meta name="keywords" content="${keywords}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "${id}: ${titlePlain}",
+    "description": "${subtitle}",
+    "datePublished": "${pubDate}",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"}${heroImage ? `,\n    "image": "${esc(heroImage)}"` : ''}
+  }
+  <\/script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #13131a; --border: #22223a;
+      --accent: #6c63ff; --accent2: #00d4aa;
+      --text: #e8e8f0; --muted: #8888aa; --radius: 12px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; text-decoration: none; }
+    .logo span { color: var(--accent); }
+    nav a { color: var(--muted); text-decoration: none; font-size: .95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: .78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: .78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem,4vw,2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: .85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: .85rem; color: var(--muted); line-height: 1.4; }
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body img { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); margin: 24px 0; display: block; }
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: .95rem; margin: 0; }
+    blockquote { border-left: 3px solid var(--accent); padding: 16px 24px; margin: 32px 0; }
+    blockquote p { font-size: 1.1rem; font-style: italic; color: var(--text); margin: 0; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+    .cta-box { background: linear-gradient(135deg,rgba(108,99,255,.15),rgba(0,212,170,.08)); border: 1px solid rgba(108,99,255,.3); border-radius: 16px; padding: 40px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.4rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 24px; }
+    .cta-btn { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: 10px; font-weight: 700; text-decoration: none; transition: opacity .15s; }
+    .cta-btn:hover { opacity: .88; }
+    footer { border-top: 1px solid var(--border); padding: 40px; text-align: center; color: var(--muted); font-size: .85rem; }
+    footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+    footer a:hover { color: var(--text); }
+    @media(max-width:640px) { nav { padding: 16px 20px; } .article-header, .article-body { padding-left: 20px; padding-right: 20px; } .findings-bar { padding: 24px 20px; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">Brand<span>GEO</span></a>
+  <div>
+    <a href="/blog.html">Research</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/#contact" class="nav-cta">Free Audit</a>
+  </div>
+</nav>
+
+<article>
+  <div class="article-header">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="breadcrumb-sep">/</span>
+      <a href="/blog.html">Research</a><span class="breadcrumb-sep">/</span>
+      <span>${id}</span>
+    </div>
+    <div class="article-badges">
+      <span class="badge-research">BrandGEO Research™</span>
+      <span class="badge-id">${id}</span>
+      <span class="badge-tag">${tag}</span>
+    </div>
+    <h1>${titleFormatted}</h1>
+    <p class="article-subtitle">${subtitle}</p>
+    <div class="article-meta">
+      <span class="meta-item"><strong>Published</strong> ${friendlyDate(pubDate)}</span>
+      <span class="meta-item"><strong>By</strong> BrandGEO Research</span>
+      <span class="meta-item">${readTime}</span>
+    </div>
+  </div>
+  ${heroHtml}
+  ${findingsHtml}
+
+  <div class="article-body">
+    ${sectionsHtml}
+    ${calloutsHtml}
+
+    <div class="cta-box">
+      <h3>See how visible your brand is to AI engines</h3>
+      <p>Get your free AI Visibility Snapshot — delivered within 48 hours, no commitment.</p>
+      <a href="/#contact" class="cta-btn">Request Free Audit →</a>
+    </div>
+  </div>
+</article>
+
+<footer>
+  <p style="margin-bottom:12px;">
+    <a href="/">Home</a>
+    <a href="/blog.html">Research</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/terms.html">Terms</a>
+    <a href="/privacy.html">Privacy</a>
+  </p>
+  <p>© ${new Date().getFullYear()} BrandGEO. All rights reserved.</p>
+</footer>
+
+</body>
+</html>`;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BLOG CARD SNIPPET (grid)
+  // ─────────────────────────────────────────────────────────────────────────
+  const visualBlock = heroImage
+    ? `<div class="post-card-visual" style="padding:0;overflow:hidden;"><img src="${esc(heroImage)}" alt="${heroAlt}" style="width:100%;height:160px;object-fit:cover;display:block;"></div>`
+    : `<div class="post-card-visual">
+        <span class="post-card-id">${id}</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>`;
+
+  const blogCard = `<a href="/${filename}" class="post-card">
+  ${visualBlock}
+  <div class="post-card-body">
+    <h4>${titlePlain}</h4>
+    <p>${subtitle.replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')}</p>
+    <div class="post-card-footer">
+      <span class="post-card-tag">${tag.replace(/&amp;/g,'&')} · ${monthYear(pubDate)}</span>
+      <span class="post-card-link">Read →</span>
+    </div>
+  </div>
+</a>`;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FEATURED CARD SNIPPET
+  // ─────────────────────────────────────────────────────────────────────────
+  const featuredVisual = heroImage
+    ? `<div class="featured-visual" style="padding:0;overflow:hidden;"><img src="${esc(heroImage)}" alt="${heroAlt}" style="width:100%;height:100%;min-height:320px;object-fit:cover;display:block;"></div>`
+    : `<div class="featured-visual">
+      <div class="research-id-big">${id}</div>
+    </div>`;
+
+  const findingPills = findings.slice(0,4).map(f =>
+    `<span class="finding-pill">${f.stat}${f.stat && f.desc ? ' — ' : ''}${f.desc}</span>`
+  ).join('\n        ');
+
+  const featuredCard = `<a href="/${filename}" class="featured-card">
+  ${featuredVisual}
+  <div class="featured-body">
+    <div class="post-meta">
+      <span class="post-id">${id}</span>
+      <span class="post-tag">${tag.replace(/&amp;/g,'&').split('·')[0].trim()}</span>
+      <span class="post-date">${monthYear(pubDate)}</span>
+    </div>
+    <h2>${titlePlain}</h2>
+    <p>${subtitle.replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')}</p>
+    ${findingPills ? `<div class="finding-pills">\n        ${findingPills}\n      </div>` : ''}
+    <span class="read-link">Read ${id}</span>
+  </div>
+</a>`;
+
+  // ── Push to DOM ──
+  document.getElementById('output').textContent = articleHtml;
+  document.getElementById('blogCardCode').textContent = blogCard;
+  document.getElementById('featuredCardCode').textContent = featuredCard;
+
+  window._articleHtml    = articleHtml;
+  window._blogCard       = blogCard;
+  window._featuredCard   = featuredCard;
+}
+
+// ── Copy active tab ────────────────────────────────────────────────────────
+function copyActive() {
+  let text;
+  if (activeTab === 'article') text = window._articleHtml;
+  else text = (window._blogCard || '') + '\n\n/* ─ Featured card ─ */\n\n' + (window._featuredCard || '');
+
+  if (!text || text.includes('←')) { alert('Generate HTML first.'); return; }
+  navigator.clipboard.writeText(
+    activeTab === 'article' ? window._articleHtml :
+    '<!-- Grid card -->\n' + window._blogCard + '\n\n\n<!-- Featured card (optional) -->\n' + window._featuredCard
+  ).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

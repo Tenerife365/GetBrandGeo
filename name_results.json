@@ -1,0 +1,834 @@
+[
+  {
+    "name": "FreqSeen",
+    "score": 52,
+    "com": "?",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Software as a service - Wikipedia"
+  },
+  {
+    "name": "Voxatal",
+    "score": 52,
+    "com": "?",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Intelligent Cloud Communications: APIs|SDKs, Contact Ce"
+  },
+  {
+    "name": "Frecqua",
+    "score": 52,
+    "com": "?",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Exemple de SaaS : 20 logiciels SaaS incontournables en "
+  },
+  {
+    "name": "Nexura",
+    "score": 45,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 0,
+    "notes": "5 results | Nexora"
+  },
+  {
+    "name": "Claryn",
+    "score": 40,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 0,
+    "notes": "5 results | Clari - Features, Reviews & Pricing (June 2026)"
+  },
+  {
+    "name": "Percepto",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Percepto | Autonomous Drone Tech & Industrial Solutions"
+  },
+  {
+    "name": "Notus",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Notus Design System PRO: Premium Tailwind CSS Design Sy"
+  },
+  {
+    "name": "Videra",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Automate the Patient Journey | Videra Health"
+  },
+  {
+    "name": "Merita",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | HOME - Merita Technologies"
+  },
+  {
+    "name": "TraceIQ",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Top 10 LexisNexis TraceIQ Alternatives & Competitors in"
+  },
+  {
+    "name": "Radia",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Radiacore \u2014 Digital Transformation & Technology Solutio"
+  },
+  {
+    "name": "Scanova",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Scanova Reviews 2026: Details, Pricing, & Features | G2"
+  },
+  {
+    "name": "Optum",
+    "score": 33,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | Optum Provider Management Services"
+  },
+  {
+    "name": "Resonex",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Resonate CX: AI-Powered Customer Experience & VoC Manag"
+  },
+  {
+    "name": "Resonare",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | What Is SaaS Software? A Guide to Software as a Service"
+  },
+  {
+    "name": "LumenIQ",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Lumen: Open source SaaS | InfoWorld"
+  },
+  {
+    "name": "Clarior",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Home - Clario, Inc."
+  },
+  {
+    "name": "Essa",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Produtos SaaS: conhe\u00e7a 8 solu\u00e7\u00f5es pr\u00e1ticas para sua emp"
+  },
+  {
+    "name": "Clarea",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Cledara | The SaaS Management Platform for Spend & Risk"
+  },
+  {
+    "name": "Audita",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Software Audit: Why You Need One for Your SaaS Apps"
+  },
+  {
+    "name": "Lucere",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Lucera LumeMarkets - Lucera | Lucera"
+  },
+  {
+    "name": "Indexor",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Aventis SaaS Index \u2013 Aventis Advisors"
+  },
+  {
+    "name": "Viewmet",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Best SaaS Management Platforms Reviews 2026 | Gartner P"
+  },
+  {
+    "name": "Informat",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Software as a service - Wikipedia"
+  },
+  {
+    "name": "Metrixa",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Metrix Enters Software-as-a-Service (SaaS) Market"
+  },
+  {
+    "name": "Scopica",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Software Product Development Company | Scopic"
+  },
+  {
+    "name": "AtlasIQ",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Boost Insurance Launches Boost Atlas: The AI-Driven Par"
+  },
+  {
+    "name": "Adeptor",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Adept \u2014 On-Premise Engineering Document Management | Sy"
+  },
+  {
+    "name": "Trackor",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Best User Tracking Tools: Complete Guide to User Analyt"
+  },
+  {
+    "name": "GaugeIQ",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Top 10 Best Gauge Management Software of 2026 | ZipDo S"
+  },
+  {
+    "name": "InfoScan",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | SaaS Scanner | productlaunchpad.app"
+  },
+  {
+    "name": "Verinos",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Introducing Varonis SaaS | Optiv"
+  },
+  {
+    "name": "Audexia",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | SaaS Applications Asset Page"
+  },
+  {
+    "name": "Scopera",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | PSA Software for Project, Resource & Financial Manageme"
+  },
+  {
+    "name": "Visiber",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Top Visiwise Alternatives - WebCatalog"
+  },
+  {
+    "name": "Notiqo",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | 4 Best No-Code SaaS Tools to Use | Adalo"
+  },
+  {
+    "name": "Tracient",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Top 20 SaaS Management Platforms [2026] | Zluri"
+  },
+  {
+    "name": "Quoros",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | AI Proposal & RFP Software | Create Winning Responses F"
+  },
+  {
+    "name": "Maxion",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | SaaS Billing Software to Accelerate Growth | Maxio"
+  },
+  {
+    "name": "Zenithor",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Zenith, Software as a Service"
+  },
+  {
+    "name": "Beacona",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | BEACON\u00ae Software as a Service (SaaS) | Badger Meter"
+  },
+  {
+    "name": "Radialis",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Home | RadialSpark"
+  },
+  {
+    "name": "Notoria",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Work Smarter, Not Harder: How Notary SaaS Automates Wor"
+  },
+  {
+    "name": "Elevatio",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | App Login - Elevate SAAS"
+  },
+  {
+    "name": "Refracta",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Refract"
+  },
+  {
+    "name": "Beaconis",
+    "score": 27,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | BEACON\u00ae Software as a Service (SaaS) | Badger Meter"
+  },
+  {
+    "name": "Agenza",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Cos'\u00e8 SaaS? - Spiegazione del Software as a Service (Sa"
+  },
+  {
+    "name": "Focalia",
+    "score": 27,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Suite - Focal Software"
+  },
+  {
+    "name": "EchoPulse",
+    "score": 23,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | EchoPulse \u2014 You run the business. We run the content."
+  },
+  {
+    "name": "EchoTrace",
+    "score": 23,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 40,
+    "notes": "5 results | EchoTrace - built with AI."
+  },
+  {
+    "name": "Imprinto",
+    "score": 22,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | ePRINTit SaaS - App Store - Apple"
+  },
+  {
+    "name": "Cemtrix",
+    "score": 22,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | SaaS apps | Citrix Workspace\u2122 app for Windows"
+  },
+  {
+    "name": "Clarityx",
+    "score": 22,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | SaaS"
+  },
+  {
+    "name": "Signalite",
+    "score": 17,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Signal (software) - Wikipedia"
+  },
+  {
+    "name": "Luminaire",
+    "score": 17,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 60,
+    "notes": "5 results | Luminair - App Store - Apple"
+  },
+  {
+    "name": "Resonexis",
+    "score": 17,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 60,
+    "notes": "5 results | Ressio Software | Construction Management Software for "
+  },
+  {
+    "name": "Signalix",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Signalix - Modern Security Workforce Management Platfor"
+  },
+  {
+    "name": "AuraWave",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Aurawave Reviews | Read Customer Service Reviews of aur"
+  },
+  {
+    "name": "Vibrant",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Vibrant Software : We Are Technology Problem Solvers"
+  },
+  {
+    "name": "PulseNet",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Communications: MDS PulseNet"
+  },
+  {
+    "name": "EchoLens",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | EchoLens \u2013 Your Lens to a More Accessible Digital World"
+  },
+  {
+    "name": "AuraMap",
+    "score": 15,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | auramaps.ai"
+  },
+  {
+    "name": "Pulsar",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Pulsar Platform Reviews & Ratings 2026 | Gartner Peer I"
+  },
+  {
+    "name": "Voxen",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Top Software, Website & Mobile App Development Company "
+  },
+  {
+    "name": "Auris",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Auris \u2013 Platform as a Service"
+  },
+  {
+    "name": "Vidar",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Vision Systems: EO/IR Detection & Tracking Software | S"
+  },
+  {
+    "name": "Lunex",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Lunex Core App | Official Website Platform"
+  },
+  {
+    "name": "Notica",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Notica Software Pricing, Alternatives & More 2026 | Cap"
+  },
+  {
+    "name": "Lucis",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Lucis | Developing with passion"
+  },
+  {
+    "name": "Aleris",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Alaris Pro"
+  },
+  {
+    "name": "Visura",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | GitHub - parbhatkapila4/Visura: An Enterprise AI Docume"
+  },
+  {
+    "name": "Aevita",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Aevitas IT | SAP Solutions, S/4HANA & ERP Consulting"
+  },
+  {
+    "name": "Nectar",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | SaaS Product Development | Nectar Innovations"
+  },
+  {
+    "name": "Verita",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | The Leader in Enterprise Data Management | Veritas"
+  },
+  {
+    "name": "Essentia",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Homepage \u2014 Essentia 2.1-beta6-dev documentation"
+  },
+  {
+    "name": "Cognita",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | AWS Marketplace: Cognita"
+  },
+  {
+    "name": "Fidelis",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Fidelis Security: Detect, Investigate, Hunt, Respond 9x"
+  },
+  {
+    "name": "Skanix",
+    "score": 15,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | Skanix Studio | Software, SaaS e IA para Latinoam\u00e9rica"
+  },
+  {
+    "name": "Lensify",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Lensify Alternatives: 25+ Photo Sharing Apps | Alternat"
+  },
+  {
+    "name": "Metron",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Metron Security | Certified Security App Integration Pa"
+  },
+  {
+    "name": "Spotter",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Spotter: Agentic Analytics for Software and Tech"
+  },
+  {
+    "name": "Optivis",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Optivis Consulting"
+  },
+  {
+    "name": "Praxio",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | AI Powered Business Operations Software Platform"
+  },
+  {
+    "name": "Lucentis",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | LUCENTIS\u00ae (ranibizumab) a Treatment Option for wAMD, DR"
+  },
+  {
+    "name": "Cognivis",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | CogniVis - 2026 Company Profile & Competitors - Tracxn"
+  },
+  {
+    "name": "Audara",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Audara 2026 Pricing, Features, Reviews & Alternatives |"
+  },
+  {
+    "name": "Veralux",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Home - veralux.ai -"
+  },
+  {
+    "name": "Meridix",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Meridix Live Streaming Platform"
+  },
+  {
+    "name": "Prismiq",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | PrismIQ Customer Analytics"
+  },
+  {
+    "name": "Apexia",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | APEXIA - Global Providers Directory"
+  },
+  {
+    "name": "Luminos",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Scaling for success: How SaaS partners are superchargin"
+  },
+  {
+    "name": "Illumine",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Illumine - Crunchbase Company Profile & Funding"
+  },
+  {
+    "name": "Pivotal",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | What is Pivotal? Competitors, Complementary Techs & Usa"
+  },
+  {
+    "name": "Aurorae",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Software - Aurora Energy Research Production"
+  },
+  {
+    "name": "Genus",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Our Products and Solutions | Genus Technologies"
+  },
+  {
+    "name": "Nexus",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Nexus - Nexus - Custom Software Development and Premium"
+  },
+  {
+    "name": "Invisio",
+    "score": 15,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Website Development Company | SEO | Digital Marketing |"
+  },
+  {
+    "name": "Tracktus",
+    "score": 10,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | Tech Tracktus App App - App Store"
+  },
+  {
+    "name": "Sentrix",
+    "score": 10,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Sentrix.one - Modern IT Solutions & Consulting"
+  },
+  {
+    "name": "Vistron",
+    "score": 10,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | Custom Application | Increase Efficiency, Optimize Prod"
+  },
+  {
+    "name": "SonicView",
+    "score": 5,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | SonicView: Pricing, Free Demo & Features | Software Fin"
+  },
+  {
+    "name": "AuraSync",
+    "score": 0,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Asus Aura Sync Utility - Download the standalone versio"
+  },
+  {
+    "name": "Cipherscope",
+    "score": 0,
+    "com": "NO",
+    "ai": "?",
+    "conflict": 100,
+    "notes": "5 results | GitHub - script3r/cipherscope: CipherScope rapidly scan"
+  },
+  {
+    "name": "Scryer",
+    "score": 0,
+    "com": "NO",
+    "ai": "NO",
+    "conflict": 100,
+    "notes": "5 results | Scryer Software House | Scryer Software House"
+  }
+]

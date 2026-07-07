@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- Privacy-friendly analytics by Plausible -->
+  <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
+  <script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>
+  <title>BrandGEO — AI Visibility Intelligence</title>
+  <meta name="description" content="Find out how visible your brand is across every major AI engine. BrandGEO monitors and scores your AI presence across ChatGPT, Gemini, Claude, Perplexity and Meta AI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ── */
+    :root {
+      --bg:   #050508;
+      --s:    #0e0e17;
+      --s2:   #12121c;
+      --bd:   rgba(255,255,255,.07);
+      --bd2:  rgba(255,255,255,.13);
+      --ac:   #6c63ff;
+      --ac2:  #00d4aa;
+      --t:    #ffffff;
+      --t2:   rgba(255,255,255,.6);
+      --t3:   rgba(255,255,255,.35);
+      --nav:  rgba(5,5,8,.85);
+      --r:    12px;
+    }
+    [data-theme="light"] {
+      --bg:   #f7f7fc;
+      --s:    #ffffff;
+      --s2:   #f4f4fb;
+      --bd:   rgba(0,0,0,.08);
+      --bd2:  rgba(0,0,0,.14);
+      --t:    #09090f;
+      --t2:   rgba(9,9,15,.58);
+      --t3:   rgba(9,9,15,.35);
+      --nav:  rgba(247,247,252,.88);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--t);
+      font-family: 'Inter', system-ui, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      transition: background .3s, color .3s;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 40px;
+      border-bottom: 1px solid var(--bd);
+      position: sticky;
+      top: 0;
+      background: var(--nav);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
+    .logo-text .geo {
+      background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
+    nav a:hover { color: var(--t); }
+    .nav-cta {
+      background: var(--ac) !important;
+      color: #fff !important;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-weight: 700;
+      margin-left: 16px !important;
+      transition: opacity .15s !important;
+    }
+    .nav-cta:hover { opacity: .9; }
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--bd2);
+      color: var(--t2);
+      cursor: pointer;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      margin-left: 12px;
+      flex-shrink: 0;
+      transition: border-color .15s, color .15s;
+    }
+    .theme-toggle:hover { border-color: var(--ac); color: var(--ac); }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 56px 40px 64px;
+      max-width: 680px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .hero-orb {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 520px;
+      background: radial-gradient(ellipse at 50% 35%,
+        rgba(108,99,255,.18) 0%,
+        rgba(0,212,170,.07) 45%,
+        transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .hero > *:not(.hero-orb) { position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(108,99,255,.1);
+      border: 1px solid rgba(108,99,255,.25);
+      color: rgba(180,175,255,.9);
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ac);
+      box-shadow: 0 0 8px var(--ac);
+      flex-shrink: 0;
+    }
+    .hero h1 {
+      font-size: clamp(2.6rem, 6vw, 3.8rem);
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -.06em;
+      margin-bottom: 22px;
+      color: var(--t);
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--ac) 0%, var(--ac2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { font-size: 1.05rem; color: var(--t2); max-width: 500px; margin: 0 auto 36px; line-height: 1.7; }
+
+    /* ── SEARCH BAR ── */
+    .search-wrap {
+      background: linear-gradient(135deg, rgba(108,99,255,.5), rgba(0,212,170,.4));
+      border-radius: 14px;
+      padding: 1.5px;
+      max-width: 560px;
+      margin: 0 auto 20px;
+    }
+    .search-inner {
+      background: var(--s2);
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      padding: 5px 5px 5px 18px;
+      gap: 8px;
+    }
+    .search-inner input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 0.95rem;
+      color: var(--t);
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 10px 0;
+    }
+    .search-inner input::placeholder { color: var(--t3); }
+    .search-btn {
+      background: var(--ac);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: 'Inter', system-ui, sans-serif;
+      flex-shrink: 0;
+      transition: opacity .15s, transform .1s;
+      letter-spacing: -.01em;
+    }
+    .search-btn:hover { opacity: .9; transform: scale(.98); }
+
+    /* ── ENGINE CHIPS ── */
+    .engine-chips {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .engine-chip img { width:16px; height:16px; border-radius:3px; flex-shrink:0; }
+    .engine-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--s);
+      border: 1px solid var(--bd);
+      color: var(--t2);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    /* ── PROOF BAR ── */
+    .proof-bar {
+      text-align: center;
+      padding: 14px 40px;
+      border-top: 1px solid var(--bd);
+      border-bottom: 1px solid var(--bd);
+      font-size: 0.82rem;
+      color: var(--t3);
+      letter-spacing: .01em;
+    }
+    .proof-bar strong { color: var(--ac2); font-weight: 700; }
+
+    /* ── PRODUCT PREVIEW ── */
+    .product-preview {
+      padding: 72px 40px;
+      text-align: center;
+    }
+    .product-preview .section-label { margin-bottom: 12px; }
+    .product-preview h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -.04em;
+      color: var(--t);
+      margin-bottom: 10px;
+    }
+    .product-preview > p { font-size: 0.9rem; color: var(--t2); margin: 0 auto 40px; max-width: 480px; line-height: 1.7; }
+    .preview-wrap {
+      position: relative;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .preview-glow {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 580px; height: 340px;
+      background: radial-gradient(ellipse, rgba(108,99,255,.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .preview-card {
+      background: var(--s);
+      border: 1px solid var(--bd2);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 40px 80px -20px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
+      position: relative;
+      transform: perspective(1000px) rotateX(3deg);
+      transform-origin: center bottom;
+      text-align: left;
+    }
+
+    /* preview inner layout */
+    .preview-top { display: grid; grid-template-columns: auto 1fr; gap: 14px; margin-bottom: 14px; }
+    .preview-score-box {
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .preview-ring-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+    .preview-ring-num {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .preview-ring-num .num { font-size: 1.35rem; font-weight: 900; color: var(--t); line-height: 1; letter-spacing: -.04em; }
+    .preview-ring-num .denom { font-size: 0.65rem; color: var(--t3); }
+    .preview-score-meta { font-size: 0.7rem; color: var(--t3); }
+    .preview-score-meta .improving { color: var(--ac2); font-weight: 600; font-size: 0.78rem; display: block; margin: 2px 0; }
+
+    .preview-dims-box {
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .preview-dims-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 8px; }
+    .preview-dims-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 20px; }
+    .dim-row .dim-top { display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 3px; }
+    .dim-row .dim-name { color: var(--t2); }
+    .dim-row .dim-val { font-weight: 600; }
+    .dim-bar { height: 3px; background: var(--bd); border-radius: 2px; overflow: hidden; }
+    .dim-fill { height: 100%; border-radius: 2px; }
+
+    .preview-engines-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 7px; }
+    .preview-engines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+    .pe-card {
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      border-radius: 8px;
+      padding: 10px 4px;
+      text-align: center;
+    }
+    .pe-card.know { border-color: rgba(52,211,153,.3); background: rgba(52,211,153,.04); }
+    .pe-card.partial { border-color: rgba(251,146,60,.3); background: rgba(251,146,60,.04); }
+    .pe-card.missing { border-color: rgba(248,113,113,.25); background: rgba(248,113,113,.03); opacity: .75; }
+    .pe-name { font-size: 0.62rem; color: var(--t3); margin-bottom: 4px; font-weight: 500; }
+    .pe-pos { font-size: 1.1rem; font-weight: 900; line-height: 1; margin-bottom: 3px; letter-spacing: -.03em; }
+    .pe-status { font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; }
+    .pe-status.know { color: #34d399; background: rgba(52,211,153,.12); border: 1px solid rgba(52,211,153,.2); }
+    .pe-status.partial { color: #fb923c; background: rgba(251,146,60,.12); border: 1px solid rgba(251,146,60,.2); }
+    .pe-status.missing { color: #f87171; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.18); }
+
+    .preview-fix-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 7px; }
+    .fix-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      margin-bottom: 5px;
+    }
+    .fix-row.p0 { background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.12); }
+    .fix-row.p1 { background: rgba(251,146,60,.04); border: 1px solid rgba(251,146,60,.11); }
+    .fix-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; margin-top: 1px; }
+    .fix-badge.p0 { background: rgba(248,113,113,.12); color: #f87171; }
+    .fix-badge.p1 { background: rgba(251,146,60,.12); color: #fb923c; }
+    .fix-title { font-size: 0.8rem; font-weight: 600; color: var(--t); margin-bottom: 2px; }
+    .fix-desc { font-size: 0.72rem; color: var(--t2); line-height: 1.5; }
+
+    /* ── DIVIDER ── */
+    .section-divider { border: none; border-top: 1px solid var(--bd); }
+
+    /* ── SECTION ── */
+    .section { padding: 72px 40px; max-width: 1060px; margin: 0 auto; }
+    .section-label { color: var(--ac); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+    .section h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -.04em;
+      color: var(--t);
+      margin-bottom: 14px;
+      line-height: 1.15;
+    }
+    .section > p { color: var(--t2); font-size: 0.95rem; max-width: 540px; line-height: 1.7; }
+
+    /* ── FEATURES ── */
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+    .feature-card {
+      background: var(--s);
+      border: 1px solid var(--bd);
+      border-radius: var(--r);
+      padding: 26px;
+      transition: border-color .2s, transform .2s;
+      cursor: default;
+    }
+    .feature-card:hover { border-color: rgba(108,99,255,.4); transform: translateY(-3px); }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: rgba(108,99,255,.12);
+      border: 1px solid rgba(108,99,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    .feature-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--t); margin-bottom: 8px; }
+    .feature-card p { color: var(--t2); font-size: 0.85rem; line-height: 1.65; }
+    @media(max-width: 780px) { .features-grid { grid-template-columns: 1fr 1fr; } }
+    @media(max-width: 520px) { .features-grid { grid-template-columns: 1fr; } }
+
+    /* ── HOW IT WORKS ── */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; position: relative; }
+    .step { position: relative; }
+    .step-num {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--ac), var(--ac2));
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+    .step h3 { font-size: 0.92rem; font-weight: 700; color: var(--t); margin-bottom: 7px; }
+    .step p { color: var(--t2); font-size: 0.85rem; line-height: 1.65; }
+    @media(max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+
+    /* ── PRICING ── */
+    .pricing-toggle-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 36px; }
+    .toggle-label { font-size: 0.9rem; color: var(--t2); }
+    .pricing-toggle {
+      position: relative; width: 44px; height: 24px;
+      background: var(--bd2); border: none; border-radius: 12px;
+      cursor: pointer; transition: background .2s; padding: 0;
+    }
+    .pricing-toggle.active { background: var(--ac); }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; transition: transform .2s;
+      display: block;
+    }
+    .pricing-toggle.active .toggle-thumb { transform: translateX(20px); }
+    .savings-pill { display: inline-block; background: rgba(0,212,170,.15); color: var(--ac2); font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 4px; }
+
+    /* ─── Pricing grid ─── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      max-width: 1160px;
+      margin: 0 auto 48px;
+      /* default align-items:stretch → all cards same height */
+    }
+
+    /* ─── Card ─── */
+    .pricing-box {
+      background: var(--s);
+      border: 1px solid var(--bd);
+      border-radius: 10px;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 3px 10px rgba(0,0,0,.04);
+    }
+    [data-theme="light"] .pricing-box {
+      border-color: rgba(0,0,0,.08);
+      box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.06);
+    }
+    .pricing-box.featured {
+      border: 2px solid var(--ac);
+      box-shadow: 0 0 0 3px rgba(108,99,255,.09), 0 4px 18px rgba(108,99,255,.13);
+    }
+
+    /*
+     * ── Fixed-height row wrappers ──────────────────────────────────────────
+     * Each wrapper has a fixed min-height so that, regardless of content,
+     * the SAME row always starts at the SAME Y position across all 5 cards.
+     * ──────────────────────────────────────────────────────────────────────
+     */
+
+    /* Row 1 — Eyebrow (empty placeholder on non-featured cards) */
+    .plan-eyebrow {
+      height: 1.3rem;           /* same height whether empty or "Most Popular" */
+      display: flex;
+      align-items: center;
+      font-size: 0.66rem;
+      font-weight: 700;
+      color: var(--ac);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      gap: 4px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Row 2 — Plan name (min 2 lines so short names don't pull price up) */
+    .plan-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--t);
+      line-height: 1.3;
+      min-height: 2.6rem;       /* 0.95 × 1.3 × 2 lines = 2.47rem → round up */
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Row 3 — Price number */
+    .plan-price-row {
+      min-height: 3.4rem;       /* matches 2.2rem font with line-height 1 + /mo */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+    .plan-price {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -.05em;
+      color: var(--t);
+      line-height: 1;
+    }
+    .plan-price span {
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--t3);
+      letter-spacing: 0;
+      margin-left: 2px;
+    }
+    .plan-price-custom {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -.03em;
+      color: var(--t);
+      line-height: 1;
+    }
+    .savings-tag {
+      display: inline-block;
+      background: rgba(0,212,170,.11);
+      color: var(--ac2);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-top: 4px;
+    }
+
+    /* Row 4 — Sub-text (min 2 lines for setup-fee notes) */
+    .plan-sub-row {
+      min-height: 2.8rem;       /* 0.73 × 1.45 × 2 lines = 2.12rem → round up */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+    .plan-sub {
+      font-size: 0.73rem;
+      color: var(--t3);
+      line-height: 1.45;
+    }
+    .plan-sub strong { color: var(--t); font-weight: 600; }
+
+    /* Row 5 — CTA button (consistent padding → consistent height) */
+    .btn-plan {
+      display: block;
+      text-align: center;
+      background: var(--ac);
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .15s;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+    .btn-plan:hover { opacity: .88; }
+    .pricing-box.featured .btn-plan {
+      box-shadow: 0 3px 10px rgba(108,99,255,.32);
+    }
+
+    /* Row 6 — Feature section (grows to fill remaining card height) */
+    .plan-features-label {
+      font-size: 0.67rem;
+      font-weight: 600;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 8px;
+    }
+    .pricing-features { list-style: none; flex: 1; }
+    .pricing-features li {
+      padding: 5px 0;
+      border-bottom: 1px solid var(--bd);
+      color: var(--t2);
+      display: flex;
+      gap: 6px;
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
+    .pricing-features li:last-child { border-bottom: none; }
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--ac2);
+      font-weight: 700;
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      margin-top: 2px;
+    }
+
+    /* ─── Upgrade timeline ─── */
+    .upgrade-timeline { max-width: 860px; margin: 0 auto 48px; text-align: center; }
+    .upgrade-timeline-label { font-size: 0.72rem; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 20px; }
+    .upgrade-steps { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
+    .upgrade-step { background: var(--s); border: 1px solid var(--bd); border-radius: 10px; padding: 12px 16px; min-width: 130px; }
+    .upgrade-step.upgrade-step-featured { border-color: var(--ac); background: rgba(108,99,255,.06); }
+    .upgrade-step-name { font-size: 0.8rem; font-weight: 800; color: var(--t); margin-bottom: 2px; }
+    .upgrade-step.upgrade-step-featured .upgrade-step-name { color: var(--ac); }
+    .upgrade-step-desc { font-size: 0.72rem; color: var(--t3); }
+    .upgrade-arrow { font-size: 1.1rem; color: var(--t3); padding: 0 4px; flex-shrink: 0; }
+
+    /* ─── Snapshot CTA block ─── */
+    .pricing-cta-block { text-align: center; padding: 36px 24px; background: var(--s); border: 1px solid var(--bd); border-radius: 16px; max-width: 580px; margin: 0 auto; }
+    .pricing-cta-block p { font-size: 1.05rem; font-weight: 700; color: var(--t); margin-bottom: 18px; }
+
+    @media(max-width: 1100px) {
+      .pricing-grid { grid-template-columns: 1fr 1fr 1fr; }
+      .pricing-grid .pricing-box:nth-child(4),
+      .pricing-grid .pricing-box:nth-child(5) { grid-column: span 1; }
+    }
+    @media(max-width: 780px) {
+      .pricing-grid { grid-template-columns: 1fr 1fr; }
+      .pricing-box.featured { grid-column: span 2; }
+    }
+    @media(max-width: 520px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+      .pricing-box.featured { grid-column: span 1; }
+      .upgrade-steps { flex-direction: column; }
+      .upgrade-arrow { transform: rotate(90deg); }
+    }
+
+    /* ── CONTACT ── */
+    #contact {
+      background: var(--s);
+      border-top: 1px solid var(--bd);
+      padding: 80px 40px;
+    }
+    .contact-inner { max-width: 520px; margin: 0 auto; text-align: center; }
+    .contact-inner h2 { font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 900; color: var(--t); letter-spacing: -.04em; margin-bottom: 12px; }
+    .contact-inner > p { color: var(--t2); margin-bottom: 40px; font-size: 0.9rem; line-height: 1.7; }
+    form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+    label { font-size: 0.78rem; color: var(--t3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; display: block; margin-bottom: 4px; }
+    input, textarea, select {
+      background: var(--bg);
+      border: 1px solid var(--bd2);
+      color: var(--t);
+      padding: 13px 15px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      width: 100%;
+      outline: none;
+      font-family: 'Inter', system-ui, sans-serif;
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--ac); }
+    input::placeholder, textarea::placeholder { color: var(--t3); }
+    textarea { resize: vertical; min-height: 110px; }
+    select option { background: var(--s); color: var(--t); }
+    .submit-btn {
+      background: var(--ac); color: #fff;
+      border: none; padding: 15px;
+      border-radius: 10px; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      transition: opacity .15s;
+    }
+    .submit-btn:hover { opacity: .9; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--bd);
+      padding: 56px 40px 32px;
+      color: var(--t3);
+    }
+    .footer-grid { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 44px; }
+    .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .footer-logo-text { font-size: 1.1rem; font-weight: 800; line-height: 1; color: var(--t); }
+    .footer-brand p { line-height: 1.65; margin-bottom: 16px; font-size: 0.82rem; color: var(--t2); }
+    .footer-social { display: flex; gap: 8px; }
+    .footer-social a {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      border: 1px solid var(--bd);
+      color: var(--t3);
+      text-decoration: none;
+      transition: border-color .2s, color .2s;
+    }
+    .footer-social a:hover { border-color: var(--ac); color: var(--ac); }
+    .footer-col h4 { color: var(--t); font-size: 0.72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+    .footer-col a { color: var(--t3); text-decoration: none; font-size: 0.84rem; transition: color .2s; }
+    .footer-col a:hover { color: var(--t); }
+    .footer-col .reg-info { margin-top: 14px; font-size: 0.76rem; line-height: 1.6; color: var(--t3); }
+    .footer-bottom {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding-top: 22px;
+      border-top: 1px solid var(--bd);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.78rem;
+    }
+    .footer-bottom a { color: var(--t3); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--t); }
+    .gdpr-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      color: var(--t3);
+      border: 1px solid var(--bd);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    @media(max-width: 720px) { .footer-grid { grid-template-columns: 1fr 1fr; } .footer-bottom { flex-direction: column; text-align: center; } }
+    @media(max-width: 480px) { .footer-grid { grid-template-columns: 1fr; } }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width: 640px) {
+      nav { padding: 14px 20px; }
+      nav a:not(.nav-cta) { display: none; }
+      .hero, .product-preview, .section, #contact { padding-left: 20px; padding-right: 20px; }
+      .pricing-box { padding: 22px 16px; }
+      .preview-top { grid-template-columns: 1fr; }
+      .preview-engines-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="logo">
+    <img src="logo.png" alt="BrandGEO" style="height:32px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-orb"></div>
+  <div class="hero-badge">AI Visibility Platform</div>
+  <h1>Be the brand<br><em>AI recommends.</em></h1>
+  <p>Every day your customers ask ChatGPT, Gemini, Claude, Perplexity and Meta AI for recommendations. Find out exactly where you stand &mdash; then fix it.</p>
+  <div class="search-wrap">
+    <div class="search-inner">
+      <input type="text" id="brandInput" placeholder="yourcompany.com or brand name" aria-label="Enter your brand or domain">
+      <button class="search-btn" onclick="startAudit()">Run Free Audit &rarr;</button>
+    </div>
+  </div>
+  <div class="engine-chips">
+    <div class="engine-chip"><img src="https://www.google.com/s2/favicons?sz=32&domain_url=https://openai.com" alt=""> ChatGPT</div>
+    <div class="engine-chip"><img src="https://www.google.com/s2/favicons?sz=32&domain_url=https://gemini.google.com" alt=""> Gemini</div>
+    <div class="engine-chip"><img src="https://www.google.com/s2/favicons?sz=32&domain_url=https://claude.ai" alt=""> Claude</div>
+    <div class="engine-chip"><img src="https://www.google.com/s2/favicons?sz=32&domain_url=https://perplexity.ai" alt=""> Perplexity</div>
+    <div class="engine-chip"><img src="https://www.google.com/s2/favicons?sz=32&domain_url=https://meta.ai" alt=""> Meta AI</div>
+  </div>
+</section>
+
+<!-- PROOF BAR -->
+<div class="proof-bar">
+  <strong>50+ brands</strong> audited in month one &nbsp;&middot;&nbsp; No credit card required &nbsp;&middot;&nbsp; Results in 48 hours
+</div>
+
+<!-- PRODUCT PREVIEW -->
+<section class="product-preview">
+  <div class="section-label">What you get</div>
+  <h2>Your complete AI visibility &mdash; in one view.</h2>
+  <p>A 0&ndash;100 score across 6 dimensions, a per-engine breakdown, and a prioritised fix list to climb the AI rankings.</p>
+  <div class="preview-wrap">
+    <div class="preview-glow"></div>
+    <div class="preview-card">
+      <!-- Score + Dimensions -->
+      <div class="preview-top">
+        <div class="preview-score-box">
+          <div class="preview-ring-wrap">
+            <svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg);" aria-hidden="true">
+              <circle cx="36" cy="36" r="28" fill="none" stroke="var(--bd2)" stroke-width="5.5"/>
+              <circle cx="36" cy="36" r="28" fill="none" stroke="url(#scoreGrad)" stroke-width="5.5"
+                stroke-dasharray="175.93" stroke-dashoffset="63" stroke-linecap="round"/>
+              <defs>
+                <linearGradient id="scoreGrad" x1="0%" y1="0%">
+                  <stop offset="0%" stop-color="#6c63ff"/>
+                  <stop offset="100%" stop-color="#00d4aa"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="preview-ring-num">
+              <div class="num">64</div>
+              <div class="denom">/100</div>
+            </div>
+          </div>
+          <div class="preview-score-meta">
+            <span style="display:block;margin-bottom:2px;">AI Visibility Score</span>
+            <span class="improving">Improving &uarr;</span>
+            <span>+8 pts vs last audit</span>
+          </div>
+        </div>
+        <div class="preview-dims-box">
+          <div class="preview-dims-label">6 dimensions</div>
+          <div class="preview-dims-grid">
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Recognition</span><span class="dim-val" style="color:#34d399">72%</span></div><div class="dim-bar"><div class="dim-fill" style="width:72%;background:#34d399"></div></div></div>
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Knowledge</span><span class="dim-val" style="color:#fb923c">60%</span></div><div class="dim-bar"><div class="dim-fill" style="width:60%;background:#fb923c"></div></div></div>
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Sentiment</span><span class="dim-val" style="color:#34d399">68%</span></div><div class="dim-bar"><div class="dim-fill" style="width:68%;background:#34d399"></div></div></div>
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Accuracy</span><span class="dim-val" style="color:#f87171">55%</span></div><div class="dim-bar"><div class="dim-fill" style="width:55%;background:#f87171"></div></div></div>
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Reach</span><span class="dim-val" style="color:#34d399">78%</span></div><div class="dim-bar"><div class="dim-fill" style="width:78%;background:#34d399"></div></div></div>
+            <div class="dim-row"><div class="dim-top"><span class="dim-name">Consistency</span><span class="dim-val" style="color:#f87171">52%</span></div><div class="dim-bar"><div class="dim-fill" style="width:52%;background:#f87171"></div></div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Engine grid -->
+      <div class="preview-engines-label">Engine split view</div>
+      <div class="preview-engines-grid">
+        <div class="pe-card know"><div class="pe-name">ChatGPT</div><div class="pe-pos" style="color:#34d399">#2</div><span class="pe-status know">KNOW</span></div>
+        <div class="pe-card know"><div class="pe-name">Gemini</div><div class="pe-pos" style="color:#34d399">#1</div><span class="pe-status know">KNOW</span></div>
+        <div class="pe-card partial"><div class="pe-name">Claude</div><div class="pe-pos" style="color:#fb923c">#4</div><span class="pe-status partial">PARTIAL</span></div>
+        <div class="pe-card missing"><div class="pe-name">Perplexity</div><div class="pe-pos" style="color:#f87171">&mdash;</div><span class="pe-status missing">MISSING</span></div>
+        <div class="pe-card missing"><div class="pe-name">Meta AI</div><div class="pe-pos" style="color:#f87171">&mdash;</div><span class="pe-status missing">MISSING</span></div>
+      </div>
+      <!-- Fix This -->
+      <div class="preview-fix-label">Fix This &mdash; prioritised actions</div>
+      <div class="fix-row p0">
+        <span class="fix-badge p0">P0</span>
+        <div>
+          <div class="fix-title">Add schema markup so Perplexity can find you</div>
+          <div class="fix-desc">Your site has 0 structured data. Perplexity relies on schema.org to surface local businesses in its web results.</div>
+        </div>
+      </div>
+      <div class="fix-row p1">
+        <span class="fix-badge p1">P1</span>
+        <div>
+          <div class="fix-title">Publish an authoritative entity page</div>
+          <div class="fix-desc">ChatGPT and Meta AI are guessing. An entity page or Wikipedia presence gives AI models a reliable training signal.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">Why BrandGEO</div>
+  <h2>GEO is the new SEO.</h2>
+  <p>AI search now answers your customers before they visit any website. BrandGEO is the first platform built to track, measure, and dominate that new layer.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F4E1;</div>
+      <h3>5-engine coverage</h3>
+      <p>ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; all queried with live web search enabled, every week, with the exact queries your customers use.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F4CA;</div>
+      <h3>100-point visibility score</h3>
+      <p>One clear number across 6 dimensions: recognition, knowledge, sentiment, accuracy, reach, and consistency. Track your trend week over week.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F3AF;</div>
+      <h3>Prioritised fix list</h3>
+      <p>P0/P1/P2 actions ranked by impact &mdash; schema markup, entity pages, FAQ content &mdash; with copy-paste implementations ready to go.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F514;</div>
+      <h3>Weekly intelligence report</h3>
+      <p>A clear, non-technical report every week: your GEO score, what AI says about you, what changed, and what your competitors are doing.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F3C6;</div>
+      <h3>Competitor tracking</h3>
+      <p>See how your AI visibility stacks up against your top competitors. Know when a rival gains ground before it affects your business.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#x1F6E0;</div>
+      <h3>Fully managed</h3>
+      <p>No tools to learn, no dashboards to maintain. We handle everything &mdash; you receive insights, act on them, and grow.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="section-label">How it works</div>
+  <h2>From domain to full audit in 48 hours.</h2>
+  <p>We configure everything for you. No technical knowledge required. No setup headaches.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Onboarding call</h3>
+      <p>A 30-minute call to understand your brand, your customers, your competitors, and what people ask AI engines about your category.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>We query 5 AI engines</h3>
+      <p>We run 20+ tailored queries across ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; all with live web search active.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Score &amp; roadmap delivered</h3>
+      <p>You receive your AI Visibility Score, per-engine breakdown, and a P0/P1/P2 action plan to climb the AI rankings, every week.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2>Simple, transparent pricing.</h2>
+  <p style="color:var(--t2);margin-bottom:32px;font-size:0.92rem;">From free to fully managed. No surprises.</p>
+
+  <!-- Monthly / Yearly toggle -->
+  <div class="pricing-toggle-wrap">
+    <span class="toggle-label" id="toggle-monthly-lbl" style="font-weight:700;color:var(--t);">Monthly</span>
+    <button class="pricing-toggle" id="billingToggle" aria-label="Toggle billing period" onclick="toggleBilling()">
+      <span class="toggle-thumb" id="toggleThumb"></span>
+    </button>
+    <span class="toggle-label" id="toggle-yearly-lbl" style="color:var(--t2);">Yearly <span class="savings-pill">Save 17%</span></span>
+  </div>
+
+  <div class="pricing-grid">
+
+    <!-- Free -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow"></div>
+      <div class="plan-name">BrandGEO Free</div>
+      <div class="plan-price-row">
+        <div class="plan-price">&#x20AC;0</div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub">No credit card required</div>
+      </div>
+      <a href="#contact" class="btn-plan">Start Free</a>
+      <div class="plan-features-label">This includes:</div>
+      <ul class="pricing-features">
+        <li>1 project</li>
+        <li>5 buyer prompts</li>
+        <li>ChatGPT visibility</li>
+        <li>Monthly refresh</li>
+        <li>Basic visibility score</li>
+        <li>Dashboard access</li>
+      </ul>
+    </div>
+
+    <!-- Essentials -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow"></div>
+      <div class="plan-name">BrandGEO Essentials</div>
+      <div class="plan-price-row">
+        <div class="plan-price">&#x20AC;99 <span>/mo</span></div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub">Software only &middot; no setup fee</div>
+      </div>
+      <a href="#contact" class="btn-plan">Start Monitoring</a>
+      <div class="plan-features-label">Everything in Free, plus:</div>
+      <ul class="pricing-features">
+        <li>30 commercial prompts</li>
+        <li>ChatGPT, Gemini, Claude</li>
+        <li>Weekly monitoring</li>
+        <li>Competitor tracking</li>
+        <li>Dashboard + CSV export</li>
+      </ul>
+    </div>
+
+    <!-- Managed — MOST POPULAR -->
+    <div class="pricing-box featured">
+      <div class="plan-eyebrow">&#x2B50; Most Popular</div>
+      <div class="plan-name">BrandGEO Managed</div>
+      <div class="plan-price-row">
+        <div class="plan-price billing-monthly">&#x20AC;500 <span>/mo</span></div>
+        <div class="plan-price billing-yearly" style="display:none;">&#x20AC;6,000 <span>/yr</span></div>
+        <div class="savings-tag billing-yearly" style="display:none;">Save &#x20AC;1,000</div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub billing-monthly">+ &#x20AC;1,250 setup &middot; <strong>waived on annual plan</strong></div>
+        <div class="plan-sub billing-yearly" style="display:none;"><strong>Setup fee waived</strong> &middot; annual commitment</div>
+      </div>
+      <a href="#contact" class="btn-plan">Book Consultation</a>
+      <div class="plan-features-label">Everything in Essentials, plus:</div>
+      <ul class="pricing-features">
+        <li>Onboarding &amp; AI visibility strategy</li>
+        <li>Buyer journey &amp; prompt research</li>
+        <li>Competitor research</li>
+        <li>Website AI audit + citation analysis</li>
+        <li>Monthly executive report</li>
+        <li>Monthly strategy call</li>
+        <li>Quarterly optimisation review</li>
+        <li>Priority support</li>
+      </ul>
+    </div>
+
+    <!-- Pro -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow"></div>
+      <div class="plan-name">BrandGEO Pro</div>
+      <div class="plan-price-row">
+        <div class="plan-price">&#x20AC;1,250 <span>/mo</span></div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub billing-monthly">From &middot; tailored to scale<br>+ &#x20AC;1,250 setup &middot; <strong>waived on annual</strong></div>
+        <div class="plan-sub billing-yearly" style="display:none;">From &middot; tailored to scale<br><strong>Setup fee waived</strong> on annual</div>
+      </div>
+      <a href="#contact" class="btn-plan">Contact Sales</a>
+      <div class="plan-features-label">Everything in Managed, plus:</div>
+      <ul class="pricing-features">
+        <li>Multiple countries</li>
+        <li>Multiple brands</li>
+        <li>Larger prompt coverage</li>
+        <li>Executive reporting</li>
+      </ul>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow"></div>
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-price-row">
+        <div class="plan-price-custom">Custom</div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub">Tailored to your organisation</div>
+      </div>
+      <a href="#contact" class="btn-plan">Contact Sales</a>
+      <div class="plan-features-label">Everything in Pro, plus:</div>
+      <ul class="pricing-features">
+        <li>Unlimited projects</li>
+        <li>White-label</li>
+        <li>Dedicated support</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- Why companies upgrade timeline -->
+  <div class="upgrade-timeline">
+    <div class="upgrade-timeline-label">Why companies upgrade</div>
+    <div class="upgrade-steps">
+      <div class="upgrade-step">
+        <div class="upgrade-step-name">BrandGEO Free</div>
+        <div class="upgrade-step-desc">See your baseline score</div>
+      </div>
+      <div class="upgrade-arrow">&rarr;</div>
+      <div class="upgrade-step">
+        <div class="upgrade-step-name">Essentials</div>
+        <div class="upgrade-step-desc">Start weekly tracking</div>
+      </div>
+      <div class="upgrade-arrow">&rarr;</div>
+      <div class="upgrade-step upgrade-step-featured">
+        <div class="upgrade-step-name">Managed</div>
+        <div class="upgrade-step-desc">Fully managed strategy</div>
+      </div>
+      <div class="upgrade-arrow">&rarr;</div>
+      <div class="upgrade-step">
+        <div class="upgrade-step-name">Pro</div>
+        <div class="upgrade-step-desc">Multi-brand &amp; global scale</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Snapshot CTA -->
+  <div class="pricing-cta-block">
+    <p>Not sure which plan fits?</p>
+    <a href="#contact" class="btn-pricing-primary" style="display:inline-block;width:auto;padding:14px 32px;">Apply for a Free AI Visibility Snapshot &rarr;</a>
+  </div>
+
+</section>
+
+<hr class="section-divider">
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="contact-inner">
+    <div class="section-label" style="display:inline-block;margin-bottom:12px;">Free audit</div>
+    <h2>Request your free AI audit.</h2>
+    <p>Find out how visible your brand is across every major AI engine &mdash; free, no commitment, results within 48 hours.</p>
+    <form action="https://formsubmit.co/contact@getbrandgeo.com" method="POST">
+      <input type="hidden" name="_subject" value="New BrandGEO Audit Request">
+      <input type="hidden" name="_captcha" value="false">
+      <input type="hidden" name="_next" value="https://getbrandgeo.com/thanks.html">
+      <div>
+        <label for="name">Full name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required>
+      </div>
+      <div>
+        <label for="email">Business email</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required>
+      </div>
+      <div>
+        <label for="company">Company / brand name</label>
+        <input type="text" id="company" name="company" placeholder="Your company" required>
+      </div>
+      <div>
+        <label for="industry">Industry</label>
+        <select id="industry" name="industry">
+          <option value="">Select your industry</option>
+          <option>Technology &amp; SaaS</option>
+          <option>Catering &amp; Events</option>
+          <option>Hospitality &amp; Hotels</option>
+          <option>Food &amp; Beverage</option>
+          <option>Professional Services</option>
+          <option>E-commerce &amp; Retail</option>
+          <option>Real Estate</option>
+          <option>Healthcare</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="message">Anything else? (optional)</label>
+        <textarea id="message" name="message" placeholder="Tell us about your brand, competitors, or goals&hellip;"></textarea>
+      </div>
+      <button type="submit" class="submit-btn">Send my free audit request &rarr;</button>
+    </form>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+
+    <!-- Brand -->
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <img src="logo.png" alt="BrandGEO" style="height:28px;width:auto;display:block;">
+        <div class="footer-logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+      </div>
+      <p>AI Visibility Intelligence for brands that want to stay ahead of the curve. Monitor, measure, and improve your presence across every major AI engine.</p>
+      <div class="footer-social">
+        <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener" aria-label="LinkedIn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Product -->
+    <div class="footer-col">
+      <h4>Product</h4>
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="https://app.getbrandgeo.com" target="_blank" rel="noopener">Dashboard</a></li>
+        <li><a href="#contact">Free audit</a></li>
+        <li><a href="/faq.html">FAQ</a></li>
+        <li><a href="/blog.html">Research Blog</a></li>
+      </ul>
+    </div>
+
+    <!-- Contact -->
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></li>
+        <li><a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="#contact">Request a call</a></li>
+      </ul>
+    </div>
+
+    <!-- Legal -->
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <ul>
+        <li><a href="/privacy.html">Privacy Policy</a></li>
+        <li>
+          <a href="https://gdpr.eu" target="_blank" rel="noopener">
+            <span class="gdpr-badge">&#x1F512; GDPR Compliant</span>
+          </a>
+        </li>
+      </ul>
+      <p class="reg-info">
+        Santa Cruz de Tenerife<br>
+        Canary Islands, Spain &#x1F1EA;&#x1F1F8;<br>
+        European Union
+      </p>
+    </div>
+
+  </div>
+
+  <div class="footer-bottom">
+    <span>&copy; BrandGEO Global &nbsp;&middot;&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;&middot;&nbsp; Registered in Spain &#x1F1EA;&#x1F1F8; (EU)</span>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>
+<a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy Policy</a>
+      <a href="https://gdpr.eu" target="_blank" rel="noopener" class="gdpr-badge">&#x1F512; GDPR</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function() {
+    // Theme toggle
+    var btn = document.getElementById('themeBtn');
+    var saved = localStorage.getItem('bgTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    btn.innerHTML = saved === 'dark' ? '&#x1F319;' : '&#x2600;&#xFE0F;';
+    btn.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      btn.innerHTML = next === 'dark' ? '&#x1F319;' : '&#x2600;&#xFE0F;';
+      localStorage.setItem('bgTheme', next);
+    });
+
+    // Search bar: pre-fill contact form and scroll to it
+    window.startAudit = function() {
+      var val = document.getElementById('brandInput').value.trim();
+      if (val) {
+        var companyField = document.getElementById('company');
+        if (companyField) companyField.value = val;
+      }
+      document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Also allow pressing Enter in search bar
+    document.getElementById('brandInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') window.startAudit();
+    });
+
+    // Billing toggle
+    var billingYearly = false;
+    window.toggleBilling = function() {
+      billingYearly = !billingYearly;
+      var btn = document.getElementById('billingToggle');
+      var monthlyLbl = document.getElementById('toggle-monthly-lbl');
+      var yearlyLbl  = document.getElementById('toggle-yearly-lbl');
+      btn.classList.toggle('active', billingYearly);
+      monthlyLbl.style.fontWeight = billingYearly ? '' : '700';
+      monthlyLbl.style.color      = billingYearly ? '' : 'var(--t)';
+      yearlyLbl.style.fontWeight  = billingYearly ? '700' : '';
+      yearlyLbl.style.color       = billingYearly ? 'var(--t)' : '';
+      document.querySelectorAll('.billing-monthly').forEach(function(el) {
+        el.style.display = billingYearly ? 'none' : '';
+      });
+      document.querySelectorAll('.billing-yearly').forEach(function(el) {
+        el.style.display = billingYearly ? '' : 'none';
+      });
+    };
+  })();
+</script>
+</body>
+</html>
