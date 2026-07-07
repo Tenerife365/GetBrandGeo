@@ -474,7 +474,7 @@ exports.handler = async (event) => {
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' } }
 
-  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label, market_id } = body
+  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label, market_id, active_engines } = body
   if (!prompt_id || !prompt_text || !client_id || !client_config)
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
 
@@ -499,13 +499,31 @@ exports.handler = async (event) => {
     meta:       p => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),  // training data
   }
 
+  // active_engines filters which engines this function should run.
+  // It contains only the subset of {gemini, perplexity, meta} that are active for this client.
+  // If not provided, run all (backwards-compatible with direct API calls).
+  const allowedEngines = Array.isArray(active_engines) && active_engines.length > 0
+    ? new Set(active_engines)
+    : null   // null = all allowed
+
   let toRun
 
   if (force) {
-    const { error: delErr } = await supabase.from('ai_results').delete().eq('prompt_id', prompt_id).eq('client_id', client_id)
-    if (delErr) console.error('[Delete] failed:', delErr.message)
-    else console.log('[Delete] cleared prompt', prompt_id, 'for client', client_id)
-    toRun = Object.keys(LLM_CALLERS)
+    // On force, only delete rows for the engines we're about to re-run
+    const enginesForDelete = allowedEngines
+      ? Object.keys(LLM_CALLERS).filter(e => allowedEngines.has(e))
+      : Object.keys(LLM_CALLERS)
+    if (enginesForDelete.length > 0) {
+      const { error: delErr } = await supabase
+        .from('ai_results')
+        .delete()
+        .eq('prompt_id', prompt_id)
+        .eq('client_id', client_id)
+        .in('llm', enginesForDelete)
+      if (delErr) console.error('[Delete] failed:', delErr.message)
+      else console.log('[Delete] cleared', enginesForDelete.join(', '), 'for prompt', prompt_id)
+    }
+    toRun = enginesForDelete
   } else {
     const monthStart = new Date()
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
@@ -516,7 +534,11 @@ exports.handler = async (event) => {
       .eq('client_id', client_id)
       .gte('checked_at', monthStart.toISOString())
     const done = new Set((existing || []).map(r => r.llm))
-    toRun = Object.keys(LLM_CALLERS).filter(llm => !done.has(llm))
+    toRun = Object.keys(LLM_CALLERS).filter(llm => {
+      if (done.has(llm)) return false
+      if (allowedEngines && !allowedEngines.has(llm)) return false
+      return true
+    })
     if (toRun.length === 0)
       return { statusCode: 200, body: JSON.stringify({ skipped: true, prompt_id }) }
   }

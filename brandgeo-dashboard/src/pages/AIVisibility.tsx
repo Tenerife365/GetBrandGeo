@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, Play, Loader2, Globe2, Copy, CheckCheck, Zap } from 'lucide-react'
+import {
+  RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
+  Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock,
+} from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
@@ -8,14 +11,12 @@ import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
+import {
+  ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
+  type EngineId, type EngineState,
+} from '../lib/planConfig'
 
-const LLMS: { id: LLMName; label: string; color: string; bg: string; logoUrl: string }[] = [
-  { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com'       },
-  { id: 'gemini',     label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com' },
-  { id: 'claude',     label: 'Claude',     color: 'text-purple-400',  bg: 'bg-purple-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai'         },
-  { id: 'perplexity', label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai'     },
-  { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-400/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai'            },
-]
+// ── Category display helpers ──────────────────────────────────────────────────
 
 const CATEGORY_LABEL: Record<string, string> = {
   mid:            'Mid (100-200)',
@@ -58,16 +59,11 @@ const CATEGORY_COLOR: Record<string, string> = {
 const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? cat
 const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
 
-type ResultMap = Map<number, Map<LLMName, AIResult>>
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Ranked entry from an LLM response: {pos, name} */
+type ResultMap = Map<number, Map<LLMName, AIResult>>
 type RankedEntry = { pos: number; name: string }
 
-/**
- * Parse competitors_mentioned field.
- * New format: [{pos, name}, ...] — actual positions from AI ranked list.
- * Legacy format: string[] — converted with sequential positions.
- */
 function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
   if (!raw) return []
   try {
@@ -80,39 +76,144 @@ function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
   } catch { return [] }
 }
 
+// ── Admin Engine Toggle Modal ─────────────────────────────────────────────────
+
+function EngineToggleModal({
+  clientName,
+  engineStates,
+  enginesEnabled,
+  onToggle,
+  onClose,
+}: {
+  clientName: string
+  engineStates: Record<EngineId, EngineState>
+  enginesEnabled: Record<string, boolean> | null
+  onToggle: (engine: EngineId, enabled: boolean) => Promise<void>
+  onClose: () => void
+}) {
+  const [saving, setSaving] = useState<EngineId | null>(null)
+
+  const planEngines = ALL_ENGINES.filter(e => engineStates[e] !== 'locked')
+
+  const handleToggle = async (engine: EngineId, current: boolean) => {
+    setSaving(engine)
+    await onToggle(engine, !current)
+    setSaving(null)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Engine Configuration</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{clientName}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Engine list */}
+        <div className="divide-y divide-dark-700/50 max-h-96 overflow-y-auto">
+          {planEngines.map(engine => {
+            const meta  = ENGINE_META[engine]
+            const state = engineStates[engine]
+            const isBuilt = !COMING_SOON_ENGINES.has(engine)
+            // Current enabled value: if no override saved, treat as true (active)
+            const isEnabled = enginesEnabled?.[engine] !== false
+            const isSaving  = saving === engine
+
+            return (
+              <div key={engine} className="flex items-center gap-3 px-5 py-3.5">
+                <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 rounded-lg object-contain shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium ${meta.color}`}>{meta.label}</div>
+                  {!isBuilt && (
+                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon — not yet collecting data</div>
+                  )}
+                  {isBuilt && !isEnabled && (
+                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled — shown as Coming Soon to client</div>
+                  )}
+                </div>
+
+                {/* Toggle — only for built engines; coming-soon engines show a note */}
+                {isBuilt ? (
+                  <button
+                    onClick={() => handleToggle(engine, isEnabled)}
+                    disabled={isSaving}
+                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                      isEnabled
+                        ? 'bg-brand-500 border-brand-500'
+                        : 'bg-dark-600 border-dark-500'
+                    }`}
+                  >
+                    {isSaving
+                      ? <Loader2 size={10} className="animate-spin absolute inset-0 m-auto text-white" />
+                      : <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 mt-[1px] ${isEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    }
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-slate-600 shrink-0 bg-dark-700 px-2 py-1 rounded">🔜 Soon</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="px-5 py-3 bg-dark-700/30 text-xs text-slate-600">
+          Disabled engines show as "Coming Soon" to clients. Locked engines require a plan upgrade.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export default function AIVisibility() {
-  const { selections, primaryMarket } = useMarket()
-  const { activeClientId, activeClient, isAdmin } = useClient()
+  const { selections } = useMarket()
+  const { activeClientId, activeClient, isAdmin, activeEngines, engineStates, setClientEngineOverride } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
   const { theme } = useTheme()
-  const [prompts, setPrompts] = useState<Prompt[]>([])
-  const [results, setResults] = useState<ResultMap>(new Map())
-  const [loading, setLoading] = useState(true)
-  const [filterCats, setFilterCats] = useState<Set<string>>(new Set())
-  const [expandedRow, setExpandedRow] = useState<number | null>(null)
-  const [lastChecked, setLastChecked] = useState<string | null>(null)
+
+  const [prompts, setPrompts]           = useState<Prompt[]>([])
+  const [results, setResults]           = useState<ResultMap>(new Map())
+  const [loading, setLoading]           = useState(true)
+  const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
+  const [expandedRow, setExpandedRow]   = useState<number | null>(null)
+  const [lastChecked, setLastChecked]   = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
-  const [showFixHub, setShowFixHub] = useState(true)
-  const [copiedFix, setCopiedFix] = useState<number | null>(null)
-  const [refreshed, setRefreshed] = useState(false)
+  const [showFixHub, setShowFixHub]     = useState(true)
+  const [copiedFix, setCopiedFix]       = useState<number | null>(null)
+  const [refreshed, setRefreshed]       = useState(false)
   const [refreshingPromptId, setRefreshingPromptId] = useState<number | null>(null)
+  const [showEngineModal, setShowEngineModal]         = useState(false)
+
   const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection, runSinglePrompt } = useCollection()
 
+  // Active engines as a LLM-typed array (only engines with state === 'active')
+  const activeLLMs = activeEngines.map(id => ({ id, ...ENGINE_META[id] }))
+
   const runCollection = async () => {
-    await startCollection(activeClientId, false, selections)
+    await startCollection(activeClientId, false, selections, activeEngines)
     load()
   }
 
   const forceCollection = async () => {
-    await startCollection(activeClientId, true, selections)
+    await startCollection(activeClientId, true, selections, activeEngines)
     load()
   }
 
   const handleRefreshPrompt = async (prompt: Prompt) => {
     if (refreshingPromptId !== null || collecting) return
     setRefreshingPromptId(prompt.id)
-    await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections)
+    await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections, activeEngines)
     await load()
     setRefreshingPromptId(null)
   }
@@ -141,6 +242,8 @@ export default function AIVisibility() {
     let latestChecked = lastChecked
     if (rData) {
       rData.forEach((r: AIResult) => {
+        // Only show results for active engines
+        if (!activeEngines.includes(r.llm as EngineId)) return
         if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
         const llmMap = map.get(r.prompt_id)!
         if (!llmMap.has(r.llm as LLMName)) {
@@ -158,12 +261,14 @@ export default function AIVisibility() {
     setTimeout(() => setRefreshed(false), 2500)
   }
 
-  useEffect(() => { load() }, [activeClientId])
+  useEffect(() => { load() }, [activeClientId, activeEngines.join(',')])
   useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
 
   const filtered = filterCats.size === 0 ? prompts : prompts.filter(p => filterCats.has(p.category ?? ''))
 
-  const llmStats = LLMS.map(llm => {
+  // ── Stats computed over active engines only ───────────────────────────────
+
+  const llmStats = activeLLMs.map(llm => {
     const mentioned = prompts.filter(p => results.get(p.id)?.get(llm.id)?.brand_mentioned).length
     const checked   = prompts.filter(p => results.get(p.id)?.has(llm.id)).length
     return { ...llm, mentioned, checked, pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0 }
@@ -172,7 +277,7 @@ export default function AIVisibility() {
   const overallPct = (() => {
     let total = 0, mentioned = 0
     prompts.forEach(p => {
-      LLMS.forEach(llm => {
+      activeLLMs.forEach(llm => {
         const r = results.get(p.id)?.get(llm.id)
         if (r) { total++; if (r.brand_mentioned) mentioned++ }
       })
@@ -217,13 +322,11 @@ export default function AIVisibility() {
     return n
   })()
 
-  // ── AI Visibility Score computation ──────────────────────────────────────────
+  // ── AI Visibility Score ───────────────────────────────────────────────────
 
   const dimensions = (() => {
-    // Recognition: overall brand mention rate across all prompt × engine combinations
     const recognition = overallPct
 
-    // Knowledge: position quality — pos 1=100, pos 5=20, weighted average when mentioned
     let posSum = 0, posCount = 0
     results.forEach(llmMap => llmMap.forEach(r => {
       if (r.brand_mentioned && r.brand_position) {
@@ -233,7 +336,6 @@ export default function AIVisibility() {
     }))
     const knowledge = posCount > 0 ? Math.round(posSum / posCount) : 0
 
-    // Sentiment: positive=1, neutral=0.5, negative=0, avg among mentioned
     let sentScore = 0, sentTotal = 0
     results.forEach(llmMap => llmMap.forEach(r => {
       if (r.brand_mentioned) {
@@ -244,7 +346,6 @@ export default function AIVisibility() {
     }))
     const sentiment = sentTotal > 0 ? Math.round((sentScore / sentTotal) * 100) : (knowledge > 0 ? 55 : 0)
 
-    // Accuracy: % of mentions where brand lands in top-3 position
     let topThree = 0, mentionedTotal = 0
     results.forEach(llmMap => llmMap.forEach(r => {
       if (r.brand_mentioned) {
@@ -254,16 +355,14 @@ export default function AIVisibility() {
     }))
     const accuracy = mentionedTotal > 0 ? Math.round((topThree / mentionedTotal) * 100) : 0
 
-    // Reach: % of engines that mention brand in at least one prompt
-    const enginesWithMention = LLMS.filter(llm =>
+    const enginesWithMention = activeLLMs.filter(llm =>
       prompts.some(p => results.get(p.id)?.get(llm.id)?.brand_mentioned)
     ).length
-    const reach = LLMS.length > 0 ? Math.round((enginesWithMention / LLMS.length) * 100) : 0
+    const reach = activeLLMs.length > 0 ? Math.round((enginesWithMention / activeLLMs.length) * 100) : 0
 
-    // Consistency: % of prompts where brand appears in ≥60% of engines that checked
     const consistentPrompts = prompts.filter(p => {
-      const checked = LLMS.filter(l => results.get(p.id)?.has(l.id)).length
-      const mentioned = LLMS.filter(l => results.get(p.id)?.get(l.id)?.brand_mentioned).length
+      const checked   = activeLLMs.filter(l => results.get(p.id)?.has(l.id)).length
+      const mentioned = activeLLMs.filter(l => results.get(p.id)?.get(l.id)?.brand_mentioned).length
       return checked > 0 && mentioned / checked >= 0.6
     }).length
     const consistency = prompts.length > 0 ? Math.round((consistentPrompts / prompts.length) * 100) : 0
@@ -280,9 +379,9 @@ export default function AIVisibility() {
     dimensions.consistency * 0.10
   )
 
-  // ── Engine status grid ────────────────────────────────────────────────────────
+  // ── Engine status (active engines only, for KNOW/PARTIAL/MISSING) ─────────
 
-  const engineStatuses = llmStats.map(s => {
+  const engineStatusCards = llmStats.map(s => {
     const status: 'KNOW' | 'PARTIAL' | 'MISSING' =
       s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
     let bestPos: number | null = null
@@ -295,12 +394,16 @@ export default function AIVisibility() {
     return { ...s, status, bestPos }
   })
 
-  // ── Fix This hub ──────────────────────────────────────────────────────────────
+  // Coming-soon and locked engines for the status grid
+  const comingSoonEngines = ALL_ENGINES.filter(e => engineStates[e] === 'coming_soon')
+  const lockedEngines     = ALL_ENGINES.filter(e => engineStates[e] === 'locked')
+
+  // ── Fix This hub ──────────────────────────────────────────────────────────
 
   const fixItems = (() => {
     const items: { priority: 'P0' | 'P1' | 'P2'; title: string; description: string; fix: string }[] = []
 
-    engineStatuses.filter(e => e.status === 'MISSING' && e.checked > 0).forEach(e => {
+    engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0).forEach(e => {
       items.push({
         priority: 'P0',
         title: `Not found in ${e.label}`,
@@ -309,7 +412,7 @@ export default function AIVisibility() {
       })
     })
 
-    engineStatuses.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
+    engineStatusCards.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
       items.push({
         priority: 'P1',
         title: `Low visibility in ${e.label} (${e.pct}%)`,
@@ -350,10 +453,9 @@ export default function AIVisibility() {
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.aiv_loading}</div>
 
-  const scoreColor = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
-  const circumference = 2 * Math.PI * 54 // r=54 → 339.3
-  const dashOffset = circumference - (aiScore / 100) * circumference
-  // SVG text fill adapts to light/dark mode (fill="white" is invisible on light bg)
+  const scoreColor      = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
+  const circumference   = 2 * Math.PI * 54
+  const dashOffset      = circumference - (aiScore / 100) * circumference
   const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
   const ringTextFillDim = theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'
 
@@ -373,8 +475,22 @@ export default function AIVisibility() {
     })
   }
 
+  // Total columns in prompt table = active engines only
+  const tableColsTemplate = `2rem 1fr repeat(${activeLLMs.length}, 8rem)`
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+
+      {/* Engine toggle modal */}
+      {showEngineModal && activeClient && (
+        <EngineToggleModal
+          clientName={activeClient.name}
+          engineStates={engineStates}
+          enginesEnabled={activeClient.engines_enabled}
+          onToggle={setClientEngineOverride}
+          onClose={() => setShowEngineModal(false)}
+        />
+      )}
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="mb-6 flex items-start justify-between">
@@ -404,9 +520,17 @@ export default function AIVisibility() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {isAdmin && (
             <>
+              <button
+                onClick={() => setShowEngineModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
+                title="Configure engines for this client"
+              >
+                <Settings size={14} />
+                <span className="hidden sm:inline">Engines</span>
+              </button>
               <button
                 onClick={runCollection}
                 disabled={collecting || loading}
@@ -424,7 +548,7 @@ export default function AIVisibility() {
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RotateCcw size={14} />
-                Force Refresh
+                <span className="hidden sm:inline">Force Refresh</span>
               </button>
             </>
           )}
@@ -441,8 +565,6 @@ export default function AIVisibility() {
 
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
       <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
-
-        {/* Score ring — Apple-style */}
         <div className="flex flex-col items-center gap-3">
           <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
@@ -450,57 +572,29 @@ export default function AIVisibility() {
                 <stop offset="0%" stopColor="#06b6d4" />
                 <stop offset="100%" stopColor="#818cf8" />
               </linearGradient>
-              {/* Glow bloom behind the arc */}
               <filter id="scoreGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
             </defs>
-            {/* Track — adapts to light/dark */}
             <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-            {/* Glow halo layer */}
-            <circle
-              cx="60" cy="60" r="54"
-              fill="none"
-              stroke="url(#scoreRingGrad)"
-              strokeWidth="10"
-              strokeLinecap="round"
-              strokeDasharray={`${circumference}`}
-              strokeDashoffset={`${dashOffset}`}
-              transform="rotate(-90 60 60)"
-              filter="url(#scoreGlow)"
-              opacity="0.3"
-              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }}
-            />
-            {/* Main arc */}
-            <circle
-              cx="60" cy="60" r="54"
-              fill="none"
-              stroke="url(#scoreRingGrad)"
-              strokeWidth="5.5"
-              strokeLinecap="round"
-              strokeDasharray={`${circumference}`}
-              strokeDashoffset={`${dashOffset}`}
-              transform="rotate(-90 60 60)"
-              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }}
-            />
-            {/* Score number with superscript % */}
+            <circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
+              strokeDasharray={`${circumference}`} strokeDashoffset={`${dashOffset}`} transform="rotate(-90 60 60)"
+              filter="url(#scoreGlow)" opacity="0.3" style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
+            <circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
+              strokeDasharray={`${circumference}`} strokeDashoffset={`${dashOffset}`} transform="rotate(-90 60 60)"
+              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
             <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{aiScore}</tspan><tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
+              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{aiScore}</tspan>
+              <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
             </text>
           </svg>
-          {/* Label + status pill */}
           <div className="text-center -mt-1">
             <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-2">AI Visibility Score</div>
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
-              aiScore >= 60
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : aiScore >= 35
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                : 'bg-red-500/10 text-red-400 border-red-500/20'
+              aiScore >= 60 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+              : 'bg-red-500/10 text-red-400 border-red-500/20'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-emerald-400' : aiScore >= 35 ? 'bg-amber-400' : 'bg-red-400'}`} />
               {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
@@ -508,7 +602,6 @@ export default function AIVisibility() {
           </div>
         </div>
 
-        {/* Dimension bars */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
           {dimConfig.map(d => (
             <div key={d.key}>
@@ -533,8 +626,10 @@ export default function AIVisibility() {
       </div>
 
       {/* ── Engine status grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
-        {engineStatuses.map(e => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+
+        {/* Active engine cards */}
+        {engineStatusCards.map(e => {
           const statusStyles = {
             KNOW:    { badge: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30', dot: 'bg-emerald-400', card: 'border-emerald-500/20' },
             PARTIAL: { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',     dot: 'bg-amber-400',   card: 'border-amber-500/20'   },
@@ -556,6 +651,46 @@ export default function AIVisibility() {
                 {e.bestPos !== null && (
                   <div className="text-xs text-slate-500 mt-0.5">best pos #{e.bestPos}</div>
                 )}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Coming Soon engine cards */}
+        {comingSoonEngines.map(id => {
+          const meta = ENGINE_META[id]
+          return (
+            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-4 flex flex-col items-center gap-2 opacity-60">
+              <img src={meta.logoUrl} alt={meta.label} className="w-8 h-8 rounded-lg object-contain grayscale" />
+              <div className="text-sm font-semibold text-slate-500">{meta.label}</div>
+              <div className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-700/50 text-slate-500 border border-slate-600/30 flex items-center gap-1">
+                <Clock size={10} />
+                Coming Soon
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-slate-600 mt-1">
+                  {COMING_SOON_ENGINES.has(id) ? 'Not yet built' : 'Paused by admin'}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Locked engine cards (not in plan) */}
+        {lockedEngines.map(id => {
+          const meta        = ENGINE_META[id]
+          const unlockPlan  = ENGINE_UNLOCK_PLAN[id]
+          const planLabel   = PLAN_LABELS[unlockPlan]
+          return (
+            <div key={id} className="bg-dark-800/30 border border-dark-700/30 rounded-xl p-4 flex flex-col items-center gap-2 opacity-40">
+              <img src={meta.logoUrl} alt={meta.label} className="w-8 h-8 rounded-lg object-contain grayscale" />
+              <div className="text-sm font-semibold text-slate-600">{meta.label}</div>
+              <div className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-slate-600 border border-slate-700/30 flex items-center gap-1">
+                <Lock size={9} />
+                Locked
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] text-slate-700 mt-1">{planLabel}+</div>
               </div>
             </div>
           )
@@ -589,9 +724,9 @@ export default function AIVisibility() {
             <div className="border-t border-dark-700/50 divide-y divide-dark-700/50">
               {fixItems.map((item, idx) => {
                 const pStyles = {
-                  P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'    },
-                  P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300'  },
-                  P2: { border: 'border-l-4 border-l-purple-500', badge: 'bg-purple-500/20 text-purple-300', title: 'text-slate-200'  },
+                  P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'   },
+                  P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300' },
+                  P2: { border: 'border-l-4 border-l-purple-500', badge: 'bg-purple-500/20 text-purple-300', title: 'text-slate-200' },
                 }[item.priority]
                 return (
                   <div key={idx} className={`px-5 py-4 ${pStyles.border}`}>
@@ -655,16 +790,11 @@ export default function AIVisibility() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {competitorFreq.map(({ name, count, avgPos }) => (
-                  <div
-                    key={name}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg"
-                  >
+                  <div key={name} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg">
                     <Target size={11} className="text-red-400" />
                     <span className="text-sm font-medium text-red-300">{name}</span>
                     <span className="text-xs text-red-500/70">{count}x</span>
-                    {avgPos !== null && (
-                      <span className="text-xs text-slate-600">avg #{avgPos}</span>
-                    )}
+                    {avgPos !== null && <span className="text-xs text-slate-600">avg #{avgPos}</span>}
                   </div>
                 ))}
               </div>
@@ -680,7 +810,7 @@ export default function AIVisibility() {
           const catPrompts = prompts.filter(p => p.category === cat)
           let mentioned = 0, checked = 0
           catPrompts.forEach(p => {
-            LLMS.forEach(llm => {
+            activeLLMs.forEach(llm => {
               const r = results.get(p.id)?.get(llm.id)
               if (r) { checked++; if (r.brand_mentioned) mentioned++ }
             })
@@ -692,7 +822,7 @@ export default function AIVisibility() {
           <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
-              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts \xd7 {LLMS.length} engines</span>
+              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {catStats.map(({ cat, label, pct, checked, mentioned }) => (
@@ -719,7 +849,6 @@ export default function AIVisibility() {
         if (activeCats.length === 0) return null
         return (
           <div className="flex gap-2 mb-4 flex-wrap">
-            {/* "All categories" — clears selection */}
             <button
               onClick={() => setFilterCats(new Set())}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
@@ -757,17 +886,17 @@ export default function AIVisibility() {
         )
       })()}
 
-      {/* ── Prompt table ─────────────────────────────────────────────────────── */}
+      {/* ── Prompt table (active engines only) ──────────────────────────────── */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
         <div className="min-w-[640px]">
         <div
           className="grid border-b border-dark-700 bg-dark-700/50"
-          style={{ gridTemplateColumns: '2rem 1fr repeat(5, 8rem)' }}
+          style={{ gridTemplateColumns: tableColsTemplate }}
         >
           <div className="px-3 py-3 text-xs text-slate-600">#</div>
           <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">{t.aiv_prompt}</div>
-          {LLMS.map(llm => (
+          {activeLLMs.map(llm => (
             <div key={llm.id} className={`px-2 py-3 text-xs font-medium text-center ${llm.color}`}>
               {llm.label}
             </div>
@@ -777,14 +906,14 @@ export default function AIVisibility() {
         {filtered.map((prompt, i) => {
           const rowResults = results.get(prompt.id)
           const isExpanded = expandedRow === prompt.id
-          const mentionCount = LLMS.filter(l => rowResults?.get(l.id)?.brand_mentioned).length
-          const hasData = LLMS.some(l => rowResults?.has(l.id))
+          const mentionCount = activeLLMs.filter(l => rowResults?.get(l.id)?.brand_mentioned).length
+          const hasData = activeLLMs.some(l => rowResults?.has(l.id))
 
           return (
             <div key={prompt.id} className="border-b border-dark-700 last:border-0">
               <div
                 className="w-full grid hover:bg-dark-700/30 transition-colors cursor-pointer"
-                style={{ gridTemplateColumns: '2rem 1fr repeat(5, 8rem)' }}
+                style={{ gridTemplateColumns: tableColsTemplate }}
                 onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
               >
                 <div className="px-3 py-3 text-xs text-slate-600 self-center">{prompt.position || i + 1}</div>
@@ -795,8 +924,8 @@ export default function AIVisibility() {
                       {getCatLabel(prompt.category)}
                     </span>
                     {hasData && (
-                      <span className={`text-xs font-semibold ${mentionCount >= 4 ? 'text-emerald-400' : mentionCount >= 2 ? 'text-amber-400' : 'text-red-400'}`}>
-                        {mentionCount}/{LLMS.filter(l => rowResults?.has(l.id)).length} LLMs
+                      <span className={`text-xs font-semibold ${mentionCount >= activeLLMs.length * 0.8 ? 'text-emerald-400' : mentionCount >= activeLLMs.length * 0.4 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {mentionCount}/{activeLLMs.filter(l => rowResults?.has(l.id)).length} LLMs
                       </span>
                     )}
                     <button
@@ -811,15 +940,13 @@ export default function AIVisibility() {
                   <div className="text-sm text-slate-300 truncate max-w-md">{prompt.text}</div>
                 </div>
 
-                {LLMS.map(llm => {
+                {activeLLMs.map(llm => {
                   const r = rowResults?.get(llm.id)
-                  if (!r) {
-                    return (
-                      <div key={llm.id} className="px-2 py-3 flex items-center justify-center">
-                        <span className="text-slate-700 text-xs">-</span>
-                      </div>
-                    )
-                  }
+                  if (!r) return (
+                    <div key={llm.id} className="px-2 py-3 flex items-center justify-center">
+                      <span className="text-slate-700 text-xs">-</span>
+                    </div>
+                  )
                   const competitors = parseCompetitors(r.competitors_mentioned)
                   const topComp = competitors[0] ?? null
                   return (
@@ -831,10 +958,7 @@ export default function AIVisibility() {
                             <span className="text-[10px] text-emerald-500 font-medium">pos #{r.brand_position}</span>
                           )}
                           {topComp && r.brand_position && topComp.pos < r.brand_position && (
-                            <span
-                              className="text-[9px] text-slate-600 text-center leading-tight max-w-[70px] truncate"
-                              title={`#${topComp.pos} ${topComp.name}`}
-                            >
+                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-[70px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
                               #{topComp.pos} above
                             </span>
                           )}
@@ -843,10 +967,7 @@ export default function AIVisibility() {
                         <>
                           <span className="text-red-400 font-bold text-sm">{t.aiv_no}</span>
                           {topComp && (
-                            <span
-                              className="text-[9px] text-red-400/70 text-center leading-tight max-w-[70px] truncate"
-                              title={`#${topComp.pos} ${topComp.name}`}
-                            >
+                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-[70px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
                               #{topComp.pos} {topComp.name}
                             </span>
                           )}
@@ -859,11 +980,10 @@ export default function AIVisibility() {
 
               {isExpanded && (
                 <div className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                    {LLMS.map(llm => {
+                  <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(activeLLMs.length, 5)}, 1fr)` }}>
+                    {activeLLMs.map(llm => {
                       const r = rowResults?.get(llm.id)
                       const competitors = r ? parseCompetitors(r.competitors_mentioned) : []
-
                       const rankedList: { pos: number; name: string; isBrand: boolean }[] = [
                         ...competitors.map(c => ({ ...c, isBrand: false })),
                         ...(r?.brand_mentioned && r.brand_position
@@ -882,30 +1002,20 @@ export default function AIVisibility() {
                               <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
                               </div>
-
                               {rankedList.length > 0 && (
                                 <div className="mb-2">
-                                  <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">
-                                    AI Top Results
-                                  </div>
+                                  <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">AI Top Results</div>
                                   {rankedList.map(entry => (
-                                    <div
-                                      key={`${entry.pos}-${entry.name}`}
-                                      className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}
-                                    >
+                                    <div key={`${entry.pos}-${entry.name}`}
+                                      className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}>
                                       <span className="font-mono text-slate-600 shrink-0 w-5">#{entry.pos}</span>
                                       <span className="leading-tight">{entry.name}{entry.isBrand ? ' ✓' : ''}</span>
                                     </div>
                                   ))}
                                 </div>
                               )}
-
                               {r.sentiment && r.brand_mentioned && (
-                                <div className={`text-[10px] font-medium mb-1 ${
-                                  r.sentiment === 'positive' ? 'text-emerald-500'
-                                  : r.sentiment === 'negative' ? 'text-red-500'
-                                  : 'text-slate-500'
-                                }`}>
+                                <div className={`text-[10px] font-medium mb-1 ${r.sentiment === 'positive' ? 'text-emerald-500' : r.sentiment === 'negative' ? 'text-red-500' : 'text-slate-500'}`}>
                                   {r.sentiment}
                                 </div>
                               )}
@@ -929,7 +1039,7 @@ export default function AIVisibility() {
                   </div>
 
                   {rowResults && (() => {
-                    const missing = LLMS.filter(l => {
+                    const missing = activeLLMs.filter(l => {
                       const r = rowResults.get(l.id)
                       return r && !r.brand_mentioned
                     })
@@ -939,9 +1049,7 @@ export default function AIVisibility() {
                         <div className="text-xs text-amber-300 font-medium mb-0.5">
                           {fmt(t.aiv_opportunity, { brand: brandName, llms: missing.map(l => l.label).join(', ') })}
                         </div>
-                        <div className="text-[11px] text-slate-500">
-                          {t.aiv_opportunityTip}
-                        </div>
+                        <div className="text-[11px] text-slate-500">{t.aiv_opportunityTip}</div>
                       </div>
                     )
                   })()}

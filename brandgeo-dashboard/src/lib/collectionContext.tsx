@@ -11,6 +11,7 @@
 import { createContext, useContext, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import type { MarketSelection } from './marketContext'
+import type { EngineId } from './planConfig'
 
 interface Progress {
   done: number
@@ -23,8 +24,8 @@ interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
   lastCompletedAt: number   // increments after each prompt -- watch to reload data
-  runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[]) => Promise<void>
-  runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[]) => Promise<void>
+  runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<void>
+  runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<void>
   stopCollection:   () => void
 }
 
@@ -32,8 +33,8 @@ const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
   lastCompletedAt: 0,
-  runCollection:   async (_clientId: number, _force?: boolean, _markets?: MarketSelection[]) => {},
-  runSinglePrompt: async (_clientId: number, _promptId: number, _promptText: string, _markets?: MarketSelection[]) => {},
+  runCollection:   async () => {},
+  runSinglePrompt: async () => {},
   stopCollection:  () => {},
 })
 
@@ -53,11 +54,23 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     clientId: number,
     force = false,
     markets?: MarketSelection[],
+    activeEngines?: EngineId[],
   ) => {
     if (runningRef.current) return
     runningRef.current = true
     abortRef.current   = false
     setCollecting(true)
+
+    // Determine which functions to fire based on active engines
+    // If activeEngines not provided, fire all (backwards-compatible)
+    const engines = activeEngines ?? ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'] as EngineId[]
+    const runChatgpt = engines.includes('chatgpt')
+    const runClaude  = engines.includes('claude')
+    // Engines handled by collect-prompt
+    const promptEngines = engines.filter(e => ['gemini', 'perplexity', 'meta'].includes(e))
+    const runPrompt = promptEngines.length > 0
+
+    console.log('[Collection] active engines:', engines, '| runChatgpt:', runChatgpt, '| runClaude:', runClaude, '| promptEngines:', promptEngines)
 
     try {
       // Fetch client config + name
@@ -108,48 +121,40 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         setProgress({ done: i, total: prompts.length, clientId, clientName: clientRow?.name ?? '' })
 
         const payload = {
-          prompt_id:     prompts[i].id,
-          prompt_text:   prompts[i].text,
-          client_id:     clientId,
-          client_config: clientConfig,
+          prompt_id:      prompts[i].id,
+          prompt_text:    prompts[i].text,
+          client_id:      clientId,
+          client_config:  clientConfig,
           force,
           market_label,
           region_label,
           market_id,
+          active_engines: promptEngines,   // collect-prompt filters to these
         }
 
-        // Fire all 3 functions in parallel -- each has its own 26s Netlify timeout.
-        // collect-prompt: gemini + perplexity + meta
-        // collect-claude: Claude only
-        // collect-chatgpt: ChatGPT (gpt-5.5) only
+        // Fire only the functions whose engines are active.
+        // Each function has its own 26s Netlify timeout.
         try {
-          const [fastRes, claudeRes, chatgptRes] = await Promise.allSettled([
-            fetch('/.netlify/functions/collect-prompt', {
-              method: 'POST',
-              headers: authHeader,
-              body: JSON.stringify(payload),
-            }).then(r => r.json().catch(() => null)),
-            fetch('/.netlify/functions/collect-claude', {
-              method: 'POST',
-              headers: authHeader,
-              body: JSON.stringify(payload),
-            }).then(r => r.json().catch(() => null)),
-            fetch('/.netlify/functions/collect-chatgpt', {
-              method: 'POST',
-              headers: authHeader,
-              body: JSON.stringify(payload),
-            }).then(r => r.json().catch(() => null)),
-          ])
-          console.log(
-            `[Collection] prompt ${i + 1}/${prompts.length}`,
-            '-> fast:', fastRes.status === 'fulfilled' ? fastRes.value : fastRes.reason,
-            '-> claude:', claudeRes.status === 'fulfilled' ? claudeRes.value : claudeRes.reason,
-            '-> chatgpt:', chatgptRes.status === 'fulfilled' ? chatgptRes.value : chatgptRes.reason,
+          const calls: Promise<any>[] = []
+          if (runPrompt) calls.push(
+            fetch('/.netlify/functions/collect-prompt', { method: 'POST', headers: authHeader, body: JSON.stringify(payload) })
+              .then(r => r.json().catch(() => null))
           )
+          if (runClaude) calls.push(
+            fetch('/.netlify/functions/collect-claude', { method: 'POST', headers: authHeader, body: JSON.stringify(payload) })
+              .then(r => r.json().catch(() => null))
+          )
+          if (runChatgpt) calls.push(
+            fetch('/.netlify/functions/collect-chatgpt', { method: 'POST', headers: authHeader, body: JSON.stringify(payload) })
+              .then(r => r.json().catch(() => null))
+          )
+
+          const settled = await Promise.allSettled(calls)
+          console.log(`[Collection] prompt ${i + 1}/${prompts.length}`, settled.map((r, idx) => `${idx}=${r.status}`).join(' | '))
         } catch { /* network blip -- skip prompt, keep going */ }
+
         setLastCompletedAt(Date.now())
-        // gpt-5.5 can take 30-40s -- Netlify closes the HTTP connection at 26s but the
-        // Lambda saves in the background. Schedule follow-up reloads to catch late saves.
+        // gpt-5.5 can take 30-40s -- schedule follow-up reloads to catch late saves.
         setTimeout(() => setLastCompletedAt(Date.now()), 15000)
         setTimeout(() => setLastCompletedAt(Date.now()), 40000)
       }
@@ -165,7 +170,14 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     promptId: number,
     promptText: string,
     markets?: MarketSelection[],
+    activeEngines?: EngineId[],
   ) => {
+    const engines = activeEngines ?? ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'] as EngineId[]
+    const runChatgpt    = engines.includes('chatgpt')
+    const runClaude     = engines.includes('claude')
+    const promptEngines = engines.filter(e => ['gemini', 'perplexity', 'meta'].includes(e))
+    const runPrompt     = promptEngines.length > 0
+
     const { data: clientRow } = await supabase
       .from('clients')
       .select('brand_aliases, brand_website, known_competitors')
@@ -184,14 +196,15 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     const market_id     = primaryMarket?.market.id    ?? null
 
     const payload = {
-      prompt_id:     promptId,
-      prompt_text:   promptText,
-      client_id:     clientId,
-      client_config: clientConfig,
-      force:         true,
+      prompt_id:      promptId,
+      prompt_text:    promptText,
+      client_id:      clientId,
+      client_config:  clientConfig,
+      force:          true,
       market_label,
       region_label,
       market_id,
+      active_engines: promptEngines,
     }
 
     const { data: { session: singleSession } } = await supabase.auth.getSession()
@@ -199,31 +212,17 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     const singleAuthHeader: Record<string, string> = { 'Content-Type': 'application/json' }
     if (singleToken) singleAuthHeader['Authorization'] = `Bearer ${singleToken}`
 
-    // Fire all 3 functions in parallel.
-    // collect-prompt (force=true) deletes all rows first, then saves gemini/perplexity/meta.
-    // collect-claude and collect-chatgpt insert independently with their own 26s windows.
+    // Fire only functions for active engines.
+    // collect-prompt (force=true) deletes matching rows first, then saves active prompt engines.
     try {
-      await Promise.allSettled([
-        fetch('/.netlify/functions/collect-prompt', {
-          method: 'POST',
-          headers: singleAuthHeader,
-          body: JSON.stringify(payload),
-        }),
-        fetch('/.netlify/functions/collect-claude', {
-          method: 'POST',
-          headers: singleAuthHeader,
-          body: JSON.stringify(payload),
-        }),
-        fetch('/.netlify/functions/collect-chatgpt', {
-          method: 'POST',
-          headers: singleAuthHeader,
-          body: JSON.stringify(payload),
-        }),
-      ])
+      const calls: Promise<any>[] = []
+      if (runPrompt)   calls.push(fetch('/.netlify/functions/collect-prompt',  { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
+      if (runClaude)   calls.push(fetch('/.netlify/functions/collect-claude',   { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
+      if (runChatgpt)  calls.push(fetch('/.netlify/functions/collect-chatgpt', { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
+      await Promise.allSettled(calls)
     } catch { /* network blip -- caller handles UI reset */ }
 
     setLastCompletedAt(Date.now())
-    // Follow-up reloads to catch ChatGPT background saves that land after 26s
     setTimeout(() => setLastCompletedAt(Date.now()), 15000)
     setTimeout(() => setLastCompletedAt(Date.now()), 40000)
   }, [])
