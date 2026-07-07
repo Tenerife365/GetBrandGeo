@@ -20,6 +20,7 @@ import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
 
+// ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
 const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
 const ENGINE_LABEL: Record<string, string> = {
   chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
@@ -212,9 +213,10 @@ function buildRadarData(
   engineStats: Partial<Record<LLMName, EngineRow>>,
   topCompetitors: CompetitorStat[],
   aiTotal: number,
+  activeEngines: LLMName[],
 ) {
   const top3 = topCompetitors.slice(0, 3)
-  return ENGINES.map(engine => {
+  return activeEngines.map(engine => {
     const es = engineStats[engine]
     const engineTotal = es?.total ?? 0
     const brandPct = engineTotal > 0 ? Math.round((es?.mentioned ?? 0) / engineTotal * 100) : 0
@@ -231,7 +233,7 @@ function buildRadarData(
 
 export default function Competitors() {
   const { primaryMarket } = useMarket()
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, activeEngines } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [data, setData] = useState<ReturnType<typeof computeData> | null>(null)
@@ -270,13 +272,15 @@ export default function Competitors() {
       supabase.from('competitors').select('*').eq('client_id', activeClientId).eq('source', 'manual'),
     ])
 
-    setData(computeData(aiResults ?? [], prompts ?? [], brandName))
-    setAllResults(aiResults ?? [])
+    // Filter to active engines only before computing
+    const filtered = (aiResults ?? []).filter(r => activeEngines.includes(r.llm))
+    setData(computeData(filtered, prompts ?? [], brandName))
+    setAllResults(filtered)
     setManualComps(manual ?? [])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [activeClientId, brandName])
+  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
 
   const addCompetitor = async () => {
     if (!newName.trim()) return
@@ -299,7 +303,7 @@ export default function Competitors() {
   const { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap } = data!
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
   const barData    = buildBarData(brandName, brandMentions, topCompetitors)
-  const radarData  = buildRadarData(brandName, engineStats, topCompetitors, totalResponses)
+  const radarData  = buildRadarData(brandName, engineStats, topCompetitors, totalResponses, activeEngines as LLMName[])
   const radarKeys  = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendData  = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
   const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
@@ -467,7 +471,7 @@ export default function Competitors() {
             {brandAvgPos ? `#${brandAvgPos}` : '—'}
           </div>
           <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">
-            {ENGINES.filter(e => (engineStats[e]?.mentioned ?? 0) > 0).map(e => (
+            {activeEngines.filter(e => (engineStats[e]?.mentioned ?? 0) > 0).map(e => (
               <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={ENGINE_LABEL[e]} />
             ))}
           </div>
@@ -482,7 +486,7 @@ export default function Competitors() {
           </div>
         ) : (
           topCompetitors.map((c, idx) => {
-            const engineDots = ENGINES.filter(e => (c.byEngine[e] ?? 0) > 0)
+            const engineDots = activeEngines.filter(e => (c.byEngine[e] ?? 0) > 0)
             const samplePrompt = c.promptIds[0] ? promptMap.get(c.promptIds[0]) : null
             const sampleText = samplePrompt
               ? (samplePrompt.length > 60 ? samplePrompt.slice(0, 58) + '…' : samplePrompt)

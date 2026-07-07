@@ -163,10 +163,13 @@ const IMPACT_STYLE = {
 
 // ─── Stats computation ────────────────────────────────────────────────────────
 
-function computeStats(aiResults: any[], prompts: any[], brandName: string) {
+function computeStats(aiResults: any[], prompts: any[], brandName: string, activeLLMs: LLMName[]) {
+  // Filter results to only active engines before computing anything
+  const filtered = aiResults.filter(r => activeLLMs.includes(r.llm as LLMName))
+
   // Per-LLM
   const llmMap: Record<string, { total: number; mentioned: number; positions: number[] }> = {}
-  for (const r of aiResults) {
+  for (const r of filtered) {
     if (!llmMap[r.llm]) llmMap[r.llm] = { total: 0, mentioned: 0, positions: [] }
     llmMap[r.llm].total++
     if (r.brand_mentioned) {
@@ -174,7 +177,7 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
       if (r.brand_position) llmMap[r.llm].positions.push(r.brand_position)
     }
   }
-  const llmStats: LLMStat[] = (['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'] as LLMName[])
+  const llmStats: LLMStat[] = activeLLMs
     .map(llm => {
       const s = llmMap[llm] ?? { total: 0, mentioned: 0, positions: [] }
       const avgPos = s.positions.length > 0
@@ -187,7 +190,7 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
   // Per-category
   const promptMap = new Map(prompts.map((p: any) => [p.id, p]))
   const catMap: Record<string, { total: number; mentioned: number }> = {}
-  for (const r of aiResults) {
+  for (const r of filtered) {
     const prompt: any = promptMap.get(r.prompt_id)
     if (!prompt?.category) continue
     const cat = prompt.category
@@ -224,7 +227,7 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
   }
 
   const compMap: Record<string, { count: number; positions: number[] }> = {}
-  for (const r of aiResults) {
+  for (const r of filtered) {
     try {
       const comps = JSON.parse(r.competitors_mentioned || '[]')
       if (!Array.isArray(comps)) continue
@@ -251,15 +254,15 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string) {
     .slice(0, 6)
 
   // Overall brand position
-  const allPositions = aiResults
+  const allPositions = filtered
     .filter(r => r.brand_mentioned && r.brand_position)
     .map(r => r.brand_position as number)
   const avgBrandPos = allPositions.length > 0
     ? Math.round(allPositions.reduce((a, b) => a + b, 0) / allPositions.length * 10) / 10
     : null
 
-  const totalChecks    = aiResults.length
-  const totalMentioned = aiResults.filter(r => r.brand_mentioned).length
+  const totalChecks    = filtered.length
+  const totalMentioned = filtered.filter(r => r.brand_mentioned).length
   const overallRate    = totalChecks > 0 ? totalMentioned / totalChecks : 0
 
   return { llmStats, catStats, competitors, avgBrandPos, totalChecks, totalMentioned, overallRate, brandName }
@@ -452,7 +455,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Recommendations() {
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, activeEngines } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
@@ -482,7 +485,7 @@ export default function Recommendations() {
 
     setRawResults(aiResults ?? [])
     setRawPrompts(prompts ?? [])
-    const computed = computeStats(aiResults ?? [], prompts ?? [], brandName)
+    const computed = computeStats(aiResults ?? [], prompts ?? [], brandName, activeEngines as LLMName[])
     setStats(computed)
     setRecs(generateRecs(computed))
     setLoading(false)
@@ -567,7 +570,7 @@ export default function Recommendations() {
     setAiLoading(false)
   }
 
-  useEffect(() => { load() }, [activeClientId, brandName])
+  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading recommendations…</div>
 
