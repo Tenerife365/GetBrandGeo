@@ -40,3 +40,6 @@
 
 [functions."onboard-client"]
   timeout = 26
+
+[functions."purge-old-results"]
+  schedule = "0 3 * * *"
