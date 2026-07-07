@@ -11,7 +11,9 @@ export type PromptCategory =
   | 'mid' | 'large' | 'very_large' | 'general'
   | 'tool_discovery' | 'geo_category' | 'problem_based' | 'direct_brand'
 
-export type LLMName = 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
+export type LLMName =
+  | 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
+  | 'google_ai' | 'copilot' | 'deepseek' | 'grok'
 
 export interface SearchResult {
   id: number
