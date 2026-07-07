@@ -21,13 +21,15 @@ import type { LLMName } from '../types'
 // --- Types -------------------------------------------------------------------
 
 const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
-const ENGINE_LABEL: Record<LLMName, string> = {
+const ENGINE_LABEL: Record<string, string> = {
   chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
   perplexity: 'Perplexity', meta: 'Meta AI',
+  google_ai: 'Google AI', copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
 }
-const ENGINE_COLOR: Record<LLMName, string> = {
+const ENGINE_COLOR: Record<string, string> = {
   chatgpt: '#10b981', gemini: '#3b82f6', claude: '#8b5cf6',
   perplexity: '#06b6d4', meta: '#f59e0b',
+  google_ai: '#ef4444', copilot: '#38bdf8', deepseek: '#818cf8', grok: '#94a3b8',
 }
 const RADAR_COLORS = ['#1f9baa', '#ef4444', '#f59e0b', '#8b5cf6']
 

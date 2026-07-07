@@ -57,17 +57,22 @@ interface CompetitorStat {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LLM_LABEL: Record<LLMName, string> = {
+const LLM_LABEL: Record<string, string> = {
   chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
   perplexity: 'Perplexity', meta: 'Meta AI',
+  google_ai: 'Google AI', copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
 }
 
-const LLM_COLOR: Record<LLMName, string> = {
+const LLM_COLOR: Record<string, string> = {
   chatgpt:    'bg-emerald-500/15 text-emerald-400',
   gemini:     'bg-blue-500/15 text-blue-400',
   claude:     'bg-violet-500/15 text-violet-400',
   perplexity: 'bg-cyan-500/15 text-cyan-400',
   meta:       'bg-amber-500/15 text-amber-400',
+  google_ai:  'bg-red-500/15 text-red-400',
+  copilot:    'bg-sky-500/15 text-sky-400',
+  deepseek:   'bg-indigo-500/15 text-indigo-400',
+  grok:       'bg-slate-500/15 text-slate-400',
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -80,16 +85,20 @@ const CATEGORY_LABEL: Record<string, string> = {
 }
 
 /** Per-LLM explanation of what drives its recommendations */
-const LLM_SOURCE: Record<LLMName, string> = {
+const LLM_SOURCE: Record<string, string> = {
   chatgpt:    'ChatGPT sources from web crawl data and Bing search — backlinks, directory listings, and well-indexed pages drive its recommendations.',
   gemini:     "Gemini is deeply integrated with Google's ecosystem — Google Business Profile, Google Maps, and Google-indexed structured data are the fastest path to appearing here.",
   claude:     'Claude sources from high-quality web content — authoritative pages, reputable citations, and clear brand descriptions help most.',
   perplexity: 'Perplexity uses real-time web search — fresh, well-indexed content on platforms it actively crawls appears fastest.',
   meta:       'Meta AI combines web search with social signals — LinkedIn company pages, Facebook presence, and web directory listings all contribute.',
+  google_ai:  'Google AI uses Google Search index data — being well-indexed and having structured data on your site helps most.',
+  copilot:    'Copilot leverages Bing search index — ensuring your site is crawlable and listed on Bing-indexed directories boosts visibility.',
+  deepseek:   'DeepSeek sources from high-quality web content — comprehensive, well-structured pages with clear brand information perform best.',
+  grok:       'Grok uses real-time web data and X/Twitter — an active social presence combined with fresh indexed content helps visibility.',
 }
 
 /** Fastest fixes per LLM (generic enough for any client) */
-const LLM_QUICK_WINS: Record<LLMName, string[]> = {
+const LLM_QUICK_WINS: Record<string, string[]> = {
   chatgpt: [
     'Get listed on 3+ authoritative directories in your industry (Tripadvisor, Trustpilot, G2, etc.) — ChatGPT reads these directly',
     'Publish 2+ pieces of content in the past 90 days — ChatGPT weights recently indexed pages',
@@ -119,6 +128,30 @@ const LLM_QUICK_WINS: Record<LLMName, string[]> = {
     'Ensure your Facebook Business Page is complete if relevant to your audience',
     'List on web directories Meta AI crawls: Trustpilot, Capterra, local and industry business directories',
     'Publish LinkedIn content mentioning your key services — these surface in Meta AI responses',
+  ],
+  google_ai: [
+    'Ensure your site is fully indexed in Google Search Console with no crawl errors',
+    'Complete your Google Business Profile with all categories, services, and photos',
+    'Add structured data (Organization, LocalBusiness) to your homepage',
+    'Earn backlinks from authoritative, Google-trusted domains in your industry',
+  ],
+  copilot: [
+    'Submit your site to Bing Webmaster Tools and verify indexing',
+    'List on Bing-indexed directories and review platforms',
+    'Ensure your site loads quickly and is mobile-friendly',
+    'Publish clear, factual content about your brand and services',
+  ],
+  deepseek: [
+    'Publish comprehensive, well-structured content about your brand and services',
+    'Ensure your site has clear navigation and is easy to crawl',
+    'Build authoritative backlinks from established industry publications',
+    'Create a dedicated About page with verifiable company information',
+  ],
+  grok: [
+    'Maintain an active presence on X (Twitter) with regular updates about your brand',
+    'Ensure your site is indexed and well-structured for web search',
+    'Publish timely content and news updates — Grok weights recency',
+    'Earn mentions in recently published online articles and news sites',
   ],
 }
 
