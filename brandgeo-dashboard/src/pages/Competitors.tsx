@@ -195,15 +195,35 @@ const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : 
 
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
-    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#1f9baa', isYou: true },
+    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#8b5cf6', isYou: true },
     ...topCompetitors.map((c, i) => ({
       name: short(c.name),
       fullName: c.name,
       mentions: c.totalMentions,
-      fill: ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#10b981'][i],
+      fill: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#f97316'][i],
       isYou: false,
     })),
   ]
+}
+
+/** One row per active engine; columns = brand + top 3 competitors (% of prompts) */
+function buildEngineGroupData(
+  brandName: string,
+  engineStats: Partial<Record<LLMName, EngineRow>>,
+  topCompetitors: CompetitorStat[],
+  activeEngines: LLMName[],
+): Record<string, string | number>[] {
+  return activeEngines
+    .filter(e => (engineStats[e]?.total ?? 0) > 0)
+    .map(engine => {
+      const es = engineStats[engine]!
+      const row: Record<string, string | number> = { engine: ENGINE_LABEL[engine] }
+      row[brandName] = es.total > 0 ? Math.round(es.mentioned / es.total * 100) : 0
+      for (const comp of topCompetitors.slice(0, 3)) {
+        row[comp.name] = es.total > 0 ? Math.round((comp.byEngine[engine] ?? 0) / es.total * 100) : 0
+      }
+      return row
+    })
 }
 
 // --- Main component ----------------------------------------------------------
@@ -279,8 +299,11 @@ export default function Competitors() {
 
   const { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap } = data!
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
-  const barData    = buildBarData(brandName, brandMentions, topCompetitors)
-  const trendData  = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
+  const barData         = buildBarData(brandName, brandMentions, topCompetitors)
+  const engineGroupData = buildEngineGroupData(brandName, engineStats, topCompetitors, activeEngines as LLMName[])
+  const groupColors     = ['#8b5cf6', '#ef4444', '#f59e0b', '#3b82f6']
+  const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
+  const trendData       = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
   const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
 
   return (
@@ -396,64 +419,29 @@ export default function Competitors() {
             </ResponsiveContainer>
           </div>
 
-          {/* Peec-style visibility % bar chart */}
+          {/* Grouped bar chart — visibility % per AI engine per brand */}
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
-              AI Visibility Rate
+              Visibility by Engine
             </h2>
-            <p className="text-[11px] text-slate-600 mb-5">% of AI responses where each brand appears</p>
-            {(() => {
-              const entries = [
-                { name: brandName, mentions: brandMentions, isYou: true,  color: '#8b5cf6' },
-                ...topCompetitors.slice(0, 4).map((c, i) => ({
-                  name: c.name,
-                  mentions: c.totalMentions,
-                  isYou: false,
-                  color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'][i],
-                })),
-              ]
-              const maxMentions = Math.max(...entries.map(e => e.mentions), 1)
-              return (
-                <div className="flex items-end gap-3 h-40">
-                  {entries.map(e => {
-                    const pct = totalResponses > 0 ? Math.round(e.mentions / totalResponses * 100) : 0
-                    const barH = maxMentions > 0 ? Math.max((e.mentions / maxMentions) * 100, 4) : 4
-                    const initials = e.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-                    return (
-                      <div key={e.name} className="flex-1 flex flex-col items-center gap-1.5">
-                        {/* Avatar */}
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                          style={{ background: e.color, opacity: e.isYou ? 1 : 0.75 }}
-                        >
-                          {initials}
-                        </div>
-                        {/* Bar */}
-                        <div className="w-full flex-1 flex items-end">
-                          <div
-                            className="w-full rounded-t-md transition-all duration-500"
-                            style={{
-                              height: `${barH}%`,
-                              background: e.isYou
-                                ? `linear-gradient(180deg, ${e.color} 0%, ${e.color}88 100%)`
-                                : `linear-gradient(180deg, ${e.color}99 0%, ${e.color}33 100%)`,
-                            }}
-                          />
-                        </div>
-                        {/* Label */}
-                        <div className="text-[11px] font-semibold tabular-nums" style={{ color: e.color }}>
-                          {pct}%
-                        </div>
-                        <div className="text-[10px] text-slate-600 truncate w-full text-center leading-tight">
-                          {e.name.split(' ')[0]}
-                          {e.isYou && <span className="ml-0.5 text-[9px] text-slate-500">(you)</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })()}
+            <p className="text-[11px] text-slate-600 mb-3">% of prompts where each brand appears, per AI engine</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={engineGroupData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="engine" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#cbd5e1', fontSize: 12 }}
+                  itemStyle={{ fontSize: 11 }}
+                  formatter={(v: any) => [`${v}%`]}
+                />
+                <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 6 }} />
+                {groupKeys.map((key, i) => (
+                  <Bar key={key} dataKey={key} fill={groupColors[i]} radius={[3, 3, 0, 0]} maxBarSize={28} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
