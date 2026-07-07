@@ -80,11 +80,26 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setIsAdmin(admin)
 
       if (admin) {
-        const { data: allClients } = await supabase
+        const { data: allClients, error: clientsErr } = await supabase
           .from('clients')
           .select(CLIENT_SELECT)
           .order('id')
-        if (allClients) {
+
+        if (clientsErr) {
+          // New columns (plan, engines_enabled) may not exist yet — fallback to base columns
+          console.warn('[ClientCtx] full select failed (run DB migration):', clientsErr.message)
+          const { data: fallback } = await supabase
+            .from('clients')
+            .select('id, name, slug')
+            .order('id')
+          if (fallback) {
+            const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null }))
+            setClients(withDefaults as Client[])
+            const validId = withDefaults.find(c => c.id === saved)?.id ?? withDefaults[0]?.id ?? 1
+            setActiveClientIdState(validId)
+            setActiveClient((withDefaults.find(c => c.id === validId) ?? withDefaults[0] ?? null) as Client | null)
+          }
+        } else if (allClients) {
           setClients(allClients as Client[])
           const validId = allClients.find(c => c.id === saved)?.id ?? allClients[0]?.id ?? 1
           setActiveClientIdState(validId)
@@ -94,12 +109,22 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         const cid = profile.client_id ?? 1
         setActiveClientIdState(cid)
         setClients([])
-        const { data: myClient } = await supabase
+        const { data: myClient, error: myClientErr } = await supabase
           .from('clients')
           .select(CLIENT_SELECT)
           .eq('id', cid)
           .single()
-        if (myClient) setActiveClient(myClient as Client)
+        if (myClientErr) {
+          console.warn('[ClientCtx] client select failed (run DB migration):', myClientErr.message)
+          const { data: fallback } = await supabase
+            .from('clients')
+            .select('id, name, slug')
+            .eq('id', cid)
+            .single()
+          if (fallback) setActiveClient({ ...fallback, plan: 'essentials', engines_enabled: null } as Client)
+        } else if (myClient) {
+          setActiveClient(myClient as Client)
+        }
       }
       setLoading(false)
     }
