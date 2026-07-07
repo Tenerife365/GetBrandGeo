@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useTheme } from '../lib/themeContext'
@@ -109,7 +109,11 @@ export default function Login() {
           )}
 
         </div>
-        <p className="text-center text-xs text-slate-600 mt-6">2026 BrandGEO - AI Visibility Intelligence</p>
+        <p className="text-center text-xs text-slate-500 mt-4">
+          Don't have an account?{' '}
+          <Link to="/signup" className="text-brand-400 hover:text-brand-300 transition-colors">Sign up free</Link>
+        </p>
+        <p className="text-center text-xs text-slate-600 mt-3">2026 BrandGEO - AI Visibility Intelligence</p>
       </div>
     </div>
   )

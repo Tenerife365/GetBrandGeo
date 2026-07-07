@@ -43,3 +43,6 @@
 
 [functions."purge-old-results"]
   schedule = "0 3 * * *"
+
+[functions."signup-client"]
+  timeout = 15

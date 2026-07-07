@@ -10,6 +10,7 @@ import { TimeFilterProvider } from './lib/timeFilterContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
+import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Mentions from './pages/Mentions'
 import Competitors from './pages/Competitors'
@@ -58,6 +59,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<DemoLoginInterceptor />} />
+              <Route path="/signup" element={<Signup />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
               <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
