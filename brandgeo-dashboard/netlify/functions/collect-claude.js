@@ -12,6 +12,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
+const { requireAuth } = require('./_auth')
 
 // ─── Geo context ──────────────────────────────────────────────────────────────
 
@@ -294,22 +295,30 @@ async function callClaude(prompt, ctx) {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  const auth = await requireAuth(event)
+  if (auth.response) return auth.response
+
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: auth.headers, body: 'Method Not Allowed' }
 
   const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
 
   let body
   try { body = JSON.parse(event.body) } catch {
-    return { statusCode: 400, body: 'Invalid JSON' }
+    return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' }
   }
 
   const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label } = body
 
   if (!prompt_id || !prompt_text || !client_id || !client_config)
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
+
+  // Client ownership check
+  if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
+    return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-  console.log(`[Claude/${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
+  console.log(`[Claude/${invId}] user:${auth.user.id} prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
 
   // For non-force: skip if Claude already ran this month
   if (!force) {
@@ -321,7 +330,7 @@ exports.handler = async (event) => {
       .gte('checked_at', monthStart.toISOString())
     if (existing?.length > 0) {
       console.log(`[Claude/${invId}] already ran this month — skipping`)
-      return { statusCode: 200, body: JSON.stringify({ skipped: true, llm: 'claude' }) }
+      return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, llm: 'claude' }) }
     }
   }
 
@@ -339,14 +348,14 @@ exports.handler = async (event) => {
 
   if (!text) {
     console.warn(`[Claude/${invId}] no text — nothing saved`)
-    return { statusCode: 200, body: JSON.stringify({ done: false, llm: 'claude', reason: 'no_response' }) }
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'claude', reason: 'no_response' }) }
   }
 
   let analysis
   try { analysis = analyseResponse(text, client_config) }
   catch (e) {
     console.error(`[Claude/${invId}] analyseResponse threw:`, e.message)
-    return { statusCode: 200, body: JSON.stringify({ done: false, llm: 'claude', reason: 'analysis_error' }) }
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'claude', reason: 'analysis_error' }) }
   }
 
   const { error: insErr } = await supabase.from('ai_results').insert([{
@@ -363,12 +372,13 @@ exports.handler = async (event) => {
 
   if (insErr) {
     console.error(`[Claude/${invId}] insert FAILED:`, insErr.message)
-    return { statusCode: 200, body: JSON.stringify({ done: false, llm: 'claude', reason: 'insert_error', detail: insErr.message }) }
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'claude', reason: 'insert_error', detail: insErr.message }) }
   }
 
   console.log(`[Claude/${invId}] saved | mentioned:${analysis.brand_mentioned} | position:${analysis.brand_position} | sentiment:${analysis.sentiment}`)
   return {
     statusCode: 200,
+    headers: auth.headers,
     body: JSON.stringify({ done: true, llm: 'claude', summary: { brand_mentioned: analysis.brand_mentioned } }),
   }
 }

@@ -11,6 +11,16 @@
   # VITE_SUPABASE_URL (same value) is inlined by Vite, so Netlify's scanner flags it.
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

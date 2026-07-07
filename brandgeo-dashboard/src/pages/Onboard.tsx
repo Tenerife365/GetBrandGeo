@@ -60,9 +60,14 @@ export default function Onboard() {
   const handleCreate = async () => {
     setCreating(true); setError(null)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
       const res = await fetch('/.netlify/functions/onboard-client', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           name, slug,
           brand_website:    website,
@@ -115,6 +120,9 @@ export default function Onboard() {
 
     setProgress({ total: prompts.length, done: 0, current: '', errors: 0, finished: false })
 
+    const { data: { session: collSession } } = await supabase.auth.getSession()
+    const collToken = collSession?.access_token ?? ''
+
     let errors = 0
     for (let i = 0; i < prompts.length; i++) {
       const p = prompts[i]
@@ -122,7 +130,10 @@ export default function Onboard() {
       try {
         const res = await fetch('/.netlify/functions/collect-prompt', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(collToken ? { 'Authorization': `Bearer ${collToken}` } : {}),
+          },
           body: JSON.stringify({
             prompt_id:     p.id,
             prompt_text:   p.text,

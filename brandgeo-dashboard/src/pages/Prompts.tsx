@@ -125,9 +125,14 @@ export default function Prompts() {
     setAiLoading(true)
     setSuggestions([])
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
       const res = await fetch('/.netlify/functions/suggest-prompts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           messages: [
             { role: 'system', content: buildSystemPrompt(name, website) },
@@ -240,9 +245,14 @@ export default function Prompts() {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 30000)
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
       const res = await fetch('/.netlify/functions/suggest-prompts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         signal: controller.signal,
         body: JSON.stringify({
           messages: [

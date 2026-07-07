@@ -96,6 +96,11 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       const region_label  = primaryMarket?.region.label ?? null
       const market_id     = primaryMarket?.market.id    ?? null
 
+      // Get auth token once for all fetch calls
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const authHeader = token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' }
+
       for (let i = 0; i < prompts.length; i++) {
         if (abortRef.current) break
 
@@ -120,17 +125,17 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           const [fastRes, claudeRes, chatgptRes] = await Promise.allSettled([
             fetch('/.netlify/functions/collect-prompt', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: authHeader,
               body: JSON.stringify(payload),
             }).then(r => r.json().catch(() => null)),
             fetch('/.netlify/functions/collect-claude', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: authHeader,
               body: JSON.stringify(payload),
             }).then(r => r.json().catch(() => null)),
             fetch('/.netlify/functions/collect-chatgpt', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: authHeader,
               body: JSON.stringify(payload),
             }).then(r => r.json().catch(() => null)),
           ])
@@ -188,6 +193,12 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       market_id,
     }
 
+    const { data: { session: singleSession } } = await supabase.auth.getSession()
+    const singleToken = singleSession?.access_token ?? ''
+    const singleAuthHeader = singleToken
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${singleToken}` }
+      : { 'Content-Type': 'application/json' }
+
     // Fire all 3 functions in parallel.
     // collect-prompt (force=true) deletes all rows first, then saves gemini/perplexity/meta.
     // collect-claude and collect-chatgpt insert independently with their own 26s windows.
@@ -195,17 +206,17 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       await Promise.allSettled([
         fetch('/.netlify/functions/collect-prompt', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: singleAuthHeader,
           body: JSON.stringify(payload),
         }),
         fetch('/.netlify/functions/collect-claude', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: singleAuthHeader,
           body: JSON.stringify(payload),
         }),
         fetch('/.netlify/functions/collect-chatgpt', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: singleAuthHeader,
           body: JSON.stringify(payload),
         }),
       ])

@@ -18,12 +18,17 @@
  *   { recommendations: [ { title, insight, action, engines, priority } ] }
  */
 
+const { requireAuth } = require('./_auth')
+
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  const auth = await requireAuth(event)
+  if (auth.response) return auth.response
+
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: auth.headers, body: 'Method Not Allowed' }
 
   let body
   try { body = JSON.parse(event.body) } catch {
-    return { statusCode: 400, body: 'Invalid JSON' }
+    return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' }
   }
 
   const {
@@ -35,10 +40,10 @@ exports.handler = async (event) => {
     prompts            = [],
   } = body
 
-  if (!brand_name) return { statusCode: 400, body: JSON.stringify({ error: 'brand_name required' }) }
+  if (!brand_name) return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'brand_name required' }) }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not set' }) }
+  if (!apiKey) return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not set' }) }
 
   // --- Build prompt -------------------------------------------------------
 
@@ -140,7 +145,7 @@ Return ONLY this JSON (no markdown, no explanation outside it):
     const msg = await r.json()
     if (msg.error) {
       console.error('[GenRec] Anthropic error:', JSON.stringify(msg.error))
-      return { statusCode: 200, body: JSON.stringify({ error: msg.error.message ?? 'anthropic_error' }) }
+      return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ error: msg.error.message ?? 'anthropic_error' }) }
     }
 
     const raw = msg.content?.[0]?.type === 'text' ? msg.content[0].text.trim() : ''
@@ -162,18 +167,18 @@ Return ONLY this JSON (no markdown, no explanation outside it):
     let parsed
     try { parsed = JSON.parse(jsonStr) } catch (e) {
       console.error('[GenRec] parse failed:', e.message, '| extracted:', jsonStr.slice(0, 300))
-      return { statusCode: 200, body: JSON.stringify({ error: `JSON parse failed: ${e.message}. Raw starts: ${raw.slice(0, 120)}` }) }
+      return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ error: `JSON parse failed: ${e.message}. Raw starts: ${raw.slice(0, 120)}` }) }
     }
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: auth.headers,
       body: JSON.stringify(parsed),
     }
   } catch (e) {
     clearTimeout(killTimer)
     const msg = e.name === 'AbortError' ? 'Request timed out — try again' : (e.message ?? 'unknown_error')
     console.error('[GenRec] threw:', msg)
-    return { statusCode: 200, body: JSON.stringify({ error: msg }) }
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ error: msg }) }
   }
 }

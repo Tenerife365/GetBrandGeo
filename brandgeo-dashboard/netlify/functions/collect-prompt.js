@@ -15,6 +15,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
+const { requireAuth } = require('./_auth')
 
 // ─── Geographic / language context ───────────────────────────────────────────
 // Without geo context, API calls from our US Netlify server return US-centric
@@ -461,20 +462,29 @@ async function callOpenRouter(model, prompt, ctx) {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  // Auth: verify JWT + origin (client ownership checked after body parse)
+  const auth = await requireAuth(event)
+  if (auth.response) return auth.response
+
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: auth.headers, body: 'Method Not Allowed' }
 
   // Unique ID per invocation — disambiguates interleaved logs from warm-start container reuse
   const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
 
   let body
-  try { body = JSON.parse(event.body) } catch { return { statusCode: 400, body: 'Invalid JSON' } }
+  try { body = JSON.parse(event.body) } catch { return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' } }
 
   const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label, market_id } = body
   if (!prompt_id || !prompt_text || !client_id || !client_config)
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
+
+  // Viewers may only collect for their own client
+  if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
+    return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-  console.log(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force}`)
+  console.log(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force} user:${auth.user.id}`)
 
   // Build geo context — explicit market takes priority over TLD inference
   const ctx = buildSystemContext(client_config, market_label, region_label)
