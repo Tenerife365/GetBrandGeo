@@ -568,9 +568,9 @@ export default function AIVisibility() {
         <div className="flex flex-col items-center gap-3">
           <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
-              <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#06b6d4" />
-                <stop offset="100%" stopColor="#818cf8" />
+              <linearGradient id="scoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#c4b5fd" />
+                <stop offset="100%" stopColor="#6d28d9" />
               </linearGradient>
               <filter id="scoreGlow" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
@@ -610,13 +610,13 @@ export default function AIVisibility() {
                   <span className="text-sm font-medium text-slate-300">{d.label}</span>
                   <span className="ml-2 text-xs text-slate-600">{d.desc}</span>
                 </div>
-                <span className={`text-sm font-bold tabular-nums ${d.value >= 60 ? 'text-emerald-400' : d.value >= 35 ? 'text-amber-400' : 'text-red-400'}`}>
+                <span className={`text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
                   {d.value}%
                 </span>
               </div>
               <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${d.value >= 60 ? 'bg-emerald-400' : d.value >= 35 ? 'bg-amber-400' : 'bg-red-400'}`}
+                  className="h-full rounded-full transition-all bg-brand-500"
                   style={{ width: `${d.value}%` }}
                 />
               </div>
@@ -631,9 +631,9 @@ export default function AIVisibility() {
         {/* Active engine cards */}
         {engineStatusCards.map(e => {
           const statusStyles = {
-            KNOW:    { badge: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30', dot: 'bg-emerald-400', card: 'border-emerald-500/20' },
-            PARTIAL: { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',     dot: 'bg-amber-400',   card: 'border-amber-500/20'   },
-            MISSING: { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',           dot: 'bg-red-400',     card: 'border-red-500/20'     },
+            KNOW:    { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400', card: 'border-brand-500/20' },
+            PARTIAL: { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400', card: 'border-amber-500/20' },
+            MISSING: { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',   card: 'border-red-500/20'   },
           }[e.status]
           return (
             <div key={e.id} className={`bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
@@ -644,7 +644,7 @@ export default function AIVisibility() {
                 {e.status}
               </div>
               <div className="text-center">
-                <div className={`text-2xl font-bold tabular-nums ${e.pct >= 50 ? 'text-emerald-400' : e.pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
+                <div className={`text-2xl font-bold tabular-nums ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>
                   {e.pct}%
                 </div>
                 <div className="text-xs text-slate-600 mt-0.5">{e.mentioned}/{e.checked} prompts</div>
