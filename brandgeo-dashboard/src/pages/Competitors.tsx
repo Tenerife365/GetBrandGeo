@@ -8,7 +8,6 @@
 import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  RadarChart, PolarGrid, PolarAngleAxis, Radar, Legend,
   LineChart, Line, CartesianGrid,
 } from 'recharts'
 import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown } from 'lucide-react'
@@ -32,7 +31,6 @@ const ENGINE_COLOR: Record<string, string> = {
   perplexity: '#06b6d4', meta: '#f59e0b',
   google_ai: '#ef4444', copilot: '#38bdf8', deepseek: '#818cf8', grok: '#94a3b8',
 }
-const RADAR_COLORS = ['#1f9baa', '#ef4444', '#f59e0b', '#8b5cf6']
 
 interface EngineRow { total: number; mentioned: number; positions: number[] }
 
@@ -208,27 +206,6 @@ function buildBarData(brandName: string, brandMentions: number, topCompetitors: 
   ]
 }
 
-function buildRadarData(
-  brandName: string,
-  engineStats: Partial<Record<LLMName, EngineRow>>,
-  topCompetitors: CompetitorStat[],
-  aiTotal: number,
-  activeEngines: LLMName[],
-) {
-  const top3 = topCompetitors.slice(0, 3)
-  return activeEngines.map(engine => {
-    const es = engineStats[engine]
-    const engineTotal = es?.total ?? 0
-    const brandPct = engineTotal > 0 ? Math.round((es?.mentioned ?? 0) / engineTotal * 100) : 0
-    const row: Record<string, string | number> = { engine: ENGINE_LABEL[engine], [brandName]: brandPct }
-    for (const comp of top3) {
-      const compCount = comp.byEngine[engine] ?? 0
-      row[comp.name] = engineTotal > 0 ? Math.round(compCount / engineTotal * 100) : 0
-    }
-    return row
-  })
-}
-
 // --- Main component ----------------------------------------------------------
 
 export default function Competitors() {
@@ -303,8 +280,6 @@ export default function Competitors() {
   const { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap } = data!
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
   const barData    = buildBarData(brandName, brandMentions, topCompetitors)
-  const radarData  = buildRadarData(brandName, engineStats, topCompetitors, totalResponses, activeEngines as LLMName[])
-  const radarKeys  = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendData  = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
   const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
 
@@ -359,7 +334,7 @@ export default function Competitors() {
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">AI responses analysed</div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{totalResponses}</div>
-          <div className="text-xs text-slate-500 mt-0.5">across 5 engines</div>
+          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engines</div>
         </div>
       </div>
 
@@ -421,29 +396,64 @@ export default function Competitors() {
             </ResponsiveContainer>
           </div>
 
-          {/* Radar — engine visibility profile */}
+          {/* Peec-style visibility % bar chart */}
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-              Visibility by Engine — {brandName} vs Top 3
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
+              AI Visibility Rate
             </h2>
-            <p className="text-[11px] text-slate-600 mb-3">% of each engine's responses where entity appears</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <RadarChart data={radarData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
-                <PolarGrid stroke="#334155" />
-                <PolarAngleAxis dataKey="engine" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                {radarKeys.map((key, i) => (
-                  <Radar key={key} name={key} dataKey={key}
-                    stroke={RADAR_COLORS[i]} fill={RADAR_COLORS[i]} fillOpacity={i === 0 ? 0.2 : 0.08}
-                    strokeWidth={i === 0 ? 2 : 1.5}
-                  />
-                ))}
-                <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 4 }} />
-                <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                  formatter={(v: any) => [`${v}%`]}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
+            <p className="text-[11px] text-slate-600 mb-5">% of AI responses where each brand appears</p>
+            {(() => {
+              const entries = [
+                { name: brandName, mentions: brandMentions, isYou: true,  color: '#8b5cf6' },
+                ...topCompetitors.slice(0, 4).map((c, i) => ({
+                  name: c.name,
+                  mentions: c.totalMentions,
+                  isYou: false,
+                  color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'][i],
+                })),
+              ]
+              const maxMentions = Math.max(...entries.map(e => e.mentions), 1)
+              return (
+                <div className="flex items-end gap-3 h-40">
+                  {entries.map(e => {
+                    const pct = totalResponses > 0 ? Math.round(e.mentions / totalResponses * 100) : 0
+                    const barH = maxMentions > 0 ? Math.max((e.mentions / maxMentions) * 100, 4) : 4
+                    const initials = e.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+                    return (
+                      <div key={e.name} className="flex-1 flex flex-col items-center gap-1.5">
+                        {/* Avatar */}
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                          style={{ background: e.color, opacity: e.isYou ? 1 : 0.75 }}
+                        >
+                          {initials}
+                        </div>
+                        {/* Bar */}
+                        <div className="w-full flex-1 flex items-end">
+                          <div
+                            className="w-full rounded-t-md transition-all duration-500"
+                            style={{
+                              height: `${barH}%`,
+                              background: e.isYou
+                                ? `linear-gradient(180deg, ${e.color} 0%, ${e.color}88 100%)`
+                                : `linear-gradient(180deg, ${e.color}99 0%, ${e.color}33 100%)`,
+                            }}
+                          />
+                        </div>
+                        {/* Label */}
+                        <div className="text-[11px] font-semibold tabular-nums" style={{ color: e.color }}>
+                          {pct}%
+                        </div>
+                        <div className="text-[10px] text-slate-600 truncate w-full text-center leading-tight">
+                          {e.name.split(' ')[0]}
+                          {e.isYou && <span className="ml-0.5 text-[9px] text-slate-500">(you)</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

@@ -45,8 +45,8 @@ html.light .text-slate-600   { color: rgb(148 163 184) !important; }
 
 html.light .text-brand-100   { color: rgb(15 23 42)   !important; }
 html.light .text-brand-200   { color: rgb(15 23 42)   !important; }
-html.light .text-brand-300   { color: rgb(27 125 142) !important; }
-html.light .text-brand-400   { color: rgb(27 125 142) !important; }
+html.light .text-brand-300   { color: rgb(109 40 217) !important; }
+html.light .text-brand-400   { color: rgb(109 40 217) !important; }
 html.light .text-emerald-400 { color: rgb(5 150 105) !important; }
 html.light .text-red-400     { color: rgb(220 38 38) !important; }
 html.light .text-amber-400   { color: rgb(180 83 9) !important; }
@@ -72,7 +72,7 @@ html.light textarea::placeholder {
 }
 
 html.light .bg-brand-500\/20 {
-  background-color: rgba(27, 125, 142, 0.15) !important;
+  background-color: rgba(139, 92, 246, 0.15) !important;
 }
 
 @layer utilities {
