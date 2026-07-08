@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- Privacy-friendly analytics by Plausible -->
+  <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
+  <script src="plausible-init.js"></script>
+  <title>Terms &amp; Conditions — BrandGEO</title>
+  <meta name="description" content="Terms and Conditions for BrandGEO AI Visibility Intelligence services, including pricing, free audit policy, cancellation, and governing law.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508; --s: #0e0e17; --s2: #12121c;
+      --bd: rgba(255,255,255,.07); --bd2: rgba(255,255,255,.13);
+      --ac: #6c63ff; --ac2: #00d4aa;
+      --t: #ffffff; --t2: rgba(255,255,255,.6); --t3: rgba(255,255,255,.35);
+      --nav: rgba(5,5,8,.85); --r: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f7f7fc; --s: #ffffff; --s2: #f4f4fb;
+      --bd: rgba(0,0,0,.08); --bd2: rgba(0,0,0,.14);
+      --t: #09090f; --t2: rgba(9,9,15,.58); --t3: rgba(9,9,15,.35);
+      --nav: rgba(247,247,252,.88);
+    }
+    body { background: var(--bg); color: var(--t); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; transition: background .3s, color .3s; }
+
+    /* NAV */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid var(--bd); position: sticky; top: 0; background: var(--nav); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
+    .logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
+    nav a:hover { color: var(--t); }
+    .nav-cta { background: var(--ac) !important; color: #fff !important; padding: 8px 18px; border-radius: 8px; font-weight: 700; margin-left: 16px !important; }
+    .nav-cta:hover { opacity: .9; }
+    .theme-toggle { background: none; border: 1px solid var(--bd2); color: var(--t2); cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-left: 12px; flex-shrink: 0; transition: border-color .15s, color .15s; }
+    .theme-toggle:hover { border-color: var(--ac); color: var(--ac); }
+
+    /* HERO */
+    .page-hero { padding: 64px 40px 48px; max-width: 760px; margin: 0 auto; text-align: center; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: rgba(180,175,255,.9); padding: 6px 14px; border-radius: 30px; font-size: 0.72rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 24px; }
+    .page-hero h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 900; letter-spacing: -.05em; margin-bottom: 14px; color: var(--t); }
+    .page-hero p { color: var(--t2); font-size: 0.9rem; line-height: 1.7; }
+    .effective-date { display: inline-block; margin-top: 12px; font-size: 0.8rem; color: var(--t3); background: var(--s); border: 1px solid var(--bd); padding: 4px 14px; border-radius: 20px; }
+
+    /* DOC LAYOUT */
+    .doc-wrap { max-width: 820px; margin: 0 auto; padding: 0 40px 80px; }
+    .doc-toc { background: var(--s); border: 1px solid var(--bd); border-radius: var(--r); padding: 24px 28px; margin-bottom: 48px; }
+    .doc-toc h3 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ac2); margin-bottom: 14px; }
+    .doc-toc ol { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+    .doc-toc li a { color: var(--t2); text-decoration: none; font-size: 0.88rem; transition: color .15s; }
+    .doc-toc li a:hover { color: var(--ac); }
+
+    .doc-section { margin-bottom: 48px; scroll-margin-top: 80px; }
+    .doc-section h2 { font-size: 1.15rem; font-weight: 800; letter-spacing: -.03em; color: var(--t); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--bd); }
+    .doc-section h3 { font-size: 0.95rem; font-weight: 700; color: var(--t); margin: 20px 0 8px; }
+    .doc-section p { color: var(--t2); font-size: 0.9rem; line-height: 1.8; margin-bottom: 12px; }
+    .doc-section p:last-child { margin-bottom: 0; }
+    .doc-section ul, .doc-section ol { padding-left: 18px; margin-bottom: 12px; }
+    .doc-section li { color: var(--t2); font-size: 0.9rem; line-height: 1.75; margin-bottom: 6px; }
+    .doc-section strong { color: var(--t); }
+    .doc-section a { color: var(--ac); text-decoration: none; }
+    .doc-section a:hover { text-decoration: underline; }
+
+    /* Pricing table */
+    .pricing-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; }
+    .pricing-table th { background: var(--s2); color: var(--t); font-weight: 700; padding: 10px 14px; text-align: left; border: 1px solid var(--bd2); }
+    .pricing-table td { padding: 10px 14px; border: 1px solid var(--bd); color: var(--t2); vertical-align: top; }
+    .pricing-table tr:hover td { background: var(--s2); }
+    .tag-free { color: var(--ac2); font-weight: 700; }
+    .tag-monthly { color: var(--ac); font-weight: 700; }
+    .tag-yearly { color: #a78bfa; font-weight: 700; }
+
+    /* Highlight box */
+    .info-box { background: rgba(108,99,255,.06); border: 1px solid rgba(108,99,255,.18); border-radius: 10px; padding: 16px 18px; margin: 16px 0; }
+    .info-box p { color: var(--t2); font-size: 0.88rem; margin: 0; }
+    .info-box strong { color: var(--ac); }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--bd); padding: 28px 40px; }
+    .footer-bottom { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; color: var(--t3); }
+    .footer-bottom a { color: var(--t3); text-decoration: none; transition: color .15s; }
+    .footer-bottom a:hover { color: var(--t); }
+
+    @media(max-width:640px) {
+      nav { padding: 14px 20px; }
+      nav a:not(.nav-cta) { display: none; }
+      .page-hero, .doc-wrap { padding-left: 20px; padding-right: 20px; }
+      .pricing-table { font-size: 0.8rem; }
+      .pricing-table th, .pricing-table td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="logo.png" alt="BrandGEO" style="height:30px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
+  </div>
+</nav>
+
+<div class="page-hero">
+  <div class="hero-badge">Legal</div>
+  <h1>Terms &amp; Conditions</h1>
+  <p>These terms govern your use of BrandGEO services, including the free audit, monthly subscription, and yearly subscription. Please read them carefully.</p>
+  <div class="effective-date">Effective date: 1 July 2026</div>
+</div>
+
+<div class="doc-wrap">
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="doc-toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#definitions">Definitions</a></li>
+      <li><a href="#services">Services Overview</a></li>
+      <li><a href="#free-audit">Free Audit Plan</a></li>
+      <li><a href="#paid-plans">Paid Plans &amp; Pricing</a></li>
+      <li><a href="#payment">Payment Terms</a></li>
+      <li><a href="#cancellation">Cancellation &amp; Refund Policy</a></li>
+      <li><a href="#acceptable-use">Acceptable Use</a></li>
+      <li><a href="#data">Data &amp; Privacy</a></li>
+      <li><a href="#liability">Limitation of Liability</a></li>
+      <li><a href="#changes">Changes to These Terms</a></li>
+      <li><a href="#governing-law">Governing Law</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. DEFINITIONS -->
+  <div class="doc-section" id="definitions">
+    <h2>1. Definitions</h2>
+    <p>In these Terms &amp; Conditions, the following terms have the meanings set out below:</p>
+    <ul>
+      <li><strong>"BrandGEO"</strong>, <strong>"we"</strong>, <strong>"us"</strong>, or <strong>"our"</strong> means BrandGEO Global, registered in Santa Cruz de Tenerife, Canary Islands, Spain (EU).</li>
+      <li><strong>"Client"</strong>, <strong>"you"</strong>, or <strong>"your"</strong> means the individual or organisation that has requested or subscribed to a BrandGEO service.</li>
+      <li><strong>"Service"</strong> means any of the AI Visibility monitoring and reporting services provided by BrandGEO, including the Free Audit, Monthly Plan, and Yearly Plan.</li>
+      <li><strong>"AI Engines"</strong> means the large language model&ndash;based search and chat platforms monitored by BrandGEO, currently: ChatGPT (OpenAI), Gemini (Google), Claude (Anthropic), Perplexity AI, and Meta AI (Meta).</li>
+      <li><strong>"AI Visibility Score"</strong> means the 0&ndash;100 composite score calculated by BrandGEO across six dimensions: Recognition, Knowledge, Sentiment, Accuracy, Reach, and Consistency.</li>
+      <li><strong>"Brand Domain"</strong> means the primary registered domain associated with the client's brand (e.g., example.com), used to identify and limit free audit eligibility.</li>
+    </ul>
+  </div>
+
+  <!-- 2. SERVICES OVERVIEW -->
+  <div class="doc-section" id="services">
+    <h2>2. Services Overview</h2>
+    <p>BrandGEO provides AI Visibility Intelligence services that monitor, measure, and report on a brand's presence across major AI engines. The service includes:</p>
+    <ul>
+      <li>Structured query execution across five AI engines using live web search where available</li>
+      <li>Weekly collection, analysis, and scoring of AI engine responses</li>
+      <li>AI Visibility Score (0&ndash;100) across six measurement dimensions</li>
+      <li>Per-engine status reporting (KNOW, PARTIAL, MISSING) and position tracking</li>
+      <li>Prioritised Fix This action hub (P0/P1/P2 recommendations)</li>
+      <li>Competitor comparison tracking</li>
+      <li>Access to the BrandGEO client dashboard at app.getbrandgeo.com</li>
+      <li>Strategy calls as specified per plan</li>
+    </ul>
+    <p>BrandGEO is a fully managed service. Clients are not required to install software, access APIs, or perform technical configuration. All service delivery is handled by BrandGEO on the client's behalf.</p>
+    <div class="info-box"><p><strong>Note:</strong> BrandGEO monitors AI engine outputs as they appear at the time of query. We do not guarantee any specific AI engine behaviour, mention frequency, or score outcome, as AI engine responses are determined by third-party systems outside our control.</p></div>
+  </div>
+
+  <!-- 3. FREE AUDIT -->
+  <div class="doc-section" id="free-audit">
+    <h2>3. Free Audit Plan</h2>
+    <h3>What is included</h3>
+    <p>The Free Audit is a one-time, no-cost snapshot of a brand's AI Visibility. It includes:</p>
+    <ul>
+      <li>One-time query across all five AI engines</li>
+      <li>AI Visibility Score (0&ndash;100)</li>
+      <li>Per-engine status (KNOW / PARTIAL / MISSING)</li>
+      <li>Top 3 improvement areas</li>
+      <li>Basic competitor comparison (1&ndash;2 competitors)</li>
+    </ul>
+    <p>The Free Audit does <strong>not</strong> include weekly monitoring, dashboard access, the full Fix This action hub, or strategy calls. These are available under the paid plans.</p>
+
+    <h3>Eligibility &amp; refresh policy</h3>
+    <p>The Free Audit is available <strong>once per Brand Domain</strong>. The same brand domain may request a new Free Audit after a minimum of <strong>six (6) calendar months</strong> from the date the previous audit was delivered.</p>
+    <p>BrandGEO reserves the right to decline Free Audit requests that appear to circumvent this policy (e.g., through submission of slight variations of the same brand domain or multiple requests from the same organisation).</p>
+
+    <h3>Delivery</h3>
+    <p>Free Audit results are delivered within <strong>48 business hours</strong> of the request being confirmed. BrandGEO will contact you by email to the address provided in the request form.</p>
+
+    <h3>No obligation</h3>
+    <p>Requesting a Free Audit does not create any obligation to purchase a paid plan. There is no credit card required and no automatic subscription activation.</p>
+  </div>
+
+  <!-- 4. PAID PLANS & PRICING -->
+  <div class="doc-section" id="paid-plans">
+    <h2>4. Paid Plans &amp; Pricing</h2>
+    <p>BrandGEO offers two paid service plans. All prices are in Euros (EUR) and are exclusive of applicable taxes unless otherwise stated.</p>
+
+    <table class="pricing-table">
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Price</th>
+          <th>Setup Fee</th>
+          <th>Commitment</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag-free">Free Audit</span></td>
+          <td>&#x20AC;0</td>
+          <td>None</td>
+          <td>None &mdash; once per brand (refreshes in 6 months)</td>
+        </tr>
+        <tr>
+          <td><span class="tag-monthly">Monthly Plan</span></td>
+          <td>&#x20AC;500 / month</td>
+          <td>&#x20AC;1,250 one-time</td>
+          <td>Month-to-month, cancel anytime</td>
+        </tr>
+        <tr>
+          <td><span class="tag-yearly">Yearly Plan</span></td>
+          <td>&#x20AC;5,000 / year</td>
+          <td>Waived (&#x20AC;0)</td>
+          <td>12 months, paid upfront</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Monthly Plan</h3>
+    <p>The Monthly Plan is billed at <strong>&#x20AC;500 per calendar month</strong>, plus a one-time setup fee of <strong>&#x20AC;1,250</strong> charged at the start of the first billing period. The setup fee covers initial query configuration, the onboarding call, and delivery of the baseline AI Visibility report.</p>
+    <p>The Monthly Plan includes: weekly AI Visibility reports, full Fix This action hub, competitor tracking (up to 5 competitors), dashboard access, and one monthly strategy call per month.</p>
+
+    <h3>Yearly Plan</h3>
+    <p>The Yearly Plan is billed at <strong>&#x20AC;5,000 per year</strong>, payable upfront at the start of the subscription period. The setup fee is waived. This equates to approximately &#x20AC;417/month &mdash; a saving of &#x20AC;2,250 versus twelve months of Monthly billing (including the setup fee).</p>
+    <p>The Yearly Plan includes everything in the Monthly Plan, plus: setup fee waived, priority onboarding within 24 hours, one quarterly strategy session (in addition to monthly calls), and early access to new BrandGEO features.</p>
+
+    <h3>Price changes</h3>
+    <p>BrandGEO reserves the right to update its pricing at any time. Existing monthly subscribers will receive at least <strong>30 days' written notice</strong> before any price increase takes effect. Yearly subscribers are locked in at their contracted price for the full 12-month term.</p>
+  </div>
+
+  <!-- 5. PAYMENT TERMS -->
+  <div class="doc-section" id="payment">
+    <h2>5. Payment Terms</h2>
+    <p>Payment is collected via invoice issued by BrandGEO. Accepted payment methods include bank transfer (SEPA and international wire) and major credit/debit cards where available.</p>
+    <p>For the Monthly Plan, the setup fee and first month's subscription are due before service commencement. Subsequent monthly invoices are issued at the start of each billing month and are due within <strong>14 days of the invoice date</strong>.</p>
+    <p>For the Yearly Plan, the full annual fee is due before service commencement.</p>
+    <p>Late payments may result in a temporary suspension of the service. BrandGEO reserves the right to charge interest on overdue invoices at a rate of 1.5% per month on the outstanding balance.</p>
+    <p>All invoices are issued by BrandGEO Global (Spain, EU) and may be subject to Spanish VAT (IVA) depending on the client's jurisdiction. EU businesses may provide a valid VAT number for reverse-charge treatment.</p>
+  </div>
+
+  <!-- 6. CANCELLATION & REFUND -->
+  <div class="doc-section" id="cancellation">
+    <h2>6. Cancellation &amp; Refund Policy</h2>
+    <h3>Monthly Plan</h3>
+    <p>You may cancel your Monthly Plan subscription at any time by sending written notice to <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>. Cancellation takes effect at the end of the current billing month. No prorated refunds are issued for partial months already billed.</p>
+    <p>The one-time setup fee is <strong>non-refundable</strong> once the onboarding call has taken place or the first report has been delivered, whichever comes first.</p>
+
+    <h3>Yearly Plan</h3>
+    <p>The Yearly Plan may be cancelled within <strong>14 calendar days</strong> of the subscription start date for a full refund, provided no reports have been delivered and no onboarding call has taken place.</p>
+    <p>After the 14-day window, the annual fee is <strong>non-refundable</strong>. If you wish to terminate early, service will continue until the end of the paid annual term.</p>
+
+    <h3>Service termination by BrandGEO</h3>
+    <p>BrandGEO may terminate a subscription immediately and without refund in cases of: material breach of these Terms, fraudulent activity, or abusive conduct toward BrandGEO staff. In all other cases of BrandGEO-initiated termination, a prorated refund of the unused portion of any prepaid fees will be issued within 30 days.</p>
+  </div>
+
+  <!-- 7. ACCEPTABLE USE -->
+  <div class="doc-section" id="acceptable-use">
+    <h2>7. Acceptable Use</h2>
+    <p>By using BrandGEO services, you agree that you will not:</p>
+    <ul>
+      <li>Use the service to monitor or track brands you do not represent or have authorisation to represent</li>
+      <li>Attempt to reverse-engineer, scrape, or reproduce BrandGEO's proprietary scoring methodology or platform</li>
+      <li>Resell or sublicense BrandGEO services or reports to third parties without written consent</li>
+      <li>Submit false or misleading information during the onboarding process</li>
+      <li>Use BrandGEO's reports to make defamatory claims about competitors</li>
+    </ul>
+    <p>Reports and data provided by BrandGEO are for the client's internal business use. Sharing of report excerpts in marketing materials is permitted with appropriate attribution to BrandGEO.</p>
+  </div>
+
+  <!-- 8. DATA & PRIVACY -->
+  <div class="doc-section" id="data">
+    <h2>8. Data &amp; Privacy</h2>
+    <p>BrandGEO processes personal data in accordance with its <a href="/privacy.html">Privacy Policy</a> and applicable EU data protection law, including the General Data Protection Regulation (GDPR).</p>
+    <p>The data we collect to deliver the service includes: your name, email address, company name, and brand information submitted during onboarding or via the contact form. We do not sell personal data to third parties.</p>
+    <p>AI engine query results and visibility scores are stored securely and associated with your client account. You may request deletion of your account data at any time by contacting <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>.</p>
+    <p>BrandGEO is registered in Spain (EU) and all data is processed in accordance with GDPR. For full details see our <a href="/privacy.html">Privacy Policy</a>.</p>
+  </div>
+
+  <!-- 9. LIMITATION OF LIABILITY -->
+  <div class="doc-section" id="liability">
+    <h2>9. Limitation of Liability</h2>
+    <p>BrandGEO's services monitor and report on AI engine outputs. We do not control, influence, or guarantee the behaviour of any third-party AI engine (including ChatGPT, Gemini, Claude, Perplexity, or Meta AI). Changes in AI engine behaviour, training data, or output policies are outside BrandGEO's control.</p>
+    <p>BrandGEO does not guarantee any specific improvement in AI Visibility Score, mention frequency, position, or business outcome as a result of using our service or following our recommendations.</p>
+    <p>To the maximum extent permitted by applicable law, BrandGEO's total liability to any client in connection with these Terms shall not exceed the total fees paid by that client in the three (3) months preceding the event giving rise to the claim.</p>
+    <p>BrandGEO shall not be liable for any indirect, consequential, incidental, or punitive damages, including loss of revenue, loss of profits, or loss of business opportunity.</p>
+  </div>
+
+  <!-- 10. CHANGES -->
+  <div class="doc-section" id="changes">
+    <h2>10. Changes to These Terms</h2>
+    <p>BrandGEO may update these Terms &amp; Conditions from time to time. When we make material changes, we will notify active clients by email at least <strong>14 days before</strong> the updated terms take effect.</p>
+    <p>Your continued use of BrandGEO services after the effective date of updated Terms constitutes your acceptance of those changes. If you do not agree with updated Terms, you may cancel your subscription before the effective date in accordance with Section 6.</p>
+    <p>The current version of these Terms is always available at <a href="/terms.html">getbrandgeo.com/terms.html</a>. The effective date at the top of this page indicates when the current version was last updated.</p>
+  </div>
+
+  <!-- 11. GOVERNING LAW -->
+  <div class="doc-section" id="governing-law">
+    <h2>11. Governing Law</h2>
+    <p>These Terms &amp; Conditions are governed by and construed in accordance with the laws of <strong>Spain</strong> and applicable European Union regulations, without regard to conflict of law principles.</p>
+    <p>Any dispute arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts of <strong>Santa Cruz de Tenerife, Spain</strong>, except where mandatory consumer protection laws in the client's country of residence require otherwise.</p>
+    <p>EU clients may also have recourse to the <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">EU Online Dispute Resolution platform</a> for resolving disputes related to online services.</p>
+  </div>
+
+  <!-- 12. CONTACT -->
+  <div class="doc-section" id="contact">
+    <h2>12. Contact</h2>
+    <p>For any questions regarding these Terms &amp; Conditions, please contact us at:</p>
+    <ul>
+      <li><strong>Email:</strong> <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></li>
+      <li><strong>Website:</strong> <a href="https://getbrandgeo.com">getbrandgeo.com</a></li>
+      <li><strong>Registered address:</strong> Santa Cruz de Tenerife, Canary Islands, Spain (EU)</li>
+    </ul>
+    <p>We aim to respond to all legal and contractual inquiries within 5 business days.</p>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; BrandGEO Global &nbsp;&middot;&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;&middot;&nbsp; Registered in Spain &#x1F1EA;&#x1F1F8; (EU)</span>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <a href="/faq.html">FAQ</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

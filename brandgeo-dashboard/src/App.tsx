@@ -16,6 +16,7 @@ import Mentions from './pages/Mentions'
 import Competitors from './pages/Competitors'
 import Prompts from './pages/Prompts'
 import AIVisibility from './pages/AIVisibility'
+import BrandSentiment from './pages/BrandSentiment'
 import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
 import Usage from './pages/Usage'
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
               <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
               <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
+              <Route path="/sentiment" element={<PrivateRoute><Layout><BrandSentiment /></Layout></PrivateRoute>} />
               <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
               <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><Layout><Usage /></Layout></PrivateRoute>} />

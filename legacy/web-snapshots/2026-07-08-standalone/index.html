@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrandGEO | AI Visibility Monitoring and Generative Engine Optimisation</title>
+  <meta name="description" content="Measure how your brand is mentioned, ranked and recommended across ChatGPT, Gemini, Perplexity, Claude and Microsoft Copilot with BrandGEO.">
+  <link rel="canonical" href="https://getbrandgeo.com/">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "BrandGEO",
+    "url": "https://getbrandgeo.com",
+    "logo": "https://getbrandgeo.com/logo.png",
+    "description": "BrandGEO helps companies measure, understand and improve how their brand is mentioned, ranked and recommended across AI engines such as ChatGPT, Gemini, Perplexity, Claude and Microsoft Copilot.",
+    "sameAs": ["https://www.linkedin.com/company/79409681"]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    /* NAV */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.9); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .nav-cta:hover { background: #7c75ff; }
+
+    /* HERO */
+    .hero { text-align: center; padding: 100px 40px 80px; max-width: 860px; margin: 0 auto; }
+    .hero-badge { display: inline-block; background: rgba(108,99,255,.15); color: var(--accent); border: 1px solid rgba(108,99,255,.3); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; letter-spacing: .5px; margin-bottom: 28px; }
+    .hero h1 { font-size: clamp(2.4rem, 5vw, 3.8rem); font-weight: 800; line-height: 1.15; letter-spacing: -1px; margin-bottom: 24px; }
+    .hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 1.2rem; color: var(--muted); max-width: 620px; margin: 0 auto 40px; }
+    .hero-cta { display: inline-flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .btn-primary { background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); border: none; cursor: pointer; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { border: 1px solid var(--border); color: var(--text); padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 600; text-decoration: none; transition: border-color .2s; background: none; cursor: pointer; }
+    .btn-secondary:hover { border-color: var(--accent); }
+
+    /* ENGINES STRIP */
+    .engines { text-align: center; padding: 40px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .engines p { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .engine-logos { display: flex; gap: 40px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .engine-logo { color: var(--muted); font-size: 1rem; font-weight: 600; transition: color .2s; }
+    .engine-logo:hover { color: var(--text); }
+
+    /* SECTIONS */
+    .section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
+    .section-label { color: var(--accent); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px; }
+    .section h2 { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; margin-bottom: 20px; }
+    .section p { color: var(--muted); font-size: 1.05rem; max-width: 680px; }
+    .section-subhead { font-weight: 700; color: var(--text); margin: 48px 0 0; font-size: 1rem; }
+
+    /* FEATURES */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 24px; }
+    .feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; transition: border-color .2s, transform .2s; }
+    .feature-card:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .feature-icon { width: 48px; height: 48px; background: rgba(108,99,255,.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 20px; }
+    .feature-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 10px; }
+    .feature-card p { color: var(--muted); font-size: 0.95rem; max-width: none; }
+
+    /* HOW IT WORKS */
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; margin-top: 56px; }
+    .step { text-align: center; }
+    .step-num { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-weight: 800; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .step p { color: var(--muted); font-size: 0.9rem; max-width: none; }
+
+    /* PRICING */
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1140px; margin: 48px auto 0; align-items: stretch; }
+    .pricing-box { background: var(--surface); border: 2px solid var(--border); border-radius: 20px; padding: 40px 32px; text-align: center; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    .pricing-box.featured { border-color: var(--accent); }
+    .pricing-box::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(ellipse at center, rgba(108,99,255,.06) 0%, transparent 60%); pointer-events: none; }
+    .pricing-box.featured::before { background: radial-gradient(ellipse at center, rgba(108,99,255,.12) 0%, transparent 60%); }
+    .price-badge { display: inline-block; background: var(--accent); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 14px; border-radius: 20px; margin-bottom: 20px; letter-spacing: .5px; }
+    .price-badge.secondary { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+    .price { font-size: 2.6rem; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 4px; }
+    .price span { font-size: 1.05rem; font-weight: 400; color: var(--muted); }
+    .price-setup { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; min-height: 1.4em; }
+    .price-setup strong { color: var(--text); }
+    .pricing-desc { color: var(--muted); margin-bottom: 24px; font-size: 0.92rem; max-width: none; }
+    .pricing-features { list-style: none; text-align: left; margin-bottom: 28px; flex-grow: 1; }
+    .pricing-features li { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text); display: flex; gap: 10px; font-size: 0.87rem; }
+    .pricing-features li::before { content: '✓'; color: var(--accent2); font-weight: 700; flex-shrink: 0; }
+    .plan-note { font-size: 0.78rem; color: var(--muted); margin-top: 14px; line-height: 1.5; text-align: center; }
+    a.plan-note { display: block; text-decoration: underline; }
+    a.plan-note:hover { color: var(--text); }
+    @media(max-width:900px) { .pricing-grid { grid-template-columns: 1fr; max-width: 480px; } }
+
+    /* CONTACT / SNAPSHOT FORM */
+    #contact { background: var(--surface); border-top: 1px solid var(--border); padding: 80px 40px; }
+    .contact-inner { max-width: 640px; margin: 0 auto; text-align: center; }
+    .contact-inner h2 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
+    .contact-inner > p { color: var(--muted); margin-bottom: 32px; max-width: none; }
+    .snapshot-includes { list-style: none; text-align: left; max-width: 460px; margin: 0 auto 40px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; }
+    .snapshot-includes li { padding: 6px 0; font-size: 0.92rem; color: var(--text); display: flex; gap: 10px; }
+    .snapshot-includes li::before { content: '✓'; color: var(--accent2); font-weight: 700; flex-shrink: 0; }
+    .snapshot-caveat { font-size: 0.85rem; color: var(--muted); max-width: 460px; margin: -20px auto 40px; text-align: left; }
+    form { display: flex; flex-direction: column; gap: 16px; text-align: left; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media(max-width:640px) { .form-row { grid-template-columns: 1fr; } }
+    input, textarea, select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 14px 16px; border-radius: var(--radius); font-size: 0.95rem; width: 100%; outline: none; transition: border-color .2s; font-family: inherit; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 100px; }
+    label { font-size: 0.88rem; color: var(--muted); margin-bottom: 4px; display: block; }
+    .consent-row { display: flex; align-items: flex-start; gap: 10px; }
+    .consent-row input[type="checkbox"] { width: auto; margin-top: 3px; flex-shrink: 0; }
+    .consent-row label { font-size: 0.88rem; color: var(--text); margin-bottom: 0; }
+    .submit-note { font-size: 0.82rem; color: var(--muted); margin-top: -4px; }
+    .submit-btn { background: var(--accent); color: #fff; border: none; padding: 16px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; cursor: pointer; transition: background .2s, transform .2s; }
+    .submit-btn:hover { background: #7c75ff; transform: translateY(-2px); }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--border); padding: 56px 40px 32px; color: var(--muted); font-size: 0.88rem; }
+    .footer-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 48px; }
+    .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 800; line-height: 1; }
+    .footer-brand .footer-logo-text .brand { color: var(--text); }
+    .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-brand p { line-height: 1.6; margin-bottom: 16px; font-size: 0.85rem; }
+    .footer-social { display: flex; gap: 10px; }
+    .footer-social a { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); color: var(--muted); text-decoration: none; transition: border-color .2s, color .2s; font-size: 0.8rem; }
+    .footer-social a:hover { border-color: var(--accent); color: var(--accent); }
+    .footer-col h4 { color: var(--text); font-size: 0.8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color .2s; }
+    .footer-col ul a:hover { color: var(--text); }
+    .footer-bottom { max-width: 1100px; margin: 0 auto; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+    .gdpr-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--muted); border: 1px solid var(--border); padding: 3px 10px; border-radius: 20px; }
+    @media(max-width:720px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:480px) { .footer-grid { grid-template-columns: 1fr; } .footer-bottom { flex-direction: column; text-align: center; } }
+
+    /* THEME TOGGLE */
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    @media (max-width: 640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta) { display: none; }
+      .hero, .section, #contact { padding-left: 20px; padding-right: 20px; }
+      .pricing-box { padding: 32px 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">AI VISIBILITY INTELLIGENCE</div>
+  <h1>Know Where Your Brand Stands <em>in AI Search</em></h1>
+  <p>BrandGEO tracks how your company is mentioned, ranked and recommended across ChatGPT, Gemini, Perplexity, Claude and Microsoft Copilot — then shows you what to improve.</p>
+  <div class="hero-cta">
+    <a href="#contact" class="btn-primary">Apply for a Free Snapshot</a>
+    <a href="#pricing" class="btn-secondary">View Pricing</a>
+  </div>
+</section>
+
+<div class="engines">
+  <p>Monitors your brand across</p>
+  <div class="engine-logos">
+    <span class="engine-logo">ChatGPT</span>
+    <span class="engine-logo">Gemini</span>
+    <span class="engine-logo">Perplexity</span>
+    <span class="engine-logo">Claude</span>
+    <span class="engine-logo">Copilot</span>
+    <span class="engine-logo">Meta AI</span>
+    <span class="engine-logo">Grok</span>
+  </div>
+</div>
+
+<section class="section">
+  <div class="section-label">The AI visibility problem</div>
+  <h2>SEO is no longer enough.<br>AI is the new search.</h2>
+  <p>Your customers are asking AI what to buy, use and recommend. BrandGEO shows whether your company appears, how it compares with competitors, and what actions can improve its visibility.</p>
+  <p style="margin-top:16px;">Millions of professionals now get recommendations directly from AI assistants, without ever clicking a traditional search result. If your brand isn't visible to AI engines, it's invisible to a growing share of your market — regardless of how well it ranks on Google.</p>
+
+  <h3 class="section-subhead">What BrandGEO monitors</h3>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">📡</div>
+      <h3>AI Visibility Monitoring</h3>
+      <p>We query major AI engines with the commercial questions your customers actually ask, and track whether your brand appears in the answers.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>AI Visibility Score</h3>
+      <p>A clear score per engine, tracked over time and benchmarked against the competitors you actually compete with.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Actionable Recommendations</h3>
+      <p>Understand why AI engines do or don't mention you — and which specific actions can improve how you appear in AI-generated answers.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔔</div>
+      <h3>Regular Reporting</h3>
+      <p>Receive clear, non-technical reports showing your visibility, what AI engines say about you, and what changed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏆</div>
+      <h3>Competitor Comparison</h3>
+      <p>See how your AI visibility compares with your top competitors, and where a competitor is gaining ground.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛠</div>
+      <h3>Managed Interpretation</h3>
+      <p>Monitoring technology paired with expert review — you receive prioritised insights, not just raw data to interpret yourself.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="section-label">How BrandGEO works</div>
+  <h2>Up and running in 48 hours.</h2>
+  <p>We set everything up for you. No technical knowledge required.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Onboarding call</h3>
+      <p>A short call to understand your brand, competitors, and what your customers actually search and ask AI about.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>We configure your monitoring</h3>
+      <p>We build a set of tailored commercial prompts across ChatGPT, Gemini, Perplexity, and more — specific to your business and market.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Ongoing intelligence</h3>
+      <p>You receive a clear report: your AI visibility score, what AI engines say about you, and what changed.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <h3>You prioritise and act</h3>
+      <p>Use the monthly prioritised actions to decide what to fix first, with our team reviewing progress alongside you.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="engines-explained">
+  <div class="section-label">Engine by engine</div>
+  <h2>Every AI engine sources its answers differently.</h2>
+  <p>That's why a brand can rank first in one engine and be completely absent in another — and why AI visibility isn't one score, it's several.</p>
+  <div class="features-grid" style="margin-top:40px;">
+    <div class="feature-card">
+      <h3>ChatGPT</h3>
+      <p>Live citations lean heavily on Bing's search index, alongside OpenAI's own training data.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Gemini</h3>
+      <p>Grounds its answers directly in the Google Search index — the same one that powers traditional rankings.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Perplexity</h3>
+      <p>Combines its own web index with real-time retrieval, weighted toward recent, well-structured content.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Claude</h3>
+      <p>Uses Brave Search for live retrieval, alongside broad training-data recall from sources across the open web.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Microsoft Copilot</h3>
+      <p>Built on Bing's index — closely related to, but not identical to, what drives ChatGPT's citations.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2>Three ways to work with BrandGEO.</h2>
+  <p>A qualified one-time snapshot to see where you stand today. A standard managed service for continuous visibility. Custom scope for multi-market and agency needs.</p>
+
+  <div class="pricing-grid">
+
+    <!-- Free Snapshot -->
+    <div class="pricing-box">
+      <div class="price-badge secondary">FREE SNAPSHOT</div>
+      <div class="price">€0</div>
+      <p class="price-setup"><strong>Qualification required</strong></p>
+      <p class="pricing-desc">See how your brand appears when customers ask AI what to buy, use or recommend.</p>
+      <ul class="pricing-features">
+        <li>10 commercial buyer prompts</li>
+        <li>ChatGPT, Gemini &amp; Perplexity</li>
+        <li>One market and language</li>
+        <li>Comparison with up to 3 competitors</li>
+        <li>AI visibility score</li>
+        <li>Engine-by-engine results</li>
+        <li>One critical competitive gap</li>
+        <li>Executive summary, delivered by email</li>
+      </ul>
+      <a href="#contact" class="btn-secondary" style="display:block;text-align:center;">Apply for a Free Snapshot</a>
+      <p class="plan-note">One-time assessment. Does not include dashboard access, recurring monitoring, or a complete optimisation roadmap.</p>
+    </div>
+
+    <!-- BrandGEO Managed -->
+    <div class="pricing-box featured">
+      <div class="price-badge">RECOMMENDED · BRANDGEO MANAGED</div>
+      <div class="price">€500 <span>/month</span></div>
+      <p class="price-setup">+ <strong>€1,250</strong> onboarding &nbsp;·&nbsp; 3-month minimum commitment</p>
+      <p class="price-setup">or <strong>€6,000</strong><span>/year</span> — onboarding included</p>
+      <p class="pricing-desc" style="margin-top:8px;">Continuous AI visibility intelligence for brands that want to be found, recommended and trusted across AI engines.</p>
+      <ul class="pricing-features">
+        <li>One brand, one market and language</li>
+        <li>Up to 40 commercially researched prompts</li>
+        <li>Five major AI engines</li>
+        <li>Up to five competitors</li>
+        <li>Weekly visibility monitoring</li>
+        <li>Historical dashboard</li>
+        <li>Recommendation &amp; ranking analysis</li>
+        <li>Competitor share of visibility</li>
+        <li>Citation &amp; source intelligence</li>
+        <li>Baseline AI-readiness review</li>
+        <li>Monthly executive report</li>
+        <li>Five prioritised actions every month</li>
+        <li>Monthly strategy review</li>
+        <li>Quarterly prompt refinement</li>
+      </ul>
+      <a href="#contact" class="btn-primary" style="display:block;text-align:center;">Book a BrandGEO Consultation</a>
+      <a href="#contact" class="plan-note">or Apply for a Free Snapshot</a>
+    </div>
+
+    <!-- Multi-Market & Agency -->
+    <div class="pricing-box">
+      <div class="price-badge secondary">MULTI-MARKET &amp; AGENCY</div>
+      <div class="price">Custom</div>
+      <p class="price-setup">From <strong>€5,000</strong>/month</p>
+      <p class="pricing-desc">For companies managing multiple countries, languages, brands or client accounts.</p>
+      <ul class="pricing-features">
+        <li>Multiple markets</li>
+        <li>Multiple languages</li>
+        <li>Multiple brands</li>
+        <li>Expanded prompt coverage</li>
+        <li>Agency reporting</li>
+        <li>Customised support</li>
+        <li>Larger competitor sets</li>
+        <li>Custom reporting requirements</li>
+      </ul>
+      <a href="#contact" class="btn-secondary" style="display:block;text-align:center;">Contact BrandGEO</a>
+    </div>
+
+  </div>
+</section>
+
+<section id="contact">
+  <div class="contact-inner">
+    <h2>Apply for your Free AI Visibility Snapshot</h2>
+    <p>A one-time assessment across ChatGPT, Gemini and Perplexity. Interested in BrandGEO Managed or a multi-market engagement instead? Use the same form and tell us in the message field below — we'll route it correctly.</p>
+
+    <ul class="snapshot-includes">
+      <li>10 commercial buyer prompts, across ChatGPT, Gemini &amp; Perplexity</li>
+      <li>Comparison with up to 3 competitors</li>
+      <li>AI visibility score &amp; engine-by-engine results</li>
+      <li>One critical competitive gap</li>
+      <li>Executive summary delivered by email</li>
+    </ul>
+
+    <form action="https://formsubmit.co/contact@getbrandgeo.com" method="POST" id="snapshotForm">
+      <input type="hidden" name="_subject" value="New BrandGEO Free Snapshot Application">
+      <input type="hidden" name="_captcha" value="false">
+      <input type="hidden" name="_next" value="https://getbrandgeo.com/thanks.html">
+      <input type="hidden" name="_template" value="table">
+
+      <div>
+        <label for="name">Full name</label>
+        <input type="text" id="name" name="name" placeholder="Your name" required>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="email">Work email</label>
+          <input type="email" id="email" name="email" placeholder="you@company.com" required>
+        </div>
+        <div>
+          <label for="jobtitle">Job title</label>
+          <input type="text" id="jobtitle" name="job_title" placeholder="e.g. VP of Growth" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="company">Company name</label>
+          <input type="text" id="company" name="company" placeholder="Your company" required>
+        </div>
+        <div>
+          <label for="website">Company website</label>
+          <input type="url" id="website" name="website" placeholder="https://yourcompany.com" required>
+        </div>
+      </div>
+
+      <div>
+        <label for="companysize">Company size</label>
+        <select id="companysize" name="company_size" required>
+          <option value="">Select company size</option>
+          <option>1–10 employees</option>
+          <option>11–50 employees</option>
+          <option>51–200 employees</option>
+          <option>201–500 employees</option>
+          <option>501–1,000 employees</option>
+          <option>1,000+ employees</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="market">Main market</label>
+          <input type="text" id="market" name="main_market" placeholder="e.g. United States, Spain, DACH" required>
+        </div>
+        <div>
+          <label for="language">Main language</label>
+          <input type="text" id="language" name="main_language" placeholder="e.g. English, Spanish" required>
+        </div>
+      </div>
+
+      <div>
+        <label for="category">Product or service category</label>
+        <input type="text" id="category" name="category" placeholder="e.g. B2B SaaS, fintech, travel tech, healthcare platform" required>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="competitor1">Competitor 1 (optional)</label>
+          <input type="text" id="competitor1" name="competitor_1" placeholder="Competitor name">
+        </div>
+        <div>
+          <label for="competitor2">Competitor 2 (optional)</label>
+          <input type="text" id="competitor2" name="competitor_2" placeholder="Competitor name">
+        </div>
+      </div>
+      <div>
+        <label for="competitor3">Competitor 3 (optional)</label>
+        <input type="text" id="competitor3" name="competitor_3" placeholder="Competitor name">
+      </div>
+
+      <div>
+        <label for="reason">Reason for requesting the audit</label>
+        <textarea id="reason" name="reason" placeholder="What made you request an AI Visibility Snapshot? What do you want to know, and are you also interested in BrandGEO Managed or a multi-market engagement?" required></textarea>
+      </div>
+
+      <div class="consent-row">
+        <input type="checkbox" id="consent" name="consent" value="Consent given" required>
+        <label for="consent">I agree that BrandGEO may contact me regarding this audit and related services.</label>
+      </div>
+
+      <p class="submit-note">Applications are reviewed to ensure BrandGEO can produce a commercially meaningful analysis. Submitting the form does not guarantee acceptance.</p>
+
+      <button type="submit" class="submit-btn">Apply for My Free Snapshot →</button>
+    </form>
+  </div>
+</section>
+
+<section class="section" id="proof">
+  <div class="section-label">Proof, not promises</div>
+  <h2>Ranked first in three AI engines. Absent in a fourth.</h2>
+  <p>One established brand ranked as the leading recommendation across several AI engines, while remaining completely absent from another. BrandGEO revealed the engine-by-engine visibility gap that traditional search rankings did not show.</p>
+  <p style="margin-top:16px;font-weight:700;color:var(--text);max-width:680px;">Strong Google rankings do not guarantee consistent visibility across AI platforms.</p>
+  <p style="margin-top:28px;"><a href="/bg-004.html" class="btn-secondary" style="display:inline-block;">Read the full case study →</a></p>
+</section>
+
+<section class="section" style="text-align:center;padding-top:20px;">
+  <h2 style="margin-bottom:16px;">Ready to see where you stand?</h2>
+  <p style="margin:0 auto 32px;">Apply for a Free Snapshot, or talk to us about BrandGEO Managed.</p>
+  <div class="hero-cta">
+    <a href="#contact" class="btn-primary">Apply for a Free Snapshot</a>
+    <a href="#contact" class="btn-secondary">Book a BrandGEO Consultation</a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-grid">
+
+    <!-- Brand column -->
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <img src="/logo.png" alt="BrandGEO icon" style="height:32px;width:auto;display:block;">
+        <div class="footer-logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+      </div>
+      <p>AI Visibility Intelligence for brands that want to be found, recommended and trusted across every major AI engine — ChatGPT, Gemini, Perplexity, Claude, Microsoft Copilot, Meta AI and Grok.</p>
+      <div class="footer-social">
+        <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener" aria-label="LinkedIn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Product column -->
+    <div class="footer-col">
+      <h4>Product</h4>
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="https://app.getbrandgeo.com" target="_blank" rel="noopener">Dashboard</a></li>
+        <li><a href="#contact">Free Snapshot</a></li>
+        <li><a href="/faq.html">FAQ</a></li>
+        <li><a href="/blog.html">Research Blog</a></li>
+      </ul>
+    </div>
+
+    <!-- Contact column -->
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></li>
+        <li><a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="#contact">Request a call</a></li>
+      </ul>
+    </div>
+
+    <!-- Legal column -->
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <ul>
+        <li><a href="/privacy.html">Privacy Policy</a></li>
+        <li><a href="/terms.html">Terms and Conditions</a></li>
+        <li><a href="/cookies.html">Cookie Policy</a></li>
+        <li>
+          <a href="https://gdpr.eu" target="_blank" rel="noopener">
+            <span class="gdpr-badge">🔒 GDPR Compliant</span>
+          </a>
+        </li>
+      </ul>
+      <p style="margin-top:16px;font-size:0.8rem;line-height:1.5;">
+        Santa Cruz de Tenerife<br>
+        Canary Islands, Spain 🇪🇸<br>
+        European Union
+      </p>
+    </div>
+
+  </div>
+
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Worldwide &nbsp;·&nbsp; Registered in Spain 🇪🇸 (EU)</span>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="https://gdpr.eu" target="_blank" rel="noopener" class="gdpr-badge">🔒 GDPR Compliant</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function() {
+    const btn = document.getElementById('themeBtn');
+    const saved = localStorage.getItem('bgTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+    btn.addEventListener('click', function() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      btn.textContent = next === 'dark' ? '🌙' : '☀️';
+      localStorage.setItem('bgTheme', next);
+    });
+  })();
+</script>
+</body>
+</html>

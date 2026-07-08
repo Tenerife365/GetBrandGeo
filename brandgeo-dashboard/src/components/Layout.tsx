@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign,
+  StopCircle, Plus, DollarSign, Smile,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -49,9 +49,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
 
-  // Nav order: AI Visibility → Recommendations → Competitors → AI Mentions → Overview → Prompts
+  // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
   const nav = [
     { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility    },
+    { to: '/sentiment',       icon: Smile,           label: t.nav_sentiment       },
     { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
     { to: '/competitors',     icon: Users,           label: t.nav_competitors     },
     { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions        },

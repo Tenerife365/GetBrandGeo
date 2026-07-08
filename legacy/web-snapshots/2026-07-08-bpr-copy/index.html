@@ -398,38 +398,6 @@
     @media(max-width: 780px) { .features-grid { grid-template-columns: 1fr 1fr; } }
     @media(max-width: 520px) { .features-grid { grid-template-columns: 1fr; } }
 
-    /* ── BRAND SENTIMENT SPOTLIGHT ── */
-    .sentiment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; margin-top: 8px; }
-    .sentiment-copy p { margin-bottom: 22px; }
-    .sentiment-points { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
-    .sentiment-points li { display: flex; gap: 10px; font-size: 0.86rem; color: var(--t2); line-height: 1.6; }
-    .sentiment-points li::before { content: '\2713'; color: var(--ac2); font-weight: 700; flex-shrink: 0; }
-    .sentiment-card {
-      background: var(--s);
-      border: 1px solid var(--bd2);
-      border-radius: 16px;
-      padding: 22px;
-      box-shadow: 0 30px 60px -20px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04);
-    }
-    .sentiment-card-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 14px; }
-    .sentiment-bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-    .sentiment-bar-top { display: flex; justify-content: space-between; font-size: 0.76rem; margin-bottom: 4px; }
-    .sentiment-bar-top .name { color: var(--t2); }
-    .sentiment-bar-top .val { font-weight: 700; }
-    .sentiment-bar-track { height: 6px; background: var(--bd); border-radius: 3px; overflow: hidden; }
-    .sentiment-bar-fill { height: 100%; border-radius: 3px; }
-    .sentiment-quotes { display: flex; flex-direction: column; gap: 10px; }
-    .sentiment-quote { padding: 10px 12px; border-radius: 8px; font-size: 0.78rem; line-height: 1.55; color: var(--t2); }
-    .sentiment-quote .tag { display: inline-block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
-    .sentiment-quote .engine { color: var(--t3); font-size: 0.68rem; }
-    .sentiment-quote.positive { background: rgba(52,211,153,.05); border: 1px solid rgba(52,211,153,.15); }
-    .sentiment-quote.positive .tag { color: #34d399; background: rgba(52,211,153,.12); }
-    .sentiment-quote.neutral { background: rgba(251,146,60,.05); border: 1px solid rgba(251,146,60,.14); }
-    .sentiment-quote.neutral .tag { color: #fb923c; background: rgba(251,146,60,.12); }
-    .sentiment-quote.negative { background: rgba(248,113,113,.05); border: 1px solid rgba(248,113,113,.13); }
-    .sentiment-quote.negative .tag { color: #f87171; background: rgba(248,113,113,.1); }
-    @media(max-width: 780px) { .sentiment-grid { grid-template-columns: 1fr; gap: 32px; } }
-
     /* ── HOW IT WORKS ── */
     .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; position: relative; }
     .step { position: relative; }
@@ -924,50 +892,6 @@
       <div class="feature-icon">&#x1F6E0;</div>
       <h3>Fully managed</h3>
       <p>No tools to learn, no dashboards to maintain. We handle everything &mdash; you receive insights, act on them, and grow.</p>
-    </div>
-  </div>
-</section>
-
-<hr class="section-divider">
-
-<!-- BRAND SENTIMENT SPOTLIGHT -->
-<section class="section" id="sentiment">
-  <div class="sentiment-grid">
-    <div class="sentiment-copy">
-      <div class="section-label">Beyond mentions</div>
-      <h2>It's not just if AI mentions you. It's how.</h2>
-      <p>A brand mention isn't automatically good news. BrandGEO reads every AI response for tone &mdash; positive, neutral, or negative &mdash; so you know whether ChatGPT is recommending you or quietly warning people off.</p>
-      <ul class="sentiment-points">
-        <li>Every response, across all 5 engines, is scored for sentiment &mdash; not just presence.</li>
-        <li>See the actual language AI models use when they describe your brand.</li>
-        <li>Catch a negative shift in tone before it shows up in lost customers.</li>
-        <li>Compare sentiment engine-by-engine &mdash; ChatGPT and Perplexity don't always agree.</li>
-      </ul>
-      <a href="#contact" class="btn-plan" style="display:inline-block;width:auto;padding:12px 28px;">Ask about Brand Sentiment &rarr;</a>
-    </div>
-    <div class="sentiment-visual">
-      <div class="sentiment-card">
-        <div class="sentiment-card-label">Sentiment breakdown &mdash; last 7 days</div>
-        <div class="sentiment-bars">
-          <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Positive</span><span class="val" style="color:#34d399">61%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:61%;background:#34d399"></div></div>
-          </div>
-          <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Neutral</span><span class="val" style="color:#fb923c">27%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:27%;background:#fb923c"></div></div>
-          </div>
-          <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Negative</span><span class="val" style="color:#f87171">12%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:12%;background:#f87171"></div></div>
-          </div>
-        </div>
-        <div class="sentiment-quotes">
-          <div class="sentiment-quote positive"><span class="tag">Positive</span><span class="engine">ChatGPT</span><br>&ldquo;&hellip;widely regarded as a reliable, well-reviewed choice in this category.&rdquo;</div>
-          <div class="sentiment-quote neutral"><span class="tag">Neutral</span><span class="engine">Perplexity</span><br>&ldquo;&hellip;offers standard features comparable to other providers in the space.&rdquo;</div>
-          <div class="sentiment-quote negative"><span class="tag">Negative</span><span class="engine">Claude</span><br>&ldquo;&hellip;mixed reviews, particularly around customer support responsiveness.&rdquo;</div>
-        </div>
-      </div>
     </div>
   </div>
 </section>

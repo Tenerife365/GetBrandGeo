@@ -1,0 +1,36 @@
+# ─── Security Headers — getbrandgeo.com ───────────────────────────────────────
+
+<IfModule mod_headers.c>
+  # Prevent clickjacking
+  Header always set X-Frame-Options "DENY"
+
+  # Prevent MIME sniffing
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Control referrer information
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Disable browser features not needed on a marketing site
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+  # Force HTTPS for 1 year (only enable once HTTPS is confirmed working)
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+  # Content Security Policy
+  # - Plausible analytics (plausible.io)
+  # - Google Fonts (fonts.googleapis.com, fonts.gstatic.com)
+  # - FormSubmit.co contact form
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://plausible.io https://formsubmit.co; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
+</IfModule>
+
+# ─── Force HTTPS ───────────────────────────────────────────────────────────────
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ─── Prevent directory listing ────────────────────────────────────────────────
+
+Options -Indexes

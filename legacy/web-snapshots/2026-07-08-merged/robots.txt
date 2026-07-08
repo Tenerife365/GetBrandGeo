@@ -1,0 +1,49 @@
+# getbrandgeo.com robots.txt
+
+# Standard crawlers — always welcome
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# AI retrieval bots — explicitly allowed for grounding & citations
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+# Google Gemini grounding (live retrieval, not training)
+# Blocking Google-Extended would only affect future Gemini training data,
+# NOT live grounding — so we allow everything here.
+User-agent: Google-Extended
+Allow: /
+
+# Default: allow all
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://getbrandgeo.com/sitemap.xml

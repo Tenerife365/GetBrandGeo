@@ -22,6 +22,7 @@ interface Strings {
   nav_competitors:      string
   nav_prompts:          string
   nav_aiVisibility:     string
+  nav_sentiment:        string
   nav_recommendations:  string
   // Sidebar
   sidebar_client:       string
@@ -165,6 +166,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Competitors',
     nav_prompts:         'Prompts',
     nav_aiVisibility:    'AI Visibility',
+    nav_sentiment:       'Brand Sentiment',
     nav_recommendations: 'Recommendations',
     sidebar_client:      'CLIENT',
     sidebar_market:      'MARKET',
@@ -298,6 +300,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Competidores',
     nav_prompts:         'Preguntas',
     nav_aiVisibility:    'Visibilidad IA',
+    nav_sentiment:       'Sentimiento de Marca',
     nav_recommendations: 'Recomendaciones',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCADO',
@@ -431,6 +434,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Wettbewerber',
     nav_prompts:         'Prompts',
     nav_aiVisibility:    'KI-Sichtbarkeit',
+    nav_sentiment:       'Marken-Sentiment',
     nav_recommendations: 'Empfehlungen',
     sidebar_client:      'KUNDE',
     sidebar_market:      'MARKT',
@@ -564,6 +568,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Concurrents',
     nav_prompts:         'Prompts',
     nav_aiVisibility:    'Visibilite IA',
+    nav_sentiment:       'Sentiment de Marque',
     nav_recommendations: 'Recommandations',
     sidebar_client:      'CLIENT',
     sidebar_market:      'MARCHE',
@@ -697,6 +702,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Concurrenten',
     nav_prompts:         'Prompts',
     nav_aiVisibility:    'AI-zichtbaarheid',
+    nav_sentiment:       'Merksentiment',
     nav_recommendations: 'Aanbevelingen',
     sidebar_client:      'KLANT',
     sidebar_market:      'MARKT',
@@ -830,6 +836,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Competitori',
     nav_prompts:         'Prompturi',
     nav_aiVisibility:    'Vizibilitate AI',
+    nav_sentiment:       'Sentiment Brand',
     nav_recommendations: 'Recomandari',
     sidebar_client:      'CLIENT',
     sidebar_market:      'PIATA',
@@ -963,6 +970,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Concorrentes',
     nav_prompts:         'Prompts',
     nav_aiVisibility:    'Visibilidade IA',
+    nav_sentiment:       'Sentimento da Marca',
     nav_recommendations: 'Recomendacoes',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCADO',
@@ -1096,6 +1104,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_competitors:     'Concorrenti',
     nav_prompts:         'Prompt',
     nav_aiVisibility:    'Visibilita IA',
+    nav_sentiment:       'Sentiment del Brand',
     nav_recommendations: 'Raccomandazioni',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCATO',
