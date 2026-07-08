@@ -690,10 +690,7 @@ commands from two sessions at once regardless of scope.
   handling the fix himself (`git add -A`, review `git status`, then commit)
   — not yet confirmed done as of this note.
   Scope: `brandgeo-signup/`, `brandgeo/backend/`, `BrandGEO-archives/brandgeo-standalone/backend/`.
-- **#73** Define and document Client Onboarding Flow
-  Scope: docs-only — a new standalone `.md` deliverable, no existing source files.
-- **#84** Update getbrandgeo.com to feature Brand Sentiment. **Draft done 2026-07-08, not final** — added a new "Brand Sentiment" spotlight section (`id="sentiment"`) to `brandgeo/web/index.html`, placed between the existing FEATURES and HOW IT WORKS sections (own `.sentiment-*` CSS block added just before the `/* HOW IT WORKS */` comment). Two-column layout: left = copy (headline, 4 bullet points, CTA), right = a self-built mockup card (sentiment %-breakdown bars + 3 illustrative AI-quote snippets tagged positive/neutral/negative) — no real screenshot, since one doesn't exist yet. Deliberately held back per Constantin's instruction (#83 running in parallel): CTA button links to `#contact` (existing, safe) rather than any dashboard route, and no dashboard screenshot was used. Copy is written to be accurate regardless of #83's ship date — it describes sentiment scoring as a capability BrandGEO already has (real: `ai_results.sentiment`, keyword-based, see §2.6), not as a brand-new page. **#83 has now shipped (see Completed above) — remaining to finalize:** decide whether to swap the mockup card for a real screenshot of `/sentiment`, and whether the CTA should deep-link to `app.getbrandgeo.com/sentiment` instead of `#contact`. Not yet uploaded to cPanel (site changes here don't go live until manually re-uploaded, per §6.4 sequencing precedent from #99).
-  Scope: `brandgeo/web/index.html` only.
+- *(no other pending items — #73 and #84 finalized below, see Completed)*
 
 ---
 
@@ -914,3 +911,192 @@ sessions start in parallel.
 - OpenRouter fallback for same-model continuity when primary quota runs out (medium-term)
 - Scheduled automatic collection (cron-triggered Netlify function)
 - Caching layer to deduplicate identical prompt+market combinations across clients
+
+---
+
+## 7. Redesign Initiative — Website + Dashboard Modernization (opened 2026-07-08)
+
+**Status: kicked off, not yet built.** Constantin wants both `getbrandgeo.com`
+and `app.getbrandgeo.com` to compete visually with modern AI-visibility SaaS
+tools (named benchmark: **peec.ai**) — describes current state as "25% of
+100%" vs. a slick, intuitive, modern competitor bar. This should live in its
+own **`Master-Redesign`** chat going forward (see §0 chat-naming convention —
+ongoing/occasional-update area, not a single scoped task), not be folded into
+unrelated task chats.
+
+### 7.1 Audit findings (design-critique pass, 2026-07-08, live site + dashboard)
+
+Checked live via browser: `getbrandgeo.com` (hero + "what you get" section)
+and `app.getbrandgeo.com` (Overview page), plus source-code check of
+`Dashboard.tsx` and `tailwind.config.js`.
+
+- 🔴 **Critical bug, not a design problem:** the dashboard **Overview** page
+  (`Dashboard.tsx`) renders in a plain light/white theme live, even though
+  its own source code uses `bg-dark-700`, `text-white`, `border-dark-600`
+  throughout, and `tailwind.config.js` does define those tokens via CSS
+  variables (`--dark-700`, `--dark-600`, etc.). The rest of the app
+  (`Layout.tsx`, `AIVisibility.tsx`, `Recommendations.tsx`, `Prompts.tsx`,
+  `Mentions.tsx`) correctly renders the violet/dark theme — **Overview is the
+  outlier**, both in the live screenshot and in that it's the one page that
+  doesn't grep-match the dark theme classes as heavily. Root cause not fully
+  confirmed — leading hypothesis is either a stale Netlify deploy vs. latest
+  commit, or the `--dark-700`/`--dark-600` CSS custom properties not being
+  defined/loaded correctly for that route. **This needs to be fixed BEFORE
+  any visual redesign work on Overview**, since new components would render
+  on top of the same broken variables otherwise.
+- 🔴 Marketing site's own "what you get" section shows a polished dark
+  dashboard-preview mockup (big AI Visibility Score ring, clean card
+  layout) that **does not match the real dashboard** — a real trust/first-
+  impression gap between what's promised and what's delivered.
+- 🟡 Overview's `Brand Visibility by AI Engine` chart overflows/cuts off at
+  the right edge of its container — responsive/overflow bug in the chart
+  container, separate from the theme issue.
+- 🟡 Sidebar nav is a flat icon+label list with no grouping and a weak
+  active-state indicator, compared to grouped/sectioned nav patterns in
+  modern competitors.
+- 🟢 Cards are flat-bordered with no elevation/depth — reads as less premium
+  than competitor dashboards.
+- ✅ What's already working: the website hero/copy/preview-mockup section is
+  close to competitive already; the underlying violet dark-theme design
+  system already exists and is correctly used on 5 of 6 dashboard pages —
+  this is a fix-and-polish effort, not a from-scratch rebuild.
+
+Full critique (first-impression/usability/hierarchy/consistency/accessibility
+breakdown) was delivered in chat on 2026-07-08 — not fully duplicated here;
+this section captures the decisions and findings that need to survive into
+the next session.
+
+### 7.2 Constantin's priority call (2026-07-08)
+
+Given three recommended priorities (1. fix the Overview theme bug, 2. unify
+chart styling to brand palette, 3. redesign sidebar nav + Overview layout for
+stronger visual hierarchy — bigger score treatment, grouped nav, card
+elevation), **Constantin confirmed priority 3 (the actual visual redesign) is
+the most relevant one to him.**
+
+**Sequencing dependency flagged and accepted:** priority 3 depends on
+priority 1 being fixed first — a redesigned Overview layout would still
+render with the same broken/light theme until the CSS variable / stale-
+deploy issue is resolved. So the `Master-Redesign` work should treat the
+theme-bug fix as **step zero** (quick, mechanical, not a design decision)
+before building the new sidebar/Overview layout on top of it, rather than
+skipping straight to the redesign and having it render broken too.
+
+### 7.3 Next steps for the `Master-Redesign` chat (short version — see §7.4 for the full roadmap)
+
+1. Diagnose and fix the Overview theme bug (check latest Netlify deploy
+   timestamp vs. latest commit; check `index.css` for `--dark-700`/
+   `--dark-600` variable definitions and confirm they ship in the production
+   build).
+2. Fix the Overview chart overflow bug.
+3. Redesign sidebar nav (grouping, stronger active state) and Overview card
+   layout (lead with a large AI Visibility Score treatment matching the
+   marketing site's own preview mockup, add card elevation) — this is the
+   actual "modern SaaS" polish pass Constantin asked for.
+4. Unify chart color palette to brand violet/teal tokens across all pages
+   (lower priority than 1–3 per Constantin, but still open).
+5. Revisit whether the marketing site's dashboard-preview mockup should be
+   swapped for a real screenshot once the redesigned Overview exists (ties
+   into #84's still-open "real screenshot vs. mockup" question).
+
+### 7.4 Full Phased Roadmap (requested 2026-07-08 — "plan even further")
+
+Constantin asked for a fuller phased plan beyond the 5-bullet list above:
+design-system definition, page-by-page order, and milestones. This
+supersedes §7.3 as the actual working plan — §7.3 stays as the quick-glance
+summary of Phase 0.
+
+**Phase 0 — Unblock (bug fixes, not design decisions)**
+- 0.1 Diagnose + fix the Overview theme bug (§7.1).
+- 0.2 Fix the Overview chart overflow/responsive bug.
+- *Exit criteria:* Overview renders in the same dark/violet theme as every
+  other page; no chart clipping.
+
+**Phase 1 — Design System Consolidation**
+Formalize what's partially already there (§4.2 violet tokens,
+`ENGINE_META` colors) plus what's missing:
+- Color: primary/accent violet, slate backgrounds, engine colors — mostly
+  defined already, needs to be the single source of truth (this file §4.2,
+  or a new `DESIGN-SYSTEM.md`).
+- Typography scale — currently ad hoc per page, needs a defined
+  heading/body/label scale.
+- Spacing scale — for consistent card padding/gaps across pages.
+- Elevation/shadow tokens — new; cards are currently flat-bordered (§7.1
+  finding), need a subtle shadow/gradient-border system for "premium" feel.
+- Chart color palette — unify whatever charting lib is in use to brand
+  violet/teal tokens instead of default library colors.
+- CTA/button variants — primary/secondary/ghost, directly serves
+  Constantin's "smooth call-to-action" ask.
+- Empty/loading/error state patterns — for consistency across pages.
+- *Exit criteria:* every token Phase 2+ needs is named and defined once,
+  not invented per-page.
+
+**Phase 2 — Shell Redesign (`Layout.tsx`)**
+- Group sidebar nav into logical sections (e.g. Insights: Overview/AI
+  Visibility/Sentiment; Strategy: Competitors/Recommendations; Manage:
+  Prompts/Usage/Onboard — illustrative, adjust to taste) instead of one flat
+  list.
+- Stronger active-state indicator (e.g. left accent bar + background tint,
+  not just a bg tint).
+- Highest-leverage single change — `Layout.tsx` wraps every page, so fixing
+  it once benefits all of them.
+- *Exit criteria:* current page is obvious at a glance; nav reads as
+  organized, not a flat icon dump.
+
+**Phase 3 — Page-by-Page Redesign (priority order)**
+1. **Overview** (`Dashboard.tsx`) — highest-traffic page, first thing seen
+   after login, currently the most broken. Lead with a large AI Visibility
+   Score treatment (ring/gauge) matching the marketing site's own preview
+   mockup; add card elevation from Phase 1; fix chart styling.
+2. **AI Visibility** (`AIVisibility.tsx`) — core feature page (engine cards,
+   prompt table, Fix This hub); apply Phase 1–2 conventions.
+3. **Brand Sentiment** (`BrandSentiment.tsx`) — newest page (#83), least
+   legacy-encumbered, good candidate to set the "target look" other pages
+   get matched to.
+4. **Competitors, Recommendations, Mentions** — same treatment, lower
+   individual traffic than 1–3.
+5. **Prompts, Usage, Onboard, Signup** — functional/utility pages, lowest
+   visual priority but still worth bringing onto the token system, to avoid
+   repeating the "5 of 11 pages" inconsistency pattern already documented in
+   #72 (i18n coverage drift).
+- *Exit criteria per page:* passes a quick self-check against Phase 1
+  tokens — hierarchy, consistency, no `as any` casts or hardcoded one-off
+  colors (§4.4).
+
+**Phase 4 — Marketing Site Alignment**
+- Swap the "what you get" dashboard-preview mockup on `getbrandgeo.com` for
+  a real screenshot/embed of the redesigned Overview — resolves the open
+  question already flagged in #84.
+- Lower-priority pass on `blog.html`/`bg-00X.html`/`faq.html`/`terms.html`
+  for the same visual consistency (these already scored better in the §7.1
+  audit, so this is polish, not a fix).
+
+**Phase 5 — Polish & Accessibility Pass**
+- Run `design:accessibility-review` (contrast, touch targets) across every
+  redesigned page.
+- Dedicated `design:ux-copy` pass on CTAs/microcopy — this is Constantin's
+  explicit "smooth call-to-action" ask, worth its own pass rather than
+  folding into Phase 3.
+- Motion/transition polish (hover states, subtle transitions) for the
+  "pleasant to open" feel Constantin described.
+
+**Timeline framing**
+This codebase's workflow is session-scoped, not calendar-scoped (§0: one
+Task chat = one scoped step). Rough session budget, not calendar time:
+
+| Phase | Est. sessions |
+|---|---|
+| 0 — Unblock | 1 |
+| 1 — Design system | 1 |
+| 2 — Shell/nav | 1 |
+| 3 — Page-by-page (6 pages/groups) | 5–6 |
+| 4 — Marketing site alignment | 1–2 |
+| 5 — Polish/accessibility | 1–2 |
+| **Total** | **~10–13 sessions** |
+
+The temporary parallel-work window (§0, through 2026-08-12) makes this a
+good time to push through Phases 0–3 (the structural, highest-leverage
+work) since multiple Task chats can run at once on non-overlapping pages —
+e.g. one session on Phase 3.1 (Overview) while another does Phase 3.3
+(Sentiment), as long as neither touches `Layout.tsx` at the same time as
+Phase 2. Phases 4–5 are lower-risk and can spill past the window if needed.
