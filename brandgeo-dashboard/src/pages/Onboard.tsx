@@ -1,21 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useClient } from '../lib/clientContext'
+import { useCollection } from '../lib/collectionContext'
+import { getActiveEngines } from '../lib/planConfig'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Lock, Zap } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Lock, Zap, MessageSquarePlus } from 'lucide-react'
 
-type Step = 1 | 2 | 3 | 4 | 5
-
-interface CollectionProgress {
-  total: number
-  done: number
-  current: string
-  errors: number
-  finished: boolean
-}
+type Step = 1 | 2 | 3 | 4 | 5 | 6
 
 export default function Onboard() {
   const { isAdmin } = useClient()
+  const { collecting, progress: collectionProgress, runCollection } = useCollection()
   const navigate = useNavigate()
 
   // Form state
@@ -27,13 +22,23 @@ export default function Onboard() {
   const [aliases, setAliases]             = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
   const [competitors, setCompetitors]     = useState<string[]>([])
+  const [promptInput, setPromptInput]     = useState('')
+  const [prompts, setPrompts]             = useState<string[]>([])
   const [email, setEmail]         = useState('')
   const [password, setPassword]   = useState('')
   const [showPass, setShowPass]   = useState(false)
   const [creating, setCreating]   = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [newClientId, setNewClientId] = useState<number | null>(null)
-  const [progress, setProgress]   = useState<CollectionProgress | null>(null)
+  const [collectionRunning, setCollectionRunning] = useState(false)
+  const [lastTotal, setLastTotal] = useState<number | null>(null)
+
+  // Snapshot the last known prompt count while collectionContext's progress
+  // is live — it resets to null when the run finishes, so this is what the
+  // "Collection complete!" card reads after the fact.
+  useEffect(() => {
+    if (collectionProgress) setLastTotal(collectionProgress.total)
+  }, [collectionProgress])
 
   if (!isAdmin) return (
     <div className="p-8 text-slate-500 text-sm">Access restricted to admins.</div>
