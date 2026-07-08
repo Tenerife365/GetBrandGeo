@@ -1,6 +1,9 @@
 # CLAUDE.md — BrandGEO Platform Memory
 
-> **Last updated:** 2026-07-08 (task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)  
+> **Last updated:** 2026-07-08 (task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)
+> **New this pass:** #73 (onboarding flow doc, found a deeper bug — no
+> prompts ever seeded during onboarding) and #84 (website CTA finalized,
+> not yet uploaded to cPanel) — both done in parallel via subagents.  
 > **App:** [app.getbrandgeo.com](https://app.getbrandgeo.com)  
 > **Website:** [getbrandgeo.com](https://getbrandgeo.com) (static HTML, cPanel hosted)  
 > **Project root:** `C:\Users\const\Constantin Daniel Goane\BrandGEO` (canonical — the old `C:\Users\const\Desktop\BpR` no longer exists, archived, see §6.4 step 8)  
@@ -662,19 +665,18 @@ commands from two sessions at once regardless of scope.
   the original #100/#101/#102 cleanup trio (and #101 is itself mostly done,
   see its entry above).
   Scope: GitHub repo settings only, no local files.
-- **#101** ✅ **MOSTLY DONE 2026-07-08** — Investigated and resolved both parts:
+- **#101** ✅ **DONE 2026-07-08** — Investigated and resolved both parts:
   **Signup:** confirmed `brandgeo-signup/` was a drop-in install kit (its own
   `INSTALL.md` says "copy these files into your repo") whose content was
   already merged into `brandgeo-dashboard/src/pages/Signup.tsx` +
   `netlify/functions/signup-client.js` (styled version, ~1hr newer). Copied
   `brandgeo-signup/` to `BrandGEO-archives/brandgeo-signup/` (content-diff
-  verified identical). **Not yet done:** could not delete the original
-  `brandgeo-signup/` at the canonical root — this session's connected-folder
-  mount blocks file deletion (`Operation not permitted` on `mv`/`rm`, same as
-  the `.claude/` write restriction, just for deletes). Constantin needs to
-  delete `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-signup\`
-  himself (File Explorer delete, or `git rm -r brandgeo-signup` — it was
-  untracked anyway).
+  verified identical). The original at the canonical root
+  (`C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-signup\`) is now
+  confirmed deleted — Claude's own `mv`/`rm` was blocked by the
+  connected-folder mount (`Operation not permitted`), but Constantin ran
+  `rmdir /S /Q` on his end and it's gone; verified via directory listing.
+  It was untracked in git, so no `git rm` was needed.
   **Backend:** confirmed `BrandGEO-archives/brandgeo-standalone/backend/` is
   a stale snapshot of the canonical `brandgeo/backend/` — single one-line
   diff in `app/engine_runner.py` (older Perplexity model name + missing
@@ -690,7 +692,52 @@ commands from two sessions at once regardless of scope.
   handling the fix himself (`git add -A`, review `git status`, then commit)
   — not yet confirmed done as of this note.
   Scope: `brandgeo-signup/`, `brandgeo/backend/`, `BrandGEO-archives/brandgeo-standalone/backend/`.
-- *(no other pending items — #73 and #84 finalized below, see Completed)*
+- **#73** ✅ **DONE 2026-07-08** — Wrote `client-onboarding-flow.md` (repo
+  root), documenting the real, as-implemented onboarding flow (not an
+  aspirational design), based on reading `Onboard.tsx`,
+  `onboard-client.js`, `planConfig.ts`, and the §3 schema. Flow: a single
+  admin-only 5-step wizard (Company → Brand Aliases → Competitors → Login
+  → Collecting) that POSTs once to `onboard-client.js`, which atomically
+  creates a `clients` row, a Supabase Auth user, and a `user_profiles` row
+  (hard-coded `role: viewer`), with rollback on partial failure — then the
+  wizard runs its own local, hand-rolled collection loop over the client's
+  prompts. Confirms the known #72 finding (Claude/ChatGPT silently
+  skipped) and found it's **worse than previously recorded**: (1) **no
+  prompts are ever created during onboarding** — neither the wizard nor
+  `onboard-client.js` inserts into `prompts`, so step 5's "Running Initial
+  Collection" will show "No active prompts found" for every real new
+  client; the admin has to manually add prompts via `/prompts` afterward,
+  which the wizard never tells them to do; (2) confirmed in code:
+  `Onboard.tsx`'s local `runCollection()` (~line 94) calls only
+  `collect-prompt` and never `collect-claude`/`collect-chatgpt` — contrast
+  with the correct pattern in `collectionContext.tsx`, which fires all
+  three via `Promise.allSettled`; (3) Onboard's local loop also never
+  passes `active_engines` in its payload, so onboarding collection isn't
+  plan-gated at all, unlike the rest of the app. The wizard's final
+  success message ("{total} prompts × 5 engines collected") is therefore
+  inaccurate on two counts, not one. **Not fixed** — this session was
+  docs-only by design; fixing onboarding to (a) seed default prompts and
+  (b) reuse `collectionContext`'s real `runCollection` instead of its own
+  loop is a good candidate for its own scoped task.
+  Scope: docs-only, `client-onboarding-flow.md` output only.
+- **#84** ✅ **DONE 2026-07-08 (finalized)** — Updated the `id="sentiment"`
+  spotlight section in `brandgeo/web/index.html` now that #83 shipped:
+  CTA `href` changed from `#contact` to
+  `https://app.getbrandgeo.com/sentiment` (the real page is live); CTA
+  text changed from "Ask about Brand Sentiment →" (inquiry-style, implied
+  no self-serve access) to "See Brand Sentiment live →" (direct, matches a
+  button that now links straight into the working app). Fact-checked all 4
+  bullet points against what's actually live on `/sentiment` (score,
+  positive/neutral/negative breakdown, per-engine chart, trend chart,
+  response-snippet feed) — all accurate, no copy changes needed. Mockup
+  card deliberately left untouched (no screenshot-capture tooling
+  available in this environment) — swapping it for a real `/sentiment`
+  screenshot remains an optional future polish item, not a blocker.
+  **Not yet live** — like #99, this is a local file change only; needs
+  manual cPanel re-upload from
+  `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo\web\` before
+  it's visible on getbrandgeo.com.
+  Scope: `brandgeo/web/index.html` only.
 
 ---
 
@@ -700,11 +747,10 @@ commands from two sessions at once regardless of scope.
 Daniel Goane\BrandGEO` is the canonical project root; the old
 `C:\Users\const\Desktop\BpR` and standalone `brandgeo` folders were archived
 (not deleted) to `C:\Users\const\Constantin Daniel Goane\BrandGEO-archives\`.
-Three independent, low-priority cleanup decisions remain open — #100
-(abandoned GitHub repo fate), #101 (signup/backend dedupe), #102 (legacy
-Supabase tables) — none of them block anything or require re-confirming
-before future sessions do normal feature work in the canonical root. Only
-re-open this section's sequencing if actually touching #100/#101/#102 or if
+Of the three independent cleanup decisions, #100 and #102 are now closed
+(see §5 Completed) — only #101's remainder (deleting `brandgeo-signup/`
+manually, see its §5 entry) is still open, and it's non-blocking. Only
+re-open this section's sequencing if actually touching #101 or if
 something about the new structure turns out to be broken.
 
 ### 6.1 Why
@@ -1044,24 +1090,41 @@ Formalize what's partially already there (§4.2 violet tokens,
   organized, not a flat icon dump.
 
 **Phase 3 — Page-by-Page Redesign (priority order)**
+
+Bundle the relevant still-open #72 audit findings into each page's pass
+below — same file is already being opened, so fixing these alongside the
+visual work is close to free rather than a separate future cleanup pass.
+
 1. **Overview** (`Dashboard.tsx`) — highest-traffic page, first thing seen
    after login, currently the most broken. Lead with a large AI Visibility
    Score treatment (ring/gauge) matching the marketing site's own preview
-   mockup; add card elevation from Phase 1; fix chart styling.
+   mockup; add card elevation from Phase 1; fix chart styling. **Also fix
+   while here (#72):** `as any` casts, decorative time filter (page doesn't
+   actually read `timeRange`).
 2. **AI Visibility** (`AIVisibility.tsx`) — core feature page (engine cards,
-   prompt table, Fix This hub); apply Phase 1–2 conventions.
+   prompt table, Fix This hub); apply Phase 1–2 conventions. **Also fix
+   while here (#72):** teal used for active/selected states, violating the
+   violet-only brand rule (§4.2).
 3. **Brand Sentiment** (`BrandSentiment.tsx`) — newest page (#83), least
    legacy-encumbered, good candidate to set the "target look" other pages
    get matched to.
 4. **Competitors, Recommendations, Mentions** — same treatment, lower
-   individual traffic than 1–3.
+   individual traffic than 1–3. **Also fix while here (#72):** `as any`
+   casts in `Mentions.tsx`.
 5. **Prompts, Usage, Onboard, Signup** — functional/utility pages, lowest
    visual priority but still worth bringing onto the token system, to avoid
    repeating the "5 of 11 pages" inconsistency pattern already documented in
-   #72 (i18n coverage drift).
+   #72 (i18n coverage drift). **Also fix while here (#72):** teal violation
+   in `Prompts.tsx`. **Onboard.tsx is a special case — see §7.5 Risks below,
+   don't let it wait for its Phase 3 turn.**
 - *Exit criteria per page:* passes a quick self-check against Phase 1
   tokens — hierarchy, consistency, no `as any` casts or hardcoded one-off
   colors (§4.4).
+- `marketContext.tsx`'s Romania-default bug (#72 finding 3 — any session
+  with no saved market defaults to `MARKETS[1]`, a leftover BpR assumption
+  that violates the Scalability Rule for every non-Romanian client) isn't
+  page-specific — fix it once, in whichever session first touches
+  `marketContext.tsx`, rather than waiting for a specific page's turn.
 
 **Phase 4 — Marketing Site Alignment**
 - Swap the "what you get" dashboard-preview mockup on `getbrandgeo.com` for
@@ -1100,3 +1163,33 @@ work) since multiple Task chats can run at once on non-overlapping pages —
 e.g. one session on Phase 3.1 (Overview) while another does Phase 3.3
 (Sentiment), as long as neither touches `Layout.tsx` at the same time as
 Phase 2. Phases 4–5 are lower-risk and can spill past the window if needed.
+
+### 7.5 Risks & Open Questions (added 2026-07-08)
+
+- 🔴 **Onboarding flow is functionally broken, independent of any visual
+  redesign — don't let it wait for Phase 3.** Per #73's finding: no prompts
+  are ever seeded during onboarding, so a brand-new client's dashboard shows
+  "No active prompts found" immediately after signup; `Onboard.tsx`'s own
+  collection loop only calls `collect-prompt` (Gemini/Perplexity/Meta),
+  silently skipping Claude and ChatGPT while its success message claims "5
+  engines collected." A beautifully redesigned dashboard that greets new
+  users with a broken empty state undercuts the whole point of this
+  initiative. **Recommendation:** fix this as its own Task chat, in
+  parallel with Phase 0–2 (different files, no scope overlap — see the
+  parallel-work window in §0), not gated behind the Phase 3 queue.
+  Scope: `Onboard.tsx`, `onboard-client.js` only.
+- 🟡 **The roadmap in §7.4 is based on general "modern SaaS" conventions,
+  not an actual peec.ai teardown.** If beating that specific competitor
+  matters, a real side-by-side (their onboarding flow, empty states, actual
+  color/type choices, live screenshots) would sharpen Phase 1's
+  design-system decisions more than general impressions would. Worth doing
+  before Phase 1 locks in tokens, not after.
+- 🟡 **No success metric defined for the redesign.** Plausible analytics is
+  already live on the website. Before Phase 4/5, decide what "the redesign
+  worked" actually means — signup conversion rate, time-to-first-prompt,
+  session length — so there's something concrete to check against rather
+  than a vibe-based judgment.
+- 🟢 **Mobile/responsive coverage isn't explicitly called out per-phase.**
+  #39 already made the dashboard responsive once; Phase 3's exit criteria
+  should explicitly include a mobile check per page, not just desktop, so
+  this doesn't regress silently during the redesign.
