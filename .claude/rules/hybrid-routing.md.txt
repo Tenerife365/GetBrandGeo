@@ -1,0 +1,13 @@
+# Hybrid Model Routing Instructions
+
+When executing tasks in the `brandgeo-dashboard` workspace, follow these model assignments:
+
+### 1. Route to Sonnet 5 (Frontend UI & Standard Workflows)
+- Refactoring, styling, or creating React/Next.js dashboard components.
+- Standard script writing, folder management, and local file organization.
+- Writing data cleaning, geocoding validation, or JSON extraction logic.
+
+### 2. Route to Opus 4.8 (Complex Reasoning & Feature Design)
+- Designing the architecture for "Geo-Agents" or natural language mapping queries.
+- Debugging complex state-tracking issues or deeply nested data pipelines.
+- Reviewing security, authentication, or major database schema changes.
