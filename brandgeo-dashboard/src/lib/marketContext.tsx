@@ -178,8 +178,13 @@ const Ctx = createContext<MarketCtx>({
  * collects a real default market per client; this is what makes writing
  * `clients.default_market_id` actually do something instead of being a
  * column nobody reads.
+ *
+ * `defaultRegionId` param added same day: `default_market_id` alone can
+ * only pick the country, not e.g. Bucharest specifically within Romania —
+ * this narrows to that region when it's a valid region of the resolved
+ * market, otherwise falls back to that market's first region as before.
  */
-function loadSaved(clientId: number, defaultMarketId?: string | null): MarketSelection[] {
+function loadSaved(clientId: number, defaultMarketId?: string | null, defaultRegionId?: string | null): MarketSelection[] {
   try {
     // Per-client key (new) — explicit prior selection always wins
     const clientKey = `brandgeo_markets_v2_${clientId}`
@@ -212,7 +217,10 @@ function loadSaved(clientId: number, defaultMarketId?: string | null): MarketSel
   // falling back to legacy global v1 keys or the hardcoded Romania default.
   if (defaultMarketId) {
     const mkt = MARKETS.find(m => m.id === defaultMarketId)
-    if (mkt) return [{ market: mkt, region: mkt.regions[0] }]
+    if (mkt) {
+      const reg = mkt.regions.find(r => r.id === defaultRegionId) ?? mkt.regions[0]
+      return [{ market: mkt, region: reg }]
+    }
   }
 
   // v1 migration / final default
@@ -231,14 +239,15 @@ function loadSaved(clientId: number, defaultMarketId?: string | null): MarketSel
 export function MarketProvider({ children }: { children: ReactNode }) {
   const { activeClientId, activeClient } = useClient()
   const [selections, setSelections] = useState<MarketSelection[]>(
-    () => loadSaved(activeClientId, activeClient?.default_market_id)
+    () => loadSaved(activeClientId, activeClient?.default_market_id, activeClient?.default_region_id)
   )
 
   // Reload market whenever the active client changes, or once its record
-  // (including default_market_id) finishes loading asynchronously.
+  // (including default_market_id/default_region_id) finishes loading
+  // asynchronously.
   useEffect(() => {
-    setSelections(loadSaved(activeClientId, activeClient?.default_market_id))
-  }, [activeClientId, activeClient?.default_market_id])
+    setSelections(loadSaved(activeClientId, activeClient?.default_market_id, activeClient?.default_region_id))
+  }, [activeClientId, activeClient?.default_market_id, activeClient?.default_region_id])
 
   const storageKey = `brandgeo_markets_v2_${activeClientId}`
 

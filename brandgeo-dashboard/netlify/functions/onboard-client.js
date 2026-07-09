@@ -8,6 +8,7 @@
  *   name, slug, brand_website, brand_aliases, known_competitors,
  *   plan?: 'free'|'essentials'|'managed'|'pro'|'enterprise',
  *   default_market_id?: string,   // e.g. 'RO', 'WW' — see marketContext.tsx MARKETS
+ *   default_region_id?: string,   // e.g. 'B' (Bucharest) — must belong to default_market_id's regions
  *   contact_email,
  *   prompts?: string[]   // initial buyer-query prompts to seed for this client
  * }
@@ -47,7 +48,7 @@ exports.handler = async (event) => {
 
   const {
     name, slug, brand_website, brand_aliases, known_competitors,
-    plan, default_market_id, contact_email, prompts,
+    plan, default_market_id, default_region_id, contact_email, prompts,
   } = body
 
   if (!name || !slug || !contact_email) {
@@ -65,6 +66,7 @@ exports.handler = async (event) => {
       name, slug, brand_website, brand_aliases, known_competitors,
       plan: clientPlan,
       default_market_id: default_market_id || null,
+      default_region_id: default_region_id || null,
     })
     .select()
     .single()

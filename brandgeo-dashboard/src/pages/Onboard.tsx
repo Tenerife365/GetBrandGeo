@@ -21,6 +21,7 @@ export default function Onboard() {
   const [website, setWebsite]     = useState('')
   const [plan, setPlan]           = useState<Plan>('essentials')
   const [marketId, setMarketId]   = useState<string>('WW')
+  const [regionId, setRegionId]   = useState<string>('ALL')
   const [aliasInput, setAliasInput]       = useState('')
   const [aliases, setAliases]             = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
@@ -67,6 +68,14 @@ export default function Onboard() {
 
   const autoSlug = (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+  const selectedMarket = MARKETS.find(m => m.id === marketId) ?? MARKETS[0]
+
+  const handleMarketChange = (id: string) => {
+    setMarketId(id)
+    const mkt = MARKETS.find(m => m.id === id) ?? MARKETS[0]
+    setRegionId(mkt.regions[0]?.id ?? 'ALL')
+  }
+
   // ── Step 5: Create client + user + initial prompts ───────────────────────
 
   const handleCreate = async () => {
@@ -87,6 +96,7 @@ export default function Onboard() {
           known_competitors:  competitors,
           plan,
           default_market_id:  marketId,
+          default_region_id:  regionId,
           contact_email:      email,
           prompts,
         }),
@@ -182,15 +192,22 @@ export default function Onboard() {
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Default market</label>
-                <select value={marketId} onChange={e => setMarketId(e.target.value)}
+                <select value={marketId} onChange={e => handleMarketChange(e.target.value)}
                   className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
                   {MARKETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </div>
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Default region</label>
+              <select value={regionId} onChange={e => setRegionId(e.target.value)}
+                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
+                {selectedMarket.regions.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+              </select>
+            </div>
             <p className="text-xs text-slate-500 -mt-2">
-              Plan controls which AI engines collect for this client. Market sets what this
-              client's dashboard defaults to before they pick their own — without it, new
+              Plan controls which AI engines collect for this client. Market and region set what
+              this client's dashboard defaults to before they pick their own — without it, new
               clients otherwise default to Romania regardless of who they are.
             </p>
             <button disabled={!name || !slug}
@@ -321,7 +338,7 @@ export default function Onboard() {
               <div><span className="text-slate-600">Company:</span> <span className="text-slate-300">{name}</span></div>
               <div><span className="text-slate-600">Website:</span> <span className="text-slate-300">{website || '—'}</span></div>
               <div><span className="text-slate-600">Plan:</span> <span className="text-slate-300">{PLAN_LABELS[plan]}</span></div>
-              <div><span className="text-slate-600">Market:</span> <span className="text-slate-300">{MARKETS.find(m => m.id === marketId)?.label ?? marketId}</span></div>
+              <div><span className="text-slate-600">Market:</span> <span className="text-slate-300">{selectedMarket.regions.find(r => r.id === regionId)?.label ?? regionId}, {selectedMarket.label}</span></div>
               <div><span className="text-slate-600">Aliases:</span> <span className="text-slate-300">{aliases.join(', ') || '—'}</span></div>
               <div><span className="text-slate-600">Competitors:</span> <span className="text-slate-300">{competitors.length} added</span></div>
               <div><span className="text-slate-600">Prompts:</span> <span className="text-slate-300">{prompts.length} added</span></div>
