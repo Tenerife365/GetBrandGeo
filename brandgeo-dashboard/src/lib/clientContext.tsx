@@ -67,8 +67,15 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     if (isDemoMode) { setLoading(false); return }
 
     async function init() {
+      setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
+      if (!user) {
+        setIsAdmin(false)
+        setClients([])
+        setActiveClient(null)
+        setLoading(false)
+        return
+      }
 
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -132,6 +139,25 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     }
 
     init()
+
+    // Re-run on real sign-in/sign-out transitions. Without this listener,
+    // isAdmin/clients only ever populate from the very first time this
+    // Provider mounts — logging out and back in client-side (no full page
+    // reload) never re-triggers the effect above, so the sidebar's client
+    // switcher silently disappears and stays gone for the rest of the tab's
+    // life. Found + fixed 2026-07-09 (task #107).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        init()
+      } else if (event === 'SIGNED_OUT') {
+        setIsAdmin(false)
+        setClients([])
+        setActiveClient(null)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const setActiveClientId = (id: number) => {
