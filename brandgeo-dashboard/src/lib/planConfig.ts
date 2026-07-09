@@ -19,17 +19,26 @@ export type EngineId =
   | 'deepseek'
   | 'grok'
 
-export type Plan = 'free' | 'essentials' | 'managed' | 'pro' | 'enterprise'
+export type Plan = 'free' | 'essentials' | 'growth' | 'managed' | 'pro' | 'enterprise'
 
 export type EngineState = 'active' | 'coming_soon' | 'locked'
 
 // ── Plan → engines ceiling ────────────────────────────────────────────────────
+// Growth/Managed/Pro/Enterprise all get the same 5 "live" (built) engines —
+// per PRICING-SPEC.md §4 sub-decision B1, the differentiation from Growth up
+// is service level + scale (done-for-you work, prompt volume, markets,
+// support), not engine count. Pro/Enterprise additionally carry the 4
+// not-yet-built engines (google_ai/copilot/deepseek/grok) in their own engine
+// set so those tiers auto-unlock them the moment they leave COMING_SOON_ENGINES,
+// without a config change — Growth/Managed deliberately do not reserve those
+// yet (2026-07-09, PRICING-SPEC.md §4 item 4).
 export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'meta', 'copilot', 'deepseek', 'grok'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'meta', 'copilot', 'deepseek', 'grok'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta', 'google_ai', 'copilot', 'deepseek', 'grok'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta', 'google_ai', 'copilot', 'deepseek', 'grok'],
 }
 
 // ── Engines not yet built/collecting — always "coming soon" ──────────────────
@@ -42,13 +51,17 @@ export const ALL_ENGINES: EngineId[] = [
 ]
 
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
+// Kept in sync with PLAN_ENGINES above by hand — derive the "X+" label shown
+// on locked engine cards. perplexity/meta moved to 'growth' (was
+// managed/pro) and google_ai moved to 'pro' (was managed) to match the
+// PLAN_ENGINES change above (2026-07-09).
 export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
   chatgpt:    'free',
   gemini:     'essentials',
   claude:     'essentials',
-  perplexity: 'managed',
-  google_ai:  'managed',
-  meta:       'pro',
+  perplexity: 'growth',
+  meta:       'growth',
+  google_ai:  'pro',
   copilot:    'pro',
   deepseek:   'pro',
   grok:       'pro',
@@ -73,11 +86,12 @@ export const ENGINE_META: Record<EngineId, {
   grok:       { label: 'Grok',      color: 'text-slate-300',   bg: 'bg-slate-300/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#94a3b8' },
 }
 
-export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'managed', 'pro', 'enterprise']
+export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'managed', 'pro', 'enterprise']
 
 export const PLAN_LABELS: Record<Plan, string> = {
   free:       'Free',
   essentials: 'Essentials',
+  growth:     'Growth',
   managed:    'Managed',
   pro:        'Pro',
   enterprise: 'Enterprise',
