@@ -91,6 +91,24 @@ function matchesAlias(segment, aliases, aliasesStripped, website) {
 }
 
 /**
+ * Return only the sentence(s) / list-item(s) that actually mention the brand,
+ * joined + normalised + lowercased. Used to scope sentiment to the brand's own
+ * context instead of the whole response (audit finding 1.1): a "best X" listicle
+ * contains 'best'/'top'/'recommend' no matter what it says about *this* brand, so
+ * scanning the full text scored almost everything positive.
+ *
+ * Split at sentence boundaries AND newlines (list items are newline-separated,
+ * prose is sentence-separated), keep the segments matching the brand, and return
+ * them. Splitting must happen on the raw text before normalizeText() collapses
+ * newlines. Returns '' if no segment matches (caller falls back to neutral).
+ */
+function extractBrandContext(text, aliases, aliasesStripped, website) {
+  const segments = String(text).split(/(?<=[.!?])\s+|\n+/)
+  const hits = segments.filter(s => matchesAlias(s, aliases, aliasesStripped, website))
+  return hits.length ? normalizeText(hits.join(' ')).toLowerCase() : ''
+}
+
+/**
  * Reject descriptive phrases that AI engines sometimes list as numbered items
  * instead of actual company names (e.g. "Experiență Masivă", "Record De Capacitate").
  * Applied before saving competitors_mentioned so the DB stays clean.
@@ -173,13 +191,25 @@ function analyseResponse(text, cfg) {
   if (brandInList)   position = brandInList.pos
   else if (mentioned) position = detectListPosition(text, aliases, aliasesStripped, website)
 
+  // Sentiment is scored ONLY on the brand's own sentence(s)/list-item(s), not
+  // the whole response (audit finding 1.1). We claim a polarity only when the
+  // brand's own context is unambiguous: positive words but no negative → positive,
+  // negative but no positive → negative, both-or-neither → neutral. This is
+  // deliberately conservative — a mixed or signal-less mention is neutral, not a
+  // coin-flip. NOTE: word lists are RO+EN only, so brand clauses in other
+  // languages score neutral (audit finding 1.1 part b, still open — needs either
+  // a maintained multilingual lexicon or an LLM-based classifier; not fixed here).
   const posWords = ['recomandat','recomandam','recommend','best','top','excelen','calitat',
                     'profesional','lider','prima','leading','trusted','award']
   const negWords = ['evita','avoid','problema','complaint','slab','negativ','poor','worst']
   let sentiment = 'neutral'
   if (mentioned) {
-    if (posWords.some(w => lower.includes(w))) sentiment = 'positive'
-    else if (negWords.some(w => lower.includes(w))) sentiment = 'negative'
+    const brandCtx = extractBrandContext(text, aliases, aliasesStripped, website)
+    const hasPos = posWords.some(w => brandCtx.includes(w))
+    const hasNeg = negWords.some(w => brandCtx.includes(w))
+    if (hasPos && !hasNeg)      sentiment = 'positive'
+    else if (hasNeg && !hasPos) sentiment = 'negative'
+    // both signals, or neither → neutral (ambiguous / no signal in brand's context)
   }
 
   let snippet = null
@@ -224,6 +254,7 @@ module.exports = {
   extractTopRankedResults,
   detectListPosition,
   matchesAlias,
+  extractBrandContext,
   isCompanyName,
   scanForKnownCompetitors,
   NOT_A_COMPANY,
