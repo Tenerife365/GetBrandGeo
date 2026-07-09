@@ -192,16 +192,27 @@ function analyseResponse(text, cfg) {
   else if (mentioned) position = detectListPosition(text, aliases, aliasesStripped, website)
 
   // Sentiment is scored ONLY on the brand's own sentence(s)/list-item(s), not
-  // the whole response (audit finding 1.1). We claim a polarity only when the
+  // the whole response (audit finding 1.1a). We claim a polarity only when the
   // brand's own context is unambiguous: positive words but no negative → positive,
-  // negative but no positive → negative, both-or-neither → neutral. This is
-  // deliberately conservative — a mixed or signal-less mention is neutral, not a
-  // coin-flip. NOTE: word lists are RO+EN only, so brand clauses in other
-  // languages score neutral (audit finding 1.1 part b, still open — needs either
-  // a maintained multilingual lexicon or an LLM-based classifier; not fixed here).
-  const posWords = ['recomandat','recomandam','recommend','best','top','excelen','calitat',
-                    'profesional','lider','prima','leading','trusted','award']
-  const negWords = ['evita','avoid','problema','complaint','slab','negativ','poor','worst']
+  // negative but no positive → negative, both-or-neither → neutral (conservative —
+  // a mixed or signal-less mention is neutral, not a coin-flip).
+  //
+  // Word lists use stems (not full forms) so one entry covers inflections:
+  // 'recomand' catches recomandat/recomandăm/recomandare/recomandarea/recomandată;
+  // 'excelen' catches excelent/excelentă; 'potrivit' catches potrivit/potrivită.
+  // Expanded 2026-07-09 from real production data (finding 1.1b): a 🥇 #1
+  // "Recomandarea …/cea mai potrivită alegere" and an "în primul rând" first-pick
+  // were scoring neutral because the RO praise phrasings weren't covered.
+  // STILL a keyword approach → non-RO/EN languages and novel phrasings remain a
+  // gap; explicit negation ("nu recomand …") resolves to neutral, not negative
+  // (the pos stem also matches). The real fix for full nuance is an LLM-based
+  // classifier of the brand clause (finding 1.1b, still the open long-term item).
+  const posWords = ['recomand','recommend','best','top','excelen','excellent','calitat',
+                    'profesional','lider','leading','prima','primul rând','potrivit',
+                    'cea mai bun','cel mai bun','de încredere','trusted','premiat','award',
+                    'ideal','reliable','preferat','🥇']
+  const negWords = ['evita','avoid','problema','complaint','slab','negativ','poor','worst',
+                    'nu recomand','nerecomand','dezamăg','plânger','prost']
   let sentiment = 'neutral'
   if (mentioned) {
     const brandCtx = extractBrandContext(text, aliases, aliasesStripped, website)

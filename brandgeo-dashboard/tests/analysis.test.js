@@ -92,4 +92,35 @@ console.log('extractBrandContext — isolates only brand segments:')
   passed++; console.log('  ok - context excludes neighbouring items')
 }
 
+console.log('lexicon — real Romanian praise phrasings (finding 1.1b, 2026-07-09):')
+
+// 8. 🥇 #1 "Recomandarea …/cea mai potrivită alegere" — was scoring neutral
+//    (id 1559 in prod). 'recomand' stem + 'potrivit' + '🥇' now catch it.
+{
+  const text = 'Iată cele mai bune opțiuni:\n\n## 🥇 1. Bucate pe Roate — (Recomandarea #1 pentru evenimente mari)\nAceasta este cea mai potrivită alegere pentru un eveniment de 1.000+ persoane.'
+  check('RO gold-medal #1 recommendation → positive', analyseResponse(text, cfg).sentiment, 'positive')
+}
+
+// 9. "în primul rând <brand>" first-pick (id 1553 in prod) — was neutral.
+{
+  const text = 'Pentru evenimente corporate mari, eu aș pune pe shortlist în primul rând Bucate pe Roate.'
+  check('RO "primul rand" first pick → positive', analyseResponse(text, cfg).sentiment, 'positive')
+}
+
+// 10. "opțiune excelentă" — stayed positive (id 1550 in prod), 'excelen' stem.
+{
+  const text = 'Bucate pe Roate este o opțiune excelentă, cu experiență considerabilă.'
+  check('RO "excelenta" → positive', analyseResponse(text, cfg).sentiment, 'positive')
+}
+
+// 11. Explicit RO negation must NOT read as positive. Because the pos stem
+//     'recomand' also matches "nu recomand", this resolves to neutral (both
+//     signals) — documented keyword limitation; the key property is "not positive".
+{
+  const text = 'Nu recomand Bucate pe Roate din cauza serviciilor slabe.'
+  const s = analyseResponse(text, cfg).sentiment
+  assert.notStrictEqual(s, 'positive', `RO negation must not be positive (got ${s})`)
+  passed++; console.log('  ok - RO "nu recomand" is not positive (got ' + s + ')')
+}
+
 console.log(`\nAll ${passed} assertions passed.`)
