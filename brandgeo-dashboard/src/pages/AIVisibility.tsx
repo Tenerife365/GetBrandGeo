@@ -819,7 +819,7 @@ export default function AIVisibility() {
               onClick={() => setFilterCats(new Set())}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                 filterCats.size === 0
-                  ? 'bg-teal-500 text-white border-teal-600'
+                  ? 'bg-brand-500 text-white border-brand-600'
                   : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
               }`}
             >
@@ -840,7 +840,7 @@ export default function AIVisibility() {
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                     active
-                      ? 'bg-teal-500 text-white border-teal-600'
+                      ? 'bg-brand-500 text-white border-brand-600'
                       : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
                   }`}
                 >
