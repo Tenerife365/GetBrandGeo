@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
-import { getActiveEngines } from '../lib/planConfig'
+import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, type Plan } from '../lib/planConfig'
+import { MARKETS } from '../lib/marketContext'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Lock, Zap, MessageSquarePlus } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus } from 'lucide-react'
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -18,6 +19,8 @@ export default function Onboard() {
   const [name, setName]           = useState('')
   const [slug, setSlug]           = useState('')
   const [website, setWebsite]     = useState('')
+  const [plan, setPlan]           = useState<Plan>('essentials')
+  const [marketId, setMarketId]   = useState<string>('WW')
   const [aliasInput, setAliasInput]       = useState('')
   const [aliases, setAliases]             = useState<string[]>([])
   const [competitorInput, setCompetitorInput] = useState('')
@@ -25,8 +28,6 @@ export default function Onboard() {
   const [promptInput, setPromptInput]     = useState('')
   const [prompts, setPrompts]             = useState<string[]>([])
   const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [showPass, setShowPass]   = useState(false)
   const [creating, setCreating]   = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [newClientId, setNewClientId] = useState<number | null>(null)
@@ -81,11 +82,12 @@ export default function Onboard() {
         },
         body: JSON.stringify({
           name, slug,
-          brand_website:    website,
-          brand_aliases:    aliases,
-          known_competitors: competitors,
-          contact_email:    email,
-          contact_password: password,
+          brand_website:      website,
+          brand_aliases:      aliases,
+          known_competitors:  competitors,
+          plan,
+          default_market_id:  marketId,
+          contact_email:      email,
           prompts,
         }),
       })
@@ -97,7 +99,7 @@ export default function Onboard() {
       // Fire the same 3-parallel-function collection every other page uses
       // (collectionContext.tsx), gated to this client's actual plan — not
       // the hand-rolled, collect-prompt-only loop this page used to run.
-      const engines = getActiveEngines(data.plan ?? 'essentials', data.engines_enabled ?? null)
+      const engines = getActiveEngines(data.plan ?? plan, data.engines_enabled ?? null)
       setCollectionRunning(true)
       runCollection(data.client_id, true, undefined, engines).finally(() => setCollectionRunning(false))
     } catch (err: unknown) {
@@ -114,7 +116,7 @@ export default function Onboard() {
     { n: 2, label: 'Brand',       icon: Tag },
     { n: 3, label: 'Competitors', icon: Users },
     { n: 4, label: 'Prompts',     icon: MessageSquarePlus },
-    { n: 5, label: 'Login',       icon: Lock },
+    { n: 5, label: 'Invite',      icon: Mail },
     { n: 6, label: 'Collecting',  icon: Zap },
   ]
 
@@ -170,6 +172,27 @@ export default function Onboard() {
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
                 placeholder="bucateperoate.ro" />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Plan *</label>
+                <select value={plan} onChange={e => setPlan(e.target.value as Plan)}
+                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
+                  {PLAN_ORDER.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Default market</label>
+                <select value={marketId} onChange={e => setMarketId(e.target.value)}
+                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
+                  {MARKETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 -mt-2">
+              Plan controls which AI engines collect for this client. Market sets what this
+              client's dashboard defaults to before they pick their own — without it, new
+              clients otherwise default to Romania regardless of who they are.
+            </p>
             <button disabled={!name || !slug}
               onClick={() => setStep(2)}
               className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
@@ -274,35 +297,31 @@ export default function Onboard() {
           </div>
         )}
 
-        {/* ── Step 5: Login credentials ── */}
+        {/* ── Step 5: Client invite ──
+             No password field — onboard-client.js now uses Supabase's
+             auth.admin.inviteUserByEmail, which emails the client a link to
+             /reset-password to set their own password. The admin never
+             sees or relays a password (task, 2026-07-09). */}
         {step === 5 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Lock size={18} className="text-brand-400" /> Client Login</h2>
-            <p className="text-xs text-slate-500">These credentials will be used by the client to log in. They'll have viewer-only access.</p>
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Mail size={18} className="text-brand-400" /> Client Invite</h2>
+            <p className="text-xs text-slate-500">
+              We'll email this address an invite link to set their own password and log in
+              with viewer-only access. No password to relay by hand.
+            </p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Email *</label>
               <input value={email} onChange={e => setEmail(e.target.value)} type="email"
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
                 placeholder="client@company.com" />
             </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Password *</label>
-              <div className="relative">
-                <input value={password} onChange={e => setPassword(e.target.value)}
-                  type={showPass ? 'text' : 'password'}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50 pr-16"
-                  placeholder="Minimum 8 characters" />
-                <button onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-300">
-                  {showPass ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
 
             {/* Summary */}
             <div className="rounded-lg bg-dark-700/50 border border-dark-600 p-4 space-y-1.5 text-xs text-slate-400">
               <div><span className="text-slate-600">Company:</span> <span className="text-slate-300">{name}</span></div>
               <div><span className="text-slate-600">Website:</span> <span className="text-slate-300">{website || '—'}</span></div>
+              <div><span className="text-slate-600">Plan:</span> <span className="text-slate-300">{PLAN_LABELS[plan]}</span></div>
+              <div><span className="text-slate-600">Market:</span> <span className="text-slate-300">{MARKETS.find(m => m.id === marketId)?.label ?? marketId}</span></div>
               <div><span className="text-slate-600">Aliases:</span> <span className="text-slate-300">{aliases.join(', ') || '—'}</span></div>
               <div><span className="text-slate-600">Competitors:</span> <span className="text-slate-300">{competitors.length} added</span></div>
               <div><span className="text-slate-600">Prompts:</span> <span className="text-slate-300">{prompts.length} added</span></div>
@@ -312,9 +331,9 @@ export default function Onboard() {
 
             <div className="flex gap-2">
               <button onClick={() => setStep(4)} disabled={creating} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors disabled:opacity-40">Back</button>
-              <button onClick={handleCreate} disabled={creating || !email || !password || password.length < 8}
+              <button onClick={handleCreate} disabled={creating || !email}
                 className="flex-1 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {creating ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : 'Create Client'}
+                {creating ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : 'Create Client & Send Invite'}
               </button>
             </div>
           </div>

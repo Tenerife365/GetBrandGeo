@@ -166,11 +166,22 @@ const Ctx = createContext<MarketCtx>({
 /**
  * Load saved market selections for a specific client.
  * Storage key: brandgeo_markets_v2_${clientId}
- * Falls back to the old global key for migration, then to RO default.
+ * Falls back (in order) to: the old global key for migration, then the
+ * client's own `default_market_id` (set during onboarding, see
+ * onboard-client.js), then the old v1 global keys, then a hardcoded RO
+ * default as the last resort.
+ *
+ * `defaultMarketId` param added 2026-07-09: previously any client with no
+ * saved localStorage entry — which is every brand-new client — silently
+ * fell all the way to the hardcoded Romania default below, regardless of
+ * where that client actually operates (#72 audit finding). Onboarding now
+ * collects a real default market per client; this is what makes writing
+ * `clients.default_market_id` actually do something instead of being a
+ * column nobody reads.
  */
-function loadSaved(clientId: number): MarketSelection[] {
+function loadSaved(clientId: number, defaultMarketId?: string | null): MarketSelection[] {
   try {
-    // Per-client key (new)
+    // Per-client key (new) — explicit prior selection always wins
     const clientKey = `brandgeo_markets_v2_${clientId}`
     const perClient = localStorage.getItem(clientKey)
     if (perClient) {
@@ -196,7 +207,15 @@ function loadSaved(clientId: number): MarketSelection[] {
       if (result.length > 0) return result
     }
   } catch {}
-  // v1 migration / default
+
+  // This client's own configured default (set during onboarding) — before
+  // falling back to legacy global v1 keys or the hardcoded Romania default.
+  if (defaultMarketId) {
+    const mkt = MARKETS.find(m => m.id === defaultMarketId)
+    if (mkt) return [{ market: mkt, region: mkt.regions[0] }]
+  }
+
+  // v1 migration / final default
   const oldId  = localStorage.getItem('brandgeo_market')
   const oldReg = localStorage.getItem('brandgeo_region') ?? 'ALL'
   const mkt = MARKETS.find(m => m.id === oldId) ?? MARKETS[1] // default RO
@@ -210,13 +229,16 @@ function loadSaved(clientId: number): MarketSelection[] {
  * Switching clients reloads that client's saved market instantly.
  */
 export function MarketProvider({ children }: { children: ReactNode }) {
-  const { activeClientId } = useClient()
-  const [selections, setSelections] = useState<MarketSelection[]>(() => loadSaved(activeClientId))
+  const { activeClientId, activeClient } = useClient()
+  const [selections, setSelections] = useState<MarketSelection[]>(
+    () => loadSaved(activeClientId, activeClient?.default_market_id)
+  )
 
-  // Reload market whenever the active client changes
+  // Reload market whenever the active client changes, or once its record
+  // (including default_market_id) finishes loading asynchronously.
   useEffect(() => {
-    setSelections(loadSaved(activeClientId))
-  }, [activeClientId])
+    setSelections(loadSaved(activeClientId, activeClient?.default_market_id))
+  }, [activeClientId, activeClient?.default_market_id])
 
   const storageKey = `brandgeo_markets_v2_${activeClientId}`
 

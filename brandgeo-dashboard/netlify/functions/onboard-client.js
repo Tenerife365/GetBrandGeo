@@ -6,21 +6,34 @@
  *
  * POST body: {
  *   name, slug, brand_website, brand_aliases, known_competitors,
- *   contact_email, contact_password,
+ *   plan?: 'free'|'essentials'|'managed'|'pro'|'enterprise',
+ *   default_market_id?: string,   // e.g. 'RO', 'WW' — see marketContext.tsx MARKETS
+ *   contact_email,
  *   prompts?: string[]   // initial buyer-query prompts to seed for this client
  * }
  *
- * Note (task #73 fix, 2026-07-08): this function now (a) sets an explicit
- * `plan: 'essentials'` default on the new client — previously omitted, so
- * the row fell through to whatever the DB column default happened to be —
- * and returns `plan`/`engines_enabled` so the caller can compute
- * `active_engines` correctly for the initial collection pass, and (b)
+ * Note (task #73 fix, 2026-07-08): this function sets an explicit `plan`
+ * default on the new client (was previously omitted, falling through to an
+ * undocumented DB column default), returns `plan`/`engines_enabled` so the
+ * caller can compute `active_engines` for the initial collection pass, and
  * seeds `prompts` rows if provided, since nothing else in onboarding ever
- * created any and the wizard's own collection step had nothing to collect.
+ * created any.
+ *
+ * Update (2026-07-09): the wizard now collects `plan` and `default_market_id`
+ * explicitly instead of hardcoding 'essentials' and leaving market unset
+ * (the latter previously meant every new client silently defaulted to
+ * Romania in marketContext.tsx — see its `loadSaved()`). Also switched from
+ * `auth.admin.createUser({ password })` to `auth.admin.inviteUserByEmail()`
+ * — the admin no longer sets/relays a password by hand; Supabase emails the
+ * client an invite link to `/reset-password` (existing page) to set their
+ * own.
  */
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
+
+const VALID_PLANS = ['free', 'essentials', 'managed', 'pro', 'enterprise']
+const APP_URL = 'https://app.getbrandgeo.com'
 
 exports.handler = async (event) => {
   // Auth: only admin users may create clients
@@ -34,24 +47,25 @@ exports.handler = async (event) => {
 
   const {
     name, slug, brand_website, brand_aliases, known_competitors,
-    contact_email, contact_password, prompts,
+    plan, default_market_id, contact_email, prompts,
   } = body
 
-  if (!name || !slug || !contact_email || !contact_password) {
-    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields: name, slug, contact_email, contact_password' }) }
+  if (!name || !slug || !contact_email) {
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields: name, slug, contact_email' }) }
   }
+
+  const clientPlan = VALID_PLANS.includes(plan) ? plan : 'essentials'
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
   // 1. Create client row
-  // `plan` explicitly set (was previously omitted, falling through to an
-  // undocumented DB column default) — 'essentials' matches the fallback
-  // default already used elsewhere in the app (clientContext.tsx) for
-  // clients missing plan data, and unlocks chatgpt+gemini+claude out of
-  // the box rather than the bare 'free' tier's chatgpt-only.
   const { data: client, error: clientErr } = await supabase
     .from('clients')
-    .insert({ name, slug, brand_website, brand_aliases, known_competitors, plan: 'essentials' })
+    .insert({
+      name, slug, brand_website, brand_aliases, known_competitors,
+      plan: clientPlan,
+      default_market_id: default_market_id || null,
+    })
     .select()
     .single()
 
@@ -59,17 +73,20 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Client creation failed: ${clientErr.message}` }) }
   }
 
-  // 2. Create Supabase auth user (email confirmed immediately)
-  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-    email: contact_email,
-    password: contact_password,
-    email_confirm: true,
-  })
+  // 2. Invite the client by email instead of setting a password directly —
+  // Supabase sends its "Invite user" template email (same delivery path
+  // signup-client.js already relies on for its confirmation email) with a
+  // link to /reset-password, where ResetPassword.tsx lets them set their
+  // own password. The admin never sees or has to relay a password.
+  const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
+    contact_email,
+    { redirectTo: `${APP_URL}/reset-password` },
+  )
 
   if (authErr) {
     // Rollback client row
     await supabase.from('clients').delete().eq('id', client.id)
-    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Auth user creation failed: ${authErr.message}` }) }
+    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Invite email failed: ${authErr.message}` }) }
   }
 
   // 3. Create user_profiles row linking user → client as viewer
