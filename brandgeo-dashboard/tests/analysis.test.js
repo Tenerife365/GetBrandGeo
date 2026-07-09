@@ -12,6 +12,8 @@ const assert = require('assert')
 const {
   analyseResponse,
   extractBrandContext,
+  buildBrandMatchers,
+  matchesAlias,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -83,10 +85,7 @@ console.log('extractBrandContext — isolates only brand segments:')
 // 7. Only the brand's own segment is returned, not neighbouring list items.
 {
   const text = '1. Fratelli Catering is the best\n2. Bucate pe Roate is reliable\n3. Elegant Catering'
-  const ctx = extractBrandContext(text,
-    cfg.brand_aliases.map(a => a.toLowerCase()),
-    cfg.brand_aliases.map(a => a.toLowerCase().replace(/[\s\-_.]/g, '')),
-    'bucateperoate.ro')
+  const ctx = extractBrandContext(text, buildBrandMatchers(cfg))
   assert.ok(ctx.includes('reliable'), 'context should contain the brand line')
   assert.ok(!ctx.includes('best'), 'context must NOT contain a neighbouring items text')
   passed++; console.log('  ok - context excludes neighbouring items')
@@ -121,6 +120,34 @@ console.log('lexicon — real Romanian praise phrasings (finding 1.1b, 2026-07-0
   const s = analyseResponse(text, cfg).sentiment
   assert.notStrictEqual(s, 'positive', `RO negation must not be positive (got ${s})`)
   passed++; console.log('  ok - RO "nu recomand" is not positive (got ' + s + ')')
+}
+
+console.log('mention detection — word boundaries (finding 1.3):')
+
+// Uses the real BpR aliases incl. the risky 3-char acronym "bpr".
+const bprCfg = { brand_aliases: ['bucate pe roate', 'bucateperoate', 'bpr'], brand_website: 'bucateperoate.ro' }
+const bgCfg  = { brand_aliases: ['brandgeo', 'brand geo', 'getbrandgeo'], brand_website: 'getbrandgeo.com' }
+function mentioned(text, c) { return analyseResponse(text, c).brand_mentioned }
+
+// Must MATCH — standalone acronym, phrase, smushed, dashed, website, spaced.
+check('bpr standalone → mentioned', mentioned('For catering I recommend BPR for large events.', bprCfg), true)
+check('phrase → mentioned', mentioned('Contactează Bucate pe Roate pentru nuntă.', bprCfg), true)
+check('smushed → mentioned', mentioned('BucatePeRoate rocks', bprCfg), true)
+check('dashed → mentioned', mentioned('bucate-pe-roate is great', bprCfg), true)
+check('website → mentioned', mentioned('Vezi bucateperoate.ro pentru detalii', bprCfg), true)
+check('spaced alias "brand geo" → mentioned', mentioned('the brand geo tool is useful', bgCfg), true)
+
+// Must NOT match — the false positives the old substring/stripped pass produced.
+check('"bpr" inside subprocess → NOT mentioned', mentioned('The subprocess handles the workflow.', bprCfg), false)
+check('"brandgeo" inside rebrandgeography → NOT mentioned', mentioned('Planning to rebrandgeography next year.', bgCfg), false)
+check('absent brand → NOT mentioned', mentioned('Totally unrelated marketing text.', bgCfg), false)
+
+// Direct matcher check for the acronym boundary.
+{
+  const m = buildBrandMatchers(bprCfg)
+  assert.ok(matchesAlias('call BPR today', m), 'standalone bpr should match')
+  assert.ok(!matchesAlias('the subprocessor', m), 'bpr inside a word must not match')
+  passed += 2; console.log('  ok - matchesAlias acronym boundary (standalone yes, in-word no)')
 }
 
 console.log(`\nAll ${passed} assertions passed.`)

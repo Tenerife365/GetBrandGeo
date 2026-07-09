@@ -62,32 +62,62 @@ function extractTopRankedResults(text) {
   return items.sort((a, b) => a.pos - b.pos).slice(0, 5)
 }
 
-function detectListPosition(text, aliases, aliasesStripped, website) {
+function detectListPosition(text, matchers) {
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
   while ((m = listRe.exec(text)) !== null) {
     const num     = parseInt(m[1], 10)
     const segment = m[2]
-    if (matchesAlias(segment, aliases, aliasesStripped, website)) return num
+    if (matchesAlias(segment, matchers)) return num
   }
   const sentences = text.split(/(?<=[.!?])\s+/)
   for (let i = 0; i < sentences.length; i++) {
-    if (matchesAlias(sentences[i], aliases, aliasesStripped, website)) return i + 1
+    if (matchesAlias(sentences[i], matchers)) return i + 1
   }
   return null
 }
 
-/**
- * Match a text segment against brand aliases.
- * Checks both verbatim (lowercased) AND space-stripped forms so that
- * "Bucate pe Roate" matches the alias "bucateperoate" and vice-versa.
- */
-function matchesAlias(segment, aliases, aliasesStripped, website) {
-  const sl  = segment.toLowerCase()
-  const sls = sl.replace(/[\s\-_.]/g, '')
-  return aliases.some(a => sl.includes(a)) ||
-         aliasesStripped.some(a => a && sls.includes(a)) ||
-         (website && sl.includes(website))
+// ─── Brand mention matching (finding 1.3) ────────────────────────────────────
+// Mention detection used to be raw substring `includes()` plus a space-stripped
+// pass, so a short alias like "bpr" could match INSIDE an unrelated word
+// ("subprocess") and silently inflate the flagship mention rate. Instead we
+// build, per alias/phrase, a boundary-anchored regex whose words may be
+// separated OR smushed:
+//   "brand geo" → matches "brand geo", "brandgeo", "brand-geo"
+//   but NOT inside a larger word ("rebrandgeography" won't match).
+// Boundaries use Unicode letter/number classes so Romanian diacritics count as
+// letters. This kills the false positives while keeping the smushed-form matches
+// the old stripped pass existed to catch.
+// KNOWN GAP (not fixed here, separate from 1.3's false-positive focus): matching
+// is diacritic-sensitive, so an ASCII alias ("paunescu si asociatii") still won't
+// match diacritic text ("Păunescu și Asociații") — a false-NEGATIVE worth a later
+// diacritic-folding pass.
+
+function escapeRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+// Boundary-anchored, separator-flexible matcher for one alias/phrase.
+function buildAliasRegex(alias) {
+  const parts = String(alias).trim().toLowerCase().split(/[\s\-_.]+/).filter(Boolean).map(escapeRe)
+  if (!parts.length) return null
+  try {
+    return new RegExp(`(?<![\\p{L}\\p{N}])${parts.join('[\\s_.-]*')}(?![\\p{L}\\p{N}])`, 'iu')
+  } catch { return null }
+}
+
+// Precompute the brand's matchers (all aliases + the bare website domain) once
+// per analyse call, then reuse across every segment/list-item test.
+function buildBrandMatchers(cfg) {
+  const website = ((cfg.brand_website || '').toLowerCase()
+    .replace(/^https?:\/\//, '').replace(/^\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
+  const terms = [...(cfg.brand_aliases || [])]
+  if (website) terms.push(website)
+  return terms.map(buildAliasRegex).filter(Boolean)
+}
+
+// True if `text` mentions the brand as a bounded token/phrase.
+function matchesAlias(text, matchers) {
+  const t = String(text)
+  return matchers.some(re => re.test(t))
 }
 
 /**
@@ -102,9 +132,9 @@ function matchesAlias(segment, aliases, aliasesStripped, website) {
  * them. Splitting must happen on the raw text before normalizeText() collapses
  * newlines. Returns '' if no segment matches (caller falls back to neutral).
  */
-function extractBrandContext(text, aliases, aliasesStripped, website) {
+function extractBrandContext(text, matchers) {
   const segments = String(text).split(/(?<=[.!?])\s+|\n+/)
-  const hits = segments.filter(s => matchesAlias(s, aliases, aliasesStripped, website))
+  const hits = segments.filter(s => matchesAlias(s, matchers))
   return hits.length ? normalizeText(hits.join(' ')).toLowerCase() : ''
 }
 
@@ -145,7 +175,7 @@ function isCompanyName(name) {
  */
 const CATERING_STRIP_RE = /\b(catering|events?|restaurant|&)\b/gi
 
-function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStripped, website) {
+function scanForKnownCompetitors(text, knownCompetitors, matchers) {
   if (!Array.isArray(knownCompetitors) || knownCompetitors.length === 0) return []
   const lower = text.toLowerCase()
   const found = []
@@ -153,7 +183,7 @@ function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStrippe
     if (!comp || comp.length < 2) continue
     const compLower = comp.toLowerCase().trim()
     // Skip if this matches the brand itself
-    if (matchesAlias(compLower, aliases, aliasesStripped, website)) continue
+    if (matchesAlias(compLower, matchers)) continue
     // Also try short form: strip common catering words so "Fratelli Catering" → "fratelli"
     const shortForm = compLower.replace(CATERING_STRIP_RE, ' ').replace(/\s+/g, ' ').trim()
     const matched = lower.includes(compLower) ||
@@ -166,30 +196,16 @@ function scanForKnownCompetitors(text, knownCompetitors, aliases, aliasesStrippe
 }
 
 function analyseResponse(text, cfg) {
-  const aliases         = (cfg.brand_aliases || []).map(a => a.toLowerCase())
-  const aliasesStripped = aliases.map(a => a.replace(/[\s\-_.]/g, ''))
-  const website = ((cfg.brand_website || '')
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/^\//, '')
-    .replace(/\/.*$/, '')
-    .replace(/^www\./, ''))
-  const lower      = normalizeText(text).toLowerCase()
-  const lowerStrip = lower.replace(/[\s\-_.]/g, '')
+  // Boundary-aware brand matchers (aliases + website), built once (finding 1.3).
+  const matchers = buildBrandMatchers(cfg)
 
   const topResults  = extractTopRankedResults(text)
-  const brandInList = topResults.find(item =>
-    matchesAlias(item.name, aliases, aliasesStripped, website)
-  )
-  const mentionedInText =
-    aliases.some(a => lower.includes(a)) ||
-    aliasesStripped.some(a => a && lowerStrip.includes(a)) ||
-    (website && lower.includes(website))
-  const mentioned = !!brandInList || mentionedInText
+  const brandInList = topResults.find(item => matchesAlias(item.name, matchers))
+  const mentioned   = matchers.length > 0 && (!!brandInList || matchesAlias(text, matchers))
 
   let position = null
   if (brandInList)   position = brandInList.pos
-  else if (mentioned) position = detectListPosition(text, aliases, aliasesStripped, website)
+  else if (mentioned) position = detectListPosition(text, matchers)
 
   // Sentiment is scored ONLY on the brand's own sentence(s)/list-item(s), not
   // the whole response (audit finding 1.1a). We claim a polarity only when the
@@ -215,7 +231,7 @@ function analyseResponse(text, cfg) {
                     'nu recomand','nerecomand','dezamăg','plânger','prost']
   let sentiment = 'neutral'
   if (mentioned) {
-    const brandCtx = extractBrandContext(text, aliases, aliasesStripped, website)
+    const brandCtx = extractBrandContext(text, matchers)
     const hasPos = posWords.some(w => brandCtx.includes(w))
     const hasNeg = negWords.some(w => brandCtx.includes(w))
     if (hasPos && !hasNeg)      sentiment = 'positive'
@@ -225,22 +241,21 @@ function analyseResponse(text, cfg) {
 
   let snippet = null
   if (mentioned) {
-    // Try each alias verbatim first, then website domain
-    const searchTerms = [...aliases, website].filter(Boolean)
-    for (const a of searchTerms) {
-      const idx = lower.indexOf(a)
-      if (idx !== -1) { snippet = text.slice(Math.max(0, idx - 50), idx + 250).trim(); break }
+    // Centre the snippet on the first brand match (boundary-aware).
+    for (const re of matchers) {
+      const m = re.exec(text)
+      if (m) { const idx = m.index; snippet = text.slice(Math.max(0, idx - 50), idx + 250).trim(); break }
     }
   }
   if (!snippet) snippet = text.slice(0, 300).trim()
 
   const competitors = topResults
-    .filter(item => !matchesAlias(item.name, aliases, aliasesStripped, website))
+    .filter(item => !matchesAlias(item.name, matchers))
     .filter(item => isCompanyName(item.name))
     .map(({ pos, name }) => ({ pos, name }))
 
   // Secondary pass: catch known competitors mentioned in prose (not just in lists)
-  const knownScan = scanForKnownCompetitors(text, cfg.known_competitors || [], aliases, aliasesStripped, website)
+  const knownScan = scanForKnownCompetitors(text, cfg.known_competitors || [], matchers)
   for (const kc of knownScan) {
     const already = competitors.some(c =>
       c.name.toLowerCase().includes(kc.name.toLowerCase()) ||
@@ -264,6 +279,8 @@ module.exports = {
   normalizeText,
   extractTopRankedResults,
   detectListPosition,
+  buildBrandMatchers,
+  buildAliasRegex,
   matchesAlias,
   extractBrandContext,
   isCompanyName,
