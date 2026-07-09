@@ -29,11 +29,54 @@ export default function Onboard() {
   const [promptInput, setPromptInput]     = useState('')
   const [prompts, setPrompts]             = useState<string[]>([])
   const [email, setEmail]         = useState('')
+  const [role, setRole]           = useState<'admin' | 'viewer'>('viewer')
   const [creating, setCreating]   = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [newClientId, setNewClientId] = useState<number | null>(null)
   const [collectionRunning, setCollectionRunning] = useState(false)
   const [lastTotal, setLastTotal] = useState<number | null>(null)
+
+  // Live slug-availability check (debounced) — surfaces a duplicate slug
+  // on step 1 instead of only at the final submit on step 5.
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+
+  useEffect(() => {
+    if (!slug) { setSlugStatus('idle'); return }
+    setSlugStatus('checking')
+    const t = setTimeout(async () => {
+      const { data } = await supabase.from('clients').select('id').eq('slug', slug).maybeSingle()
+      setSlugStatus(data ? 'taken' : 'available')
+    }, 400)
+    return () => clearTimeout(t)
+  }, [slug])
+
+  // Resend-invite state (step 6, in case the first email was missed/spam-filtered)
+  const [resending, setResending]           = useState(false)
+  const [resendMessage, setResendMessage]   = useState<string | null>(null)
+  const [resendError, setResendError]       = useState<string | null>(null)
+
+  const handleResendInvite = async () => {
+    setResending(true); setResendMessage(null); setResendError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/resend-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Resend failed')
+      setResendMessage(`Invite re-sent to ${email}.`)
+    } catch (err: unknown) {
+      setResendError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setResending(false)
+    }
+  }
 
   // Snapshot the last known prompt count while collectionContext's progress
   // is live — it resets to null when the run finishes, so this is what the
@@ -98,6 +141,7 @@ export default function Onboard() {
           default_market_id:  marketId,
           default_region_id:  regionId,
           contact_email:      email,
+          role,
           prompts,
         }),
       })
@@ -173,8 +217,13 @@ export default function Onboard() {
             <div>
               <label className="block text-xs text-slate-400 mb-1">Slug (URL key) *</label>
               <input value={slug} onChange={e => setSlug(e.target.value)}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50 font-mono"
+                className={`w-full bg-dark-700 border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none font-mono ${
+                  slugStatus === 'taken' ? 'border-red-500/50' : 'border-dark-600 focus:border-brand-500/50'
+                }`}
                 placeholder="bucate-pe-roate" />
+              {slugStatus === 'checking' && <p className="text-xs text-slate-500 mt-1">Checking availability…</p>}
+              {slugStatus === 'available' && <p className="text-xs text-emerald-400 mt-1">✓ Available</p>}
+              {slugStatus === 'taken' && <p className="text-xs text-red-400 mt-1">✗ Already taken by another client — choose a different slug</p>}
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Globe size={11} /> Website domain</label>
@@ -210,7 +259,7 @@ export default function Onboard() {
               this client's dashboard defaults to before they pick their own — without it, new
               clients otherwise default to Romania regardless of who they are.
             </p>
-            <button disabled={!name || !slug}
+            <button disabled={!name || !slug || slugStatus === 'taken' || slugStatus === 'checking'}
               onClick={() => setStep(2)}
               className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               Next <ChevronRight size={14} />
@@ -324,7 +373,7 @@ export default function Onboard() {
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Mail size={18} className="text-brand-400" /> Client Invite</h2>
             <p className="text-xs text-slate-500">
               We'll email this address an invite link to set their own password and log in
-              with viewer-only access. No password to relay by hand.
+              at the access level chosen below. No password to relay by hand.
             </p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Email *</label>
@@ -332,12 +381,26 @@ export default function Onboard() {
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
                 placeholder="client@company.com" />
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Access level</label>
+              <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'viewer')}
+                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
+                <option value="viewer">Viewer — sees only this client's data</option>
+                <option value="admin">Admin — full access to every client</option>
+              </select>
+              {role === 'admin' && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Admin access lets this person view and manage every client, not just {name || 'this one'}. Use sparingly.
+                </p>
+              )}
+            </div>
 
             {/* Summary */}
             <div className="rounded-lg bg-dark-700/50 border border-dark-600 p-4 space-y-1.5 text-xs text-slate-400">
               <div><span className="text-slate-600">Company:</span> <span className="text-slate-300">{name}</span></div>
               <div><span className="text-slate-600">Website:</span> <span className="text-slate-300">{website || '—'}</span></div>
               <div><span className="text-slate-600">Plan:</span> <span className="text-slate-300">{PLAN_LABELS[plan]}</span></div>
+              <div><span className="text-slate-600">Access:</span> <span className="text-slate-300">{role === 'admin' ? 'Admin' : 'Viewer'}</span></div>
               <div><span className="text-slate-600">Market:</span> <span className="text-slate-300">{selectedMarket.regions.find(r => r.id === regionId)?.label ?? regionId}, {selectedMarket.label}</span></div>
               <div><span className="text-slate-600">Aliases:</span> <span className="text-slate-300">{aliases.join(', ') || '—'}</span></div>
               <div><span className="text-slate-600">Competitors:</span> <span className="text-slate-300">{competitors.length} added</span></div>
@@ -396,6 +459,20 @@ export default function Onboard() {
                   <div>Email: <span className="text-slate-300">{email}</span></div>
                   <div>Client ID: <span className="text-slate-300">#{newClientId}</span></div>
                 </div>
+
+                {/* Resend invite — invite links expire in 24h; covers a missed
+                    or spam-filtered first email without needing the Supabase
+                    Dashboard (task, 2026-07-09). */}
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-slate-500">Didn't receive the invite email?</span>
+                  <button onClick={handleResendInvite} disabled={resending}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-700 text-slate-300 hover:bg-dark-600 transition-colors disabled:opacity-50">
+                    {resending ? <><Loader2 size={12} className="animate-spin" /> Resending…</> : 'Resend invite'}
+                  </button>
+                </div>
+                {resendMessage && <p className="text-xs text-emerald-400">{resendMessage}</p>}
+                {resendError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{resendError}</p>}
+
                 <button onClick={() => navigate('/')} className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors">
                   Go to Dashboard
                 </button>

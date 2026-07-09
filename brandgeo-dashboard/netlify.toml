@@ -46,3 +46,6 @@
 
 [functions."signup-client"]
   timeout = 15
+
+[functions."resend-invite"]
+  timeout = 15

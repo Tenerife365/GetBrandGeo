@@ -10,6 +10,7 @@
  *   default_market_id?: string,   // e.g. 'RO', 'WW' — see marketContext.tsx MARKETS
  *   default_region_id?: string,   // e.g. 'B' (Bucharest) — must belong to default_market_id's regions
  *   contact_email,
+ *   role?: 'admin'|'viewer',      // access level for the invited user (default 'viewer')
  *   prompts?: string[]   // initial buyer-query prompts to seed for this client
  * }
  *
@@ -28,12 +29,20 @@
  * — the admin no longer sets/relays a password by hand; Supabase emails the
  * client an invite link to `/reset-password` (existing page) to set their
  * own.
+ *
+ * Update (2026-07-09, onboarding-gaps pass): `role` is now accepted so the
+ * wizard can create an admin account, not just viewer (previously
+ * hardcoded). Also added friendly error translation for the two most common
+ * failure modes — duplicate slug (Postgres unique violation) and an email
+ * that's already registered (Supabase Auth) — since the raw driver error
+ * messages were unreadable dead ends for the admin filling out the form.
  */
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
 
 const VALID_PLANS = ['free', 'essentials', 'managed', 'pro', 'enterprise']
+const VALID_ROLES = ['admin', 'viewer']
 const APP_URL = 'https://app.getbrandgeo.com'
 
 exports.handler = async (event) => {
@@ -48,7 +57,7 @@ exports.handler = async (event) => {
 
   const {
     name, slug, brand_website, brand_aliases, known_competitors,
-    plan, default_market_id, default_region_id, contact_email, prompts,
+    plan, default_market_id, default_region_id, contact_email, role, prompts,
   } = body
 
   if (!name || !slug || !contact_email) {
@@ -56,6 +65,7 @@ exports.handler = async (event) => {
   }
 
   const clientPlan = VALID_PLANS.includes(plan) ? plan : 'essentials'
+  const userRole   = VALID_ROLES.includes(role) ? role : 'viewer'
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
@@ -72,7 +82,12 @@ exports.handler = async (event) => {
     .single()
 
   if (clientErr) {
-    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Client creation failed: ${clientErr.message}` }) }
+    // Postgres unique_violation on clients.slug — translate the raw driver
+    // error into something the admin can actually act on.
+    const friendly = clientErr.code === '23505' || /slug/i.test(clientErr.message)
+      ? `A client with the slug "${slug}" already exists. Choose a different slug and try again.`
+      : `Client creation failed: ${clientErr.message}`
+    return { statusCode: 409, headers: auth.headers, body: JSON.stringify({ error: friendly }) }
   }
 
   // 2. Invite the client by email instead of setting a password directly —
@@ -88,13 +103,16 @@ exports.handler = async (event) => {
   if (authErr) {
     // Rollback client row
     await supabase.from('clients').delete().eq('id', client.id)
-    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Invite email failed: ${authErr.message}` }) }
+    const friendly = /already.*regist|already.*exist/i.test(authErr.message)
+      ? `${contact_email} already has an account. Use a different email, or have them use "Forgot password" on the login screen to regain access.`
+      : `Invite email failed: ${authErr.message}`
+    return { statusCode: 409, headers: auth.headers, body: JSON.stringify({ error: friendly }) }
   }
 
-  // 3. Create user_profiles row linking user → client as viewer
+  // 3. Create user_profiles row linking user → client with the chosen access level
   const { error: profileErr } = await supabase
     .from('user_profiles')
-    .insert({ id: authData.user.id, client_id: client.id, role: 'viewer' })
+    .insert({ id: authData.user.id, client_id: client.id, role: userRole })
 
   if (profileErr) {
     // Rollback both
@@ -140,6 +158,7 @@ exports.handler = async (event) => {
       client_name:     client.name,
       user_id:         authData.user.id,
       plan:            client.plan,
+      role:            userRole,
       engines_enabled: client.engines_enabled ?? null,
       prompts_created: promptsCreated,
     }),
