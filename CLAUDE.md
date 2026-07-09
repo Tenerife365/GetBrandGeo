@@ -1,9 +1,11 @@
 # CLAUDE.md — BrandGEO Platform Memory
 
-> **Last updated:** 2026-07-08 (task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)
-> **New this pass:** #73 (onboarding flow doc, found a deeper bug — no
-> prompts ever seeded during onboarding) and #84 (website CTA finalized,
-> not yet uploaded to cPanel) — both done in parallel via subagents.  
+> **Last updated:** 2026-07-08 (task #103 shipped, not yet built/committed; task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)
+> **New this pass:** #103 (fixed onboarding — seeds initial prompts, fires
+> all 3 collection functions with plan gating; build/commit still pending
+> on Constantin's machine, see §5). Previous pass: #73 (onboarding flow doc,
+> found the bug #103 now fixes) and #84 (website CTA finalized, not yet
+> uploaded to cPanel).  
 > **App:** [app.getbrandgeo.com](https://app.getbrandgeo.com)  
 > **Website:** [getbrandgeo.com](https://getbrandgeo.com) (static HTML, cPanel hosted)  
 > **Project root:** `C:\Users\const\Constantin Daniel Goane\BrandGEO` (canonical — the old `C:\Users\const\Desktop\BpR` no longer exists, archived, see §6.4 step 8)  
@@ -739,6 +741,84 @@ commands from two sessions at once regardless of scope.
   it's visible on getbrandgeo.com.
   Scope: `brandgeo/web/index.html` only.
 
+- **#103** ✅ **DONE 2026-07-08** — Fixed the two broken-onboarding bugs
+  documented by #73/`client-onboarding-flow.md` (also flagged as a
+  don't-wait-for-Phase-3 risk in §7.5).
+  1. **No prompts ever seeded.** Added a new required "Prompts" step
+     (step 4 of 6) to `Onboard.tsx`'s wizard, between Competitors and
+     Login — same free-text tag-input pattern as aliases/competitors, "Next"
+     disabled until at least one prompt is entered (this is the actual fix:
+     a brand-new client can no longer reach the Collecting step with zero
+     prompts). `onboard-client.js` now accepts an optional `prompts: string[]`
+     in its POST body and inserts them as `prompts` rows
+     (`category: 'general', is_active: true, position: idx+1`) via one
+     `.insert()` call (atomic as a single INSERT statement), with the same
+     rollback-on-failure chain as the existing client/auth/profile steps.
+  2. **Collection silently skipped Claude + ChatGPT and ignored plan
+     gating.** Deleted `Onboard.tsx`'s local hand-rolled `runCollection()`
+     (only ever called `collect-prompt.js`, i.e. gemini/perplexity/meta)
+     entirely. The wizard now imports `useCollection()` from
+     `collectionContext.tsx` and calls the same shared `runCollection(clientId,
+     true, undefined, activeEngines)` that `AIVisibility.tsx`'s Force Refresh
+     already uses — fires `collect-prompt` + `collect-claude` + `collect-chatgpt`
+     in parallel via `Promise.allSettled`, correctly gated to the new client's
+     plan. `activeEngines` is computed via `getActiveEngines(plan,
+     engines_enabled)` from `planConfig.ts`, using the *new* client's own
+     plan/engines_enabled — not the admin's currently-selected client from
+     `useClient()`, which would have been wrong.
+  3. **Follow-on fix needed to make (2) correct:** `onboard-client.js`
+     previously never set `plan` on insert at all (fell through to an
+     undocumented DB column default — see #73 finding). Now explicitly sets
+     `plan: 'essentials'` (matches the fallback default already used
+     elsewhere in `clientContext.tsx` for clients missing plan data) and
+     returns `plan` + `engines_enabled` + `prompts_created` in its response
+     so the frontend can compute `activeEngines` without a second round-trip.
+  4. Rewired the Collecting step's progress UI (now step 6) to read
+     `collecting`/`progress`/off the shared `CollectionContext` instead of a
+     local `progress` state — the old "{total} prompts × 5 engines
+     collected" copy (inaccurate on two counts per #73) is now "{N} prompts
+     collected across this client's active engines," which is honest about
+     however many engines the client's plan actually allows.
+  **Files touched:** `brandgeo-dashboard/src/pages/Onboard.tsx`,
+  `brandgeo-dashboard/netlify/functions/onboard-client.js` — matches the
+  `Scope:` already committed to in §7.5 for this task, nothing else touched.
+  **Build verification caveat (same category as #83):** this sandbox's
+  `npx tsc --noEmit` and `npx esbuild` both still hit the documented
+  Windows/Linux `node_modules` platform mismatch (confirmed again this
+  session: `@esbuild/win32-x64` present, needs `@esbuild/linux-x64`) —
+  `App.tsx`/`Layout.tsx`, untouched this session, threw the identical class
+  of cascading JSX errors, reconfirming it's environment noise, not a real
+  defect. **New wrinkle found this session, worth knowing for next time:**
+  partway through editing `Onboard.tsx`, this sandbox's mounted view of the
+  file stopped picking up further edits — `wc -l` via the bash tool stayed
+  frozen at a stale, mid-write 338-line snapshot (cut off mid-word) even
+  10+ seconds after later edits landed, while the Read tool (which goes
+  straight to the real Windows disk) correctly showed the final, complete
+  374-line file. So neither `tsc` nor `esbuild` in-sandbox actually checked
+  the final version of this file at all this session — verification here
+  was a manual structural review of the Read tool's output only (JSX
+  tags/step blocks balance out on inspection). **Run a real build before
+  pushing:** open PowerShell in
+  `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-dashboard` and
+  run `npm run build` — should exit 0. If it reports real errors, paste
+  them into the next session before committing.
+  **Not yet committed** — git add/commit/push not run this session (per
+  the execution-delegation rule). Once the build above passes:
+  ```
+  cd "C:\Users\const\Constantin Daniel Goane\BrandGEO"
+  git status
+  git add brandgeo-dashboard/src/pages/Onboard.tsx brandgeo-dashboard/netlify/functions/onboard-client.js
+  git commit -m "Fix onboarding: seed initial prompts + fire all 3 collection functions with plan gating (#73/#103)"
+  git push
+  ```
+  **Deliberately still open (out of today's Scope):** no plan *picker* UI
+  (every new client is hard-set to `essentials` — upgrading to
+  managed/pro/enterprise still needs a manual Supabase edit afterward); no
+  welcome/credentials email; no admin-role creation path; no
+  `default_market_id` set. All four were already flagged as open in
+  `client-onboarding-flow.md` §4 and remain so.
+  Scope: `Onboard.tsx`, `onboard-client.js` only.
+
 ---
 
 ## 6. Restructuring — New Root Folder & GitHub Rename (agreed 2026-07-08, ✅ COMPLETE)
@@ -1166,18 +1246,11 @@ Phase 2. Phases 4–5 are lower-risk and can spill past the window if needed.
 
 ### 7.5 Risks & Open Questions (added 2026-07-08)
 
-- 🔴 **Onboarding flow is functionally broken, independent of any visual
-  redesign — don't let it wait for Phase 3.** Per #73's finding: no prompts
-  are ever seeded during onboarding, so a brand-new client's dashboard shows
-  "No active prompts found" immediately after signup; `Onboard.tsx`'s own
-  collection loop only calls `collect-prompt` (Gemini/Perplexity/Meta),
-  silently skipping Claude and ChatGPT while its success message claims "5
-  engines collected." A beautifully redesigned dashboard that greets new
-  users with a broken empty state undercuts the whole point of this
-  initiative. **Recommendation:** fix this as its own Task chat, in
-  parallel with Phase 0–2 (different files, no scope overlap — see the
-  parallel-work window in §0), not gated behind the Phase 3 queue.
-  Scope: `Onboard.tsx`, `onboard-client.js` only.
+- ✅ **RESOLVED 2026-07-08 (see #103 in §5).** Onboarding's two bugs — zero
+  prompts ever seeded, and collection silently skipping Claude/ChatGPT +
+  plan gating — are both fixed. Build verification still pending on
+  Constantin's machine (`npm run build`), and the change isn't committed
+  yet — see #103's entry for exact commands.
 - 🟡 **The roadmap in §7.4 is based on general "modern SaaS" conventions,
   not an actual peec.ai teardown.** If beating that specific competitor
   matters, a real side-by-side (their onboarding flow, empty states, actual

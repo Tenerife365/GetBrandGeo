@@ -58,9 +58,15 @@ export default function Onboard() {
     setCompetitorInput('')
   }
 
+  const addPrompt = () => {
+    const v = promptInput.trim()
+    if (v && !prompts.includes(v)) setPrompts(prev => [...prev, v])
+    setPromptInput('')
+  }
+
   const autoSlug = (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  // ── Step 4: Create client + user ─────────────────────────────────────────
+  // ── Step 5: Create client + user + initial prompts ───────────────────────
 
   const handleCreate = async () => {
     setCreating(true); setError(null)
@@ -80,77 +86,25 @@ export default function Onboard() {
           known_competitors: competitors,
           contact_email:    email,
           contact_password: password,
+          prompts,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Onboarding failed')
       setNewClientId(data.client_id)
-      setStep(5)
-      runCollection(data.client_id)
+      setStep(6)
+
+      // Fire the same 3-parallel-function collection every other page uses
+      // (collectionContext.tsx), gated to this client's actual plan — not
+      // the hand-rolled, collect-prompt-only loop this page used to run.
+      const engines = getActiveEngines(data.plan ?? 'essentials', data.engines_enabled ?? null)
+      setCollectionRunning(true)
+      runCollection(data.client_id, true, undefined, engines).finally(() => setCollectionRunning(false))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setCreating(false)
     }
-  }
-
-  // ── Step 5: Sequential collection ────────────────────────────────────────
-
-  const runCollection = async (clientId: number) => {
-    // Fetch client config from Supabase
-    const { data: clientRow } = await supabase
-      .from('clients')
-      .select('brand_aliases, brand_website, known_competitors')
-      .eq('id', clientId)
-      .single()
-
-    const clientConfig = {
-      brand_aliases:    clientRow?.brand_aliases    ?? [],
-      brand_website:    clientRow?.brand_website    ?? '',
-      known_competitors: clientRow?.known_competitors ?? [],
-    }
-
-    // Fetch active prompts
-    const { data: prompts } = await supabase
-      .from('prompts')
-      .select('id, text')
-      .eq('client_id', clientId)
-      .eq('is_active', true)
-      .order('position')
-
-    if (!prompts || prompts.length === 0) {
-      setProgress({ total: 0, done: 0, current: 'No active prompts found.', errors: 0, finished: true })
-      return
-    }
-
-    setProgress({ total: prompts.length, done: 0, current: '', errors: 0, finished: false })
-
-    const { data: { session: collSession } } = await supabase.auth.getSession()
-    const collToken = collSession?.access_token ?? ''
-
-    let errors = 0
-    for (let i = 0; i < prompts.length; i++) {
-      const p = prompts[i]
-      setProgress(prev => ({ ...prev!, current: p.text.slice(0, 70) + '…', done: i }))
-      try {
-        const res = await fetch('/.netlify/functions/collect-prompt', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(collToken ? { 'Authorization': `Bearer ${collToken}` } : {}),
-          },
-          body: JSON.stringify({
-            prompt_id:     p.id,
-            prompt_text:   p.text,
-            client_id:     clientId,
-            client_config: clientConfig,
-          }),
-        })
-        if (!res.ok) errors++
-      } catch { errors++ }
-    }
-
-    setProgress({ total: prompts.length, done: prompts.length, current: 'All done!', errors, finished: true })
   }
 
   // ── Step indicators ───────────────────────────────────────────────────────
@@ -159,8 +113,9 @@ export default function Onboard() {
     { n: 1, label: 'Company',     icon: Building2 },
     { n: 2, label: 'Brand',       icon: Tag },
     { n: 3, label: 'Competitors', icon: Users },
-    { n: 4, label: 'Login',       icon: Lock },
-    { n: 5, label: 'Collecting',  icon: Zap },
+    { n: 4, label: 'Prompts',     icon: MessageSquarePlus },
+    { n: 5, label: 'Login',       icon: Lock },
+    { n: 6, label: 'Collecting',  icon: Zap },
   ]
 
   return (
@@ -283,8 +238,44 @@ export default function Onboard() {
           </div>
         )}
 
-        {/* ── Step 4: Login credentials ── */}
+        {/* ── Step 4: Initial Prompts ── */}
         {step === 4 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2"><MessageSquarePlus size={18} className="text-brand-400" /> Initial Prompts</h2>
+            <p className="text-xs text-slate-500">
+              Real questions a customer might ask an AI assistant when looking for a business like this one.
+              These are what get sent to each AI engine every month — at least one is required, since without
+              it there's nothing for the collection step to run.
+            </p>
+            <div className="flex gap-2">
+              <input value={promptInput} onChange={e => setPromptInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addPrompt()}
+                className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
+                placeholder="e.g. Best catering companies in Bucharest" />
+              <button onClick={addPrompt} className="px-4 py-2 rounded-lg bg-brand-500/20 text-brand-300 text-sm border border-brand-500/30 hover:bg-brand-500/30">Add</button>
+            </div>
+            <div className="flex flex-col gap-2 max-h-56 overflow-y-auto min-h-[40px]">
+              {prompts.map(p => (
+                <span key={p} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-dark-700 border border-dark-600 rounded-lg text-xs text-slate-300">
+                  <span className="truncate">{p}</span>
+                  <button onClick={() => setPrompts(prev => prev.filter(x => x !== p))} className="text-slate-600 hover:text-red-400 shrink-0 ml-2">×</button>
+                </span>
+              ))}
+              {prompts.length === 0 && <span className="text-xs text-slate-600 italic">No prompts added yet — at least one is required</span>}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setStep(3)} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors">Back</button>
+              <button disabled={prompts.length === 0}
+                onClick={() => setStep(5)}
+                className="flex-1 py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 5: Login credentials ── */}
+        {step === 5 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Lock size={18} className="text-brand-400" /> Client Login</h2>
             <p className="text-xs text-slate-500">These credentials will be used by the client to log in. They'll have viewer-only access.</p>
@@ -314,12 +305,13 @@ export default function Onboard() {
               <div><span className="text-slate-600">Website:</span> <span className="text-slate-300">{website || '—'}</span></div>
               <div><span className="text-slate-600">Aliases:</span> <span className="text-slate-300">{aliases.join(', ') || '—'}</span></div>
               <div><span className="text-slate-600">Competitors:</span> <span className="text-slate-300">{competitors.length} added</span></div>
+              <div><span className="text-slate-600">Prompts:</span> <span className="text-slate-300">{prompts.length} added</span></div>
             </div>
 
             {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
 
             <div className="flex gap-2">
-              <button onClick={() => setStep(3)} disabled={creating} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors disabled:opacity-40">Back</button>
+              <button onClick={() => setStep(4)} disabled={creating} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors disabled:opacity-40">Back</button>
               <button onClick={handleCreate} disabled={creating || !email || !password || password.length < 8}
                 className="flex-1 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {creating ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : 'Create Client'}
@@ -328,56 +320,50 @@ export default function Onboard() {
           </div>
         )}
 
-        {/* ── Step 5: Collection in progress ── */}
-        {step === 5 && (
+        {/* ── Step 6: Collection in progress ──
+             Uses collectionContext.tsx's shared runCollection/progress/collecting
+             state — same code path AIVisibility.tsx's Force Refresh uses — instead
+             of a separate hand-rolled loop, so Claude/ChatGPT and plan-based engine
+             gating are no longer silently skipped (task #73 fix, 2026-07-08). */}
+        {step === 6 && (
           <div className="space-y-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Zap size={18} className="text-brand-400" /> Running Initial Collection</h2>
 
-            {progress ? (
+            {collectionRunning || collecting ? (
               <>
-                {!progress.finished ? (
-                  <>
-                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                      <span>Prompt {progress.done + 1} of {progress.total}</span>
-                      <span>{Math.round((progress.done / progress.total) * 100)}%</span>
-                    </div>
-                    <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                        style={{ width: `${(progress.done / progress.total) * 100}%` }} />
-                    </div>
-                    <p className="text-xs text-slate-500 italic truncate">{progress.current}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Loader2 size={12} className="animate-spin text-brand-400" />
-                      Querying 5 AI engines in parallel…
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                      <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
-                      <div>
-                        <div className="text-sm font-semibold text-emerald-300">Collection complete!</div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          {progress.total} prompts × 5 engines collected.
-                          {progress.errors > 0 && <span className="text-amber-400"> {progress.errors} errors (will retry next month).</span>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-slate-500 bg-dark-700/50 rounded-lg p-3">
-                      <div className="font-medium text-slate-400 mb-1">Client ready:</div>
-                      <div>Email: <span className="text-slate-300">{email}</span></div>
-                      <div>Client ID: <span className="text-slate-300">#{newClientId}</span></div>
-                    </div>
-                    <button onClick={() => navigate('/')} className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors">
-                      Go to Dashboard
-                    </button>
-                  </>
-                )}
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                  <span>Prompt {(collectionProgress?.done ?? 0) + 1} of {collectionProgress?.total ?? prompts.length}</span>
+                  <span>{Math.round(((collectionProgress?.done ?? 0) / (collectionProgress?.total || prompts.length)) * 100)}%</span>
+                </div>
+                <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-500 rounded-full transition-all duration-500"
+                    style={{ width: `${((collectionProgress?.done ?? 0) / (collectionProgress?.total || prompts.length)) * 100}%` }} />
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Loader2 size={12} className="animate-spin text-brand-400" />
+                  Querying your active AI engines in parallel…
+                </div>
               </>
             ) : (
-              <div className="text-xs text-slate-500 flex items-center gap-2">
-                <Loader2 size={12} className="animate-spin" /> Setting up collection…
-              </div>
+              <>
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                  <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold text-emerald-300">Collection complete!</div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {lastTotal ?? prompts.length} prompt{(lastTotal ?? prompts.length) === 1 ? '' : 's'} collected across this client's active engines.
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 bg-dark-700/50 rounded-lg p-3">
+                  <div className="font-medium text-slate-400 mb-1">Client ready:</div>
+                  <div>Email: <span className="text-slate-300">{email}</span></div>
+                  <div>Client ID: <span className="text-slate-300">#{newClientId}</span></div>
+                </div>
+                <button onClick={() => navigate('/')} className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors">
+                  Go to Dashboard
+                </button>
+              </>
             )}
           </div>
         )}
