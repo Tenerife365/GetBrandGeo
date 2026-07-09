@@ -14,6 +14,7 @@ const {
   extractBrandContext,
   buildBrandMatchers,
   matchesAlias,
+  isCompanyName,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -181,5 +182,62 @@ check('list rank → brand_position 2',
   check('year "2019." → mentioned', r.brand_mentioned, true)
   check('year "2019." → position null (not rank 2019)', r.brand_position, null)
 }
+
+console.log('competitor extraction — reject instructional headings (Component A false positives, 2026-07-09):')
+
+// Brand not present in these texts, so competitor extraction runs on the numbered
+// list regardless of mention. Use a neutral cfg with no known_competitors so the
+// only path exercised is extractTopRankedResults → isCompanyName.
+const auditCfg = { brand_aliases: ['Acme Corp'], brand_website: 'acme.com', known_competitors: [] }
+function competitorNames(text, c) {
+  const raw = analyseResponse(text, c).competitors_mentioned
+  return raw ? JSON.parse(raw).map(x => x.name) : []
+}
+
+// C1. THE bug — a generic "how to improve AI visibility" answer. Every one of
+//     these five is a live-captured false positive (§10.4). None is a company.
+{
+  const text = 'How to improve your AI visibility:\n' +
+    '1. Define the AI surfaces you care about\n' +
+    '2. Establish a Fixed Prompt Panel\n' +
+    '3. Structure Content for AI Extraction\n' +
+    '4. AI Visibility Score\n' +
+    '5. Brand Visibility Score'
+  check('instructional/metric headings → no competitors', competitorNames(text, auditCfg), [])
+}
+
+// C2. Regression — real company names in a genuine "best X" listicle still come
+//     through, in list order.
+{
+  const text = 'Best catering companies in Bucharest:\n' +
+    '1. Fratelli Catering\n' +
+    '2. Elegant Catering\n' +
+    '3. Gusto Events'
+  check('real company names still captured',
+    competitorNames(text, auditCfg), ['Fratelli Catering', 'Elegant Catering', 'Gusto Events'])
+}
+
+// C3. Mixed list — headings dropped, a real brand among them kept.
+{
+  const text = '1. Optimize your content for AI\n2. Salesforce\n3. Track brand mentions carefully'
+  check('mixed list keeps only the real brand', competitorNames(text, auditCfg), ['Salesforce'])
+}
+
+console.log('isCompanyName — structural discrimination:')
+
+// Instruction steps / metric headings rejected.
+check('imperative + article → not a company', isCompanyName('Establish a Fixed Prompt Panel'), false)
+check('imperative + preposition → not a company', isCompanyName('Structure Content for AI Extraction'), false)
+check('you-clause (6+ words) → not a company', isCompanyName('Define the AI surfaces you care about'), false)
+check('metric tail "Score" → not a company', isCompanyName('AI Visibility Score'), false)
+check('metric tail "Score" (2) → not a company', isCompanyName('Brand Visibility Score'), false)
+
+// Real brands preserved — INCLUDING verb-initial names without clause shape.
+check('single-word brand kept', isCompanyName('Salesforce'), true)
+check('two-word brand kept', isCompanyName('Fratelli Catering'), true)
+check('verb-initial 2-word brand kept (Focus Features)', isCompanyName('Focus Features'), true)
+check('verb-initial 2-word brand kept (Boost Mobile)', isCompanyName('Boost Mobile'), true)
+check('verb-initial 3-word brand kept (Design Within Reach)', isCompanyName('Design Within Reach'), true)
+check('brand with & kept', isCompanyName('Ben & Jerry'), true)
 
 console.log(`\nAll ${passed} assertions passed.`)

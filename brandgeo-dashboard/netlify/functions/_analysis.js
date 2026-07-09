@@ -145,6 +145,18 @@ function extractBrandContext(text, matchers) {
  * Reject descriptive phrases that AI engines sometimes list as numbered items
  * instead of actual company names (e.g. "Experiență Masivă", "Record De Capacitate").
  * Applied before saving competitors_mentioned so the DB stays clean.
+ *
+ * NOTE (2026-07-09): this substring list was tuned for BpR's original catering
+ * use case (§1.4/§2.4) and does NOT generalise. Live-testing the Instant Audit
+ * Engine (§10.4) showed generic "how to measure/improve X" prompts make engines
+ * answer with numbered *instruction steps* and *metric headings* — not company
+ * names — which sailed through this filter and got misreported as competitors on
+ * both ai_results.competitors_mentioned and prospect_audits.competitor_flags.
+ * Real captured false positives: "AI Visibility Score", "Brand Visibility Score",
+ * "Define the AI surfaces you care about", "Establish a Fixed Prompt Panel",
+ * "Structure Content for AI Extraction". The structural signals below
+ * (isCompanyName) generalise across domains/languages so the fix is not another
+ * client-specific patch.
  */
 const NOT_A_COMPANY = [
   // Romanian abstract nouns — virtually never appear in real company names
@@ -160,12 +172,88 @@ const NOT_A_COMPANY = [
   'firme de', 'si altele', 'și altele',
 ]
 
+// Leading imperative/instructional verbs (English + common Romanian stems).
+// AI engines answering generic "how to measure/improve X" prompts return numbered
+// lists of STEPS ("Define …", "Establish …", "Structure …") that read as
+// instructions, not company names. A leading imperative verb is a strong
+// instruction signal — real brand names almost never begin with one. We only
+// reject when the phrase ALSO looks clause-shaped (see isCompanyName), so genuine
+// verb-led brands ("Focus Features", "Boost Mobile", "Design Within Reach") are
+// preserved. Partial coverage: non-EN/RO how-to lists remain a gap (same honesty
+// caveat as the sentiment lexicon, finding 1.1b).
+const INSTRUCTION_VERBS = new Set([
+  'define', 'establish', 'structure', 'create', 'build', 'optimize', 'optimise',
+  'monitor', 'track', 'measure', 'identify', 'ensure', 'understand', 'improve',
+  'increase', 'use', 'leverage', 'choose', 'add', 'implement', 'consider', 'set',
+  'make', 'get', 'start', 'develop', 'maintain', 'provide', 'include', 'avoid',
+  'check', 'review', 'update', 'publish', 'write', 'design', 'test', 'run', 'keep',
+  'find', 'learn', 'know', 'grow', 'boost', 'enhance', 'align', 'map', 'audit',
+  'claim', 'verify', 'register', 'submit', 'prioritize', 'prioritise', 'target',
+  'engage', 'respond', 'answer', 'craft', 'curate', 'collect', 'gather', 'analyze',
+  'analyse', 'evaluate', 'assess', 'determine', 'select', 'pick', 'apply', 'adopt',
+  'embrace', 'position', 'differentiate', 'highlight', 'showcase', 'demonstrate',
+  'focus', 'guide',
+  // Romanian imperative stems (partial coverage)
+  'definește', 'defineste', 'stabilește', 'stabileste', 'creează', 'creeaza',
+  'optimizează', 'optimizeaza', 'monitorizează', 'monitorizeaza', 'măsoară',
+  'masoara', 'identifică', 'identifica', 'asigură', 'asigura', 'folosește',
+  'foloseste', 'structurează', 'structureaza', 'adaugă', 'adauga', 'publică',
+  'publica', 'alege', 'construiește', 'construieste',
+])
+
+// Function words whose presence (as a whole word, case-insensitive) marks a
+// phrase as a clause/sentence rather than a Title-Cased brand name. Deliberately
+// excludes ambiguous connectors ("of", "and", "&") that appear in real names
+// (e.g. "Bank of America", "Ben & Jerry's"). Only consulted alongside the
+// leading-verb signal above.
+const CLAUSE_FUNCTION_WORDS = new Set([
+  'the', 'a', 'an', 'for', 'to', 'your', 'you', 'yours', 'with', 'how', 'what',
+  'why', 'that', 'about', 'when', 'into', 'via', 'using', 'ways',
+])
+
+// Section-heading / metric tail nouns. A numbered item ENDING in one of these is
+// a heading or metric label ("AI Visibility Score", "Content Overview"), not a
+// company. Kept small and trailing-only to avoid rejecting real brands whose name
+// happens to contain a common noun ("Score Media", "Index Ventures").
+const HEADING_TAIL_NOUNS = new Set([
+  'score', 'scores', 'overview', 'breakdown', 'summary', 'checklist',
+  'takeaways', 'recap',
+])
+
 function isCompanyName(name) {
   if (!name || name.length < 2 || name.length > 60) return false
   const lower = name.toLowerCase()
+  // Existing domain-phrase filter (RO catering descriptors etc.).
   if (NOT_A_COMPANY.some(t => lower.includes(t))) return false
-  // Must contain at least one letter
-  return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
+  // Must contain at least one letter.
+  if (!/[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)) return false
+
+  const words = name.trim().split(/\s+/)
+  const wordCount = words.length
+
+  // Rule A — a long phrase is a sentence, not a name. No real brand in a
+  // commercial listicle runs to 6+ words. Catches "Define the AI surfaces you
+  // care about" outright.
+  if (wordCount >= 6) return false
+
+  // Rule B — metric/heading tail noun ("… Score", "… Overview"). Catches
+  // "AI Visibility Score" / "Brand Visibility Score".
+  const lastWord = words[wordCount - 1].toLowerCase().replace(/[^\p{L}]/gu, '')
+  if (HEADING_TAIL_NOUNS.has(lastWord)) return false
+
+  // Rule C — leading imperative verb + clause-shaped body → instruction step.
+  // We require the clause confirmation (a function word, or ≥4 words) so that
+  // short Title-Cased verb-led brands ("Focus Features", "Boost Mobile",
+  // "Design Within Reach") are NOT dropped. Catches "Establish a Fixed Prompt
+  // Panel" (has "a"), "Structure Content for AI Extraction" (has "for").
+  const firstWord = lower.split(/[\s\-]+/)[0]
+  if (INSTRUCTION_VERBS.has(firstWord)) {
+    const hasFunctionWord = words.some(w =>
+      CLAUSE_FUNCTION_WORDS.has(w.toLowerCase().replace(/[^\p{L}]/gu, '')))
+    if (hasFunctionWord || wordCount >= 4) return false
+  }
+
+  return true
 }
 
 /**
