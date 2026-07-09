@@ -49,15 +49,34 @@ function buildSystemContext(cfg, marketLabel, regionLabel) {
   )
 }
 
-// ─── Claude — streaming with early abort ─────────────────────────────────────
+// ─── Claude — streaming with a wall-clock time budget ────────────────────────
 // The full 26s Netlify window is dedicated to this function alone.
-// Web search for some markets (e.g. Romanian catering) takes 24-26s before text
-// starts streaming. The early abort at MAX_TEXT chars avoids waiting for the
-// full response once we have enough to detect brand mentions.
+// Web search for some markets (e.g. Romanian catering) can take 24-26s before
+// text starts streaming, so a fixed *character* cap was previously used to
+// avoid waiting for the full response. That caused a real accuracy bug
+// (reasoning-audit-findings.md §1.4 / CLAUDE.md §8.4 finding 1.4): a numbered
+// list of competitors routinely runs past 2500 chars, so any brand ranked
+// ~#7-10 got silently cut off mid-list and recorded as "not mentioned" —
+// a false negative on the flagship metric, not a real absence.
+//
+// Fix: abort on a wall-clock deadline for the whole call (connection +
+// streaming), not on how much text has arrived. In the common case (search
+// returns promptly, text streams from early on) this lets the response
+// finish naturally instead of truncating at an arbitrary character offset,
+// so the full ranked list — including lower positions — gets analysed. In
+// the slow-search case, behaviour is no worse than before: we still stop
+// before Netlify's hard 26s kill, just measured in time instead of chars.
 
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error' } }
+
+  // Budget for the whole call (fetch/search wait + streaming). Netlify kills
+  // this function at 26s total; reserve ~5s for analyseResponse + the
+  // Supabase insert + building the response after callClaude returns.
+  const TIME_BUDGET_MS = 21000
+  const deadline = Date.now() + TIME_BUDGET_MS
+
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -88,11 +107,37 @@ async function callClaude(prompt, ctx) {
     let buf        = ''
     let text       = ''
     let stopReason = null
-    let partial    = false
-    const MAX_TEXT = 2500   // abort once we have enough for brand detection (~500-1000 chars needed)
+    let timedOut   = false
 
     outer: while (true) {
-      const { done, value } = await reader.read()
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) {
+        timedOut = true
+        reader.cancel('time budget exceeded').catch(() => {})
+        break
+      }
+
+      // Race the next chunk against the remaining time budget — reader.read()
+      // itself has no timeout option, so a pending read that never resolves
+      // (e.g. a stalled connection) must be bounded explicitly here too.
+      let timer
+      let result
+      try {
+        result = await Promise.race([
+          reader.read(),
+          new Promise((resolve) => { timer = setTimeout(() => resolve('__timeout__'), remaining) }),
+        ])
+      } finally {
+        clearTimeout(timer)
+      }
+
+      if (result === '__timeout__') {
+        timedOut = true
+        reader.cancel('time budget exceeded').catch(() => {})
+        break
+      }
+
+      const { done, value } = result
       if (done) break
       buf += decoder.decode(value, { stream: true })
       const lines = buf.split('\n')
@@ -105,11 +150,6 @@ async function callClaude(prompt, ctx) {
           const ev = JSON.parse(raw)
           if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
             text += ev.delta.text ?? ''
-            if (text.length >= MAX_TEXT) {
-              partial = true
-              reader.cancel('enough').catch(() => {})
-              break outer
-            }
           }
           if (ev.type === 'message_delta') stopReason = ev.delta?.stop_reason ?? stopReason
           if (ev.type === 'error') console.error('[Claude] stream error:', JSON.stringify(ev.error))
@@ -118,11 +158,11 @@ async function callClaude(prompt, ctx) {
     }
 
     if (text) {
-      console.log('[Claude] ok | stop:', partial ? 'partial' : stopReason,
+      console.log('[Claude] ok | stop:', timedOut ? 'time_budget' : stopReason,
         '| len:', text.length, '| preview:', text.slice(0, 200))
       return { text, errorCode: null }
     }
-    console.warn('[Claude] stream done but no text | stop_reason:', stopReason)
+    console.warn('[Claude] stream done but no text | stop_reason:', timedOut ? 'time_budget' : stopReason)
     return { text: null, errorCode: null }
   } catch (e) { console.error('[Claude] threw:', e.message); return { text: null, errorCode: null } }
 }
