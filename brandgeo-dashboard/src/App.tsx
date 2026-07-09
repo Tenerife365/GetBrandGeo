@@ -20,6 +20,8 @@ import BrandSentiment from './pages/BrandSentiment'
 import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
 import Usage from './pages/Usage'
+import AuditRequest from './pages/AuditRequest'
+import AuditReport from './pages/AuditReport'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -62,6 +64,9 @@ export default function App() {
               <Route path="/login" element={<DemoLoginInterceptor />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              {/* Public, unauthenticated — Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10) */}
+              <Route path="/audit" element={<AuditRequest />} />
+              <Route path="/audit/:token" element={<AuditReport />} />
               <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
               <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
               <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />

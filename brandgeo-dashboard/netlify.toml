@@ -49,3 +49,20 @@
 
 [functions."resend-invite"]
   timeout = 15
+
+# ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
+[functions."audit-domain"]
+  timeout = 26
+
+[functions."get-audit-report"]
+  timeout = 15
+
+[functions."unlock-audit-report"]
+  timeout = 15
+
+# run-full-audit-background is a Netlify Background Function (the `-background`
+# filename suffix triggers this automatically) — it gets up to 15 minutes and
+# doesn't take a `timeout` setting the way synchronous functions above do.
+
+[functions."purge-old-audits"]
+  schedule = "0 4 * * *"
