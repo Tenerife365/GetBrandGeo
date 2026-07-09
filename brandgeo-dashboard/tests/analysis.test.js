@@ -150,4 +150,36 @@ check('absent brand → NOT mentioned', mentioned('Totally unrelated marketing t
   passed += 2; console.log('  ok - matchesAlias acronym boundary (standalone yes, in-word no)')
 }
 
+console.log('position units — list rank only, no sentence index (finding 1.2):')
+
+// P1. Genuine list rank is kept.
+check('list rank → brand_position 2',
+  analyseResponse('1. Fratelli Catering\n2. Bucate pe Roate\n3. Elegant Catering', cfg).brand_position, 2)
+
+// P2. Prose mention (no list) → null, NOT a sentence index (was 1).
+{
+  const r = analyseResponse('Bucate pe Roate is a great caterer serving Bucharest.', cfg)
+  check('prose mention → mentioned', r.brand_mentioned, true)
+  check('prose mention → position null (not sentence index)', r.brand_position, null)
+}
+
+// P3. Prose mention deep in the text → null, NOT sentence index 3.
+{
+  const r = analyseResponse('First the venue matters. Then the menu. Ultimately Bucate pe Roate handled it well.', cfg)
+  check('deep prose mention → position null', r.brand_position, null)
+}
+
+// P4. Rank beyond top-5 is still recovered (detectListPosition, not sentence idx).
+{
+  const text = '1. A\n2. B\n3. C\n4. D\n5. E\n6. F\n7. Bucate pe Roate\n8. G'
+  check('rank #7 recovered → brand_position 7', analyseResponse(text, cfg).brand_position, 7)
+}
+
+// P5. A year leading a line must NOT be read as a rank (1..50 guard).
+{
+  const r = analyseResponse('2019. Bucate pe Roate a fost premiată în acel an.', cfg)
+  check('year "2019." → mentioned', r.brand_mentioned, true)
+  check('year "2019." → position null (not rank 2019)', r.brand_position, null)
+}
+
 console.log(`\nAll ${passed} assertions passed.`)

@@ -63,16 +63,19 @@ function extractTopRankedResults(text) {
 }
 
 function detectListPosition(text, matchers) {
+  // Genuine numbered-list rank ONLY. Prose mentions return null — previously
+  // this fell back to the *sentence index* (i+1), which landed in the same
+  // brand_position column and got averaged with real list ranks into avgPos
+  // (finding 1.2: two different units in one field). "Mentioned in prose but
+  // not ranked" is legitimately position=null, not "ranked #9".
+  // The 1..50 guard rejects a year/price/absurd number that happens to lead a
+  // line (e.g. "2019. Brand expanded…") from being read as a rank.
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
   while ((m = listRe.exec(text)) !== null) {
-    const num     = parseInt(m[1], 10)
-    const segment = m[2]
-    if (matchesAlias(segment, matchers)) return num
-  }
-  const sentences = text.split(/(?<=[.!?])\s+/)
-  for (let i = 0; i < sentences.length; i++) {
-    if (matchesAlias(sentences[i], matchers)) return i + 1
+    const num = parseInt(m[1], 10)
+    if (num < 1 || num > 50) continue
+    if (matchesAlias(m[2], matchers)) return num
   }
   return null
 }
