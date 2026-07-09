@@ -316,6 +316,7 @@ export default function Prompts() {
             <>
           <button
             onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
+            aria-expanded={showDiscover}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
               showDiscover
                 ? 'bg-brand-500/30 text-brand-200 border border-brand-500/50'
@@ -342,6 +343,7 @@ export default function Prompts() {
         <div className="flex flex-wrap gap-2 mb-6">
           <button
             onClick={() => setFilterCat('all')}
+            aria-pressed={filterCat === 'all'}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
               filterCat === 'all'
                 ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
@@ -356,6 +358,7 @@ export default function Prompts() {
               <button
                 key={cat}
                 onClick={() => setFilterCat(filterCat === cat ? 'all' : (cat as PromptCategory))}
+                aria-pressed={filterCat === cat}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                   filterCat === cat ? 'border-brand-500/50 bg-brand-500/10 text-brand-300' : 'border-dark-700 bg-dark-800 hover:border-dark-600'
                 }`}
@@ -423,6 +426,7 @@ export default function Prompts() {
                   <button
                     onClick={() => addSuggestion(s, i)}
                     disabled={s.added}
+                    aria-label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
                     className={`shrink-0 p-1 rounded-lg transition-colors ${
                       s.added
                         ? 'text-emerald-500 cursor-default'
@@ -442,12 +446,14 @@ export default function Prompts() {
               onChange={e => setUserInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
               placeholder={t.pr_placeholder}
+              aria-label="Message to AI Discover"
               className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
               disabled={aiLoading}
             />
             <button
               onClick={sendMessage}
               disabled={!userInput.trim() || aiLoading}
+              aria-label="Send message"
               className="px-3 py-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
             >
               <Send size={14} />
@@ -465,11 +471,13 @@ export default function Prompts() {
               onChange={e => setNewText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addPrompt()}
               placeholder={t.pr_searchPlaceholder}
+              aria-label="New prompt text"
               className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
             />
             <select
               value={newCat}
               onChange={e => setNewCat(e.target.value as PromptCategory)}
+              aria-label="Prompt category"
               className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-brand-500"
             >
               {Object.entries(CATEGORY_META).map(([cat, meta]) => (
@@ -478,8 +486,8 @@ export default function Prompts() {
             </select>
           </div>
           <div className="flex gap-2 pt-0.5">
-            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} className="p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"><Check size={16} /></button>
-            <button onClick={() => setShowAdd(false)} className="p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors"><X size={16} /></button>
+            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"><Check size={16} /></button>
+            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors"><X size={16} /></button>
           </div>
         </div>
       )}
@@ -499,26 +507,28 @@ export default function Prompts() {
                     value={editText}
                     onChange={e => setEditText(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                    aria-label="Edit prompt text"
                     className="flex-1 bg-dark-700 border border-brand-500/50 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
                   />
                   <select
                     value={editCat}
                     onChange={e => setEditCat(e.target.value as PromptCategory)}
+                    aria-label="Prompt category"
                     className="bg-dark-700 border border-dark-600 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
                   >
                     {Object.keys(CATEGORY_META).map(cat => (
                       <option key={cat} value={cat}>{getCategoryMeta(cat).label}</option>
                     ))}
                   </select>
-                  <button onClick={saveEdit} disabled={saving} className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>
-                  <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600"><X size={14} /></button>
+                  <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>
+                  <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600"><X size={14} /></button>
                 </div>
               ) : (
                 <>
                   <span className="flex-1 text-sm text-slate-300">{p.text}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
+                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors"><Pencil size={14} /></button>
+                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
                   </div>
                 </>
               )}

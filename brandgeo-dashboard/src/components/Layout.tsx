@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
@@ -48,6 +48,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
+
+  // Refs for the three dropdown menus below — used only to detect outside clicks
+  // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
+  // existing toggle-on-click behavior, they just add the missing keyboard/click-away paths.
+  const clientMenuRef = useRef<HTMLDivElement>(null)
+  const marketMenuRef = useRef<HTMLDivElement>(null)
+  const langMenuRef   = useRef<HTMLDivElement>(null)
+
+  // Close any open dropdown on outside click or Escape — none of the 3 dropdowns below
+  // previously had this, so keyboard/screen-reader users had no way to dismiss one short
+  // of re-clicking the trigger or picking an option.
+  useEffect(() => {
+    function handlePointerDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (showClients && clientMenuRef.current && !clientMenuRef.current.contains(target)) setShowClients(false)
+      if (showAddMarket && marketMenuRef.current && !marketMenuRef.current.contains(target)) setShowAddMarket(false)
+      if (showLangs && langMenuRef.current && !langMenuRef.current.contains(target)) setShowLangs(false)
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setShowClients(false)
+        setShowAddMarket(false)
+        setShowLangs(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showClients, showAddMarket, showLangs])
 
   // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
   // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
@@ -116,6 +148,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-dark-900 overflow-hidden">
 
+      {/* Skip-to-content link (WCAG 2.4.1) — visually hidden until keyboard-focused.
+          sr-only/focus:not-sr-only are Tailwind built-ins; .skip-link (index.css) handles
+          the fixed positioning once it's focused. */}
+      <a href="#main-content" className="skip-link sr-only focus:not-sr-only bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        Skip to main content
+      </a>
+
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
@@ -136,7 +175,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
             )}
-            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-1" aria-label="Close menu">
+            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-2" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
@@ -175,7 +214,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
-        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
               <div className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-1">
@@ -200,10 +239,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {isAdmin && clients.length > 0 && (
           <div className="p-3 border-t border-dark-700/60 flex-shrink-0">
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
-            <div className="relative">
+            <div className="relative" ref={clientMenuRef}>
               <button
                 onClick={() => { setShowClients(v => !v); setShowAddMarket(false); setShowLangs(false) }}
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
+                aria-haspopup="listbox"
+                aria-expanded={showClients}
               >
                 <Building2 size={13} className="text-brand-400 flex-shrink-0" />
                 <span className="flex-1 text-left truncate font-medium">
@@ -246,8 +287,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {selections.length > 1 && (
                     <button
                       onClick={() => removeSelection(sel.market.id)}
-                      className="text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                      className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
                       title={`Remove ${sel.market.label}`}
+                      aria-label={`Remove ${sel.market.label} from selected markets`}
                     >
                       <X size={12} />
                     </button>
@@ -263,6 +305,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         if (r) updateRegion(sel.market.id, r)
                       }}
                       className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                      aria-label={`Region for ${sel.market.label}`}
                     >
                       {sel.market.regions.map(r => (
                         <option key={r.id} value={r.id}>{r.label}</option>
@@ -276,10 +319,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Add market picker */}
           {availableMarkets.length > 0 && (
-            <div className="relative">
+            <div className="relative" ref={marketMenuRef}>
               <button
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
                 className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+                aria-haspopup="listbox"
+                aria-expanded={showAddMarket}
               >
                 <Plus size={11} />
                 Add market
@@ -306,10 +351,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Bottom actions */}
         <div className="p-3 border-t border-dark-700/60 space-y-0.5 flex-shrink-0">
-          <div className="relative">
+          <div className="relative" ref={langMenuRef}>
             <button
               onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              aria-haspopup="listbox"
+              aria-expanded={showLangs}
             >
               <Languages size={16} />
               <span className="flex-1 text-left">
@@ -349,7 +396,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Mobile header */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-1" aria-label="Open menu">
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-2" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
@@ -367,6 +414,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               key={r}
               onClick={() => setTimeRange(r)}
+              aria-pressed={timeRange === r}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                 timeRange === r
                   ? 'bg-brand-500/20 text-brand-300'
@@ -378,13 +426,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <main className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
           {children}
         </main>
       </div>
 
       {/* Mobile bottom nav bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-dark-800/95 backdrop-blur-md border-t border-dark-700 flex items-stretch justify-around safe-area-pb">
+      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-dark-800/95 backdrop-blur-md border-t border-dark-700 flex items-stretch justify-around safe-area-pb">
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

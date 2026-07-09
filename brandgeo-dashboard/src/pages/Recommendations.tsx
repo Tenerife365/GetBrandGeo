@@ -403,6 +403,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
     <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
         className="w-full flex items-start gap-4 p-5 text-left hover:bg-dark-700/40 transition-colors"
       >
         <div className="flex-1 min-w-0">

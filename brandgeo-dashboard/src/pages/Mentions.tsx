@@ -185,6 +185,7 @@ export default function Mentions() {
 
       <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setFilterLLM('all')}
+          aria-pressed={filterLLM === 'all'}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
             filterLLM === 'all'
               ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
@@ -197,6 +198,7 @@ export default function Mentions() {
           if (!meta || count === 0) return null
           return (
             <button key={llm} onClick={() => setFilterLLM(llm === filterLLM ? 'all' : llm)}
+              aria-pressed={filterLLM === llm}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                 filterLLM === llm ? `${meta.bg} ${meta.color}` : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
               }`}>
@@ -210,6 +212,7 @@ export default function Mentions() {
       <div className="flex flex-wrap gap-2 mb-5">
         {(['all', ...Object.keys(CATEGORY_LABEL)] as FilterCat[]).map(cat => (
           <button key={cat} onClick={() => setFilterCat(cat)}
+            aria-pressed={filterCat === cat}
             className={`px-3 py-1 rounded-lg text-xs transition-colors border ${
               filterCat === cat
                 ? 'bg-slate-700 text-slate-200 border-slate-600'
@@ -227,7 +230,8 @@ export default function Mentions() {
           return (
             <div key={m.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
               <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
-                onClick={() => setExpanded(isOpen ? null : m.id)}>
+                onClick={() => setExpanded(isOpen ? null : m.id)}
+                aria-expanded={isOpen}>
                 <div className="flex items-start gap-4">
                   <div className="shrink-0 w-10 text-center mt-0.5">
                     {m.brand_position ? (

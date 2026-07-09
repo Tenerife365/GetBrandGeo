@@ -334,6 +334,8 @@ export default function BrandSentiment() {
                 <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
                   {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
                     <button key={p} onClick={() => setTrendPeriod(p)}
+                      aria-pressed={trendPeriod === p}
+                      aria-label={`View ${p} trend`}
                       className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
                         trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                       }`}>
@@ -375,6 +377,7 @@ export default function BrandSentiment() {
             <div className="flex flex-wrap gap-2 mb-3">
               {(['all', 'positive', 'neutral', 'negative'] as const).map(s => (
                 <button key={s} onClick={() => setFilterSentiment(s)}
+                  aria-pressed={filterSentiment === s}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                     filterSentiment === s
                       ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
@@ -388,6 +391,7 @@ export default function BrandSentiment() {
 
             <div className="flex flex-wrap gap-2 mb-4">
               <button onClick={() => setFilterEngine('all')}
+                aria-pressed={filterEngine === 'all'}
                 className={`px-2.5 py-1 rounded-lg text-xs transition-colors border ${
                   filterEngine === 'all' ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
                 }`}>
@@ -397,6 +401,7 @@ export default function BrandSentiment() {
                 const meta = ENGINE_META[e]
                 return (
                   <button key={e} onClick={() => setFilterEngine(e === filterEngine ? 'all' : e)}
+                    aria-pressed={filterEngine === e}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
                       filterEngine === e ? `${meta.bg} ${meta.color} border-transparent` : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
                     }`}>
@@ -413,7 +418,8 @@ export default function BrandSentiment() {
                 return (
                   <div key={e.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
                     <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
-                      onClick={() => setExpanded(isOpen ? null : e.id)}>
+                      onClick={() => setExpanded(isOpen ? null : e.id)}
+                      aria-expanded={isOpen}>
                       <div className="flex items-start gap-4">
                         <div className="shrink-0 w-10 text-center mt-0.5">
                           {e.brand_position ? (

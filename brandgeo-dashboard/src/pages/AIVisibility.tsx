@@ -113,6 +113,7 @@ function EngineToggleModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close engine configuration"
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
           >
             <X size={16} />
@@ -483,9 +484,10 @@ export default function AIVisibility() {
                 onClick={() => setShowEngineModal(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
                 title="Configure engines for this client"
+                aria-label="Configure engines for this client"
               >
                 <Settings size={14} />
-                <span className="hidden sm:inline">Engines</span>
+                <span className="hidden sm:inline" aria-hidden="true">Engines</span>
               </button>
               <button
                 onClick={runCollection}
@@ -501,10 +503,11 @@ export default function AIVisibility() {
                 onClick={forceCollection}
                 disabled={collecting || loading}
                 title="Force Refresh — wipes existing results and re-runs all engines"
+                aria-label="Force refresh — wipes existing results and re-runs all engines"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RotateCcw size={14} />
-                <span className="hidden sm:inline">Force Refresh</span>
+                <span className="hidden sm:inline" aria-hidden="true">Force Refresh</span>
               </button>
             </>
           )}
@@ -669,6 +672,7 @@ export default function AIVisibility() {
           <button
             className="w-full flex items-center justify-between px-5 py-3.5 text-left"
             onClick={() => setShowFixHub(v => !v)}
+            aria-expanded={showFixHub}
           >
             <div className="flex items-center gap-2">
               <Zap size={15} className="text-brand-400" />
@@ -734,6 +738,7 @@ export default function AIVisibility() {
           <button
             className="w-full flex items-center justify-between px-5 py-3 text-left"
             onClick={() => setShowInsights(v => !v)}
+            aria-expanded={showInsights}
           >
             <div className="flex items-center gap-2">
               <AlertTriangle size={15} className="text-amber-400" />
@@ -817,6 +822,7 @@ export default function AIVisibility() {
           <div className="flex gap-2 mb-4 flex-wrap">
             <button
               onClick={() => setFilterCats(new Set())}
+              aria-pressed={filterCats.size === 0}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                 filterCats.size === 0
                   ? 'bg-brand-500 text-white border-brand-600'
@@ -838,6 +844,7 @@ export default function AIVisibility() {
                       return next
                     })
                   }}
+                  aria-pressed={active}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                     active
                       ? 'bg-brand-500 text-white border-brand-600'
@@ -881,6 +888,16 @@ export default function AIVisibility() {
                 className="w-full grid hover:bg-dark-700/30 transition-colors cursor-pointer"
                 style={{ gridTemplateColumns: tableColsTemplate }}
                 onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                aria-label={`${prompt.text} — expand for engine-by-engine detail`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setExpandedRow(isExpanded ? null : prompt.id)
+                  }
+                }}
               >
                 <div className="px-3 py-3 text-xs text-slate-600 self-center">{prompt.position || i + 1}</div>
 
@@ -899,6 +916,7 @@ export default function AIVisibility() {
                       disabled={refreshingPromptId === prompt.id || collecting}
                       className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
                       title="Re-run this prompt on all engines"
+                      aria-label="Re-run this prompt on all engines"
                     >
                       <RotateCcw size={11} className={refreshingPromptId === prompt.id ? 'animate-spin' : ''} />
                     </button>

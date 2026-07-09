@@ -107,3 +107,39 @@ html.light .bg-dark-800.border,
 html.light .bg-dark-800.rounded-xl {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
 }
+
+/* Keyboard focus indicator (Master-Dashboard-Polish Phase 5, WCAG 2.4.7).
+   Tailwind's preflight doesn't strip the native outline, but nothing in this
+   app ever defined one either, so keyboard users got whatever the browser's
+   default happened to be — inconsistent, and low-contrast on the dark theme.
+   :focus-visible (not :focus) so mouse/touch clicks don't show a ring, only
+   real keyboard/AT navigation does. Brand-400 for contrast against both
+   dark-900/dark-800 surfaces and light-mode surfaces. */
+:focus-visible {
+  outline: 2px solid rgb(167 139 250);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+html.light :focus-visible {
+  outline-color: rgb(124 58 237);
+}
+/* Rings on already-round elements (pills, avatars, toggle chips) look better
+   following the shape than a boxy outline. */
+.rounded-full:focus-visible {
+  outline-offset: 1px;
+}
+
+/* Skip-to-content link (WCAG 2.4.1) — visually hidden until keyboard-focused,
+   then docked top-left above everything else. Pairs with the `sr-only
+   focus:not-sr-only` classes on the link itself in Layout.tsx; this just
+   handles the fixed positioning Tailwind's own not-sr-only doesn't cover. */
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 0.75rem;
+  z-index: 100;
+  transition: top 0.15s ease-out;
+}
+.skip-link:focus {
+  top: 0.75rem;
+}

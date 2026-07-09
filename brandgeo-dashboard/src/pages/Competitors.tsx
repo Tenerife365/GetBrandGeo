@@ -325,6 +325,7 @@ export default function Competitors() {
           </p>
         </div>
         <button onClick={() => setShowAdd(v => !v)}
+          aria-expanded={showAdd}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 transition-colors">
           <Plus size={14} />
           Add manually
@@ -366,24 +367,26 @@ export default function Competitors() {
         <div className="mb-5 bg-dark-800 border border-brand-500/30 rounded-xl p-4 flex gap-3 items-end">
           <div className="flex-1 space-y-2">
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Competitor name</label>
-              <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+              <label htmlFor="competitor-name-input" className="text-xs text-slate-500 mb-1 block">Competitor name</label>
+              <input id="competitor-name-input" autoFocus value={newName} onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. Premier Catering"
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Website (optional)</label>
-              <input value={newWebsite} onChange={e => setNewWebsite(e.target.value)}
+              <label htmlFor="competitor-website-input" className="text-xs text-slate-500 mb-1 block">Website (optional)</label>
+              <input id="competitor-website-input" value={newWebsite} onChange={e => setNewWebsite(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="https://example.com"
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
             </div>
           </div>
           <div className="flex gap-2 pb-0.5">
             <button onClick={addCompetitor} disabled={saving || !newName.trim()}
+              aria-label="Add competitor"
               className="p-2.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors">
               <Check size={16} />
             </button>
             <button onClick={() => setShowAdd(false)}
+              aria-label="Cancel adding competitor"
               className="p-2.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors">
               <X size={16} />
             </button>
@@ -533,12 +536,14 @@ export default function Competitors() {
                 <span className="text-sm text-slate-300">{c.name}</span>
                 {c.website && (
                   <a href={c.website} target="_blank" rel="noopener noreferrer"
+                    aria-label={`Visit ${c.name} website`}
                     className="text-slate-600 hover:text-brand-400 transition-colors" onClick={e => e.stopPropagation()}>
                     <Globe size={13} />
                   </a>
                 )}
               </div>
               <button onClick={() => deleteManual(c.id)}
+                aria-label={`Remove ${c.name} from tracked competitors`}
                 className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100">
                 <Trash2 size={13} />
               </button>
@@ -559,6 +564,8 @@ export default function Competitors() {
           <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
             {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
               <button key={p} onClick={() => setTrendPeriod(p)}
+                aria-pressed={trendPeriod === p}
+                aria-label={`View ${p} trend`}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                 }`}>
