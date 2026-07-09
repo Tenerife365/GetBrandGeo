@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
@@ -7,14 +8,28 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
-import type { LLMName, Sentiment } from '../types'
+import { useTimeFilter } from '../lib/timeFilterContext'
+import { useTheme } from '../lib/themeContext'
+import { ENGINE_META } from '../lib/planConfig'
+import {
+  computeAiVisibilityScore, buildScoreResultMap,
+  type AiVisibilityDimensions,
+} from '../lib/aiVisibilityScore'
+import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
-const LLMS: { id: LLMName; label: string; color: string; chartColor: string }[] = [
-  { id: 'chatgpt',    label: 'ChatGPT',    color: 'text-emerald-400', chartColor: '#10b981' },
-  { id: 'gemini',     label: 'Gemini',     color: 'text-blue-400',    chartColor: '#3b82f6' },
-  { id: 'claude',     label: 'Claude',     color: 'text-purple-400',  chartColor: '#a855f7' },
-  { id: 'perplexity', label: 'Perplexity', color: 'text-cyan-400',    chartColor: '#06b6d4' },
-  { id: 'meta',       label: 'Meta AI',    color: 'text-amber-400',   chartColor: '#f59e0b' },
+// Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
+// page's palette from drifting out of sync with AIVisibility.tsx (DESIGN-SYSTEM.md §1/§5).
+const LLM_IDS: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
+const LLMS = LLM_IDS.map(id => ({
+  id,
+  label: ENGINE_META[id].label,
+  color: ENGINE_META[id].color,
+  chartColor: ENGINE_META[id].chartColor,
+}))
+
+const DIMENSION_LABELS: [keyof AiVisibilityDimensions, string][] = [
+  ['recognition', 'Recognition'], ['knowledge', 'Knowledge'], ['sentiment', 'Sentiment'],
+  ['accuracy', 'Accuracy'], ['reach', 'Reach'], ['consistency', 'Consistency'],
 ]
 
 interface AIResultRow {
@@ -53,47 +68,73 @@ function computeStats(rows: AIResultRow[]): OverviewStats {
 }
 
 export default function Dashboard() {
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, activeEngines } = useClient()
   const { t } = useI18n()
+  const { getStartDate, timeRange } = useTimeFilter()
+  const { theme } = useTheme()
   const brandName = activeClient?.name ?? 'your brand'
 
-  const [rows, setRows]       = useState<AIResultRow[]>([])
-  const [stats, setStats]     = useState<OverviewStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [rows, setRows]           = useState<AIResultRow[]>([])
+  const [stats, setStats]         = useState<OverviewStats | null>(null)
+  const [scoreData, setScoreData] = useState<{ dimensions: AiVisibilityDimensions; aiScore: number } | null>(null)
+  const [loading, setLoading]     = useState(true)
 
   const load = async () => {
     setLoading(true)
 
     if (isDemoMode) {
-      const demoRows: AIResultRow[] = mockAIResults.map((r: any) => ({
-        ...r,
-        prompts: mockPrompts.find((p: any) => p.id === r.prompt_id)
-          ? { text: (mockPrompts.find((p: any) => p.id === r.prompt_id) as any).text,
-              category: (mockPrompts.find((p: any) => p.id === r.prompt_id) as any).category }
-          : null,
-      }))
+      const demoRows: AIResultRow[] = mockAIResults.map((r: AIResult) => {
+        const p = mockPrompts.find((mp: Prompt) => mp.id === r.prompt_id)
+        return {
+          ...r,
+          competitors_mentioned: r.competitors_mentioned ?? null,
+          prompts: p ? { text: p.text, category: p.category } : null,
+        }
+      })
       setRows(demoRows)
       setStats(computeStats(demoRows))
+
+      // AI Visibility Score — same shared computation as AIVisibility.tsx, deliberately
+      // all-time (not time-filtered) so both pages always show the identical headline number.
+      const scoreMap = buildScoreResultMap(mockAIResults)
+      setScoreData(computeAiVisibilityScore(mockPrompts.map(p => p.id), scoreMap, activeEngines))
+
       setLoading(false)
       return
     }
 
-    const { data, error } = await supabase
+    const startDate = getStartDate()
+    let query = supabase
       .from('ai_results')
       .select('*, prompts(text, category)')
       .eq('client_id', activeClientId)
       .order('checked_at', { ascending: false })
       .limit(1000)
+    if (startDate) query = query.gte('checked_at', startDate.toISOString())
+
+    const [{ data, error }, { data: pData }, { data: scoreRows }] = await Promise.all([
+      query,
+      supabase.from('prompts').select('id').eq('is_active', true).eq('client_id', activeClientId),
+      supabase.from('ai_results')
+        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment')
+        .eq('client_id', activeClientId),
+    ])
 
     if (!error && data) {
       const r = data as AIResultRow[]
       setRows(r)
       setStats(computeStats(r))
     }
+
+    if (pData && scoreRows) {
+      const scoreMap = buildScoreResultMap(scoreRows as unknown as { prompt_id: number; llm: string; brand_mentioned: boolean; brand_position: number | null; sentiment: string | null }[])
+      setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
+    }
+
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [activeClientId])
+  useEffect(() => { load() }, [activeClientId, timeRange])
 
   const llmData = LLMS.map(l => {
     const lRows     = rows.filter(r => r.llm === l.id)
@@ -129,6 +170,56 @@ export default function Dashboard() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
           <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
+
+      {scoreData && (
+        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-6">
+          <div className="flex flex-col items-center gap-3 shrink-0">
+            <svg viewBox="0 0 120 120" className="w-32 h-32 sm:w-40 sm:h-40" style={{ overflow: 'visible' }}>
+              <defs>
+                <linearGradient id="overviewScoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#c4b5fd" />
+                  <stop offset="100%" stopColor="#6d28d9" />
+                </linearGradient>
+                <filter id="overviewScoreGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+              </defs>
+              <circle cx="60" cy="60" r="54" fill="none"
+                stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
+              <circle cx="60" cy="60" r="54" fill="none" stroke="url(#overviewScoreRingGrad)" strokeWidth="10" strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 54}`}
+                strokeDashoffset={`${2 * Math.PI * 54 - (scoreData.aiScore / 100) * (2 * Math.PI * 54)}`}
+                transform="rotate(-90 60 60)" filter="url(#overviewScoreGlow)" opacity="0.3"
+                style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
+              <circle cx="60" cy="60" r="54" fill="none" stroke="url(#overviewScoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 54}`}
+                strokeDashoffset={`${2 * Math.PI * 54 - (scoreData.aiScore / 100) * (2 * Math.PI * 54)}`}
+                transform="rotate(-90 60 60)" style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
+              <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
+                <tspan fontSize="34" fontWeight="800" fill={theme === 'light' ? '#1e293b' : 'white'} letterSpacing="-1.5">
+                  {scoreData.aiScore}
+                </tspan>
+                <tspan fontSize="13" fontWeight="500" fill={theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'} dy="-12">%</tspan>
+              </text>
+            </svg>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</div>
+          </div>
+
+          <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {DIMENSION_LABELS.map(([key, label]) => (
+              <div key={key} className="bg-dark-700/60 rounded-lg px-3 py-2">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{label}</div>
+                <div className="text-lg font-bold text-white tabular-nums">{scoreData.dimensions[key]}%</div>
+              </div>
+            ))}
+            <Link to="/ai-visibility"
+              className="col-span-2 sm:col-span-3 mt-1 text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors">
+              View full breakdown →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

@@ -15,6 +15,7 @@ import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
+import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -286,16 +287,14 @@ export default function AIVisibility() {
     return { ...llm, mentioned, checked, pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0 }
   })
 
-  const overallPct = (() => {
-    let total = 0, mentioned = 0
-    prompts.forEach(p => {
-      activeLLMs.forEach(llm => {
-        const r = results.get(p.id)?.get(llm.id)
-        if (r) { total++; if (r.brand_mentioned) mentioned++ }
-      })
-    })
-    return total > 0 ? Math.round((mentioned / total) * 100) : 0
-  })()
+  // AI Visibility Score + its 6 dimensions — shared with Dashboard.tsx's Overview hero
+  // via aiVisibilityScore.ts so both pages always show the identical number (§7.4 Phase 3.1).
+  const { dimensions, aiScore } = computeAiVisibilityScore(
+    prompts.map(p => p.id),
+    results,
+    activeLLMs.map(l => l.id),
+  )
+  const overallPct = dimensions.recognition
 
   const competitorFreq = (() => {
     const freq: Record<string, { count: number; positions: number[] }> = {}
@@ -333,63 +332,6 @@ export default function AIVisibility() {
     results.forEach(m => { m.forEach(r => { if (r.brand_mentioned) n++ }) })
     return n
   })()
-
-  // ── AI Visibility Score ───────────────────────────────────────────────────
-
-  const dimensions = (() => {
-    const recognition = overallPct
-
-    let posSum = 0, posCount = 0
-    results.forEach(llmMap => llmMap.forEach(r => {
-      if (r.brand_mentioned && r.brand_position) {
-        posSum += Math.max(20, 100 - ((r.brand_position - 1) / 4) * 80)
-        posCount++
-      }
-    }))
-    const knowledge = posCount > 0 ? Math.round(posSum / posCount) : 0
-
-    let sentScore = 0, sentTotal = 0
-    results.forEach(llmMap => llmMap.forEach(r => {
-      if (r.brand_mentioned) {
-        sentTotal++
-        if (r.sentiment === 'positive') sentScore += 1
-        else if (r.sentiment === 'neutral') sentScore += 0.5
-      }
-    }))
-    const sentiment = sentTotal > 0 ? Math.round((sentScore / sentTotal) * 100) : (knowledge > 0 ? 55 : 0)
-
-    let topThree = 0, mentionedTotal = 0
-    results.forEach(llmMap => llmMap.forEach(r => {
-      if (r.brand_mentioned) {
-        mentionedTotal++
-        if (!r.brand_position || r.brand_position <= 3) topThree++
-      }
-    }))
-    const accuracy = mentionedTotal > 0 ? Math.round((topThree / mentionedTotal) * 100) : 0
-
-    const enginesWithMention = activeLLMs.filter(llm =>
-      prompts.some(p => results.get(p.id)?.get(llm.id)?.brand_mentioned)
-    ).length
-    const reach = activeLLMs.length > 0 ? Math.round((enginesWithMention / activeLLMs.length) * 100) : 0
-
-    const consistentPrompts = prompts.filter(p => {
-      const checked   = activeLLMs.filter(l => results.get(p.id)?.has(l.id)).length
-      const mentioned = activeLLMs.filter(l => results.get(p.id)?.get(l.id)?.brand_mentioned).length
-      return checked > 0 && mentioned / checked >= 0.6
-    }).length
-    const consistency = prompts.length > 0 ? Math.round((consistentPrompts / prompts.length) * 100) : 0
-
-    return { recognition, knowledge, sentiment, accuracy, reach, consistency }
-  })()
-
-  const aiScore = Math.round(
-    dimensions.recognition * 0.25 +
-    dimensions.knowledge   * 0.20 +
-    dimensions.sentiment   * 0.15 +
-    dimensions.accuracy    * 0.15 +
-    dimensions.reach       * 0.15 +
-    dimensions.consistency * 0.10
-  )
 
   // ── Engine status (active engines only, for KNOW/PARTIAL/MISSING/UNAVAILABLE) ─
 
