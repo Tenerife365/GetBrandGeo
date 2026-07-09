@@ -15,22 +15,22 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
+import { ENGINE_META } from '../lib/planConfig'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
 
 // ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
 const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
-const ENGINE_LABEL: Record<string, string> = {
-  chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
-  perplexity: 'Perplexity', meta: 'Meta AI',
-  google_ai: 'Google AI', copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
-}
-const ENGINE_COLOR: Record<string, string> = {
-  chatgpt: '#10b981', gemini: '#3b82f6', claude: '#8b5cf6',
-  perplexity: '#06b6d4', meta: '#f59e0b',
-  google_ai: '#ef4444', copilot: '#38bdf8', deepseek: '#818cf8', grok: '#94a3b8',
-}
+// Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
+// file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
+// ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.
+const ENGINE_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(ENGINE_META).map(([id, meta]) => [id, meta.label])
+)
+const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
+  Object.entries(ENGINE_META).map(([id, meta]) => [id, meta.chartColor])
+)
 
 interface EngineRow { total: number; mentioned: number; positions: number[] }
 

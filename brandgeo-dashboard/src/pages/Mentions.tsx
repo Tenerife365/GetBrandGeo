@@ -19,6 +19,21 @@ interface MentionEvent {
   checked_at: string
 }
 
+// Shape of the raw Supabase row for the joined ai_results + prompts select below.
+// `engine` is a legacy/fallback field some older rows may carry; current schema
+// column is `llm` (see CLAUDE.md §3) — preserved as-is, just typed instead of `any`.
+interface RawMentionRow {
+  id: number
+  prompt_id: number
+  llm: LLMName
+  engine?: LLMName
+  brand_position: number | null
+  sentiment: string
+  response_snippet: string | null
+  checked_at: string
+  prompts?: { text: string; category: string; position: number } | null
+}
+
 const LLM_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   chatgpt:    { label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25', dot: 'bg-emerald-400' },
   gemini:     { label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-500/15 border-blue-500/25',       dot: 'bg-blue-400'    },
@@ -98,7 +113,7 @@ export default function Mentions() {
         .order('checked_at', { ascending: false })
 
       if (data) {
-        setMentions(data.map((r: any) => ({
+        setMentions((data as RawMentionRow[]).map(r => ({
           id: r.id,
           prompt_id: r.prompt_id,
           promptText: r.prompts?.text ?? '',
@@ -193,8 +208,8 @@ export default function Mentions() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        {(['all', ...Object.keys(CATEGORY_LABEL)] as const).map(cat => (
-          <button key={cat} onClick={() => setFilterCat(cat as any)}
+        {(['all', ...Object.keys(CATEGORY_LABEL)] as FilterCat[]).map(cat => (
+          <button key={cat} onClick={() => setFilterCat(cat)}
             className={`px-3 py-1 rounded-lg text-xs transition-colors border ${
               filterCat === cat
                 ? 'bg-slate-700 text-slate-200 border-slate-600'
@@ -233,7 +248,7 @@ export default function Mentions() {
                         {getCatLabel(m.category)}
                       </span>
                       <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <SentimentDot value={m.sentiment as any} />{m.sentiment}
+                        <SentimentDot value={m.sentiment} />{m.sentiment}
                       </span>
                     </div>
                     <p className="text-sm text-slate-200 truncate">{m.promptText}</p>

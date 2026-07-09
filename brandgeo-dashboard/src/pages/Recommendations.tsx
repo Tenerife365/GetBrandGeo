@@ -583,7 +583,7 @@ export default function Recommendations() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-xl font-bold text-slate-100">Recommendations</h1>
+            <h1 className="text-2xl font-bold text-white">Recommendations</h1>
             {recs.length > 0 && (
               <span className="text-xs bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-medium">
                 {recs.length} action{recs.length !== 1 ? 's' : ''}

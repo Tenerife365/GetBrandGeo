@@ -8,6 +8,7 @@ import { DollarSign, TrendingUp, Cpu } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
+import { ENGINE_META, type EngineId } from '../lib/planConfig'
 
 const ENGINE_COST: Record<string, number> = {
   claude:     0.018,
@@ -20,13 +21,12 @@ const ENGINE_COST: Record<string, number> = {
 // 50% overhead to cover platform costs (Supabase, Netlify, hosting, Plausible, domain, etc.)
 const OVERHEAD_MULTIPLIER = 1.5
 
-const ENGINE_COLOR: Record<string, string> = {
-  chatgpt:    'text-emerald-400',
-  gemini:     'text-blue-400',
-  claude:     'text-purple-400',
-  perplexity: 'text-cyan-400',
-  meta:       'text-amber-400',
-}
+// Sourced from ENGINE_META (planConfig.ts) instead of a hardcoded local map — same
+// duplication-drift risk DESIGN-SYSTEM.md §1/§5 flagged for Dashboard.tsx/Competitors.tsx.
+// Keyed off ENGINE_COST's own keys since those are the only engines this page ever renders.
+const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
+  Object.keys(ENGINE_COST).map(id => [id, ENGINE_META[id as EngineId]?.color ?? 'text-slate-400'])
+)
 
 interface ClientUsage {
   clientId: number
