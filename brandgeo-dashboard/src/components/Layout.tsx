@@ -49,6 +49,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
 
+  // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
   // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
   const nav = [
     { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility    },
@@ -59,6 +60,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/',                icon: LayoutDashboard, label: t.nav_overview        },
     { to: '/prompts',         icon: BookText,        label: t.nav_prompts         },
   ]
+
+  // Desktop sidebar: same pages, grouped into sections for a stronger information hierarchy
+  // (Master-Redesign Phase 2, 2026-07-09 — see CLAUDE.md §7.4). Overview leads Insights since
+  // it's the "/" landing route; Onboard Client and Usage & Costs (both admin-only) are folded
+  // into Manage instead of their own standalone bordered blocks further down the sidebar.
+  const navGroups: { label: string; items: typeof nav }[] = [
+    {
+      label: 'Insights',
+      items: [
+        { to: '/',              icon: LayoutDashboard, label: t.nav_overview     },
+        { to: '/ai-visibility', icon: Bot,             label: t.nav_aiVisibility },
+        { to: '/sentiment',     icon: Smile,           label: t.nav_sentiment    },
+        { to: '/mentions',      icon: MessageSquare,   label: t.nav_mentions     },
+      ],
+    },
+    {
+      label: 'Strategy',
+      items: [
+        { to: '/competitors',     icon: Users,     label: t.nav_competitors     },
+        { to: '/recommendations', icon: Lightbulb, label: t.nav_recommendations },
+      ],
+    },
+    {
+      label: 'Manage',
+      items: [
+        { to: '/prompts', icon: BookText, label: t.nav_prompts },
+        ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
+        ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
+      ],
+    },
+  ]
+
+  // Stronger active-state indicator: left accent bar + bg tint, not just a bg tint (§7.4 Phase 2)
+  const navItemClass = ({ isActive }: { isActive: boolean }) =>
+    [
+      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors border-l-2',
+      isActive
+        ? 'bg-brand-500/15 text-brand-300 font-medium border-brand-400'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700 border-transparent',
+    ].join(' ')
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -133,31 +174,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Nav links */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {nav.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} end={to === '/'}
-              onClick={closeSidebar}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
-              }
-            >
-              <Icon size={16} />
-              {label}
-            </NavLink>
+        {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+          {navGroups.map(group => (
+            <div key={group.label}>
+              <div className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-1">
+                {group.label}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map(({ to, icon: Icon, label }) => (
+                  <NavLink key={to} to={to} end={to === '/'}
+                    onClick={closeSidebar}
+                    className={navItemClass}
+                  >
+                    <Icon size={16} />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
-
-          {/* Admin: Usage & Costs link */}
-          {isAdmin && (
-            <NavLink to="/usage" onClick={closeSidebar}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
-              }
-            >
-              <DollarSign size={16} />
-              Usage &amp; Costs
-            </NavLink>
-          )}
         </nav>
 
         {/* Client switcher — admin only */}
@@ -189,20 +225,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Onboard Client */}
-        {isAdmin && (
-          <div className="p-3 border-t border-dark-700/60 flex-shrink-0">
-            <NavLink to="/onboard" onClick={closeSidebar}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500/20 text-brand-300 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700'}`
-              }
-            >
-              <UserPlus size={16} />
-              Onboard Client
-            </NavLink>
           </div>
         )}
 
