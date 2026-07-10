@@ -314,4 +314,32 @@ check('"employee/claimant" → not brand-like (slash)', looksLikeBrandName('empl
   passed++; console.log('  ok - leading medal emoji stripped from bullet names')
 }
 
+console.log('competitor extraction — reject bold section headings (live Gemini id 1629, 2026-07-10):')
+
+// B6. Gemini bolds section headings above its firm lists ("For Employer
+//     Representation", "First Tier Firms", "Other Highly-Ranked Firms"). These
+//     are Title-Cased so they pass looksLikeBrandName + isCompanyName, but a
+//     trailing category noun ("… Firms") or leading section word ("For …") drops
+//     them. The real firms in the same answer must survive.
+{
+  const text = 'Here are the best employment law firms in London:\n\n' +
+    '## **For Employer Representation**\n' +
+    '### **First Tier Firms**\n' +
+    'Consider **Baker McKenzie**, **Mishcon de Reya**, and **Lewis Silkin**.\n' +
+    '### **Other Highly-Ranked Firms**\n' +
+    '**Russell-Cooke**, **BDBF LLP**, **Leigh Day**, and **Monaco Solicitors**.'
+  const n = competitorNames(text, auditCfg)
+  for (const hdr of ['For Employer Representation', 'First Tier Firms', 'Other Highly-Ranked Firms'])
+    assert.ok(!n.includes(hdr), `section heading must be dropped: ${hdr}`)
+  for (const real of ['Baker McKenzie', 'Mishcon de Reya', 'Lewis Silkin', 'Russell-Cooke', 'BDBF LLP', 'Leigh Day', 'Monaco Solicitors'])
+    assert.ok(n.includes(real), `real firm must be kept: ${real}`)
+  passed++; console.log('  ok - section headings dropped, real firms kept')
+}
+
+// B7. Real brands near header words survive — superlatives/ordinals are excluded
+//     from the lead set so "Best Buy" / "First Direct" are not mistaken for headers.
+check('brands near header words kept',
+  competitorNames('For banking, **Best Buy** and **First Direct** are options.', auditCfg),
+  ['Best Buy', 'First Direct'])
+
 console.log(`\nAll ${passed} assertions passed.`)

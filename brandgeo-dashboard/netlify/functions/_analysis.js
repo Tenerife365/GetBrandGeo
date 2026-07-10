@@ -107,6 +107,31 @@ function looksLikeBrandName(name) {
   return significant > 0 && capped === significant
 }
 
+// Bold section headings that engines (esp. Gemini) emit above their firm lists —
+// "For Employer Representation", "First Tier Firms", "Other Highly-Ranked Firms".
+// They're Title-Cased so looksLikeBrandName + isCompanyName pass them, but a
+// trailing plural CATEGORY noun ("… Firms/Options/Tools") or a leading section
+// word ("For …", "Other …") is a strong header signal. Kept deliberately narrow:
+// tail nouns exclude real firm suffixes like "Solicitors"/"Lawyers"/"Systems";
+// lead words exclude ordinals/superlatives ("First"/"Best"/"Top") so real brands
+// like "First Direct" / "Best Buy" survive. Only used in the bold/bullet path.
+const CATEGORY_TAIL_NOUNS = new Set([
+  'firms', 'companies', 'options', 'providers', 'vendors', 'solutions',
+  'services', 'tools', 'apps', 'platforms', 'brands', 'picks', 'choices',
+  'recommendations', 'players', 'contenders', 'alternatives', 'agencies',
+  'consultancies', 'specialists', 'names',
+])
+const HEADING_LEAD_WORDS = new Set([
+  'for', 'other', 'additional', 'more', 'notable', 'further', 'several', 'various',
+])
+function looksLikeSectionHeading(name) {
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2) return false
+  const first = words[0].toLowerCase().replace(/[^\p{L}]/gu, '')
+  const last = words[words.length - 1].toLowerCase().replace(/[^\p{L}]/gu, '')
+  return CATEGORY_TAIL_NOUNS.has(last) || HEADING_LEAD_WORDS.has(first)
+}
+
 function extractBoldAndBulletNames(text) {
   const raw = []
   const boldRe = /\*\*([^*\n]{2,80})\*\*/g
@@ -122,6 +147,7 @@ function extractBoldAndBulletNames(text) {
     if (name.length < 2 || name.length > 60) continue
     const key = name.toLowerCase()
     if (seen.has(key)) continue
+    if (looksLikeSectionHeading(name)) continue
     if (!looksLikeBrandName(name)) continue
     if (!isCompanyName(name)) continue
     seen.add(key)
