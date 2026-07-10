@@ -31,6 +31,7 @@ interface Strings {
   sidebar_darkMode:     string
   sidebar_lightMode:    string
   sidebar_signOut:      string
+  sidebar_billing:      string
   sidebar_allRegions:   string
   // Recommendations page
   rec_actions:          string
@@ -174,6 +175,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Dark mode',
     sidebar_lightMode:   'Light mode',
     sidebar_signOut:     'Sign out',
+    sidebar_billing:     'Manage billing',
     sidebar_allRegions:  'All regions',
     rec_actions:         'actions',
     rec_subtitle:        'AI-powered actions to improve your brand visibility across LLMs',
@@ -308,6 +310,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Modo oscuro',
     sidebar_lightMode:   'Modo claro',
     sidebar_signOut:     'Cerrar sesion',
+    sidebar_billing:     'Gestionar facturacion',
     sidebar_allRegions:  'Todas las regiones',
     rec_actions:         'acciones',
     rec_subtitle:        'Acciones con IA para mejorar la visibilidad de tu marca en LLMs',
@@ -442,6 +445,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Dunkelmodus',
     sidebar_lightMode:   'Hellmodus',
     sidebar_signOut:     'Abmelden',
+    sidebar_billing:     'Abrechnung verwalten',
     sidebar_allRegions:  'Alle Regionen',
     rec_actions:         'Maßnahmen',
     rec_subtitle:        'KI-gestutzte Maßnahmen zur Verbesserung Ihrer Markensichtbarkeit',
@@ -576,6 +580,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Mode sombre',
     sidebar_lightMode:   'Mode clair',
     sidebar_signOut:     'Se deconnecter',
+    sidebar_billing:     'Gerer la facturation',
     sidebar_allRegions:  'Toutes les regions',
     rec_actions:         'actions',
     rec_subtitle:        'Actions IA pour ameliorer la visibilite de votre marque',
@@ -710,6 +715,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Donkere modus',
     sidebar_lightMode:   'Lichte modus',
     sidebar_signOut:     'Uitloggen',
+    sidebar_billing:     'Facturering beheren',
     sidebar_allRegions:  'Alle regio\'s',
     rec_actions:         'acties',
     rec_subtitle:        'AI-gestuurde acties om je merkzichtbaarheid te verbeteren',
@@ -844,6 +850,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Mod intunecat',
     sidebar_lightMode:   'Mod luminos',
     sidebar_signOut:     'Deconectare',
+    sidebar_billing:     'Gestioneaza facturarea',
     sidebar_allRegions:  'Toate regiunile',
     rec_actions:         'actiuni',
     rec_subtitle:        'Actiuni AI pentru imbunatatirea vizibilitatii marcii in LLMs',
@@ -978,6 +985,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Modo escuro',
     sidebar_lightMode:   'Modo claro',
     sidebar_signOut:     'Terminar sessao',
+    sidebar_billing:     'Gerir faturacao',
     sidebar_allRegions:  'Todas as regioes',
     rec_actions:         'acoes',
     rec_subtitle:        'Acoes com IA para melhorar a visibilidade da sua marca',
@@ -1112,6 +1120,7 @@ const STRINGS: Record<LangId, Strings> = {
     sidebar_darkMode:    'Modalita scura',
     sidebar_lightMode:   'Modalita chiara',
     sidebar_signOut:     'Esci',
+    sidebar_billing:     'Gestisci fatturazione',
     sidebar_allRegions:  'Tutte le regioni',
     rec_actions:         'azioni',
     rec_subtitle:        'Azioni IA per migliorare la visibilita del tuo marchio',

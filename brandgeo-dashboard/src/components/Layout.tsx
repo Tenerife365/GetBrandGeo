@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile,
+  StopCircle, Plus, DollarSign, Smile, CreditCard,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -39,7 +39,7 @@ const TIME_LABELS: Record<TimeRange, string> = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
-  const { activeClientId, setActiveClientId, clients, isAdmin } = useClient()
+  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
@@ -136,6 +136,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  // Opens the Stripe Customer Portal for the active client's subscription
+  // (update card, switch plan, cancel). Only rendered when the client actually
+  // has a Stripe customer id — cancellations flow back via stripe-webhook.js.
+  const [billingLoading, setBillingLoading] = useState(false)
+  const openBilling = async () => {
+    if (billingLoading) return
+    setBillingLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ client_id: activeClientId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.url) {
+        window.location.href = data.url   // hand off to Stripe's hosted portal
+        return
+      }
+      alert(data?.error || 'Could not open the billing portal. Please try again.')
+    } catch {
+      alert('Could not open the billing portal. Please try again.')
+    }
+    setBillingLoading(false)
   }
 
   const closeSidebar = () => setSidebarOpen(false)
@@ -379,6 +406,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
           </div>
+
+          {activeClient?.stripe_customer_id && (
+            <button
+              onClick={openBilling}
+              disabled={billingLoading}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-60"
+            >
+              {billingLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+              {t.sidebar_billing}
+            </button>
+          )}
 
           <button onClick={toggle} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}

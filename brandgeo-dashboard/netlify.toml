@@ -56,6 +56,10 @@
 [functions."stripe-webhook"]
   timeout = 15
 
+# Stripe Customer Portal session (dashboard "Manage billing" button).
+[functions."create-portal-session"]
+  timeout = 15
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26
