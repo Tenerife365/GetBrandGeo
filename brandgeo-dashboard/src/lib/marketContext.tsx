@@ -54,6 +54,10 @@ export const MARKETS: Market[] = [
     regions: [{ id: 'ALL', label: 'All regions' }, { id: 'LDN', label: 'London' }, { id: 'MAN', label: 'Manchester' }, { id: 'EDI', label: 'Edinburgh' }],
   },
   {
+    id: 'IE', label: 'Ireland', flag: '', flagCode: 'ie',
+    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'DUB', label: 'Dublin' }, { id: 'CRK', label: 'Cork' }],
+  },
+  {
     id: 'FR', label: 'France', flag: '', flagCode: 'fr',
     regions: [{ id: 'ALL', label: 'All regions' }, { id: 'PAR', label: 'Paris' }, { id: 'LYO', label: 'Lyon' }, { id: 'MRS', label: 'Marseille' }],
   },
