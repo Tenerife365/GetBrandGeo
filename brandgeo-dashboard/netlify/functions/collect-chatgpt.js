@@ -179,6 +179,7 @@ exports.handler = async (event) => {
     sentiment:             analysis.sentiment,
     response_snippet:      analysis.response_snippet,
     competitors_mentioned: analysis.competitors_mentioned,
+    response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
     checked_at:            new Date().toISOString(),
   }])
 

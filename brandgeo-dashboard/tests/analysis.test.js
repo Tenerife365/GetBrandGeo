@@ -15,6 +15,8 @@ const {
   buildBrandMatchers,
   matchesAlias,
   isCompanyName,
+  extractBoldAndBulletNames,
+  looksLikeBrandName,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -239,5 +241,77 @@ check('verb-initial 2-word brand kept (Focus Features)', isCompanyName('Focus Fe
 check('verb-initial 2-word brand kept (Boost Mobile)', isCompanyName('Boost Mobile'), true)
 check('verb-initial 3-word brand kept (Design Within Reach)', isCompanyName('Design Within Reach'), true)
 check('brand with & kept', isCompanyName('Ben & Jerry'), true)
+
+console.log('competitor extraction — bold prose + bullet lists (London run 2026-07-10, finding §9.18):')
+
+// B1. Perplexity-shape: real firms bolded inline in prose, no numbered list at
+//     all — extractTopRankedResults saw 0 of these. The "**Band 2**" ranking-tier
+//     emphasis must NOT be captured as a company (looksLikeBrandName RANK_LABEL_RE).
+{
+  const text = 'Some of the top employment law firms in London include **Leigh Day**, ' +
+    '**Thompsons**, and **Slater and Gordon Lawyers**, all ranked in **Band 2** by Chambers UK.'
+  check('perplexity bold-prose names captured',
+    competitorNames(text, auditCfg),
+    ['Leigh Day', 'Thompsons', 'Slater and Gordon Lawyers'])
+}
+
+// B2. Gemini-shape: "*   **Name** — descriptor" bullet list (id 1607). Descriptor
+//     after the en-dash is dropped; the emoji/medal residue would be too.
+{
+  const text = 'For London startups, popular tools include:\n\n' +
+    '*   **Asana** — task management\n' +
+    '*   **Trello** — kanban boards\n' +
+    '*   **Notion** — all-in-one workspace\n'
+  check('gemini bullet-list names captured',
+    competitorNames(text, auditCfg), ['Asana', 'Trello', 'Notion'])
+}
+
+// B3. Bold emphasis that is NOT a name must be rejected (the real trap: bold marks
+//     every kind of emphasis). None of these is a company.
+{
+  const text = 'The right choice depends on whether you are **an employer**, an ' +
+    '**employee/claimant**, or a **senior executive/partner**. **Short answer**: it varies.'
+  check('bold emphasis phrases → no competitors', competitorNames(text, auditCfg), [])
+}
+
+// B4. The "Ask" garbage fragment (ChatGPT row 1618): a bare imperative verb leaking
+//     through numbered extraction. Real single-word brands beside it survive.
+{
+  const text = '1. Vanguard\n2. Ask\n3. Fidelity'
+  check('bare-verb "Ask" fragment dropped, real brands kept',
+    competitorNames(text, auditCfg), ['Vanguard', 'Fidelity'])
+}
+check('isCompanyName("Ask") → false (bare imperative verb)', isCompanyName('Ask'), false)
+
+// B5. Merge: a numbered list PLUS an extra bolded firm in the surrounding prose —
+//     the bold one is appended (not duplicated) after the ranked names.
+{
+  const text = 'My top picks:\n1. Linklaters\n2. Freshfields\n3. Clifford Chance\n' +
+    'You might also consider **Herbert Smith Freehills** for litigation.'
+  const names = competitorNames(text, auditCfg)
+  assert.deepStrictEqual(names.slice(0, 3), ['Linklaters', 'Freshfields', 'Clifford Chance'],
+    'ranked names kept in order')
+  assert.ok(names.includes('Herbert Smith Freehills'), 'bolded prose firm appended')
+  assert.strictEqual(new Set(names).size, names.length, 'no duplicates in merged list')
+  passed++; console.log('  ok - numbered + bold-prose merge, deduped')
+}
+
+console.log('looksLikeBrandName — Title-Case discrimination:')
+check('"Leigh Day" → brand-like', looksLikeBrandName('Leigh Day'), true)
+check('"Capsule CRM" → brand-like', looksLikeBrandName('Capsule CRM'), true)
+check('"Slater and Gordon Lawyers" → brand-like (connector lowercase ok)',
+  looksLikeBrandName('Slater and Gordon Lawyers'), true)
+check('"Monday.com" → brand-like', looksLikeBrandName('Monday.com'), true)
+check('"an employer" → not brand-like', looksLikeBrandName('an employer'), false)
+check('"Short answer" → not brand-like', looksLikeBrandName('Short answer'), false)
+check('"Band 2" → not brand-like (rank label)', looksLikeBrandName('Band 2'), false)
+check('"employee/claimant" → not brand-like (slash)', looksLikeBrandName('employee/claimant'), false)
+
+// extractBoldAndBulletNames strips leading medal emoji (id 1623 shape: "🌟 Starling Bank").
+{
+  const names = extractBoldAndBulletNames('- 🌟 **Starling Bank** — best overall\n- 💜 **Monzo Business**')
+  assert.deepStrictEqual(names, ['Starling Bank', 'Monzo Business'], 'emoji stripped from bullet names')
+  passed++; console.log('  ok - leading medal emoji stripped from bullet names')
+}
 
 console.log(`\nAll ${passed} assertions passed.`)

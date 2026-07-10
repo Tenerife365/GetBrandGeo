@@ -40,6 +40,24 @@ function normalizeText(t) {
 
 // ─── Analysis helpers ─────────────────────────────────────────────────────────
 
+// Clean a raw captured name fragment (from a numbered line, a bold span, or a
+// bullet) into a bare brand name: drop markdown bold/italic markers, strip any
+// leading emoji / medal / bullet residue (🥇, 🌟, •, "-"), and cut off a trailing
+// "— tagline" / ": description" / "(note)" descriptor. Splitting descriptors on
+// en/em-dash only (not ASCII hyphen) is deliberate — matches the canonical
+// behaviour reconciled during the §2.1 extraction (see file header).
+function cleanCandidateName(raw) {
+  return String(raw).trim()
+    .replace(/\*\*/g, '')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^[^\p{L}\p{N}]+/u, '')       // strip leading emoji / medal / bullet residue
+    .split(/\s*[–—]\s+/)[0]
+    .split(/\s*:\s+/)[0]
+    .split(/\s*\((?!$)/)[0]
+    .replace(/[.:,;!?\s]+$/, '')
+    .trim()
+}
+
 function extractTopRankedResults(text) {
   const items = []
   // Also matches emoji-prefixed lines: '🥇 1. **Name**' — common in Claude web-search responses
@@ -48,18 +66,68 @@ function extractTopRankedResults(text) {
   while ((m = listRe.exec(text)) !== null) {
     const pos = parseInt(m[1], 10)
     if (pos < 1 || pos > 10) continue
-    let name = m[2].trim()
-      .replace(/\*\*/g, '')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .split(/\s*[–—]\s+/)[0]
-      .split(/\s*:\s+/)[0]
-      .split(/\s*\((?!$)/)[0]
-      .replace(/[.:,;!?\s]+$/, '')
-      .trim()
+    const name = cleanCandidateName(m[2])
     if (name.length >= 2 && name.length <= 80 && !items.some(x => x.pos === pos))
       items.push({ pos, name })
   }
   return items.sort((a, b) => a.pos - b.pos).slice(0, 5)
+}
+
+// ─── Prose / bullet competitor extraction (London run 2026-07-10) ─────────────
+// extractTopRankedResults only sees "1." numbered lists. Gemini and Perplexity
+// answer with bold names inline in prose ("include **Leigh Day**, **Thompsons**")
+// and "* " bullet lists ("*   **Asana**"), so they extracted ZERO competitors
+// despite naming real firms. This pass captures bold spans and bullet-leading
+// names, in first-appearance order, filtered HARD because bold marks emphasis of
+// every kind ("an employer", "best", "Band 2", "Short answer") — not only names.
+// Two gates: looksLikeBrandName (Title-Cased, no slash, not a "Band 2" rank label)
+// then the shared isCompanyName (rejects instruction steps / metric headings).
+const NAME_CONNECTORS = new Set([
+  'and', 'of', 'the', 'for', '&', 'de', 'la', 'di', 'von', 'van', 'à', 'y', 'e',
+  'del', 'della', 'du', 'des', 'le',
+])
+// Ranking/label phrases AI engines bold as emphasis ("Band 2", "Tier 1").
+const RANK_LABEL_RE = /^(band|tier|level|rank|group|phase|step|part|section|figure|table|chapter|no|note|option|round|point)\s*\d+$/i
+
+function looksLikeBrandName(name) {
+  if (/[\/\\|]/.test(name)) return false          // "employee/claimant", "Top-Tier / Magic"
+  if (RANK_LABEL_RE.test(name)) return false       // "Band 2", "Tier 1"
+  const words = name.trim().split(/\s+/)
+  let significant = 0, capped = 0
+  for (const w of words) {
+    const clean = w.replace(/[^\p{L}\p{N}.]/gu, '')
+    if (!clean) continue
+    if (NAME_CONNECTORS.has(clean.toLowerCase())) continue
+    significant++
+    // A significant word must start uppercase / with a digit, or be a lowercase
+    // domain token ("monday.com"). This is what separates "Leigh Day" / "Capsule
+    // CRM" from emphasis like "an employer" / "Short answer".
+    if (/^[\p{Lu}\p{N}]/u.test(clean) || /^[\p{L}]+\.[\p{L}]/u.test(clean)) capped++
+  }
+  return significant > 0 && capped === significant
+}
+
+function extractBoldAndBulletNames(text) {
+  const raw = []
+  const boldRe = /\*\*([^*\n]{2,80})\*\*/g
+  let m
+  while ((m = boldRe.exec(text)) !== null) raw.push(m[1])
+  // Bullet-leading names: "- Name", "* Name", "•  Name" (name may itself be **bold**).
+  const bulletRe = /(?:^|\n)[ \t]*[-*•][ \t]+([^\n]{2,120})/g
+  while ((m = bulletRe.exec(text)) !== null) raw.push(m[1])
+  const out = []
+  const seen = new Set()
+  for (const r of raw) {
+    const name = cleanCandidateName(r)
+    if (name.length < 2 || name.length > 60) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    if (!looksLikeBrandName(name)) continue
+    if (!isCompanyName(name)) continue
+    seen.add(key)
+    out.push(name)
+  }
+  return out
 }
 
 function detectListPosition(text, matchers) {
@@ -192,7 +260,7 @@ const INSTRUCTION_VERBS = new Set([
   'engage', 'respond', 'answer', 'craft', 'curate', 'collect', 'gather', 'analyze',
   'analyse', 'evaluate', 'assess', 'determine', 'select', 'pick', 'apply', 'adopt',
   'embrace', 'position', 'differentiate', 'highlight', 'showcase', 'demonstrate',
-  'focus', 'guide',
+  'focus', 'guide', 'ask',
   // Romanian imperative stems (partial coverage)
   'definește', 'defineste', 'stabilește', 'stabileste', 'creează', 'creeaza',
   'optimizează', 'optimizeaza', 'monitorizează', 'monitorizeaza', 'măsoară',
@@ -248,6 +316,11 @@ function isCompanyName(name) {
   // Panel" (has "a"), "Structure Content for AI Extraction" (has "for").
   const firstWord = lower.split(/[\s\-]+/)[0]
   if (INSTRUCTION_VERBS.has(firstWord)) {
+    // A bare single-word imperative verb is a sentence fragment, not a brand.
+    // Catches the live "Ask" garbage capture (ChatGPT row 1618, London run) that
+    // leaked through numbered extraction. Rare real single-word verb-brands
+    // (e.g. "Focus") are an accepted trade-off per the honesty caveat above.
+    if (wordCount === 1) return false
     const hasFunctionWord = words.some(w =>
       CLAUSE_FUNCTION_WORDS.has(w.toLowerCase().replace(/[^\p{L}]/gu, '')))
     if (hasFunctionWord || wordCount >= 4) return false
@@ -345,6 +418,23 @@ function analyseResponse(text, cfg) {
     .filter(item => isCompanyName(item.name))
     .map(({ pos, name }) => ({ pos, name }))
 
+  // Prose / bullet fallback (Gemini, Perplexity, markdown tables): append bold and
+  // bullet-leading names not already captured. When there were no numbered results
+  // these become the primary competitor list, with sequential appearance-order
+  // positions (a reasonable prominence proxy for a "best X" answer — there is no
+  // real rank in prose). Capped at 10 to bound noise.
+  const dupOf = (name) => competitors.some(c =>
+    c.name.toLowerCase().includes(name.toLowerCase()) ||
+    name.toLowerCase().includes(c.name.toLowerCase()))
+  let nextPos = competitors.length ? Math.max(...competitors.map(c => c.pos)) : 0
+  for (const name of extractBoldAndBulletNames(text)) {
+    if (competitors.length >= 10) break
+    if (matchesAlias(name, matchers)) continue
+    if (dupOf(name)) continue
+    nextPos++
+    competitors.push({ pos: nextPos, name })
+  }
+
   // Secondary pass: catch known competitors mentioned in prose (not just in lists)
   const knownScan = scanForKnownCompetitors(text, cfg.known_competitors || [], matchers)
   for (const kc of knownScan) {
@@ -368,7 +458,10 @@ module.exports = {
   analyseResponse,
   // exported for unit testing / future accuracy fixes:
   normalizeText,
+  cleanCandidateName,
   extractTopRankedResults,
+  extractBoldAndBulletNames,
+  looksLikeBrandName,
   detectListPosition,
   buildBrandMatchers,
   buildAliasRegex,
