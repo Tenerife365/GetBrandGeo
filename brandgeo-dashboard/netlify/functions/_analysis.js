@@ -58,6 +58,18 @@ function cleanCandidateName(raw) {
     .trim()
 }
 
+// Field-label detection (London run 2026-07-10, §8.11 round 3). In "how to
+// choose / key factors / next steps" sections, engines bold criterion labels
+// with the colon INSIDE the bold span — "**Best for:**", "**Pricing:**",
+// "**Research:**", "**Expertise and Specialisation:**" — then a description. The
+// name cleaner strips the colon and the label sailed through as a fake competitor.
+// Real company entries never carry the colon inside their bold name (they get a
+// "— tagline", an italic subtitle, or a bare newline), so a bold span ending in
+// a colon is a clean, structural field-label signal.
+function isBoldColonLabel(raw) {
+  return /\*\*\s*[^*\n]{1,60}:\s*\*\*/.test(String(raw))
+}
+
 function extractTopRankedResults(text) {
   const items = []
   // Also matches emoji-prefixed lines: '🥇 1. **Name**' — common in Claude web-search responses
@@ -66,6 +78,7 @@ function extractTopRankedResults(text) {
   while ((m = listRe.exec(text)) !== null) {
     const pos = parseInt(m[1], 10)
     if (pos < 1 || pos > 10) continue
+    if (isBoldColonLabel(m[2])) continue   // "2. **Research:** Use…" is a field label, not a firm
     const name = cleanCandidateName(m[2])
     if (name.length >= 2 && name.length <= 80 && !items.some(x => x.pos === pos))
       items.push({ pos, name })
@@ -143,6 +156,9 @@ function extractBoldAndBulletNames(text) {
   const out = []
   const seen = new Set()
   for (const r of raw) {
+    // Colon-terminated field label ("**Best for:**", inner "Best for:") — a
+    // criterion/field header, not a company (§8.11 round 3).
+    if (/:\s*$/.test(r) || /:\s*\*\*/.test(r)) continue
     const name = cleanCandidateName(r)
     if (name.length < 2 || name.length > 60) continue
     const key = name.toLowerCase()
@@ -314,6 +330,41 @@ const HEADING_TAIL_NOUNS = new Set([
   'takeaways', 'recap',
 ])
 
+// Single-word common evaluation/section/criterion nouns that engines surface as
+// standalone bold or numbered items in advice sections ("**Budget** — …",
+// "1. **Speed** — …"). Matched as a WHOLE single-word name only, so multi-word
+// real company names that merely contain one of these ("Forrester Research",
+// "First Sentinel Wealth") are never affected. Trade-off (documented, same spirit
+// as NOT_A_COMPANY): a real one-word brand named exactly e.g. "Budget" would be
+// dropped — acceptable in BrandGEO's B2B/professional-services verticals, where
+// these words are criteria ~always. Non-EN coverage remains a gap. §8.11 round 3.
+const COMMON_NON_BRAND = new Set([
+  'budget', 'speed', 'pricing', 'research', 'cost', 'quality', 'value',
+  'considerations', 'consideration', 'recommendation', 'recommendations',
+  'conclusion', 'methodology', 'disclaimer', 'eligibility', 'minimums',
+  'regulation', 'verdict', 'background', 'introduction', 'pros', 'cons', 'tips',
+  'notes', 'factors', 'criteria', 'timeline', 'availability', 'requirements',
+  'features', 'security', 'scalability', 'reliability', 'performance',
+  'reputation', 'communication', 'support', 'integrations', 'onboarding',
+])
+
+// A multi-word phrase where a non-first, non-connector word is lowercase reads as
+// a sentence/criterion ("Commercial strategy", "Your merits", "Opponent
+// conflicts"), not a Title-Cased brand ("Clifford Chance", "Slater and Gordon
+// Lawyers"). Single-word items are exempt so lowercase-first brands ("eBay") are
+// untouched. §8.11 round 3.
+function looksLikePhrase(name) {
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2) return false
+  for (let i = 1; i < words.length; i++) {
+    const clean = words[i].replace(/[^\p{L}\p{N}.]/gu, '')
+    if (!clean) continue
+    if (NAME_CONNECTORS.has(clean.toLowerCase())) continue
+    if (/^[\p{Ll}]/u.test(clean)) return true
+  }
+  return false
+}
+
 function isCompanyName(name) {
   if (!name || name.length < 2 || name.length > 60) return false
   const lower = name.toLowerCase()
@@ -334,6 +385,13 @@ function isCompanyName(name) {
   // "AI Visibility Score" / "Brand Visibility Score".
   const lastWord = words[wordCount - 1].toLowerCase().replace(/[^\p{L}]/gu, '')
   if (HEADING_TAIL_NOUNS.has(lastWord)) return false
+
+  // Single-word common evaluation/criterion noun ("Budget", "Speed", "Pricing").
+  if (wordCount === 1 && COMMON_NON_BRAND.has(lower)) return false
+
+  // Multi-word criterion/sentence phrase with a lowercase tail ("Commercial
+  // strategy", "Your merits", "Opponent conflicts") — not a Title-Cased brand.
+  if (looksLikePhrase(name)) return false
 
   // Rule C — leading imperative verb + clause-shaped body → instruction step.
   // We require the clause confirmation (a function word, or ≥4 words) so that
@@ -488,6 +546,8 @@ module.exports = {
   extractTopRankedResults,
   extractBoldAndBulletNames,
   looksLikeBrandName,
+  isBoldColonLabel,
+  looksLikePhrase,
   detectListPosition,
   buildBrandMatchers,
   buildAliasRegex,

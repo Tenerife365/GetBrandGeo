@@ -17,6 +17,8 @@ const {
   isCompanyName,
   extractBoldAndBulletNames,
   looksLikeBrandName,
+  isBoldColonLabel,
+  looksLikePhrase,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -341,5 +343,92 @@ console.log('competitor extraction — reject bold section headings (live Gemini
 check('brands near header words kept',
   competitorNames('For banking, **Best Buy** and **First Direct** are options.', auditCfg),
   ['Best Buy', 'First Direct'])
+
+console.log('competitor extraction — field labels & criteria (live rows 1658/1666/1667, §8.11 round 3):')
+
+// L1. Row 1658 (Gemini law-firm): bold criterion labels with the colon INSIDE the
+//     bold span ("**Best for:**"-style) in "Key Factors" / "Next Steps" sections
+//     leaked as competitors. The real firms in the bullet list must survive.
+{
+  const text = 'Here is how to choose a law firm.\n\n' +
+    '### Key Factors to Consider\n\n' +
+    '*   **Expertise and Specialisation:** Look for firms with a track record.\n' +
+    '*   **Reputation and Track Record:** Research client testimonials.\n' +
+    '*   **Communication and Client Approach:** Effective communication is crucial.\n' +
+    '*   **Cost-Effectiveness and Fee Structure:** Understand the fees upfront.\n' +
+    '*   **Strategic Thinking:** The most effective representation is deliberate.\n' +
+    '*   **Team and Resources:** Complex disputes need a team.\n\n' +
+    '### Leading Firms in London\n\n' +
+    '*   **Clifford Chance LLP**\n' +
+    '*   **Freshfields Bruckhaus Deringer LLP**\n' +
+    '*   **Herbert Smith Freehills LLP**\n\n' +
+    '### Next Steps\n\n' +
+    '1.  **Define Your Needs:** Understand the specifics.\n' +
+    '2.  **Research:** Use legal directories.\n' +
+    '3.  **Initial Consultations:** Many firms offer these.\n' +
+    "4.  **Ask Questions:** Don't hesitate to ask."
+  const n = competitorNames(text, auditCfg)
+  for (const label of ['Expertise and Specialisation', 'Reputation and Track Record',
+    'Communication and Client Approach', 'Cost-Effectiveness and Fee Structure',
+    'Strategic Thinking', 'Team and Resources', 'Research', 'Initial Consultations',
+    'Ask Questions', 'Define Your Needs'])
+    assert.ok(!n.includes(label), `field label must be dropped: ${label}`)
+  for (const firm of ['Clifford Chance LLP', 'Freshfields Bruckhaus Deringer LLP', 'Herbert Smith Freehills LLP'])
+    assert.ok(n.includes(firm), `real firm must be kept: ${firm}`)
+  passed++; console.log('  ok - L1 colon field labels dropped, firms kept (row 1658)')
+}
+
+// L2. Row 1666 (ChatGPT law-firm): numbered evaluation criteria ("1. **Your merits**
+//     — …", "3. **Budget** — …") leaked. Real firms from the bold prose must survive.
+{
+  const text = 'For a normal dispute, start with **RPC**, **Addleshaw Goddard**, ' +
+    '**Mishcon de Reya**, **Stewarts**, or **Penningtons Manches Cooper**.\n\n' +
+    '## How I’d choose between them\n\n' +
+    'Pick the one that gives the clearest answer on:\n\n' +
+    '1. **Your merits** — what are the strongest points?\n' +
+    '2. **Commercial strategy** — settlement, mediation, or litigation?\n' +
+    '3. **Budget** — fixed-fee initial advice and cost exposure.\n' +
+    '4. **Speed** — do you need an urgent injunction?\n' +
+    '5. **Opponent conflicts** — big firms often cannot act.'
+  const n = competitorNames(text, auditCfg)
+  for (const crit of ['Your merits', 'Commercial strategy', 'Budget', 'Speed', 'Opponent conflicts'])
+    assert.ok(!n.includes(crit), `criterion must be dropped: ${crit}`)
+  for (const firm of ['RPC', 'Addleshaw Goddard', 'Mishcon de Reya', 'Stewarts', 'Penningtons Manches Cooper'])
+    assert.ok(n.includes(firm), `real firm must be kept: ${firm}`)
+  passed++; console.log('  ok - L2 numbered criteria dropped, firms kept (row 1666)')
+}
+
+// L3. Row 1667 (Claude CRM): "**Best for:**" / "**Pricing:**" field labels inside
+//     each entry's description leaked at the tail of a clean numbered CRM list.
+{
+  const text = '## Best CRM Software\n\n' +
+    '### 1. 🥇 **Capsule CRM** *(Top Pick)*\n' +
+    'A straightforward option.\n' +
+    '- **Best for:** Small service-based firms.\n' +
+    '- **Pricing:** Free plan for up to 2 users.\n\n' +
+    '### 2. 🥈 **Prospect CRM** *(Best Rated)*\n' +
+    'Highest-rated UK-based CRM.\n' +
+    '- **Best for:** Product-based businesses.\n\n' +
+    '### 3. **Workbooks CRM**\n### 4. **Freshsales**\n### 5. **HubSpot CRM**'
+  const n = competitorNames(text, auditCfg)
+  assert.ok(!n.includes('Best for'), 'field label "Best for" dropped')
+  assert.ok(!n.includes('Pricing'), 'field label "Pricing" dropped')
+  for (const crm of ['Capsule CRM', 'Prospect CRM', 'Workbooks CRM', 'Freshsales', 'HubSpot CRM'])
+    assert.ok(n.includes(crm), `real CRM must be kept: ${crm}`)
+  passed++; console.log('  ok - L3 Best for/Pricing labels dropped, CRMs kept (row 1667)')
+}
+
+console.log('field-label & phrase discrimination — unit checks:')
+check('isBoldColonLabel("**Best for:** desc") → true', isBoldColonLabel('**Best for:** Small firms'), true)
+check('isBoldColonLabel("**Research:** desc") → true', isBoldColonLabel('2.  **Research:** Use directories'), true)
+check('isBoldColonLabel("**Capsule CRM** *(Top)*") → false', isBoldColonLabel('**Capsule CRM** *(Top Pick)*'), false)
+check('looksLikePhrase("Commercial strategy") → true', looksLikePhrase('Commercial strategy'), true)
+check('looksLikePhrase("Your merits") → true', looksLikePhrase('Your merits'), true)
+check('looksLikePhrase("Clifford Chance") → false', looksLikePhrase('Clifford Chance'), false)
+check('looksLikePhrase("Slater and Gordon Lawyers") → false', looksLikePhrase('Slater and Gordon Lawyers'), false)
+check('isCompanyName("Budget") → false (common noun)', isCompanyName('Budget'), false)
+check('isCompanyName("Speed") → false (common noun)', isCompanyName('Speed'), false)
+check('isCompanyName("Tide") → true (brand, not in denylist)', isCompanyName('Tide'), true)
+check('isCompanyName("Monzo") → true', isCompanyName('Monzo'), true)
 
 console.log(`\nAll ${passed} assertions passed.`)
