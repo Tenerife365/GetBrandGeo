@@ -70,12 +70,27 @@ function isBoldColonLabel(raw) {
   return /\*\*\s*[^*\n]{1,60}:\s*\*\*/.test(String(raw))
 }
 
+// Rank-prefix stripping (CLIENT-HEALTH-BPR.md §4.2, BpR rows 1586 vs 1592/1581).
+// Engines write a ranked brand as a markdown heading with a medal emoji:
+//   "## 🥇 1. **Bucate pe Roate**"   →  H2, matched
+//   "### 🥇 1. **Bucate pe Roate**"  →  H3, did NOT match
+// The old fixed budget of [^\d\n]{0,6} before the rank digit counted UTF-16 units:
+// "## 🥇 " is exactly 6 (##, space, 🥇 = 2 units, space) and squeaked through, while
+// "### 🥇 " is 7 and silently failed — so the SAME #1 recommendation scored
+// brand_position=1 under an H2 and null under an H3. Widening the budget would just
+// move the cliff; instead strip the heading marker and any emoji/symbol run that sits
+// between the line start and the rank, so rank matching sees a bare "1. …".
+// The lookahead means lines with no rank are left completely untouched.
+function stripRankPrefixes(text) {
+  return String(text).replace(/^[ \t]*(?:#{1,6}[ \t]*)?[^\p{L}\p{N}\n]*(?=\d+[.)])/gmu, '')
+}
+
 function extractTopRankedResults(text) {
   const items = []
-  // Also matches emoji-prefixed lines: '🥇 1. **Name**' — common in Claude web-search responses
-  const listRe = /(?:^|\n)[^\d\n]{0,6}(\d+)[.)](?:\*{0,2})\s+([^\n]{2,120})/gm
+  const listRe = /(?:^|\n)(\d+)[.)](?:\*{0,2})\s+([^\n]{2,120})/gm
   let m
-  while ((m = listRe.exec(text)) !== null) {
+  const src = stripRankPrefixes(text)
+  while ((m = listRe.exec(src)) !== null) {
     const pos = parseInt(m[1], 10)
     if (pos < 1 || pos > 10) continue
     if (isBoldColonLabel(m[2])) continue   // "2. **Research:** Use…" is a field label, not a firm
@@ -180,9 +195,12 @@ function detectListPosition(text, matchers) {
   // not ranked" is legitimately position=null, not "ranked #9".
   // The 1..50 guard rejects a year/price/absurd number that happens to lead a
   // line (e.g. "2019. Brand expanded…") from being read as a rank.
+  // Runs on the rank-prefix-stripped text (§4.2): the old \s* prefix could not skip
+  // a markdown heading marker, so "### 🥇 1. **Brand**" never matched here either.
   const listRe = /(?:^|\n)\s*(\d+)[.)]\s+(.{0,200})/g
   let m
-  while ((m = listRe.exec(text)) !== null) {
+  const src = stripRankPrefixes(text)
+  while ((m = listRe.exec(src)) !== null) {
     const num = parseInt(m[1], 10)
     if (num < 1 || num > 50) continue
     if (matchesAlias(m[2], matchers)) return num
@@ -244,10 +262,52 @@ function matchesAlias(text, matchers) {
  * prose is sentence-separated), keep the segments matching the brand, and return
  * them. Splitting must happen on the raw text before normalizeText() collapses
  * newlines. Returns '' if no segment matches (caller falls back to neutral).
+ *
+ * HEADING EXTENSION (CLIENT-HEALTH-BPR.md §4.3, BpR rows 1586 vs 1592): when an
+ * engine names the brand in a markdown HEADING and puts the verdict in the body
+ * sentence beneath it, the verdict was excluded and the mention scored neutral —
+ * while an otherwise-identical answer that happened to tuck "(Recomandat #1)"
+ * inside the heading line itself scored positive. Same praise, different markdown,
+ * opposite sentiment. So when a brand-matching segment is a heading, also pull in
+ * the first body segment under it (stopping at the next heading), which is the
+ * sentence that actually carries the verdict.
  */
+function isHeadingSegment(s) { return /^\s*#{1,6}\s/.test(String(s)) }
+
+// NOTE: heading detection must happen at LINE level, before sentence-splitting.
+// The old splitter also split on `(?<=[.!?])\s+`, and a ranked heading contains its
+// own period — "### 🥇 1. **Bucate pe Roate**" was cut into "### 🥇 1." and
+// "**Bucate pe Roate** …". The brand then sat in a fragment that no longer looked
+// like a heading (and no longer carried the 🥇), which is precisely why row 1586
+// scored neutral while row 1592 — whose praise happened to land inside the same
+// fragment as the brand — scored positive.
 function extractBrandContext(text, matchers) {
-  const segments = String(text).split(/(?<=[.!?])\s+|\n+/)
-  const hits = segments.filter(s => matchesAlias(s, matchers))
+  const lines = String(text).split(/\n/)
+  const hits = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.trim()) continue
+
+    if (isHeadingSegment(line)) {
+      // A heading that names the brand: take the whole heading line, plus the first
+      // body line beneath it — that is the sentence carrying the actual verdict.
+      if (!matchesAlias(line, matchers)) continue
+      hits.push(line)
+      for (let j = i + 1; j < lines.length; j++) {
+        const next = lines[j]
+        if (!next || !next.trim()) continue
+        if (isHeadingSegment(next)) break        // next heading → this body ended
+        hits.push(next)
+        break
+      }
+      continue
+    }
+
+    // Ordinary line: sentence-split and keep only the brand's own sentence(s).
+    for (const s of line.split(/(?<=[.!?])\s+/)) {
+      if (matchesAlias(s, matchers)) hits.push(s)
+    }
+  }
   return hits.length ? normalizeText(hits.join(' ')).toLowerCase() : ''
 }
 
@@ -269,8 +329,15 @@ function extractBrandContext(text, matchers) {
  * client-specific patch.
  */
 const NOT_A_COMPANY = [
-  // Romanian abstract nouns — virtually never appear in real company names
-  'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
+  // Romanian abstract nouns — virtually never appear in real company names.
+  // 'recomand' is a STEM (was the full form 'recomandare', which missed the plural):
+  // BpR row 1588 captured the section heading "Recomandări Top de Catering Impecabil"
+  // as a competitor — it has no leading imperative verb and every significant word is
+  // Title-Cased ('de' is a name connector), so none of the §8.11 round-3 structural
+  // rules fire on it. The stem covers recomandare/recomandări/recomandat/recomandarea.
+  // 'sugesti' likewise covers sugestie/sugestii ("Sugestii de Pregătire și Costuri").
+  // No real company name contains either stem.
+  'experienta', 'experiență', 'recomand', 'sugesti', 'capacitate', 'planificare',
   'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
   'masiva', 'masivă', 'proprie', 'proprii',
   // Mid-string Romanian prepositions that signal descriptive phrases
@@ -543,6 +610,7 @@ module.exports = {
   // exported for unit testing / future accuracy fixes:
   normalizeText,
   cleanCandidateName,
+  stripRankPrefixes,
   extractTopRankedResults,
   extractBoldAndBulletNames,
   looksLikeBrandName,

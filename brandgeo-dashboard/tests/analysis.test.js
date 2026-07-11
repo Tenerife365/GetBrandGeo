@@ -19,6 +19,7 @@ const {
   looksLikeBrandName,
   isBoldColonLabel,
   looksLikePhrase,
+  stripRankPrefixes,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -430,5 +431,83 @@ check('isCompanyName("Budget") → false (common noun)', isCompanyName('Budget')
 check('isCompanyName("Speed") → false (common noun)', isCompanyName('Speed'), false)
 check('isCompanyName("Tide") → true (brand, not in denylist)', isCompanyName('Tide'), true)
 check('isCompanyName("Monzo") → true', isCompanyName('Monzo'), true)
+
+console.log('BpR live rows — heading rank + heading sentiment (CLIENT-HEALTH-BPR.md §4.2/§4.3):')
+
+// The same #1 recommendation, written three ways by Claude. Before the fix, only the
+// H2 variants scored position=1/positive; the H3 variant scored null/neutral purely
+// because "### 🥇 " is 7 UTF-16 units vs the old 6-char budget, and because the praise
+// sat in the body sentence under the heading instead of inside the heading itself.
+
+// R1586 — H3 heading + praise in the BODY sentence. Was: position null, neutral.
+{
+  const text = '### 🥇 1. **Bucate pe Roate** *(bucateperoate.ro)*\n' +
+    'Aceasta este probabil cea mai bună opțiune pentru un eveniment de această amploare.\n' +
+    '- Au construit o echipă de peste 50 de profesioniști.'
+  const r = analyseResponse(text, cfg)
+  check('row 1586 (H3) → mentioned', r.brand_mentioned, true)
+  check('row 1586 (H3) → brand_position 1 (was null)', r.brand_position, 1)
+  check('row 1586 (H3) → positive (praise in body under heading, was neutral)', r.sentiment, 'positive')
+}
+
+// R1592 — H2 heading, praise inside the heading. Already worked: regression guard.
+{
+  const text = '## 🥇 1. **Bucate pe Roate** *(Recomandat #1 pentru evenimente mari)*\n' +
+    'Aceasta este, probabil, **cea mai potrivită alegere** pentru tine.'
+  const r = analyseResponse(text, cfg)
+  check('row 1592 (H2) → brand_position 1', r.brand_position, 1)
+  check('row 1592 (H2) → positive', r.sentiment, 'positive')
+}
+
+// R1581 — H2 heading, ALL-CAPS brand. Already worked: regression guard.
+{
+  const text = '## 🥇 1. BUCATE PE ROATE *(Top Recomandare)*\n' +
+    'Aceasta este alegerea #1 pentru evenimente mari în București:'
+  const r = analyseResponse(text, cfg)
+  check('row 1581 (H2, caps) → brand_position 1', r.brand_position, 1)
+  check('row 1581 (H2, caps) → positive', r.sentiment, 'positive')
+}
+
+// Heading rank must work at every heading depth, not just H2.
+for (const h of ['#', '##', '###', '####']) {
+  const r = analyseResponse(`${h} 🥇 1. **Bucate pe Roate**\nEste o alegere solidă.`, cfg)
+  check(`heading depth "${h}" → brand_position 1`, r.brand_position, 1)
+}
+
+// stripRankPrefixes leaves non-ranked lines alone, and must not turn a year into a rank.
+check('stripRankPrefixes strips "### 🥇 1."', stripRankPrefixes('### 🥇 1. **X**'), '1. **X**')
+check('stripRankPrefixes leaves plain prose alone', stripRankPrefixes('Aceasta este o firmă.'), 'Aceasta este o firmă.')
+{
+  const r = analyseResponse('2019. Bucate pe Roate a fost premiată în acel an.', cfg)
+  check('year "2019." still → position null (not a rank)', r.brand_position, null)
+}
+
+// Sentiment must NOT leak from a heading whose body praises a DIFFERENT brand.
+{
+  const text = '## 1. **Fratelli Catering**\nEste cea mai bună opțiune, premiată.\n' +
+    '## 2. **Bucate pe Roate**\nOferă servicii de catering în București.'
+  const r = analyseResponse(text, cfg)
+  check('praise under a rival heading does not leak → neutral', r.sentiment, 'neutral')
+  check('  (brand still ranked #2)', r.brand_position, 2)
+}
+
+// R1588 — Romanian noun-initial section heading captured as a competitor. It has no
+// leading imperative verb and every significant word is Title-Cased ("de" is a name
+// connector), so no round-3 structural rule fires — handled by the NOT_A_COMPANY stem.
+check('RO heading "Recomandări Top de Catering Impecabil" → not a company',
+  isCompanyName('Recomandări Top de Catering Impecabil'), false)
+check('RO heading "Sugestii de Pregătire și Costuri" → not a company',
+  isCompanyName('Sugestii de Pregătire și Costuri'), false)
+check('real RO caterer still kept', isCompanyName('Fratelli Catering'), true)
+{
+  const text = '### 1. Recomandări Top de Catering Impecabil\n' +
+    'Cea mai recomandată opțiune este **Carte Blanche**.\n' +
+    '### 2. Sugestii de Pregătire și Costuri\nDetalii despre costuri.'
+  const n = competitorNames(text, { brand_aliases: ['Acme'], brand_website: 'acme.com', known_competitors: [] })
+  assert.ok(!n.includes('Recomandări Top de Catering Impecabil'), 'RO heading dropped')
+  assert.ok(!n.includes('Sugestii de Pregătire și Costuri'), 'RO heading 2 dropped')
+  assert.ok(n.includes('Carte Blanche'), 'real brand in the body still captured')
+  passed++; console.log('  ok - row 1588 RO section headings dropped, real brand kept')
+}
 
 console.log(`\nAll ${passed} assertions passed.`)
