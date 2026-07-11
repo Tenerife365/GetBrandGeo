@@ -13,7 +13,7 @@ import { useTheme } from '../lib/themeContext'
 import { ENGINE_META } from '../lib/planConfig'
 import {
   computeAiVisibilityScore, buildScoreResultMap,
-  type AiVisibilityDimensions,
+  type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
@@ -96,7 +96,7 @@ export default function Dashboard() {
 
       // AI Visibility Score — same shared computation as AIVisibility.tsx, deliberately
       // all-time (not time-filtered) so both pages always show the identical headline number.
-      const scoreMap = buildScoreResultMap(mockAIResults)
+      const scoreMap = buildScoreResultMap(mockAIResults, activeEngines)
       setScoreData(computeAiVisibilityScore(mockPrompts.map(p => p.id), scoreMap, activeEngines))
 
       setLoading(false)
@@ -104,10 +104,14 @@ export default function Dashboard() {
     }
 
     const startDate = getStartDate()
+    // .neq('status','error') — API-failure rows are not real "not mentioned"
+    // results; counting them tanked every KPI/chart on this page (CLAUDE.md §4.8,
+    // CLIENT-HEALTH-BPR.md §4.6). AIVisibility.tsx already excluded them.
     let query = supabase
       .from('ai_results')
       .select('*, prompts(text, category)')
       .eq('client_id', activeClientId)
+      .neq('status', 'error')
       .order('checked_at', { ascending: false })
       .limit(1000)
     if (startDate) query = query.gte('checked_at', startDate.toISOString())
@@ -115,9 +119,15 @@ export default function Dashboard() {
     const [{ data, error }, { data: pData }, { data: scoreRows }] = await Promise.all([
       query,
       supabase.from('prompts').select('id').eq('is_active', true).eq('client_id', activeClientId),
+      // Score query: deliberately all-time (no startDate) so the headline number
+      // never disagrees with AI Visibility's. Now also ordered + error-filtered +
+      // carrying checked_at/status, so buildScoreResultMap can enforce
+      // newest-non-error-wins itself rather than trusting this query's shape.
       supabase.from('ai_results')
-        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment')
-        .eq('client_id', activeClientId),
+        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status')
+        .eq('client_id', activeClientId)
+        .neq('status', 'error')
+        .order('checked_at', { ascending: false }),
     ])
 
     if (!error && data) {
@@ -127,7 +137,7 @@ export default function Dashboard() {
     }
 
     if (pData && scoreRows) {
-      const scoreMap = buildScoreResultMap(scoreRows as unknown as { prompt_id: number; llm: string; brand_mentioned: boolean; brand_position: number | null; sentiment: string | null }[])
+      const scoreMap = buildScoreResultMap(scoreRows as unknown as ScoreInputRow[], activeEngines)
       setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
     }
 
