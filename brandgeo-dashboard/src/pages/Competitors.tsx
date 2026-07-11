@@ -37,6 +37,16 @@ interface EngineRow { total: number; mentioned: number; positions: number[] }
 interface CompetitorStat {
   name: string
   totalMentions: number
+  /**
+   * Mentions where an engine actually RANKED this competitor in a list.
+   * `pos: 99` is the sentinel _analysis.js uses for a prose/known-competitor
+   * name-scan hit — the name was merely spotted in the text, never ranked.
+   * Sorting the leaderboard by totalMentions counted those identically to real
+   * rankings, so a name that only ever appeared because it's on the client's own
+   * seed list could outrank a genuine competitor (BpR's "Elegant Catering": 14
+   * mentions, all 14 pos:99, never ranked once — CLIENT-HEALTH-BPR.md §4.5).
+   */
+  rankedMentions: number
   byEngine: Partial<Record<LLMName, number>>
   positions: number[]
   promptIds: number[]
@@ -110,22 +120,26 @@ function computeData(
     }
   }
 
-  // Top 5 competitors by total mentions
+  // Top 5 competitors — ranked by how often an engine actually RANKED them,
+  // not by raw mention count. avgPos already excluded the pos:99 prose sentinel
+  // (below); the sort key now does too, so a prose-only name can't top the board.
   const topCompetitors: CompetitorStat[] = Object.entries(compMap)
-    .map(([key, v]) => ({
-      name: toDisplayName(key),
-      totalMentions: v.totalMentions,
-      byEngine: v.byEngine,
-      positions: v.positions,
-      promptIds: Array.from(v.promptIds),
-      avgPos: (() => {
-        const real = v.positions.filter(p => p !== 99)
-        return real.length > 0
+    .map(([key, v]) => {
+      const real = v.positions.filter(p => p !== 99)
+      return {
+        name: toDisplayName(key),
+        totalMentions: v.totalMentions,
+        rankedMentions: real.length,
+        byEngine: v.byEngine,
+        positions: v.positions,
+        promptIds: Array.from(v.promptIds),
+        avgPos: real.length > 0
           ? Math.round(real.reduce((a, b) => a + b, 0) / real.length * 10) / 10
-          : null
-      })(),
-    }))
-    .sort((a, b) => b.totalMentions - a.totalMentions)
+          : null,
+      }
+    })
+    // Genuinely-ranked competitors first; raw mentions only break ties.
+    .sort((a, b) => (b.rankedMentions - a.rankedMentions) || (b.totalMentions - a.totalMentions))
     .slice(0, 5)
 
   // Brand overall stats
@@ -250,7 +264,7 @@ export default function Competitors() {
       setData({
         engineStats: {},
         topCompetitors: mockCompetitors.slice(0, 5).map((c, i) => ({
-          name: c.name, totalMentions: 8 - i * 1.5 | 0,
+          name: c.name, totalMentions: 8 - i * 1.5 | 0, rankedMentions: 2,
           byEngine: { chatgpt: 2, gemini: 2, claude: 1 },
           positions: [2, 3], promptIds: [], avgPos: 2.5,
         })),
@@ -506,6 +520,13 @@ export default function Competitors() {
                 </div>
                 <div className="px-3 py-3 text-center tabular-nums">
                   <span className="text-red-400 font-semibold">{c.totalMentions}</span>
+                  {/* Never ranked by any engine — only spotted in prose (pos:99).
+                      Without this the number reads as if they beat you in a list. */}
+                  {c.rankedMentions === 0 && (
+                    <span className="block text-[10px] text-slate-500 leading-tight" title="Named in prose, but never ranked in a list by any engine">
+                      prose only
+                    </span>
+                  )}
                 </div>
                 <div className="px-3 py-3 text-center tabular-nums text-slate-300">
                   {c.avgPos ? `#${c.avgPos}` : '—'}
