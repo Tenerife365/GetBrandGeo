@@ -22,7 +22,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { analyseResponse } = require('./_analysis')
 const { buildAuditContext, withTimeout, ALL_CALLERS, FULL_ENGINES } = require('./_prospect_engines')
-const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags } = require('./_score')
+const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults } = require('./_score')
 
 const PER_CALL_TIMEOUT = 60000   // generous — background functions aren't racing a 26s wall
 
@@ -97,8 +97,14 @@ exports.handler = async (event) => {
         console.warn(`[FullAudit/${invId}] ${engine} timed out on prompt ${promptId}`)
         continue
       }
-      const { text, errorCode } = result.value || {}
-      if (errorCode || !text) continue
+      const { text, errorCode, detail } = result.value || {}
+      if (errorCode || !text) {
+        // #109: log WHY. Dropped engines are now reported 'unavailable', not
+        // 'missing' (see _score.js) — we never claim an engine doesn't know a
+        // prospect when the truth is we failed to ask it.
+        console.warn(`[FullAudit/${invId}] ${engine} failed on prompt ${promptId}: ${errorCode || 'no text'} ${detail || ''}`)
+        continue
+      }
 
       let analysis
       try {
@@ -121,6 +127,21 @@ exports.handler = async (event) => {
 
     const resultMap = buildResultMap(scoreRows)
     const promptIds = prompts.map(p => p.id)
+
+    // #109: every engine failed → we have zero evidence. Never publish a 0/100
+    // scorecard off no data; that would tell a prospect no AI engine knows them
+    // when we simply never got an answer. Fail loudly instead.
+    const heardFrom = enginesWithResults(promptIds, resultMap, engines)
+    if (heardFrom.length === 0) {
+      console.error(`[FullAudit/${invId}] every engine failed for ${domain} — refusing to publish a 0/100 scorecard`)
+      await supabase.from('prospect_audits').update({
+        status: 'error',
+        error_message: 'Could not reach the AI engines for this audit. Please try again shortly.',
+        updated_at: new Date().toISOString(),
+      }).eq('id', auditId)
+      return
+    }
+
     const { dimensions, aiScore } = computeAuditScore(promptIds, resultMap, engines)
     const engineStates = computeEngineStates(promptIds, resultMap, engines)
     const { topGaps, competitorFlags } = computeGapsAndFlags(promptTextById, resultMap)

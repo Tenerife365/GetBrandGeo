@@ -59,11 +59,19 @@ function computeAuditScore(promptIds, resultsByPromptEngine, activeEngines) {
   }))
   const accuracy = mentionedTotal > 0 ? Math.round((topThree / mentionedTotal) * 100) : 0
 
-  // Reach — % of engines that mention the brand in at least one prompt
-  const enginesWithMention = activeEngines.filter(engine =>
+  // Reach — % of engines that mention the brand in at least one prompt.
+  //
+  // #109 follow-up: the denominator is the engines we ACTUALLY HEARD FROM, not
+  // the engines we asked. Previously an engine that failed (quota, timeout, API
+  // error) still counted in the denominator, so our own outage silently deflated
+  // a prospect's score — telling them they have a visibility problem when what
+  // they really had was our billing problem. An engine that answered but never
+  // named the brand still produces rows, so it is correctly counted below.
+  const heardFrom = enginesWithResults(promptIds, resultsByPromptEngine, activeEngines)
+  const enginesWithMention = heardFrom.filter(engine =>
     promptIds.some(pid => resultsByPromptEngine.get(pid)?.get(engine)?.brand_mentioned)
   ).length
-  const reach = activeEngines.length > 0 ? Math.round((enginesWithMention / activeEngines.length) * 100) : 0
+  const reach = heardFrom.length > 0 ? Math.round((enginesWithMention / heardFrom.length) * 100) : 0
 
   // Consistency — % of prompts where >=60% of checked engines mention the brand
   const consistentPrompts = promptIds.filter(pid => {
@@ -86,6 +94,21 @@ function computeAuditScore(promptIds, resultsByPromptEngine, activeEngines) {
   return { dimensions, aiScore }
 }
 
+/**
+ * The engines that produced at least one usable result for this audit.
+ *
+ * An engine that ran and simply never mentioned the brand still produces rows
+ * (with brand_mentioned: false), so zero rows can ONLY mean the engine failed —
+ * quota, auth, timeout, or an unreadable response. That distinction is the whole
+ * point of #109: "we asked and it didn't know you" and "we never managed to ask"
+ * are opposite claims, and only one of them is a reason for a prospect to buy.
+ */
+function enginesWithResults(promptIds, resultsByPromptEngine, requestedEngines) {
+  return requestedEngines.filter(engine =>
+    promptIds.some(pid => resultsByPromptEngine.get(pid)?.has(engine))
+  )
+}
+
 function buildResultMap(rows) {
   const map = new Map()
   rows.forEach(r => {
@@ -102,7 +125,12 @@ function computeEngineStates(promptIds, resultsByPromptEngine, activeEngines) {
   const states = {}
   for (const engine of activeEngines) {
     const checked = promptIds.filter(pid => resultsByPromptEngine.get(pid)?.has(engine))
-    if (checked.length === 0) { states[engine] = 'missing'; continue }
+    // #109 follow-up: zero rows means WE FAILED TO ASK, not "this engine doesn't
+    // know you" — an engine that answers without naming the brand still writes a
+    // row (brand_mentioned: false), so it lands in the rate === 0 branch below.
+    // This used to report 'missing', i.e. it told a prospect an AI engine had
+    // never heard of them when the truth was our quota ran out. Never again.
+    if (checked.length === 0) { states[engine] = 'unavailable'; continue }
     const mentionedCount = checked.filter(pid => resultsByPromptEngine.get(pid)?.get(engine)?.brand_mentioned).length
     const rate = mentionedCount / checked.length
     states[engine] = rate === 0 ? 'missing' : rate >= 0.6 ? 'know' : 'partial'
@@ -144,4 +172,4 @@ function computeGapsAndFlags(promptTextById, resultsByPromptEngine) {
   return { topGaps, competitorFlags }
 }
 
-module.exports = { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags }
+module.exports = { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults }

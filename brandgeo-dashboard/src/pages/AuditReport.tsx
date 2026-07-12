@@ -39,7 +39,11 @@ interface FullReport {
   domain: string; category: string | null; ai_score: number; low_confidence: boolean
   depth: 'screening' | 'full'; engines_used: string[]
   dimensions: Record<string, number>
-  engine_states: Record<string, 'know' | 'partial' | 'missing'>
+  // 'unavailable' = we could not reach this engine (quota/timeout/API error).
+  // Deliberately NOT the same as 'missing', which means the engine answered and
+  // never named the brand. Claiming the first is the second would be telling a
+  // prospect an AI engine has never heard of them when we simply failed to ask.
+  engine_states: Record<string, 'know' | 'partial' | 'missing' | 'unavailable'>
   engine_results: EngineResult[]
   top_gaps: Gap[]
   competitor_flags: { engine: string; prompt: string; competitor_name: string }[]
@@ -54,9 +58,13 @@ const ENGINE_LABEL: Record<string, string> = {
 }
 
 const STATE_STYLE: Record<string, string> = {
-  know:    'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  partial: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  missing: 'bg-slate-700/60 text-slate-400 border-slate-600/40',
+  know:        'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  partial:     'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  missing:     'bg-slate-700/60 text-slate-400 border-slate-600/40',
+  // Same muted treatment the client dashboard already uses for an unreachable
+  // engine (§1.8 "Temporarily unavailable"), so it never reads as a finding
+  // about the brand.
+  unavailable: 'bg-slate-700/60 text-slate-500 border-slate-600/40',
 }
 
 function scoreColor(score: number) {
@@ -225,16 +233,28 @@ function FullReportView({ report }: { report: FullReport }) {
         </div>
       </div>
 
-      {/* Per-engine KNOW/PARTIAL/MISSING */}
+      {/* Per-engine KNOW / PARTIAL / MISSING / UNAVAILABLE */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
         <h2 className="text-sm font-semibold text-slate-300 mb-3">By AI engine</h2>
         <div className="flex flex-wrap gap-2">
           {Object.entries(report.engine_states).map(([engine, state]) => (
-            <span key={engine} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATE_STYLE[state] ?? STATE_STYLE.missing}`}>
+            <span
+              key={engine}
+              className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATE_STYLE[state] ?? STATE_STYLE.unavailable}`}
+              title={state === 'unavailable'
+                ? 'We could not reach this engine during your audit — this is not a result about your brand.'
+                : undefined}
+            >
               {ENGINE_LABEL[engine] ?? engine}: {state.toUpperCase()}
             </span>
           ))}
         </div>
+        {Object.values(report.engine_states).includes('unavailable') && (
+          <p className="text-xs text-slate-500 mt-3">
+            One or more engines could not be reached during your audit. They are shown as
+            UNAVAILABLE and are excluded from your score — they are not counted against you.
+          </p>
+        )}
       </div>
 
       {/* Top gaps */}

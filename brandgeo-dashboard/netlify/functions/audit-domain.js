@@ -25,7 +25,7 @@ const {
   buildAuditContext, withTimeout, ALL_CALLERS, SCREENING_ENGINES, FULL_ENGINES, estimateAuditCost,
 } = require('./_prospect_engines')
 const { generateAuditPrompts } = require('./_prospect_prompts')
-const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags } = require('./_score')
+const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults } = require('./_score')
 const {
   guardPublicRequest, checkMonthlyBudget, checkGlobalHourlyLimit, generateToken, isPlausibleDomain, normalizeDomain, isInternalCaller,
 } = require('./_prospect_guard')
@@ -160,8 +160,14 @@ exports.handler = async (event) => {
       console.warn(`[Audit/${invId}] ${engine} timed out for prompt ${promptId}`)
       continue
     }
-    const { text, errorCode } = result.value || {}
-    if (errorCode || !text) continue
+    const { text, errorCode, detail } = result.value || {}
+    if (errorCode || !text) {
+      // #109: log WHY. A dropped engine is now reported as 'unavailable' rather
+      // than 'missing' (see _score.js), so we never tell a prospect an engine
+      // doesn't know them when the truth is we failed to ask it.
+      console.warn(`[Audit/${invId}] ${engine} failed on prompt ${promptId}: ${errorCode || 'no text'} ${detail || ''}`)
+      continue
+    }
 
     let analysis
     try {
@@ -187,6 +193,22 @@ exports.handler = async (event) => {
 
   const resultMap = buildResultMap(scoreRows)
   const promptIds = promptsToRun.map(p => p.id)
+
+  // #109: if EVERY engine failed we have no evidence at all. Publishing a
+  // "0/100" scorecard here would be the worst possible outcome — we'd be telling
+  // a prospect no AI engine knows them, on the basis of zero data, in the one
+  // asset used to open a sales conversation. Fail loudly instead.
+  const heardFrom = enginesWithResults(promptIds, resultMap, engines)
+  if (heardFrom.length === 0) {
+    console.error(`[Audit/${invId}] every engine failed for ${domain} — refusing to publish a 0/100 scorecard`)
+    await supabase.from('prospect_audits').update({
+      status: 'error',
+      error_message: 'Could not reach the AI engines for this audit. Please try again shortly.',
+      updated_at: new Date().toISOString(),
+    }).eq('id', inserted.id)
+    return { statusCode: 503, headers, body: JSON.stringify({ error: 'Could not reach the AI engines right now. Please try again in a few minutes.' }) }
+  }
+
   const { dimensions, aiScore } = computeAuditScore(promptIds, resultMap, engines)
   const engineStates = computeEngineStates(promptIds, resultMap, engines)
   const { topGaps, competitorFlags } = computeGapsAndFlags(promptTextById, resultMap)

@@ -76,42 +76,104 @@ async function callChatGPT(prompt, ctx) {
     .filter(o => o.type === 'message')
     .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
     .join('\n')
-  return { text: text || null, errorCode: null }
+  // #109: a null text with a null errorCode is silence — the caller can't tell a
+  // failure from a real answer. Always name the failure.
+  if (!text) return { text: null, errorCode: 'empty_response', detail: 'no output_text in response' }
+  return { text, errorCode: null, detail: null }
+}
+
+// Gemini — #109: ported from collect-prompt.js's fixed callGemini.
+//
+// The old version here had the exact bug that made BpR collect ZERO gemini rows
+// for weeks: it read only `parts[0].text` (a grounded/thinking response can put a
+// thought part first and the real answer in parts[1..], which was then thrown
+// away), and it returned a bare { text: null, errorCode: null } on four separate
+// failure paths. In the audit pipeline that null is even more damaging than in
+// the client collector: the caller drops the engine, and the scorecard then tells
+// a PROSPECT that Gemini has never heard of them. Every exit now carries a real
+// errorCode so the caller can mark the engine 'unavailable' instead of 'missing'.
+
+// Join every text part — never read parts[0] alone.
+function geminiText(d) {
+  const parts = d?.candidates?.[0]?.content?.parts
+  if (!Array.isArray(parts)) return null
+  const t = parts
+    .map(p => p?.text)
+    .filter(s => typeof s === 'string' && s.length > 0)
+    .join('\n')
+    .trim()
+  return t || null
+}
+
+function classifyGeminiError(httpStatus, err) {
+  if (httpStatus === 429 || httpStatus === 402 ||
+      err?.status === 'RESOURCE_EXHAUSTED' || err?.code === 429) return 'quota_exceeded'
+  if (httpStatus === 401 || httpStatus === 403 ||
+      err?.status === 'UNAUTHENTICATED' || err?.status === 'PERMISSION_DENIED') return 'auth_error'
+  return 'api_error'
 }
 
 async function callGemini(prompt, ctx) {
   const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) return { text: null, errorCode: 'auth_error' }
+  if (!apiKey) return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
+
   const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+  let last = { errorCode: 'api_error', detail: 'no model returned a response' }
+
   for (const model of models) {
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: ctx }] },
-            contents:          [{ parts: [{ text: prompt }] }],
-            tools:             [{ googleSearch: {} }],
-          }),
+    // grounded first, then ungrounded for the same model before moving on
+    for (const grounded of [true, false]) {
+      const tag = `${model}${grounded ? '' : '/ungrounded'}`
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: ctx }] },
+              contents:          [{ parts: [{ text: prompt }] }],
+              ...(grounded ? { tools: [{ googleSearch: {} }] } : {}),
+            }),
+          }
+        )
+        const d = await r.json()
+
+        const text = geminiText(d)
+        if (text) return { text, errorCode: null, detail: null }
+
+        if (d.error) {
+          const errorCode = classifyGeminiError(r.status, d.error)
+          const detail = `${tag}: HTTP ${r.status} ${d.error.status || ''} ${d.error.message || ''}`.trim()
+          console.error(`[Audit/Gemini] ${detail}`)
+          last = { errorCode, detail }
+          // Account-level failure — no other model or retry will fix it.
+          if (errorCode === 'quota_exceeded' || errorCode === 'auth_error') {
+            return { text: null, ...last }
+          }
+          if (r.status === 404 || d.error.code === 404) break   // model retired → next model
+          continue                                              // else retry ungrounded
         }
-      )
-      const d = await r.json()
-      if (d.candidates?.[0]?.content?.parts?.[0]?.text) {
-        return { text: d.candidates[0].content.parts[0].text, errorCode: null }
-      }
-      if (r.status === 404 || d.error?.code === 404) continue
-      if (d.error) {
-        const isQuota = r.status === 429 || r.status === 402 ||
-          d.error.status === 'RESOURCE_EXHAUSTED' || d.error.code === 429
-        if (isQuota) return { text: null, errorCode: 'quota_exceeded' }
+
+        // HTTP 200 with no usable text: safety block, RECITATION, empty candidate.
+        // The old code `break`ed here, so the fallback chain never ran.
+        const finishReason = d.candidates?.[0]?.finishReason ?? 'unknown'
+        const blockReason  = d.promptFeedback?.blockReason
+        const detail = `${tag}: empty response (finishReason=${finishReason}` +
+          `${blockReason ? `, blockReason=${blockReason}` : ''})`
+        console.warn(`[Audit/Gemini] ${detail}`)
+        last = { errorCode: 'empty_response', detail }
+        continue
+      } catch (e) {
+        const detail = `${tag}: threw ${e.message}`
+        console.error(`[Audit/Gemini] ${detail}`)
+        last = { errorCode: 'api_error', detail }
         continue
       }
-      break
-    } catch (e) { console.error(`[Audit/Gemini] ${model}:`, e.message); continue }
+    }
   }
-  return { text: null, errorCode: null }
+
+  return { text: null, ...last }
 }
 
 async function callOpenRouter(model, prompt, ctx) {
@@ -137,7 +199,10 @@ async function callOpenRouter(model, prompt, ctx) {
       d.error.code === 402 || (d.error.message || '').toLowerCase().includes('credit')
     return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error' }
   }
-  return { text: d.choices?.[0]?.message?.content ?? null, errorCode: null }
+  const text = d.choices?.[0]?.message?.content ?? null
+  // #109: never return null text with a null errorCode — see callChatGPT above.
+  if (!text) return { text: null, errorCode: 'empty_response', detail: `${model}: no message content` }
+  return { text, errorCode: null, detail: null }
 }
 
 // Claude — same wall-clock-budget streaming approach as collect-claude.js
@@ -204,10 +269,12 @@ async function callClaude(prompt, ctx) {
         } catch { /* skip malformed SSE */ }
       }
     }
-    return { text: text || null, errorCode: null }
+    // #109: never return null text with a null errorCode — see callChatGPT above.
+    if (!text) return { text: null, errorCode: 'empty_response', detail: 'stream produced no text' }
+    return { text, errorCode: null, detail: null }
   } catch (e) {
     console.error('[Audit/Claude] threw:', e.message)
-    return { text: null, errorCode: null }
+    return { text: null, errorCode: 'api_error', detail: `threw ${e.message}` }
   }
 }
 
