@@ -113,57 +113,109 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
   return text || null
 }
 
-// Gemini — Google Search grounding + systemInstruction for geo context
+// Gemini — Google Search grounding + systemInstruction for geo context.
+//
+// #109: this function must NEVER return a bare { text: null, errorCode: null }.
+// The old version had four separate paths that did exactly that (all models 404,
+// API error + failed ungrounded retry, HTTP 200 with an unreadable candidate,
+// and a thrown exception). The handler maps a null errorCode to "no_response"
+// and skips the insert — so Gemini could fail forever and leave no trace at all:
+// no ok row, no error row, nothing to debug. BpR (client 1) collected ZERO gemini
+// rows of any kind for exactly this reason. Every exit below now carries an
+// errorCode + a human-readable detail so the next run explains itself.
+
+// Grounded/thinking responses can split the answer across several parts, and may
+// put a non-text part (thought, functionCall) first — reading only parts[0].text
+// silently throws the answer away. Join every text part instead.
+function geminiText(d) {
+  const parts = d?.candidates?.[0]?.content?.parts
+  if (!Array.isArray(parts)) return null
+  const t = parts
+    .map(p => p?.text)
+    .filter(s => typeof s === 'string' && s.length > 0)
+    .join('\n')
+    .trim()
+  return t || null
+}
+
+function classifyGeminiError(httpStatus, err) {
+  if (httpStatus === 429 || httpStatus === 402 ||
+      err?.status === 'RESOURCE_EXHAUSTED' || err?.code === 429) return 'quota_exceeded'
+  if (httpStatus === 401 || httpStatus === 403 ||
+      err?.status === 'UNAUTHENTICATED' || err?.status === 'PERMISSION_DENIED') return 'auth_error'
+  return 'api_error'
+}
+
 async function callGemini(prompt, ctx) {
+  if (!process.env.GEMINI_API_KEY) {
+    console.error('[Gemini] GEMINI_API_KEY not set — engine skipped')
+    return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
+  }
+
   const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+  let last = { errorCode: 'api_error', detail: 'no model returned a response' }
+
   for (const model of models) {
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: ctx }] },
-            contents:          [{ parts: [{ text: prompt }] }],
-            tools:             [{ googleSearch: {} }],
-          }),
-        }
-      )
-      const d = await r.json()
-      if (d.candidates?.[0]?.content?.parts?.[0]?.text) {
-        const t = d.candidates[0].content.parts[0].text
-        console.log(`[Gemini] ${model} ok | preview:`, t.slice(0, 200))
-        return { text: t, errorCode: null }
-      }
-      if (r.status === 404 || d.error?.code === 404) continue
-      if (d.error) {
-        // Detect quota / resource exhaustion
-        const isQuota = r.status === 429 || r.status === 402 ||
-          d.error.status === 'RESOURCE_EXHAUSTED' || d.error.code === 429
-        if (isQuota) {
-          console.error(`[Gemini] ${model} quota exceeded:`, d.error.message)
-          return { text: null, errorCode: 'quota_exceeded' }
-        }
-        console.warn(`[Gemini] ${model} search failed (${d.error.message}), retrying without grounding`)
-        const r2 = await fetch(
+    // grounded first; fall back to ungrounded for the same model before moving on
+    for (const grounded of [true, false]) {
+      const tag = `${model}${grounded ? '' : '/ungrounded'}`
+      try {
+        const r = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: ctx }] },
               contents:          [{ parts: [{ text: prompt }] }],
-            }) }
+              ...(grounded ? { tools: [{ googleSearch: {} }] } : {}),
+            }),
+          }
         )
-        const d2 = await r2.json()
-        if (d2.candidates?.[0]?.content?.parts?.[0]?.text) {
-          return { text: d2.candidates[0].content.parts[0].text, errorCode: null }
+        const d = await r.json()
+
+        const text = geminiText(d)
+        if (text) {
+          console.log(`[Gemini] ${tag} ok | len:`, text.length, '| preview:', text.slice(0, 200))
+          return { text, errorCode: null, detail: null }
         }
+
+        if (d.error) {
+          const errorCode = classifyGeminiError(r.status, d.error)
+          const detail = `${tag}: HTTP ${r.status} ${d.error.status || ''} ${d.error.message || ''}`.trim()
+          console.error(`[Gemini] ${detail}`)
+          last = { errorCode, detail }
+
+          // Account-level failures: no other model and no ungrounded retry can fix
+          // these, so fail fast rather than burning the 20s budget on 5 more calls.
+          if (errorCode === 'quota_exceeded' || errorCode === 'auth_error') {
+            return { text: null, ...last }
+          }
+          // 404 = model retired → skip the ungrounded retry, go straight to next model
+          if (r.status === 404 || d.error.code === 404) break
+          continue   // other API error → retry this model without grounding
+        }
+
+        // HTTP 200 but no usable text: safety block, RECITATION, MAX_TOKENS with an
+        // empty candidate, etc. The old code `break`ed here, so the model-fallback
+        // chain never actually ran on an empty candidate — now we keep trying.
+        const finishReason = d.candidates?.[0]?.finishReason ?? 'unknown'
+        const blockReason  = d.promptFeedback?.blockReason
+        const detail = `${tag}: empty response (finishReason=${finishReason}` +
+          `${blockReason ? `, blockReason=${blockReason}` : ''})`
+        console.warn(`[Gemini] ${detail}`)
+        last = { errorCode: 'empty_response', detail }
+        continue
+      } catch (e) {
+        const detail = `${tag}: threw ${e.message}`
+        console.error(`[Gemini] ${detail}`)
+        last = { errorCode: 'api_error', detail }
         continue
       }
-      break
-    } catch (e) { console.error(`[Gemini] ${model}:`, e.message); continue }
+    }
   }
-  return { text: null, errorCode: null }
+
+  return { text: null, ...last }
 }
 
 // Claude — streaming API with early abort.
@@ -373,32 +425,57 @@ exports.handler = async (event) => {
 
   const summary = {}
   const inserts = []
+
+  // #109: EVERY engine in toRun must produce exactly one row — an ok row or an
+  // error row, never silence. Previously a timeout, an empty response, or a
+  // throwing analyseResponse all just `continue`d, writing nothing. An engine
+  // could then fail indefinitely while the dashboard showed it as simply
+  // "never checked" — indistinguishable from a brand that is genuinely absent,
+  // and silently capping the Reach dimension of the client's headline score.
+  //
+  // Error rows are safe and self-healing: the non-force skip check below uses
+  // .neq('status','error'), so an error row never blocks a retry, and a force
+  // refresh deletes it before re-collecting (#95–#97).
+  const errorRow = (llm, error_code, detail) => ({
+    prompt_id, llm, client_id,
+    status: 'error',
+    error_code,
+    brand_mentioned: false,
+    // Stash the diagnosis on the row itself. Error rows are excluded from every
+    // analysis query by status='error', so this can't pollute any metric — it
+    // just means the next failure explains itself instead of vanishing.
+    response_text: detail ? String(detail).slice(0, 10000) : null,
+    checked_at: new Date().toISOString(),
+  })
+
   for (let i = 0; i < toRun.length; i++) {
     const llm    = toRun[i]
     const result = settled[i]
 
-    // Timeout — transient, don't store
+    // Timeout / thrown rejection — store it. It IS a real failure to collect:
+    // if an engine times out on every run, that must be visible, not invisible.
     if (result.status === 'rejected') {
-      summary[llm] = `timeout: ${result.reason?.message || 'unknown'}`
+      const detail = result.reason?.message || 'unknown'
+      summary[llm] = `timeout: ${detail}`
+      inserts.push(errorRow(llm, 'timeout', detail))
       continue
     }
 
-    const { text, errorCode } = result.value ?? { text: null, errorCode: null }
+    const { text, errorCode, detail } = result.value ?? { text: null, errorCode: null }
 
-    // API/quota error — store error row so dashboard can show "unavailable"
+    // API/quota/auth error — store error row so dashboard can show "unavailable"
     if (errorCode) {
       summary[llm] = errorCode
-      inserts.push({
-        prompt_id, llm, client_id,
-        status: 'error', error_code: errorCode,
-        brand_mentioned: false,
-        checked_at: new Date().toISOString(),
-      })
+      inserts.push(errorRow(llm, errorCode, detail))
       continue
     }
 
+    // Resolved, no error, but no text either. Should now be unreachable for the
+    // engines above (they all return an errorCode instead) — kept as a backstop
+    // so a future engine caller can never reintroduce the silent drop.
     if (!text) {
       summary[llm] = 'no_response'
+      inserts.push(errorRow(llm, 'no_response', 'engine returned no text and no error code'))
       continue
     }
 
@@ -407,6 +484,8 @@ exports.handler = async (event) => {
     catch (e) {
       console.error(`[${llm}] analyseResponse threw:`, e.message)
       summary[llm] = 'analysis_error'
+      // Keep the raw response — this row is the only evidence of what broke.
+      inserts.push(errorRow(llm, 'analysis_error', `${e.message}\n---\n${text}`))
       continue
     }
     inserts.push({
