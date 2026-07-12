@@ -187,6 +187,89 @@ function extractBoldAndBulletNames(text) {
   return out
 }
 
+// ─── Bullet-list rank (#109 follow-up) ───────────────────────────────────────
+// Gemini structurally never emits "1. Brand" — it answers in bullets
+// ("*   **Brand**: ..."), so detectListPosition below could never return a rank
+// for it, and Gemini contributed nothing to the Knowledge/Accuracy dimensions
+// for ANY client. Bullet order is sometimes a real rank — but only sometimes.
+//
+// Verified against BpR's live Gemini responses (2026-07-12): the lead-ins read
+// "ai la dispoziție MAI MULTE firme" ("several firms") and "Iată CÂTEVA firme"
+// ("here are a few firms"). Those are unordered option sets, not rankings.
+// Numbering them 1..n would invent a rank the engine never expressed — exactly
+// the class of error finding 1.2 fixed when it removed the sentence-index
+// fallback. So we take a rank from a bullet list ONLY when the lead-in says the
+// list is ordered, and an explicit "a few / several" veto beats a weak quality
+// adjective ("firme de top" describes calibre, it does not declare an order).
+const RANK_CUES = [
+  // ordering is stated outright
+  'clasament', 'în ordinea', 'in ordinea', 'în ordine descrescătoare', 'ranked', 'ranking',
+  'in order of', 'ordered by', 'from best to', 'în funcție de clasament',
+  // explicit top-N (a numbered cut implies an ordering)
+  'top 3', 'top 5', 'top 10', 'top three', 'top five', 'top ten',
+  // superlative framing of the list itself
+  'cele mai bune', 'cea mai bună', 'cea mai buna', 'cel mai bun', 'primele',
+  'the best', 'best-ranked', 'strongest', 'leading',
+]
+const NO_RANK_CUES = [
+  'câteva', 'cateva', 'mai multe', 'unele dintre', 'o parte dintre',
+  'ordine aleatorie', 'nu în ordine', 'fără o anumită ordine',
+  'a few', 'several', 'some of', 'here are some', 'no particular order',
+  'not ranked', 'not in any order', 'in no particular order', 'among others',
+]
+
+function looksRankedList(leadIn) {
+  const s = String(leadIn).toLowerCase()
+  // A stated "a few / several / no particular order" always wins: the engine has
+  // told us the list is NOT an ordering, whatever adjectives it also used.
+  if (NO_RANK_CUES.some(c => s.includes(c))) return false
+  return RANK_CUES.some(c => s.includes(c))
+}
+
+const BULLET_RE = /^[ \t]*[-*•][ \t]+(.*)$/
+
+/**
+ * Rank of the brand within a bullet list, 1-based — but only for lists whose
+ * lead-in declares an ordering. Returns null otherwise (never a fabricated rank).
+ */
+function detectBulletPosition(text, matchers) {
+  const lines = String(text).split('\n')
+  let i = 0
+
+  while (i < lines.length) {
+    if (!BULLET_RE.test(lines[i])) { i++; continue }
+
+    const blockStart = i
+    const items = []
+    // Collect the block. A bullet starts a new item; an indented or blank line
+    // continues the current one (Gemini puts the description on the next line);
+    // any other non-blank, non-indented line ends the block.
+    while (i < lines.length) {
+      const m = lines[i].match(BULLET_RE)
+      if (m) { items.push(m[1]); i++; continue }
+      if (/^\s*$/.test(lines[i]) || /^[ \t]{2,}\S/.test(lines[i])) {
+        if (items.length) items[items.length - 1] += '\n' + lines[i]
+        i++
+        continue
+      }
+      break
+    }
+
+    // A single bullet is not a list; >50 is not a ranking anyone means literally.
+    if (items.length >= 2 && items.length <= 50) {
+      // Lead-in = the few lines immediately above the first bullet.
+      const leadIn = lines.slice(Math.max(0, blockStart - 3), blockStart).join(' ')
+      if (looksRankedList(leadIn)) {
+        for (let k = 0; k < items.length; k++) {
+          if (matchesAlias(items[k], matchers)) return k + 1
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 function detectListPosition(text, matchers) {
   // Genuine numbered-list rank ONLY. Prose mentions return null — previously
   // this fell back to the *sentence index* (i+1), which landed in the same
@@ -518,9 +601,15 @@ function analyseResponse(text, cfg) {
   const brandInList = topResults.find(item => matchesAlias(item.name, matchers))
   const mentioned   = matchers.length > 0 && (!!brandInList || matchesAlias(text, matchers))
 
+  // Rank sources, in descending order of trust:
+  //   1. the brand's own numbered-list entry
+  //   2. any numbered-list line naming the brand
+  //   3. a bullet list whose lead-in explicitly declares an ordering (#109)
+  // Anything else stays null. A prose or unordered-bullet mention is genuinely
+  // "mentioned but not ranked" — never a fabricated position (finding 1.2).
   let position = null
   if (brandInList)   position = brandInList.pos
-  else if (mentioned) position = detectListPosition(text, matchers)
+  else if (mentioned) position = detectListPosition(text, matchers) ?? detectBulletPosition(text, matchers)
 
   // Sentiment is scored ONLY on the brand's own sentence(s)/list-item(s), not
   // the whole response (audit finding 1.1a). We claim a polarity only when the
@@ -617,6 +706,8 @@ module.exports = {
   isBoldColonLabel,
   looksLikePhrase,
   detectListPosition,
+  detectBulletPosition,
+  looksRankedList,
   buildBrandMatchers,
   buildAliasRegex,
   matchesAlias,

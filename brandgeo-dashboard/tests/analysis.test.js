@@ -20,6 +20,8 @@ const {
   isBoldColonLabel,
   looksLikePhrase,
   stripRankPrefixes,
+  detectBulletPosition,
+  looksRankedList,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -509,5 +511,84 @@ check('real RO caterer still kept', isCompanyName('Fratelli Catering'), true)
   assert.ok(n.includes('Carte Blanche'), 'real brand in the body still captured')
   passed++; console.log('  ok - row 1588 RO section headings dropped, real brand kept')
 }
+
+// ─── Bullet-list rank, only for genuinely ranked lists (#109 follow-up) ───────
+// Gemini structurally never emits "1. Brand" — it always bullets. Bullet order is
+// a rank only when the engine says the list is ordered. These fixtures are lifted
+// from BpR's real Gemini rows (2026-07-12), whose lead-ins say "mai multe firme"
+// ("several firms") and "Iată câteva firme" ("here are a few") — unordered option
+// sets. Numbering those would fabricate a rank, the same error finding 1.2 fixed.
+console.log('bullet-list rank — ranked lists only (#109):')
+
+// Real row, prompt 239. Lead-in: "ai la dispoziție MAI MULTE firme" → NOT a ranking.
+const G239 = `Pentru evenimente corporate de succes în București, ai la dispoziție mai multe firme de catering cu experiență și servicii variate:
+
+*   **Bucate pe Roate / Carte Blanche**: Această companie este una dintre cele mai experimentate din București.
+
+*   **Happy Friday**: Alt furnizor cunoscut.`
+check('G239 mentioned (real Gemini row)', analyseResponse(G239, cfg).brand_mentioned, true)
+check('G239 unordered "mai multe" list → position null (no fabricated rank)',
+  analyseResponse(G239, cfg).brand_position, null)
+
+// Real row, prompt 243. Lead-in: "Iată CÂTEVA firme…" → NOT a ranking, brand is 3rd bullet.
+const G243 = `Iată câteva firme de catering din București care menționează certificări de siguranță alimentară:
+
+*   **Ana Catering** menționează certificări.
+*   **FOOD CONCEPT CATERING SRL**
+*   **Bucate pe Roate**
+*   **ELEGANT CATERING SRL**`
+check('G243 "câteva" list → position null even though brand is 3rd bullet',
+  analyseResponse(G243, cfg).brand_position, null)
+
+// Real row, prompt 245 — the tricky one: "de top" + "recomandări" (quality cues) BUT
+// also "câteva" (a few). The explicit "a few" must veto the weak quality adjective.
+const G245 = `Pentru o nuntă în București, ai la dispoziție mai multe firme de catering de top, recunoscute pentru profesionalism. Iată câteva recomandări, bazate pe expertiza lor:
+
+*   **Carte Blanche Catering & Events (parte din grupul Bucate pe Roate)**: companie de lux.
+*   **Alt Furnizor**: alta optiune.`
+check('G245 "câteva recomandări" vetoes the weak "de top" cue → position null',
+  analyseResponse(G245, cfg).brand_position, null)
+
+// A genuinely ranked bullet list — this is the case the feature exists for.
+const RANKED = `Acestea sunt cele mai bune firme de catering din București, în ordinea calității:
+
+*   **Fratelli Catering** — locul întâi.
+*   **Bucate pe Roate** — a doua opțiune.
+*   **Alt Furnizor**`
+check('ranked list ("cele mai bune … în ordinea") → brand gets position 2',
+  analyseResponse(RANKED, cfg).brand_position, 2)
+
+const RANKED_EN = `Here are the top 5 catering companies in Bucharest, ranked:
+
+- Fratelli Catering
+- Bucate pe Roate
+- Someone Else`
+check('EN "top 5 … ranked" list → brand gets position 2',
+  analyseResponse(RANKED_EN, cfg).brand_position, 2)
+
+// Numbered lists must still win outright — bullets are only the fallback.
+const NUMBERED = `Cele mai bune firme:
+
+1. Fratelli Catering
+2. Bucate pe Roate
+3. Alt Furnizor`
+check('numbered list still takes precedence → position 2',
+  analyseResponse(NUMBERED, cfg).brand_position, 2)
+
+// Prose mention in a ranked-cue document must still be null — no list, no rank.
+check('prose mention with a ranking cue but no list → still null',
+  analyseResponse('Cele mai bune firme includ Bucate pe Roate, care este apreciată.', cfg).brand_position, null)
+
+console.log('looksRankedList — unit checks:')
+check('looksRankedList("Iată câteva recomandări") → false', looksRankedList('Iată câteva recomandări, bazate pe expertiza lor'), false)
+check('looksRankedList("ai la dispoziție mai multe firme") → false', looksRankedList('ai la dispoziție mai multe firme de catering de top'), false)
+check('looksRankedList("cele mai bune … în ordinea") → true', looksRankedList('Acestea sunt cele mai bune firme, în ordinea calității'), true)
+check('looksRankedList("top 5 … ranked") → true', looksRankedList('Here are the top 5 companies, ranked'), true)
+check('looksRankedList("here are some options") → false', looksRankedList('Here are some options for you'), false)
+
+// A single bullet is not a list.
+check('single bullet in a ranked doc → null (not a list)',
+  detectBulletPosition('Cele mai bune firme, în ordinea calității:\n\n* Bucate pe Roate',
+    buildBrandMatchers(cfg)), null)
 
 console.log(`\nAll ${passed} assertions passed.`)
