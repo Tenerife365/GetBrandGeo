@@ -86,6 +86,29 @@ export const ENGINE_META: Record<EngineId, {
   grok:       { label: 'Grok',      color: 'text-slate-300',   bg: 'bg-slate-300/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#94a3b8' },
 }
 
+// ── Per-call engine API cost (EUR) ───────────────────────────────────────────
+// SCALE-SPEC.md §2.1 — single source of truth for the FRONTEND. The Netlify
+// functions (which write ai_results.cost_eur on every insert, and the
+// Instant Audit Engine's cost guardrail) can't import a Vite-bundled .ts
+// module at runtime, so netlify/functions/_cost.js carries the same numbers
+// as a separate, hand-kept-in-sync CommonJS copy — same tradeoff already
+// accepted for _score.js <-> aiVisibilityScore.ts. Update BOTH files together.
+//
+// REPRICED 2026-07-10 (SCALE-SPEC.md §1.1, CLAUDE.md §12.3) after Claude's
+// web_search tool was removed, ChatGPT's reasoning effort was capped to
+// 'low', and Gemini moved to 3.5-flash grounding. See _cost.js for full
+// per-engine confidence notes (gemini LOW, chatgpt MEDIUM, the rest HIGH) —
+// these are derived from published rate cards + measured response size, not
+// an invoice, and are not exact. Only the 5 currently-built engines have a
+// real cost; the other 4 (google_ai/copilot/deepseek/grok) never collect.
+export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
+  claude:     0.010,
+  chatgpt:    0.060,
+  gemini:     0.020,
+  perplexity: 0.006,
+  meta:       0.001,
+}
+
 export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'managed', 'pro', 'enterprise']
 
 export const PLAN_LABELS: Record<Plan, string> = {

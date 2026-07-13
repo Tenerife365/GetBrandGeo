@@ -314,27 +314,20 @@ const SCREENING_ENGINES = ['gemini', 'perplexity']
 const FULL_ENGINES       = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────
-// Mirrors src/pages/Usage.tsx's ENGINE_COST + OVERHEAD_MULTIPLIER exactly (same
-// figures, kept in sync by hand — Netlify functions run as plain CommonJS and
-// can't import a Vite-bundled .tsx file, so this is a deliberate, documented
-// duplication rather than an oversight; update both places together).
-// REPRICED 2026-07-10 (SCALE-SPEC.md §1.1, CLAUDE.md §12.3) — the old figures
-// were never checked against a rate card and were ~2.4x too low overall.
+// SCALE-SPEC.md §2.1 (2026-07-13) consolidated the previously hand-duplicated
+// cost table — this file, src/pages/Usage.tsx, and now the ai_results
+// collectors too — into ONE server-side copy: ./_cost.js. This file requires
+// it instead of declaring its own, closing exactly the duplication SCALE-SPEC
+// called out by name.
 //
 // ⚠️ This mattered MORE here than on the dashboard, because these numbers are
 // not just displayed — `estimateAuditCost()` below writes them to
 // `prospect_audits.estimated_cost_eur`, and `_prospect_guard.js`'s
 // checkMonthlyBudget() sums that column against PROSPECTING_MONTHLY_BUDGET_EUR
-// (default €200). Under-pricing the engines therefore under-counted real spend,
-// so the cap was letting through far more than €200 of actual API cost.
-// Worst offender: gemini at €0.001 (20x too low) — and SCREENING_ENGINES is
-// gemini+perplexity, so a screening audit was costed at €0.006/prompt when it
-// really runs ≈€0.026. The guardrail was ~4x too loose on the screening path.
-//
-// Values below are AFTER this file's own config fixes (Claude web search
-// removed, gpt-5.5 reasoning capped, Gemini 3.5 grounding). Keep in sync with
-// src/pages/Usage.tsx by hand — see the note above.
-const ENGINE_COST_EUR = { claude: 0.010, chatgpt: 0.060, gemini: 0.020, perplexity: 0.006, meta: 0.001 }
+// (default €200). A stale local copy here previously under-priced Gemini 20x
+// and let real spend outrun the €200 cap — see _cost.js for the full
+// derivation/confidence notes and keep this file pointed at it, not a local copy.
+const { ENGINE_COST_EUR } = require('./_cost')
 const OVERHEAD_MULTIPLIER = 1.5
 const PROMPT_GEN_COST_EUR = 0.002   // one gpt-4o-mini call for category+prompt generation
 

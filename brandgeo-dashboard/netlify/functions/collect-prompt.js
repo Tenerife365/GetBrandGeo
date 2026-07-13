@@ -17,6 +17,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
 const { analyseResponse } = require('./_analysis')
+const { costForRow } = require('./_cost')
 
 // ─── Geographic / language context ───────────────────────────────────────────
 // Without geo context, API calls from our US Netlify server return US-centric
@@ -483,6 +484,9 @@ exports.handler = async (event) => {
     // just means the next failure explains itself instead of vanishing.
     response_text: detail ? String(detail).slice(0, 10000) : null,
     checked_at: new Date().toISOString(),
+    // SCALE-SPEC.md §2.1 — 0 for quota_exceeded/auth_error (no billable call
+    // happened), full engine cost otherwise (a request was actually sent).
+    cost_eur: costForRow(llm, error_code),
   })
 
   for (let i = 0; i < toRun.length; i++) {
@@ -535,6 +539,7 @@ exports.handler = async (event) => {
       competitors_mentioned: analysis.competitors_mentioned,
       response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
       checked_at:            new Date().toISOString(),
+      cost_eur:              costForRow(llm, null),
     })
     summary[llm] = analysis.brand_mentioned ? 'mentioned' : 'not_mentioned'
   }

@@ -14,6 +14,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
 const { analyseResponse } = require('./_analysis')
+const { costForRow } = require('./_cost')
 
 // --- Geo context ------------------------------------------------------------------
 
@@ -166,6 +167,7 @@ exports.handler = async (event) => {
       prompt_id, llm: 'chatgpt', client_id,
       status: 'error', error_code: errorCode,
       brand_mentioned: false, checked_at: new Date().toISOString(),
+      cost_eur: costForRow('chatgpt', errorCode),
     }])
     return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'chatgpt', reason: errorCode }) }
   }
@@ -194,6 +196,7 @@ exports.handler = async (event) => {
     competitors_mentioned: analysis.competitors_mentioned,
     response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
     checked_at:            new Date().toISOString(),
+    cost_eur:              costForRow('chatgpt', null),
   }])
 
   if (insErr) {

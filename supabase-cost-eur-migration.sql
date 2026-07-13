@@ -1,0 +1,41 @@
+-- Migration: meter real per-row API cost on ai_results
+-- SCALE-SPEC.md §2.1 (Master-DashboardDesign, 2026-07-13).
+--
+-- Why: the monthly rate limit in _auth.js counts ROWS (flat 150/hr/client), which
+-- has nothing to do with actual EUR spend and is why Growth (150 prompts x 5
+-- engines) was structurally unable to complete a single refresh. Constantin's
+-- rule is "API cost <=10% of revenue per client, measured monthly" -- that can
+-- only be enforced by metering euros, not rows. This column is that meter.
+--
+-- Every insert into ai_results (ok row or error row) now carries the estimated
+-- cost of the API call that produced it, sourced from the single shared
+-- ENGINE_COST_EUR table in netlify/functions/_cost.js (mirrored by hand into
+-- src/lib/planConfig.ts for the frontend -- same pattern as _score.js's
+-- relationship with aiVisibilityScore.ts). Rows where no billable call happened
+-- (quota_exceeded, auth_error) are metered at 0; every other outcome (ok, or a
+-- failure that still hit the provider -- timeout, api_error, empty_response,
+-- no_response, analysis_error) is charged the full engine cost, since that's
+-- the best available approximation without real per-call token accounting.
+--
+-- Nullable, no default: existing rows stay NULL (their real cost was never
+-- captured and can't be reconstructed); only newly collected / force-refreshed
+-- rows populate it going forward. numeric(10,5) gives 5 decimal places of
+-- precision -- engine costs run as low as EUR 0.001/call (Meta), and 4 decimals
+-- would round that to nothing.
+--
+-- The index this column's monthly-sum queries need
+-- (client_id, checked_at DESC -> idx_ai_results_client_checked) was already
+-- added 2026-07-11 (STATE-OF-PRODUCT.md §4.3) -- no new index required here.
+--
+-- Run once in the Supabase SQL Editor (project duiyifepitvugyulobqm).
+
+ALTER TABLE ai_results ADD COLUMN IF NOT EXISTS cost_eur NUMERIC(10,5) DEFAULT NULL;
+
+-- purge-old-results.js already deletes rows by checked_at date, so this column
+-- is bounded by the same retention window -- no extra cleanup needed. A future
+-- monthly-budget-enforcement pass (SCALE-SPEC §2.1 "Enforcement" / §2.3) can
+-- sum this column directly:
+--   select client_id, sum(cost_eur) as spend_eur
+--   from ai_results
+--   where checked_at >= date_trunc('month', now())
+--   group by client_id;

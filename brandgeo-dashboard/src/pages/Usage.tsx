@@ -8,49 +8,28 @@ import { DollarSign, TrendingUp, Cpu } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
-import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { ENGINE_META, ENGINE_COST_EUR, type EngineId } from '../lib/planConfig'
 
 /**
- * EUR cost per response, per engine.
+ * EUR cost per response, per engine — sourced from planConfig.ts's
+ * ENGINE_COST_EUR (SCALE-SPEC.md §2.1), not a local copy. This used to be its
+ * own hand-maintained table here, duplicated a second time in
+ * _prospect_engines.js, and (until the cost_eur metering work landed
+ * 2026-07-13) not applied at all to the actual ai_results rows it estimates
+ * from. All three now read the same numbers — see planConfig.ts /
+ * netlify/functions/_cost.js for the full pricing derivation and confidence
+ * notes (gemini LOW confidence, chatgpt MEDIUM, the rest HIGH).
  *
- * REPRICED 2026-07-10 (SCALE-SPEC.md §1.1). The previous numbers were guesses
- * that had never been checked against a rate card and were ~2.4x TOO LOW — a
- * real 5-engine check cost ≈€0.156, not the €0.066 this table implied. Every
- * quota and margin figure downstream keyed off these, so they were quietly
- * wrong too.
- *
- * These values are AFTER the three config fixes shipped the same day:
- *   - Claude:  web_search tool removed (it was ~75% of Claude's cost, and was
- *              never supposed to be on — task #63 claimed it was removed).
- *              €0.040 -> ≈€0.010.
- *   - ChatGPT: reasoning effort capped to 'low'. gpt-5.5 bills reasoning tokens
- *              as output ($30/MTok) and they were uncapped. ≈€0.075 -> ≈€0.060.
- *              (Its $10/1k web-search fee is a hard ≈€0.009 floor per call.)
- *   - Gemini:  2.5-flash -> 3.5-flash grounding. See the caveat below.
- *
- * CONFIDENCE — these are derived from published rate cards + the measured mean
- * response size (2,598 chars ≈ 650 output tokens, n=243), NOT from an invoice:
- *   claude     HIGH   — no tool fee left, token counts are small and known.
- *   perplexity HIGH   — flat OpenRouter rate.
- *   meta       HIGH   — flat OpenRouter rate.
- *   chatgpt    MEDIUM — reasoning-token volume is not directly observable.
- *   gemini     LOW    — 3.x bills per SEARCH QUERY ($14/1k), not per prompt,
- *                       and one prompt can fire several. 0.020 assumes ~1.4
- *                       queries/prompt. Break-even vs 2.5 is 2.5 queries/prompt.
- *
- * Do not treat these as exact. The `cost_eur` column (SCALE-SPEC §2.1) is the
- * real fix: meter actual cost per ai_results row, then true these up from data.
+ * Re-typed to a plain string-keyed Record here (planConfig.ts's version is
+ * keyed by the EngineId union so it can't silently typo an engine name) so
+ * every existing lookup/iteration below — which indexes by whatever `llm`
+ * string comes back from Supabase — keeps working unchanged.
  */
-const ENGINE_COST: Record<string, number> = {
-  claude:     0.010,
-  chatgpt:    0.060,
-  gemini:     0.020,
-  perplexity: 0.006,
-  meta:       0.001,
-}
-// => 5-engine check ≈ €0.097 (was ≈€0.156 before today's fixes; the old table
-//    claimed €0.066). Batching (SCALE-SPEC §1.1b step 4) would take it to ≈€0.062,
-//    but that needs the §3 collection queue first — not built yet.
+const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, number>
+// => 5-engine check ≈ €0.097. Batching (SCALE-SPEC §1.1b step 4) would take it
+//    to ≈€0.062, but that needs the §3 collection queue first — not built yet.
+//    The cost_eur column now meters this per row for real, so these estimates
+//    can be trued up from actual data instead of re-derived by hand.
 
 // 50% overhead to cover platform costs (Supabase, Netlify, hosting, Plausible, domain, etc.)
 const OVERHEAD_MULTIPLIER = 1.5
@@ -221,7 +200,7 @@ export default function Usage() {
           {Object.entries(ENGINE_COST).map(([engine, cost]) => (
             <div key={engine} className="flex items-center gap-1.5">
               <span className={`text-xs font-medium capitalize ${ENGINE_COLOR[engine] ?? 'text-slate-400'}`}>{engine}</span>
-              <span className="text-xs text-slate-600">€{cost.toFixed(3)}</span>
+              <span className="text-xs text-slate-600">€{(cost ?? 0).toFixed(3)}</span>
             </div>
           ))}
         </div>
