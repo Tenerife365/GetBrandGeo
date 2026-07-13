@@ -40,12 +40,34 @@
  * audit endpoints, rather than a second, divergent implementation.
  *
  * Ordering matters: we validate everything, then create the clients row, and
- * only THEN call createUser (which is what actually sends an email). The old
- * order (createUser first) meant a request that was going to fail anyway had
- * already emailed the address — an email-bomb vector on an endpoint anyone can
- * hit. Rollback unwinds in reverse.
+ * only THEN send the invite (the step that actually emails the address). The
+ * old order (auth-user creation first) meant a request that was going to fail
+ * anyway had already hit the address — an email-bomb vector on an endpoint
+ * anyone can hit. Rollback unwinds in reverse.
  *
- * POST body: { email, password, brand_domain, company_website? (honeypot) }
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 📧 EMAIL — why this uses inviteUserByEmail(), not createUser() (fixed 2026-07-13)
+ *
+ *   `auth.admin.createUser()` DOES NOT SEND ANY EMAIL. It is a silent admin
+ *   operation. The `email_confirm: false` flag only marks the user as
+ *   *unconfirmed* — it does NOT trigger a confirmation email. This function
+ *   used to call createUser and claimed in a comment that Supabase "sends the
+ *   confirmation email automatically". It does not. Proven on live data: the
+ *   first real signup produced an auth.users row with confirmation_sent_at =
+ *   NULL and no confirmation token at all — the email was never sent, and no
+ *   amount of waiting would have produced one.
+ *
+ *   `inviteUserByEmail()` DOES send (branded template + verified DKIM/SPF/DMARC
+ *   via Resend — see CLAUDE.md #106). It is what onboard-client.js and
+ *   stripe-webhook.js already use. Signup now uses the same path.
+ *
+ *   Consequence: the user does NOT choose a password here. They receive the
+ *   invite email, click through to /reset-password, and set their own. So this
+ *   endpoint never receives or handles a password at all — which is also
+ *   strictly better for a public, unauthenticated endpoint.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * POST body: { email, brand_domain, company_website? (honeypot) }
  */
 
 const { createClient } = require('@supabase/supabase-js')
@@ -57,8 +79,8 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ]
 
+const APP_URL = 'https://app.getbrandgeo.com'
 const SIGNUPS_PER_IP_PER_DAY = 3
-const MIN_PASSWORD_LENGTH = 8
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
@@ -100,7 +122,7 @@ exports.handler = async (event) => {
     return fail(400, 'Invalid request body')
   }
 
-  const { email, password, brand_domain, company_website } = body
+  const { email, brand_domain, company_website } = body
 
   // ── Honeypot bot guard ────────────────────────────────────────────────────
   // `company_website` is a hidden field no human/real JS ever fills. If it has
@@ -116,16 +138,12 @@ exports.handler = async (event) => {
   }
 
   // ── Validate BEFORE any write and before any email is sent ────────────────
-  if (!email || !password || !brand_domain) {
-    return fail(400, 'email, password, and brand_domain are required')
+  if (!email || !brand_domain) {
+    return fail(400, 'email and brand_domain are required')
   }
 
   const cleanEmail = String(email).trim().toLowerCase()
   if (!EMAIL_RE.test(cleanEmail)) return fail(400, 'Please enter a valid email address')
-
-  if (String(password).length < MIN_PASSWORD_LENGTH) {
-    return fail(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
-  }
 
   const cleanDomain = normalizeDomain(brand_domain)
   if (!isPlausibleDomain(cleanDomain)) {
@@ -195,25 +213,28 @@ exports.handler = async (event) => {
     return fail(500, 'Account setup failed. Please try again.')
   }
 
-  // ── Step 2: auth user (this is what actually sends the confirmation email) ─
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email: cleanEmail,
-    password,
-    email_confirm: false,   // Supabase sends the confirmation email
-    user_metadata: { brand_domain: cleanDomain },
-  })
+  // ── Step 2: invite the user (THIS is what actually sends the email) ───────
+  // 📧 Must be inviteUserByEmail, NOT createUser — see the email header at the
+  // top of this file. createUser is silent and sends nothing.
+  const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(
+    cleanEmail,
+    {
+      redirectTo: `${APP_URL}/reset-password`,
+      data: { brand_domain: cleanDomain },
+    },
+  )
 
   if (authError) {
     await supabase.from('clients').delete().eq('id', clientData.id)   // rollback
 
     const isDuplicate =
       authError.code === 'email_exists' ||
-      /already (registered|exists)/i.test(authError.message || '')
+      /already (registered|exists|invited)/i.test(authError.message || '')
 
     return fail(
       isDuplicate ? 409 : 400,
       isDuplicate
-        ? 'An account with this email already exists. Try logging in.'
+        ? 'An account with this email already exists. Try logging in, or use "Forgot password" to regain access.'
         : 'Account setup failed. Please try again.',
     )
   }
@@ -237,14 +258,14 @@ exports.handler = async (event) => {
     return fail(500, 'Account setup failed. Please try again.')
   }
 
-  console.log(`[signup] New free account: ${cleanEmail} → client ${clientData.id} (viewer)`)
+  console.log(`[signup] New free account: ${cleanEmail} → client ${clientData.id} (viewer, invite sent)`)
 
   return {
     statusCode: 201,
     headers,
     body: JSON.stringify({
       success: true,
-      message: 'Account created. Check your email to confirm and log in.',
+      message: 'Account created. Check your email for a link to set your password and log in.',
     }),
   }
 }

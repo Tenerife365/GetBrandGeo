@@ -23,7 +23,6 @@ const bc = 'w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:
 export default function Signup() {
   const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [brandDomain, setBrandDomain] = useState(searchParams.get('domain') || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +44,6 @@ export default function Signup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          password,
           brand_domain: brandDomain.trim(),
           company_website: companyWebsite,   // honeypot — expected to be ''
         }),
@@ -70,9 +68,9 @@ export default function Signup() {
             <div className="text-4xl mb-4">📧</div>
             <h1 className="text-lg font-semibold text-white mb-2">Check your email</h1>
             <p className="text-sm text-slate-400 mb-6">
-              We sent a confirmation link to{' '}
+              We sent a link to{' '}
               <strong className="text-slate-300">{email}</strong>.<br />
-              Click it to activate your account, then log in.
+              Click it to set your password and activate your account.
             </p>
             <Link to="/login" className={bc} style={{ textDecoration: 'none' }}>
               Go to Login →
@@ -129,19 +127,9 @@ export default function Signup() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1.5 font-medium">Password</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
-                className={ic}
-              />
-            </div>
+            {/* No password field by design. Signup sends an invite email and the
+                user sets their own password on /reset-password — so no password
+                ever transits this public endpoint. See signup-client.js. */}
 
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 font-medium">Brand domain</label>

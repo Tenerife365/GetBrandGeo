@@ -43,6 +43,40 @@ low-priority cleanup.
 
 ---
 
+## 0.4 📧 Follow-up bug — signup sent NO confirmation email (fixed 2026-07-13)
+
+The first real signup created the account correctly but **no email ever
+arrived**. Root cause, proven on live data (not guessed):
+
+> **`auth.admin.createUser()` DOES NOT SEND ANY EMAIL.** It is a silent admin
+> operation. `email_confirm: false` only marks the user *unconfirmed* — it does
+> **not** trigger a confirmation email.
+
+The original file asserted the opposite in a comment ("Supabase sends the
+confirmation email automatically"), and that false assumption was carried
+through the F1 rewrite without being verified. The live `auth.users` row proved
+it: `confirmation_sent_at = NULL`, `invited_at = NULL`, **and no confirmation
+token was ever generated** — so it wasn't a spam-folder or SMTP issue, the mail
+was never sent and never would have been.
+
+**Fix:** signup now uses **`inviteUserByEmail()`**, which *does* send — and is
+already the pattern used by `onboard-client.js` **and** `stripe-webhook.js`,
+with the branded, DKIM/SPF/DMARC-verified Resend template from #106. Signup was
+the only provisioning path not using it, and the only one that didn't email.
+Confirmed by contrast in the same table: the Onboard-wizard user has
+`confirmation_sent_at` set; the signup user does not.
+
+**Consequence (deliberate, chosen by Constantin):** the user no longer picks a
+password on the signup form. They get the invite email → `/reset-password` →
+set their own. So **no password ever transits this public endpoint** — strictly
+better for an unauthenticated route. `Signup.tsx`'s password field is removed.
+
+**Verified:** `node --check` passes, `npx tsc --noEmit` exits 0 (both on
+Windows). `createUser` no longer appears anywhere in the function except in the
+warning comments.
+
+---
+
 ## 0.5 Remediation status (updated 2026-07-13)
 
 **F1 and F2 are FIXED, DEPLOYED, and LIVE (2026-07-13).** Constantin chose the
@@ -56,7 +90,7 @@ work. Built, committed, pushed; Netlify deploy confirmed **Published**; the
 | **F1** — signup grants global admin | ✅ **FIXED + LIVE** — `role: 'admin'` → `role: 'viewer'` |
 | **F2** — no throttle on public signup | ✅ **FIXED + LIVE** — honeypot + per-IP daily cap (3/day) |
 | *(new)* signup was never functional | ✅ **FIXED + LIVE** — both broken inserts corrected |
-| *(new)* self-serve users can't add prompts | ✅ **FIXED** — RLS live; frontend pending deploy |
+| *(new)* self-serve users can't add prompts | ✅ **FIXED + LIVE** — RLS + frontend deployed |
 | F3 — `search_path` on RLS helpers | ⏳ open (SQL ready in §F3) |
 | F4/F5/F7 | ⏳ open (low priority) |
 
