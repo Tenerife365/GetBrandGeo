@@ -572,7 +572,21 @@ const HEADING_TAIL_NOUNS = new Set([
 // as NOT_A_COMPANY): a real one-word brand named exactly e.g. "Budget" would be
 // dropped — acceptable in BrandGEO's B2B/professional-services verticals, where
 // these words are criteria ~always. Non-EN coverage remains a gap. §8.11 round 3.
+// EXTENDED 2026-07-13 (round 5) — the "Non-EN coverage remains a gap" note above is
+// exactly what bit. BpR row 2070 (claude) stored **Referințe** ("References") as a
+// competitor, from a bold checklist under "## Ce Trebuie să Verifici Obligatoriu":
+//     - **Capacitatea logistică** pentru 1000+ persoane   ← NOT_A_COMPANY ('capacitate')
+//     - **Referințe** de la evenimente similare           ← LEAKED
+//     - **Autorizații sanitare** valabile                 ← looksLikePhrase (lowercase tail)
+//     - **Personal suficient** (raport 1 chelner…)        ← looksLikePhrase
+// Every sibling was already rejected; only the bare single Title-Cased noun survived —
+// precisely the class this set exists for, in the one language it did not cover.
+// Also folds in the single-word English residue observed in the London run (§9.18):
+// "Employment", "Specialisation", "Fees", "Integration".
+// Still single-word-EXACT, so no multi-word real name ("Forrester Research", "First
+// Sentinel Wealth", "Premier Catering & Events") can be touched by any of these.
 const COMMON_NON_BRAND = new Set([
+  // English — evaluation / section / criterion nouns
   'budget', 'speed', 'pricing', 'research', 'cost', 'quality', 'value',
   'considerations', 'consideration', 'recommendation', 'recommendations',
   'conclusion', 'methodology', 'disclaimer', 'eligibility', 'minimums',
@@ -580,6 +594,15 @@ const COMMON_NON_BRAND = new Set([
   'notes', 'factors', 'criteria', 'timeline', 'availability', 'requirements',
   'features', 'security', 'scalability', 'reliability', 'performance',
   'reputation', 'communication', 'support', 'integrations', 'onboarding',
+  'employment', 'specialisation', 'specialization', 'fees', 'integration',
+  'complexity', 'insights', 'benefits', 'efficiency',
+  // Romanian — same class (diacritic and ASCII spellings, since engines emit both)
+  'referințe', 'referinte', 'autorizații', 'autorizatii', 'personal', 'echipamente',
+  'buget', 'preț', 'pret', 'prețuri', 'preturi', 'costuri', 'meniu', 'meniuri',
+  'calitate', 'locație', 'locatie', 'contact', 'contacte', 'concluzie', 'concluzii',
+  'detalii', 'avantaje', 'dezavantaje', 'observații', 'observatii', 'sfaturi',
+  'criterii', 'etape', 'garanție', 'garantie', 'disponibilitate', 'siguranță',
+  'siguranta', 'livrare', 'servicii',
 ])
 
 // A multi-word phrase where a non-first, non-connector word is lowercase reads as

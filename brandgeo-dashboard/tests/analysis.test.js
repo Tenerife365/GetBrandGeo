@@ -710,4 +710,41 @@ check('Monday.com still captured as a competitor',
     return JSON.parse(raw).map(x => x.name).includes('Monday.com')
   })(), true)
 
+console.log('round 5 — bare single-word criterion nouns, non-EN (BpR row 2070, 2026-07-13):')
+
+// Verbatim from the live Claude row: a bold CHECKLIST under a "what you must check"
+// heading. Every sibling was already rejected — "Capacitatea logistică" by
+// NOT_A_COMPANY ('capacitate'), "Autorizații sanitare" / "Personal suficient" by
+// looksLikePhrase's lowercase tail — and only the bare Title-Cased noun "Referințe"
+// survived. That is the class COMMON_NON_BRAND exists for, in the one language it did
+// not cover. The real caterers named elsewhere in the same answer must all survive.
+{
+  const text =
+    '### 🍽️ **Intercatering**\n- Specializați în evenimente de anvergură\n\n' +
+    '### 🍽️ **Exquis Catering**\n- Evenimente premium\n\n' +
+    "### 🍽️ **Roberto's Catering**\n- Prezență solidă în București\n\n" +
+    '---\n\n## ⚠️ Ce Trebuie să Verifici Obligatoriu\n\n' +
+    '- **Capacitatea logistică** pentru 1000+ persoane\n' +
+    '- **Referințe** de la evenimente similare\n' +
+    '- **Autorizații sanitare** valabile\n' +
+    '- **Personal suficient** (raport 1 chelner / 15-20 persoane)\n' +
+    '- **Echipamente proprii** de transport\n'
+  const n = competitorNames(text, auditCfg)
+  for (const label of ['Referințe', 'Capacitatea logistică', 'Autorizații sanitare',
+                       'Personal suficient', 'Echipamente proprii'])
+    assert.ok(!n.includes(label), `checklist criterion must be dropped: ${label}`)
+  for (const firm of ['Intercatering', 'Exquis Catering', "Roberto's Catering"])
+    assert.ok(n.includes(firm), `real caterer must be kept: ${firm}`)
+  passed++; console.log('  ok - row 2070: "Referințe" dropped, real caterers kept')
+}
+
+// Single-word-EXACT only: multi-word real names containing these words are untouched.
+check('RO "Referințe" → not a company', isCompanyName('Referințe'), false)
+check('RO ASCII "Referinte" → not a company', isCompanyName('Referinte'), false)
+check('EN "Employment" → not a company (London residue)', isCompanyName('Employment'), false)
+check('EN "Fees" → not a company (London residue)', isCompanyName('Fees'), false)
+check('multi-word "Forrester Research" still a company', isCompanyName('Forrester Research'), true)
+check('multi-word "Premier Catering & Events" still a company', isCompanyName('Premier Catering & Events'), true)
+check('multi-word "First Sentinel Wealth" still a company', isCompanyName('First Sentinel Wealth'), true)
+
 console.log(`\nAll ${passed} assertions passed.`)
