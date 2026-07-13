@@ -28,6 +28,10 @@ export default function Signup() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  // Honeypot (SECURITY-AUDIT.md F2): a hidden field a real user never sees and
+  // never fills, but a form-filling bot will. If it comes back non-empty, the
+  // server silently drops the request. Must stay empty in normal use.
+  const [companyWebsite, setCompanyWebsite] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,6 +47,7 @@ export default function Signup() {
           email: email.trim(),
           password,
           brand_domain: brandDomain.trim(),
+          company_website: companyWebsite,   // honeypot — expected to be ''
         }),
       })
       const data = await res.json()
@@ -97,6 +102,19 @@ export default function Signup() {
           <p className="text-sm text-slate-400 mb-6">No credit card required</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Honeypot — hidden from humans and screen readers; only bots fill it.
+                Not `display:none` (some bots skip those), just moved off-screen. */}
+            <input
+              type="text"
+              name="company_website"
+              value={companyWebsite}
+              onChange={(e) => setCompanyWebsite(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute left-[-9999px] h-0 w-0 opacity-0"
+            />
+
             <div>
               <label className="block text-xs text-slate-400 mb-1.5 font-medium">Work email</label>
               <input
