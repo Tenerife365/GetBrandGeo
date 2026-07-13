@@ -72,6 +72,19 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
       instructions: ctx,
       tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
       input:        prompt,
+      // Cost control (SCALE-SPEC.md §1.1b step 3, 2026-07-10). gpt-5.5 is a
+      // REASONING model: reasoning tokens bill as OUTPUT ($30/MTok) and were
+      // completely uncapped here — the single biggest unbounded cost in the
+      // whole pipeline. 'low' effort cuts them without touching the answer.
+      //
+      // Two things SCALE-SPEC suggested that are NOT done here, on purpose:
+      //  - `max_output_tokens`: gpt-5.5 on the Responses API REJECTS it with a
+      //    400 Bad Request. Setting it would break every ChatGPT call.
+      //  - `text: { verbosity: 'low' }`: shortens the ANSWER, which would
+      //    truncate long competitor listicles and drop brands ranked ~#7+ —
+      //    the exact false-negative bug already fixed for Claude (§8.4 1.4).
+      //    Never trade answer length for cost in this product.
+      reasoning:    { effort: 'low' },
     }),
   })
   const d = await r.json()

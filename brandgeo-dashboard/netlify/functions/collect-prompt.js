@@ -75,6 +75,15 @@ function withTimeout(promise, ms) {
 // ChatGPT — OpenAI Responses API with forced web_search_preview tool + geo context.
 // user_location makes web_search_preview actually query from the client's country,
 // not from the US Netlify server. marketId is ISO 3166-1 alpha-2 (e.g. "RO").
+// ⚠️⚠️ DEAD CODE — NOT THE LIVE CHATGPT CALLER. ⚠️⚠️
+// This function is never invoked. `LLM_CALLERS` (below) contains only
+// { gemini, perplexity, meta }, and `toRun` is derived exclusively from
+// Object.keys(LLM_CALLERS) in BOTH the force and non-force branches — so
+// 'chatgpt' can never reach it. ChatGPT moved to its own dedicated function in
+// task #65/#66; this copy was left behind.
+// THE LIVE ONE IS `collect-chatgpt.js`. Edit that. Changing this file's copy
+// does nothing (it nearly caused a cost fix to be applied to the wrong file,
+// 2026-07-10). Safe to delete — kept only to avoid widening this pass's diff.
 async function callChatGPT(prompt, ctx, marketId, regionLabel) {
   // Build user_location for truly geo-targeted search results.
   // Without this, the search runs from the US regardless of the system prompt.
@@ -131,6 +140,15 @@ function geminiText(d) {
   const parts = d?.candidates?.[0]?.content?.parts
   if (!Array.isArray(parts)) return null
   const t = parts
+    // Skip THOUGHT parts. Gemini 3.x is a thinking model; a thought part is
+    // flagged `thought: true` and carries the model's internal reasoning in
+    // `.text`. Joining it into the answer would feed the model's own
+    // deliberation into analyseResponse — competitor names and brand mentions
+    // would get extracted from its scratchpad, not from the answer. Thought
+    // parts are only returned when thinkingConfig.includeThoughts is set (we
+    // don't set it), so this is belt-and-braces — but it costs nothing and the
+    // failure mode would be silent data corruption.
+    .filter(p => p && p.thought !== true)
     .map(p => p?.text)
     .filter(s => typeof s === 'string' && s.length > 0)
     .join('\n')
@@ -152,7 +170,21 @@ async function callGemini(prompt, ctx) {
     return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
   }
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+  // Gemini 3.5 Flash first (SCALE-SPEC.md §1.1b step 2, 2026-07-10). Grounding
+  // on 2.5 bills a flat $35 per 1,000 grounded PROMPTS; on 3.x it's $14 per
+  // 1,000 SEARCH QUERIES, with 5,000 grounded prompts/month free.
+  //
+  // ⚠️ The saving is NOT the flat 56% SCALE-SPEC assumed — that modelled 3.x as
+  // $14/1k *prompts*. Google bills 3.x per QUERY, and one prompt can trigger
+  // several ("if the model executes multiple search queries to answer a single
+  // prompt... this counts as multiple billable uses"). Break-even vs 2.5 is at
+  // 2.5 queries/prompt; past that, 3.5 is MORE expensive. Expect a real but
+  // smaller win on our simple listicle prompts (usually 1-2 queries). The
+  // cost_eur metering column (SCALE-SPEC §2.1) is what settles this properly.
+  //
+  // 2.5/2.0 stay as fallbacks: if the 3.5 model string is ever wrong or
+  // retired, callGemini walks the chain instead of failing the engine.
+  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
   let last = { errorCode: 'api_error', detail: 'no model returned a response' }
 
   for (const model of models) {
@@ -221,6 +253,11 @@ async function callGemini(prompt, ctx) {
 // Claude — streaming API with early abort.
 // Anthropic web search fetches Romanian pages before streaming starts (15-25s).
 // We abort after 2500 chars — enough for brand detection — so we finish in 8-15s.
+// ⚠️⚠️ DEAD CODE — NOT THE LIVE CLAUDE CALLER. ⚠️⚠️
+// Never invoked (see the LLM_CALLERS note on callChatGPT above). This copy still
+// sends the web_search tool and still has the old 2500-char abort — BOTH of
+// which were fixed in the real one. THE LIVE ONE IS `collect-claude.js`.
+// Safe to delete; kept only to avoid widening this pass's diff.
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return null }

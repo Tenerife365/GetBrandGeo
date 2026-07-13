@@ -10,13 +10,47 @@ import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 
+/**
+ * EUR cost per response, per engine.
+ *
+ * REPRICED 2026-07-10 (SCALE-SPEC.md §1.1). The previous numbers were guesses
+ * that had never been checked against a rate card and were ~2.4x TOO LOW — a
+ * real 5-engine check cost ≈€0.156, not the €0.066 this table implied. Every
+ * quota and margin figure downstream keyed off these, so they were quietly
+ * wrong too.
+ *
+ * These values are AFTER the three config fixes shipped the same day:
+ *   - Claude:  web_search tool removed (it was ~75% of Claude's cost, and was
+ *              never supposed to be on — task #63 claimed it was removed).
+ *              €0.040 -> ≈€0.010.
+ *   - ChatGPT: reasoning effort capped to 'low'. gpt-5.5 bills reasoning tokens
+ *              as output ($30/MTok) and they were uncapped. ≈€0.075 -> ≈€0.060.
+ *              (Its $10/1k web-search fee is a hard ≈€0.009 floor per call.)
+ *   - Gemini:  2.5-flash -> 3.5-flash grounding. See the caveat below.
+ *
+ * CONFIDENCE — these are derived from published rate cards + the measured mean
+ * response size (2,598 chars ≈ 650 output tokens, n=243), NOT from an invoice:
+ *   claude     HIGH   — no tool fee left, token counts are small and known.
+ *   perplexity HIGH   — flat OpenRouter rate.
+ *   meta       HIGH   — flat OpenRouter rate.
+ *   chatgpt    MEDIUM — reasoning-token volume is not directly observable.
+ *   gemini     LOW    — 3.x bills per SEARCH QUERY ($14/1k), not per prompt,
+ *                       and one prompt can fire several. 0.020 assumes ~1.4
+ *                       queries/prompt. Break-even vs 2.5 is 2.5 queries/prompt.
+ *
+ * Do not treat these as exact. The `cost_eur` column (SCALE-SPEC §2.1) is the
+ * real fix: meter actual cost per ai_results row, then true these up from data.
+ */
 const ENGINE_COST: Record<string, number> = {
-  claude:     0.018,
-  chatgpt:    0.040,
-  gemini:     0.001,
-  perplexity: 0.005,
-  meta:       0.002,
+  claude:     0.010,
+  chatgpt:    0.060,
+  gemini:     0.020,
+  perplexity: 0.006,
+  meta:       0.001,
 }
+// => 5-engine check ≈ €0.097 (was ≈€0.156 before today's fixes; the old table
+//    claimed €0.066). Batching (SCALE-SPEC §1.1b step 4) would take it to ≈€0.062,
+//    but that needs the §3 collection queue first — not built yet.
 
 // 50% overhead to cover platform costs (Supabase, Netlify, hosting, Plausible, domain, etc.)
 const OVERHEAD_MULTIPLIER = 1.5
@@ -99,7 +133,7 @@ export default function Usage() {
             <DollarSign size={15} className="text-emerald-400" />
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Est. Total Cost</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-400 tabular-nums">${grandTotal.toFixed(2)}</div>
+          <div className="text-2xl font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</div>
           <p className="text-xs text-slate-500 mt-1">across all clients</p>
         </div>
 
@@ -118,7 +152,7 @@ export default function Usage() {
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
           </div>
           <div className="text-2xl font-bold text-white tabular-nums">
-            {rows.length > 0 ? `$${(grandTotal / rows.length).toFixed(2)}` : '—'}
+            {rows.length > 0 ? `€${(grandTotal / rows.length).toFixed(2)}` : '—'}
           </div>
           <p className="text-xs text-slate-500 mt-1">{rows.length} active client{rows.length !== 1 ? 's' : ''}</p>
         </div>
@@ -158,7 +192,7 @@ export default function Usage() {
                       </td>
                     ))}
                     <td className="px-4 py-3 text-right font-semibold text-emerald-400 tabular-nums">
-                      ${r.totalCost.toFixed(3)}
+                      €{r.totalCost.toFixed(3)}
                     </td>
                   </tr>
                 ))}
@@ -172,7 +206,7 @@ export default function Usage() {
                       {rows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">${grandTotal.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -187,12 +221,13 @@ export default function Usage() {
           {Object.entries(ENGINE_COST).map(([engine, cost]) => (
             <div key={engine} className="flex items-center gap-1.5">
               <span className={`text-xs font-medium capitalize ${ENGINE_COLOR[engine] ?? 'text-slate-400'}`}>{engine}</span>
-              <span className="text-xs text-slate-600">${cost.toFixed(3)}</span>
+              <span className="text-xs text-slate-600">€{cost.toFixed(3)}</span>
             </div>
           ))}
         </div>
         <p className="text-xs text-slate-600 mt-2">
-          API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Actual API costs may vary.
+          EUR, API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Estimates from
+          published rate cards, not invoices — Gemini is the least certain (billed per search query).
         </p>
       </div>
     </div>

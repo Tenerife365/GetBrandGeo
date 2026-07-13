@@ -49,23 +49,35 @@ function buildSystemContext(cfg, marketLabel, regionLabel) {
   )
 }
 
-// ─── Claude — streaming with a wall-clock time budget ────────────────────────
-// The full 26s Netlify window is dedicated to this function alone.
-// Web search for some markets (e.g. Romanian catering) can take 24-26s before
-// text starts streaming, so a fixed *character* cap was previously used to
-// avoid waiting for the full response. That caused a real accuracy bug
-// (reasoning-audit-findings.md §1.4 / CLAUDE.md §8.4 finding 1.4): a numbered
-// list of competitors routinely runs past 2500 chars, so any brand ranked
-// ~#7-10 got silently cut off mid-list and recorded as "not mentioned" —
-// a false negative on the flagship metric, not a real absence.
+// ─── Claude — training-data mode, streaming with a wall-clock time budget ────
 //
-// Fix: abort on a wall-clock deadline for the whole call (connection +
-// streaming), not on how much text has arrived. In the common case (search
-// returns promptly, text streams from early on) this lets the response
-// finish naturally instead of truncating at an arbitrary character offset,
-// so the full ranked list — including lower positions — gets analysed. In
-// the slow-search case, behaviour is no worse than before: we still stop
-// before Netlify's hard 26s kill, just measured in time instead of chars.
+// WEB SEARCH REMOVED 2026-07-10 (SCALE-SPEC.md §1.1c). This function used to
+// send `tools: [{ type: 'web_search_20250305', max_uses: 1 }]` + the
+// `anthropic-beta: web-search-2025-03-05` header — despite CLAUDE.md §1.2
+// documenting Claude as "training-data mode (no web search)" and task #63
+// ("Remove web search from Claude") being marked DONE. The task was never
+// actually applied; the reasoning audit (§8.4 finding 1.4) spotted the
+// doc/code mismatch and nobody reconciled it.
+//
+// That single tool was ~75% of Claude's cost: a $0.010/call search fee plus
+// ~7k search-result tokens injected into context. Removing it takes Claude
+// from ≈€0.040 to ≈€0.010 per call with NO model downgrade — it simply makes
+// the code do what the task list already claimed it did.
+//
+// Side benefit: the 15-25s search wait that motivated the old character-cap
+// hack is gone entirely, so the time budget below now almost never fires.
+//
+// The full 26s Netlify window is dedicated to this function alone.
+//
+// Historical note — why the time budget below exists at all. A fixed 2500-char
+// cap used to abort the stream (reasoning-audit-findings.md §1.4 / CLAUDE.md
+// §8.4 finding 1.4): a numbered list of competitors routinely runs past 2500
+// chars, so any brand ranked ~#7-10 got silently cut off mid-list and recorded
+// as "not mentioned" — a false negative on the flagship metric, not a real
+// absence. It was replaced by a wall-clock deadline for the whole call, so the
+// response finishes naturally and the full ranked list gets analysed. Keep the
+// deadline: it still guards against a stalled connection before Netlify's hard
+// 26s kill. Do not reintroduce a character cap.
 
 async function callClaude(prompt, ctx) {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -84,14 +96,16 @@ async function callClaude(prompt, ctx) {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta':    'web-search-2025-03-05',
+        // NOTE: the 'anthropic-beta: web-search-2025-03-05' header and the
+        // web_search tool were REMOVED 2026-07-10 — see the block comment above.
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 1000,   // less to generate = faster streaming start
         stream:     true,
         system:     ctx,
-        tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
+        // No `tools` — training-data mode, deliberately. Do NOT re-add
+        // web_search here without re-reading the cost note above.
         messages:   [{ role: 'user', content: prompt }],
       }),
     })
