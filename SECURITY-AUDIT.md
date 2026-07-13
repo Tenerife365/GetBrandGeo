@@ -45,17 +45,36 @@ low-priority cleanup.
 
 ## 0.5 Remediation status (updated 2026-07-13)
 
-**F1 and F2 are FIXED in code — code-complete, verified, NOT yet deployed.**
-Constantin chose the "full repair" option: fix the security hole *and* make
-free signup actually work.
+**F1 and F2 are FIXED, DEPLOYED, and LIVE (2026-07-13).** Constantin chose the
+"full repair" option: fix the security hole *and* make free signup actually
+work. Built, committed, pushed; Netlify deploy confirmed **Published**; the
+`signup_attempts` migration was run and verified live (RLS enabled, 0 policies
+= deny-all, indexed) — so the throttle is backed and cannot fail open.
 
 | Finding | Status |
 |---|---|
-| **F1** — signup grants global admin | ✅ **FIXED** — `role: 'admin'` → `role: 'viewer'` |
-| **F2** — no throttle on public signup | ✅ **FIXED** — honeypot + per-IP daily cap (3/day) |
-| *(new)* signup was never functional | ✅ **FIXED** — both broken inserts corrected |
+| **F1** — signup grants global admin | ✅ **FIXED + LIVE** — `role: 'admin'` → `role: 'viewer'` |
+| **F2** — no throttle on public signup | ✅ **FIXED + LIVE** — honeypot + per-IP daily cap (3/day) |
+| *(new)* signup was never functional | ✅ **FIXED + LIVE** — both broken inserts corrected |
+| *(new)* self-serve users can't add prompts | ✅ **FIXED** — RLS live; frontend pending deploy |
 | F3 — `search_path` on RLS helpers | ⏳ open (SQL ready in §F3) |
 | F4/F5/F7 | ⏳ open (low priority) |
+
+**The critical cross-tenant landmine is closed.** No `role: 'admin'` assignment
+exists anywhere outside `onboard-client.js`, which is gated behind
+`requireAuth({ adminOnly: true })`. A self-serve signup can no longer obtain
+global read access to every client's data.
+
+**Worth doing once, now that signup actually works:** run a real end-to-end
+signup and confirm the new account lands as `viewer` with its own `client_id`
+(not `admin`):
+
+```sql
+select up.role, up.client_id, c.slug, c.plan, c.default_market_id
+from user_profiles up join clients c on c.id = up.client_id
+order by up.created_at desc limit 3;
+-- Expect the newest row: role='viewer'. If it EVER says 'admin', stop and revert.
+```
 
 **What changed (3 files + 1 migration):**
 
@@ -95,6 +114,49 @@ Confirmed by grep that **no `role: 'admin'` assignment remains anywhere**
 outside `onboard-client.js`, which is correctly gated behind
 `requireAuth({ adminOnly: true })`.
 
+### ✅ RESOLVED 2026-07-13 — self-serve users can now manage their own prompts
+
+**RLS is applied and live** (migration `prompts_own_client_writes`; source of
+truth kept at `supabase-prompts-own-client-writes-migration.sql`). The
+**frontend half is code-complete but needs a deploy** — see the handoff at the
+end of this section.
+
+`prompts` INSERT/UPDATE/DELETE are now `is_admin() OR client_id =
+get_my_client_id()`, scoped to `authenticated`. **UPDATE carries both `USING`
+and `WITH CHECK`** — `USING` alone would have let a viewer reassign
+`client_id` on a row they legitimately own, i.e. *move a prompt into another
+tenant*. That's the subtle hole this avoids.
+
+**Verified by impersonating a real viewer's JWT against the live DB** (inside a
+DO block that raised at the end, so nothing persisted — confirmed 0 leftover
+rows):
+
+| Test | Result |
+|---|---|
+| viewer INSERT for **own** client | ✅ ALLOWED |
+| viewer INSERT for **another** client | ✅ BLOCKED |
+| viewer **moves** own prompt to another tenant | ✅ BLOCKED |
+| viewer DELETE another tenant's prompts | ✅ 0 rows |
+
+**Frontend (`src/pages/Prompts.tsx`)** — the "AI Discover" and "Add prompt"
+buttons were gated behind `isAdmin`, so fixing RLS alone would have changed
+nothing visible. That gate is removed; cross-tenant safety is enforced in the
+DB, not the UI. (Note the row-level edit/delete buttons were *never* gated —
+viewers already saw buttons that would silently fail against the old RLS.)
+`npx tsc --noEmit` exits 0.
+
+**Trade-off, accepted deliberately:** Managed/done-for-you clients are also
+`viewer`, so they can now edit their own prompts — including deleting ones
+BrandGEO set up for them. Harmless security-wise (it's their own data), but
+worth knowing.
+
+**Requires deploy:** `npm run build` → commit `Prompts.tsx` +
+`supabase-prompts-own-client-writes-migration.sql` → push → confirm Netlify
+**Published**.
+
+<details>
+<summary>Original finding (kept for the record)</summary>
+
 ### 🟠 New finding surfaced by this fix — self-serve users cannot add prompts
 
 Making signup work exposes the next problem: the `prompts` RLS write policies
@@ -130,7 +192,10 @@ CREATE POLICY prompts_delete ON public.prompts FOR DELETE TO authenticated
 
 The alternative is a third role (`owner` = own-client read-write, never
 global), which is cleaner conceptually but touches `_auth.js`, the frontend
-`isAdmin` logic, and `Prompts.tsx`'s viewer gating. **Not started — your call.**
+`isAdmin` logic, and `Prompts.tsx`'s viewer gating. **Not taken** — the
+minimal own-client-writes fix above was chosen instead.
+
+</details>
 
 ---
 

@@ -68,7 +68,7 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId, isAdmin } = useClient()
+  const { activeClientId } = useClient()
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
@@ -311,9 +311,15 @@ export default function Prompts() {
           <h1 className="text-2xl font-bold text-white">{t.pr_title}</h1>
           <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
         </div>
+        {/* Prompt management is available to any signed-in user for THEIR OWN
+            client — not admin-only. This used to be gated behind `isAdmin`,
+            which meant every self-serve account (free signup AND paying
+            Essentials/Growth, both provisioned as `viewer`) landed on a
+            dashboard they could not fill. Cross-tenant safety is enforced in
+            the DB, not here: the prompts RLS policies pin writes to
+            `is_admin() OR client_id = get_my_client_id()`.
+            See SECURITY-AUDIT.md §0.5. */}
         <div className="flex gap-2">
-          {isAdmin && (
-            <>
           <button
             onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
             aria-expanded={showDiscover}
@@ -333,8 +339,6 @@ export default function Prompts() {
             <Plus size={14} />
             {t.pr_addPrompt}
           </button>
-            </>
-          )}
         </div>
       </div>
 
