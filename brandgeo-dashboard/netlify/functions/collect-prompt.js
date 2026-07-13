@@ -171,32 +171,54 @@ async function callGemini(prompt, ctx) {
     return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
   }
 
-  // Gemini 3.5 Flash first (SCALE-SPEC.md §1.1b step 2, 2026-07-10). Grounding
-  // on 2.5 bills a flat $35 per 1,000 grounded PROMPTS; on 3.x it's $14 per
-  // 1,000 SEARCH QUERIES, with 5,000 grounded prompts/month free.
+  // ⚠️ REVERTED 2026-07-13 — `gemini-3.5-flash` was the primary here (SCALE-SPEC.md
+  // §1.1b step 2, a cost optimisation) and it BROKE THE ENGINE. BpR force-refresh:
+  // gemini 10/10 rows `status=error, error_code=timeout, "timeout after 20000ms"`,
+  // where the previous run on 2.5-flash was 10/10 ok. Gemini 3.5 Flash is a
+  // reasoning-first model ("near-Pro intelligence") that THINKS BY DEFAULT; with
+  // Google Search grounding on our Romanian listicle prompts it does not return
+  // inside the 20s FAST_TIMEOUT. Cost is not worth a dead engine on a paying client.
   //
-  // ⚠️ The saving is NOT the flat 56% SCALE-SPEC assumed — that modelled 3.x as
-  // $14/1k *prompts*. Google bills 3.x per QUERY, and one prompt can trigger
-  // several ("if the model executes multiple search queries to answer a single
-  // prompt... this counts as multiple billable uses"). Break-even vs 2.5 is at
-  // 2.5 queries/prompt; past that, 3.5 is MORE expensive. Expect a real but
-  // smaller win on our simple listicle prompts (usually 1-2 queries). The
-  // cost_eur metering column (SCALE-SPEC §2.1) is what settles this properly.
+  // The cost saving can be re-attempted later, but ONLY with 3.x's thinking level
+  // explicitly turned down AND measured end-to-end against a real collection —
+  // not assumed from a pricing page. See §12.3 / SCALE-SPEC §1.1b.
   //
-  // 2.5/2.0 stay as fallbacks: if the 3.5 model string is ever wrong or
-  // retired, callGemini walks the chain instead of failing the engine.
-  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
+  // `gemini-2.0-flash` removed from the chain: Google SHUT IT DOWN on 2026-06-01.
+  // It was a dead fallback. 3.1-flash-lite is the current low-latency model.
+  const models = ['gemini-2.5-flash', 'gemini-3.1-flash-lite']
   let last = { errorCode: 'api_error', detail: 'no model returned a response' }
+
+  // ⚠️ THE REAL BUG, and the reason the fallback chain was decorative.
+  // There was no per-attempt timeout — only the caller's single 20s withTimeout()
+  // wrapping the WHOLE engine. So the first slow model ate the entire budget and
+  // the outer race rejected before ANY fallback ran. The comment here used to
+  // promise "callGemini walks the chain instead of failing the engine"; the code
+  // could not do that. A per-attempt deadline is what makes the chain real.
+  const GEMINI_BUDGET_MS  = 18000  // stay inside the caller's 20s FAST_TIMEOUT
+  const GEMINI_ATTEMPT_MS = 9000   // no single model may eat the whole budget
+  const deadline = Date.now() + GEMINI_BUDGET_MS
 
   for (const model of models) {
     // grounded first; fall back to ungrounded for the same model before moving on
     for (const grounded of [true, false]) {
       const tag = `${model}${grounded ? '' : '/ungrounded'}`
+
+      const remaining = deadline - Date.now()
+      if (remaining <= 500) {
+        const detail = `${tag}: gemini budget exhausted (${GEMINI_BUDGET_MS}ms) before attempt`
+        console.error(`[Gemini] ${detail}`)
+        return { text: null, errorCode: 'timeout', detail }
+      }
+      const attemptMs = Math.min(GEMINI_ATTEMPT_MS, remaining)
+      const ac = new AbortController()
+      const attemptTimer = setTimeout(() => ac.abort(), attemptMs)
+
       try {
         const r = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
           {
             method: 'POST',
+            signal: ac.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: ctx }] },
@@ -206,6 +228,7 @@ async function callGemini(prompt, ctx) {
           }
         )
         const d = await r.json()
+        clearTimeout(attemptTimer)
 
         const text = geminiText(d)
         if (text) {
@@ -240,9 +263,16 @@ async function callGemini(prompt, ctx) {
         last = { errorCode: 'empty_response', detail }
         continue
       } catch (e) {
-        const detail = `${tag}: threw ${e.message}`
+        clearTimeout(attemptTimer)
+        // An aborted attempt is this MODEL being too slow, not the engine failing.
+        // Record it and let the chain move on — that is the whole point of the
+        // per-attempt deadline. (Before this, a slow model killed the engine.)
+        const timedOut = e.name === 'AbortError'
+        const detail = timedOut
+          ? `${tag}: attempt timed out after ${attemptMs}ms`
+          : `${tag}: threw ${e.message}`
         console.error(`[Gemini] ${detail}`)
-        last = { errorCode: 'api_error', detail }
+        last = { errorCode: timedOut ? 'timeout' : 'api_error', detail }
         continue
       }
     }

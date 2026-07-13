@@ -33,8 +33,18 @@
  *   perplexity HIGH   — flat OpenRouter rate.
  *   meta       HIGH   — flat OpenRouter rate.
  *   chatgpt    MEDIUM — reasoning-token volume isn't directly observable.
- *   gemini     LOW    — 3.x bills per SEARCH QUERY, not per prompt, and one
- *                       prompt can fire several; 0.020 assumes ~1.4 queries/prompt.
+ *   gemini     MEDIUM — see the 2026-07-13 note below.
+ *
+ * ⚠️ GEMINI REPRICED 2026-07-13, 0.020 → 0.034. The 0.020 figure was derived for
+ * `gemini-3.5-flash` ($14 per 1,000 SEARCH QUERIES, ~1.4 queries/prompt). We are NO
+ * LONGER ON 3.5 — it is a reasoning-first model that thinks by default and timed out
+ * on 10/10 grounded calls, so collect-prompt.js and _prospect_engines.js were reverted
+ * to `gemini-2.5-flash`, which bills a FLAT $35 per 1,000 grounded PROMPTS ≈ €0.034
+ * (CLAUDE.md §12.2's original derivation). Leaving 0.020 in place would have
+ * under-priced Gemini by ~1.7x — and this table is NOT cosmetic: _prospect_guard.js's
+ * checkMonthlyBudget() sums estimated_cost_eur against PROSPECTING_MONTHLY_BUDGET_EUR
+ * (default €200), so an under-priced engine silently loosens a real spend cap. That is
+ * the exact failure §12.3 caught when gemini was priced at 0.001.
  *
  * Do not treat these as exact. This IS the fix SCALE-SPEC promised — once
  * every row carries cost_eur, actual spend can be measured directly and these
@@ -46,7 +56,7 @@
 const ENGINE_COST_EUR = {
   claude:     0.010,
   chatgpt:    0.060,
-  gemini:     0.020,
+  gemini:     0.034,   // 2.5-flash, flat $35/1k grounded prompts (see the note above)
   perplexity: 0.006,
   meta:       0.001,
 }

@@ -128,21 +128,46 @@ async function callGemini(prompt, ctx) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
 
-  // Gemini 3.5 Flash first, 2.5/2.0 as fallbacks — mirrors collect-prompt.js.
-  // 3.x grounding bills per SEARCH QUERY ($14/1k) rather than per prompt ($35/1k
-  // on 2.5), so the win is real but smaller than modelled. See CLAUDE.md §12.3.
-  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
+  // ⚠️ REVERTED 2026-07-13 — `gemini-3.5-flash` was primary here too (§12.3), and it
+  // is a reasoning-first model that thinks by default. Grounded, it does not return
+  // inside the timeout. In collect-prompt.js this produced 10/10 `timeout` rows for a
+  // paying client. HERE IT IS WORSE: gemini is 1 of only 2 SCREENING_ENGINES, so a
+  // Gemini timeout blanks HALF of every public prospect scorecard — the outbound sales
+  // asset. Correctness beats the cost saving; re-attempt 3.x only with its thinking
+  // level explicitly turned down AND measured against a real audit.
+  //
+  // `gemini-2.0-flash` removed: Google SHUT IT DOWN on 2026-06-01. Dead fallback.
+  const models = ['gemini-2.5-flash', 'gemini-3.1-flash-lite']
   let last = { errorCode: 'api_error', detail: 'no model returned a response' }
+
+  // ⚠️ THE REAL BUG: there was no per-attempt timeout, only the caller's single
+  // withTimeout() around the whole engine. One slow model ate the entire budget and
+  // the fallback chain — which the comment above promised — never ran even once.
+  const GEMINI_BUDGET_MS  = 18000
+  const GEMINI_ATTEMPT_MS = 9000
+  const deadline = Date.now() + GEMINI_BUDGET_MS
 
   for (const model of models) {
     // grounded first, then ungrounded for the same model before moving on
     for (const grounded of [true, false]) {
       const tag = `${model}${grounded ? '' : '/ungrounded'}`
+
+      const remaining = deadline - Date.now()
+      if (remaining <= 500) {
+        const detail = `${tag}: gemini budget exhausted (${GEMINI_BUDGET_MS}ms) before attempt`
+        console.error(`[Audit/Gemini] ${detail}`)
+        return { text: null, errorCode: 'timeout', detail }
+      }
+      const attemptMs = Math.min(GEMINI_ATTEMPT_MS, remaining)
+      const ac = new AbortController()
+      const attemptTimer = setTimeout(() => ac.abort(), attemptMs)
+
       try {
         const r = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
+            signal: ac.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: ctx }] },
@@ -152,6 +177,7 @@ async function callGemini(prompt, ctx) {
           }
         )
         const d = await r.json()
+        clearTimeout(attemptTimer)
 
         const text = geminiText(d)
         if (text) return { text, errorCode: null, detail: null }
@@ -179,9 +205,15 @@ async function callGemini(prompt, ctx) {
         last = { errorCode: 'empty_response', detail }
         continue
       } catch (e) {
-        const detail = `${tag}: threw ${e.message}`
+        clearTimeout(attemptTimer)
+        // An aborted attempt means THIS MODEL is too slow — not that the engine failed.
+        // Record it and let the chain move on. That is the point of the per-attempt deadline.
+        const timedOut = e.name === 'AbortError'
+        const detail = timedOut
+          ? `${tag}: attempt timed out after ${attemptMs}ms`
+          : `${tag}: threw ${e.message}`
         console.error(`[Audit/Gemini] ${detail}`)
-        last = { errorCode: 'api_error', detail }
+        last = { errorCode: timedOut ? 'timeout' : 'api_error', detail }
         continue
       }
     }
