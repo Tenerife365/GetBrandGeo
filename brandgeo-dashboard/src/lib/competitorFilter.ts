@@ -81,12 +81,27 @@ export interface CompetitorAggregate {
   /** Average of genuine ranks only; the pos:99 sentinel is excluded. */
   avgPos: number | null
   byEngine: Record<string, number>
+  /**
+   * Every recorded position, INCLUDING the pos:99 prose sentinel — the raw
+   * distribution, not the avgPos summary. Most callers want avgPos/rankedMentions
+   * instead; kept for parity with what Competitors.tsx tracked before it adopted
+   * this module (2026-07-13, CLAUDE.md §14.2).
+   */
+  positions: number[]
+  /**
+   * Every prompt_id a row mentioning this competitor came from, deduplicated —
+   * lets a caller show a sample prompt for a competitor. Only populated when the
+   * source rows carry `prompt_id` (see CompetitorSourceRow below); empty otherwise.
+   */
+  promptIds: number[]
 }
 
 /** Minimal row shape this module needs — any ai_results row satisfies it. */
 export interface CompetitorSourceRow {
   llm?: string | null
   competitors_mentioned?: string | null
+  /** Optional — only needed by callers that want `promptIds` back (Competitors.tsx). */
+  prompt_id?: number | null
 }
 
 /**
@@ -109,6 +124,7 @@ export function aggregateCompetitors(
     total: number
     positions: number[]
     byEngine: Record<string, number>
+    promptIds: Set<number>
   }> = {}
 
   for (const row of rows) {
@@ -129,12 +145,13 @@ export function aggregateCompetitors(
         : null
 
       const key = rawName.toLowerCase().trim()
-      if (!map[key]) map[key] = { total: 0, positions: [], byEngine: {} }
+      if (!map[key]) map[key] = { total: 0, positions: [], byEngine: {}, promptIds: new Set() }
       const entry = map[key]
       entry.total++
       if (typeof pos === 'number') entry.positions.push(pos)
       const engine = row.llm ?? 'unknown'
       entry.byEngine[engine] = (entry.byEngine[engine] ?? 0) + 1
+      if (typeof row.prompt_id === 'number') entry.promptIds.add(row.prompt_id)
     }
   }
 
@@ -150,6 +167,8 @@ export function aggregateCompetitors(
           ? Math.round((ranked.reduce((a, b) => a + b, 0) / ranked.length) * 10) / 10
           : null,
         byEngine: v.byEngine,
+        positions: v.positions,
+        promptIds: Array.from(v.promptIds),
       }
     })
     .sort((a, b) =>

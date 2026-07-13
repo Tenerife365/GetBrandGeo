@@ -16,6 +16,7 @@ import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { ENGINE_META } from '../lib/planConfig'
+import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
@@ -34,53 +35,21 @@ const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
 
 interface EngineRow { total: number; mentioned: number; positions: number[] }
 
-interface CompetitorStat {
-  name: string
-  totalMentions: number
-  /**
-   * Mentions where an engine actually RANKED this competitor in a list.
-   * `pos: 99` is the sentinel _analysis.js uses for a prose/known-competitor
-   * name-scan hit — the name was merely spotted in the text, never ranked.
-   * Sorting the leaderboard by totalMentions counted those identically to real
-   * rankings, so a name that only ever appeared because it's on the client's own
-   * seed list could outrank a genuine competitor (BpR's "Elegant Catering": 14
-   * mentions, all 14 pos:99, never ranked once — CLIENT-HEALTH-BPR.md §4.5).
-   */
-  rankedMentions: number
-  byEngine: Partial<Record<LLMName, number>>
-  positions: number[]
-  promptIds: number[]
-  avgPos: number | null
-}
-
-// --- Noise filter ------------------------------------------------------------
-// AI responses sometimes include generic phrases in numbered lists (e.g.
-// "Other large-scale options", "Alte optiuni de volum mare"). Filter these out
-// so only real company names appear as competitors.
-
-// Must match NOT_A_COMPANY in the Netlify collect functions — single source of truth.
-const GENERIC_TOKENS = [
-  'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
-  'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
-  'masiva', 'masivă', 'proprie', 'proprii',
-  ' pentru ', 'datorit', 'grație', 'gratie',
-  'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
-  'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
-  'firme de', 'si altele', 'și altele',
-]
-
-function isLikelyCompanyName(name: string): boolean {
-  if (name.length > 60) return false
-  if (name.length < 2)  return false
-  const lower = name.toLowerCase()
-  if (GENERIC_TOKENS.some(t => lower.includes(t))) return false
-  return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
-}
-
-// Title-case a competitor name for display (handles "flavours catering" → "Flavours Catering")
-function toDisplayName(name: string): string {
-  return name.replace(/\b\w/g, c => c.toUpperCase())
-}
+/**
+ * The noise filter (GENERIC_TOKENS / isLikelyCompanyName / toDisplayName) and the
+ * competitor aggregation loop that used to live in this file both moved to
+ * lib/competitorFilter.ts (2026-07-13, CLAUDE.md §14.2) — it was the last front-end
+ * copy of a filter triplicated across this file, Recommendations.tsx, and the
+ * authoritative write-time filter in netlify/functions/_analysis.js. See that
+ * module's header for the full history and why two copies (not one) is the
+ * deliberate floor.
+ *
+ * `CompetitorAggregate` already carries every field this page used
+ * (name/totalMentions/rankedMentions/byEngine/avgPos), plus `positions` and
+ * `promptIds` — added to the shared type specifically so this page didn't need a
+ * second, parallel loop to rebuild them.
+ */
+type CompetitorStat = CompetitorAggregate
 
 // --- Data computation --------------------------------------------------------
 
@@ -90,7 +59,6 @@ function computeData(
   brandName: string,
 ) {
   const engineStats: Partial<Record<LLMName, EngineRow>> = {}
-  const compMap: Record<string, { totalMentions: number; byEngine: Partial<Record<LLMName, number>>; positions: number[]; promptIds: Set<number> }> = {}
 
   for (const row of aiResults) {
     const llm = row.llm as LLMName
@@ -101,46 +69,12 @@ function computeData(
       es.mentioned++
       if (row.brand_position) es.positions.push(row.brand_position)
     }
-
-    let comps: any[] = []
-    try { comps = JSON.parse(row.competitors_mentioned || '[]') } catch {}
-    if (!Array.isArray(comps)) continue
-
-    for (const c of comps) {
-      const rawName = typeof c === 'string' ? c : c?.name
-      if (!rawName || rawName.length < 2) continue
-      if (!isLikelyCompanyName(rawName)) continue   // skip generic phrases
-      const key = rawName.toLowerCase().trim()
-      if (!compMap[key]) compMap[key] = { totalMentions: 0, byEngine: {}, positions: [], promptIds: new Set() }
-      const cm = compMap[key]
-      cm.totalMentions++
-      cm.byEngine[llm] = (cm.byEngine[llm] ?? 0) + 1
-      if (c?.pos) cm.positions.push(c.pos)
-      if (row.prompt_id) cm.promptIds.add(row.prompt_id)
-    }
   }
 
-  // Top 5 competitors — ranked by how often an engine actually RANKED them,
-  // not by raw mention count. avgPos already excluded the pos:99 prose sentinel
-  // (below); the sort key now does too, so a prose-only name can't top the board.
-  const topCompetitors: CompetitorStat[] = Object.entries(compMap)
-    .map(([key, v]) => {
-      const real = v.positions.filter(p => p !== 99)
-      return {
-        name: toDisplayName(key),
-        totalMentions: v.totalMentions,
-        rankedMentions: real.length,
-        byEngine: v.byEngine,
-        positions: v.positions,
-        promptIds: Array.from(v.promptIds),
-        avgPos: real.length > 0
-          ? Math.round(real.reduce((a, b) => a + b, 0) / real.length * 10) / 10
-          : null,
-      }
-    })
-    // Genuinely-ranked competitors first; raw mentions only break ties.
-    .sort((a, b) => (b.rankedMentions - a.rankedMentions) || (b.totalMentions - a.totalMentions))
-    .slice(0, 5)
+  // Top 5 competitors — one shared implementation (lib/competitorFilter.ts).
+  // Already sorts genuinely-ranked competitors first (raw mentions only break
+  // ties) and excludes the pos:99 prose sentinel from avgPos — not re-derived here.
+  const topCompetitors: CompetitorStat[] = aggregateCompetitors(aiResults, 5)
 
   // Brand overall stats
   const brandMentions = Object.values(engineStats).reduce((s, e) => s + (e?.mentioned ?? 0), 0)
@@ -265,6 +199,7 @@ export default function Competitors() {
         engineStats: {},
         topCompetitors: mockCompetitors.slice(0, 5).map((c, i) => ({
           name: c.name, totalMentions: 8 - i * 1.5 | 0, rankedMentions: 2,
+          proseOnly: false,
           byEngine: { chatgpt: 2, gemini: 2, claude: 1 },
           positions: [2, 3], promptIds: [], avgPos: 2.5,
         })),
