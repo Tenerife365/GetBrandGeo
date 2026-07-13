@@ -64,6 +64,12 @@ async function callChatGPT(prompt, ctx) {
       instructions: ctx,
       tools:        [{ type: 'web_search_preview' }],
       input:        prompt,
+      // Same cost fix as collect-chatgpt.js (SCALE-SPEC.md §1.1b, 2026-07-10):
+      // gpt-5.5 bills reasoning tokens as OUTPUT ($30/MTok) and they were
+      // uncapped. Do NOT add `max_output_tokens` (Responses API 400s on it for
+      // reasoning models) and do NOT add `text.verbosity` (shortens the answer
+      // and would truncate competitor listicles).
+      reasoning:    { effort: 'low' },
     }),
   })
   const d = await r.json()
@@ -98,6 +104,11 @@ function geminiText(d) {
   const parts = d?.candidates?.[0]?.content?.parts
   if (!Array.isArray(parts)) return null
   const t = parts
+    // Skip THOUGHT parts — Gemini 3.x is a thinking model and a thought part
+    // carries its internal reasoning in `.text`. Joining it in would extract
+    // competitors/brand mentions from the model's scratchpad instead of its
+    // answer — and on this path that lands on a PROSPECT'S scorecard.
+    .filter(p => p && p.thought !== true)
     .map(p => p?.text)
     .filter(s => typeof s === 'string' && s.length > 0)
     .join('\n')
@@ -117,7 +128,10 @@ async function callGemini(prompt, ctx) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+  // Gemini 3.5 Flash first, 2.5/2.0 as fallbacks — mirrors collect-prompt.js.
+  // 3.x grounding bills per SEARCH QUERY ($14/1k) rather than per prompt ($35/1k
+  // on 2.5), so the win is real but smaller than modelled. See CLAUDE.md §12.3.
+  const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
   let last = { errorCode: 'api_error', detail: 'no model returned a response' }
 
   for (const model of models) {
@@ -221,14 +235,18 @@ async function callClaude(prompt, ctx) {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta':    'web-search-2025-03-05',
+        // web-search beta header REMOVED 2026-07-10 — see note below.
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
-        tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
+        // WEB SEARCH REMOVED (SCALE-SPEC.md §1.1c / CLAUDE.md §12.3). The tool
+        // was ~75% of Claude's cost ($0.010 search fee + ~7k search-result
+        // tokens into context): ≈€0.040 -> ≈€0.010 per call, no model change.
+        // Matches collect-claude.js and CLAUDE.md §1.2's documented
+        // training-data mode. Do NOT re-add without re-reading the cost note.
         messages:   [{ role: 'user', content: prompt }],
       }),
     })
@@ -300,7 +318,23 @@ const FULL_ENGINES       = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
 // figures, kept in sync by hand — Netlify functions run as plain CommonJS and
 // can't import a Vite-bundled .tsx file, so this is a deliberate, documented
 // duplication rather than an oversight; update both places together).
-const ENGINE_COST_EUR = { claude: 0.018, chatgpt: 0.040, gemini: 0.001, perplexity: 0.005, meta: 0.002 }
+// REPRICED 2026-07-10 (SCALE-SPEC.md §1.1, CLAUDE.md §12.3) — the old figures
+// were never checked against a rate card and were ~2.4x too low overall.
+//
+// ⚠️ This mattered MORE here than on the dashboard, because these numbers are
+// not just displayed — `estimateAuditCost()` below writes them to
+// `prospect_audits.estimated_cost_eur`, and `_prospect_guard.js`'s
+// checkMonthlyBudget() sums that column against PROSPECTING_MONTHLY_BUDGET_EUR
+// (default €200). Under-pricing the engines therefore under-counted real spend,
+// so the cap was letting through far more than €200 of actual API cost.
+// Worst offender: gemini at €0.001 (20x too low) — and SCREENING_ENGINES is
+// gemini+perplexity, so a screening audit was costed at €0.006/prompt when it
+// really runs ≈€0.026. The guardrail was ~4x too loose on the screening path.
+//
+// Values below are AFTER this file's own config fixes (Claude web search
+// removed, gpt-5.5 reasoning capped, Gemini 3.5 grounding). Keep in sync with
+// src/pages/Usage.tsx by hand — see the note above.
+const ENGINE_COST_EUR = { claude: 0.010, chatgpt: 0.060, gemini: 0.020, perplexity: 0.006, meta: 0.001 }
 const OVERHEAD_MULTIPLIER = 1.5
 const PROMPT_GEN_COST_EUR = 0.002   // one gpt-4o-mini call for category+prompt generation
 
