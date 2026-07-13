@@ -23,12 +23,26 @@
 // ─── Text normalisation ───────────────────────────────────────────────────────
 
 function normalizeText(t) {
-  // Strip lone surrogates before normalising — web-scraped content (especially
-  // from non-UTF-8 pages that Claude's web search may include) can contain
-  // \uD800–\uDFFF code units that are not valid paired surrogates.
-  // String.prototype.normalize('NFC') throws a RangeError on lone surrogates,
-  // which crashes the handler silently and prevents the Supabase insert.
-  const safe = t.replace(/[\uD800-\uDFFF]/g, '')
+  // Strip LONE surrogates before normalising — web-scraped content (especially from
+  // non-UTF-8 pages that Claude's web search may include) can contain \uD800–\uDFFF
+  // code units that are not valid paired surrogates, and String.prototype
+  // .normalize('NFC') throws a RangeError on them, crashing the handler silently and
+  // preventing the Supabase insert.
+  //
+  // BUG FIXED (round 4): the old guard was `/[\uD800-\uDFFF]/g`, which strips EVERY
+  // surrogate code unit — including the two halves of a VALID pair. Every astral-plane
+  // character (i.e. every emoji) was therefore deleted here. That silently made the
+  // '🥇' entry in posWords unreachable dead code: engines mark their #1 pick with a
+  // medal constantly ("## 🥇 1. <brand>"), the sentiment scorer was told to treat it as
+  // praise, and it never once matched — BpR row 2017 scored `neutral` on an answer
+  // headed "🥇 1. Bucate pe Roate — Alegerea #1".
+  //
+  // Now only UNPAIRED surrogates are removed: a high surrogate not followed by a low,
+  // or a low surrogate not preceded by a high. Valid pairs (emoji) survive; the
+  // RangeError guard is preserved.
+  const safe = String(t)
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
   try {
     return safe
       .replace(/\s+/g, ' ')
@@ -68,6 +82,24 @@ function cleanCandidateName(raw) {
 // a colon is a clean, structural field-label signal.
 function isBoldColonLabel(raw) {
   return /\*\*\s*[^*\n]{1,60}:\s*\*\*/.test(String(raw))
+}
+
+// ─── Entity identity: domain ↔ company name (round 4, finding 2) ──────────────
+// A bare domain ("premiercatering.ro") and the company name it belongs to
+// ("Premier Catering & Events") are the same entity, but the old raw-substring dedupe
+// could not see that, so the firm was counted twice on the leaderboard.
+// NOTE: bare domains are deliberately still ACCEPTED as names — "Monday.com" is a real
+// brand whose name is a domain. We only need them to dedupe correctly.
+const BARE_DOMAIN_RE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]{2,})+$/i
+function isBareDomain(name) { return BARE_DOMAIN_RE.test(String(name).trim()) }
+
+// Canonical identity key: drop a bare domain's TLD, then strip all punctuation/space.
+//   "premiercatering.ro"        → "premiercatering"
+//   "Premier Catering & Events" → "premiercateringevents"   (one contains the other)
+function dedupeKey(name) {
+  let n = String(name).trim().toLowerCase()
+  if (isBareDomain(n)) n = n.replace(/\.[a-z0-9.-]+$/i, '')
+  return n.replace(/[^a-z0-9]/gi, '')
 }
 
 // Rank-prefix stripping (CLIENT-HEALTH-BPR.md §4.2, BpR rows 1586 vs 1592/1581).
@@ -224,6 +256,58 @@ function looksRankedList(leadIn) {
   // told us the list is NOT an ordering, whatever adjectives it also used.
   if (NO_RANK_CUES.some(c => s.includes(c))) return false
   return RANK_CUES.some(c => s.includes(c))
+}
+
+// ─── Stated superlative rank (round 4, finding 4) ─────────────────────────────
+// BpR row 2015 (perplexity): "firma de catering cea mai recomandat este **Bucate pe
+// Roate**, urmată de **Premier Catering & Events**" — the engine names BpR as the #1
+// recommendation in PROSE while the bullets hold only the other firms. We stored
+// brand_position = null and rendered a competitor at #1, so the product displayed a
+// LOSS on a query the engine actually gave the brand. On a prospect scorecard that is
+// worse than cosmetic: "a competitor was named instead of you" would be a false flag.
+//
+// This does NOT re-open §8.8 / finding 1.2. That rule correctly refuses to INFER a rank
+// from prose (sentence index is not a rank). An explicit superlative claim about the
+// brand is a STATED rank of 1 — a different signal from list order.
+//
+// The guard is the entire risk: the superlative must be PREDICATED OF the brand via a
+// copula, not merely co-occurring with it in the same sentence:
+//   ✅ "cea mai recomandată ESTE <brand>"        → stated #1
+//   ✅ "<brand> ESTE cea mai bună opțiune"       → stated #1
+//   ❌ "Cele mai bune firme INCLUD <brand>"      → membership, stays null
+//   ❌ "Premier ESTE cea mai bună, iar <brand> este a doua"  → superlative is about the rival
+const SUPERLATIVE_RE = /(cea|cel|cele|cei)\s+mai\s+\p{L}+|prima\s+(alegere|op[țt]iune)|alegerea\s*#?\s*1|recomandarea\s*#?\s*1|top\s+(choice|pick|recommendation)|#\s*1\b|the\s+(most|best|top)\s+\p{L}+|our\s+(top|#?\s*1)\s+(pick|choice|recommendation)/iu
+const COPULA_RE = /\b(este|sunt|r[ăa]m[âa]ne|is|are|remains|would\s+be)\b/i
+// Membership verbs: the brand is one of a set, not the superlative itself.
+const MEMBERSHIP_RE = /\b(includ[eăâ]?|includes?|including|such\s+as|precum|printre|cum\s+ar\s+fi|de\s+exemplu|among|e\.g\.)\b/i
+
+function detectSuperlativeRank(text, matchers) {
+  const sentences = String(text).split(/(?<=[.!?])\s+|\n+/)
+  for (const s of sentences) {
+    if (MEMBERSHIP_RE.test(s)) continue
+    // Locate the brand inside this sentence.
+    let bi = -1, blen = 0
+    for (const re of matchers) {
+      const probe = new RegExp(re.source, re.flags.replace(/g/g, ''))
+      const m = probe.exec(s)
+      if (m) { bi = m.index; blen = m[0].length; break }
+    }
+    if (bi === -1) continue
+    const before = s.slice(0, bi)
+    const after  = s.slice(bi + blen)
+
+    // (A) "… cea mai recomandată ESTE <brand>" — copula must sit immediately before the
+    //     brand (only markup/quotes/space may intervene), so a superlative about a rival
+    //     earlier in the sentence cannot claim the brand.
+    if (SUPERLATIVE_RE.test(before) &&
+        /\b(este|sunt|r[ăa]m[âa]ne|is|are|remains)\b[\s*_"'“„:\-–—]*$/i.test(before)) return 1
+
+    // (B) "<brand> ESTE cea mai bună opțiune" — copula immediately after the brand, and
+    //     the superlative must follow within a short window.
+    const m2 = after.match(/^[\s*_"'”,:\-–—]*\b(este|sunt|r[ăa]m[âa]ne|is|are|remains)\b\s*([\s\S]{0,40})/i)
+    if (m2 && SUPERLATIVE_RE.test(m2[2])) return 1
+  }
+  return null
 }
 
 const BULLET_RE = /^[ \t]*[-*•][ \t]+(.*)$/
@@ -515,11 +599,46 @@ function looksLikePhrase(name) {
   return false
 }
 
+// Certification / standard names (round 4, finding 1 — BpR row 2015 stored
+// "FSSC 22000" as a competitor). Food-safety, security and compliance standards recur
+// constantly in these answers — BpR's own prompt 243 asks about HACCP / ISO 22000 — and
+// they clear every brand-name gate: an uppercase token plus digits is Title-Cased by
+// looksLikeBrandName, and RANK_LABEL_RE only rejects "Band 2"/"Tier 1" shapes.
+//
+// Two signals, both anchored to the WHOLE name so real brands are untouched:
+//   (a) STANDARD_CODE_RE — "ACRONYM 22000": 2–6 uppercase letters + a 1–5 digit code,
+//       optionally with a :YYYY edition suffix. Catches FSSC 22000, ISO 9001, SOC 2,
+//       ISO 22000:2018. It requires BOTH the all-caps acronym AND the number, so real
+//       all-caps brands with no digits survive (CMS, RPC, BDBF, OFX, UBS).
+//   (b) STANDARD_TOKENS — bare scheme names with no number (HACCP, GFSI, GDPR).
+//       Kept deliberately SHORT and unambiguous: 'IFS', 'UL', 'SOC', 'BRC' and 'CE' are
+//       excluded on purpose because real companies use those exact names (IFS AB, UL
+//       Solutions). Those still get caught by (a) whenever they carry a number.
+//
+// Real digit-bearing brands verified safe: "Capsule CRM" (not all-caps), "Monday.com"
+// (no digits), "7-Eleven" (leads with a digit), "Level 3 Communications" (3 tokens).
+const STANDARD_CODE_RE = /^[A-Z]{2,6}[\s\-\/]?\d{1,5}(:\d{4})?$/
+const STANDARD_TOKENS = new Set([
+  'iso', 'fssc', 'haccp', 'gfsi', 'gdpr', 'hipaa', 'pci dss', 'pci-dss', 'iso/iec',
+])
+function isCertificationName(name) {
+  const n = String(name).trim()
+  if (STANDARD_CODE_RE.test(n)) return true
+  const lower = n.toLowerCase().replace(/[.,;:]+$/, '')
+  if (STANDARD_TOKENS.has(lower)) return true
+  // "ISO 22000" / "FSSC 22000 v6" — leading standards token plus any code.
+  const first = lower.split(/[\s\-\/]+/)[0]
+  if (STANDARD_TOKENS.has(first) && /\d/.test(n)) return true
+  return false
+}
+
 function isCompanyName(name) {
   if (!name || name.length < 2 || name.length > 60) return false
   const lower = name.toLowerCase()
   // Existing domain-phrase filter (RO catering descriptors etc.).
   if (NOT_A_COMPANY.some(t => lower.includes(t))) return false
+  // A certification/standard is not a competitor (round 4, finding 1).
+  if (isCertificationName(name)) return false
   // Must contain at least one letter.
   if (!/[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)) return false
 
@@ -607,9 +726,14 @@ function analyseResponse(text, cfg) {
   //   3. a bullet list whose lead-in explicitly declares an ordering (#109)
   // Anything else stays null. A prose or unordered-bullet mention is genuinely
   // "mentioned but not ranked" — never a fabricated position (finding 1.2).
+  // A STATED superlative claim ("cea mai recomandată este <brand>") is the last resort,
+  // after real list/bullet ranks — it is a rank the engine declared, not one we inferred
+  // (round 4, finding 4). Still null for a plain prose mention.
   let position = null
   if (brandInList)   position = brandInList.pos
-  else if (mentioned) position = detectListPosition(text, matchers) ?? detectBulletPosition(text, matchers)
+  else if (mentioned) position = detectListPosition(text, matchers)
+    ?? detectBulletPosition(text, matchers)
+    ?? detectSuperlativeRank(text, matchers)
 
   // Sentiment is scored ONLY on the brand's own sentence(s)/list-item(s), not
   // the whole response (audit finding 1.1a). We claim a polarity only when the
@@ -663,14 +787,44 @@ function analyseResponse(text, cfg) {
   // these become the primary competitor list, with sequential appearance-order
   // positions (a reasonable prominence proxy for a "best X" answer — there is no
   // real rank in prose). Capped at 10 to bound noise.
-  const dupOf = (name) => competitors.some(c =>
-    c.name.toLowerCase().includes(name.toLowerCase()) ||
-    name.toLowerCase().includes(c.name.toLowerCase()))
+  //
+  // Dedupe is DOMAIN-AWARE (round 4, finding 2 — BpR row 2017 stored BOTH
+  // "Premier Catering & Events" and "premiercatering.ro" as two separate competitors,
+  // inflating the count and distorting the leaderboard). Engines routinely print a
+  // firm's site under its name ("🌐 **premiercatering.ro**"), and the old substring
+  // dedupe compared raw strings, so the domain never matched the spaced name.
+  // dedupeKey strips the TLD from a bare domain and removes all punctuation/spaces, so
+  // "premiercatering.ro" → "premiercatering" folds into "Premier Catering & Events" →
+  // "premiercateringevents".
+  //
+  // Bare domains are NOT rejected outright: "Monday.com" is a real brand (and one of
+  // the top project-management tools in the London data) whose name IS a domain.
+  const dupIndexOf = (name) => {
+    const k = dedupeKey(name)
+    if (!k) return -1
+    return competitors.findIndex(c => {
+      const ck = dedupeKey(c.name)
+      if (!ck) return false
+      if (ck === k) return true
+      // Substring folding needs a floor, or a short key ("cms") matches inside an
+      // unrelated longer one.
+      if (k.length >= 5 && ck.includes(k)) return true
+      if (ck.length >= 5 && k.includes(ck)) return true
+      return false
+    })
+  }
   let nextPos = competitors.length ? Math.max(...competitors.map(c => c.pos)) : 0
   for (const name of extractBoldAndBulletNames(text)) {
     if (competitors.length >= 10) break
     if (matchesAlias(name, matchers)) continue
-    if (dupOf(name)) continue
+    const di = dupIndexOf(name)
+    if (di !== -1) {
+      // Same entity already captured. Prefer the human-readable name over a bare
+      // domain, so "premiercatering.ro" first + "Premier Catering & Events" later
+      // still ends up displaying the company name, not the URL.
+      if (isBareDomain(competitors[di].name) && !isBareDomain(name)) competitors[di].name = name
+      continue
+    }
     nextPos++
     competitors.push({ pos: nextPos, name })
   }
@@ -707,7 +861,11 @@ module.exports = {
   looksLikePhrase,
   detectListPosition,
   detectBulletPosition,
+  detectSuperlativeRank,
   looksRankedList,
+  isCertificationName,
+  isBareDomain,
+  dedupeKey,
   buildBrandMatchers,
   buildAliasRegex,
   matchesAlias,

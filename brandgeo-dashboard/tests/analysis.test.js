@@ -22,6 +22,11 @@ const {
   stripRankPrefixes,
   detectBulletPosition,
   looksRankedList,
+  isCertificationName,
+  isBareDomain,
+  dedupeKey,
+  detectSuperlativeRank,
+  normalizeText,
 } = require('../netlify/functions/_analysis')
 
 const cfg = {
@@ -590,5 +595,119 @@ check('looksRankedList("here are some options") → false', looksRankedList('Her
 check('single bullet in a ranked doc → null (not a list)',
   detectBulletPosition('Cele mai bune firme, în ordinea calității:\n\n* Bucate pe Roate',
     buildBrandMatchers(cfg)), null)
+
+console.log('round 4 — BpR first clean 5-engine collection (ANALYSIS-EXTRACTION-BRIEF.md, rows 2015/2017):')
+
+// Verbatim excerpts from the live rows (client 1, prompt 238, 2026-07-13).
+
+// ── Row 2015 (perplexity) — findings 1 + 4 ──────────────────────────────────
+// "FSSC 22000" (a food-safety certification) was stored as a competitor, and the brand
+// was named the #1 recommendation in PROSE while the list held only the other firms —
+// so we stored position=null and rendered a competitor at #1, inverting a win.
+const row2015 =
+  'Pentru un eveniment corporate de 500 de persoane cu invitați C-level în București, ' +
+  'firma de catering cea mai recomandat este **Bucate pe Roate**, urmată de ' +
+  '**Premier Catering & Events** pentru experiența lor specifică în B2B.\n\n' +
+  '**Bucate pe Roate** este cea mai potrivită opțiune din cauza capacității logistice:\n' +
+  '*   Au servit un record de **peste 18.000 de invitați într-o singură zi**.\n' +
+  '*   Dispun de o bucătărie proprie certificată **FSSC 22000** de peste 500 mp.\n\n' +
+  '**Alte opțiuni premium** care pot gestiona volumul:\n' +
+  '*   **Pastel Lab Catering**: Oferă servicii complete de organizare.\n' +
+  '*   **A la Catering**: Specializată în soluții eficiente pentru conferințe.'
+{
+  const r = analyseResponse(row2015, cfg)
+  const n = JSON.parse(r.competitors_mentioned).map(x => x.name)
+  assert.ok(!n.includes('FSSC 22000'), 'FSSC 22000 is a certification, not a competitor')
+  for (const f of ['Premier Catering & Events', 'Pastel Lab Catering', 'A la Catering'])
+    assert.ok(n.includes(f), `real firm must be kept: ${f}`)
+  passed++; console.log('  ok - row 2015: FSSC 22000 dropped, 3 real firms kept')
+  check('row 2015 → brand_position 1 (stated superlative, was null)', r.brand_position, 1)
+}
+
+// ── Row 2017 (claude) — finding 2 ───────────────────────────────────────────
+// Premier Catering was counted TWICE: once by name, once as the bare domain the engine
+// printed under it ("🌐 **premiercatering.ro**").
+const row2017 =
+  'Iată recomandările mele principale:\n\n---\n\n' +
+  '## 🥇 1. Bucate pe Roate / Carte Blanche — *Alegerea #1 pentru C-level*\n\n' +
+  'Aceasta este, fără îndoială, cea mai solidă opțiune pentru un eveniment de anvergură.\n\n' +
+  '- **Certificare internațională:** Sunt certificați FSSC 22000, una dintre puținele companii.\n\n' +
+  '🌐 **bucateperoate.ro**\n\n---\n\n' +
+  '## 🥈 2. Premier Catering & Events — *Catering de 5 stele*\n\n' +
+  'O altă opțiune premium din București. 🌐 **premiercatering.ro**\n\n---\n\n' +
+  '## 🥉 3. Chat Noir Catering — *Fiabilitate și flexibilitate*\n'
+{
+  const r = analyseResponse(row2017, cfg)
+  const n = JSON.parse(r.competitors_mentioned).map(x => x.name)
+  assert.ok(!n.includes('premiercatering.ro'), 'bare domain must fold into the company name')
+  assert.strictEqual(n.filter(x => /premier/i.test(x)).length, 1, 'Premier counted exactly once')
+  for (const f of ['Premier Catering & Events', 'Chat Noir Catering'])
+    assert.ok(n.includes(f), `real firm must be kept: ${f}`)
+  passed++; console.log('  ok - row 2017: premiercatering.ro folded into Premier Catering & Events')
+  check('row 2017 → brand_position 1 (regression guard, heading rank §8.12)', r.brand_position, 1)
+  // Finding 3: this scored `neutral` live on an answer headed "🥇 1. Bucate pe Roate —
+  // Alegerea #1". Root cause was NOT the lexicon: normalizeText was deleting the medal
+  // (see the surrogate section below), so the '🥇' posWord could never match.
+  check('row 2017 → positive (was neutral: the medal was being deleted)', r.sentiment, 'positive')
+}
+
+console.log('normalizeText — strip LONE surrogates only, keep valid emoji pairs:')
+
+// The old guard `/[\uD800-\uDFFF]/g` deleted BOTH halves of every valid surrogate pair,
+// i.e. every emoji — which silently made the '🥇' entry in posWords unreachable dead
+// code. Engines mark their #1 pick with a medal constantly; it never once scored.
+{
+  const kept = normalizeText('## 🥇 1. Bucate pe Roate')
+  assert.ok(kept.includes('🥇'), 'a valid emoji pair must survive normalizeText')
+  passed++; console.log('  ok - valid emoji (🥇) survives normalizeText')
+}
+{
+  // Lone surrogates still stripped — .normalize("NFC") throws a RangeError on them and
+  // that crash silently prevented the Supabase insert. Guard must be preserved.
+  const out = normalizeText('bad \uD800 lone \uDC00 text 🥇 ok')
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(out), 'lone high surrogate stripped')
+  assert.ok(!/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(out), 'lone low surrogate stripped')
+  assert.ok(out.includes('🥇'), 'the valid pair still survives alongside lone surrogates')
+  passed++; console.log('  ok - lone surrogates stripped, valid pair preserved (no RangeError)')
+}
+{
+  // End-to-end: a response carrying both must not crash the analyser.
+  const r = analyseResponse('## \uD800 1. Bucate pe Roate 🥇\nEste o alegere bună.', cfg)
+  check('mixed lone-surrogate + emoji response → still analysed', r.brand_position, 1)
+}
+
+console.log('superlative rank — the guard is the whole risk (finding 4):')
+
+// MUST NOT regress: §8.8/finding 1.2 still holds — we never INFER a rank from prose.
+check('generic superlative + membership verb → null (brand is just a member)',
+  analyseResponse('Cele mai bune firme de catering din București includ Bucate pe Roate și Fratelli.', cfg).brand_position, null)
+check('superlative belongs to a RIVAL in the same sentence → null',
+  analyseResponse('Premier Catering este cea mai bună opțiune, iar Bucate pe Roate este a doua.', cfg).brand_position, null)
+check('plain prose mention → null',
+  analyseResponse('Bucate pe Roate oferă servicii de catering în București.', cfg).brand_position, null)
+// MUST detect: an explicitly STATED rank of 1, predicated of the brand via a copula.
+check('"<brand> este cea mai bună opțiune" → 1',
+  analyseResponse('Bucate pe Roate este cea mai bună opțiune pentru evenimente mari.', cfg).brand_position, 1)
+check('EN "the most recommended … is <brand>" → 1',
+  analyseResponse('The most recommended catering firm is Bucate pe Roate.', cfg).brand_position, 1)
+
+console.log('certification rejector (finding 1) — digit-bearing real brands must survive:')
+for (const c of ['FSSC 22000', 'ISO 22000', 'ISO 9001', 'HACCP', 'GFSI', 'SOC 2', 'GDPR', 'ISO 22000:2018'])
+  check(`certification "${c}" → not a company`, isCompanyName(c), false)
+for (const b of ['Capsule CRM', 'Monday.com', '7-Eleven', 'CMS', 'RPC', 'BDBF', 'OFX',
+                 'Premier Catering & Events', 'A la Catering', 'Really Simple Systems', 'ANNA Money'])
+  check(`real brand "${b}" → still a company`, isCompanyName(b), true)
+
+console.log('domain identity (finding 2):')
+check('isBareDomain("premiercatering.ro")', isBareDomain('premiercatering.ro'), true)
+check('isBareDomain("Premier Catering & Events")', isBareDomain('Premier Catering & Events'), false)
+check('dedupeKey folds domain into name',
+  dedupeKey('Premier Catering & Events').includes(dedupeKey('premiercatering.ro')), true)
+// Monday.com is a real brand whose NAME is a domain — bare domains are not rejected.
+check('Monday.com still captured as a competitor',
+  (() => {
+    const raw = analyseResponse('Top tools: **Monday.com** and **Asana**.', cfg).competitors_mentioned
+    return JSON.parse(raw).map(x => x.name).includes('Monday.com')
+  })(), true)
 
 console.log(`\nAll ${passed} assertions passed.`)
