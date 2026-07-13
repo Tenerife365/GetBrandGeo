@@ -1,26 +1,69 @@
 /**
- * Recommendations.tsx — Dynamic, data-driven recommendations
- * All recs generated from actual ai_results: LLM gaps, weak categories, real competitors.
- * No hardcoded client IDs, no static catalogues.
+ * Recommendations.tsx — data-driven recommendations, now with an audit trail.
+ *
+ * Three things changed here (Master-Recommendations, CLIENT-HEALTH-BPR.md §6):
+ *
+ * 1. INPUTS ARE FILTERED. The ai_results query had NO status filter and did not even
+ *    select `status`, so API-failure rows (BpR: 3 x quota_exceeded) were counted as
+ *    genuine non-mentions. The engine could emit "critical: 0% on ChatGPT" about an
+ *    unpaid API bill. Errors are now excluded from every stat and surfaced separately.
+ *
+ * 2. COMPETITORS ARE SCORED BY RANKINGS, NOT BY NOISE. This page used to build its own
+ *    competitor aggregation that counted `pos: 99` prose matches — names that only
+ *    appear because the client seeded them into their own competitor list, never ranked
+ *    by any engine — identically with real rankings. That polluted `top_competitors`
+ *    before it ever reached the model. Aggregation now lives in one place
+ *    (lib/competitorFilter.ts) and distinguishes the two.
+ *
+ * 3. ADVICE IS PERSISTED. Generation writes recommendation_runs + recommendations, so
+ *    what a client was told, and when, and from what evidence, survives the page reload.
  */
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target, TrendingUp, RefreshCw, Sparkles, Lightbulb } from 'lucide-react'
+import {
+  AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target,
+  TrendingUp, RefreshCw, Sparkles, Lightbulb, History, Check, X, CircleSlash,
+} from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
+import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import type { LLMName } from '../types'
 
-// --- AI insight types --------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AiRec {
+type RecStatus = 'new' | 'acknowledged' | 'actioned' | 'dismissed'
+
+/** A persisted recommendation item (public.recommendations). */
+interface StoredRec {
+  id: number
+  run_id: number
+  position: number
   title: string
-  insight: string
-  action: string
-  engines: LLMName[]
+  insight: string | null
+  action: string | null
+  engines: string[]
   priority: 'critical' | 'high' | 'medium'
+  status: RecStatus
+  actioned_at: string | null
+  notes: string | null
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/** A generation batch (public.recommendation_runs). */
+interface StoredRun {
+  id: number
+  generated_at: string
+  model: string
+  rec_count: number
+}
+
+/** Shape returned by the function before it is saved (only shown if the save failed). */
+interface AiRec {
+  title: string
+  insight: string | null
+  action: string | null
+  engines: string[]
+  priority: 'critical' | 'high' | 'medium'
+}
 
 interface Rec {
   id: string
@@ -49,10 +92,10 @@ interface CatStat {
   rate: number
 }
 
-interface CompetitorStat {
-  name: string
+/** Engines whose only rows were API failures — our outage, not the brand's absence. */
+interface EngineError {
+  engine: string
   count: number
-  avgPos: number | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -161,11 +204,27 @@ const IMPACT_STYLE = {
   medium:   { badge: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',    icon: <TrendingUp size={13} />,    label: 'Medium Impact' },
 }
 
+const STATUS_STYLE: Record<RecStatus, { badge: string; label: string }> = {
+  new:          { badge: 'bg-slate-500/15 text-slate-400 border border-slate-500/20',    label: 'New'          },
+  acknowledged: { badge: 'bg-sky-500/15 text-sky-400 border border-sky-500/20',          label: 'Acknowledged' },
+  actioned:     { badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', label: 'Actioned'  },
+  dismissed:    { badge: 'bg-slate-600/20 text-slate-500 border border-slate-600/30',    label: 'Dismissed'    },
+}
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleString(undefined, {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
 // ─── Stats computation ────────────────────────────────────────────────────────
 
-function computeStats(aiResults: any[], prompts: any[], brandName: string, activeLLMs: LLMName[]) {
-  // Filter results to only active engines before computing anything
-  const filtered = aiResults.filter(r => activeLLMs.includes(r.llm as LLMName))
+/**
+ * `okResults` MUST already exclude status='error' rows — see load(). An API failure is
+ * not a non-mention, and treating it as one is how a "0% on ChatGPT" recommendation
+ * about an unpaid bill gets written to a paying client.
+ */
+function computeStats(okResults: any[], prompts: any[], brandName: string, activeLLMs: LLMName[]) {
+  const filtered = okResults.filter(r => activeLLMs.includes(r.llm as LLMName))
 
   // Per-LLM
   const llmMap: Record<string, { total: number; mentioned: number; positions: number[] }> = {}
@@ -208,50 +267,11 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string, activ
     }))
     .sort((a, b) => a.rate - b.rate)
 
-  // Competitors — from actual ranked results only
-  // Must match GENERIC_TOKENS in Competitors.tsx and NOT_A_COMPANY in collect functions
-  const GENERIC_TOKENS = [
-    'experienta', 'experiență', 'recomandare', 'capacitate', 'planificare',
-    'infrastructur', 'specializare', 'diversitate', 'acoperire', 'competitivitate',
-    'masiva', 'masivă', 'proprie', 'proprii',
-    ' pentru ', 'datorit', 'grație', 'gratie',
-    'options', 'providers', 'vendors', 'services', 'alternatives', 'solutions',
-    'alte ', 'altele', 'optiuni', 'opțiuni', 'furnizori', 'companii de',
-    'firme de', 'si altele', 'și altele',
-  ]
-  const isCompanyName = (name: string) => {
-    if (!name || name.length < 2 || name.length > 60) return false
-    const lower = name.toLowerCase()
-    if (GENERIC_TOKENS.some(t => lower.includes(t))) return false
-    return /[a-zA-ZăâîșțÎȘȚĂÂ]/.test(name)
-  }
-
-  const compMap: Record<string, { count: number; positions: number[] }> = {}
-  for (const r of filtered) {
-    try {
-      const comps = JSON.parse(r.competitors_mentioned || '[]')
-      if (!Array.isArray(comps)) continue
-      for (const c of comps) {
-        const name = typeof c === 'string' ? c : c?.name
-        const pos  = typeof c === 'object' ? c?.pos : null
-        if (!isCompanyName(name)) continue
-        const key = name.toLowerCase().trim()
-        if (!compMap[key]) compMap[key] = { count: 0, positions: [] }
-        compMap[key].count++
-        if (pos) compMap[key].positions.push(pos)
-      }
-    } catch { /* malformed JSON */ }
-  }
-  const competitors: CompetitorStat[] = Object.entries(compMap)
-    .map(([key, { count, positions }]) => ({
-      name: key.charAt(0).toUpperCase() + key.slice(1),
-      count,
-      avgPos: positions.length > 0
-        ? Math.round(positions.reduce((a: number, b: number) => a + b, 0) / positions.length * 10) / 10
-        : null,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
+  // Competitors — one shared implementation (lib/competitorFilter.ts). Ranked
+  // appearances drive the order; pos:99 prose/seed-list matches are flagged, not counted
+  // as wins. This page used to have its own third copy of the filter and its own sort by
+  // raw mention count.
+  const competitors: CompetitorAggregate[] = aggregateCompetitors(filtered, 6)
 
   // Overall brand position
   const allPositions = filtered
@@ -271,7 +291,7 @@ function computeStats(aiResults: any[], prompts: any[], brandName: string, activ
 // ─── Rec generators ───────────────────────────────────────────────────────────
 
 function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
-  const { llmStats, catStats, competitors, avgBrandPos, brandName, totalChecks, overallRate } = data
+  const { llmStats, catStats, competitors, avgBrandPos, brandName, totalChecks } = data
   if (totalChecks === 0) return []
 
   const recs: Rec[] = []
@@ -279,8 +299,14 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
   const zeroLLMs    = llmStats.filter(s => s.rate === 0)
   const partialLLMs = llmStats.filter(s => s.rate >= 0.5 && s.rate < 0.85)
   const weakCats    = catStats.filter(s => s.rate < 0.5)
-  const topComp     = competitors[0] ?? null
-  const secondComp  = competitors[1] ?? null
+
+  // Only a GENUINELY RANKED competitor can be described as beating the brand. A
+  // prose-only name was never ranked by any engine — it is on the board solely because
+  // the client seeded it. (BpR's "Elegant Catering": 14 mentions, 0 rankings, #2 on the
+  // leaderboard. CLIENT-HEALTH-BPR.md §4.5.)
+  const ranked      = competitors.filter(c => !c.proseOnly)
+  const topComp     = ranked[0] ?? null
+  const secondComp  = ranked[1] ?? null
 
   // 1. Zero-visibility LLMs (critical, one rec per engine, max 2)
   for (const s of zeroLLMs.slice(0, 2)) {
@@ -300,7 +326,7 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
   const weakestCat = weakCats[0] ?? null
   if (weakestCat && weakestCat.rate < 0.4) {
     const compHint = topComp
-      ? ` ${topComp.name} is the most frequent alternative AI recommends for these queries.`
+      ? ` ${topComp.name} is the alternative AI engines rank most often for these queries.`
       : ''
     recs.push({
       id: `weak-cat-${weakestCat.cat}`,
@@ -321,23 +347,25 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
     })
   }
 
-  // 3. Top competitor gap (if competitor appears 3+ times)
-  if (topComp && topComp.count >= 3) {
-    const posText   = topComp.avgPos ? ` at an average position of #${topComp.avgPos}` : ''
-    const secText   = secondComp && secondComp.count >= 2 ? ` ${secondComp.name} is the second most common (${secondComp.count}×).` : ''
+  // 3. Top competitor gap — fires on RANKED appearances only, never on prose matches.
+  if (topComp && topComp.rankedMentions >= 3) {
+    const posText = topComp.avgPos ? ` at an average rank of #${topComp.avgPos}` : ''
+    const secText = secondComp && secondComp.rankedMentions >= 2
+      ? ` ${secondComp.name} is the second most often ranked (${secondComp.rankedMentions}×).`
+      : ''
     recs.push({
       id: 'top-competitor',
       impact: 'high',
       effort: 'medium',
-      title: `${topComp.name} appears${posText} in ${topComp.count} responses where ${brandName} is absent`,
-      why: `${topComp.name} is the most frequently recommended alternative across your tracked prompts.${secText} Closing this gap is the most direct path to recapturing those AI recommendations.`,
+      title: `${topComp.name} is ranked${posText} in ${topComp.rankedMentions} responses`,
+      why: `${topComp.name} is the alternative AI engines rank most often across your tracked prompts.${secText} Closing this gap is the most direct path to recapturing those AI recommendations.`,
       how: [
         `Audit ${topComp.name}'s website: which pages do they have that you don't? (service pages, case studies, certifications, FAQ)`,
         `Identify which of your prompts ${topComp.name} appears in — those topics are your highest-priority content gaps`,
         `Create content that directly targets the prompts where ${topComp.name} ranks and you don't`,
         `Build citations from the same directories and publications that mention ${topComp.name}`,
         secondComp
-          ? `Repeat the analysis for ${secondComp.name} (appears ${secondComp.count}×) once you've addressed the primary gap`
+          ? `Repeat the analysis for ${secondComp.name} (ranked ${secondComp.rankedMentions}×) once you've addressed the primary gap`
           : `After closing the content gap, re-run collection to see if ${topComp.name}'s lead shrinks`,
       ],
       fixes: gapLLMs.length > 0 ? gapLLMs.map(s => s.llm) : llmStats.map(s => s.llm),
@@ -386,14 +414,13 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
     })
   }
 
-  // Sort: critical → high → medium
   return recs.sort((a, b) => {
     const order = { critical: 0, high: 1, medium: 2 }
     return order[a.impact] - order[b.impact]
   })
 }
 
-// ─── RecCard ──────────────────────────────────────────────────────────────────
+// ─── RecCard (rule-based) ─────────────────────────────────────────────────────
 
 function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -453,30 +480,156 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
   )
 }
 
+// ─── Stored AI rec card (with workflow status) ────────────────────────────────
+
+function StoredRecCard({
+  rec, canEdit, onStatus,
+}: {
+  rec: StoredRec
+  canEdit: boolean
+  onStatus: (id: number, status: RecStatus) => void
+}) {
+  const imp = IMPACT_STYLE[rec.priority]
+  const st  = STATUS_STYLE[rec.status]
+  const dim = rec.status === 'dismissed'
+
+  return (
+    <div className={`bg-dark-800 border border-violet-500/15 rounded-xl p-5 ${dim ? 'opacity-55' : ''}`}>
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
+          {imp.label}
+        </span>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.badge}`}>
+          {st.label}
+        </span>
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
+          <Lightbulb size={9} className="inline mr-0.5" />AI insight
+        </span>
+        {(rec.engines ?? []).map(e => (
+          <span key={e} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${LLM_COLOR[e] ?? 'bg-slate-500/15 text-slate-400'}`}>
+            {LLM_LABEL[e] ?? e}
+          </span>
+        ))}
+      </div>
+
+      <div className="font-semibold text-slate-100 text-sm mb-3">{rec.title}</div>
+
+      {rec.insight && (
+        <div className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/40 mb-3">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">What the data shows</div>
+          <p className="text-sm text-slate-300 leading-relaxed">{rec.insight}</p>
+        </div>
+      )}
+
+      {rec.action && (
+        <>
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Action</div>
+          <p className="text-sm text-slate-300 leading-relaxed">{rec.action}</p>
+        </>
+      )}
+
+      {rec.actioned_at && (
+        <div className="mt-3 text-xs text-emerald-400/80">
+          <Check size={11} className="inline mr-1" />
+          Marked actioned {fmtDate(rec.actioned_at)}
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mt-4 pt-3 border-t border-dark-700/60 flex flex-wrap gap-2">
+          <button
+            onClick={() => onStatus(rec.id, 'actioned')}
+            disabled={rec.status === 'actioned'}
+            aria-label={`Mark actioned: ${rec.title}`}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors disabled:opacity-40"
+          >
+            <Check size={12} /> Actioned
+          </button>
+          <button
+            onClick={() => onStatus(rec.id, 'acknowledged')}
+            disabled={rec.status === 'acknowledged'}
+            aria-label={`Mark acknowledged: ${rec.title}`}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-300 border border-sky-500/20 hover:bg-sky-500/25 transition-colors disabled:opacity-40"
+          >
+            <CircleSlash size={12} /> Acknowledged
+          </button>
+          <button
+            onClick={() => onStatus(rec.id, 'dismissed')}
+            disabled={rec.status === 'dismissed'}
+            aria-label={`Dismiss: ${rec.title}`}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-dark-600 text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-40"
+          >
+            <X size={12} /> Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Recommendations() {
-  const { activeClientId, activeClient, activeEngines } = useClient()
+  const { activeClientId, activeClient, activeEngines, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
   const [recs, setRecs]       = useState<Rec[]>([])
   const [loading, setLoading] = useState(true)
-  const [aiRecs, setAiRecs]   = useState<AiRec[]>([])
+
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
-  // Store raw ai_results for passing to the AI function
-  const [rawResults, setRawResults] = useState<any[]>([])
+  const [aiError, setAiError]     = useState<string | null>(null)
+  /** Only populated when the function generated advice but FAILED to persist it. */
+  const [unsavedRecs, setUnsavedRecs] = useState<AiRec[]>([])
+
+  const [runs, setRuns]           = useState<StoredRun[]>([])
+  const [storedRecs, setStoredRecs] = useState<StoredRec[]>([])
+  const [showAllRuns, setShowAllRuns] = useState(false)
+
+  const [engineErrors, setEngineErrors] = useState<EngineError[]>([])
+  const [rawOk, setRawOk]           = useState<any[]>([])
   const [rawPrompts, setRawPrompts] = useState<any[]>([])
+
+  // ── Load ──────────────────────────────────────────────────────────────────
+  const loadHistory = async () => {
+    const { data: runRows } = await supabase
+      .from('recommendation_runs')
+      .select('id, generated_at, model, rec_count')
+      .eq('client_id', activeClientId)
+      .order('generated_at', { ascending: false })
+      .limit(20)
+
+    const runIds = (runRows ?? []).map(r => r.id)
+    let itemRows: StoredRec[] = []
+    if (runIds.length > 0) {
+      const { data } = await supabase
+        .from('recommendations')
+        .select('id, run_id, position, title, insight, action, engines, priority, status, actioned_at, notes')
+        .in('run_id', runIds)
+        .order('position', { ascending: true })
+      itemRows = (data ?? []) as StoredRec[]
+    }
+    setRuns((runRows ?? []) as StoredRun[])
+    setStoredRecs(itemRows)
+  }
 
   const load = async () => {
     setLoading(true)
 
-    const [{ data: aiResults }, { data: prompts }] = await Promise.all([
+    const [{ data: okResults }, { data: errRows }, { data: prompts }] = await Promise.all([
+      // status='error' rows are API failures (quota, auth, network). They are NOT
+      // non-mentions and must never reach a stat or the model. CLAUDE.md §4.8.
       supabase
         .from('ai_results')
-        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, response_snippet')
-        .eq('client_id', activeClientId),
+        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, response_snippet, status, checked_at')
+        .eq('client_id', activeClientId)
+        .neq('status', 'error')
+        .order('checked_at', { ascending: false }),
+      supabase
+        .from('ai_results')
+        .select('llm, error_code')
+        .eq('client_id', activeClientId)
+        .eq('status', 'error'),
       supabase
         .from('prompts')
         .select('id, category, text')
@@ -484,27 +637,39 @@ export default function Recommendations() {
         .eq('is_active', true),
     ])
 
-    setRawResults(aiResults ?? [])
+    // Only surface engines that produced errors AND no usable rows — a partial failure
+    // is already reflected correctly in the stats.
+    const okEngines = new Set((okResults ?? []).map(r => r.llm))
+    const errCount: Record<string, number> = {}
+    for (const r of errRows ?? []) {
+      if (okEngines.has(r.llm)) continue
+      errCount[r.llm] = (errCount[r.llm] ?? 0) + 1
+    }
+    setEngineErrors(Object.entries(errCount).map(([engine, count]) => ({ engine, count })))
+
+    setRawOk(okResults ?? [])
     setRawPrompts(prompts ?? [])
-    const computed = computeStats(aiResults ?? [], prompts ?? [], brandName, activeEngines as LLMName[])
+    const computed = computeStats(okResults ?? [], prompts ?? [], brandName, activeEngines as LLMName[])
     setStats(computed)
     setRecs(generateRecs(computed))
+
+    await loadHistory()
     setLoading(false)
   }
 
+  // ── Generate ──────────────────────────────────────────────────────────────
   const generateAiInsights = async () => {
-    if (!stats || rawResults.length === 0) return
+    if (!stats || rawOk.length === 0 || !activeClientId) return
     setAiLoading(true)
     setAiError(null)
+    setUnsavedRecs([])
 
-    // Build engine_stats payload
     const engineStats: Record<string, any> = {}
     for (const s of stats.llmStats) {
       engineStats[s.llm] = { total: s.total, mentioned: s.mentioned, rate: s.rate, avgPos: s.avgPos }
     }
 
-    // Collect up to 4 snippets where brand was mentioned
-    const mentionedSnippets = rawResults
+    const mentionedSnippets = rawOk
       .filter(r => r.brand_mentioned && r.response_snippet)
       .slice(0, 4)
       .map(r => {
@@ -512,8 +677,7 @@ export default function Recommendations() {
         return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet }
       })
 
-    // Collect up to 5 snippets where brand was absent — include top competitor name
-    const absentSnippets = rawResults
+    const absentSnippets = rawOk
       .filter(r => !r.brand_mentioned && r.response_snippet)
       .slice(0, 5)
       .map(r => {
@@ -522,18 +686,19 @@ export default function Recommendations() {
         try {
           const comps = JSON.parse(r.competitors_mentioned || '[]')
           topComp = comps[0]?.name ?? comps[0] ?? null
-        } catch {}
+        } catch { /* malformed */ }
         return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet, topComp }
       })
 
     const payload = {
-      client_id:         activeClientId,
-      brand_name:        brandName,
-      engine_stats:      engineStats,
-      top_competitors:   stats.competitors,
-      mentioned_snippets: mentionedSnippets,
-      absent_snippets:   absentSnippets,
-      prompts:           rawPrompts.map((p: any) => ({ text: p.text, category: p.category })),
+      client_id:           activeClientId,
+      brand_name:          brandName,
+      engine_stats:        engineStats,
+      engines_with_errors: engineErrors,
+      top_competitors:     stats.competitors,   // carries rankedMentions + proseOnly
+      mentioned_snippets:  mentionedSnippets,
+      absent_snippets:     absentSnippets,
+      prompts:             rawPrompts.map((p: any) => ({ text: p.text, category: p.category })),
     }
 
     try {
@@ -543,7 +708,7 @@ export default function Recommendations() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload),
       })
@@ -552,7 +717,6 @@ export default function Recommendations() {
       try {
         data = JSON.parse(text)
       } catch {
-        // Netlify returned HTML (function timeout or crash)
         console.error('[GenRec] non-JSON response:', res.status, text.slice(0, 300))
         throw new Error(
           res.status === 524 || res.status === 502
@@ -560,15 +724,39 @@ export default function Recommendations() {
             : `Function error (HTTP ${res.status}) — check Netlify logs`
         )
       }
+
       if (data.error) {
         setAiError(data.error)
+      } else if (data.persisted) {
+        await loadHistory()
       } else {
-        setAiRecs(data.recommendations ?? [])
+        // Generated but not stored. Show it rather than throw it away — but say so
+        // plainly, because an unsaved deliverable has no audit trail.
+        setUnsavedRecs(data.recommendations ?? [])
+        setAiError(
+          `Generated, but NOT saved to the audit trail${data.persist_error ? `: ${data.persist_error}` : ''}. ` +
+          `Has supabase-recommendations-migration.sql been run?`
+        )
       }
     } catch (e: any) {
       setAiError(e.message ?? 'Network error')
     }
     setAiLoading(false)
+  }
+
+  // ── Status update ─────────────────────────────────────────────────────────
+  const setItemStatus = async (id: number, status: RecStatus) => {
+    const prev = storedRecs
+    // Optimistic. actioned_at is set server-side by the freeze trigger, so refetch after.
+    setStoredRecs(rs => rs.map(r => (r.id === id ? { ...r, status } : r)))
+    const { error } = await supabase.from('recommendations').update({ status }).eq('id', id)
+    if (error) {
+      console.error('[Recs] status update failed:', error.message)
+      setStoredRecs(prev)
+      setAiError(`Could not update status: ${error.message}`)
+      return
+    }
+    await loadHistory()
   }
 
   useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
@@ -577,6 +765,8 @@ export default function Recommendations() {
 
   const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
+  const visibleRuns = showAllRuns ? runs : runs.slice(0, 1)
+  const latestRunId = runs[0]?.id ?? null
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
@@ -592,12 +782,13 @@ export default function Recommendations() {
             )}
           </div>
           <p className="text-sm text-slate-400">
-            Generated from {stats?.totalChecks ?? 0} real AI checks — no generic advice.
+            Generated from {stats?.totalChecks ?? 0} successful AI checks — API failures excluded.
           </p>
         </div>
         <button
           onClick={load}
           disabled={loading}
+          aria-label="Refresh recommendations"
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -605,7 +796,23 @@ export default function Recommendations() {
         </button>
       </div>
 
-      {/* No data state */}
+      {/* API-failure notice — this is OUR outage, not the brand's invisibility. */}
+      {engineErrors.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/8 border border-amber-500/20 rounded-xl flex gap-3">
+          <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="text-sm font-semibold text-amber-300 mb-0.5">
+              No usable data from {engineErrors.map(e => LLM_LABEL[e.engine] ?? e.engine).join(', ')}
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed calls),
+              so they are excluded from every score and from the AI analysis below. This is a collection
+              failure, not a visibility failure — it does not mean these engines ignore your brand.
+            </p>
+          </div>
+        </div>
+      )}
+
       {(stats?.totalChecks ?? 0) === 0 ? (
         <div className="text-center py-16 text-slate-500">
           <Target size={40} className="mx-auto mb-3 opacity-20" />
@@ -640,17 +847,35 @@ export default function Recommendations() {
           {/* Competitor context */}
           {stats && stats.competitors.length > 0 && (
             <div className="mb-6 p-4 bg-dark-800 border border-dark-700 rounded-xl">
-              <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Top competitors in AI responses</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Competitors in AI responses</div>
               <div className="flex flex-wrap gap-2">
                 {stats.competitors.map(c => (
-                  <div key={c.name} className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <Target size={10} className="text-red-400 shrink-0" />
-                    <span className="text-xs font-medium text-red-300">{c.name}</span>
-                    <span className="text-[10px] text-red-500/60">{c.count}×</span>
+                  <div
+                    key={c.name}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+                      c.proseOnly
+                        ? 'bg-dark-700/40 border-dark-600/50'
+                        : 'bg-red-500/10 border-red-500/20'
+                    }`}
+                    title={c.proseOnly
+                      ? 'Named in prose, but never ranked in a list by any engine — usually because they are on your own competitor seed list'
+                      : `Ranked ${c.rankedMentions}× by AI engines`}
+                  >
+                    <Target size={10} className={c.proseOnly ? 'text-slate-500 shrink-0' : 'text-red-400 shrink-0'} />
+                    <span className={`text-xs font-medium ${c.proseOnly ? 'text-slate-400' : 'text-red-300'}`}>{c.name}</span>
+                    {c.proseOnly
+                      ? <span className="text-[10px] text-slate-500">prose only</span>
+                      : <span className="text-[10px] text-red-500/60">ranked {c.rankedMentions}×</span>}
                     {c.avgPos && <span className="text-[10px] text-slate-600">avg #{c.avgPos}</span>}
                   </div>
                 ))}
               </div>
+              {stats.competitors.some(c => c.proseOnly) && (
+                <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                  "Prose only" names were never ranked by any engine — they appear because they are on your
+                  own competitor list and an engine happened to mention them. They are not counted as losses.
+                </p>
+              )}
             </div>
           )}
 
@@ -677,7 +902,7 @@ export default function Recommendations() {
             </div>
           ) : null}
 
-          {/* AI-generated insights */}
+          {/* ── AI analysis + advice history ────────────────────────────────── */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -686,14 +911,20 @@ export default function Recommendations() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20">
                   Claude
                 </span>
+                {runs.length > 0 && (
+                  <span className="text-xs text-slate-500">
+                    · last generated {fmtDate(runs[0].generated_at)}
+                  </span>
+                )}
               </div>
               <button
                 onClick={generateAiInsights}
-                disabled={aiLoading || rawResults.length === 0}
+                disabled={aiLoading || rawOk.length === 0}
+                aria-label="Generate AI insights"
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 transition-colors disabled:opacity-50"
               >
                 <Sparkles size={12} className={aiLoading ? 'animate-spin' : ''} />
-                {aiLoading ? 'Analysing…' : aiRecs.length > 0 ? 'Regenerate' : 'Generate insights'}
+                {aiLoading ? 'Analysing…' : runs.length > 0 ? 'Generate new analysis' : 'Generate insights'}
               </button>
             </div>
 
@@ -704,51 +935,79 @@ export default function Recommendations() {
             )}
 
             {aiError && !aiLoading && (
-              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 text-xs text-red-400">
-                Error generating insights: {aiError}
+              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 text-xs text-red-400 mb-3">
+                {aiError}
               </div>
             )}
 
-            {!aiLoading && aiRecs.length === 0 && !aiError && (
+            {/* Unsaved fallback — only when persistence failed. */}
+            {unsavedRecs.length > 0 && !aiLoading && (
+              <div className="space-y-3 mb-3">
+                {unsavedRecs.map((rec, i) => (
+                  <StoredRecCard
+                    key={`unsaved-${i}`}
+                    rec={{
+                      id: -1 - i, run_id: -1, position: i,
+                      title: rec.title, insight: rec.insight, action: rec.action,
+                      engines: rec.engines ?? [], priority: rec.priority,
+                      status: 'new', actioned_at: null, notes: null,
+                    }}
+                    canEdit={false}
+                    onStatus={() => {}}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!aiLoading && runs.length === 0 && unsavedRecs.length === 0 && !aiError && (
               <div className="bg-dark-800 border border-dark-700 border-dashed rounded-xl p-5 text-center text-sm text-slate-600">
-                Click "Generate insights" — Claude will read your actual response snippets and competitor data to produce specific, evidence-based advice.
+                Click "Generate insights" — Claude reads your actual response snippets and ranked competitors
+                and produces specific, evidence-based advice. Every run is saved, so you keep a record of what
+                was advised and when.
               </div>
             )}
 
-            {aiRecs.length > 0 && !aiLoading && (
-              <div className="space-y-3">
-                {aiRecs.map((rec, i) => {
-                  const imp = rec.priority === 'critical'
-                    ? { badge: 'bg-red-500/15 text-red-400 border border-red-500/20', label: 'Critical' }
-                    : rec.priority === 'high'
-                    ? { badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', label: 'High Impact' }
-                    : { badge: 'bg-blue-500/15 text-blue-400 border border-blue-500/20', label: 'Medium' }
-                  return (
-                    <div key={i} className="bg-dark-800 border border-violet-500/15 rounded-xl p-5">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
-                          {imp.label}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
-                          <Lightbulb size={9} className="inline mr-0.5" />AI insight
-                        </span>
-                        {(rec.engines ?? []).map(e => (
-                          <span key={e} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${LLM_COLOR[e] ?? ''}`}>
-                            {LLM_LABEL[e] ?? e}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="font-semibold text-slate-100 text-sm mb-3">{rec.title}</div>
-                      <div className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/40 mb-3">
-                        <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">What the data shows</div>
-                        <p className="text-sm text-slate-300 leading-relaxed">{rec.insight}</p>
-                      </div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Action</div>
-                      <p className="text-sm text-slate-300 leading-relaxed">{rec.action}</p>
-                    </div>
-                  )
-                })}
-              </div>
+            {/* Persisted history */}
+            {!aiLoading && visibleRuns.map(run => {
+              const items = storedRecs
+                .filter(r => r.run_id === run.id)
+                .sort((a, b) => a.position - b.position)
+              const isLatest = run.id === latestRunId
+              return (
+                <div key={run.id} className="mb-5">
+                  <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
+                    <History size={12} />
+                    <span>
+                      {isLatest ? 'Latest analysis' : 'Earlier analysis'} · {fmtDate(run.generated_at)} · {run.model}
+                    </span>
+                    <span className="text-slate-600">
+                      · {items.filter(i => i.status === 'actioned').length}/{items.length} actioned
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {items.map(item => (
+                      <StoredRecCard
+                        key={item.id}
+                        rec={item}
+                        canEdit={isAdmin}
+                        onStatus={setItemStatus}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+
+            {runs.length > 1 && !aiLoading && (
+              <button
+                onClick={() => setShowAllRuns(v => !v)}
+                aria-expanded={showAllRuns}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 border border-dark-700 border-dashed hover:bg-dark-800 transition-colors"
+              >
+                {showAllRuns
+                  ? <><ChevronUp size={13} /> Hide earlier analyses</>
+                  : <><ChevronDown size={13} /> Show {runs.length - 1} earlier analys{runs.length - 1 === 1 ? 'is' : 'es'}</>}
+              </button>
             )}
           </div>
 
