@@ -15,7 +15,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-const { requireAuth } = require('./_auth')
+const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { analyseResponse } = require('./_analysis')
 const { costForRow } = require('./_cost')
 
@@ -417,6 +417,15 @@ exports.handler = async (event) => {
   // Viewers may only collect for their own client
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
+
+  // SCALE-SPEC.md §2 — hourly ceiling + monthly EUR budget + platform-wide
+  // ceiling, scoped to the CONFIRMED target client (client_id above), not
+  // whichever account is authenticated. See _auth.js's checkCollectionLimits
+  // doc comment for why this isn't baked into requireAuth() itself.
+  const limitCheck = await checkCollectionLimits(auth.supabase, client_id)
+  if (limitCheck.blocked) {
+    return { statusCode: 429, headers: auth.headers, body: JSON.stringify({ error: limitCheck.message, reason: limitCheck.reason }) }
   }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)

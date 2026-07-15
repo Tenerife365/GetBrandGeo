@@ -95,18 +95,46 @@ export const ENGINE_META: Record<EngineId, {
 // accepted for _score.js <-> aiVisibilityScore.ts. Update BOTH files together.
 //
 // REPRICED 2026-07-10 (SCALE-SPEC.md §1.1, CLAUDE.md §12.3) after Claude's
-// web_search tool was removed, ChatGPT's reasoning effort was capped to
-// 'low', and Gemini moved to 3.5-flash grounding. See _cost.js for full
-// per-engine confidence notes (gemini LOW, chatgpt MEDIUM, the rest HIGH) —
-// these are derived from published rate cards + measured response size, not
-// an invoice, and are not exact. Only the 5 currently-built engines have a
-// real cost; the other 4 (google_ai/copilot/deepseek/grok) never collect.
+// web_search tool was removed and ChatGPT's reasoning effort was capped to
+// 'low'. See _cost.js for full per-engine confidence notes (gemini MEDIUM,
+// chatgpt MEDIUM, the rest HIGH) — these are derived from published rate
+// cards + measured response size, not an invoice, and are not exact. Only
+// the 5 currently-built engines have a real cost; the other 4
+// (google_ai/copilot/deepseek/grok) never collect.
+//
+// ⚠️ gemini CORRECTED 2026-07-13 (CLAUDE.md §12.3b), 0.020 → 0.034 — this
+// value had drifted out of sync with netlify/functions/_cost.js (the
+// authoritative, server-enforced copy). 0.020 was priced for
+// gemini-3.5-flash grounding; that model was reverted back to
+// gemini-2.5-flash after it timed out on 10/10 grounded calls in
+// production, and 2.5-flash bills a flat $35/1k grounded prompts ≈ €0.034,
+// not 3.5's per-search-query rate. This file is display-only (no server-side
+// enforcement reads it), but a stale value here still misleads anyone
+// reading Usage.tsx's cost estimator. Keep in sync with _cost.js by hand.
 export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   claude:     0.010,
   chatgpt:    0.060,
-  gemini:     0.020,
+  gemini:     0.034,
   perplexity: 0.006,
   meta:       0.001,
+}
+
+// ── Monthly per-client API spend cap (EUR) ───────────────────────────────────
+// SCALE-SPEC.md §2 — server-side enforcement lives in
+// netlify/functions/_cost.js's PLAN_MONTHLY_API_BUDGET_EUR (the authoritative
+// copy, read by _auth.js's checkCollectionLimits() before every collection
+// call). This frontend copy is display-only today (no UI reads it yet — kept
+// for future use, e.g. a "budget used this month" indicator on Usage.tsx) but
+// must be kept numerically in sync with _cost.js by hand, same tradeoff as
+// ENGINE_COST_EUR above. See _cost.js for the full 9%-of-plan-price
+// derivation.
+export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
+  free: 0.30,
+  essentials: 8.91,
+  growth: 26.91,
+  managed: 81.00,
+  pro: 135.00,
+  enterprise: 900.00,
 }
 
 export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'managed', 'pro', 'enterprise']

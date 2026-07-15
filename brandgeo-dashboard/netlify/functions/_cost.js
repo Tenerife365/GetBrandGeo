@@ -90,4 +90,65 @@ function costForRow(llm, errorCode) {
   return ENGINE_COST_EUR[llm] ?? 0
 }
 
-module.exports = { ENGINE_COST_EUR, FREE_ERROR_CODES, costForRow }
+/**
+ * PLAN_LIVE_ENGINE_COUNT — how many engines actually collect (and cost
+ * money) per plan, used only to derive the SCALE-SPEC.md §2.2 hourly
+ * abuse-ceiling formula (max(150, activePrompts * engineCount)). The 4
+ * not-yet-built engines (google_ai/copilot/deepseek/grok, see
+ * planConfig.ts's COMING_SOON_ENGINES) never collect, so they don't count
+ * here even for pro/enterprise, which reserve slots for them.
+ * Mirrors planConfig.ts's PLAN_ENGINES — keep counts in sync by hand if
+ * that map ever changes.
+ */
+const PLAN_LIVE_ENGINE_COUNT = {
+  free: 1,        // chatgpt
+  essentials: 3,  // chatgpt, gemini, claude
+  growth: 5,      // + perplexity, meta
+  managed: 5,
+  pro: 5,
+  enterprise: 5,
+}
+
+/**
+ * PLAN_MONTHLY_API_BUDGET_EUR — SCALE-SPEC.md §2.1's monthly per-client EUR
+ * spend cap, enforced by _auth.js's checkCollectionLimits() before a new
+ * collection call is allowed.
+ *
+ * Derivation (2026-07-13, this pass): SCALE-SPEC's own published Scenario
+ * A/B tables were NOT used verbatim — neither matches what's actually live.
+ * Scenario A predates the 2026-07-10 cost fixes; Scenario B assumes the
+ * Batch API + Gemini 3.x, and Gemini 3.x was reverted 2026-07-13 (§12.3b,
+ * it times out on grounded calls). These are computed fresh from _cost.js's
+ * CURRENT live ENGINE_COST_EUR values above, at 9% of monthly plan price
+ * (SCALE-SPEC §1.2's own sizing rule — 9%, not 10%, so the reserved 1%
+ * headroom absorbs Free-tier + prospecting spend):
+ *   5-engine check (chatgpt+gemini+claude+perplexity+meta): EUR 0.111
+ *   3-engine check (chatgpt+gemini+claude):                 EUR 0.104
+ *   1-engine check (chatgpt):                                EUR 0.060
+ * free:       fixed small allowance (5 checks), not price-derived (E0 revenue)
+ * essentials: 9% of EUR 99   = 8.91
+ * growth:     9% of EUR 299  = 26.91
+ * managed:    9% of EUR 900  = 81.00
+ * pro:        9% of EUR 1500 = 135.00
+ * enterprise: 9% of EUR 10000 (pricing floor) = 900.00
+ *
+ * Not exact — same caveat as ENGINE_COST_EUR above. True these up once
+ * real cost_eur data accumulates (SCALE-SPEC §2.1's own stated intent).
+ * Keep in sync with src/lib/planConfig.ts's copy of the same map.
+ */
+const PLAN_MONTHLY_API_BUDGET_EUR = {
+  free: 0.30,
+  essentials: 8.91,
+  growth: 26.91,
+  managed: 81.00,
+  pro: 135.00,
+  enterprise: 900.00,
+}
+
+module.exports = {
+  ENGINE_COST_EUR,
+  FREE_ERROR_CODES,
+  costForRow,
+  PLAN_LIVE_ENGINE_COUNT,
+  PLAN_MONTHLY_API_BUDGET_EUR,
+}

@@ -12,7 +12,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-const { requireAuth } = require('./_auth')
+const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { analyseResponse } = require('./_analysis')
 const { costForRow } = require('./_cost')
 
@@ -131,6 +131,13 @@ exports.handler = async (event) => {
   // Client ownership check
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
+
+  // SCALE-SPEC.md §2 — see collect-prompt.js / _auth.js's checkCollectionLimits
+  // doc comment for the full rationale.
+  const limitCheck = await checkCollectionLimits(auth.supabase, client_id)
+  if (limitCheck.blocked) {
+    return { statusCode: 429, headers: auth.headers, body: JSON.stringify({ error: limitCheck.message, reason: limitCheck.reason }) }
   }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)

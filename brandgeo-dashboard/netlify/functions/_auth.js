@@ -9,10 +9,14 @@
  *  3. Supabase JWT verification (blocks unauthenticated / bot callers)
  *  4. Role check — adminOnly flag for privileged functions
  *  5. Client ownership check — viewers can only trigger collection for their own client
- *  6. Rate limit — max 150 ai_results rows per client per hour (blocks runaway abuse)
+ *
+ * Rate/cost limiting for collection calls is NOT part of requireAuth() itself
+ * (see checkCollectionLimits() below) — see SCALE-SPEC.md §2 and the comment
+ * above that function for why it moved out of the universal auth gate.
  */
 
 const { createClient } = require('@supabase/supabase-js')
+const { PLAN_LIVE_ENGINE_COUNT, PLAN_MONTHLY_API_BUDGET_EUR } = require('./_cost')
 
 const ALLOWED_ORIGINS = [
   'https://app.getbrandgeo.com',
@@ -20,7 +24,8 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ]
 
-const RATE_LIMIT_PER_HOUR = 150  // max LLM result rows a client can accumulate per hour
+const HOURLY_CEILING_FLOOR = 150  // never go below this even for a 1-prompt free client
+const VALID_PLANS = Object.keys(PLAN_LIVE_ENGINE_COUNT)
 
 // ── CORS helpers ───────────────────────────────────────────────────────────────
 
@@ -113,27 +118,144 @@ async function requireAuth(event, { adminOnly = false, clientId = null } = {}) {
     }
   }
 
-  // ── 6. Rate limit ──
-  // Count ai_results rows created for this client in the last hour.
-  // Each collection run produces up to 5 rows/prompt × N prompts.
-  // 150/hr = ~30 prompts/hr across 5 engines — generous for normal use,
-  // but stops runaway abuse (the Chinese token-burn incident was 1000s of calls).
-  const effectiveClientId = clientId ?? profile.client_id
-  if (effectiveClientId) {
-    const hourAgo = new Date(Date.now() - 3_600_000).toISOString()
-    const { count } = await supabase
-      .from('ai_results')
-      .select('*', { count: 'exact', head: true })
-      .eq('client_id', effectiveClientId)
-      .gte('checked_at', hourAgo)
-
-    if (count !== null && count >= RATE_LIMIT_PER_HOUR) {
-      console.warn(`[Auth] Rate limit hit: client ${effectiveClientId} has ${count} rows in last hour`)
-      return { response: err(429, `Rate limit exceeded: max ${RATE_LIMIT_PER_HOUR} LLM calls/hour. Try again later.`, origin) }
-    }
-  }
-
   return { user, profile, supabase, headers: corsHeaders(origin) }
 }
 
-module.exports = { requireAuth, corsHeaders, ALLOWED_ORIGINS }
+// ── Collection rate/cost limiting (SCALE-SPEC.md §2) ────────────────────────────
+//
+// Replaces the old flat "150 ai_results rows/hr/client" check that used to sit
+// inside requireAuth() step 6 above. That check was doing two unrelated jobs
+// badly (SCALE-SPEC.md §2's own framing) — cost control and abuse control — with
+// a real scoping bug on top: none of the 3 collect-*.js functions ever pass
+// `clientId` into requireAuth(), so `clientId ?? profile.client_id` silently
+// rate-limited the CALLING USER's own client, not the client the collection was
+// actually being run for. For an admin running collection on behalf of a
+// different client (the common path today — Constantin runs Force Refresh for
+// research/managed clients from his own admin account), the ceiling was being
+// checked against the wrong account entirely, and a Growth-tier client's real
+// 150-prompt plan would still 429 around prompt 30 regardless, since the old
+// limit was a flat number with no notion of plan size.
+//
+// Deliberately NOT folded back into requireAuth() as an unconditional step:
+// requireAuth() is shared by 6+ non-collection endpoints (onboard-client,
+// resend-invite, create-portal-session, generate-recommendations,
+// suggest-prompts) that never write ai_results rows and have no business being
+// budget-gated by a client's collection spend. checkCollectionLimits() is
+// instead called explicitly by the 3 collect-*.js functions, AFTER they've
+// parsed the request body and confirmed (via their existing manual ownership
+// check) which client_id the call is really for — so the checks below are keyed
+// to the correct target client, not whoever happens to be authenticated.
+//
+// Three checks, in cheapest-first order so an already-blocked client doesn't
+// pay for two extra queries after the first one already says no:
+//   1. Plan-derived hourly ceiling — abuse circuit-breaker only, sized so it
+//      never blocks legitimate use: max(150, activePrompts × liveEngineCount).
+//   2. Per-client monthly EUR budget — the real cost control, summing
+//      ai_results.cost_eur since the start of the current calendar month
+//      against PLAN_MONTHLY_API_BUDGET_EUR[plan] (see _cost.js for the
+//      derivation of those numbers).
+//   3. Platform-wide monthly EUR ceiling — the last line of defence, summing
+//      cost_eur across ALL clients for the month against
+//      process.env.PLATFORM_MONTHLY_API_BUDGET_EUR (mirrors
+//      _prospect_guard.js's existing checkMonthlyBudget()/GLOBAL_HOURLY_LIMIT
+//      pattern for the Instant Audit Engine — same shape, applied here to the
+//      paying-client collection path, which never had an equivalent).
+
+const PLATFORM_MONTHLY_API_BUDGET_EUR = Number(process.env.PLATFORM_MONTHLY_API_BUDGET_EUR || 12000)
+
+function monthStartIso() {
+  const d = new Date()
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+/**
+ * checkCollectionLimits(supabase, clientId) -> Promise<{ blocked, reason?, message?, detail? }>
+ *
+ * clientId: the CONFIRMED target client for this collection call (from the
+ * request body, after the caller's own ownership check has already passed —
+ * this function does not re-verify ownership, only spend/volume).
+ */
+async function checkCollectionLimits(supabase, clientId) {
+  if (!clientId) return { blocked: false }
+
+  const { data: client } = await supabase
+    .from('clients')
+    .select('plan')
+    .eq('id', clientId)
+    .single()
+
+  // Same fallback convention already established in clientContext.tsx (#104)
+  // for a client with missing/unrecognized plan data.
+  const plan = client && VALID_PLANS.includes(client.plan) ? client.plan : 'essentials'
+
+  // ── 1. Plan-derived hourly ceiling (abuse circuit-breaker) ──
+  const { count: activePromptCount } = await supabase
+    .from('prompts')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+    .eq('is_active', true)
+
+  const hourlyCeiling = Math.max(
+    HOURLY_CEILING_FLOOR,
+    (activePromptCount || 0) * PLAN_LIVE_ENGINE_COUNT[plan],
+  )
+
+  const hourAgo = new Date(Date.now() - 3_600_000).toISOString()
+  const { count: hourlyCount } = await supabase
+    .from('ai_results')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', clientId)
+    .gte('checked_at', hourAgo)
+
+  if (hourlyCount !== null && hourlyCount >= hourlyCeiling) {
+    console.warn(`[Auth] Hourly ceiling hit: client ${clientId} (${plan}) has ${hourlyCount} rows in last hour, ceiling ${hourlyCeiling}`)
+    return {
+      blocked: true,
+      reason: 'hourly_ceiling',
+      message: `Rate limit exceeded: max ${hourlyCeiling} LLM calls/hour for this plan. Try again later.`,
+    }
+  }
+
+  // ── 2. Per-client monthly EUR budget ──
+  const monthStart = monthStartIso()
+  const { data: clientRows } = await supabase
+    .from('ai_results')
+    .select('cost_eur')
+    .eq('client_id', clientId)
+    .gte('checked_at', monthStart)
+
+  const clientSpent = (clientRows || []).reduce((sum, r) => sum + (r.cost_eur || 0), 0)
+  const clientBudget = PLAN_MONTHLY_API_BUDGET_EUR[plan]
+
+  if (clientSpent >= clientBudget) {
+    console.warn(`[Auth] Monthly budget hit: client ${clientId} (${plan}) spent EUR ${clientSpent.toFixed(4)} of EUR ${clientBudget}`)
+    return {
+      blocked: true,
+      reason: 'monthly_budget',
+      message: `Monthly API budget exceeded for this plan (EUR ${clientSpent.toFixed(2)} of EUR ${clientBudget.toFixed(2)}). Contact support to raise this limit.`,
+    }
+  }
+
+  // ── 3. Platform-wide monthly EUR ceiling ──
+  const { data: platformRows } = await supabase
+    .from('ai_results')
+    .select('cost_eur')
+    .gte('checked_at', monthStart)
+
+  const platformSpent = (platformRows || []).reduce((sum, r) => sum + (r.cost_eur || 0), 0)
+
+  if (platformSpent >= PLATFORM_MONTHLY_API_BUDGET_EUR) {
+    console.error(`[Auth] PLATFORM-WIDE monthly budget hit: EUR ${platformSpent.toFixed(2)} of EUR ${PLATFORM_MONTHLY_API_BUDGET_EUR} — blocking client ${clientId}`)
+    return {
+      blocked: true,
+      reason: 'platform_budget',
+      message: 'Collection is temporarily paused platform-wide (monthly API budget reached). Try again later.',
+    }
+  }
+
+  return { blocked: false, detail: { plan, hourlyCeiling, hourlyCount: hourlyCount || 0, clientSpent, clientBudget, platformSpent } }
+}
+
+module.exports = { requireAuth, corsHeaders, ALLOWED_ORIGINS, checkCollectionLimits }
