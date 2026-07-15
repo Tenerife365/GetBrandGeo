@@ -294,12 +294,24 @@ async function callClaude(prompt, ctx, opts) {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
+        // Web search MUST stay on. It was removed by 8b7496c as a cost cut, which
+        // silently made this engine answer from training data only — so it stopped
+        // seeing web-present local businesses (BpR ranked #1 on 07-13 WITH search,
+        // vanished on 07-15 WITHOUT it) while the client's own claude.ai (search on
+        // by default) still ranks them top-3. That is measuring the wrong thing:
+        // the product's whole premise is mirroring what a real user's engine says,
+        // and a real user's Claude searches the web. Cost is controlled via
+        // max_uses:1 + the time budget + collection frequency, never by blinding
+        // the engine. (CLAUDE.md §1.2 / #63 / §12.3 — reconcile the cost math, do
+        // NOT re-remove this.)
+        'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
+        tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
         messages:   [{ role: 'user', content: prompt }],
       }),
     })

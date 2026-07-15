@@ -267,18 +267,24 @@ async function callClaude(prompt, ctx) {
         'Content-Type':      'application/json',
         'x-api-key':         apiKey,
         'anthropic-version': '2023-06-01',
-        // web-search beta header REMOVED 2026-07-10 — see note below.
+        // Web search RE-ENABLED 2026-07-15 (was removed 2026-07-10 as a cost cut).
+        // On this PUBLIC prospect scorecard the removal is even worse than on the
+        // client pipeline: training-data-only Claude misses web-present businesses,
+        // so a prospect whose real Claude ranks them well would be shown Claude as
+        // MISSING them — a false, discouraging result on the exact asset used to
+        // open a sale. Keep this in lockstep with _collect.js's callClaude.
+        'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
-        // WEB SEARCH REMOVED (SCALE-SPEC.md §1.1c / CLAUDE.md §12.3). The tool
-        // was ~75% of Claude's cost ($0.010 search fee + ~7k search-result
-        // tokens into context): ≈€0.040 -> ≈€0.010 per call, no model change.
-        // Matches collect-claude.js and CLAUDE.md §1.2's documented
-        // training-data mode. Do NOT re-add without re-reading the cost note.
+        // Web search is what makes this mirror a real user's Claude. Cost is bounded
+        // by max_uses:1 + the time budget, not by blinding the engine. Do NOT
+        // re-remove without reconciling CLAUDE.md §1.2 / §12.3 — it silently breaks
+        // results for web-present brands.
+        tools:      [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
         messages:   [{ role: 'user', content: prompt }],
       }),
     })
