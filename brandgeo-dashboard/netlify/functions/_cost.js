@@ -91,22 +91,45 @@ function costForRow(llm, errorCode) {
 }
 
 /**
- * PLAN_LIVE_ENGINE_COUNT — how many engines actually collect (and cost
- * money) per plan, used only to derive the SCALE-SPEC.md §2.2 hourly
- * abuse-ceiling formula (max(150, activePrompts * engineCount)). The 4
- * not-yet-built engines (google_ai/copilot/deepseek/grok, see
- * planConfig.ts's COMING_SOON_ENGINES) never collect, so they don't count
- * here even for pro/enterprise, which reserve slots for them.
- * Mirrors planConfig.ts's PLAN_ENGINES — keep counts in sync by hand if
- * that map ever changes.
+ * PLAN_LIVE_ENGINES — the engines that actually collect (and cost money) per
+ * plan. This is the server-side mirror of planConfig.ts's getActiveEngines()
+ * output: PLAN_ENGINES minus the 4 not-yet-built COMING_SOON engines
+ * (google_ai/copilot/deepseek/grok), which never collect even on pro/enterprise
+ * (those tiers only reserve slots for them). Used by the collection queue
+ * (schedule-collections.js / enqueue-collection.js) to decide which engines a
+ * job runs, and by activeEnginesFor() below. Keep in sync with planConfig.ts's
+ * PLAN_ENGINES by hand — same tradeoff as ENGINE_COST_EUR (CJS functions can't
+ * import the Vite-bundled .ts).
  */
-const PLAN_LIVE_ENGINE_COUNT = {
-  free: 1,        // chatgpt
-  essentials: 3,  // chatgpt, gemini, claude
-  growth: 5,      // + perplexity, meta
-  managed: 5,
-  pro: 5,
-  enterprise: 5,
+const PLAN_LIVE_ENGINES = {
+  free:       ['chatgpt'],
+  essentials: ['chatgpt', 'gemini', 'claude'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+}
+
+// Derived from PLAN_LIVE_ENGINES so there is ONE source of truth for the
+// per-plan engine set. Used by _auth.js's SCALE-SPEC §2.2 hourly ceiling
+// (max(150, activePrompts * engineCount)).
+const PLAN_LIVE_ENGINE_COUNT = Object.fromEntries(
+  Object.entries(PLAN_LIVE_ENGINES).map(([plan, engines]) => [plan, engines.length])
+)
+
+/**
+ * activeEnginesFor(plan, enginesEnabled) -> string[]
+ * The engines that should actually run for a client — its plan's live engines,
+ * minus any the admin explicitly disabled via clients.engines_enabled
+ * ({ "meta": false } → drop meta). Mirrors planConfig.ts's getActiveEngines()
+ * for server-side (queue/worker) use. Unknown plan → 'essentials' fallback
+ * (matches clientContext.tsx #104).
+ */
+function activeEnginesFor(plan, enginesEnabled) {
+  const key = PLAN_LIVE_ENGINES[plan] ? plan : 'essentials'
+  const base = PLAN_LIVE_ENGINES[key]
+  if (!enginesEnabled || typeof enginesEnabled !== 'object') return base.slice()
+  return base.filter(e => enginesEnabled[e] !== false)
 }
 
 /**
@@ -149,6 +172,8 @@ module.exports = {
   ENGINE_COST_EUR,
   FREE_ERROR_CODES,
   costForRow,
+  PLAN_LIVE_ENGINES,
   PLAN_LIVE_ENGINE_COUNT,
+  activeEnginesFor,
   PLAN_MONTHLY_API_BUDGET_EUR,
 }

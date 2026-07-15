@@ -76,3 +76,19 @@
 
 [functions."purge-old-audits"]
   schedule = "0 4 * * *"
+
+# ── Collection queue (SCALE-SPEC.md §3) ───────────────────────────────────────
+# Hourly scheduler: enqueues a fresh run for every client whose refresh_cadence
+# is due, then kicks the worker. Does nothing for refresh_cadence='manual' (the
+# default), so this is inert until cadences are set per client.
+[functions."schedule-collections"]
+  schedule = "0 * * * *"
+
+# Manual "Run collection" / "Force Refresh" enqueue endpoint (browser-called).
+# Fast: writes the queue + one worker kick, no engine calls.
+[functions."enqueue-collection"]
+  timeout = 15
+
+# collection-worker-background is a Netlify Background Function (the `-background`
+# filename suffix gives it up to 15 minutes automatically) — like
+# run-full-audit-background, it does NOT take a `timeout` setting.
