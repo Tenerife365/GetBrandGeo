@@ -100,7 +100,7 @@ function classifyGeminiError(httpStatus, err) {
   return 'api_error'
 }
 
-async function callGemini(prompt, ctx) {
+async function callGemini(prompt, ctx, opts) {
   if (!process.env.GEMINI_API_KEY) {
     console.error('[Gemini] GEMINI_API_KEY not set — engine skipped')
     return { text: null, errorCode: 'auth_error', detail: 'GEMINI_API_KEY not set' }
@@ -113,8 +113,11 @@ async function callGemini(prompt, ctx) {
   const models = ['gemini-2.5-flash', 'gemini-3.1-flash-lite']
   let last = { errorCode: 'api_error', detail: 'no model returned a response' }
 
-  const GEMINI_BUDGET_MS  = 18000  // stay inside the caller's 20s outer timeout
-  const GEMINI_ATTEMPT_MS = 9000   // no single model may eat the whole budget
+  // Budgets default to the tight HTTP values (must fit Netlify's 26s wall on the
+  // manual "Refresh this prompt" path), but the worker passes generous overrides
+  // via opts since it has a 15-min window (SCALE-SPEC §3 / CLAUDE.md §12.6).
+  const GEMINI_BUDGET_MS  = opts?.geminiBudgetMs  ?? 18000
+  const GEMINI_ATTEMPT_MS = opts?.geminiAttemptMs ?? 9000
   const deadline = Date.now() + GEMINI_BUDGET_MS
 
   for (const model of models) {
@@ -274,11 +277,14 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
 // ─── Claude — training-data mode, streaming with a wall-clock time budget ──────
 // (verbatim LIVE version from collect-claude.js — NO web search, time budget not
 // a char cap. See §8.4 finding 1.4 / §12.3 before touching this.)
-async function callClaude(prompt, ctx) {
+async function callClaude(prompt, ctx, opts) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error', detail: 'ANTHROPIC_API_KEY not set' } }
 
-  const TIME_BUDGET_MS = 21000
+  // Budget defaults to the tight HTTP value (must fit inside Netlify's 26s
+  // function wall on the manual "Refresh this prompt" path); the worker passes
+  // a generous override via opts.claudeBudgetMs (CLAUDE.md §12.6).
+  const TIME_BUDGET_MS = opts?.claudeBudgetMs ?? 21000
   const deadline = Date.now() + TIME_BUDGET_MS
 
   try {
@@ -374,18 +380,19 @@ async function callClaude(prompt, ctx) {
 // opts carries { marketId, regionLabel } (only ChatGPT uses them today).
 const ENGINE_CALLERS = {
   chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel),
-  gemini:     (p, ctx)    => callGemini(p, ctx),
-  claude:     (p, ctx)    => callClaude(p, ctx),
+  gemini:     (p, ctx, o) => callGemini(p, ctx, o),
+  claude:     (p, ctx, o) => callClaude(p, ctx, o),
   perplexity: (p, ctx)    => callOpenRouter('perplexity/sonar', p, ctx),
   meta:       (p, ctx)    => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),
 }
 
-// Per-engine outer timeout (ms). gemini/perplexity/meta keep collect-prompt's
-// 20s FAST_TIMEOUT. claude/chatgpt self-bound internally (claude's 21s wall-clock
-// budget; gpt-5.5 finishes in ~20-25s) — these generous caps are a backstop
-// against an infinite hang in the 15-min WORKER context and NEVER fire on the
-// 26s HTTP path (Netlify's own 26s kill fires first), so HTTP behaviour is
-// unchanged.
+// Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
+//
+// HTTP path (the manual "Refresh this prompt" button → collect-*.js): tight
+// values that must fit Netlify's 26s function wall. gemini/perplexity/meta keep
+// collect-prompt's 20s FAST_TIMEOUT; claude/chatgpt self-bound internally and
+// these caps only backstop an infinite hang — on the 26s HTTP path Netlify's own
+// kill fires first, so they never actually fire there.
 const ENGINE_TIMEOUT_MS = {
   gemini:     20000,
   perplexity: 20000,
@@ -393,6 +400,33 @@ const ENGINE_TIMEOUT_MS = {
   claude:     24000,
   chatgpt:    40000,
 }
+
+// WORKER path (collection-worker-background.js): the whole reason the queue
+// exists is to escape the 26s wall (SCALE-SPEC §2.2) — a background function gets
+// 15 minutes. gpt-5.5 (reasoning + web search) legitimately runs 45-60s on some
+// prompts, so the old 40s cap was firing as a false `timeout` the moment ChatGPT
+// came back online (CLAUDE.md §12.6). These generous caps let slow prompts finish
+// instead of erroring; they're still far inside the 13-min worker budget.
+const ENGINE_TIMEOUT_MS_WORKER = {
+  gemini:     45000,   // outer cap; gemini's own internal budget (below) is 40s
+  perplexity: 40000,
+  meta:       40000,
+  claude:     60000,
+  chatgpt:    90000,
+}
+
+// Gemini's internal model-fallback budget is separate from the outer timeout
+// above (it lives inside callGemini). The worker passes these generous values so
+// the 2.5-flash → 3.1-flash-lite chain isn't cut off at 18s.
+const GEMINI_BUDGET_WORKER_MS  = 40000
+const GEMINI_ATTEMPT_WORKER_MS = 20000
+
+// Claude's own wall-clock streaming budget (inside callClaude) is likewise
+// separate from the ENGINE_TIMEOUT_MS_WORKER.claude outer cap above — without
+// this override callClaude falls back to its 21000ms default internally and
+// never actually uses the worker's more generous 60s allowance. 5s margin
+// under the 60000ms outer cap so the internal budget always resolves first.
+const CLAUDE_BUDGET_WORKER_MS = 55000
 
 // ─── Row builder ──────────────────────────────────────────────────────────────
 // Turns one engine result into exactly one ai_results row — ok or error, NEVER
@@ -463,16 +497,28 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
 // Returns { rows, summary, ctx }.
 async function collectEngines(engines, {
   prompt_id, prompt_text, client_id, client_config,
-  market_label, region_label, market_id, run_id = null,
+  market_label, region_label, market_id, run_id = null, worker = false,
 }) {
   const ctx  = buildSystemContext(client_config, market_label, region_label)
-  const opts = { marketId: market_id, regionLabel: region_label }
+  // Context-aware timeouts (CLAUDE.md §12.6): the worker gets generous budgets
+  // (15-min window); the HTTP endpoints keep the tight 26s-wall values.
+  const timeouts = worker ? ENGINE_TIMEOUT_MS_WORKER : ENGINE_TIMEOUT_MS
+  const defaultTimeout = worker ? 45000 : 20000
+  const opts = {
+    marketId: market_id,
+    regionLabel: region_label,
+    ...(worker ? {
+      geminiBudgetMs:  GEMINI_BUDGET_WORKER_MS,
+      geminiAttemptMs: GEMINI_ATTEMPT_WORKER_MS,
+      claudeBudgetMs:  CLAUDE_BUDGET_WORKER_MS,
+    } : {}),
+  }
 
   const settled = await Promise.allSettled(
     engines.map((engine) => {
       const caller = ENGINE_CALLERS[engine]
       if (!caller) return Promise.reject(new Error(`unknown engine: ${engine}`))
-      return withTimeout(caller(prompt_text, ctx, opts), ENGINE_TIMEOUT_MS[engine] ?? 20000)
+      return withTimeout(caller(prompt_text, ctx, opts), timeouts[engine] ?? defaultTimeout)
     })
   )
 

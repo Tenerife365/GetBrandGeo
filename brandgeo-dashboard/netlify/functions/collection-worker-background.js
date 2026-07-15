@@ -62,6 +62,7 @@ async function processJob(supabase, job, invId) {
       region_label:  job.region_label,
       market_id:     job.market_id,
       run_id:        job.run_id,
+      worker:        true,   // generous per-engine timeouts (15-min budget) — CLAUDE.md §12.6
     })
 
     if (rows.length > 0) {
