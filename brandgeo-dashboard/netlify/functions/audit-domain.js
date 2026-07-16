@@ -25,7 +25,7 @@ const { classifyCompetitors } = require('./_competitor_filter')
 const {
   buildAuditContext, withTimeout, ALL_CALLERS, SCREENING_ENGINES, FULL_ENGINES, estimateAuditCost,
 } = require('./_prospect_engines')
-const { generateAuditPrompts } = require('./_prospect_prompts')
+const { generateAuditPrompts, buildProspectAliases } = require('./_prospect_prompts')
 const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults } = require('./_score')
 const {
   guardPublicRequest, checkMonthlyBudget, checkGlobalHourlyLimit, generateToken, isPlausibleDomain, normalizeDomain, isInternalCaller,
@@ -82,6 +82,22 @@ exports.handler = async (event) => {
   const promptsToRun = depth === 'screening' ? promptsAll.slice(0, SCREENING_PROMPT_COUNT) : promptsAll
   const estimatedCost = estimateAuditCost(engines, promptsToRun.length)
 
+  // FIX 2026-07-16: brand identity for an anonymous prospect used to be
+  // synthesized as [domain.split('.')[0]] ONLY — a single domain-root token.
+  // That fails to match a real brand name whenever it diverges from the
+  // domain root (e.g. gokickflip.com -> "Kickflip"), confirmed on 4 real
+  // domains where the brand was genuinely named/ranked in engine responses
+  // but analyseResponse() had no matching alias to check against, producing
+  // a false ai_score: 0. generateAuditPrompts() now also extracts the real
+  // brand name (from og:site_name / title / meta, one already-happening LLM
+  // call, no new network round-trip); buildProspectAliases() turns that into
+  // a small, deduped multi-entry alias list — mirroring how real clients'
+  // brand_aliases (CLAUDE.md §3) hold multiple name variants, not one guess.
+  // Falls back to [domain-root] alone if no brand name was extracted, same
+  // as before. See _prospect_prompts.js for the full rationale.
+  const prospectAliases = buildProspectAliases(domain, generated.brandName)
+  console.log(`[Audit/${invId}] brand_name:${generated.brandName || '(none)'} aliases:[${prospectAliases.join(', ')}]`)
+
   const token = generateToken()
   const nowIso = new Date().toISOString()
   const baseRow = {
@@ -125,7 +141,12 @@ exports.handler = async (event) => {
             // function unless the handler itself checks something).
             'X-Internal-Key': process.env.INTERNAL_AUDIT_KEY || '',
           },
-          body: JSON.stringify({ audit_id: inserted.id }),
+          // Thread the already-computed brand identity through to the FULL-depth
+          // worker (fix 2026-07-16, see the comment above prospectAliases) — it
+          // has the identical false-zero-score bug at its own analyseResponse()
+          // call site, and re-deriving this there would mean a second, wasteful
+          // LLM call plus a third copy of the extraction logic.
+          body: JSON.stringify({ audit_id: inserted.id, brand_aliases: prospectAliases, brand_name: generated.brandName || null }),
         }),
         5000,
       )
@@ -173,9 +194,10 @@ exports.handler = async (event) => {
     let analysis
     try {
       // No real client_aliases exist for an audited prospect — synthesize a
-      // minimal config from the domain itself, same fallback shape
-      // analyseResponse already expects (brand_aliases[] + brand_website).
-      analysis = analyseResponse(text, { brand_aliases: [domain.split('.')[0]], brand_website: domain, known_competitors: [] })
+      // config from the domain plus the extracted real brand name (fix
+      // 2026-07-16, see prospectAliases above), same shape analyseResponse
+      // already expects (brand_aliases[] + brand_website).
+      analysis = analyseResponse(text, { brand_aliases: prospectAliases, brand_website: domain, known_competitors: [] })
     } catch (e) {
       console.error(`[Audit/${invId}] analyseResponse threw:`, e.message)
       continue
@@ -198,7 +220,7 @@ exports.handler = async (event) => {
   await Promise.all(engineResults.map(async (er, i) => {
     if (!er.competitors_mentioned) return
     let cands; try { cands = JSON.parse(er.competitors_mentioned) } catch { return }
-    const kept = await classifyCompetitors(cands, { brand: domain.split('.')[0], snippet: er.snippet })
+    const kept = await classifyCompetitors(cands, { brand: generated.brandName || domain.split('.')[0], snippet: er.snippet })
     const val = kept.length ? JSON.stringify(kept) : null
     er.competitors_mentioned = val
     if (scoreRows[i]) scoreRows[i].competitors_mentioned = val

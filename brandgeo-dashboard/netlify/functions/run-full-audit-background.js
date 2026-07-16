@@ -70,6 +70,20 @@ exports.handler = async (event) => {
 
   try {
     const domain = audit.domain
+    // FIX 2026-07-16 (see audit-domain.js's matching comment): brand identity
+    // for an anonymous prospect used to be synthesized as [domain.split('.')[0]]
+    // ONLY — a single domain-root token, which fails to match a real brand
+    // name whenever it diverges from the domain root, producing a false
+    // ai_score: 0 even when the brand is genuinely, repeatedly cited.
+    // audit-domain.js already extracts+builds the real alias list before
+    // triggering this background function; thread it through the trigger
+    // body instead of recomputing (would mean a second LLM call + a third
+    // copy of the extraction logic). Falls back to [domain-root] alone for
+    // any older/direct trigger that doesn't supply it.
+    const prospectAliases = Array.isArray(body.brand_aliases) && body.brand_aliases.length > 0
+      ? body.brand_aliases
+      : [domain.split('.')[0]]
+    const brandForFilter = body.brand_name || domain.split('.')[0]
     const ctx = buildAuditContext(domain)
     const engines = Array.isArray(audit.engines_used) && audit.engines_used.length ? audit.engines_used : FULL_ENGINES
     const prompts = Array.isArray(audit.generated_prompts) ? audit.generated_prompts : []
@@ -109,7 +123,7 @@ exports.handler = async (event) => {
 
       let analysis
       try {
-        analysis = analyseResponse(text, { brand_aliases: [domain.split('.')[0]], brand_website: domain, known_competitors: [] })
+        analysis = analyseResponse(text, { brand_aliases: prospectAliases, brand_website: domain, known_competitors: [] })
       } catch (e) {
         console.error(`[FullAudit/${invId}] analyseResponse threw:`, e.message)
         continue
@@ -133,7 +147,7 @@ exports.handler = async (event) => {
     await Promise.all(engineResults.map(async (er, i) => {
       if (!er.competitors_mentioned) return
       let cands; try { cands = JSON.parse(er.competitors_mentioned) } catch { return }
-      const kept = await classifyCompetitors(cands, { brand: domain.split('.')[0], snippet: er.snippet })
+      const kept = await classifyCompetitors(cands, { brand: brandForFilter, snippet: er.snippet })
       const val = kept.length ? JSON.stringify(kept) : null
       er.competitors_mentioned = val
       if (scoreRows[i]) scoreRows[i].competitors_mentioned = val
