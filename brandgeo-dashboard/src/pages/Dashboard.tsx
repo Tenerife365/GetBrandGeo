@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { TrendingUp, Eye, Target, Hash, RefreshCw } from 'lucide-react'
+import { TrendingUp, Eye, Target, Hash, RefreshCw, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
@@ -16,7 +16,7 @@ import {
   computeAiVisibilityScore, buildScoreResultMap,
   type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
-import { staggerContainer, heroReveal } from '../lib/motion'
+import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
 import MotionCard from '../components/MotionCard'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
@@ -55,6 +55,19 @@ interface OverviewStats {
   promptCount: number
 }
 
+/**
+ * Top-of-page "what to do next" callout — DASHBOARD-UX-2026.md §6 Phase B.
+ * Sourced from the persisted recommendation_runs/recommendations tables
+ * (CLAUDE.md §14, Recommendations.tsx's loadHistory pattern), not recomputed
+ * here — this reads the SAME advice a client would see on /recommendations,
+ * it doesn't run its own rule-based generator.
+ */
+interface TopRec {
+  id: number
+  title: string
+  priority: 'critical' | 'high' | 'medium'
+}
+
 function computeStats(rows: AIResultRow[]): OverviewStats {
   const mentionCount = rows.filter(r => r.brand_mentioned).length
   const posRows = rows.filter(r => r.brand_mentioned && r.brand_position != null)
@@ -81,6 +94,8 @@ export default function Dashboard() {
   const [stats, setStats]         = useState<OverviewStats | null>(null)
   const [scoreData, setScoreData] = useState<{ dimensions: AiVisibilityDimensions; aiScore: number } | null>(null)
   const [loading, setLoading]     = useState(true)
+  const [topRecs, setTopRecs]     = useState<TopRec[]>([])
+  const [recsLoaded, setRecsLoaded] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -149,6 +164,48 @@ export default function Dashboard() {
 
   useEffect(() => { load() }, [activeClientId, timeRange])
 
+  // "What to do next" — reads the SAME persisted advice Recommendations.tsx
+  // shows (recommendation_runs/recommendations, CLAUDE.md §14), it does not
+  // generate its own. Independent of the main load() above so a slower
+  // recs fetch never delays the rest of the page — DASHBOARD-UX-2026.md §7's
+  // "never delay already-loaded data for the sake of an effect" cuts both
+  // ways: this data loading a beat later than the rest is fine, since the
+  // callout only renders once it has real data (recsLoaded && topRecs.length).
+  useEffect(() => {
+    if (isDemoMode || !activeClientId) { setTopRecs([]); setRecsLoaded(true); return }
+    let cancelled = false
+    ;(async () => {
+      setRecsLoaded(false)
+      const { data: runRows } = await supabase
+        .from('recommendation_runs')
+        .select('id')
+        .eq('client_id', activeClientId)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+      const runId = runRows?.[0]?.id
+      if (!runId) {
+        if (!cancelled) { setTopRecs([]); setRecsLoaded(true) }
+        return
+      }
+      const { data } = await supabase
+        .from('recommendations')
+        .select('id, title, priority, status')
+        .eq('run_id', runId)
+        .neq('status', 'dismissed')
+        .order('position', { ascending: true })
+        .limit(2)
+      if (!cancelled) {
+        setTopRecs((data ?? []) as TopRec[])
+        setRecsLoaded(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [activeClientId])
+
+  // Count-up target is real, already-loaded scoreData — active flips true only
+  // once the fetch has resolved, so this animates the display, never the data.
+  const displayedScore = useCountUp(scoreData?.aiScore ?? 0, !!scoreData)
+
   const llmData = LLMS.map(l => {
     const lRows     = rows.filter(r => r.llm === l.id)
     const lMentions = lRows.filter(r => r.brand_mentioned).length
@@ -163,6 +220,14 @@ export default function Dashboard() {
 
   const recentMentioned   = rows.filter(r => r.brand_mentioned).slice(0, 5)
   const recentNotMentioned = rows.filter(r => !r.brand_mentioned).slice(0, 5)
+
+  // Ring sweep math — DASHBOARD-UX-2026.md §6 Phase B. RING_R must match the
+  // SVG circles' r="54" below (kept as one constant so the two never drift).
+  const RING_R = 54
+  const RING_CIRC = 2 * Math.PI * RING_R
+  const ringOffset = scoreData
+    ? RING_CIRC - (scoreData.aiScore / 100) * RING_CIRC
+    : RING_CIRC
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
@@ -186,11 +251,11 @@ export default function Dashboard() {
 
       {scoreData && (
         <motion.div
-          className="bg-dark-800 border border-dark-700 rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-6"
+          className="relative overflow-hidden bg-dark-800 bg-gradient-to-br from-brand-500/5 via-transparent to-transparent border border-dark-700 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-8"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <div className="flex flex-col items-center gap-3 shrink-0">
-            <svg viewBox="0 0 120 120" className="w-32 h-32 sm:w-40 sm:h-40" style={{ overflow: 'visible' }}>
+            <svg viewBox="0 0 120 120" className="w-36 h-36 sm:w-48 sm:h-48" style={{ overflow: 'visible' }}>
               <defs>
                 <linearGradient id="overviewScoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#c4b5fd" />
@@ -201,22 +266,26 @@ export default function Dashboard() {
                   <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                 </filter>
               </defs>
-              <circle cx="60" cy="60" r="54" fill="none"
+              <circle cx="60" cy="60" r={RING_R} fill="none"
                 stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-              <circle cx="60" cy="60" r="54" fill="none" stroke="url(#overviewScoreRingGrad)" strokeWidth="10" strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 54}`}
-                strokeDashoffset={`${2 * Math.PI * 54 - (scoreData.aiScore / 100) * (2 * Math.PI * 54)}`}
+              {/* Sweeps in from empty (0%) to the real score on every mount — genuinely
+                  animates, unlike the old plain-CSS-transition circles, which had no
+                  distinct "from" state to animate from on first paint (DASHBOARD-UX-2026.md §6). */}
+              <motion.circle cx="60" cy="60" r={RING_R} fill="none" stroke="url(#overviewScoreRingGrad)"
+                strokeWidth="10" strokeLinecap="round" strokeDasharray={RING_CIRC}
                 transform="rotate(-90 60 60)" filter="url(#overviewScoreGlow)" opacity="0.3"
-                style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
-              <circle cx="60" cy="60" r="54" fill="none" stroke="url(#overviewScoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 54}`}
-                strokeDashoffset={`${2 * Math.PI * 54 - (scoreData.aiScore / 100) * (2 * Math.PI * 54)}`}
-                transform="rotate(-90 60 60)" style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
+                initial={{ strokeDashoffset: RING_CIRC }} animate={{ strokeDashoffset: ringOffset }}
+                transition={{ duration: 1.4, ease: EASE_OUT }} />
+              <motion.circle cx="60" cy="60" r={RING_R} fill="none" stroke="url(#overviewScoreRingGrad)"
+                strokeWidth="5.5" strokeLinecap="round" strokeDasharray={RING_CIRC}
+                transform="rotate(-90 60 60)"
+                initial={{ strokeDashoffset: RING_CIRC }} animate={{ strokeDashoffset: ringOffset }}
+                transition={{ duration: 1.4, ease: EASE_OUT }} />
               <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-                <tspan fontSize="34" fontWeight="800" fill={theme === 'light' ? '#1e293b' : 'white'} letterSpacing="-1.5">
-                  {scoreData.aiScore}
+                <tspan fontSize="38" fontWeight="800" fill={theme === 'light' ? '#1e293b' : 'white'} letterSpacing="-1.5">
+                  {displayedScore}
                 </tspan>
-                <tspan fontSize="13" fontWeight="500" fill={theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'} dy="-12">%</tspan>
+                <tspan fontSize="14" fontWeight="500" fill={theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'} dy="-13">%</tspan>
               </text>
             </svg>
             <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</div>
@@ -234,6 +303,39 @@ export default function Dashboard() {
               View full breakdown →
             </Link>
           </div>
+        </motion.div>
+      )}
+
+      {/* "What to do next" — top of page, summarized, sourced from the SAME persisted
+          advice /recommendations shows (CLAUDE.md §14), not a duplicate generator.
+          Only renders once real data has loaded and there's something to say — an
+          empty/loading callout would just be noise above the fold. */}
+      {recsLoaded && topRecs.length > 0 && (
+        <motion.div
+          className="mb-8 p-4 sm:p-5 bg-dark-800 border border-violet-500/15 rounded-xl"
+          variants={heroReveal} initial="hidden" animate="show"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-violet-400" />
+            <span className="text-sm font-semibold text-slate-200">What to do next</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
+              AI insight
+            </span>
+          </div>
+          <div className="space-y-2">
+            {topRecs.map(rec => (
+              <div key={rec.id} className="flex items-center gap-2.5 text-sm text-slate-300">
+                <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${
+                  rec.priority === 'critical' ? 'bg-red-400' : rec.priority === 'high' ? 'bg-amber-400' : 'bg-blue-400'
+                }`} />
+                <span className="truncate">{rec.title}</span>
+              </div>
+            ))}
+          </div>
+          <Link to="/recommendations"
+            className="inline-block mt-3 text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors">
+            View all recommendations →
+          </Link>
         </motion.div>
       )}
 
