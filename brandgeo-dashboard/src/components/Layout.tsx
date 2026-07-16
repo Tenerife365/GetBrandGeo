@@ -59,7 +59,7 @@ const CLIENT_GROUPS: { key: ClientGroupKey; label: string }[] = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
-  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin } = useClient()
+  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, updateClientCategory } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
@@ -69,6 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
   const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
+  const [catSaving, setCatSaving]       = useState(false)
 
   // Refs for the three dropdown menus below — used only to detect outside clicks
   // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
@@ -345,6 +346,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )
               })()}
             </div>
+
+            {/* Reclassify the current client's group (admin) */}
+            {activeClient && (
+              <div className="flex items-center gap-2 mt-2 px-1">
+                <span className="text-[11px] text-slate-500 flex-shrink-0">Group</span>
+                <select
+                  value={activeClient.category ?? 'active'}
+                  disabled={catSaving}
+                  onChange={async (e) => {
+                    const next = e.target.value
+                    setCatSaving(true)
+                    try { await updateClientCategory(activeClient.id, next) }
+                    catch (err) { alert('Could not update category: ' + (err as Error).message) }
+                    finally { setCatSaving(false) }
+                  }}
+                  className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-brand-500/50 disabled:opacity-50"
+                  aria-label="Client group category"
+                >
+                  <option value="active">Active</option>
+                  <option value="free">Free</option>
+                  <option value="test">Test</option>
+                  <option value="research">Research</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 

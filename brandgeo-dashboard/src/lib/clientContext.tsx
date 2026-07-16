@@ -30,6 +30,7 @@ interface ClientCtx {
   activeEngines:     EngineId[]                        // engines collecting right now
   engineStates:      Record<EngineId, EngineState>     // full state map
   setClientEngineOverride: (engineId: EngineId, enabled: boolean) => Promise<void>
+  updateClientCategory: (clientId: number, category: string) => Promise<void>  // admin: switcher grouping
 }
 
 const DEFAULT_ENGINES = getActiveEngines('free', null)
@@ -45,6 +46,7 @@ const Ctx = createContext<ClientCtx>({
   activeEngines:           DEFAULT_ENGINES,
   engineStates:            DEFAULT_STATES,
   setClientEngineOverride: async () => {},
+  updateClientCategory:    async () => {},
 })
 
 const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category'
@@ -198,6 +200,26 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     }
   }, [activeClient])
 
+  // Admin-only: change a client's switcher grouping category. The clients table
+  // is service-role-write-only, so this goes through the set-client-category
+  // Netlify function (which requires admin), then updates local state so the
+  // switcher regroups immediately.
+  const updateClientCategory = useCallback(async (clientId: number, category: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token ?? ''
+    const res = await fetch('/.netlify/functions/set-client-category', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ client_id: clientId, category }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as { error?: string }).error || 'Failed to update category')
+    }
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, category } : c))
+    setActiveClient(prev => (prev && prev.id === clientId ? { ...prev, category } : prev))
+  }, [])
+
   return (
     <Ctx.Provider value={{
       activeClientId,
@@ -209,6 +231,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       activeEngines,
       engineStates,
       setClientEngineOverride,
+      updateClientCategory,
     }}>
       {children}
     </Ctx.Provider>
