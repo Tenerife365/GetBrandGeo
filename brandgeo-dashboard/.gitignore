@@ -3,3 +3,8 @@ dist/
 .env.local
 .env*.local
 *.local
+
+# Google service-account key — must only ever live in Netlify's GOOGLE_JSON_KEY
+# env var, never on disk in the repo. force-index.js reads it from env only.
+service-account.json
+*-service-account.json

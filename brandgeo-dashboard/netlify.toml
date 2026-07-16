@@ -92,3 +92,9 @@
 # collection-worker-background is a Netlify Background Function (the `-background`
 # filename suffix gives it up to 15 minutes automatically) — like
 # run-full-audit-background, it does NOT take a `timeout` setting.
+
+# ── Manual "notify Google now" trigger (CLAUDE.md — Google Indexing API) ─────
+# One outbound call to Google; gated by FORCE_INDEX_KEY (see the file's own
+# header comment for the real limits of what this API actually guarantees).
+[functions."force-index"]
+  timeout = 15
