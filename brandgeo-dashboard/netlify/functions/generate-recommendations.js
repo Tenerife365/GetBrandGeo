@@ -184,7 +184,7 @@ GOOD (do this): "1. Publish a LinkedIn ARTICLE titled '<specific title using the
 WEAK (never do this): "Publish thought-leadership content and build your online presence." "Optimise your LinkedIn." — these are banned; always give the exact post/article/profile and its content.
 ` : ''
 
-  const userPrompt = `Analyse the following real AI visibility data for the brand "${brand_name}" and generate 3 to 5 specific, actionable recommendations.
+  const userPrompt = `Analyse the following real AI visibility data for the brand "${brand_name}" and generate 3 to 4 specific, actionable recommendations. Keep each insight to 2-3 sentences and each action to at most 4 short numbered steps — concise but concrete.
 
 ## Per-engine visibility (API-failure rows already excluded)
 ${engineLines || '  (no data)'}
@@ -262,7 +262,7 @@ Return ONLY this JSON (no markdown, no explanation outside it):
 
   // Abort if Anthropic takes too long — we must return JSON before Netlify's 26s kill.
   const ctrl = new AbortController()
-  const killTimer = setTimeout(() => ctrl.abort(), 20000)
+  const killTimer = setTimeout(() => ctrl.abort(), 23000)
 
   let parsed
   try {
