@@ -26,7 +26,7 @@
  * newest-per-(prompt,engine)); doing it now would inflate those aggregates.
  */
 
-const { activeEnginesFor } = require('./_cost')
+const { activeEnginesFor, WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS } = require('./_cost')
 
 // ISO 3166-1 alpha-2 → country name, for scheduled runs that resolve geo from
 // the client's default_market_id (manual runs pass full labels from the browser).
@@ -105,17 +105,40 @@ async function enqueueClientCollection(supabase, {
 
   // 5. Decide each prompt's engine subset (force vs skip)
   const promptIds = prompts.map(p => p.id)
+
+  // Weekly cap (WEEKLY_CAPPED_ENGINES, e.g. google_ai/SerpApi): find the
+  // (prompt, engine) pairs that already ran within WEEKLY_CAP_DAYS. Computed
+  // BEFORE the force-delete below, so a force refresh can't erase the evidence
+  // and bypass the cap. Applies to force AND non-force alike.
+  let cappedSet = new Set()
+  if (WEEKLY_CAPPED_ENGINES.some(e => engines.includes(e))) {
+    const capWindow = new Date(Date.now() - WEEKLY_CAP_DAYS * 86400000).toISOString()
+    const { data: recentCapped } = await supabase
+      .from('ai_results')
+      .select('prompt_id, llm')
+      .eq('client_id', clientId)
+      .in('prompt_id', promptIds)
+      .in('llm', WEEKLY_CAPPED_ENGINES)
+      .gte('checked_at', capWindow)
+    cappedSet = new Set((recentCapped || []).map(r => `${r.prompt_id}:${r.llm}`))
+  }
+
   let perPromptEngines  // Map<prompt_id, string[]>
 
   if (force) {
-    // Delete existing rows for the engines we're about to re-run, then enqueue all.
-    const { error: delErr } = await supabase
-      .from('ai_results')
-      .delete()
-      .eq('client_id', clientId)
-      .in('prompt_id', promptIds)
-      .in('llm', engines)
-    if (delErr) console.error('[Enqueue] force-delete failed:', delErr.message)
+    // Delete existing rows for the engines we're about to re-run — but NEVER
+    // delete a weekly-capped engine (that would wipe the row the cap relies on,
+    // and its cadence is managed by the cap, not by force).
+    const enginesForDelete = engines.filter(e => !WEEKLY_CAPPED_ENGINES.includes(e))
+    if (enginesForDelete.length > 0) {
+      const { error: delErr } = await supabase
+        .from('ai_results')
+        .delete()
+        .eq('client_id', clientId)
+        .in('prompt_id', promptIds)
+        .in('llm', enginesForDelete)
+      if (delErr) console.error('[Enqueue] force-delete failed:', delErr.message)
+    }
     perPromptEngines = new Map(prompts.map(p => [p.id, engines.slice()]))
   } else {
     // Skip (prompt, engine) pairs already collected OK this month.
@@ -134,10 +157,20 @@ async function enqueueClientCollection(supabase, {
     }
   }
 
+  // Apply the weekly cap on top (force + non-force): drop a capped engine from
+  // any prompt that already ran it inside the window.
+  if (cappedSet.size > 0) {
+    for (const [pid, engs] of perPromptEngines) {
+      const kept = engs.filter(e => !(WEEKLY_CAPPED_ENGINES.includes(e) && cappedSet.has(`${pid}:${e}`)))
+      if (kept.length > 0) perPromptEngines.set(pid, kept)
+      else perPromptEngines.delete(pid)
+    }
+  }
+
   const promptById = new Map(prompts.map(p => [p.id, p]))
   const jobPrompts = [...perPromptEngines.keys()]
   if (jobPrompts.length === 0)
-    return { runId: null, totalJobs: 0, skipped: true, reason: 'nothing to collect (all done this month)' }
+    return { runId: null, totalJobs: 0, skipped: true, reason: 'nothing to collect (already up to date)' }
 
   // 6. Create the run
   const { data: run, error: runErr } = await supabase

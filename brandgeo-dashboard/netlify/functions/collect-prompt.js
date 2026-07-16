@@ -24,6 +24,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
+const { WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS } = require('./_cost')
 
 // Engines this endpoint owns. Claude → collect-claude.js, ChatGPT → collect-chatgpt.js.
 // google_ai (Google AI Mode via SerpApi) is handled here too — it's a fast HTTP
@@ -70,13 +71,34 @@ exports.handler = async (event) => {
     ? new Set(active_engines)
     : null   // null = all allowed
 
+  // Weekly cap (e.g. google_ai/SerpApi): if a capped engine already ran for this
+  // (client, prompt) within WEEKLY_CAP_DAYS, it's excluded here — from BOTH the
+  // run and the force-delete — so force can't bypass the cap or wipe the row it
+  // relies on. Computed before the delete below.
+  const isCapped = (llm) => WEEKLY_CAPPED_ENGINES.includes(llm)
+  let cappedRecent = new Set()
+  if (FAST_ENGINES.some(isCapped)) {
+    const capWindow = new Date(Date.now() - WEEKLY_CAP_DAYS * 86400000).toISOString()
+    const { data: recentCapped } = await supabase
+      .from('ai_results')
+      .select('llm')
+      .eq('prompt_id', prompt_id)
+      .eq('client_id', client_id)
+      .in('llm', WEEKLY_CAPPED_ENGINES)
+      .gte('checked_at', capWindow)
+    cappedRecent = new Set((recentCapped || []).map(r => r.llm))
+  }
+  const cappedNow = (llm) => isCapped(llm) && cappedRecent.has(llm)
+
   let toRun
 
   if (force) {
-    // On force, only delete rows for the engines we're about to re-run
-    const enginesForDelete = allowedEngines
+    // On force, only delete rows for the engines we're about to re-run — never a
+    // capped engine that already ran this week (excluded from delete AND run).
+    const enginesForDelete = (allowedEngines
       ? FAST_ENGINES.filter(e => allowedEngines.has(e))
       : FAST_ENGINES.slice()
+    ).filter(e => !cappedNow(e))
     if (enginesForDelete.length > 0) {
       const { error: delErr } = await supabase
         .from('ai_results')
@@ -102,6 +124,7 @@ exports.handler = async (event) => {
     toRun = FAST_ENGINES.filter(llm => {
       if (done.has(llm)) return false
       if (allowedEngines && !allowedEngines.has(llm)) return false
+      if (cappedNow(llm)) return false   // weekly cap (e.g. google_ai) already ran this week
       return true
     })
     if (toRun.length === 0)

@@ -334,22 +334,66 @@ async function callClaude(prompt, ctx) {
   }
 }
 
+// ─── Google AI Mode — via SerpApi (ported from _collect.js) ────────────────────
+// Replaced Meta AI in the audit engine 2026-07-16. Prospect prompts are
+// US/English-oriented, so no `gl` is set (worldwide default = best AI Mode
+// coverage). no_cache forces a fresh capture — SerpApi's AI Mode endpoint caches
+// a failed/empty capture otherwise, so re-runs would return the same miss.
+function flattenAiModeBlocks(blocks) {
+  const out = []
+  const walk = (arr) => {
+    for (const b of (Array.isArray(arr) ? arr : [])) {
+      if (b && typeof b.snippet === 'string' && b.snippet) out.push(b.snippet)
+      if (Array.isArray(b?.list)) walk(b.list)
+    }
+  }
+  walk(blocks)
+  return out.join('\n').trim()
+}
+
+async function callGoogleAiMode(prompt) {
+  const key = process.env.SERPAPI_KEY
+  if (!key) return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
+  const params = new URLSearchParams({ engine: 'google_ai_mode', q: prompt, api_key: key, no_cache: 'true' })
+  try {
+    const r = await fetch(`https://serpapi.com/search?${params.toString()}`)
+    let d
+    try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON` } }
+    const idTag = d?.search_metadata?.id ? ` [serpapi:${d.search_metadata.id}]` : ''
+    if (d.error) {
+      const msg = String(d.error); const lower = msg.toLowerCase()
+      const isAuth  = r.status === 401 || lower.includes('invalid api key') || lower.includes('unauthorized')
+      const isQuota = r.status === 429 || lower.includes('run out of searches') || lower.includes('exceeded') || lower.includes('rate limit')
+      const isRetry = lower.includes("hasn't been saved") || lower.includes('resubmit') || lower.includes('xray')
+      const isNoAiMode = lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found') || lower.includes('ai mode')
+      const errorCode = isAuth ? 'auth_error' : isQuota ? 'quota_exceeded' : (isNoAiMode && !isRetry) ? 'empty_response' : 'api_error'
+      return { text: null, errorCode, detail: `${isRetry ? 'SerpApi capture failed, resubmit: ' : ''}HTTP ${r.status} ${msg}${idTag}`.slice(0, 400) }
+    }
+    let text = typeof d.reconstructed_markdown === 'string' ? d.reconstructed_markdown.trim() : ''
+    if (!text) text = flattenAiModeBlocks(d.text_blocks)
+    if (text) return { text, errorCode: null, detail: null }
+    return { text: null, errorCode: 'empty_response', detail: `Google AI Mode not shown (SerpApi status=${d?.search_metadata?.status || 'unknown'})${idTag}` }
+  } catch (e) {
+    return { text: null, errorCode: e.name === 'AbortError' ? 'timeout' : 'api_error', detail: `threw ${e.message}` }
+  }
+}
+
 // ─── Engine registry ──────────────────────────────────────────────────────────
 // SCREENING = fast + cheap only (gemini/perplexity already proven to share one
 // 26s window together in collect-prompt.js production use, §2.2). FULL = all
 // 5 live engines, matching PLAN_ENGINES' 'growth'/'managed'/'pro' set in
-// planConfig.ts — kept in sync by hand, same duplication-tradeoff already
-// accepted elsewhere in this codebase (DESIGN-SYSTEM.md §1).
+// planConfig.ts (Google AI Mode replaced Meta 2026-07-16) — kept in sync by hand.
 const ALL_CALLERS = {
   chatgpt:    (p, ctx) => callChatGPT(p, ctx),
   gemini:     (p, ctx) => callGemini(p, ctx),
   claude:     (p, ctx) => callClaude(p, ctx),
   perplexity: (p, ctx) => callOpenRouter('perplexity/sonar', p, ctx),
   meta:       (p, ctx) => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),
+  google_ai:  (p) => callGoogleAiMode(p),
 }
 
 const SCREENING_ENGINES = ['gemini', 'perplexity']
-const FULL_ENGINES       = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
+const FULL_ENGINES       = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────
 // SCALE-SPEC.md §2.1 (2026-07-13) consolidated the previously hand-duplicated

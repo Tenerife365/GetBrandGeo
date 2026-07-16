@@ -171,6 +171,14 @@ const PLAN_MONTHLY_API_BUDGET_EUR = {
   enterprise: 900.00,
 }
 
+// Engines capped at 1 run per (client, prompt) per WEEKLY_CAP_DAYS — a hard
+// throttle regardless of manual/force/scheduled, to protect a metered external
+// budget. google_ai (Google AI Mode via SerpApi) runs no_cache, so every call
+// consumes a SerpApi credit; capping it to once/week/prompt keeps a small
+// SerpApi plan (e.g. 250 searches/mo) from being burned by repeated refreshes.
+const WEEKLY_CAPPED_ENGINES = ['google_ai']
+const WEEKLY_CAP_DAYS = 7
+
 module.exports = {
   ENGINE_COST_EUR,
   FREE_ERROR_CODES,
@@ -179,4 +187,6 @@ module.exports = {
   PLAN_LIVE_ENGINE_COUNT,
   activeEnginesFor,
   PLAN_MONTHLY_API_BUDGET_EUR,
+  WEEKLY_CAPPED_ENGINES,
+  WEEKLY_CAP_DAYS,
 }
