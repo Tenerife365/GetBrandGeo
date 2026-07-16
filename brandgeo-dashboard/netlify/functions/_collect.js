@@ -417,6 +417,14 @@ async function callGoogleAiMode(prompt, _ctx, opts) {
   const params = new URLSearchParams({ engine: 'google_ai_mode', q: prompt, api_key: key })
   const marketId = opts?.marketId
   if (marketId && marketId !== 'WW') params.set('gl', String(marketId).toLowerCase())
+  // Force a FRESH capture on every call (no_cache=true). SerpApi's AI Mode engine
+  // sometimes fails to render/save the result ("XRAY file hasn't been saved —
+  // resubmit your search") and then CACHES that empty miss, so identical re-runs
+  // keep returning the same empty result for free. no_cache re-attempts the
+  // capture (SerpApi's own "resubmit" advice) — this is also what a monitoring
+  // product wants: current AI Mode data, not a cached snapshot. Trade-off: every
+  // google_ai search consumes a SerpApi credit (no cache reuse).
+  params.set('no_cache', 'true')
 
   try {
     const r = await fetch(`https://serpapi.com/search?${params.toString()}`)
