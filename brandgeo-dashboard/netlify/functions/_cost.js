@@ -58,7 +58,8 @@ const ENGINE_COST_EUR = {
   chatgpt:    0.060,
   gemini:     0.034,   // 2.5-flash, flat $35/1k grounded prompts (see the note above)
   perplexity: 0.006,
-  meta:       0.001,
+  meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); kept for historical rows
+  google_ai:  0.015,   // Google AI Mode via SerpApi, per-search — PLACEHOLDER, true up to the SerpApi plan price
 }
 
 // Error codes where NO billable API call happened — the request was rejected
@@ -101,13 +102,15 @@ function costForRow(llm, errorCode) {
  * PLAN_ENGINES by hand — same tradeoff as ENGINE_COST_EUR (CJS functions can't
  * import the Vite-bundled .ts).
  */
+// Google AI Mode (google_ai, via SerpApi) replaced Meta AI as the 5th live
+// engine 2026-07-16. Keep in sync with planConfig.ts's PLAN_ENGINES.
 const PLAN_LIVE_ENGINES = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
 }
 
 // Derived from PLAN_LIVE_ENGINES so there is ONE source of truth for the

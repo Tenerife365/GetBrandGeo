@@ -26,7 +26,10 @@ const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
 
 // Engines this endpoint owns. Claude → collect-claude.js, ChatGPT → collect-chatgpt.js.
-const FAST_ENGINES = ['gemini', 'perplexity', 'meta']
+// google_ai (Google AI Mode via SerpApi) is handled here too — it's a fast HTTP
+// call that fits the 26s window. `meta` is retired but kept in the list so an old
+// meta request wouldn't error (no plan includes it anymore, so it won't be sent).
+const FAST_ENGINES = ['gemini', 'perplexity', 'meta', 'google_ai']
 
 exports.handler = async (event) => {
   // Auth: verify JWT + origin (client ownership checked after body parse)

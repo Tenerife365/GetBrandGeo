@@ -148,10 +148,10 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     markets?: MarketSelection[],
     activeEngines?: EngineId[],
   ) => {
-    const engines = activeEngines ?? ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'] as EngineId[]
+    const engines = activeEngines ?? ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'] as EngineId[]
     const runChatgpt    = engines.includes('chatgpt')
     const runClaude     = engines.includes('claude')
-    const promptEngines = engines.filter(e => ['gemini', 'perplexity', 'meta'].includes(e))
+    const promptEngines = engines.filter(e => ['gemini', 'perplexity', 'meta', 'google_ai'].includes(e))
     const runPrompt     = promptEngines.length > 0
 
     const { data: clientRow } = await supabase

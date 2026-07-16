@@ -388,15 +388,77 @@ async function callClaude(prompt, ctx, opts) {
   }
 }
 
+// ─── Google AI Mode — via SerpApi ─────────────────────────────────────────────
+// The only way to capture Google's REAL AI Mode surface: Google has no public API
+// for it, and the Gemini API is a different surface. Endpoint
+// https://serpapi.com/search?engine=google_ai_mode. The response's top-level
+// `reconstructed_markdown` is the full AI Mode answer as markdown (ideal for
+// analyseResponse — it has the lists/rankings we parse); text_blocks[] is the
+// structured fallback. Geo is via `gl` (country) — the LLM system prompt (`ctx`)
+// doesn't apply here, SerpApi isn't a model we can steer.
+function flattenAiModeBlocks(blocks) {
+  const out = []
+  const walk = (arr) => {
+    for (const b of (Array.isArray(arr) ? arr : [])) {
+      if (b && typeof b.snippet === 'string' && b.snippet) out.push(b.snippet)
+      if (Array.isArray(b?.list)) walk(b.list)
+    }
+  }
+  walk(blocks)
+  return out.join('\n').trim()
+}
+
+async function callGoogleAiMode(prompt, _ctx, opts) {
+  const key = process.env.SERPAPI_KEY
+  if (!key) {
+    console.error('[GoogleAIMode] SERPAPI_KEY not set — engine skipped')
+    return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
+  }
+  const params = new URLSearchParams({ engine: 'google_ai_mode', q: prompt, api_key: key })
+  const marketId = opts?.marketId
+  if (marketId && marketId !== 'WW') params.set('gl', String(marketId).toLowerCase())
+
+  try {
+    const r = await fetch(`https://serpapi.com/search?${params.toString()}`)
+    let d
+    try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response` } }
+
+    if (d.error) {
+      const msg = String(d.error)
+      const lower = msg.toLowerCase()
+      const isAuth  = r.status === 401 || lower.includes('invalid api key') || lower.includes('unauthorized')
+      const isQuota = r.status === 429 || lower.includes('run out of searches') || lower.includes('exceeded') || lower.includes('rate limit')
+      const isEmpty = lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found')
+      const errorCode = isAuth ? 'auth_error' : isQuota ? 'quota_exceeded' : isEmpty ? 'empty_response' : 'api_error'
+      console.error('[GoogleAIMode] error:', msg)
+      return { text: null, errorCode, detail: `HTTP ${r.status} ${msg}`.slice(0, 300) }
+    }
+
+    let text = typeof d.reconstructed_markdown === 'string' ? d.reconstructed_markdown.trim() : ''
+    if (!text) text = flattenAiModeBlocks(d.text_blocks)
+    if (!text) {
+      console.warn('[GoogleAIMode] no text_blocks / reconstructed_markdown')
+      return { text: null, errorCode: 'empty_response', detail: 'no AI Mode answer in response' }
+    }
+    console.log('[GoogleAIMode] ok | len:', text.length, '| preview:', text.slice(0, 200))
+    return { text, errorCode: null, detail: null }
+  } catch (e) {
+    if (e.name === 'AbortError') return { text: null, errorCode: 'timeout', detail: 'aborted' }
+    console.error('[GoogleAIMode] threw:', e.message)
+    return { text: null, errorCode: 'api_error', detail: `threw ${e.message}` }
+  }
+}
+
 // ─── Engine registry ──────────────────────────────────────────────────────────
 // Normalized caller map: every engine is (promptText, ctx, opts) => { text, errorCode, detail }.
-// opts carries { marketId, regionLabel } (only ChatGPT uses them today).
+// opts carries { marketId, regionLabel } (ChatGPT + Google AI Mode use them).
 const ENGINE_CALLERS = {
   chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel),
   gemini:     (p, ctx, o) => callGemini(p, ctx, o),
   claude:     (p, ctx, o) => callClaude(p, ctx, o),
   perplexity: (p, ctx)    => callOpenRouter('perplexity/sonar', p, ctx),
   meta:       (p, ctx)    => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),
+  google_ai:  (p, ctx, o) => callGoogleAiMode(p, ctx, o),
 }
 
 // Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
@@ -412,6 +474,7 @@ const ENGINE_TIMEOUT_MS = {
   meta:       20000,
   claude:     24000,
   chatgpt:    40000,
+  google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
 }
 
 // WORKER path (collection-worker-background.js): the whole reason the queue
@@ -426,6 +489,7 @@ const ENGINE_TIMEOUT_MS_WORKER = {
   meta:       40000,
   claude:     60000,
   chatgpt:    90000,
+  google_ai:  45000,   // SerpApi AI Mode can be slow; generous in the 15-min worker
 }
 
 // Gemini's internal model-fallback budget is separate from the outer timeout

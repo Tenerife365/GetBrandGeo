@@ -19,7 +19,7 @@ import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
 // page's palette from drifting out of sync with AIVisibility.tsx (DESIGN-SYSTEM.md §1/§5).
-const LLM_IDS: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
+const LLM_IDS: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
 const LLMS = LLM_IDS.map(id => ({
   id,
   label: ENGINE_META[id].label,

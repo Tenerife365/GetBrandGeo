@@ -22,7 +22,7 @@ import type { LLMName } from '../types'
 // --- Types -------------------------------------------------------------------
 
 // ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
-const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta']
+const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
 // Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
 // file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
 // ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.

@@ -32,17 +32,22 @@ export type EngineState = 'active' | 'coming_soon' | 'locked'
 // set so those tiers auto-unlock them the moment they leave COMING_SOON_ENGINES,
 // without a config change — Growth/Managed deliberately do not reserve those
 // yet (2026-07-09, PRICING-SPEC.md §4 item 4).
+// Google AI Mode (via SerpApi) REPLACED Meta AI as the 5th live engine
+// (2026-07-16). Meta (Llama, training-data only, no web search) was low-signal;
+// Google AI Mode is what real Google users now see. `meta` is retired from every
+// plan set (kept in ENGINE_META below only so historical meta rows still render).
 export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta', 'google_ai', 'copilot', 'deepseek', 'grok'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'meta', 'google_ai', 'copilot', 'deepseek', 'grok'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
 }
 
 // ── Engines not yet built/collecting — always "coming soon" ──────────────────
-export const COMING_SOON_ENGINES = new Set<EngineId>(['google_ai', 'copilot', 'deepseek', 'grok'])
+// google_ai went LIVE 2026-07-16 (Google AI Mode via SerpApi), so it's no longer here.
+export const COMING_SOON_ENGINES = new Set<EngineId>(['copilot', 'deepseek', 'grok'])
 
 // ── All engines in display order ──────────────────────────────────────────────
 export const ALL_ENGINES: EngineId[] = [
@@ -60,8 +65,8 @@ export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
   gemini:     'essentials',
   claude:     'essentials',
   perplexity: 'growth',
-  meta:       'growth',
-  google_ai:  'pro',
+  meta:       'growth',   // retired (no plan includes it) — kept for type completeness
+  google_ai:  'growth',   // Google AI Mode is now the 5th live engine, from Growth up
   copilot:    'pro',
   deepseek:   'pro',
   grok:       'pro',
@@ -80,7 +85,7 @@ export const ENGINE_META: Record<EngineId, {
   claude:     { label: 'Claude',    color: 'text-purple-400',  bg: 'bg-purple-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#a855f7' },
   perplexity: { label: 'Perplexity',color: 'text-cyan-400',    bg: 'bg-cyan-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#06b6d4' },
   meta:       { label: 'Meta AI',   color: 'text-amber-400',   bg: 'bg-amber-400/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#f59e0b' },
-  google_ai:  { label: 'Google AI', color: 'text-red-400',     bg: 'bg-red-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://ai.google',             chartColor: '#ef4444' },
+  google_ai:  { label: 'Google AI Mode', color: 'text-red-400', bg: 'bg-red-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#ef4444' },
   copilot:    { label: 'Copilot',   color: 'text-sky-400',     bg: 'bg-sky-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://copilot.microsoft.com', chartColor: '#38bdf8' },
   deepseek:   { label: 'DeepSeek',  color: 'text-indigo-400',  bg: 'bg-indigo-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://deepseek.com',          chartColor: '#818cf8' },
   grok:       { label: 'Grok',      color: 'text-slate-300',   bg: 'bg-slate-300/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#94a3b8' },
@@ -116,7 +121,8 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   chatgpt:    0.060,
   gemini:     0.034,
   perplexity: 0.006,
-  meta:       0.001,
+  meta:       0.001,   // retired engine; kept for cost calc on historical rows
+  google_ai:  0.015,   // SerpApi Google AI Mode, per-search — PLACEHOLDER, true up to your SerpApi plan's per-search price
 }
 
 // ── Monthly per-client API spend cap (EUR) ───────────────────────────────────
