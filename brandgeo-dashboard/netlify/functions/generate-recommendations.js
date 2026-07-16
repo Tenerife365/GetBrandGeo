@@ -38,6 +38,20 @@ const { requireAuth } = require('./_auth')
 const MODEL = 'claude-haiku-4-5-20251001'
 const VALID_PRIORITIES = ['critical', 'high', 'medium']
 
+// Personal-brand: classify a competitor so the model can reason about the mix
+// (marketplaces/agencies vs actual individuals). Heuristic; unknowns -> boutique.
+const MARKETPLACES = new Set(['malt','toptal','upwork','lemon.io','index.dev','paraform','dover','wellfound','otta','comatch','freelancermap','jobgether','huntly','hunt club','linkedin profinder','talent.io'])
+const AGENCIES = new Set(['hays','robert half','robert walters','randstad','adecco','korn ferry','heidrick & struggles','egon zehnder','boyden','harvey nash','morgan philips','sphere digital'])
+
+function competitorType(name) {
+  const n = String(name || '').toLowerCase().trim()
+  if (MARKETPLACES.has(n)) return 'marketplace'
+  if (AGENCIES.has(n)) return 'agency'
+  const looksIndividual = /^[A-ZÀ-Ý][a-zà-ÿ]+ [A-ZÀ-Ý][a-zà-ÿ]+$/.test(String(name).trim())
+    && !/(recruit|talent|search|staffing|consult|group|partners|tech|digital|inc|ltd|llc|hire|people)/i.test(name)
+  return looksIndividual ? 'individual' : 'boutique'
+}
+
 exports.handler = async (event) => {
   // requireAuth cannot see the body, so it can't do the client_id ownership check for
   // us. Same pattern as the collect-* functions: authenticate first, then re-check
@@ -82,6 +96,15 @@ exports.handler = async (event) => {
     return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
   }
 
+  // Personal-brand awareness: the function looks these up itself, so the caller (dashboard)
+  // needs no change. Fail-safe: any error leaves isPerson=false, i.e. the existing brand path.
+  let isPerson = false
+  let profileUrls = []
+  try {
+    const { data: c } = await supabase.from('clients').select('type, profile_urls').eq('id', client_id).single()
+    if (c) { isPerson = c.type === 'individual'; profileUrls = Array.isArray(c.profile_urls) ? c.profile_urls : [] }
+  } catch { /* default to company/brand path */ }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not set' }) }
@@ -118,7 +141,7 @@ exports.handler = async (event) => {
     const evidence = c.proseOnly
       ? 'PROSE-ONLY: never ranked by any engine; matched only because the client listed them as a competitor themselves'
       : `ranked ${c.rankedMentions}x by engines${pos}`
-    return `  ${i + 1}. ${c.name} — ${c.totalMentions} total mentions [${evidence}]${engines ? ` (${engines})` : ''}`
+    return `  ${i + 1}. ${c.name} [${competitorType(c.name)}] — ${c.totalMentions} total mentions [${evidence}]${engines ? ` (${engines})` : ''}`
   }).join('\n')
 
   const mentionedLines = mentioned_snippets.slice(0, 4).map(s =>
@@ -133,12 +156,29 @@ exports.handler = async (event) => {
     .map(p => `  - [${p.category ?? 'general'}] "${p.text}"`)
     .join('\n')
 
-  const systemPrompt = `You are an AI visibility consultant with deep expertise in how LLMs source and rank brands.
+  const systemPrompt = isPerson
+    ? `You are a personal-brand strategist who understands how AI engines decide which PEOPLE to name when someone asks for the best professional for a job.
+You analyse real data from AI engine responses and help an individual professional get named on buyer-intent queries.
+You recommend person levers ONLY: getting listed on the marketplaces and directories engines cite (e.g. Malt, Toptal), being named in "top [role]" listicles and roundups, publishing owned content that ties their name to the exact buyer phrase, getting quoted, and speaking.
+You NEVER give company-brand tactics (schema markup, review widgets, product/landing pages) to an individual.
+You cite actual competitor names, actual prompt questions, and actual patterns visible in the snippets you are shown.
+You never invent a causal mechanism you cannot see. Saying "the data does not show why" is a correct and valued answer. A confident guess is not.
+You respond only with valid JSON.`
+    : `You are an AI visibility consultant with deep expertise in how LLMs source and rank brands.
 You analyse real data from AI engine responses and give specific, evidence-based recommendations.
 You cite actual competitor names, actual prompt questions, and actual patterns visible in the snippets you are shown.
 You never give generic SEO advice, and you never invent a causal mechanism you cannot see in the data.
 Saying "the data does not show why" is a correct and valued answer. A confident guess is not.
 You respond only with valid JSON.`
+
+  const personaBlock = isPerson ? `
+## This is an INDIVIDUAL, not a company
+Judge buyer visibility ONLY on non-identity prompts. Prompts tagged [direct_brand] are identity checks (someone typing the person's name) — being named there is baseline awareness, NOT buyer visibility. Never treat name-search presence as success.
+Competitors are tagged [marketplace]/[agency]/[individual]/[boutique]. If the ranked results are dominated by marketplaces and agencies with few or no [individual] names, say that plainly — it is the core insight — and steer actions toward getting onto those marketplaces and directories, into "top [role]" listicles, and building owned content that ties the person's name to the buyer phrase. Study any [individual] who did break through.
+
+## What this person already has (reference profiles)
+${profileUrls.length ? profileUrls.map(u => '  - ' + u).join('\n') : '  (none provided)'}
+` : ''
 
   const userPrompt = `Analyse the following real AI visibility data for the brand "${brand_name}" and generate 3 to 5 specific, actionable recommendations.
 
@@ -159,7 +199,7 @@ ${absentLines || '  (none)'}
 
 ## Prompts tracked
 ${promptLines || '  (none)'}
-
+${personaBlock}
 ---
 
 Instructions:
