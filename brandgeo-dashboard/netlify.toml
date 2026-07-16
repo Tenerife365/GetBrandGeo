@@ -9,7 +9,11 @@
   NODE_VERSION = "22"
   # SUPABASE_URL is the public project URL — intentionally embedded in the frontend bundle.
   # VITE_SUPABASE_URL (same value) is inlined by Vite, so Netlify's scanner flags it.
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
+  # INDEXNOW_KEY is an IndexNow verification key — by that protocol's own design it MUST be
+  # public (published at https://getbrandgeo.com/<key>.txt), and the literal value also sits
+  # in that .txt file inside this repo, which is what the scanner is actually catching. Not a
+  # real secret leak, same category of false positive as SUPABASE_URL above.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,INDEXNOW_KEY"
 
 [[headers]]
   for = "/*"
