@@ -21,6 +21,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { analyseResponse } = require('./_analysis')
+const { classifyCompetitors } = require('./_competitor_filter')
 const { buildAuditContext, withTimeout, ALL_CALLERS, FULL_ENGINES } = require('./_prospect_engines')
 const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults } = require('./_score')
 
@@ -124,6 +125,19 @@ exports.handler = async (event) => {
       })
       scoreRows.push({ prompt_id: promptId, engine, brand_mentioned: analysis.brand_mentioned, brand_position: analysis.brand_position, sentiment: analysis.sentiment, competitors_mentioned: analysis.competitors_mentioned })
     }
+
+    // Semantic competitor gate (Master-Reasoning 2026-07-13). This is the OUTBOUND
+    // prospect scorecard, so a false "a competitor was named instead of you" is worse
+    // than for a client. engineResults[i] and scoreRows[i] are pushed in lockstep, so
+    // they align by index. All calls in parallel; fail-open (see _competitor_filter.js).
+    await Promise.all(engineResults.map(async (er, i) => {
+      if (!er.competitors_mentioned) return
+      let cands; try { cands = JSON.parse(er.competitors_mentioned) } catch { return }
+      const kept = await classifyCompetitors(cands, { brand: domain.split('.')[0], snippet: er.snippet })
+      const val = kept.length ? JSON.stringify(kept) : null
+      er.competitors_mentioned = val
+      if (scoreRows[i]) scoreRows[i].competitors_mentioned = val
+    }))
 
     const resultMap = buildResultMap(scoreRows)
     const promptIds = prompts.map(p => p.id)

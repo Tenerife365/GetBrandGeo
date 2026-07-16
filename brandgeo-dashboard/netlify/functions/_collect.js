@@ -25,6 +25,7 @@
  */
 
 const { analyseResponse } = require('./_analysis')
+const { classifyCompetitors } = require('./_competitor_filter')
 const { costForRow } = require('./_cost')
 
 // ─── Geographic / language context ───────────────────────────────────────────
@@ -552,6 +553,19 @@ async function collectEngines(engines, {
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }
+
+  // Semantic competitor gate (Master-Reasoning 2026-07-13): the structural extraction in
+  // _analysis.js still leaks non-companies that no denylist can converge on (certifications,
+  // section nouns, events/awards, the brand's own references). Filter each ok row's
+  // competitor list through one Haiku call, all engines in parallel. FAIL-OPEN: any
+  // failure leaves the structural list untouched, so this is never worse than before.
+  await Promise.all(rows.map(async (row) => {
+    if (row.status !== 'ok' || !row.competitors_mentioned) return
+    let cands
+    try { cands = JSON.parse(row.competitors_mentioned) } catch { return }
+    const kept = await classifyCompetitors(cands, { cfg: client_config, snippet: row.response_snippet })
+    row.competitors_mentioned = kept.length ? JSON.stringify(kept) : null
+  }))
 
   return { rows, summary, ctx }
 }
