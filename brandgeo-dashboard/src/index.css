@@ -36,6 +36,13 @@ html.light {
 }
 
 @layer base {
+  html {
+    /* Inter's own documented OpenType features (matches Linear's published
+       design-system values) — alternate single-story 'a'/'l' forms and a
+       slashed zero so numeric tables (KPI values, engine counts) read
+       unambiguously. DASHBOARD-UX-2026.md §8. */
+    font-feature-settings: 'cv01' on, 'ss03' on, 'zero' on;
+  }
   body {
     background-color: rgb(var(--dark-900));
     color: rgb(var(--text-base));
@@ -103,19 +110,25 @@ html.light .bg-brand-500\/20 {
 html.light .score-ring-number { fill: rgb(15 23 42) !important; }
 html.light .score-ring-label  { fill: rgba(15, 23, 42, 0.5) !important; }
 
-/* Softer card depth — shadow instead of flat hard border */
+/* Card depth (DASHBOARD-UX-2026.md §8) — tightened from a soft, diffuse glow
+   toward the "elevation through geometry" treatment premium dashboards
+   (Linear, Attio) use: a crisp, close shadow plus a near-invisible hairline
+   ring, so surfaces separate by precise edges rather than blur radius. Same
+   selectors/mechanism as before (every .bg-dark-800 card still opts in
+   automatically via its existing border/rounded-xl classes) — only the
+   shadow values changed, so nothing needs to be touched per-component. */
 .bg-dark-800.border.border-dark-700,
 .bg-dark-800.border.border-dark-700\/60 {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .bg-dark-800.rounded-xl {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* Light mode card softening */
 html.light .bg-dark-800.border,
 html.light .bg-dark-800.rounded-xl {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.07) !important;
 }
 
 /* Keyboard focus indicator (Master-Dashboard-Polish Phase 5, WCAG 2.4.7).

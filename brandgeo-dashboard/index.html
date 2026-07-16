@@ -8,6 +8,20 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BrandGEO — Dashboard</title>
+
+    <!-- Deliberate typeface (DASHBOARD-UX-2026.md §8) — the app previously had
+         zero font-family customization and rendered on whatever system-UI stack
+         the OS happened to supply. Inter is the dominant premium-SaaS typeface
+         (Linear, Attio, Vercel); loaded as a variable font via Google Fonts with
+         preconnect so it doesn't block first paint. Auth-gated internal app with
+         no SEO/indexing concern, so a CDN link is the right tradeoff over
+         self-hosting — ships today, no bundler config. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

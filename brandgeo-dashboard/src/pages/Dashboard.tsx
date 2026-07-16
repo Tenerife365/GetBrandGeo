@@ -262,7 +262,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-5 space-y-3">
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-4 space-y-3">
             <Skeleton className="h-4 w-4 rounded" />
             <Skeleton className="h-7 w-16" />
             <Skeleton className="h-3 w-20" />
@@ -297,7 +297,7 @@ export default function Dashboard() {
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">GEO Overview</h1>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">GEO Overview</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             AI visibility snapshot for <span className="text-slate-200 font-medium">{brandName}</span>
           </p>
@@ -370,7 +370,7 @@ export default function Dashboard() {
           empty/loading callout would just be noise above the fold. */}
       {recsLoaded && topRecs.length > 0 && (
         <motion.div
-          className="mb-8 p-4 sm:p-5 bg-dark-800 border border-violet-500/15 rounded-xl"
+          className="mb-8 p-5 bg-dark-800 border border-violet-500/15 rounded-xl"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <div className="flex items-center gap-2 mb-3">
@@ -586,8 +586,13 @@ function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean })
 }
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string }) {
+  // Compact tier (p-4), not Standard (p-5) — these are small data tiles, not
+  // content cards, and the tighter padding reads closer to the "precision-
+  // machined" density research flags on premium dashboards (DASHBOARD-UX-
+  // 2026.md §8). DESIGN-SYSTEM.md already named this 3-tier system; this is
+  // the first place it's actually enforced rather than just documented.
   return (
-    <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+    <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
         {icon}
         <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</span>

@@ -1,9 +1,17 @@
+import defaultTheme from 'tailwindcss/defaultTheme'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
+      // Deliberate typeface, replacing the unstyled Tailwind default stack
+      // (DASHBOARD-UX-2026.md §8). Inter loaded in index.html; keep the real
+      // system-font stack as a fallback for the brief pre-load window.
+      fontFamily: {
+        sans: ['Inter', ...defaultTheme.fontFamily.sans],
+      },
       colors: {
         brand: {
           50:  '#f5f3ff',
