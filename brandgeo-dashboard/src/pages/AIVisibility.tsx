@@ -195,7 +195,10 @@ export default function AIVisibility() {
   const [showFixHub, setShowFixHub]     = useState(true)
   const [copiedFix, setCopiedFix]       = useState<number | null>(null)
   const [refreshed, setRefreshed]       = useState(false)
-  const [refreshingPromptId, setRefreshingPromptId] = useState<number | null>(null)
+  // Granular refresh state (admin, cost-control): re-run one engine across all
+  // prompts, or one (prompt, engine) cell — instead of paying for all 5 engines.
+  const [refreshingEngine, setRefreshingEngine] = useState<EngineId | null>(null)
+  const [refreshingCell, setRefreshingCell]     = useState<string | null>(null)  // `${promptId}:${engineId}`
   const [showEngineModal, setShowEngineModal]         = useState(false)
 
   const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection, runSinglePrompt } = useCollection()
@@ -213,12 +216,32 @@ export default function AIVisibility() {
     load()
   }
 
-  const handleRefreshPrompt = async (prompt: Prompt) => {
-    if (refreshingPromptId !== null || collecting) return
-    setRefreshingPromptId(prompt.id)
-    await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections, activeEngines)
-    await load()
-    setRefreshingPromptId(null)
+  // Per-engine force refresh: re-run ALL prompts for ONE engine only (admin,
+  // cost-control). Reuses the same enqueue+poll pipeline as the master Force
+  // Refresh, just scoped to a single engine — _enqueue deletes and re-collects
+  // ONLY that engine's rows, so you pay for one engine, not five.
+  const handleRefreshEngine = async (engineId: EngineId) => {
+    if (collecting || refreshingEngine !== null) return
+    setRefreshingEngine(engineId)
+    try {
+      await startCollection(activeClientId, true, selections, [engineId])
+    } finally {
+      setRefreshingEngine(null)
+      load()
+    }
+  }
+
+  // Per-(prompt, engine) force refresh: re-run ONE prompt for ONE engine only —
+  // the finest-grained, cheapest re-collect (one API call, one row replaced).
+  const handleRefreshCell = async (prompt: Prompt, engineId: EngineId) => {
+    if (refreshingCell !== null || collecting) return
+    setRefreshingCell(`${prompt.id}:${engineId}`)
+    try {
+      await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections, [engineId])
+      await load()
+    } finally {
+      setRefreshingCell(null)
+    }
   }
 
   const load = async () => {
@@ -596,7 +619,18 @@ export default function AIVisibility() {
             UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
           }[e.status]
           return (
-            <div key={e.id} className={`bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
+            <div key={e.id} className={`relative bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
+              {isAdmin && (
+                <button
+                  onClick={() => handleRefreshEngine(e.id)}
+                  disabled={collecting || refreshingEngine !== null}
+                  className="absolute top-2 right-2 p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-200 transition-colors disabled:opacity-30"
+                  title={`Force refresh ${e.label} only — re-runs all prompts on ${e.label} and charges for this engine alone`}
+                  aria-label={`Force refresh ${e.label} only`}
+                >
+                  <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
+                </button>
+              )}
               <img src={e.logoUrl} alt={e.label} className={`w-8 h-8 rounded-lg object-contain ${e.isUnavailable ? 'opacity-40 grayscale' : ''}`} />
               <div className={`text-sm font-semibold ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</div>
               <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyles.badge}`}>
@@ -911,15 +945,11 @@ export default function AIVisibility() {
                         {mentionCount}/{activeLLMs.filter(l => rowResults?.has(l.id)).length} LLMs
                       </span>
                     )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRefreshPrompt(prompt) }}
-                      disabled={refreshingPromptId === prompt.id || collecting}
-                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
-                      title="Re-run this prompt on all engines"
-                      aria-label="Re-run this prompt on all engines"
-                    >
-                      <RotateCcw size={11} className={refreshingPromptId === prompt.id ? 'animate-spin' : ''} />
-                    </button>
+                    {isAdmin && (
+                      <span className="ml-auto text-[10px] text-slate-600" title="Expand this row to re-run a single engine">
+                        expand to refresh per engine
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm text-slate-300 truncate max-w-md">{prompt.text}</div>
                 </div>
@@ -980,6 +1010,17 @@ export default function AIVisibility() {
                           <div className={`text-xs font-semibold ${llm.color} mb-2 flex items-center gap-1.5`}>
                             <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                             {llm.label}
+                            {isAdmin && (
+                              <button
+                                onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
+                                disabled={refreshingCell !== null || collecting}
+                                className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                                title={`Re-run this prompt on ${llm.label} only — charges for one engine call`}
+                                aria-label={`Re-run this prompt on ${llm.label} only`}
+                              >
+                                <RotateCcw size={11} className={refreshingCell === `${prompt.id}:${llm.id}` ? 'animate-spin' : ''} />
+                              </button>
+                            )}
                           </div>
                           {r ? (
                             <>
