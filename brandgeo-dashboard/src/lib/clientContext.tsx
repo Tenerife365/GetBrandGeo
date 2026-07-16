@@ -16,6 +16,7 @@ export interface Client {
   default_market_id: string | null
   default_region_id: string | null
   stripe_customer_id: string | null
+  category:          string   // active | free | test | research | archived (admin switcher grouping)
 }
 
 interface ClientCtx {
@@ -46,7 +47,7 @@ const Ctx = createContext<ClientCtx>({
   setClientEngineOverride: async () => {},
 })
 
-const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id'
+const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category'
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const saved = parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
@@ -103,7 +104,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             .select('id, name, slug')
             .order('id')
           if (fallback) {
-            const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null }))
+            const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' }))
             setClients(withDefaults as Client[])
             const validId = withDefaults.find(c => c.id === saved)?.id ?? withDefaults[0]?.id ?? 1
             setActiveClientIdState(validId)
@@ -131,7 +132,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             .select('id, name, slug')
             .eq('id', cid)
             .single()
-          if (fallback) setActiveClient({ ...fallback, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null } as Client)
+          if (fallback) setActiveClient({ ...fallback, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' } as Client)
         } else if (myClient) {
           setActiveClient(myClient as Client)
         }

@@ -36,6 +36,26 @@ const TIME_LABELS: Record<TimeRange, string> = {
   'all': 'All time',
 }
 
+// Admin client-switcher grouping. Each client falls into exactly ONE bucket by
+// precedence: test > research > archived > free > active. "Free" derives from an
+// explicit category='free' OR the actual plan='free', so real free-plan signups
+// land there automatically without needing to be categorised. (Master-DashboardDesign)
+type ClientGroupKey = 'active' | 'free' | 'test' | 'research' | 'archived'
+function clientBucket(c: { category?: string | null; plan?: string | null }): ClientGroupKey {
+  if (c.category === 'test')     return 'test'
+  if (c.category === 'research') return 'research'
+  if (c.category === 'archived') return 'archived'
+  if (c.category === 'free' || c.plan === 'free') return 'free'
+  return 'active'
+}
+const CLIENT_GROUPS: { key: ClientGroupKey; label: string }[] = [
+  { key: 'active',   label: 'Active' },
+  { key: 'free',     label: 'Free' },
+  { key: 'test',     label: 'Test' },
+  { key: 'research', label: 'Research' },
+  { key: 'archived', label: 'Archived' },
+]
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
@@ -48,6 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
+  const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
 
   // Refs for the three dropdown menus below — used only to detect outside clicks
   // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
@@ -268,7 +289,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
-                onClick={() => { setShowClients(v => !v); setShowAddMarket(false); setShowLangs(false) }}
+                onClick={() => {
+                  setShowClients(v => {
+                    const opening = !v
+                    // Open on the tab that holds the current client, so the switcher
+                    // shows where you already are.
+                    if (opening && activeClient) setClientGroup(clientBucket(activeClient))
+                    return opening
+                  })
+                  setShowAddMarket(false); setShowLangs(false)
+                }}
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showClients}
@@ -279,19 +309,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </span>
                 <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
               </button>
-              {showClients && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
-                  {clients.map(c => (
-                    <button key={c.id}
-                      onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
-                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
-                    >
-                      <Building2 size={12} className="flex-shrink-0" />
-                      <span>{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {showClients && (() => {
+                // Bucket every client, then show tabs for the non-empty groups
+                // and the list for the selected one (Master-DashboardDesign).
+                const grouped: Record<ClientGroupKey, typeof clients> = { active: [], free: [], test: [], research: [], archived: [] }
+                clients.forEach(c => { grouped[clientBucket(c)].push(c) })
+                const tabs = CLIENT_GROUPS.filter(g => grouped[g.key].length > 0)
+                const current: ClientGroupKey = grouped[clientGroup].length ? clientGroup : (tabs[0]?.key ?? 'active')
+                return (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                    <div className="flex flex-wrap gap-1 p-2 border-b border-dark-600 bg-dark-800/40" role="tablist">
+                      {tabs.map(g => (
+                        <button key={g.key}
+                          role="tab"
+                          aria-selected={current === g.key}
+                          onClick={() => setClientGroup(g.key)}
+                          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${current === g.key ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-600 border border-transparent'}`}
+                        >
+                          {g.label} <span className="opacity-60">{grouped[g.key].length}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto">
+                      {grouped[current].map(c => (
+                        <button key={c.id}
+                          onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
+                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                        >
+                          <Building2 size={12} className="flex-shrink-0" />
+                          <span className="truncate">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}
