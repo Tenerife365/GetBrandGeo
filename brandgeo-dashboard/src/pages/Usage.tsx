@@ -31,8 +31,12 @@ const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, nu
 //    The cost_eur column now meters this per row for real, so these estimates
 //    can be trued up from actual data instead of re-derived by hand.
 
-// 50% overhead to cover platform costs (Supabase, Netlify, hosting, Plausible, domain, etc.)
-const OVERHEAD_MULTIPLIER = 1.5
+// The headline now shows real metered API spend (sum of cost_eur), NOT a
+// flat-estimate × row-count × overhead figure — that estimate was exactly why the
+// page read lower than the actual bill. Platform overhead (Supabase/Netlify/etc.) is
+// deliberately no longer folded in here: this card is API spend, which is the number
+// that was in dispute. ENGINE_COST is now only the fallback for legacy rows whose
+// cost_eur is NULL (collected before metering landed).
 
 // Sourced from ENGINE_META (planConfig.ts) instead of a hardcoded local map — same
 // duplication-drift risk DESIGN-SYSTEM.md §1/§5 flagged for Dashboard.tsx/Competitors.tsx.
@@ -46,7 +50,8 @@ interface ClientUsage {
   clientName: string
   byEngine: Record<string, number>
   totalResponses: number
-  totalCost: number
+  totalCost: number       // real metered spend: sum(cost_eur), flat estimate only for legacy rows
+  estimatedResponses: number  // rows with a NULL cost_eur (pre-metering) — counted via flat estimate
 }
 
 export default function Usage() {
@@ -59,29 +64,43 @@ export default function Usage() {
     if (!isAdmin) return
     const load = async () => {
       setLoading(true)
-      let q = supabase.from('ai_results').select('client_id, llm')
+      // Real metered spend: cost_eur is written per row at collection time
+      // (SCALE-SPEC.md §2.1 / _cost.js), so we SUM it instead of recomputing a flat
+      // estimate × row count — that estimate was the whole reason "the table" read
+      // lower than the actual bill. Rows collected before metering landed have a NULL
+      // cost_eur; those fall back to the flat per-engine estimate and are counted so we
+      // can show how much of the total is real vs. estimated.
+      let q = supabase.from('ai_results').select('client_id, llm, cost_eur')
       const startDate = getStartDate()
       if (startDate) q = q.gte('checked_at', startDate.toISOString())
       const { data } = await q
 
       if (!data) { setLoading(false); return }
 
-      const byClient: Record<number, Record<string, number>> = {}
+      type Acc = { byEngine: Record<string, number>; cost: number; estimated: number }
+      const byClient: Record<number, Acc> = {}
       for (const row of data) {
         const cid = row.client_id as number
-        if (!byClient[cid]) byClient[cid] = {}
-        byClient[cid][row.llm] = (byClient[cid][row.llm] ?? 0) + 1
+        const llm = row.llm as string
+        const acc = byClient[cid] ?? (byClient[cid] = { byEngine: {}, cost: 0, estimated: 0 })
+        acc.byEngine[llm] = (acc.byEngine[llm] ?? 0) + 1
+        const metered = (row as { cost_eur: number | null }).cost_eur
+        if (metered != null) {
+          acc.cost += metered
+        } else {
+          acc.cost += ENGINE_COST[llm] ?? 0   // legacy fallback (flat estimate)
+          acc.estimated += 1
+        }
       }
 
-      const result: ClientUsage[] = Object.entries(byClient).map(([cid, engines]) => {
+      const result: ClientUsage[] = Object.entries(byClient).map(([cid, acc]) => {
         const clientId = Number(cid)
         const clientName = clients.find(c => c.id === clientId)?.name ?? `Client ${clientId}`
-        const totalResponses = Object.values(engines).reduce((a, b) => a + b, 0)
-        const totalCost = Object.entries(engines).reduce(
-          (sum, [llm, cnt]) => sum + cnt * (ENGINE_COST[llm] ?? 0),
-          0
-        ) * OVERHEAD_MULTIPLIER
-        return { clientId, clientName, byEngine: engines, totalResponses, totalCost }
+        const totalResponses = Object.values(acc.byEngine).reduce((a, b) => a + b, 0)
+        return {
+          clientId, clientName, byEngine: acc.byEngine, totalResponses,
+          totalCost: acc.cost, estimatedResponses: acc.estimated,
+        }
       }).sort((a, b) => b.totalCost - a.totalCost)
 
       setRows(result)
@@ -94,6 +113,7 @@ export default function Usage() {
 
   const grandTotal     = rows.reduce((s, r) => s + r.totalCost, 0)
   const grandResponses = rows.reduce((s, r) => s + r.totalResponses, 0)
+  const grandEstimated = rows.reduce((s, r) => s + r.estimatedResponses, 0)
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
@@ -101,7 +121,8 @@ export default function Usage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Usage &amp; Costs</h1>
         <p className="text-sm text-slate-400 mt-0.5">
-          Estimated API spend per client based on response counts
+          Metered API spend per client (real per-row <code className="text-slate-300">cost_eur</code>),
+          with a flat estimate for pre-metering rows
         </p>
       </div>
 
@@ -110,10 +131,14 @@ export default function Usage() {
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={15} className="text-emerald-400" />
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Est. Total Cost</span>
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">API Cost (metered)</span>
           </div>
           <div className="text-2xl font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</div>
-          <p className="text-xs text-slate-500 mt-1">across all clients</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {grandEstimated > 0
+              ? `across all clients · ${grandEstimated.toLocaleString()} legacy row${grandEstimated === 1 ? '' : 's'} estimated`
+              : 'across all clients · fully metered'}
+          </p>
         </div>
 
         <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
