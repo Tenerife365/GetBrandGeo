@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
@@ -18,6 +18,7 @@ import {
 } from '../lib/aiVisibilityScore'
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
 import MotionCard from '../components/MotionCard'
+import Skeleton from '../components/Skeleton'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
@@ -89,6 +90,10 @@ export default function Dashboard() {
   const { getStartDate, timeRange } = useTimeFilter()
   const { theme } = useTheme()
   const brandName = activeClient?.name ?? 'your brand'
+  // Gates the Recharts draw-in animation below (DASHBOARD-UX-2026.md §6 Phase C).
+  // Not covered by App.tsx's <MotionConfig> — Recharts isn't a Motion component,
+  // same reason useCountUp checks this itself in motion.ts.
+  const prefersReducedMotion = useReducedMotion()
 
   const [rows, setRows]           = useState<AIResultRow[]>([])
   const [stats, setStats]         = useState<OverviewStats | null>(null)
@@ -229,9 +234,62 @@ export default function Dashboard() {
     ? RING_CIRC - (scoreData.aiScore / 100) * RING_CIRC
     : RING_CIRC
 
+  // Content-shaped skeleton (DASHBOARD-UX-2026.md §6 Phase C) — mirrors the real
+  // page's layout below (header / hero score card / KPI grid / two chart cards)
+  // so the page doesn't visually jump/reflow once data arrives (CLS). Replaces
+  // the old centered "pulsing text" spinner.
   if (loading) return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-slate-500 text-sm animate-pulse">{t.dash_loading}</div>
+    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-9 w-28 rounded-lg" />
+      </div>
+
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+        <div className="flex flex-col items-center gap-3 shrink-0">
+          <Skeleton className="w-36 h-36 sm:w-48 sm:h-48 rounded-full" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+        <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 rounded-lg" />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-5 space-y-3">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-7 w-16" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-6 space-y-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-[200px] w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-6 space-y-3">
+            <Skeleton className="h-4 w-36" />
+            {Array.from({ length: 5 }).map((_, j) => (
+              <Skeleton key={j} className="h-9 w-full rounded-lg" />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -399,7 +457,13 @@ export default function Dashboard() {
                   formatter={(v: any) => [`${v}%`, 'Mention rate']}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
-                <Bar dataKey="rate" radius={[4, 4, 0, 0]}>
+                <Bar
+                  dataKey="rate"
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={!prefersReducedMotion}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                >
                   {llmData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}

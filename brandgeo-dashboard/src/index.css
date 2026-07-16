@@ -194,4 +194,14 @@ html.light .card-hover-lift:hover {
     transition: none;
     transform: none;
   }
+
+  /* Tailwind's animate-pulse (skeleton loaders, DASHBOARD-UX-2026.md Phase C,
+     and every page's older "pulsing text" loading state) is a plain @keyframes
+     opacity animation — not covered by Motion's <MotionConfig>. Freeze it to
+     a static half-opacity state instead of stopping it dead at a random frame
+     (which can otherwise land on invisible). */
+  .animate-pulse {
+    animation: none;
+    opacity: 0.6;
+  }
 }
