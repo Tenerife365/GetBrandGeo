@@ -1,9 +1,24 @@
 /**
- * force-index.js — manual "notify Google now" trigger for getbrandgeo.com pages.
+ * force-index.js — manual "notify search engines now" trigger for getbrandgeo.com pages.
  *
  * Wraps Google's Indexing API (urlNotifications.publish) with the auth + domain
  * guard every other function in this codebase has and the copy-pasted quickstart
- * snippet this was built from did not.
+ * snippet this was built from did not. Also submits the same URL to IndexNow
+ * (https://www.indexnow.org — a single open protocol; despite api.indexnow.org's
+ * hostname it isn't Bing-specific, submissions fan out to every participating
+ * engine: Bing, Yandex, Seznam.cz, Naver, and others).
+ *
+ * ── IndexNow key-file placement — this matters, don't skip it ────────────────
+ * IndexNow requires a verification file at the ROOT of the domain the submitted
+ * URLs belong to: https://getbrandgeo.com/<key>.txt, containing nothing but the
+ * key. Because collect requests are for getbrandgeo.com pages (the cPanel-
+ * hosted marketing site, NOT this Netlify project — app.getbrandgeo.com is a
+ * different host), that file has to be uploaded to `brandgeo/web/` via cPanel,
+ * the same way every other file on that site is deployed. Putting it in this
+ * repo's Netlify-served output would publish it on the wrong domain and the
+ * verification would fail. The generated key file for this project already
+ * lives at `brandgeo/web/b857aee5749c1fb84e8cf6b220793454.txt` locally — see
+ * CLAUDE.md §9.24 for the upload step.
  *
  * ── Real limitation, not a caveat to bury ─────────────────────────────────────
  * Google documents this API as supported ONLY for pages carrying JobPosting or
@@ -123,10 +138,31 @@ exports.handler = async (event) => {
       requestBody: { url: parsed.toString(), type },
     });
 
-    console.log(`[force-index] ok | ${type} | ${parsed.toString()}`);
+    console.log(`[force-index] ok | google | ${type} | ${parsed.toString()}`);
+
+    // IndexNow — deliberately wrapped in its own try/catch and never allowed
+    // to fail the whole request. Google's result is what this function's
+    // callers actually depend on; an IndexNow hiccup (key not configured yet,
+    // the endpoint being briefly down) should degrade to "skipped"/"failed"
+    // in the response, not turn a working Google notification into a 502.
+    let bing = { ok: false, skipped: true };
+    if (process.env.INDEXNOW_KEY) {
+      try {
+        const indexNowUrl = `https://api.indexnow.org/indexnow?url=${encodeURIComponent(parsed.toString())}&key=${process.env.INDEXNOW_KEY}`;
+        const bingResponse = await fetch(indexNowUrl);
+        bing = { ok: bingResponse.ok, status: bingResponse.status };
+        console.log(`[force-index] ${bingResponse.ok ? 'ok' : 'failed'} | indexnow | ${bingResponse.status} | ${parsed.toString()}`);
+      } catch (err) {
+        bing = { ok: false, error: err.message };
+        console.error('[force-index] IndexNow call failed:', err.message);
+      }
+    } else {
+      console.log('[force-index] INDEXNOW_KEY not set — skipping IndexNow (Bing/Yandex/etc.)');
+    }
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: response.data }),
+      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: response.data, bing }),
     };
   } catch (err) {
     console.error('[force-index] Google Indexing API call failed:', err.message);
