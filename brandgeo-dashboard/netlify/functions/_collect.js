@@ -423,25 +423,50 @@ async function callGoogleAiMode(prompt, _ctx, opts) {
     let d
     try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response` } }
 
+    const searchId = d?.search_metadata?.id
+    const idTag = searchId ? ` [serpapi:${searchId}]` : ''
+
     if (d.error) {
       const msg = String(d.error)
       const lower = msg.toLowerCase()
       const isAuth  = r.status === 401 || lower.includes('invalid api key') || lower.includes('unauthorized')
       const isQuota = r.status === 429 || lower.includes('run out of searches') || lower.includes('exceeded') || lower.includes('rate limit')
-      const isEmpty = lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found')
-      const errorCode = isAuth ? 'auth_error' : isQuota ? 'quota_exceeded' : isEmpty ? 'empty_response' : 'api_error'
+      // SerpApi's (new-ish) AI Mode endpoint sometimes fails to capture the result
+      // and asks you to resubmit ("...XRAY file hasn't been saved. Please contact
+      // support or resubmit your search."). A search is still consumed. Flag it as
+      // a transient SerpApi-side capture issue — NOT our bug, NOT a real "brand
+      // absent" signal — so it's distinguishable and worth a manual resubmit.
+      const isRetry = lower.includes("hasn't been saved") || lower.includes('resubmit') || lower.includes('xray')
+      const isNoAiMode = lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found') || lower.includes('ai mode')
+      const errorCode = isAuth ? 'auth_error'
+        : isQuota ? 'quota_exceeded'
+        : isNoAiMode && !isRetry ? 'empty_response'
+        : 'api_error'
       console.error('[GoogleAIMode] error:', msg)
-      return { text: null, errorCode, detail: `HTTP ${r.status} ${msg}`.slice(0, 300) }
+      const prefix = isRetry ? 'SerpApi capture failed, resubmit: ' : ''
+      return { text: null, errorCode, detail: `${prefix}HTTP ${r.status} ${msg}${idTag}`.slice(0, 400) }
     }
 
     let text = typeof d.reconstructed_markdown === 'string' ? d.reconstructed_markdown.trim() : ''
     if (!text) text = flattenAiModeBlocks(d.text_blocks)
-    if (!text) {
-      console.warn('[GoogleAIMode] no text_blocks / reconstructed_markdown')
-      return { text: null, errorCode: 'empty_response', detail: 'no AI Mode answer in response' }
+
+    if (text) {
+      console.log('[GoogleAIMode] ok | len:', text.length, '| preview:', text.slice(0, 200))
+      return { text, errorCode: null, detail: null }
     }
-    console.log('[GoogleAIMode] ok | len:', text.length, '| preview:', text.slice(0, 200))
-    return { text, errorCode: null, detail: null }
+
+    // Success metadata but no AI Mode content. This is NOT a code failure and NOT
+    // a real "brand absent" result — it means Google did not render an AI Mode
+    // answer for this query (AI Mode is US/English-first; many non-English markets
+    // have thin/no coverage), or SerpApi couldn't capture it. Record it with a
+    // self-explanatory detail so the row never reads as a broken engine.
+    const status = d?.search_metadata?.status || 'unknown'
+    console.warn(`[GoogleAIMode] no AI Mode content (SerpApi status=${status})${idTag}`)
+    return {
+      text: null,
+      errorCode: 'empty_response',
+      detail: `Google AI Mode not shown for this query/market (SerpApi status=${status}, no text_blocks/reconstructed_markdown)${idTag}`,
+    }
   } catch (e) {
     if (e.name === 'AbortError') return { text: null, errorCode: 'timeout', detail: 'aborted' }
     console.error('[GoogleAIMode] threw:', e.message)
