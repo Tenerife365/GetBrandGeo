@@ -178,6 +178,10 @@ Competitors are tagged [marketplace]/[agency]/[individual]/[boutique]. If the ra
 
 ## What this person already has (reference profiles)
 ${profileUrls.length ? profileUrls.map(u => '  - ' + u).join('\n') : '  (none provided)'}
+
+## ACTION STYLE — every action for this individual must be this concrete
+GOOD (do this): "1. Publish a LinkedIn ARTICLE titled '<specific title using their real angle from the data>' — open with <specific hook>. 2. Post a LinkedIn TEXT POST every Tuesday on <one specific topic>, closing with a one-line fractional-availability CTA. 3. Create a profile on <the exact marketplace that appears in the competitor data, e.g. Malt> with the headline '<exact keyword-rich headline matching a buyer prompt>'. 4. To get into roundups, Google '<exact search query>' and pitch the authors of the top 3 results with <the subject's unique angle>."
+WEAK (never do this): "Publish thought-leadership content and build your online presence." "Optimise your LinkedIn." — these are banned; always give the exact post/article/profile and its content.
 ` : ''
 
   const userPrompt = `Analyse the following real AI visibility data for the brand "${brand_name}" and generate 3 to 5 specific, actionable recommendations.
@@ -227,9 +231,15 @@ Instructions:
    ${brand_name} — we simply failed to collect from it. Never issue a recommendation about that
    engine's visibility. If it is worth mentioning at all, say the data is missing.
 
-5. ACTIONS must be concrete and specific to this brand's situation — a thing to publish, fix,
-   claim, or measure — not "improve your SEO". Ground the action in the same evidence as the
-   insight.
+5. ACTIONS must be executable THIS WEEK, not directional. Write each action as 2 to 4 numbered
+   steps. Every step names the EXACT channel/platform and the EXACT format, and every content step
+   gives ready-to-use specifics: a concrete post or article title/hook and its angle, built from
+   THIS subject's real differentiators visible in the data. Name a specific platform to join only
+   when it appears in the data (the marketplaces/directories among the competitors). When a named
+   external source (a listicle, article, journalist, or URL) would be needed but is NOT visible in
+   the data, give the EXACT search query to find it instead of inventing a name or link. Never
+   invent a URL, publication name, metric, or citation. "Improve your SEO", "publish more content",
+   or "build your online presence" are failures — if you write one, you have not done the task.
 
 6. PRIORITY: "critical" = 0% on an engine that DID return data, or a competitor ranked by
    engines far more often than ${brand_name}. "high" = a significant, evidenced gap.
