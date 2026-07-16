@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock,
@@ -16,6 +17,8 @@ import {
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
+import { MOTION_BASE, EASE_OUT } from '../lib/motion'
+import Collapse from '../components/Collapse'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -724,7 +727,7 @@ export default function AIVisibility() {
             {showFixHub ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
           </button>
 
-          {showFixHub && (
+          <Collapse open={showFixHub}>
             <div className="border-t border-dark-700/50 divide-y divide-dark-700/50">
               {fixItems.map((item, idx) => {
                 const pStyles = {
@@ -762,7 +765,7 @@ export default function AIVisibility() {
                 )
               })}
             </div>
-          )}
+          </Collapse>
         </div>
       )}
 
@@ -788,7 +791,7 @@ export default function AIVisibility() {
             {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
           </button>
 
-          {showInsights && (
+          <Collapse open={showInsights}>
             <div className="px-5 pb-4 border-t border-dark-700/50">
               <p className="text-xs text-slate-500 mt-3 mb-3">
                 Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
@@ -804,7 +807,7 @@ export default function AIVisibility() {
                 ))}
               </div>
             </div>
-          )}
+          </Collapse>
         </div>
       )}
 
@@ -910,6 +913,7 @@ export default function AIVisibility() {
           ))}
         </div>
 
+        <AnimatePresence initial={false}>
         {filtered.map((prompt, i) => {
           const rowResults = results.get(prompt.id)
           const isExpanded = expandedRow === prompt.id
@@ -917,7 +921,15 @@ export default function AIVisibility() {
           const hasData = activeLLMs.some(l => rowResults?.has(l.id))
 
           return (
-            <div key={prompt.id} className="border-b border-dark-700 last:border-0">
+            <motion.div
+              key={prompt.id}
+              layout="position"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
+              className="border-b border-dark-700 last:border-0"
+            >
               <div
                 className="w-full grid hover:bg-dark-700/30 transition-colors cursor-pointer"
                 style={{ gridTemplateColumns: tableColsTemplate }}
@@ -992,7 +1004,7 @@ export default function AIVisibility() {
                 })}
               </div>
 
-              {isExpanded && (
+              <Collapse open={isExpanded}>
                 <div className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
                   <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(activeLLMs.length, 5)}, 1fr)` }}>
                     {activeLLMs.map(llm => {
@@ -1079,10 +1091,11 @@ export default function AIVisibility() {
                     )
                   })()}
                 </div>
-              )}
-            </div>
+              </Collapse>
+            </motion.div>
           )
         })}
+        </AnimatePresence>
 
         {filtered.length === 0 && (
           <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
