@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MotionConfig } from 'motion/react'
 import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
@@ -53,6 +54,14 @@ function DemoLoginInterceptor() {
 
 export default function App() {
   return (
+    // reducedMotion="user" — the SINGLE reduced-motion switch for the whole
+    // app (DASHBOARD-UX-2026.md §3/§7). Every motion.* component anywhere in
+    // the tree automatically snaps to its final state with no transform/
+    // opacity animation when the OS has prefers-reduced-motion set, with zero
+    // per-component logic. Layout animations (height/position, e.g. Phase D's
+    // expand/collapse) still run — only the decorative transform/opacity
+    // motion is suppressed, which is the correct behavior per WCAG 2.3.3.
+    <MotionConfig reducedMotion="user">
     <ThemeProvider>
       <I18nProvider>
       <ClientProvider>
@@ -85,5 +94,6 @@ export default function App() {
       </ClientProvider>
       </I18nProvider>
     </ThemeProvider>
+    </MotionConfig>
   )
 }

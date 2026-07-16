@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion } from 'motion/react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
@@ -15,6 +16,8 @@ import {
   computeAiVisibilityScore, buildScoreResultMap,
   type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
+import { staggerContainer, heroReveal } from '../lib/motion'
+import MotionCard from '../components/MotionCard'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
@@ -182,7 +185,10 @@ export default function Dashboard() {
       </div>
 
       {scoreData && (
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-6">
+        <motion.div
+          className="bg-dark-800 border border-dark-700 rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-center gap-6"
+          variants={heroReveal} initial="hidden" animate="show"
+        >
           <div className="flex flex-col items-center gap-3 shrink-0">
             <svg viewBox="0 0 120 120" className="w-32 h-32 sm:w-40 sm:h-40" style={{ overflow: 'visible' }}>
               <defs>
@@ -228,11 +234,14 @@ export default function Dashboard() {
               View full breakdown →
             </Link>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <motion.div
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+          variants={staggerContainer} initial="hidden" animate="show"
+        >
           <KpiCard
             icon={<TrendingUp size={18} className="text-brand-400" />}
             label={t.dash_statMentionRate}
@@ -265,11 +274,14 @@ export default function Dashboard() {
             value={<div className="text-2xl font-bold text-white tabular-nums">{stats.totalChecks}</div>}
             sub={t.dash_statChecksDesc}
           />
-        </div>
+        </motion.div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+      <motion.div
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+        variants={staggerContainer} initial="hidden" animate="show"
+      >
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_mentionRate}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionRateDesc, { brand: brandName })}</p>
           {llmData.length === 0 ? (
@@ -301,9 +313,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
+        </MotionCard>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-4">{t.dash_brandVisibility}</h2>
           {stats && stats.totalChecks > 0 ? (
             <>
@@ -334,11 +346,14 @@ export default function Dashboard() {
           ) : (
             <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noResults}</p>
           )}
-        </div>
-      </div>
+        </MotionCard>
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+      <motion.div
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        variants={staggerContainer} initial="hidden" animate="show"
+      >
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
           {recentMentioned.length === 0 ? (
@@ -350,9 +365,9 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </MotionCard>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
           {recentNotMentioned.length === 0 ? (
@@ -364,8 +379,8 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </MotionCard>
+      </motion.div>
     </div>
   )
 }
@@ -406,13 +421,13 @@ function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean })
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string }) {
   return (
-    <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+    <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-5">
       <div className="flex items-center gap-2 mb-3">
         {icon}
         <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</span>
       </div>
       {value}
       <p className="text-xs text-slate-600 mt-1">{sub}</p>
-    </div>
+    </MotionCard>
   )
 }

@@ -12,6 +12,16 @@
   --text-base:    241 245 249;
   --text-secondary: 148 163 184;
   --text-muted:   100 116 139;
+
+  /* Motion timing tokens (DASHBOARD-UX-2026.md §3 Phase A). Mirrored as plain
+     numbers in src/lib/motion.ts for the JS-driven (Motion library) side —
+     CSS vars alone can't feed a JS spring config, so keep both in sync by hand
+     if these ever change. Used directly by any plain-CSS transition (e.g. the
+     .card-hover-lift utility below); Motion-driven components read the .ts copy. */
+  --motion-fast: 180ms;
+  --motion-base: 260ms;
+  --motion-slow: 500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html.light {
@@ -142,4 +152,46 @@ html.light :focus-visible {
 }
 .skip-link:focus {
   top: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion foundation (DASHBOARD-UX-2026.md Phase A, §3/§7).
+
+   .card-hover-lift is the plain-CSS half of the hover-lift pattern — a subtle
+   translateY + shadow bloom + border-brighten, for any card that doesn't need
+   Motion's JS (scroll-triggered stagger, layout animation, etc.). Prefer this
+   over reaching for <MotionCard> when a card is static content with no
+   entrance/exit — it's zero JS, zero bundle cost, same feel.
+
+   Layered on top of the existing auto-elevation rule above (line ~97) rather
+   than replacing it — that rule sets the resting shadow, this only changes it
+   on :hover. */
+.card-hover-lift {
+  transition: transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out);
+}
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  border-color: rgb(139 92 246 / 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+html.light .card-hover-lift:hover {
+  border-color: rgb(139 92 246 / 0.3);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* Global reduced-motion guard — belt-and-suspenders alongside Motion's own
+   <MotionConfig reducedMotion="user"> in App.tsx (which handles every
+   Motion-driven animation). This catches the plain-CSS transitions above and
+   anywhere else in the app that animates via a raw CSS transition, matching
+   the same standard already held on the marketing site (CLAUDE.md §7.4
+   Phase 4.5). Does not touch the :focus-visible outline or .skip-link — both
+   are instant/functional, not decorative motion. */
+@media (prefers-reduced-motion: reduce) {
+  .card-hover-lift,
+  .card-hover-lift:hover {
+    transition: none;
+    transform: none;
+  }
 }
