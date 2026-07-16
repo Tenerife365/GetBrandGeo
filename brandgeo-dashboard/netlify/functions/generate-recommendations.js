@@ -276,7 +276,7 @@ Return ONLY this JSON (no markdown, no explanation outside it):
       },
       body: JSON.stringify({
         model:      MODEL,
-        max_tokens: 2000,
+        max_tokens: 4096,
         system:     systemPrompt,
         messages:   [{ role: 'user', content: userPrompt }],
       }),
