@@ -90,6 +90,9 @@ interface Strings {
   dash_recentGaps:      string
   dash_gapsDesc:        string
   dash_noGaps:          string
+  dash_noDataYet:       string  // shown when totalChecks === 0 (distinct from "no gaps found" — DASHBOARD-UX-2026.md §9.3)
+  dash_noDataCta:       string
+  dash_noMentionsCta:   string
   dash_statMentionRate: string
   dash_statAvgPos:      string
   dash_statPrompts:     string
@@ -231,6 +234,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Visibility Gaps',
     dash_gapsDesc:       'Prompts where your brand was not mentioned',
     dash_noGaps:         'No gaps — great visibility!',
+    dash_noDataYet:      'No data collected yet.',
+    dash_noDataCta:      'Run your first collection',
+    dash_noMentionsCta:  'View recommendations',
     dash_statMentionRate:'Mention Rate',
     dash_statAvgPos:     'Avg Position',
     dash_statPrompts:    'Active Prompts',
@@ -366,6 +372,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Brechas de visibilidad',
     dash_gapsDesc:       'Preguntas donde tu marca no fue mencionada',
     dash_noGaps:         'Sin brechas — excelente visibilidad!',
+    dash_noDataYet:      'Aun no hay datos recopilados.',
+    dash_noDataCta:      'Ejecuta tu primera recopilacion',
+    dash_noMentionsCta:  'Ver recomendaciones',
     dash_statMentionRate:'Tasa de menciones',
     dash_statAvgPos:     'Posicion media',
     dash_statPrompts:    'Preguntas activas',
@@ -501,6 +510,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Sichtbarkeitslucken',
     dash_gapsDesc:       'Prompts ohne Markenerw.',
     dash_noGaps:         'Keine Lucken — gute Sichtbarkeit!',
+    dash_noDataYet:      'Noch keine Daten gesammelt.',
+    dash_noDataCta:      'Erste Erfassung starten',
+    dash_noMentionsCta:  'Empfehlungen ansehen',
     dash_statMentionRate:'Erwahungsrate',
     dash_statAvgPos:     'Ø Position',
     dash_statPrompts:    'Aktive Prompts',
@@ -636,6 +648,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Lacunes de visibilite',
     dash_gapsDesc:       'Prompts ou votre marque n\'a pas ete mentionnee',
     dash_noGaps:         'Aucune lacune — excellente visibilite !',
+    dash_noDataYet:      'Aucune donnee collectee pour l\'instant.',
+    dash_noDataCta:      'Lancez votre premiere collecte',
+    dash_noMentionsCta:  'Voir les recommandations',
     dash_statMentionRate:'Taux de mention',
     dash_statAvgPos:     'Position moyenne',
     dash_statPrompts:    'Prompts actifs',
@@ -771,6 +786,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Zichtbaarheidsgaten',
     dash_gapsDesc:       'Prompts waar je merk niet werd vermeld',
     dash_noGaps:         'Geen gaten — uitstekende zichtbaarheid!',
+    dash_noDataYet:      'Nog geen gegevens verzameld.',
+    dash_noDataCta:      'Start je eerste verzameling',
+    dash_noMentionsCta:  'Bekijk aanbevelingen',
     dash_statMentionRate:'Vermeldingsrate',
     dash_statAvgPos:     'Gem. positie',
     dash_statPrompts:    'Actieve prompts',
@@ -906,6 +924,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Goluri de vizibilitate',
     dash_gapsDesc:       'Prompturi unde marca ta nu a fost mentionata',
     dash_noGaps:         'Niciun gol — vizibilitate excelenta!',
+    dash_noDataYet:      'Inca nu exista date colectate.',
+    dash_noDataCta:      'Ruleaza prima colectare',
+    dash_noMentionsCta:  'Vezi recomandarile',
     dash_statMentionRate:'Rata de mentionare',
     dash_statAvgPos:     'Pozitie medie',
     dash_statPrompts:    'Prompturi active',
@@ -1041,6 +1062,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Lacunas de visibilidade',
     dash_gapsDesc:       'Prompts onde a sua marca nao foi mencionada',
     dash_noGaps:         'Sem lacunas — excelente visibilidade!',
+    dash_noDataYet:      'Ainda sem dados coletados.',
+    dash_noDataCta:      'Execute sua primeira coleta',
+    dash_noMentionsCta:  'Ver recomendacoes',
     dash_statMentionRate:'Taxa de mencao',
     dash_statAvgPos:     'Posicao media',
     dash_statPrompts:    'Prompts ativos',
@@ -1176,6 +1200,9 @@ const STRINGS: Record<LangId, Strings> = {
     dash_recentGaps:     'Lacune di visibilita',
     dash_gapsDesc:       'Prompt dove il tuo marchio non e stato menzionato',
     dash_noGaps:         'Nessuna lacuna — ottima visibilita!',
+    dash_noDataYet:      'Nessun dato ancora raccolto.',
+    dash_noDataCta:      'Avvia la tua prima raccolta',
+    dash_noMentionsCta:  'Vedi i consigli',
     dash_statMentionRate:'Tasso di menzione',
     dash_statAvgPos:     'Posizione media',
     dash_statPrompts:    'Prompt attivi',

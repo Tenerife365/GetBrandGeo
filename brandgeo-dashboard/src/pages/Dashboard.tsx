@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line
 } from 'recharts'
 import { TrendingUp, Eye, Target, Hash, RefreshCw, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -82,6 +82,48 @@ function computeStats(rows: AIResultRow[]): OverviewStats {
     avgPosition: avgPos,
     promptCount: uniquePrompts,
   }
+}
+
+// A single sparkline point. avg-position buckets can be null (a bucket with no
+// ranked mentions) — Sparkline's <Line connectNulls> draws across those gaps
+// rather than dipping the line to a fake "position #0".
+interface SparkPoint { v: number | null }
+
+/**
+ * KPI trend sparklines (DASHBOARD-UX-2026.md §9.4) — bucket the SAME rows already
+ * fetched for the page into ~8 chronological slices (no new query) and derive a
+ * per-bucket series for each KPI card that carries one: mention-rate %, avg
+ * ranked position (nullable), and check volume. `rows` arrive newest-first, so
+ * we sort ascending here for a left-to-right (oldest→newest) sparkline.
+ */
+function buildKpiSparklines(rows: AIResultRow[]): {
+  mentionRate: SparkPoint[]
+  avgPosition: SparkPoint[]
+  volume: SparkPoint[]
+} {
+  const BUCKETS = 8
+  const sorted = [...rows].sort(
+    (a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
+  )
+  const mentionRate: SparkPoint[] = []
+  const avgPosition: SparkPoint[] = []
+  const volume: SparkPoint[] = []
+  if (sorted.length === 0) return { mentionRate, avgPosition, volume }
+
+  const size = Math.max(1, Math.ceil(sorted.length / BUCKETS))
+  for (let i = 0; i < sorted.length; i += size) {
+    const chunk = sorted.slice(i, i + size)
+    const mentions = chunk.filter(r => r.brand_mentioned).length
+    mentionRate.push({ v: Math.round((mentions / chunk.length) * 100) })
+    const posRows = chunk.filter(r => r.brand_mentioned && r.brand_position != null)
+    avgPosition.push({
+      v: posRows.length > 0
+        ? posRows.reduce((s, r) => s + (r.brand_position ?? 0), 0) / posRows.length
+        : null,
+    })
+    volume.push({ v: chunk.length })
+  }
+  return { mentionRate, avgPosition, volume }
 }
 
 export default function Dashboard() {
@@ -225,6 +267,15 @@ export default function Dashboard() {
 
   const recentMentioned   = rows.filter(r => r.brand_mentioned).slice(0, 5)
   const recentNotMentioned = rows.filter(r => !r.brand_mentioned).slice(0, 5)
+
+  // KPI trend sparklines — DASHBOARD-UX-2026.md §9.4. Built from the SAME rows
+  // already fetched (no new query). Avg-position only gets a sparkline when it
+  // has ≥2 real (non-null) buckets, so a brand that's never ranked doesn't show
+  // an empty 32px gap.
+  const spark = buildKpiSparklines(rows)
+  const avgPosSpark = spark.avgPosition.filter(p => p.v != null).length >= 2
+    ? spark.avgPosition
+    : undefined
 
   // Ring sweep math — DASHBOARD-UX-2026.md §6 Phase B. RING_R must match the
   // SVG circles' r="54" below (kept as one constant so the two never drift).
@@ -411,16 +462,28 @@ export default function Dashboard() {
               </div>
             }
             sub={t.dash_statMentionRateSub}
+            sparklineData={spark.mentionRate}
+            sparklineColor="#a78bfa"
           />
           <KpiCard
             icon={<Target size={18} className="text-cyan-400" />}
             label={t.dash_statAvgPos}
             value={
-              <div className="text-2xl font-bold text-white tabular-nums">
+              /* Threshold coloring — lower position is better (DASHBOARD-UX-2026.md §9.4).
+                 Neutral (white) when there's no ranked-position data (null). */
+              <div className={`text-2xl font-bold tabular-nums ${
+                stats.avgPosition == null ? 'text-white'
+                : stats.avgPosition <= 3 ? 'text-emerald-400'
+                : stats.avgPosition <= 6 ? 'text-amber-400'
+                : 'text-red-400'
+              }`}>
                 {stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
               </div>
             }
             sub={t.dash_statAvgPosSub}
+            sparklineData={avgPosSpark}
+            sparklineColor="#22d3ee"
+            connectNulls
           />
           <KpiCard
             icon={<Hash size={18} className="text-blue-400" />}
@@ -433,6 +496,8 @@ export default function Dashboard() {
             label={t.dash_statChecks}
             value={<div className="text-2xl font-bold text-white tabular-nums">{stats.totalChecks}</div>}
             sub={t.dash_statChecksDesc}
+            sparklineData={spark.volume}
+            sparklineColor="#34d399"
           />
         </motion.div>
       )}
@@ -445,7 +510,7 @@ export default function Dashboard() {
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_mentionRate}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionRateDesc, { brand: brandName })}</p>
           {llmData.length === 0 ? (
-            <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noResults}</p>
+            <EmptyState text={t.dash_noResults} ctaText={t.dash_noDataCta} to="/ai-visibility" />
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={llmData} margin={{ left: -20, bottom: 0 }}>
@@ -510,7 +575,7 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noResults}</p>
+            <EmptyState text={t.dash_noResults} ctaText={t.dash_noDataCta} to="/ai-visibility" />
           )}
         </MotionCard>
       </motion.div>
@@ -523,7 +588,11 @@ export default function Dashboard() {
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
           {recentMentioned.length === 0 ? (
-            <p className="text-sm text-slate-500 py-4">{t.dash_noMentions}</p>
+            (stats?.totalChecks ?? 0) === 0 ? (
+              <EmptyState text={t.dash_noDataYet} ctaText={t.dash_noDataCta} to="/ai-visibility" />
+            ) : (
+              <EmptyState text={t.dash_noMentions} ctaText={t.dash_noMentionsCta} to="/recommendations" />
+            )
           ) : (
             <div className="space-y-3">
               {recentMentioned.map(r => (
@@ -537,7 +606,15 @@ export default function Dashboard() {
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
           {recentNotMentioned.length === 0 ? (
-            <p className="text-sm text-slate-500 py-4">{t.dash_noGaps}</p>
+            (stats?.totalChecks ?? 0) === 0 ? (
+              /* Brand-new client with no data at all — NOT "great visibility!".
+                 Fixes the false-positive celebratory state (DASHBOARD-UX-2026.md §9 step 7). */
+              <EmptyState text={t.dash_noDataYet} ctaText={t.dash_noDataCta} to="/ai-visibility" />
+            ) : (
+              /* Genuine 100% mention rate — every checked prompt mentioned the brand.
+                 Keep the celebratory text, no CTA (there's nothing to fix). */
+              <p className="text-sm text-slate-500 py-8 text-center">{t.dash_noGaps}</p>
+            )
           ) : (
             <div className="space-y-3">
               {recentNotMentioned.map(r => (
@@ -585,7 +662,45 @@ function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean })
   )
 }
 
-function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string }) {
+// CTA-driven empty state (DASHBOARD-UX-2026.md §9.3) — a blank/muted chart reads
+// as broken; naming the concrete next action that would populate the widget is
+// the 2026 pattern. Uses the app's existing Link/react-router navigation.
+function EmptyState({ text, ctaText, to }: { text: string; ctaText: string; to: string }) {
+  return (
+    <div className="py-8 text-center">
+      <p className="text-sm text-slate-500 mb-3">{text}</p>
+      <Link to={to}
+        className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors">
+        {ctaText} →
+      </Link>
+    </div>
+  )
+}
+
+// Tiny at-a-glance trend line under a KPI value (DASHBOARD-UX-2026.md §9.4).
+// No axes/grid/tooltip — pure trend shape. Animation deliberately off
+// (isAnimationActive={false}) so it never replays a draw-in on re-render and
+// needs no reduced-motion gate; §9 permits either that or the prefersReduced
+// gate, and "off" is the more predictable choice for a 32px sparkline.
+function Sparkline({ data, color, connectNulls = false }: {
+  data: SparkPoint[]; color: string; connectNulls?: boolean
+}) {
+  return (
+    <div className="h-8 w-full mt-1.5" aria-hidden="true">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5}
+            dot={false} isAnimationActive={false} connectNulls={connectNulls} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function KpiCard({ icon, label, value, sub, sparklineData, sparklineColor, connectNulls }: {
+  icon: React.ReactNode; label: string; value: React.ReactNode; sub: string
+  sparklineData?: SparkPoint[]; sparklineColor?: string; connectNulls?: boolean
+}) {
   // Compact tier (p-4), not Standard (p-5) — these are small data tiles, not
   // content cards, and the tighter padding reads closer to the "precision-
   // machined" density research flags on premium dashboards (DASHBOARD-UX-
@@ -598,6 +713,9 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
         <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</span>
       </div>
       {value}
+      {sparklineData && sparklineData.length >= 2 && sparklineColor && (
+        <Sparkline data={sparklineData} color={sparklineColor} connectNulls={connectNulls} />
+      )}
       <p className="text-xs text-slate-600 mt-1">{sub}</p>
     </MotionCard>
   )
