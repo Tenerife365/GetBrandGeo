@@ -1,13 +1,16 @@
 # ASSISTANT-SPEC.md — BrandGEO AI Assistant (site chat widget)
 
-> **Status:** Spec + UI preview (2026-07-17). Not yet built. Approved direction:
-> **custom** (widget in `site.js` + a public Netlify function proxying Claude
-> Haiku, grounded in `llms-full.txt`). Build to run as its own dedicated chat —
-> it spans the `brandgeo-dashboard` (Netlify) repo, a different scope than the
-> static marketing site.
+> **Status:** ✅ BUILT 2026-07-18 (verified locally, NOT yet deployed). Approved
+> direction: **custom** (widget in `site.js` + public Netlify functions proxying
+> Claude Haiku, grounded in `llms-full.txt`). See **CLAUDE.md §18** for the build
+> log, the 7 files shipped, and the exact deploy steps Constantin must run to go
+> live (migration → env vars → push functions → cPanel-upload `site.js`).
 >
-> Companion clickable UI preview: published as an Artifact this session (see the
-> chat). This doc is the plan the build follows.
+> Files: `netlify/functions/{assistant.js, assistant-lead.js, _assistant_kb.js}`,
+> `brandgeo/web/site.js` (widget IIFE), `supabase-assistant-events-migration.sql`.
+>
+> Companion clickable UI preview: published as an Artifact the prior session. This
+> doc is the plan the build followed.
 
 ---
 

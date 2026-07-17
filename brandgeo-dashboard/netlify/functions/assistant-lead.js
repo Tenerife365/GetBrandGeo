@@ -28,6 +28,45 @@ const {
 const DAILY_LEAD_CAP = 10   // per-IP/day — abuse guard on the lead endpoint
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function esc(s){ return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+
+/**
+ * Email the team on every captured lead. Best-effort and independent of HubSpot,
+ * so a lead reaches an actual inbox even with no CRM configured (the common case
+ * on a free HubSpot plan) — reuses the same verified Resend sender as
+ * support-request.js. Never throws; failure just means the DB row + any HubSpot
+ * push remain the record.
+ */
+async function emailLeadToTeam({ name, email, domain, need, reason }) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  if (!RESEND_API_KEY) { console.log('[Assistant-Lead] RESEND_API_KEY not set — no team email'); return { sent: false } }
+  const html =
+    `<h2 style="margin:0 0 8px">New assistant lead</h2>` +
+    `<p style="margin:2px 0"><strong>Name:</strong> ${esc(name)}</p>` +
+    `<p style="margin:2px 0"><strong>Email:</strong> ${esc(email)}</p>` +
+    `<p style="margin:2px 0"><strong>Reason:</strong> ${esc(reason)}</p>` +
+    (domain ? `<p style="margin:2px 0"><strong>Domain:</strong> ${esc(domain)}</p>` : '') +
+    (need ? `<p style="margin:2px 0"><strong>What they need:</strong> ${esc(need)}</p>` : '') +
+    `<p style="margin:10px 0 0;color:#888;font-size:12px">Source: site chat assistant</p>`
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: 'BrandGEO Assistant <noreply@mail.getbrandgeo.com>',
+        to: ['support@getbrandgeo.com'],
+        reply_to: email || undefined,
+        subject: `[Assistant lead] ${name} — ${reason}`,
+        html,
+      }),
+    })
+    if (!res.ok) { console.error('[Assistant-Lead] resend error', res.status); return { sent: false } }
+    return { sent: true }
+  } catch (e) {
+    console.error('[Assistant-Lead] resend threw:', e.message); return { sent: false }
+  }
+}
+
 /** Push an assistant lead into HubSpot as a contact. Degrades gracefully. */
 async function pushAssistantLead({ name, email, domain, need, reason }) {
   const apiKey = process.env.HUBSPOT_API_KEY
@@ -129,10 +168,16 @@ exports.handler = async (event) => {
   }])
   if (logErr) console.error('[Assistant-Lead] local log failed:', logErr.message)
 
-  const hs = await pushAssistantLead({ name, email, domain, need, reason })
-  console.log(`[Assistant-Lead] ${email} reason:${reason} hubspot:${hs.synced ? 'synced' : 'local-only:' + hs.reason}`)
+  // HubSpot push + team email are both best-effort and independent of the DB
+  // backup above; run them in parallel so neither adds latency to the other.
+  const [hs, mail] = await Promise.all([
+    pushAssistantLead({ name, email, domain, need, reason }),
+    emailLeadToTeam({ name, email, domain, need, reason }),
+  ])
+  console.log(`[Assistant-Lead] ${email} reason:${reason} hubspot:${hs.synced ? 'synced' : 'local-only:' + hs.reason} email:${mail.sent ? 'sent' : 'skipped'}`)
 
   return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
 }
 
 module.exports.pushAssistantLead = pushAssistantLead
+module.exports.emailLeadToTeam = emailLeadToTeam

@@ -665,3 +665,371 @@
     });
   })();
 })();
+
+// ── BrandGEO site chat assistant (ASSISTANT-SPEC.md) ──────────────────────
+// Self-contained: floating launcher + panel, injected on every page that loads
+// this script. Talks to two PUBLIC Netlify functions on app.getbrandgeo.com
+// (assistant / assistant-lead). Uses the site's own CSS custom properties so it
+// inherits dark/light theme automatically; no per-page HTML edits needed.
+(function() {
+  if (!window.fetch || document.getElementById('bg-asst-launcher')) return;
+
+  var ASSISTANT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/assistant';
+  var LEAD_ENDPOINT      = 'https://app.getbrandgeo.com/.netlify/functions/assistant-lead';
+  var SIGNUP_URL   = 'https://app.getbrandgeo.com/signup';
+  var SUPPORT_URL  = 'https://getbrandgeo.com/support.html';
+  var PRIVACY_URL  = 'https://getbrandgeo.com/privacy.html';
+  var SUPPORT_EMAIL = 'support@getbrandgeo.com';
+  var TIMEOUT_MS = 22000;
+  var SESSION_MSG_CAP = 30; // soft client-side cap; the server enforces the real one
+
+  var WELCOME = "Hi — I'm the BrandGEO assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
+  var OPENING_CHIPS = [
+    { label: '💶 See pricing',       send: 'What does BrandGEO cost?' },
+    { label: '🔍 Run a free audit',  send: 'I want to run a free audit.' },
+    { label: '📞 Talk to sales',     send: 'I want to talk to sales.' },
+    { label: "🛟 I'm a customer",    send: "I'm an existing customer and need support." }
+  ];
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var history = [];   // [{role,content}] sent to the assistant endpoint
+  var sentCount = 0, busy = false, lastFocus = null;
+  var launcher, panel, msgs, composer, ta, sendBtn, chipsRow, greeted = false;
+
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function scrollDown(){ if (msgs) msgs.scrollTop = msgs.scrollHeight; }
+
+  // Escape text and turn bare URLs into safe new-tab links.
+  function fillText(node, text){
+    var re = /(https?:\/\/[^\s<>()]+[^\s<>().,!?])/g, idx = 0, m;
+    text = String(text);
+    while ((m = re.exec(text))) {
+      if (m.index > idx) node.appendChild(document.createTextNode(text.slice(idx, m.index)));
+      var a = el('a', 'bg-asst-link'); a.href = m[0]; a.textContent = m[0];
+      a.target = '_blank'; a.rel = 'noopener noreferrer';
+      node.appendChild(a);
+      idx = m.index + m[0].length;
+    }
+    if (idx < text.length) node.appendChild(document.createTextNode(text.slice(idx)));
+  }
+
+  function addBubble(role, text){
+    var row = el('div', 'bg-asst-msg bg-asst-' + role);
+    var bubble = el('div', 'bg-asst-bubble');
+    fillText(bubble, text);
+    row.appendChild(bubble);
+    msgs.appendChild(row);
+    scrollDown();
+    return row;
+  }
+
+  var typingRow = null;
+  function showTyping(){
+    if (typingRow) return;
+    typingRow = el('div', 'bg-asst-msg bg-asst-assistant');
+    var b = el('div', 'bg-asst-bubble bg-asst-typing');
+    b.innerHTML = '<span></span><span></span><span></span>';
+    typingRow.appendChild(b);
+    msgs.appendChild(typingRow);
+    scrollDown();
+  }
+  function hideTyping(){ if (typingRow) { typingRow.parentNode.removeChild(typingRow); typingRow = null; } }
+
+  function renderChips(items){
+    if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
+    if (!items || !items.length) return;
+    chipsRow = el('div', 'bg-asst-chips');
+    items.forEach(function(it){
+      var b = el('button', 'bg-asst-chip', it.label);
+      b.type = 'button';
+      b.addEventListener('click', function(){ send(it.send); });
+      chipsRow.appendChild(b);
+    });
+    msgs.appendChild(chipsRow);
+    scrollDown();
+  }
+
+  function fetchJson(url, payload){
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, TIMEOUT_MS) : null;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function(r){
+      if (timer) clearTimeout(timer);
+      return r.json().then(function(j){ return { ok: r.ok, status: r.status, data: j }; });
+    }).catch(function(e){ if (timer) clearTimeout(timer); throw e; });
+  }
+
+  function renderAction(action){
+    if (!action) return;
+    if (action.type === 'start_audit') {
+      var wrap = el('div', 'bg-asst-msg bg-asst-assistant');
+      var box = el('div', 'bg-asst-actions');
+      var a = el('a', 'bg-asst-btn', 'Run my free audit →');
+      a.href = SIGNUP_URL + '?domain=' + encodeURIComponent(action.domain);
+      box.appendChild(a);
+      wrap.appendChild(box); msgs.appendChild(wrap); scrollDown();
+    } else if (action.type === 'capture_lead') {
+      showLeadForm(action.reason || 'sales', null);
+    } else if (action.type === 'route_support') {
+      var w = el('div', 'bg-asst-msg bg-asst-assistant');
+      var b2 = el('div', 'bg-asst-actions');
+      var open = el('a', 'bg-asst-btn', 'Open support →'); open.href = SUPPORT_URL; open.target = '_blank'; open.rel = 'noopener noreferrer';
+      var mail = el('a', 'bg-asst-btn bg-asst-btn-sec', 'Email support'); mail.href = 'mailto:' + SUPPORT_EMAIL;
+      b2.appendChild(open); b2.appendChild(mail);
+      w.appendChild(b2); msgs.appendChild(w); scrollDown();
+    }
+  }
+
+  function send(text){
+    text = String(text || '').trim();
+    if (!text || busy) return;
+    if (sentCount >= SESSION_MSG_CAP) {
+      addBubble('assistant', 'That’s a lot of questions — the best next step is to talk to the team at ' + SUPPORT_EMAIL + ', or tap “Talk to a human” below.');
+      return;
+    }
+    if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
+    addBubble('user', text);
+    history.push({ role: 'user', content: text });
+    sentCount++;
+    busy = true; setBusy(true); showTyping();
+
+    fetchJson(ASSISTANT_ENDPOINT, { messages: history }).then(function(res){
+      hideTyping();
+      var d = res.data || {};
+      var reply = typeof d.reply === 'string' && d.reply ? d.reply
+        : "Sorry — I couldn't reach my knowledge base just now. You can email the team at " + SUPPORT_EMAIL + ".";
+      addBubble('assistant', reply);
+      if (res.ok) history.push({ role: 'assistant', content: reply });
+      if (res.ok && d.action) renderAction(d.action);
+    }).catch(function(){
+      hideTyping();
+      addBubble('assistant', "Sorry — something went wrong on my end. You can reach the team at " + SUPPORT_EMAIL + ", or tap “Talk to a human” below.");
+    }).then(function(){ busy = false; setBusy(false); if (ta) ta.focus(); });
+  }
+
+  function setBusy(on){
+    if (sendBtn) sendBtn.disabled = on;
+    if (ta) ta.disabled = on;
+  }
+
+  function showLeadForm(reason, domain){
+    var row = el('div', 'bg-asst-msg bg-asst-assistant');
+    var form = el('form', 'bg-asst-form');
+    var name = el('input', 'bg-asst-input'); name.type = 'text'; name.placeholder = 'Your name'; name.autocomplete = 'name'; name.required = true;
+    var email = el('input', 'bg-asst-input'); email.type = 'email'; email.placeholder = 'Work email'; email.autocomplete = 'email'; email.required = true;
+    var need = el('input', 'bg-asst-input'); need.type = 'text'; need.placeholder = 'What do you need? (optional)';
+    var hp = el('input', 'bg-asst-hp'); hp.type = 'text'; hp.tabIndex = -1; hp.setAttribute('aria-hidden', 'true'); hp.autocomplete = 'off';
+    var consent = el('div', 'bg-asst-consent');
+    consent.appendChild(document.createTextNode('We’ll only use this to get back to you. See our '));
+    var pl = el('a', 'bg-asst-link', 'privacy policy'); pl.href = PRIVACY_URL; pl.target = '_blank'; pl.rel = 'noopener noreferrer';
+    consent.appendChild(pl); consent.appendChild(document.createTextNode('.'));
+    var submit = el('button', 'bg-asst-btn', 'Send →'); submit.type = 'submit';
+    var err = el('div', 'bg-asst-err'); err.style.display = 'none';
+
+    form.appendChild(name); form.appendChild(email); form.appendChild(need);
+    form.appendChild(hp); form.appendChild(consent); form.appendChild(err); form.appendChild(submit);
+    row.appendChild(form); msgs.appendChild(row); scrollDown();
+    setTimeout(function(){ name.focus(); }, 30);
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      err.style.display = 'none';
+      var em = email.value.trim();
+      if (!name.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+        err.textContent = 'Please add your name and a valid email.'; err.style.display = 'block'; return;
+      }
+      submit.disabled = true; submit.textContent = 'Sending…';
+      fetchJson(LEAD_ENDPOINT, {
+        name: name.value.trim(), email: em, need: need.value.trim(),
+        reason: reason, domain: domain || '', honeypot: hp.value
+      }).then(function(res){
+        if (res.ok && res.data && res.data.ok) {
+          row.removeChild(form);
+          var ok = el('div', 'bg-asst-bubble');
+          fillText(ok, 'Thanks — I’ve passed your details to the team. Someone will be in touch by email shortly.');
+          row.appendChild(ok); scrollDown();
+        } else {
+          err.textContent = (res.data && res.data.error) || 'Something went wrong. Please email ' + SUPPORT_EMAIL + '.';
+          err.style.display = 'block'; submit.disabled = false; submit.textContent = 'Send →';
+        }
+      }).catch(function(){
+        err.textContent = 'Couldn’t send that. Please email ' + SUPPORT_EMAIL + '.';
+        err.style.display = 'block'; submit.disabled = false; submit.textContent = 'Send →';
+      });
+    });
+  }
+
+  // ---- open / close ----
+  function focusables(){
+    return Array.prototype.slice.call(panel.querySelectorAll(
+      'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])'
+    )).filter(function(n){ return n.offsetParent !== null; });
+  }
+  function onKeydown(e){
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key === 'Tab') {
+      var f = focusables(); if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  function open(){
+    lastFocus = document.activeElement;
+    panel.classList.add('bg-asst-on');
+    launcher.classList.add('bg-asst-hidden');
+    launcher.setAttribute('aria-expanded', 'true');
+    document.addEventListener('keydown', onKeydown, true);
+    if (!greeted) {
+      greeted = true;
+      addBubble('assistant', WELCOME);
+      renderChips(OPENING_CHIPS);
+    }
+    setTimeout(function(){ if (ta) ta.focus(); }, 40);
+  }
+  function close(){
+    panel.classList.remove('bg-asst-on');
+    launcher.classList.remove('bg-asst-hidden');
+    launcher.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', onKeydown, true);
+    if (lastFocus && lastFocus.focus) lastFocus.focus(); else launcher.focus();
+  }
+
+  function build(){
+    // Launcher
+    launcher = el('button', 'bg-asst-launcher');
+    launcher.id = 'bg-asst-launcher';
+    launcher.type = 'button';
+    launcher.setAttribute('aria-label', 'Open the BrandGEO assistant chat');
+    launcher.setAttribute('aria-expanded', 'false');
+    launcher.innerHTML =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' +
+      '<span class="bg-asst-launch-label">Ask us</span>';
+    if (!reduced) launcher.classList.add('bg-asst-pulse');
+    launcher.addEventListener('click', open);
+
+    // Panel
+    panel = el('div', 'bg-asst-panel');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', 'BrandGEO assistant');
+
+    var head = el('div', 'bg-asst-head');
+    head.appendChild(el('span', 'bg-asst-dot'));
+    var titleWrap = el('div', 'bg-asst-titlewrap');
+    titleWrap.appendChild(el('div', 'bg-asst-title', 'BrandGEO Assistant'));
+    titleWrap.appendChild(el('div', 'bg-asst-sub', 'Online · usually replies instantly'));
+    head.appendChild(titleWrap);
+    var closeBtn = el('button', 'bg-asst-close', '×');
+    closeBtn.type = 'button'; closeBtn.setAttribute('aria-label', 'Close chat');
+    closeBtn.addEventListener('click', close);
+    head.appendChild(closeBtn);
+
+    msgs = el('div', 'bg-asst-msgs');
+    msgs.setAttribute('role', 'log');
+    msgs.setAttribute('aria-live', 'polite');
+
+    var foot = el('div', 'bg-asst-foot');
+    composer = el('div', 'bg-asst-composer');
+    ta = el('textarea', 'bg-asst-ta');
+    ta.rows = 1; ta.placeholder = 'Ask about BrandGEO…'; ta.setAttribute('aria-label', 'Type your message');
+    ta.addEventListener('input', function(){ ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 100) + 'px'; });
+    ta.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); var v = ta.value; ta.value = ''; ta.style.height = 'auto'; send(v); }
+    });
+    sendBtn = el('button', 'bg-asst-send');
+    sendBtn.type = 'button'; sendBtn.setAttribute('aria-label', 'Send message');
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
+    sendBtn.addEventListener('click', function(){ var v = ta.value; ta.value = ''; ta.style.height = 'auto'; send(v); });
+    composer.appendChild(ta); composer.appendChild(sendBtn);
+
+    var human = el('button', 'bg-asst-human', 'Talk to a human');
+    human.type = 'button';
+    human.addEventListener('click', function(){
+      if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
+      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      showLeadForm('sales', null);
+    });
+    foot.appendChild(composer); foot.appendChild(human);
+
+    panel.appendChild(head); panel.appendChild(msgs); panel.appendChild(foot);
+    document.body.appendChild(launcher);
+    document.body.appendChild(panel);
+    injectCss();
+  }
+
+  function injectCss(){
+    var css = document.createElement('style');
+    css.textContent =
+      '.bg-asst-launcher{position:fixed;bottom:20px;right:20px;z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border:none;border-radius:999px;cursor:pointer;font:inherit;font-weight:600;font-size:.92rem;color:#fff;background:linear-gradient(135deg,var(--ac),#8b7bff);box-shadow:0 10px 30px rgba(108,99,255,.42);transition:transform .18s ease,box-shadow .18s ease;}' +
+      '.bg-asst-launcher:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(108,99,255,.5);}' +
+      '.bg-asst-launcher.bg-asst-hidden{display:none;}' +
+      '.bg-asst-launch-label{white-space:nowrap;}' +
+      '@keyframes bg-asst-pulse{0%{box-shadow:0 10px 30px rgba(108,99,255,.42),0 0 0 0 rgba(108,99,255,.5);}70%{box-shadow:0 10px 30px rgba(108,99,255,.42),0 0 0 14px rgba(108,99,255,0);}100%{box-shadow:0 10px 30px rgba(108,99,255,.42),0 0 0 0 rgba(108,99,255,0);}}' +
+      '.bg-asst-pulse{animation:bg-asst-pulse 2.4s ease-out 3;}' +
+      '.bg-asst-panel{position:fixed;bottom:20px;right:20px;z-index:2147483001;width:374px;max-width:calc(100vw - 32px);height:min(620px,calc(100vh - 40px));display:none;flex-direction:column;overflow:hidden;background:var(--s);border:1px solid var(--bd);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.4);}' +
+      '.bg-asst-panel.bg-asst-on{display:flex;}' +
+      '.bg-asst-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd);flex-shrink:0;}' +
+      '.bg-asst-dot{width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18);flex-shrink:0;}' +
+      '.bg-asst-titlewrap{display:flex;flex-direction:column;min-width:0;}' +
+      '.bg-asst-title{font-weight:700;font-size:.95rem;color:var(--t);line-height:1.2;}' +
+      '.bg-asst-sub{font-size:.72rem;color:var(--t3);line-height:1.2;margin-top:2px;}' +
+      '.bg-asst-close{margin-left:auto;background:none;border:none;color:var(--t2);font-size:1.4rem;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px;flex-shrink:0;}' +
+      '.bg-asst-close:hover{background:var(--bd);color:var(--t);}' +
+      '.bg-asst-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}' +
+      '.bg-asst-msg{display:flex;}' +
+      '.bg-asst-user{justify-content:flex-end;}' +
+      '.bg-asst-bubble{max-width:84%;padding:10px 13px;border-radius:14px;font-size:.9rem;line-height:1.5;color:var(--t);white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;}' +
+      '.bg-asst-assistant .bg-asst-bubble{background:var(--s2);border:1px solid var(--bd);border-bottom-left-radius:4px;}' +
+      '.bg-asst-user .bg-asst-bubble{background:linear-gradient(135deg,var(--ac),#8b7bff);color:#fff;border-bottom-right-radius:4px;}' +
+      '.bg-asst-link{color:var(--ac);text-decoration:underline;}' +
+      '.bg-asst-user .bg-asst-link{color:#fff;}' +
+      '.bg-asst-typing{display:flex;gap:4px;align-items:center;}' +
+      '.bg-asst-typing span{width:7px;height:7px;border-radius:50%;background:var(--t3);display:inline-block;animation:bg-asst-blink 1.2s infinite ease-in-out both;}' +
+      '.bg-asst-typing span:nth-child(2){animation-delay:.18s;}' +
+      '.bg-asst-typing span:nth-child(3){animation-delay:.36s;}' +
+      '@keyframes bg-asst-blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}' +
+      '.bg-asst-chips{display:flex;flex-wrap:wrap;gap:8px;}' +
+      '.bg-asst-chip{border:1px solid var(--bd2);background:transparent;color:var(--t);border-radius:999px;padding:8px 13px;font:inherit;font-size:.82rem;cursor:pointer;transition:background .15s ease;}' +
+      '.bg-asst-chip:hover{background:var(--bd);}' +
+      '.bg-asst-actions{display:flex;flex-wrap:wrap;gap:8px;}' +
+      '.bg-asst-btn{display:inline-block;background:var(--ac);color:#fff;border:none;border-radius:10px;padding:9px 14px;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;text-decoration:none;}' +
+      '.bg-asst-btn:hover{filter:brightness(1.08);}' +
+      '.bg-asst-btn-sec{background:transparent;color:var(--t);border:1px solid var(--bd2);}' +
+      '.bg-asst-form{display:flex;flex-direction:column;gap:8px;width:100%;}' +
+      '.bg-asst-input{width:100%;background:var(--bg);border:1px solid var(--bd2);border-radius:9px;padding:9px 11px;color:var(--t);font:inherit;font-size:.86rem;box-sizing:border-box;}' +
+      '.bg-asst-input::placeholder{color:var(--t3);}' +
+      '.bg-asst-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}' +
+      '.bg-asst-consent{font-size:.72rem;color:var(--t3);line-height:1.4;}' +
+      '.bg-asst-err{font-size:.78rem;color:#ef4444;}' +
+      '.bg-asst-foot{border-top:1px solid var(--bd);padding:10px 12px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;}' +
+      '.bg-asst-composer{display:flex;gap:8px;align-items:flex-end;}' +
+      '.bg-asst-ta{flex:1;resize:none;min-height:22px;max-height:100px;background:var(--bg);border:1px solid var(--bd2);border-radius:10px;padding:9px 11px;color:var(--t);font:inherit;font-size:.9rem;line-height:1.4;box-sizing:border-box;}' +
+      '.bg-asst-ta::placeholder{color:var(--t3);}' +
+      '.bg-asst-send{flex-shrink:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--ac);color:#fff;border:none;border-radius:10px;cursor:pointer;}' +
+      '.bg-asst-send:hover{filter:brightness(1.08);}' +
+      '.bg-asst-send:disabled{opacity:.5;cursor:default;}' +
+      '.bg-asst-human{align-self:flex-start;background:none;border:none;color:var(--t3);font:inherit;font-size:.76rem;cursor:pointer;padding:0;text-decoration:underline;}' +
+      '.bg-asst-human:hover{color:var(--t2);}' +
+      '.bg-asst-launcher:focus-visible,.bg-asst-panel button:focus-visible,.bg-asst-panel a:focus-visible,.bg-asst-panel textarea:focus-visible,.bg-asst-panel input:focus-visible,.bg-asst-chip:focus-visible{outline:2px solid var(--ac);outline-offset:2px;}' +
+      '@media(max-width:480px){' +
+        '.bg-asst-launcher{bottom:16px;right:16px;padding:11px 15px;}' +
+        '.bg-asst-panel{bottom:0;right:0;left:0;width:100%;max-width:100%;height:86vh;border-radius:16px 16px 0 0;}' +
+      '}' +
+      '@media(prefers-reduced-motion:reduce){' +
+        '.bg-asst-pulse{animation:none;}' +
+        '.bg-asst-typing span{animation:none;opacity:.55;}' +
+        '.bg-asst-launcher{transition:none;}' +
+      '}';
+    document.head.appendChild(css);
+  }
+
+  function init(){ if (document.body) build(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
