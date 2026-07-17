@@ -1,0 +1,539 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[numbers]{natbib}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\title{\textbf{Cross-Engine Consensus in AI-Generated Brand Recommendations:\\
+An Empirical Study Across Seven Cities and Five Large Language Models}}
+
+\author{
+Constantin Daniel\\
+BrandGEO\\
+Santa Cruz de Tenerife, Canary Islands, Spain\\
+\texttt{support@getbrandgeo.com}
+}
+
+\date{July 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+As consumers increasingly ask conversational AI systems for commercial recommendations
+(\textit{``which accounting software should I use,''} \textit{``which law firm handles
+employment disputes''}), a brand's visibility in these systems has become a measurable
+and commercially consequential property, distinct from classical search engine ranking.
+This paper reports an empirical, multi-city study of \emph{cross-engine consensus}: the
+degree to which independently queried, commercially deployed AI assistants converge on
+the same named brand or provider in response to the same buyer-intent question. We
+collected 278 production API responses across 56 buyer-intent prompts spanning seven
+cities (London, Berlin, Madrid, New York, Paris, Rome, and Dublin) and five widely used
+AI systems (OpenAI ChatGPT, Google Gemini, Anthropic Claude, Perplexity, and Meta AI),
+using each vendor's own production API rather than simulated or scraped output. One
+engine (ChatGPT) is excluded from analysis after an account-level API quota failure
+affected all 56 of its scheduled calls; the remaining 222 responses (four engines) form
+the analytic dataset. We find that categories with a small, well-documented, easily
+verifiable set of providers (project management software, business banking applications,
+large corporate law firms) converge strongly, frequently to unanimous agreement, while
+categories populated by many similarly qualified, less differentiated local or
+individual providers (employment law, independent financial advice) rarely converge at
+all. Two further findings extend this picture. First, query language can change not
+merely the ranking but the entire considered set of competitors: a wealth-management
+query in Paris returns boutique French firms when asked in French and major
+international private banks when asked in English, with almost no overlap between the
+two sets. Second, one city (Rome) shows zero categories reaching even three-engine
+agreement, the only such case in the dataset, while simultaneously showing the strongest
+single-engine, cross-lingual stability observed anywhere in the study (one engine
+reproduced an identical, identically ordered five-item ranking in both Italian and
+English). We report these findings with their accompanying data-quality caveats in
+full, and discuss their implications for brand visibility measurement and for the
+emerging practice of Generative Engine Optimization.
+\end{abstract}
+
+\noindent\textbf{Keywords:} generative engine optimization, AI visibility, large
+language models, brand recommendation, retrieval-augmented generation, cross-engine
+consensus, conversational search
+
+\section{Introduction}
+
+Consumers are increasingly using conversational AI systems, rather than a traditional
+search engine results page, as the first point of contact when researching a commercial
+purchase decision. Industry measurement of this shift is still young but directionally
+consistent: independent analyses report that a meaningful and growing share of
+commercial-intent queries now trigger an AI-generated answer rather than a list of blue
+links, and that the resulting answers frequently name specific brands or providers
+without the user ever visiting a ranked list of websites \citep{semrush2026,
+brightedge2026}. This shift has produced a new discipline, commonly referred to as
+Generative Engine Optimization (GEO), concerned with whether and how a brand is
+mentioned, ranked, or recommended inside an AI system's generated response, as distinct
+from its position in a classical search index \citep{aggarwal2024geo}.
+
+A property of this new environment that has received comparatively little direct,
+side-by-side empirical attention is \emph{cross-engine consensus}: whether different AI
+systems, queried independently with the same buyer-intent question, tend to agree on
+which brand or provider to recommend. This question matters for at least three reasons.
+First, a brand that appears consistently across engines has a materially different risk
+profile than one that appears well in a single engine and is invisible everywhere else;
+a monitoring or optimization strategy built around only one engine could produce a
+badly distorted picture of a brand's real standing. Second, consensus (or its absence)
+is itself informative about the underlying mechanism: categories where independent
+systems converge look like cases where a genuinely dominant, well-documented answer
+exists in the training and retrieval data available to every engine, while categories
+where systems disagree look more like cases where each engine is making an
+under-determined choice among many similarly qualified options. Third, for a company
+attempting to measure or improve its own AI visibility, knowing whether a category is
+structurally prone to consensus or fragmentation changes what a realistic goal even
+looks like.
+
+This paper reports a pilot-scale, empirical measurement of cross-engine consensus using
+a dataset collected through BrandGEO's own production monitoring pipeline: a system
+that fires real, commercially phrased buyer-intent prompts against the production APIs
+of five widely used AI assistants and records the resulting responses. We use this
+pipeline's own operational data, collected across seven cities as part of an internal
+research initiative, as the empirical basis for this study, and we report both the
+substantive findings and the pipeline's known data-quality limitations in full, rather
+than presenting only a cleaned final result.
+
+The remainder of this paper is organized as follows. Section~2 situates this work
+relative to prior research on generative engine optimization and AI-driven search
+behavior. Section~3 describes the dataset, collection methodology, and the operational
+definition of cross-engine consensus used throughout. Section~4 presents results,
+first in aggregate and then per city, including two extended case findings (language-
+dependent competitor sets in Paris, and the zero-consensus/high-stability anomaly in
+Rome). Section~5 discusses implications for brand visibility measurement and GEO
+practice. Section~6 states limitations, ethical considerations, and a reproducibility
+statement. Section~7 concludes.
+
+\section{Related Work}
+
+The term \emph{Generative Engine Optimization} was introduced by Aggarwal et al. \citep{aggarwal2024geo},
+who formalized the problem of improving a piece of content's visibility inside
+generative engine responses, introduced a benchmark (GEO-bench) of realistic user
+queries paired with the sources needed to answer them, and showed that specific
+content-level interventions (adding citations, statistics, or authoritative quotations)
+could measurably increase a source's visibility in generated answers, with effects
+varying substantially by domain. That work established the underlying premise this
+paper builds on: visibility inside a generated answer is a distinct, measurable,
+optimizable property, not a proxy for classical search rank. Our contribution differs
+in unit of analysis: rather than measuring whether a piece of content is cited, we
+measure whether independently queried commercial AI assistants agree with one another
+on which named brand or provider to recommend for a given buyer-intent question, across
+a geographically and linguistically varied set of prompts.
+
+A second relevant strand of work concerns how retrieval-augmented and search-grounded
+language models select and surface sources at all. Vendor documentation for the systems
+used in this study describes materially different retrieval mechanisms: Google's Gemini
+uses a search-grounding step gated by an internal confidence classifier that decides,
+per query, whether to invoke a live web search or answer from parametric knowledge
+alone \citep{googlegrounding2026}; OpenAI's web-enabled ChatGPT models invoke a
+dedicated web search tool that can additionally be scoped to a user's approximate
+location \citep{openaisearch2026}; Perplexity is built around retrieval and citation by
+design. These architectural differences are a plausible mechanistic explanation for
+why the same buyer-intent question can produce different answer sets across engines,
+and they motivate treating engine identity, not just query content, as a variable of
+interest.
+
+Independent industry measurement of AI-driven commercial search has grown quickly
+alongside these systems, though it remains largely proprietary and organization-specific
+rather than peer-reviewed. Reported findings in this literature, cited here as
+context rather than as directly comparable measurements, include analyses showing that
+a large share of AI-cited brands correlate more strongly with unstructured web mentions
+than with classical backlink counts \citep{ahrefs2026correlation}, that a majority of
+locally oriented AI answers substantially under-recommend real local businesses
+relative to their standing in classical local search \citep{soci2026}, and that citation
+freshness (how recently a cited source was published or updated) correlates with a
+source's likelihood of being surfaced by a retrieval-grounded engine
+\citep{amsive2026, ahrefs2026freshness}. Where this paper draws on such
+industry-reported figures for context, they are cited to BrandGEO's own previously
+published, sourced synthesis of the underlying reports, so that the provenance chain
+from primary report to citation here is transparent and independently checkable.
+
+\section{Data and Methods}
+
+\subsection{Study design}
+
+Between 9 and 10 July 2026, BrandGEO's monitoring pipeline was used to run a structured,
+multi-city measurement exercise. Eight buyer-intent prompts were authored for each of
+seven cities (London, Berlin, Madrid, New York, Paris, Rome, and Dublin), for a total
+of 56 prompts. Prompts were written to resemble realistic, high commercial intent
+questions a real consumer or business buyer might put to a conversational AI assistant
+(for example, \textit{``What is the best CRM software for a small business in London?''}
+or \textit{``Which law firm should I use for an employment dispute in Dublin?''}), each
+targeting a specific commercial category (software, professional services, hospitality,
+financial services, real estate, or food service, depending on the city).
+
+Two cities (London and Dublin) are English-first markets and used eight distinct
+English-language prompts, one per category. The remaining five cities (Berlin, Madrid,
+Paris, Rome) used a paired bilingual design: four commercial categories, each phrased
+once in the local language (German, Spanish, French, or Italian respectively) and once
+in English, for eight prompts per city. This design was chosen specifically to allow
+language to be isolated as a variable within a city, rather than confounded with the
+city itself.
+
+Every prompt was submitted, independently and without conversational context carried
+between prompts, to each of five production AI systems: OpenAI's ChatGPT, Google's
+Gemini, Anthropic's Claude, Perplexity, and Meta AI. Requests were geo-contextualized
+(the system prompt informed each model of the relevant city or country context) to
+approximate how a real user physically located in that market would be answered.
+
+\subsection{Collection pipeline and known engine-level failures}
+
+Responses were collected through BrandGEO's own production Netlify-hosted collection
+functions, which call each vendor's real, versioned API and log every attempt, including
+failures, to a structured results table. This is a deliberate design choice relevant to
+this paper's reliability: every one of the 56 prompts targeted five engines, for 280
+possible engine-level responses; 278 rows were actually recorded (two rows, both for
+Meta AI in New York and Paris respectively, were lost to a transient collection gap
+rather than a substantive non-response).
+
+Of the 278 recorded rows, 56 (exactly one for each of the 56 prompts, entirely
+concentrated in one engine, ChatGPT) carry a recorded \texttt{error} status rather than
+a completed response. Root-cause investigation (documented in the pipeline's internal
+engineering log) attributes this to a sustained, account-level API quota exhaustion on
+the OpenAI account used for collection, spanning the entire window in which this study's
+data was gathered. This is a genuine data-collection failure, unrelated to any
+substantive property of ChatGPT's actual visibility behavior, and we exclude ChatGPT
+from all analysis in this paper rather than treat its absence as a null result. We
+report this openly, rather than silently omitting the engine, because a reader
+attempting to reproduce or extend this work needs to know that a five-engine design
+produced a four-engine analytic dataset for a specific, documented, and since-resolved
+operational reason, not because ChatGPT was deliberately excluded from the study design.
+
+The analytic dataset therefore consists of 222 completed responses across four engines
+(Gemini, Claude, Perplexity, Meta AI), spanning 56 prompts in seven cities.
+Table~\ref{tab:dataset} summarizes engine-level completion counts.
+
+\begin{table}[h]
+\centering
+\caption{Recorded engine-level responses per city. ChatGPT is excluded from analysis
+(see Section 3.2); its column reports recorded error rows only.}
+\label{tab:dataset}
+\begin{tabular}{lccccc}
+\toprule
+City & Prompts & Gemini & Claude & Perplexity & Meta AI \\
+\midrule
+London & 8 & 8 & 8 & 8 & 8 \\
+Berlin & 8 & 8 & 8 & 8 & 8 \\
+Madrid & 8 & 8 & 8 & 8 & 8 \\
+New York & 8 & 8 & 8 & 8 & 7 \\
+Paris & 8 & 8 & 8 & 8 & 7 \\
+Rome & 8 & 8 & 8 & 8 & 8 \\
+Dublin & 8 & 8 & 8 & 8 & 8 \\
+\midrule
+\textbf{Total} & \textbf{56} & \textbf{56} & \textbf{56} & \textbf{56} & \textbf{54} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Response analysis}
+
+Each raw response was parsed by an automated pipeline to extract, where present, a
+ranked or otherwise prominently featured list of named brands or providers. This
+pipeline evolved over the course of the underlying project to reduce false-positive
+extractions (for example, rejecting section headings, evaluation-criteria labels, and
+generic category nouns that could otherwise be mistaken for brand names). Even with
+these safeguards, raw extraction is not perfectly reliable, and every city's dataset was
+subject to a manual review pass in which an analyst read the underlying raw response
+text directly and corrected or flagged extraction artifacts before any qualitative
+finding was reported. Known, disclosed categories of correction include: rejecting
+brand-like fragments that are not real companies (for example, section headings or
+sentence fragments mistakenly parsed as a ranked entry); flagging entities that could
+not be independently verified as currently operating (for example, one Madrid response
+named a restaurant that appears to correspond to a now-closed establishment); and
+flagging at least one clear geographic mismatch (a Madrid dining query returning a
+restaurant located in a different city). We report findings only where the underlying
+named entity survived this manual verification step, and we disclose, per city, where a
+response was judged too noise-corrupted to support a reliable qualitative reading.
+
+Gemini's responses showed a further, engine-specific pattern: on a nontrivial minority
+of prompts, Gemini's raw text clearly named specific brands in prose, but the automated
+extraction step returned no structured list at all, most often because Gemini answered
+in a bold-text or bulleted-paragraph format that the extraction pipeline at the time
+did not fully parse as a ranked list. This produced an elevated rate of
+\emph{apparent} non-response for Gemini in several cities (most severely in Rome, where
+five of eight prompts showed this gap, and New York, where four of eight did). We treat
+this explicitly as a pipeline extraction limitation, not evidence that Gemini lacked an
+opinion, and we flag it separately from genuine cross-engine disagreement wherever it
+materially affects a result below.
+
+\subsection{Operational definition of cross-engine consensus}
+
+For each prompt, we define \emph{cross-engine consensus} as having been reached when at
+least three of the engines that returned a usable, verifiable response for that prompt
+independently named the same brand or provider as their top-ranked or single most
+prominently featured recommendation. Where only three engines returned usable data for
+a given prompt (most often because of the Gemini extraction gap described above), we
+require unanimous three-of-three agreement rather than relaxing the threshold. This is
+a coarse, binary construct, deliberately chosen for transparency over a continuous
+similarity metric: it is directly interpretable (\textit{``did the engines agree or
+not''}), at the cost of not distinguishing, for example, a narrow three-of-four
+majority from a full four-of-four sweep. We report both, in text, wherever the
+distinction is substantively meaningful.
+
+\subsection{Ethics and scope}
+
+All prompts describe realistic, commercially neutral information-seeking scenarios (for
+example, choosing a law firm, an accounting package, or a hotel). No prompt was
+designed to elicit content harmful to any named brand, and no named brand was
+deliberately advantaged or disadvantaged in prompt design. Named brands, providers, and
+professionals appearing in this paper's results are reported exactly as they appeared in
+a real, production AI system's response to a realistic query; their inclusion here is
+descriptive of observed AI behavior, not an endorsement, criticism, or claim about the
+named entity's actual quality.
+
+\section{Results}
+
+\subsection{Aggregate pattern: category structure predicts consensus}
+
+Table~\ref{tab:results} summarizes, per city, the number of categories (of eight
+prompts, four categories in bilingual cities and eight in monolingual cities) that
+reached cross-engine consensus under the definition in Section~3.4, alongside the
+single most notable qualitative finding for that city.
+
+\begin{table}[h]
+\centering
+\caption{Per-city consensus summary and headline qualitative finding.}
+\label{tab:results}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{5.4cm}}
+\toprule
+City & Consensus reached & Example unanimous or near-unanimous pick & Headline finding \\
+\midrule
+London & 6 of 8 categories & Capsule CRM (4/4); Starling, Monzo, Revolut (each 4/4) & Small, well-documented software and fintech categories converge strongly; employment law and independent financial advice do not. \\
+Berlin & 2 of 4 categories (bilingual) & Lexware/Lexoffice (4/4, German); Personio (3/4, German) & Gemini and Meta AI both returned zero competitors in English for a prompt they answered fully in German: a language-dependent visibility gap, not just re-ranking. \\
+Madrid & 1 strong, 1 partial of 4 categories & Hilton Madrid Airport (unanimous, both languages) & The strongest single consensus item in the dataset; a bidirectional, engine-specific language gap: Gemini silent in Spanish/complete in English, Meta AI the exact opposite, same prompt. \\
+New York & Majority of 8 categories & StreetEasy (3/4, unanimous among responders) & Institutions (Douglas Elliman, Corcoran) beat individually named experts; national law firms beat city-specific boutiques for startup incorporation. \\
+Paris & 1 of 4 categories, unanimous & Qonto (4/4, both languages, zero exceptions) & Query language changes the entire considered competitor \emph{set}, not just the ranking, for wealth management: French queries surface boutique French firms, English queries surface major international private banks. \\
+Rome & 0 of 4 categories & (none reached three-engine consensus) & The only city with zero cross-engine consensus in any category, yet the strongest single-engine, cross-lingual stability in the study (Meta AI reproduced an identical ranked list in two languages). \\
+Dublin & 5 of 8 categories, 2 fully unanimous & Monday.com (4/4); Revolut Business (4/4) & Highest full-consensus rate in the study, alongside a distinct engine-level failure: Meta AI showed a recurring bias toward large, well-known institutions regardless of whether the query asked for a boutique or independent option. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The clearest structural pattern across all seven cities is that categories with a small
+number of well-documented, easily distinguished, and widely reviewed providers (project
+management software, business banking, established corporate law firms) converge, often
+to full unanimity, while categories populated by many similarly qualified, less
+differentiated providers, particularly individually named professionals (employment
+solicitors, independent financial advisers, personal injury attorneys), rarely converge
+at all. This pattern held independently in London, New York, and Dublin, three cities
+that did not share a bilingual design and therefore cannot be explained by a language
+confound.
+
+\subsection{Institutions over individuals: New York}
+
+New York's dataset adds a specific variant of this pattern. For real estate brokerage,
+three long-established, large brokerages (Douglas Elliman, Corcoran, Brown Harris
+Stevens) each achieved three-of-four engine consensus, while individually named
+``star'' agents and boutique teams named in the same responses never achieved
+cross-engine agreement above one engine. A parallel pattern held for legal services:
+for startup incorporation, two large, nationally recognized technology-sector law firms
+(Fenwick \& West, Cooley) reached three-of-four consensus ahead of any New York
+specific boutique firm, extending a national-provider-over-local-provider pattern
+already observed in this project's prior industry-level content research. Gemini's
+extraction gap was most pronounced here among the monolingual cities, returning no
+structured competitor list on four of eight prompts despite naming brands in prose,
+underscoring the pipeline limitation flagged in Section~3.3.
+
+\subsection{Language changes the competitor set, not just the order: Paris}
+
+Paris produced the strongest single unanimous result in the entire dataset: for the
+prompt asking which online bank to use as a French small business, every engine that
+returned a usable response named Qonto as its top pick, in both the French-language and
+English-language runs, with no exceptions across four engines and two languages.
+
+The city's most theoretically significant finding, however, concerns a different
+category: wealth management. Here, query language did not merely reorder a fixed set of
+candidate firms, it changed which firms were considered at all. French-language queries
+converged on independent, boutique French wealth-management firms (most notably Cheval
+Blanc Patrimoine, named in three of four French-language responses and in zero
+English-language responses). English-language queries, by contrast, converged on major
+international private banking divisions (Soci\'et\'e G\'en\'erale Private Banking, BNP
+Paribas Wealth Management), which were near-unanimous once both language runs were
+combined but almost entirely absent from the French-language responses. This is a
+substantively different phenomenon from the presence/absence gaps observed in Berlin
+and Madrid: rather than one engine going silent in one language, every engine that
+answered in a given language converged on a systematically different category of
+provider depending on that language alone.
+
+\subsection{The Rome anomaly: zero consensus, maximal within-engine stability}
+
+Rome is the only city in the dataset in which no category reached even three-engine
+agreement. Every one of its four categories (boutique hotels, business-dinner
+restaurants, real estate agencies, and a hotel near Roma Termini station) fragmented
+across engines. Rome also showed the most severe Gemini extraction gap in the study
+(five of eight prompts returned no structured competitor list), and one Perplexity
+response was judged, on manual review, to be the most heavily noise-corrupted single
+response encountered anywhere in this research program (of eight extracted entries,
+only one was a genuine restaurant name; the remainder were street addresses, generic
+labels, and a reservation platform mistakenly parsed as a competitor).
+
+Despite this absence of cross-engine agreement, Rome showed the single strongest
+within-engine, cross-lingual stability result in the study. For the business-dinner
+restaurant category, Meta AI produced a five-item ranked list in Italian and, when asked
+the equivalent question in English, produced the identical five restaurants in the
+identical order: a full, exact reproduction rather than merely a similar or overlapping
+set. Perplexity showed a comparable, slightly weaker pattern for real estate agencies,
+naming essentially the same nine agencies in both languages with only reordering
+between them. No other engine showed this pattern in Rome, and no engine showed a
+comparably exact reproduction in any other city.
+
+\subsection{An engine-specific generalization failure: Dublin}
+
+Dublin, an English-only monolingual city, showed both the strongest overall consensus
+rate in the study (a corporate legal dispute prompt converged on Ireland's five largest
+commercial law firms, all named by all three responding engines; a project management
+software prompt and a business banking prompt each reached full four-of-four unanimity,
+on Monday.com and Revolut Business respectively) and a distinct, engine-specific
+failure mode not observed elsewhere. Meta AI's answers to three of eight prompts,
+covering financial advisers, wealth management for expatriates, and property-purchase
+solicitors, were each nearly identical in composition to its answer for an unrelated
+prompt about large-scale commercial litigation, naming the same set of large,
+well-known institutions (for example, Davy, Investec, Cantor Fitzgerald, and Goodbody
+Stockbrokers for two nominally distinct wealth-related queries) regardless of whether
+the query explicitly asked for an independent or boutique option. Claude, Gemini, and
+Perplexity, queried with the identical prompts, differentiated cleanly between these
+scenarios. We interpret this as a query-intent generalization failure specific to one
+engine on this class of prompt, rather than evidence about the real market structure of
+Dublin's financial advisory sector, and note it as a further reason a single-engine
+visibility measurement can misrepresent a brand's actual standing.
+
+\section{Discussion}
+
+\subsection{Implications for brand visibility measurement}
+
+The central practical implication of these results is that a brand visibility
+measurement built on a single AI engine, however prominent that engine may be, risks
+systematically misrepresenting a brand's real standing. A brand that is the unanimous
+top pick across four independent engines (as Qonto was in Paris, or Monday.com in
+Dublin) occupies a materially more defensible market position than a brand that is
+top-ranked in one engine and simply absent, rather than merely lower-ranked, in others,
+a distinction that a single-engine measurement cannot express at all. Equally, the
+Berlin and Madrid language-gap findings show that even a multi-engine measurement can be
+misleading if it is monolingual: a brand's visibility can differ sharply by the
+language a real customer happens to use, in ways that are not predictable from
+visibility in any one language alone.
+
+\subsection{Implications for category-level strategy}
+
+The consensus-versus-fragmentation pattern observed across London, New York, and Dublin
+suggests that the realistic goal for a GEO program differs meaningfully by category
+structure. In categories that already show strong cross-engine consensus around a small
+set of incumbents (well-documented software, large banks, large corporate law firms),
+the practical opportunity for a new or smaller entrant is likely to be difficult:
+displacing an already-converged consensus requires the same widely available, easily
+verifiable signal that produced the consensus in the first place. In categories that
+show consistent fragmentation (individually named professionals, small local providers
+without a single obviously dominant option), the absence of a converged answer suggests
+more genuine opportunity for a well-documented, easily verifiable provider to become the
+engines' converged answer, precisely because no such consensus yet exists to displace.
+
+\subsection{Threats to validity}
+
+This study has several limitations that bound the strength of any conclusion drawn from
+it. It is a single-snapshot measurement, collected over a two-day window, not a
+longitudinal study; AI system outputs are known to vary over time as underlying models,
+retrieval indexes, and grounding configurations are updated, and a repeated measurement
+at a later date could show different results for the same prompts. The sample is
+small by conventional statistical standards (56 prompts, 222 analyzed responses), and
+per-prompt engine counts are frequently three or four rather than five, both because of
+the ChatGPT collection failure (Section 3.2) and the Gemini extraction gap
+(Section 3.3); we have treated both as data-quality issues to be disclosed and worked
+around, not as substantive findings, but a reader should weigh conclusions accordingly.
+The manual verification step described in Section 3.3, while conducted with the
+specific goal of reducing extraction artifacts, necessarily involves analyst judgment
+and is not independently replicated by a second coder in this study. Finally, this
+study measures a fixed, English-plus-one-additional-language design per city; it cannot
+speak to consensus behavior in language pairs, categories, or geographies outside the
+seven cities and eight categories actually tested.
+
+\section{Limitations, Ethics, and Reproducibility}
+
+We restate, for a reader relying on this paper in isolation, the two data-collection
+issues disclosed in Section~3: ChatGPT is excluded from all analysis due to a
+documented, account-level API quota failure affecting all 56 of its scheduled calls
+during the collection window, and Gemini shows an elevated, format-dependent
+non-extraction rate in several cities that should not be read as a substantive absence
+of visibility. Every qualitative finding in Section~4 is drawn from responses that
+survived a manual review of the underlying raw model output, and every flagged,
+uncertain, or noise-corrupted data point encountered during that review is disclosed
+in this paper rather than silently omitted or silently corrected. No named brand,
+professional, or provider in this dataset was contacted, sampled, or otherwise involved
+in the study; all data consists of AI system outputs to realistic informational
+prompts, collected through each vendor's public, documented API in the ordinary course
+of a commercial monitoring product's operation. The underlying per-city working notes,
+including the full prompt list and every disclosed data-quality flag referenced in
+Section~3.3, are maintained by the authors and available on reasonable request.
+
+\section{Conclusion}
+
+Across seven cities and 56 buyer-intent prompts, we find that whether independently
+queried AI assistants agree on a recommended brand depends strongly on the structure of
+the underlying commercial category: well-documented, small-provider-set categories
+converge, often unanimously, while categories with many similarly qualified
+individually named providers rarely do. We further find that query language can, in at
+least one documented case, change the entire set of brands an engine considers rather
+than merely reordering a fixed set, and that at least one city in our sample shows a
+combination of zero cross-engine consensus with the strongest observed within-engine,
+cross-lingual stability, a combination that a single aggregate consensus metric would
+have obscured. These findings support a practical conclusion for both brand owners and
+platform designers: meaningful AI visibility measurement requires sampling across
+multiple engines and, where a market is multilingual, across multiple languages,
+because both engine identity and query language are independent sources of variation
+in what an AI system recommends, not noise around a single underlying truth.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{aggarwal2024geo}
+P. Aggarwal, V. Murahari, T. Rajpurohit, A. Kalyan, K. Narasimhan, and A. Deshpande.
+GEO: Generative Engine Optimization. \textit{Proceedings of the 30th ACM SIGKDD
+Conference on Knowledge Discovery and Data Mining (KDD '24)}, 2024.
+\url{https://arxiv.org/abs/2311.09735}
+
+\bibitem{googlegrounding2026}
+Google. Grounding with Google Search. Gemini API documentation, accessed July 2026.
+
+\bibitem{openaisearch2026}
+OpenAI. Web search tool documentation, accessed July 2026.
+
+\bibitem{semrush2026}
+Semrush. AI Overview and AI-driven search prevalence tracking, 2026. As reported in
+BrandGEO Research, ``Schema Markup for AI Search: The Complete Implementation Guide,''
+\url{https://getbrandgeo.com/bg-010.html}
+
+\bibitem{brightedge2026}
+BrightEdge. AI Overview prevalence tracking study, 2026. As reported in BrandGEO
+Research, \url{https://getbrandgeo.com/bg-005.html}
+
+\bibitem{ahrefs2026correlation}
+Ahrefs. Brand mention and backlink correlation study across 75{,}000 brands, 2026. As
+reported in BrandGEO Research, ``The Anatomy of an AI-Cited Brand,''
+\url{https://getbrandgeo.com/bg-007.html}
+
+\bibitem{ahrefs2026freshness}
+Ahrefs. Content freshness and AI citation rate study, 2026. As reported in BrandGEO
+Research, \url{https://getbrandgeo.com/bg-013.html}
+
+\bibitem{amsive2026}
+Amsive. Content freshness and AI citation research, 2026. As reported in BrandGEO
+Research, \url{https://getbrandgeo.com/bg-013.html}
+
+\bibitem{soci2026}
+SOCi. Local Visibility Index, 2026. As reported in BrandGEO Research, ``AI Visibility
+by Industry: Who Wins, Who Loses,'' \url{https://getbrandgeo.com/bg-008.html}
+
+\end{thebibliography}
+
+\end{document}

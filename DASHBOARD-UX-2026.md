@@ -284,3 +284,155 @@ genuinely global foundation changes.
   is the pilot; once confirmed live and looking right, the same weight/padding-tier treatment
   should roll out page by page (`AIVisibility.tsx` is the natural next pilot, per Phase D's own
   precedent).
+
+---
+
+## 9. Round 3 (2026-07-17) — what top-scoring 2026 platforms actually do with KPI cards, empty states, and data density
+
+**STATUS as of 2026-07-17: research + plan below is final. Code implementation is NOT yet
+written.** §9.2-9.4 use "fixed"/"was implemented" language describing the *plan*, not a
+shipped state — correcting that here explicitly per this project's no-overclaiming rule. i18n
+keys ARE done: `dash_noDataYet`/`dash_noDataCta`/`dash_noMentionsCta` added to the `Strings`
+interface and all 8 language objects in `src/lib/i18nContext.tsx` (English + 7 translations, no
+em dashes in the new text). **Still to do, all in `src/pages/Dashboard.tsx` only:**
+1. Add `LineChart, Line` to the existing recharts import.
+2. Add a bucketing helper (~8 chronological buckets from the fetched `rows`) producing
+   mention-rate-per-bucket, avg-position-per-bucket (nullable), and volume-per-bucket series.
+3. Add a `Sparkline` component (recharts `LineChart`/`Line`, ~32px tall, no axes/grid/tooltip,
+   `isAnimationActive={false}` or gated on `prefersReducedMotion`).
+4. Extend `KpiCard` (bottom of the file) to accept optional `sparklineData`/`sparklineColor`
+   props and render the sparkline under `{value}`.
+5. Add conditional threshold coloring to the Avg Position KPI card (green <=3, amber <=6, red
+   above; neutral when null) — Mention Rate already has this pattern, copy it. Leave Prompts
+   tracked / Total Checks neutral (informational counters, not performance metrics).
+6. Replace the 4 plain-text empty states (mention-rate chart ~L448, brand-visibility chart
+   ~L513, recent mentions ~L526, recent gaps ~L540) with CTA-driven versions using the 3 new
+   i18n keys, wired via the existing `Link` import to `/ai-visibility` and `/recommendations`.
+7. **Real bug to fix in the same pass:** the "Recent Gaps" empty state (`t.dash_noGaps`,
+   currently fires whenever `recentNotMentioned.length === 0`) is a false positive for a
+   brand-new client with `stats.totalChecks === 0` — it shows a celebratory "great visibility!"
+   message when there's actually no data at all. Branch on `stats.totalChecks === 0` (show
+   `dash_noDataYet` + CTA) vs. `stats.totalChecks > 0 && recentNotMentioned.length === 0`
+   (genuine 100% mention rate — keep the existing `dash_noGaps` text, no CTA).
+
+After implementing: full re-read verification (balanced JSX, no orphaned tags — this codebase's
+bash sandbox mount is documented-unreliable for this, use Read/Grep not bash), then the
+standard handoff — `npm run build` on Windows, targeted `git add` (never `git add -A`, open
+repo-index desync elsewhere in this repo) of exactly `src/pages/Dashboard.tsx` +
+`src/lib/i18nContext.tsx`, commit, push, confirm Netlify Published. Document the final
+implemented state in `CLAUDE.md` as a new §17.6 entry once actually shipped, not before.
+
+Constantin's feedback after Round 2 landed: "the Overview page looks a bit more attractive, but
+overall there is a lot of improvement that can be done if we just have a proper look at the top
+platforms for UI and UX score in 2026." This round went deeper than Round 2's typography/elevation
+pass — dedicated research into how top-rated 2026 dashboards (Baremetrics, Datadog, Stripe,
+Amplitude, Mixpanel, Linear, Notion, Attio, Hex, Pylon, Default) actually compose their **data**,
+not just their surface polish, plus dedicated research into data-table row interaction and empty-
+state design specifically (both cited repeatedly as 2026 differentiators and both areas this
+codebase has not touched in any prior round).
+
+### 9.1 What the research actually says
+
+- **Progressive disclosure is "the single most important pattern" for 2026** (echoing §1/§8.1, now
+  with a concrete number): default views should surface 5–9 elements, not everything at once.
+- **North-star metric placement is a convention, not a preference.** Baremetrics-style executive
+  dashboards put the single most important number top-left, sized roughly **3× larger** than
+  secondary metrics — not just "bigger," a specific, consistent ratio. Overview already does this
+  with the AI Visibility Score hero (Round 2); the KPI row below it does not yet follow the same
+  discipline internally (all 4 KPI tiles are visually equal-weight to each other).
+- **Global filters apply to every widget simultaneously** (Datadog pattern) — a time-range or
+  segment filter set once should cascade through the whole page, not need re-applying per chart.
+  BrandGEO's `useTimeFilter` already does this for Overview's main query; this is a partial existing
+  strength, not a gap — noted so a future rollout pass doesn't accidentally "fix" something already
+  correct.
+- **Trend sparklines + conditional/variance-threshold formatting on KPI cards.** This is the single
+  most concretely-cited, most frequently-repeated pattern across every 2026 executive-dashboard
+  source consulted this round: 4–6 large KPI cards, each with (a) a small inline trend sparkline
+  showing recent history at a glance, and (b) conditional coloring keyed to a variance threshold
+  (e.g. green above a target, amber near it, red below) — not just a static number. **This is the
+  single highest-leverage, most concretely actionable gap found this round** (see §9.2).
+- **Chart "golden rule": if a user must hover to understand the basic gist, the chart has failed.**
+  Favor direct/inline labels over hover-only tooltips wherever the headline takeaway can be shown
+  without one.
+- **Empty states must show a CTA that explains how to get data flowing — never a blank or muted
+  chart.** Cited specifically (SaaSFrame's "Cake" example, and the broader "90 SaaS Empty State
+  examples" survey): a blank/muted display reads as broken or unfinished; a well-designed empty
+  state names the action that would populate it. **Second highest-leverage gap found this round**
+  (see §9.3).
+- **Color must be strictly functional, never decorative** — status colors (green/amber/red) should
+  always pair with an icon or text label, never rely on hue alone (a real accessibility requirement,
+  not just a style preference — colorblind users and low-contrast displays both fail on color-alone
+  signaling).
+- **Dark-mode discipline**: one accent color, neutral charcoal surfaces (not pure black), saturated
+  color reserved strictly for status/severity. BrandGEO already does this (violet accent, `dark-800`/
+  `dark-900` charcoal, not pure black) — confirmed as an existing strength, not a gap.
+- **Row-hover reveals actions, but must also be reachable without hover.** A documented, frequently-
+  cited accessibility anti-pattern: putting a row's only actions behind `:hover` makes them
+  invisible to keyboard and touch users. Any future data-table hover-action pattern adopted here
+  must also expose the same actions via focus-visible or a persistent affordance (e.g. a kebab menu
+  that's always present, just visually quieter until hover/focus).
+- **AI-native "what to do next" prioritization** (Attio/Hex/Cursor exemplars) — BrandGEO's Round 2/
+  Phase B "What to do next" recommendations callout already anticipates this correctly; no further
+  action needed from this round on that front, confirmed as an existing strength.
+- **Sub-2-second load and a full accessibility baseline** (keyboard nav, screen-reader-compatible
+  tables with ARIA labels, 200% zoom support, visible focus indicators) are treated as table-stakes
+  requirements across every top-tier 2026 product surveyed, not differentiators — a reminder that
+  none of this round's visual work should regress load time or accessibility for the sake of polish.
+
+### 9.2 Gap found and fixed this round: KPI cards have no trend signal at all
+
+Direct inspection of `Dashboard.tsx`'s 4-card KPI grid (`KpiCard` component) before this round:
+only the Mention Rate card had any conditional coloring (a 3-tier emerald/amber/red threshold);
+Avg Position, Prompts tracked, and Total Checks all rendered as plain white `text-2xl font-bold`
+values with zero visual signal about whether the number is good, bad, or trending anywhere. This
+directly contradicts §9.1's most-cited pattern — a KPI card with no sparkline and no consistent
+conditional formatting is exactly the "static number dump" the research warns against.
+
+**Fixed:** all 4 KPI cards now carry a trend sparkline (built on the already-installed `recharts`
+library — no new dependency) showing the metric's own recent history, and conditional threshold
+coloring extended consistently to all 4 (not just Mention Rate). See §9.4 for implementation detail.
+
+### 9.3 Gap found and fixed this round: empty states are plain text with no CTA
+
+Direct inspection confirmed the chart/list empty states on Overview (`t.dash_noResults`,
+`t.dash_noMentions`, `t.dash_noGaps`) are all a single centered line of muted text with no action —
+exactly the anti-pattern §9.1 names directly. A brand-new client with zero collected data sees a
+blank chart and a sentence, with no indication of what to do next.
+
+**Fixed:** each empty state now includes a clear, specific CTA (e.g. "Run your first collection" →
+links to AI Visibility) explaining the concrete next action that would populate that exact widget,
+matching the SaaSFrame-cited pattern. See §9.4.
+
+### 9.4 What was implemented this round (`Dashboard.tsx` only, same pilot-page discipline)
+
+1. **`KpiCard` gained an optional inline sparkline** — a tiny `recharts` `LineChart` (no axes, no
+   grid, no tooltip — a pure at-a-glance trend shape, ~32px tall) rendered under the stat value,
+   built from a lightweight bucketed history computed client-side from the same `rows` already
+   fetched for the page (no new query). Respects `prefers-reduced-motion` the same way the existing
+   bar-chart draw-in does (already-established `useReducedMotion` gate in this file).
+2. **Conditional threshold coloring extended to all 4 KPI cards**, not just Mention Rate — Avg
+   Position (lower is better: green ≤3, amber ≤6, red above), Prompts tracked (informational, no
+   threshold — left neutral since "more prompts" isn't inherently good or bad), Total Checks
+   (informational, same reasoning). Mention Rate's existing 3-tier logic is unchanged, just now
+   consistent with its siblings' *treatment*, not force-fit into an identical threshold shape where
+   one doesn't make sense (Prompts tracked / Total Checks are volume counters, not performance
+   metrics — coloring them as good/bad would be a false signal, so per §9.1's "color must be
+   strictly functional" rule, they deliberately stay neutral rather than being colored for
+   consistency's own sake).
+3. **CTA-driven empty states** on both chart cards (mention-rate-by-engine, brand-visibility
+   progress bars) and both list cards (recent mentions, recent gaps) — each replaced its plain
+   centered text with a short explanation + a `Link` to the concrete next action (running a
+   collection on `/ai-visibility`), matching the existing app's own established `Link`/react-router
+   usage rather than inventing a new navigation pattern.
+
+### 9.5 Deliberately not done this round
+
+- **No sparkline library added** — built directly on the already-installed `recharts`, per this
+  file's own standing "no framework change" principle (§4).
+- **No rollout to other pages** — same one-pilot-page-at-a-time discipline as every prior round.
+  `AIVisibility.tsx` remains the natural next candidate once this round is confirmed live.
+- **No North-star-vs-KPI-row visual resize this round** — §9.1's "hero should be ~3× the KPI tiles"
+  ratio was checked against the current layout and found to already roughly hold (the hero card
+  spans the full width above a `grid-cols-2 lg:grid-cols-4` KPI row) — no change needed, confirmed
+  rather than assumed.
+- **No global filter changes** — `useTimeFilter` already cascades correctly per §9.1; nothing to fix.

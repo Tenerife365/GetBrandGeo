@@ -1,0 +1,98 @@
+# BrandGEO
+
+> BrandGEO is an AI Visibility Intelligence platform. It monitors, scores, and
+> tracks how brands are mentioned, ranked, and described across ChatGPT,
+> Gemini, Claude, Perplexity, and Meta AI, and reports a weighted 0-100 AI
+> Visibility Score across six dimensions: recognition, knowledge, sentiment,
+> accuracy, reach, and consistency.
+
+BrandGEO is an independent, Spain-based company founded by Constantin Daniel
+in 2026, headquartered in Santa Cruz de Tenerife, Canary Islands. BrandGEO
+(getbrandgeo.com) is unrelated to and has no affiliation with any
+similarly-named domain, including brandgeo.co or brangeo.app, which are
+separate, unaffiliated products. Available as self-serve software (Free,
+Essentials, Growth) and as a fully managed, done-for-you service (Managed,
+Pro, Enterprise).
+
+## Product
+
+- [Home](https://getbrandgeo.com/): What BrandGEO does, the AI Visibility Score, pricing tiers, and a live audit widget.
+- [FAQ](https://getbrandgeo.com/faq.html): 20 questions on AI Visibility, GEO, the scoring methodology, the platform, the free audit, and pricing.
+- [Glossary](https://getbrandgeo.com/glossary.html): Original definitions for 22 AI Visibility and GEO terms (GEO, AEO, LLMO, RAG, Share of Voice, and more), each linked to the research that covers it in depth.
+- [Support](https://getbrandgeo.com/support.html): Help center for existing customers - account, dashboard, AI Visibility Score, and billing questions.
+- [Terms & Conditions](https://getbrandgeo.com/terms.html): Pricing, free audit policy, cancellation, and governing law.
+- [Newsroom](https://getbrandgeo.com/news/): Official company announcements and product launches.
+
+## Published Research
+
+- [Cross-Engine Consensus in AI-Generated Brand Recommendations](https://doi.org/10.5281/zenodo.21395598): An empirical data paper (Constantin Daniel, BrandGEO; DOI 10.5281/zenodo.21395598; CC BY 4.0) analyzing 222 real API responses across 56 buyer-intent prompts, 7 cities, and 4 AI engines to measure cross-engine consensus in AI-generated brand recommendations.
+
+## Research (BrandGEO Research™)
+
+Original data and analysis on AI Visibility and Generative Engine Optimization, indexed at [the research blog](https://getbrandgeo.com/blog.html).
+
+- [BG-001: The AI Visibility Gap](https://getbrandgeo.com/bg-001.html): Why most brands are invisible to AI engines, and what GEO means for brand strategy.
+- [BG-002: From Rankings to Recommendations](https://getbrandgeo.com/bg-002.html): The shift from "do you rank on Google" to "does AI recommend you."
+- [BG-003: How Does ChatGPT Decide Which Brands to Recommend?](https://getbrandgeo.com/bg-003.html): The six-stage pipeline and eight signal categories behind an AI recommendation.
+- [BG-004: #1 on Three AI Engines, Absent on Gemini](https://getbrandgeo.com/bg-004.html): A real 20-question, 5-engine audit case study for one brand.
+- [BG-005: GEO vs SEO: The Fundamental Difference](https://getbrandgeo.com/bg-005.html): Why treating GEO as "AI SEO" costs brands real visibility.
+- [BG-006: Perplexity vs Gemini: Which AI Cites Brands Most?](https://getbrandgeo.com/bg-006.html): Perplexity cites brands on 75-85% of commercial queries, Gemini on 55-65% - the mechanism behind the gap.
+- [BG-007: The Anatomy of an AI-Cited Brand](https://getbrandgeo.com/bg-007.html): Brand mentions correlate 3x stronger with AI citations than backlinks.
+- [BG-008: AI Visibility by Industry: Who Wins, Who Loses](https://getbrandgeo.com/bg-008.html): 98.8% of local businesses are invisible to AI search; who's actually winning.
+- [BG-009: How ChatGPT Actually Decides Which Brands to Recommend](https://getbrandgeo.com/bg-009.html): ChatGPT only searches the live web on 34.5% of queries - the mechanics of both paths.
+- [BG-010: Schema Markup for AI Search](https://getbrandgeo.com/bg-010.html): What schema markup actually does for AI citation, and what doesn't matter.
+- [BG-011: Why Reddit Mentions Move the Needle on AI Citations](https://getbrandgeo.com/bg-011.html): Reddit is the most-cited domain across ChatGPT, Gemini, and Perplexity.
+- [BG-012: AI Visibility vs. Brand Mentions](https://getbrandgeo.com/bg-012.html): Why a brand can be mentioned by ChatGPT and still be losing.
+- [BG-013: How Often You Need to Publish to Stay Cited by AI](https://getbrandgeo.com/bg-013.html): Content under 30 days old earns up to 3.2x more AI citations.
+- [BG-014: Why Your Brand Might Be Invisible to AI Outside English](https://getbrandgeo.com/bg-014.html): What English-dominant AI training data means for non-English brand citations.
+- [BG-015: Beyond "Are We Mentioned?"](https://getbrandgeo.com/bg-015.html): A practical framework for the AI visibility KPIs that actually matter.
+- [BG-016: Cross-Engine Consensus](https://getbrandgeo.com/bg-016.html): When AI engines agree on a brand recommendation, and when they don't - a pattern across 20 real buyer categories in 7 cities.
+- [BG-017: Our AI Visibility Research Is Now a Published Academic Paper](https://getbrandgeo.com/bg-017.html): A plain-language summary of the empirical data paper behind this research, published with a permanent DOI under a CC BY 4.0 license.
+
+## City AI Visibility Studies
+
+Original data from real buyer prompts run across multiple AI engines in each city, several testing local-language vs. English answers.
+
+- [London](https://getbrandgeo.com/ai-visibility-for-london.html): 8 real London buyer prompts across 4 AI engines - which categories are unanimous, which are wide open.
+- [Berlin](https://getbrandgeo.com/ai-visibility-for-berlin.html): German vs. English answers from ChatGPT, Gemini & Perplexity - some brands vanish depending on language.
+- [Madrid](https://getbrandgeo.com/ai-visibility-for-madrid.html): Spanish vs. English answers - one engine stayed identical, two others flipped completely.
+- [New York](https://getbrandgeo.com/ai-visibility-for-newyork.html): Institutions beat individuals, nationally-known brands beat local ones, across 8 categories and 4 engines.
+- [Paris](https://getbrandgeo.com/ai-visibility-for-paris.html): French vs. English testing across 4 categories - one bank swept every engine unanimously.
+- [Rome](https://getbrandgeo.com/ai-visibility-for-rome.html): Italian vs. English testing - one engine reproduced an identical ranked list in both languages.
+- [Dublin](https://getbrandgeo.com/ai-visibility-for-dublin.html): 8 real Dublin prompts, 4 engines - Monday.com and Revolut Business won unanimous consensus.
+
+## Industry Guides
+
+Practical, checklist-driven guides on how AI engines recommend brands within a specific industry, each with sourced 2026 data.
+
+- [SaaS](https://getbrandgeo.com/ai-visibility-for-saas.html): How SaaS buyers now ask ChatGPT, Gemini, and Perplexity for software recommendations.
+- [E-commerce](https://getbrandgeo.com/ai-visibility-for-ecommerce.html): How AI shopping assistants recommend products, and what gets brands cited instead of skipped.
+- [Law Firms](https://getbrandgeo.com/ai-visibility-for-law-firms.html): How law firms get cited by AI engines before a prospect ever Googles them.
+- [Hotels & Travel](https://getbrandgeo.com/ai-visibility-for-hotels.html): How AI engines recommend hotels and travel brands.
+- [Financial Services & Fintech](https://getbrandgeo.com/ai-visibility-for-financial-services.html): How financial brands earn citations, and why YMYL caution changes what it takes.
+- [Healthcare](https://getbrandgeo.com/ai-visibility-for-healthcare.html): How healthcare providers get recommended by ChatGPT, Gemini & Perplexity.
+- [Real Estate](https://getbrandgeo.com/ai-visibility-for-real-estate.html): 91% of real estate agents are invisible to ChatGPT and Gemini - what AI actually recommends instead.
+- [Home Services & Contractors](https://getbrandgeo.com/ai-visibility-for-home-services.html): How plumbers, HVAC pros, and contractors get cited instead of overlooked.
+- [Restaurants & Hospitality](https://getbrandgeo.com/ai-visibility-for-restaurants.html): Real 2026 data on AI restaurant discovery and how to get recommended.
+- [Education](https://getbrandgeo.com/ai-visibility-for-education.html): How ChatGPT, Gemini, and Perplexity recommend schools and courses today.
+
+## Comparisons
+
+Honest side-by-side comparisons against every named direct competitor - pricing, engine coverage, and genuine strengths on both sides, not one-sided.
+
+- [BrandGEO vs Peec AI](https://getbrandgeo.com/brandgeo-vs-peec.html)
+- [BrandGEO vs Profound](https://getbrandgeo.com/brandgeo-vs-profound.html)
+- [BrandGEO vs Otterly.AI](https://getbrandgeo.com/brandgeo-vs-otterly.html)
+- [BrandGEO vs Scrunch AI](https://getbrandgeo.com/brandgeo-vs-scrunch.html)
+- [BrandGEO vs AthenaHQ](https://getbrandgeo.com/brandgeo-vs-athenahq.html)
+- [BrandGEO vs Rankscale](https://getbrandgeo.com/brandgeo-vs-rankscale.html)
+- [BrandGEO vs Ahrefs Brand Radar](https://getbrandgeo.com/brandgeo-vs-ahrefs-brand-radar.html)
+- [BrandGEO vs Semrush AI Toolkit](https://getbrandgeo.com/brandgeo-vs-semrush.html)
+- [BrandGEO vs Conductor](https://getbrandgeo.com/brandgeo-vs-conductor.html)
+- [BrandGEO vs Goodie AI](https://getbrandgeo.com/brandgeo-vs-goodie.html)
+
+## Optional
+
+- [Privacy Policy](https://getbrandgeo.com/privacy.html)
+- [Cookie Policy](https://getbrandgeo.com/cookies.html)
+- [Full company/entity detail and methodology](https://getbrandgeo.com/llms-full.txt): Extended version of this file with company facts, product methodology, and per-page summaries in full.

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-010 — Schema Markup for AI Search: The Complete Implementation Guide | BrandGEO Research™</title>
+  <meta name="description" content="Schema's AI-citation boost is contested — 2.3x in one study, none in another. Here's what actually matters to implement, and why.">
+  <meta property="og:title" content="Schema Markup for AI Search: The Complete Implementation Guide — BrandGEO Research™">
+  <meta property="og:description" content="The citation-boost claim is contested. The case for implementing schema correctly anyway isn't. A practical, sourced guide to what to build and what to skip.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-010-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-010.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-010.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-010-hero.png">
+  <meta property="article:published_time" content="2026-07-09">
+  <meta name="keywords" content="schema markup AI search, structured data AI citations, JSON-LD LLM, Organization schema, FAQPage schema, GEO technical SEO, AI Visibility, BrandGEO">
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Schema Markup for AI Search: The Complete Implementation Guide",
+    "description": "BrandGEO Research: a practical, sourced guide to which schema.org types actually matter for AI visibility in 2026 — what the contested citation-boost research really shows, and what to implement regardless.",
+    "image": "https://getbrandgeo.com/images/bg-010-hero.png",
+    "datePublished": "2026-07-09",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"},
+    "about": ["Structured Data", "Schema Markup", "AI Visibility", "Generative Engine Optimization", "Technical SEO", "JSON-LD"],
+    "mentions": [
+      {"@type": "SoftwareApplication", "name": "ChatGPT", "creator": {"@type": "Organization", "name": "OpenAI"}},
+      {"@type": "SoftwareApplication", "name": "Perplexity", "creator": {"@type": "Organization", "name": "Perplexity AI"}},
+      {"@type": "Organization", "name": "Google"}
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ARTICLE HEADER */
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    /* HERO IMAGE */
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    /* KEY FINDINGS */
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    /* ARTICLE BODY */
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+
+    /* CALLOUT BOXES */
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+
+    /* BLOCKQUOTE */
+    blockquote { border-left: 3px solid var(--accent); padding: 16px 24px; margin: 32px 0; }
+    blockquote p { font-size: 1.1rem; font-style: italic; color: var(--text); margin: 0; }
+
+    /* SECTION DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+    /* COMPARISON TABLE */
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    /* RELATED RESEARCH */
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    /* CTA BOX */
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    /* NEXT POST */
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-010</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-010</span>
+    <span class="badge-tag">Technical SEO</span>
+    <span class="badge-tag">Structured Data</span>
+    <span class="badge-tag">GEO</span>
+  </div>
+  <h1>Schema Markup for AI Search: <em>The Complete Implementation Guide</em></h1>
+  <p class="article-subtitle">The citation-boost claim is contested. The case for implementing schema correctly anyway isn't. Here's exactly what to build, and what to skip.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 9, 2026</span>
+    <span class="meta-item">9 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-010</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-010-hero.png" alt="SEO-optimized websites rank in ten blue links; AI-optimized websites get recommended directly by name across ChatGPT, Gemini, Claude, Perplexity, Copilot, Meta AI, and Grok — the shift from ranking to being the cited answer that structured data is meant to support." loading="eager">
+</div>
+
+<!-- KEY FINDINGS -->
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Findings — BG-010</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">2.3x</div>
+        <div class="finding-desc">More often cited in AI Overviews for pages with Article + BreadcrumbList schema, controlling for domain authority</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">1,885</div>
+        <div class="finding-desc">Pages Ahrefs tracked adding JSON-LD schema — found no major AI-citation uplift from schema alone</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">May 2026</div>
+        <div class="finding-desc">Google deprecated FAQ rich results in Search — the markup itself remains valid, the rich snippet doesn't</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">5</div>
+        <div class="finding-desc">Schema types 2026 GEO research consistently flags as worth prioritizing for AI visibility</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARTICLE BODY -->
+<div class="article-body">
+
+  <h2 id="direct-answer">The direct answer</h2>
+  <p>Should you implement schema markup to get cited more by AI engines? Yes — but not because the evidence that it directly drives citations is settled. It isn't. One large 2026 study found a real, measurable citation lift from structured data. Another, just as rigorous, found almost none. What isn't contested is the case for schema on every other ground BrandGEO's own GEO philosophy already rests on: machine-parseability, entity clarity, and giving every AI system an unambiguous, verifiable read on who you are and what you sell. This is the practical version — which schema types matter, what to actually implement, and the mistakes that waste the effort.</p>
+
+  <h2 id="contested-backdrop">The contested backdrop — and why it doesn't settle the question</h2>
+  <p>We already flagged this honestly in <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a>: the data on whether schema markup itself boosts AI citations doesn't point in one direction. Digital Applied's 2026 analysis of 1,000 AI Overviews — comparing 4,243 cited URLs against roughly 50,000 non-cited controls, controlling for domain authority — found pages carrying Article and BreadcrumbList schema were cited <strong>2.3x more often</strong> than otherwise-comparable unstructured pages. Ahrefs ran the opposite kind of test: tracking <strong>1,885 pages</strong> that added JSON-LD schema between August 2025 and March 2026, and found that adding schema alone produced no major uplift in citations on any platform.</p>
+  <p>Both studies are real, and both are probably right about what they actually measured. Digital Applied studied pages already being cited at some rate and asked what correlated with citation frequency — schema showed up as one signal among several compounding ones, alongside domain authority, content length, and named-source citations in the body. Ahrefs studied the marginal effect of <em>adding</em> schema to a fixed set of pages and found it didn't move the needle in isolation. The likely reconciliation, consistent with BG-007's own framing: schema is an amplifier riding on top of strong content, not a citation-generating mechanism in its own right. Adding FAQPage markup to a thin, generic page won't make an AI engine cite it. Adding the same markup to a page that's already well-mentioned, current, and cross-source-verified gives that page one more way to be understood correctly.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">Why we're building this guide anyway</div>
+    <p>If schema doesn't reliably create citations on its own, it's still worth doing correctly — for the same reason keeping your books clean is worth doing even though it doesn't grow revenue on its own. It's infrastructure, not a growth lever. Treat it that way and the mistakes below stop happening.</p>
+  </div>
+
+  <h2 id="why-anyway">Why implement it anyway: the case beyond citation-boost</h2>
+  <p>Google's own AI-features documentation is explicit that no special "AI schema" exists — there's no AIPage type, no LLMOptimized property, nothing added specifically for AI Overviews or AI Mode. What Google does say is that Gemini-powered AI Mode reads your existing schema.org markup as a trust and verification signal, not a display trigger — the same markup that once earned a rich snippet now helps an AI system disambiguate who you are before it decides whether to cite you at all. As <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already established, GEO isn't SEO with new keywords — it's a different verification process, and schema plays a genuine role in that process even when it isn't the thing that gets you cited.</p>
+  <p>A February 2026 controlled experiment, run by SEO researcher Mark Williams-Cook and reported by Search Engine Roundtable, tested something more specific: does an LLM actually parse your JSON-LD, or does it just read it as text? He built a page for a fake company with an address embedded exclusively inside deliberately invalid, malformed JSON-LD — nowhere in the visible content. Both ChatGPT and Perplexity extracted and returned the address correctly. The finding: both engines tokenize the <code>&lt;script&gt;</code> block as raw text rather than parsing it as validated structured data — they never checked whether the schema was syntactically correct, they just read the characters. Two practical conclusions follow. First, the facts inside your schema function as machine-readable content even when the syntax is imperfect — which is a real, if modest, argument for using it at all. Second, don't lean on schema syntax as a substitute for saying the same thing in visible copy, since visible text is what every engine primarily reasons over, and a fact that only exists inside a script tag is one AI Overview redesign away from being invisible again.</p>
+
+  <h2 id="which-types">Which schema types actually matter for AI visibility</h2>
+  <p>Structured data sits inside the Technical SEO discipline BrandGEO's own framework defines in <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">BG-001</a> — one of six disciplines that feed AI Visibility, not the whole of it. Within that discipline, 2026 structured-data guidance from Digital Applied, Search Engine Land, and the wider GEO practitioner community converges on the same short list, in roughly this priority order:</p>
+  <ul>
+    <li><strong>Organization.</strong> The most important type of all, because it establishes a single, disambiguated brand entity every engine can cross-reference — name, logo, and <code>sameAs</code> links to your verified social/Wikidata/Crunchbase profiles. Without it, an AI system has no confirmed anchor for who you actually are, which matters most for newer brands or ones sharing a name with something else.</li>
+    <li><strong>Article / BlogPosting.</strong> Carries authorship and, critically, <code>datePublished</code>/<code>dateModified</code> — the same freshness signal <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> found among the strongest predictors of AI citation. Only useful if the dates are genuinely kept current, not just re-stamped.</li>
+    <li><strong>FAQPage.</strong> Still valid markup, no longer worth chasing for a rich-result payoff — see the mistakes section below.</li>
+    <li><strong>Product.</strong> High priority for e-commerce: price, availability, and review data an AI system can cross-check against what's actually on the live page.</li>
+    <li><strong>LocalBusiness.</strong> High priority for local and service brands — address, hours, and service area feed exactly the kind of cross-source footprint consistency that determines whether a local brand shows up in an AI recommendation at all, not just Google's map pack.</li>
+  </ul>
+
+  <h2 id="checklist">A practical implementation checklist</h2>
+  <div class="compare-table-wrap">
+    <table class="compare-table">
+      <tr><th>Schema type</th><th>Priority</th><th>What it establishes</th><th>Get this right first</th></tr>
+      <tr><td>Organization</td><td>Highest — implement first</td><td>A single, disambiguated brand entity every engine can cross-reference</td><td>name, logo, sameAs profiles, url — on every page, not just the homepage</td></tr>
+      <tr><td>Article / BlogPosting</td><td>High — every published page</td><td>Authorship and a genuine freshness signal</td><td>dateModified kept honest, not silently re-stamped</td></tr>
+      <tr><td>FAQPage</td><td>Medium — keep, don't chase</td><td>Clean, quotable Q&amp;A structure</td><td>Match the visible on-page Q&amp;A exactly; don't invent questions</td></tr>
+      <tr><td>Product</td><td>High for e-commerce</td><td>Price, availability, and review data an engine can verify</td><td>Price/availability synced live, real aggregateRating only</td></tr>
+      <tr><td>LocalBusiness</td><td>High for local/service brands</td><td>Address, hours, and service-area footprint</td><td>NAP consistency across every profile you're marked up on</td></tr>
+    </table>
+  </div>
+
+  <h2 id="mistakes">Common mistakes worth avoiding</h2>
+  <ul>
+    <li><strong>Chasing FAQPage for a rich result that no longer exists.</strong> Google deprecated FAQ rich results in Search on May 7, 2026 — the expandable dropdown under your listing is gone for every site. The markup itself is still valid and doesn't hurt anything left in place, but building new FAQPage schema specifically for a SERP feature is optimizing for something that no longer ships.</li>
+    <li><strong>Assuming AI engines validate your schema.</strong> Per the February 2026 finding above, ChatGPT and Perplexity tokenize JSON-LD as raw text rather than parsing it — both engines extracted facts successfully even from deliberately invalid schema. Don't assume perfect syntax buys you extra credit with an LLM, and don't assume sloppy syntax is harmless either — put the same facts in visible copy too.</li>
+    <li><strong>Marking up numbers that drift from the live page.</strong> Product price, availability, review counts, business hours — schema that disagrees with what a visitor (or an AI engine's own page fetch) actually sees is a trust problem, not a technical one.</li>
+    <li><strong>Skipping Organization schema because it feels too basic to matter.</strong> It's the one type every study and Google's own guidance agree on — and it's the cheapest to implement well.</li>
+    <li><strong>Treating schema as the whole GEO strategy.</strong> Per BG-007, the strongest AI-citation signals are unlinked brand mentions and content freshness, not markup. Schema is worth doing correctly — it's never a substitute for being genuinely, verifiably talked about elsewhere.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2 id="related-research">Related research</h2>
+  <p>The findings and framework referenced above, in full:</p>
+  <div class="related-grid">
+    <a href="/bg-007.html" class="related-card">
+      <div class="related-id">BG-007</div>
+      <div class="related-title">The Anatomy of an AI-Cited Brand</div>
+      <div class="related-hook">The mention, freshness, and cross-source signals that actually predict AI citation — and where schema's contested boost fits in.</div>
+    </a>
+    <a href="/bg-001.html" class="related-card">
+      <div class="related-id">BG-001</div>
+      <div class="related-title">The AI Visibility Gap</div>
+      <div class="related-hook">The six disciplines that feed AI Visibility, including the Technical SEO foundation structured data belongs to.</div>
+    </a>
+    <a href="/bg-003.html" class="related-card">
+      <div class="related-id">BG-003</div>
+      <div class="related-title">How Does ChatGPT Decide Which Brands to Recommend?</div>
+      <div class="related-hook">The sources-and-signals stage where a well-marked-up, well-verified page actually gets evaluated.</div>
+    </a>
+    <a href="/bg-005.html" class="related-card">
+      <div class="related-id">BG-005</div>
+      <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
+      <div class="related-hook">Why a schema checklist alone was never going to be the whole strategy — the verification process it feeds into.</div>
+    </a>
+  </div>
+
+  <h2>How BrandGEO treats this differently</h2>
+  <p>BrandGEO doesn't score you on whether schema is installed — it tracks whether AI engines are actually citing and recommending you, across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, on the real questions your buyers ask. Structured data is one input among the mention, freshness, and cross-source signals <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a> and <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already break down — worth getting right, never worth mistaking for the whole picture.</p>
+
+  <!-- CTA -->
+  <div class="cta-box">
+    <h3>Find out whether your structured data is actually helping</h3>
+    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
+    <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<!-- NEXT POST TEASER -->
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/bg-011.html" style="color:inherit;text-decoration:none;">BG-011: Why Reddit Mentions Move the Needle on AI Citations</a></div>
+  </div>
+  <a href="/bg-011.html" class="next-link">Read BG-011 →</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-010</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

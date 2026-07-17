@@ -3,17 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
   <title>BG-001 — The AI Visibility Gap | BrandGEO Research™</title>
   <meta name="description" content="BrandGEO Research BG-001: Why most brands are completely invisible to ChatGPT, Gemini, Claude, Perplexity, Microsoft Copilot, Meta AI, and Grok — and what Generative Engine Optimization (GEO) means for your brand strategy.">
   <meta property="og:title" content="BG-001: The AI Visibility Gap — BrandGEO Research™">
-  <meta property="og:description" content="We analyzed how 7 major AI engines respond to brand recommendation queries. The results reveal a fundamental shift in how purchase decisions begin.">
+  <meta property="og:description" content="We analyzed how leading AI engines respond to brand recommendation queries. The results reveal a fundamental shift in how purchase decisions begin.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-001-hero.jpg">
   <meta property="og:url" content="https://getbrandgeo.com/bg-001.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-001.html">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-001-hero.jpg">
   <meta property="article:published_time" content="2026-07-01">
@@ -67,7 +71,7 @@
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -142,6 +146,14 @@
     /* SECTION DIVIDER */
     .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
 
+    /* RELATED RESEARCH */
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
     /* CTA BOX */
     .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
     .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
@@ -168,12 +180,15 @@
       .cta-box { padding: 32px 24px; }
     }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
 </head>
 <body>
 
 <nav>
   <a href="/" class="logo">
-    <img src="/logo.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
     <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
   </a>
   <div style="display:flex;align-items:center;">
@@ -356,27 +371,27 @@
   <h2>The six disciplines behind AI Visibility</h2>
   <p>"GEO" is often used as a catch-all term, but AI Visibility is actually the product of six overlapping disciplines. Each one solves a different part of the problem — and most brands today are executing exactly zero of them on purpose.</p>
 
-  <h3>1. Generative Engine Optimization (GEO)</h3>
+  <h3 id="geo">1. Generative Engine Optimization (GEO)</h3>
   <p>The practice of structuring content and brand signals so generative AI engines — ChatGPT, Gemini, Claude, Perplexity — synthesize your brand directly into the answers they generate, rather than simply linking to your site. GEO is the umbrella discipline this research series is named for.</p>
 
-  <h3>2. Answer Engine Optimization (AEO)</h3>
+  <h3 id="aeo">2. Answer Engine Optimization (AEO)</h3>
   <p>Optimizing content to directly answer the specific question a user asks, in a format an AI engine can lift and cite verbatim. AEO is what makes a page "quotable" — clear, self-contained answers instead of marketing copy an AI has to interpret and paraphrase.</p>
 
-  <h3>3. Large Language Model Optimization (LLMO)</h3>
+  <h3 id="llmo">3. Large Language Model Optimization (LLMO)</h3>
   <p>Shaping how LLMs describe and understand your brand at the model level, through consistent, accurate information across the sources models are trained on and retrieve from — press coverage, structured business data, forums, and high-authority third-party mentions.</p>
 
-  <h3>4. Semantic SEO</h3>
+  <h3 id="semantic-seo">4. Semantic SEO</h3>
   <p>Organizing content around topics, entities, and the relationships between them — not isolated keywords — so both search engines and AI systems understand what your content actually means, not just which words appear on the page.</p>
 
-  <h3>5. Entity SEO</h3>
+  <h3 id="entity-seo">5. Entity SEO</h3>
   <p>Establishing your brand as a distinct, verifiable entity inside the knowledge graphs AI engines draw from — with consistent naming, structured data (Schema.org, JSON-LD), and cross-referenced third-party confirmation of who you are and what you do.</p>
 
-  <h3>6. Technical SEO</h3>
+  <h3 id="technical-seo">6. Technical SEO</h3>
   <p>Still the foundation. AI engines and the retrieval systems behind them — Perplexity's live web search, Gemini's Google index, Copilot's Bing index — still depend on crawlable, fast, well-structured sites with clean markup. Without it, none of the other five disciplines have anything to build on.</p>
 
   <div class="callout">
     <div class="callout-label">How they fit together</div>
-    <p>Technical SEO and Entity SEO build the foundation AI engines can find and trust. Semantic SEO and LLMO shape how those engines understand you. AEO and GEO determine whether you actually get surfaced inside the answer itself. BrandGEO measures your brand's maturity across all six — not just whether you rank on Google.</p>
+    <p>Technical SEO and Entity SEO build the foundation AI engines can find and trust. Semantic SEO and LLMO shape how those engines understand you. AEO and GEO determine whether you actually get surfaced inside the answer itself. BrandGEO measures your brand's maturity across all six — not just whether you rank on Google. For quick definitions of these and 16 more related terms, see the <a href="/glossary.html" style="color:var(--accent2)">AI Visibility &amp; GEO Glossary</a>.</p>
   </div>
 
   <h2>The three pillars of AI Visibility</h2>
@@ -389,12 +404,13 @@
   <p>When an AI engine is asked "what is the best catering company in Bucharest?" or "which AI visibility tool should I use?" — does it associate your brand with the relevant category and problem? Concept association is built through consistent, repeated co-occurrence of your brand name with the relevant terms across the web.</p>
 
   <h3>3. Trust signals</h3>
-  <p>AI engines weight trustworthiness. Sources that are cited by authoritative third parties, have clear authorship, publish original data, and are referenced in structured ways signal reliability. Brands that produce original research — like BrandGEO Research™ — systematically build this trust layer.</p>
+  <p>AI engines weight trustworthiness. Sources that are cited by authoritative third parties, have clear authorship, publish original data, and are referenced in structured ways signal reliability. Brands that produce original research — like BrandGEO Research™ — systematically build this trust layer. We break down exactly which signals carry the most weight, stage by stage, in <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a>.</p>
 
   <hr class="divider">
 
   <h2>What this means for brands right now</h2>
   <p>The AI Visibility Gap is not a future problem. It is a present one. Across every industry we've analyzed — from professional services to hospitality, from SaaS to retail — the pattern is the same: <strong>a small number of brands dominate AI recommendations, and the rest are absent</strong>.</p>
+  <p>We saw this pattern play out concretely in <a href="/bg-004.html" style="color:var(--accent2)">BG-004</a>, where a market-leading brand ranked #1 on three AI engines and was completely absent on a fourth — proof that strong organic rankings don't automatically translate into AI Visibility everywhere.</p>
   <p>The brands dominating AI recommendations share a set of characteristics:</p>
   <ul>
     <li>They are frequently cited by independent third parties (reviews, press, directories)</li>
@@ -405,7 +421,7 @@
   <p>Importantly, <strong>this does not require a large budget</strong>. It requires a deliberate GEO strategy — which is what BrandGEO is built to help you develop and measure.</p>
 
   <h2>How BrandGEO measures AI Visibility</h2>
-  <p>BrandGEO is an AI Visibility Intelligence platform. We run structured queries across all seven major AI engines — ChatGPT, Gemini, Claude, Perplexity, Microsoft Copilot, Meta AI, and Grok — using the questions your actual customers ask when looking for brands like yours.</p>
+  <p>BrandGEO is an AI Visibility Intelligence platform. We run structured queries across all 5 core AI engines — ChatGPT, Gemini, Claude, Perplexity, and Meta AI — using the questions your actual customers ask when looking for brands like yours.</p>
   <p>We track:</p>
   <ul>
     <li><strong>Mention frequency</strong> — how often your brand appears in AI-generated answers</li>
@@ -418,7 +434,7 @@
 
   <div class="callout">
     <div class="callout-label">What comes next: BG-002</div>
-    <p>In <strong>BG-002</strong>, we will go deeper into how ChatGPT specifically decides which brands to recommend — the citation logic, the weight of different signal types, and a framework for engineering your way into ChatGPT answers.</p>
+    <p>In <a href="/bg-002.html" style="color:var(--accent2)">BG-002</a>, we will go deeper into how ChatGPT specifically decides which brands to recommend — the citation logic, the weight of different signal types, and a framework for engineering your way into ChatGPT answers.</p>
   </div>
 
   <h2>The compounding advantage of acting early</h2>
@@ -426,10 +442,35 @@
   <p>The AI search landscape is still forming. Citation patterns are still malleable. The brands that invest in GEO today are writing the reference layer that AI engines will draw from tomorrow.</p>
   <p><strong>The AI Visibility Gap is an opportunity window.</strong> It will not stay open forever.</p>
 
+  <h2 id="related-research">Related research</h2>
+  <p>The disciplines and case data referenced above, in full:</p>
+  <div class="related-grid">
+    <a href="/bg-002.html" class="related-card">
+      <div class="related-id">BG-002</div>
+      <div class="related-title">From Rankings to Recommendations</div>
+      <div class="related-hook">Why "will I be the answer" is a different question than "how do I rank" — and why most teams still aren't asking it.</div>
+    </a>
+    <a href="/bg-003.html" class="related-card">
+      <div class="related-id">BG-003</div>
+      <div class="related-title">How Does ChatGPT Decide Which Brands to Recommend?</div>
+      <div class="related-hook">Inside the sources-and-signals and synthesis stages that stand between your brand and an AI-generated answer.</div>
+    </a>
+    <a href="/bg-004.html" class="related-card">
+      <div class="related-id">BG-004</div>
+      <div class="related-title">#1 on Three AI Engines, Absent on Gemini</div>
+      <div class="related-hook">A real audit showing exactly how a strong SEO position and an AI Visibility gap coexist, silently.</div>
+    </a>
+    <a href="/bg-005.html" class="related-card">
+      <div class="related-id">BG-005</div>
+      <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
+      <div class="related-hook">Why ranking in Google and being cited by AI are mechanically different problems — and where they still genuinely overlap.</div>
+    </a>
+  </div>
+
   <!-- CTA -->
   <div class="cta-box">
-    <h3>Find out your brand's AI Visibility score</h3>
-    <p>We'll audit how ChatGPT, Gemini, Claude, Perplexity, Microsoft Copilot, Meta AI, and Grok respond to queries about your brand — free, in 48 hours.</p>
+    <h3>Find out if your brand has an AI Visibility Gap</h3>
+    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
@@ -439,36 +480,26 @@
 <!-- NEXT POST TEASER -->
 <div class="next-post">
   <div>
-    <div class="next-label">Next research →</div>
-    <div class="next-title">BG-002: From Rankings to Recommendations</div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/bg-002.html" style="color:inherit;text-decoration:none;">BG-002: From Rankings to Recommendations</a></div>
   </div>
   <a href="/bg-002.html" class="next-link">Read BG-002 →</a>
 </div>
 
 <footer>
   <div class="footer-bottom">
-    <span>&copy; BrandGEO Global &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Worldwide &nbsp;·&nbsp; Registered in Spain 🇪🇸 (EU) &nbsp;·&nbsp; Research ID: BG-001</span>
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-001</span>
     <div style="display:flex;gap:16px;">
       <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
     </div>
   </div>
 </footer>
 
-<script>
-  (function() {
-    const btn = document.getElementById('themeBtn');
-    const saved = localStorage.getItem('bgTheme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
-    btn.textContent = saved === 'dark' ? '🌙' : '☀️';
-    btn.addEventListener('click', function() {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      btn.textContent = next === 'dark' ? '🌙' : '☀️';
-      localStorage.setItem('bgTheme', next);
-    });
-  })();
-</script>
+<script src="site.js"></script>
 </body>
 </html>

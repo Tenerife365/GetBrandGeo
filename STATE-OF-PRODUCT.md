@@ -25,7 +25,7 @@ cheap; the next three are structural.
 
 | # | Finding | Impact | Effort | Owner |
 |:--:|---|---|---|---|
-| **1** | 🔴 **The OpenAI API key has been out of quota since 2026-07-07.** 60 of 86 `chatgpt` rows in `ai_results` are `status='error', error_code='quota_exceeded'` — 69.8% failure rate, across 9 clients, still failing on the last run (2026-07-10). Every other engine is at **0%** errors. **ChatGPT is the only engine on the Free tier** — so the entire top of the product-led funnel is currently dead — and it is the engine the Instant Audit scorecard leads with, i.e. the outbound sales weapon is quoting prospects a score with its most credible engine missing. | Revenue + trust, **live right now** | **Minutes** — top up the OpenAI account, then add a balance alert | Constantin |
+| **1** | ✅ **RESOLVED 2026-07-15 — OpenAI account topped up** (twice since 07-07; all API platforms funded ~30 days). Confirmed live: ChatGPT returns `ok` rows again and its errors are now `timeout`, not `quota_exceeded`. *Original finding:* the key had been out of quota since 2026-07-07 — 60 of 86 `chatgpt` rows `error_code='quota_exceeded'` (69.8%), the sole Free-tier engine + the Instant Audit scorecard's lead engine, so the funnel's front door was dead. **Still open:** no product-level alerting on engine errors (a balance/error alert is a worthwhile follow-up), and post-topup timeout tuning (CLAUDE.md §12.6). | Was revenue + trust; now resolved | Done | Constantin |
 | **2** | 🔴 **The hottest query paths have no indexes.** `ai_results` has indexes only on `id` (PK) and `status` — **nothing on `client_id`, `checked_at`, or `prompt_id`**. `prompts` has nothing on `client_id`. The `_auth.js` rate-limit check runs `count(*) … WHERE client_id = ? AND checked_at >= ?` on **every single collect call** (3× per prompt), and every dashboard page filters on exactly those columns. Invisible at today's 362 rows; a sequential scan over a multi-million-row table at 1,000 clients — inside a 26s function budget. | Latent, then fatal | **5 minutes** — 4 `CREATE INDEX` statements (§4.3) | Supabase SQL |
 | **3** | 🔴 **`competitors.name` is globally `UNIQUE` — twice.** The table has a `client_id` column, but carries two identical `UNIQUE (name)` constraints (`competitors_name_key`, `competitors_name_unique`). **Two clients cannot track the same competitor.** The second law firm to add "Clifford Chance" gets a constraint violation. A textbook §4.1 Scalability-Rule violation sitting in the schema. | Breaks on client #2 in any shared vertical | **5 minutes** — drop both, add `UNIQUE (client_id, name)` (§4.3) | Supabase SQL |
 | **4** | 🟠 **The rate limit and the pricing sheet contradict each other.** `_auth.js` caps a client at **150 `ai_results` rows/hour**. A 5-engine client writes 5 rows per prompt → **30 prompts/hour, hard ceiling**. `PRICING-SPEC.md` sells Growth at **150 prompts** (≥5 hours of rate-limit windows for one refresh) and Enterprise at **"1,000+ prompts"** (≥33 hours). One of the two numbers is wrong. | Sold capacity the platform refuses to deliver | Half a day (decide, then re-derive the limit from the plan) | Master-Reasoning or a scoped task |
@@ -94,10 +94,12 @@ Held at L2 by: multilingual sentiment still RO/EN-only, diacritic-sensitivity,
 one known round-4 extraction leak, and no caching layer. Each is logged and
 non-blocking.
 
-**One thing the accuracy work cannot fix, and which the data now shows:** the
-pipeline's biggest correctness problem today isn't the analysis — it's that
-**ChatGPT has been returning `quota_exceeded` for four days** (§1 item 1). No
-amount of parsing improvement matters when the engine never answers.
+**One thing the accuracy work could not fix, now resolved (2026-07-15):** at the
+time of writing, the pipeline's biggest correctness problem wasn't the analysis —
+it was that **ChatGPT had been returning `quota_exceeded` for four days** (§1 item
+1). The OpenAI account has since been topped up; ChatGPT answers again. No amount
+of parsing improvement matters when the engine never answers — which is why this
+mattered more than any analysis fix while it was live.
 
 ### 3.3 Presentation & conversion — **L2 (site) / L2 (dashboard)**
 *Sources: `COMPETITIVE-BENCHMARK.md`, `DESIGN-SYSTEM.md`, `content-audit-findings.md`, CLAUDE.md §7 / §9.*
@@ -314,15 +316,17 @@ client.** Cap it, throttle it, or reprice it — but don't sell it as-is.
 
 ### 4.6 Reliability: single points of failure
 
-- 🔴 **OpenAI (ChatGPT)** — *currently failing*, `quota_exceeded`, since
-  2026-07-07. Sole Free-tier engine; highest-cost, highest-credibility engine in
-  every audit and scorecard. **Nothing in the product surfaces or alerts on this**
-  — error rows are written correctly (the #95–#97 error-state work does its job),
-  but no page or job watches them. The city-research write-ups repeatedly recorded
-  "ChatGPT errored on all 8 prompts" as a *collection quirk*; it was never
-  root-caused to a billing problem. It is one. *(Whether OpenAI-side balance
-  alerting is configured on the account itself was not checkable from here — worth
-  confirming.)*
+- ✅ **OpenAI (ChatGPT) — RESOLVED 2026-07-15.** Account topped up (twice since
+  07-07; all API platforms funded ~30 days). Confirmed on live data: a BpR
+  force-refresh produced `chatgpt` `ok` rows, and its remaining error row is now
+  `timeout`, not `quota_exceeded` — the quota block is gone. *Original finding:*
+  was *currently failing*, `quota_exceeded`, since 2026-07-07 — sole Free-tier
+  engine, highest-cost/highest-credibility engine in every audit and scorecard.
+  **Still true and unaddressed:** nothing in the product surfaces or alerts on
+  engine errors — error rows are written correctly (#95–#97) but no page or job
+  watches them, so the next outage would again be invisible until someone looked
+  at the raw rows. A monitoring/alerting pass is a worthwhile follow-up. Residual
+  post-topup timeout tuning tracked in CLAUDE.md §12.6.
 - 🟠 **OpenRouter** — Perplexity *and* Meta both route through it (§2.7). One
   expired card takes out 2 of the 5 engines simultaneously.
 - 🟠 **No global spend ceiling** on the client pipeline (§1 item 8).

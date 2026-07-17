@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-012 — AI Visibility vs. Brand Mentions: What's the Difference? | BrandGEO Research™</title>
+  <meta name="description" content="A brand can be mentioned by ChatGPT and still be losing — ranked #8, framed as a warning. Mentions and AI Visibility measure different things.">
+  <meta property="og:title" content="AI Visibility vs. Brand Mentions: What's the Difference? — BrandGEO Research™">
+  <meta property="og:description" content="Mention count says you showed up. AI Visibility says whether that showing-up actually helped you. BrandGEO breaks down the difference — and the six dimensions that matter more than raw mentions.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-012-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-012.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-012.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-012-hero.png">
+  <meta property="article:published_time" content="2026-07-09">
+  <meta name="keywords" content="AI Visibility vs brand mentions, brand mention count, AI Visibility Score, sentiment in AI answers, GEO metrics, mention rate vanity metric, AI Visibility Index, BrandGEO">
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "AI Visibility vs. Brand Mentions: What's the Difference and Why It Matters",
+    "description": "BrandGEO Research: why a raw brand-mention count is a vanity metric, and what actually predicts whether an AI mention helps or quietly hurts a brand — position, sentiment, competitive context, and consistency.",
+    "image": "https://getbrandgeo.com/images/bg-012-hero.png",
+    "datePublished": "2026-07-09",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"},
+    "about": ["AI Visibility", "Brand Mentions", "Generative Engine Optimization", "Brand Sentiment", "AI Search Metrics", "GEO Measurement"],
+    "mentions": [
+      {"@type": "SoftwareApplication", "name": "ChatGPT", "creator": {"@type": "Organization", "name": "OpenAI"}},
+      {"@type": "SoftwareApplication", "name": "Gemini", "creator": {"@type": "Organization", "name": "Google"}},
+      {"@type": "SoftwareApplication", "name": "Perplexity", "creator": {"@type": "Organization", "name": "Perplexity AI"}}
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ARTICLE HEADER */
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    /* HERO IMAGE */
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    /* KEY FINDINGS */
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    /* ARTICLE BODY */
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+
+    /* CALLOUT BOXES */
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+
+    /* BLOCKQUOTE */
+    blockquote { border-left: 3px solid var(--accent); padding: 16px 24px; margin: 32px 0; }
+    blockquote p { font-size: 1.1rem; font-style: italic; color: var(--text); margin: 0; }
+
+    /* SECTION DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+    /* COMPARISON TABLE */
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    /* RELATED RESEARCH */
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    /* CTA BOX */
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    /* NEXT POST */
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-012</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-012</span>
+    <span class="badge-tag">Measurement</span>
+    <span class="badge-tag">AI Visibility</span>
+    <span class="badge-tag">GEO</span>
+  </div>
+  <h1>AI Visibility vs. <em>Brand Mentions</em>: What's the Difference?</h1>
+  <p class="article-subtitle">A brand can be mentioned by an AI engine and still be losing — ranked low, framed as a warning, or absent the next time the same question is asked. Here's why a raw mention count doesn't tell you that, and what does.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 9, 2026</span>
+    <span class="meta-item">8 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-012</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-012-hero.png" alt="A single brand mention split into the five dimensions of real AI Visibility: position in the answer, sentiment of the framing, competitive context, recommendation strength, and consistency across repeated queries." loading="eager">
+</div>
+
+<!-- KEY FINDINGS -->
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Findings — BG-012</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">35%</div>
+        <div class="finding-desc">Higher organic click-through for brands actually cited in an AI answer, versus competitors merely mentioned in the same response</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">20%</div>
+        <div class="finding-desc">Of brands that appear in one AI answer are still visible across five identical repeat runs of the same query — a single mention is not a stable signal</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">5x</div>
+        <div class="finding-desc">Roughly the conversion-rate gap between well-surfaced AI-referred traffic (14.2%) and typical Google organic traffic (2.8%)</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">2 of 6</div>
+        <div class="finding-desc">AI engines accounted for most of the negative brand commentary found across ChatGPT, Gemini, Perplexity, Claude, Grok, and Copilot in a 2026 review — same brand, different verdict</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARTICLE BODY -->
+<div class="article-body">
+
+  <h2 id="two-different-questions">Two numbers, two very different questions</h2>
+  <p>"Brand mentions" and "AI Visibility" get used interchangeably in a lot of GEO tool marketing, but they answer two different questions. A mention count answers: <em>did an AI engine say your brand's name at all?</em> AI Visibility — the discipline <a href="/bg-001.html#geo" style="color:var(--accent2)">BG-001 defines as GEO</a> — answers a harder, more useful question: <em>when your brand shows up, does that showing-up actually help you</em> — where does it land in the answer, what tone surrounds it, how does it compare against the other brands named in the same response, and does that presence hold up the next time someone asks, or was it a one-off? A brand can score perfectly on the first question and badly on the second. That gap is the whole reason a raw mention count is a vanity metric on its own — the same shift that happened years ago when sentiment-aware social listening tools replaced simple mention-counting tools, once marketers realized being talked about and being talked about well were not the same outcome.</p>
+  <p>Concretely: <strong>brand mention count</strong> is a binary or frequency measure — present or absent, once or five times, across a set of prompts, with no judgment attached to what the AI actually said or where it said it. <strong>AI Visibility</strong>, as the term is used across the GEO measurement market today, is a composite built on top of that same raw presence signal: position (headline mention versus a buried footnote), sentiment (positive, neutral, or actively damaging), competitive context (named alongside three rivals, or the only name given), and consistency (does it hold up on the next identical run). Otterly.ai's own Brand Visibility Index, one of the earlier attempts to formalize this, normalizes exactly those factors into one score for precisely this reason — because, as the framing goes, being mentioned in passing as "one of many options" is a fundamentally different outcome than being positioned as "the leading solution," even though a naive mention-count tool logs both as an identical, single win.</p>
+
+  <h2 id="side-by-side">Mention count vs. AI Visibility, side by side</h2>
+  <div class="compare-table-wrap">
+    <table class="compare-table">
+      <tr><th>Dimension</th><th>Brand mention count</th><th>AI Visibility</th></tr>
+      <tr><td>Presence</td><td>Yes/no, or a raw frequency across prompts</td><td>Same signal, but weighted by how reliably it repeats</td></tr>
+      <tr><td>Position</td><td>Not captured</td><td>Headline mention vs. a buried, low-confidence footnote</td></tr>
+      <tr><td>Sentiment</td><td>Not captured</td><td>Positive, neutral, or actively negative framing, scored separately</td></tr>
+      <tr><td>Competitive context</td><td>Not captured</td><td>Share of voice against the other brands named in the same answer</td></tr>
+      <tr><td>Consistency</td><td>A single snapshot</td><td>Tracked across repeated, identical queries over time</td></tr>
+      <tr><td>What it predicts</td><td>Raw awareness, at best</td><td>Buyer consideration and conversion — cited, well-framed brands convert measurably higher than merely-mentioned ones</td></tr>
+    </table>
+  </div>
+
+  <h2 id="worked-examples">Two worked examples</h2>
+  <p><strong>Mentioned, but losing.</strong> Picture an AI answer to "best project management tools for small teams" that lists ten names. Your brand is #8, covered in a single half-sentence with no elaboration, while the top three each get a full sentence explaining why they fit. A mention-count tool logs this as a clean hit: present, 1 for 1. AI Visibility scores it very differently — a low position (8 of 10), thin coverage relative to the brands ranked above you, and a recommendation strength close to zero, because nothing about the placement suggests the AI is actually steering anyone toward you. Being on the list and being the list's actual answer are different outcomes, and only one of them shows up in a raw mention count.</p>
+  <p><strong>Mentioned as a warning.</strong> A 2026 review by Coalition Technologies tested how ChatGPT, Gemini, Perplexity, Claude, Grok, and Microsoft Copilot each described the same set of client brands with a simple "tell me about [brand]" prompt, recording whether the response contained negative commentary. The pattern that emerged wasn't uniform across engines: two of the six accounted for most of the critical content found, while the other four stayed largely positive on the identical brands — and most of that negative framing traced back to ordinary operational complaints (shipping delays, return policies, pricing confusion) surfaced from Reddit, Yelp, and review sites, not anything structurally wrong with the brand itself. A mention-count tool treats "Brand X is a solid option, though it's had complaints about turnaround time" identically to "Brand X is the clear category leader" — both register as one mention. This is exactly the kind of cross-engine unevenness <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> also found when it comes to which sources engines trust: a brand relying on a single "am I mentioned" check has no way of knowing its ChatGPT answer reads cleanly while its Perplexity answer opens with a complaint sourced from an old thread.</p>
+
+  <h2 id="why-context-changes-it">Why sentiment, position, and context change the picture</h2>
+  <p>Negative AI sentiment and low AI visibility are frequently treated as the same problem, but research on the mechanics of AI-search reputation draws a sharp, useful line between them: low visibility means the brand is missing from an answer entirely; negative sentiment means the brand is present but framed in language that quietly damages buyer trust before the buyer ever visits the site. They have different root causes — insufficient source coverage versus a weak or stale evidence base — and different fixes, which is part of why <a href="/bg-003.html" style="color:var(--accent2)">BG-003's breakdown of how ChatGPT actually decides who to recommend</a> treats "getting mentioned" and "getting recommended" as separate stages, not one step. A brand chasing a higher mention count without checking which of these two problems it actually has can easily improve the wrong thing.</p>
+  <p>Position compounds the same issue from a different angle. Placement inside an answer — a headline recommendation versus a footnote aside — carries real weight with buyers who read top-down, and it's exactly the layer a yes/no mention check throws away. Consistency is the piece raw mention tools miss most completely, because they're built around a single query run rather than a tracked signal. 2026 GEO measurement research puts a hard number on how unstable that single "yes, mentioned" result actually is: only 30% of brands stay visible from one AI answer to the next, and just <strong>20% remain visible across five consecutive runs of the identical query</strong>. A mention logged on Monday can be gone by Wednesday for reasons that have nothing to do with anything the brand changed — which is exactly why a single snapshot mention is such a weak thing to build a strategy on, and why tracking has to be recurring, not one-off.</p>
+  <p>The downstream cost of ignoring all this is measurable, not theoretical. Brands that are genuinely cited in an AI answer — not just mentioned in passing — earn roughly <strong>35% higher organic click-through</strong> than competitors named in the same response without a citation attached. And when that visibility converts into a visit, it converts at a materially different rate: AI-referred traffic converts at roughly <strong>5x the rate of typical Google organic traffic</strong> (around 14.2% versus 2.8%, per 2026 estimates). Neither advantage belongs to a brand that's simply mentioned somewhere in the text. Both belong specifically to brands that are surfaced with confidence, in a good position, with a favorable tone — the exact combination a mention count can't distinguish from its opposite.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">The reframe that matters</div>
+    <p>A mention count tells you whether an AI engine said your name. AI Visibility tells you whether saying your name actually moved a buyer closer to choosing you. Those are not the same question, and optimizing for the first one can leave the second one exactly where it started.</p>
+  </div>
+
+  <h2 id="how-brandgeo-differs">How BrandGEO treats this differently</h2>
+  <p>This is also why "GEO" as a discipline isn't the same thing as classic SEO with an AI coat of paint — <a href="/bg-005.html" style="color:var(--accent2)">BG-005 covers the fundamental difference</a> in more depth — and it's the same reason BrandGEO doesn't report a single mention-count number, because a single number can't tell you whether you're winning a category or quietly losing it. Every audit scores six separate dimensions and rolls them into one AI Visibility Score: <strong>Recognition</strong> — are you mentioned at all, across the real buyer prompts that matter for your category; <strong>Knowledge</strong> — does the engine actually understand what you do, not just recognize your name; <strong>Sentiment</strong> — is the framing positive, neutral, or actively working against you; <strong>Accuracy</strong> — is what's being said about you correct; <strong>Reach</strong> — how many of the engines that matter actually surface you, not just one; and <strong>Consistency</strong> — does that presence hold up run over run, or was it a one-time fluke. A brand mention count only ever answers the first of those six questions. That's exactly why it's the floor of BrandGEO's score, not the whole of it — and why two brands with an identical mention rate can land on very different sides of the AI Visibility Score once position, tone, and repeatability are factored in.</p>
+
+  <hr class="divider">
+
+  <h2 id="related-research">Related research</h2>
+  <p>The definitions and mechanisms referenced above, in full:</p>
+  <div class="related-grid">
+    <a href="/bg-001.html#geo" class="related-card">
+      <div class="related-id">BG-001</div>
+      <div class="related-title">The AI Visibility Gap</div>
+      <div class="related-hook">Where "AI Visibility" as a discipline actually comes from — the GEO definition this article builds on.</div>
+    </a>
+    <a href="/bg-003.html" class="related-card">
+      <div class="related-id">BG-003</div>
+      <div class="related-title">How Does ChatGPT Decide Which Brands to Recommend?</div>
+      <div class="related-hook">The six-stage path from raw mention to actual recommendation — the mechanism behind why position and context matter.</div>
+    </a>
+    <a href="/bg-005.html" class="related-card">
+      <div class="related-id">BG-005</div>
+      <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
+      <div class="related-hook">Why a metric built for classic search — rankings, links, raw mentions — doesn't transfer cleanly to how AI engines actually recommend.</div>
+    </a>
+    <a href="/bg-007.html" class="related-card">
+      <div class="related-id">BG-007</div>
+      <div class="related-title">The Anatomy of an AI-Cited Brand</div>
+      <div class="related-hook">What actually correlates with being cited well — mentions, freshness, and cross-source presence, not mention count alone.</div>
+    </a>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-box">
+    <h3>Find out whether you're mentioned — or actually visible</h3>
+    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
+    <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<!-- NEXT POST TEASER -->
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/bg-013.html" style="color:inherit;text-decoration:none;">BG-013: How Often You Need to Publish to Stay Cited by AI</a></div>
+  </div>
+  <a href="/bg-013.html" class="next-link">Read BG-013 →</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-012</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

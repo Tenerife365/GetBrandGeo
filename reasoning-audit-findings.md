@@ -75,6 +75,32 @@ proximity-windowed classifier rather than a global keyword `OR`. This is the
 highest-leverage single fix for trust, because a whole product page depends on
 it.
 
+**✅ Part (a) FIXED 2026-07-09 (audit step 2).** Added `extractBrandContext()`
+to `_analysis.js`: splits the response at sentence boundaries + newlines, keeps
+only the segment(s) that mention the brand, and sentiment now scans *that*, not
+the whole doc. Decision rule made conservative: positive-and-not-negative →
+`positive`, negative-and-not-positive → `negative`, **both-or-neither →
+`neutral`** (a mixed or signal-less mention no longer coin-flips to positive).
+Verified on 6 fixtures incl. the exact bug (a "best X" listicle with a neutral
+brand line now scores `neutral`, was `positive`). **Note:** existing `ai_results`
+rows keep their old sentiment; only newly collected / force-refreshed rows get
+the corrected scoring.
+
+**Part (b) — RO lexicon expansion (partial, 2026-07-09).** A live force-refresh
+right after shipping (a) exposed the flip side: the thin RO word list now
+*under*-claimed genuine praise — a 🥇 #1 *"Recomandarea #1 … cea mai potrivită
+alegere"* (prod id 1559) and an *"în primul rând"* first-pick (id 1553) scored
+`neutral`. Expanded the pos/neg lists with **stem-based** RO/EN terms drawn from
+that data (`recomand` covering recomandat/recomandăm/recomandare/recomandarea,
+`potrivit`, `primul rând`, `cea mai bun`, `de încredere`, `premiat`, `ideal`,
+`🥇`; negatives `nu recomand`, `dezamăg`, `plânger`, `prost`). Re-verified all
+6 originals + 4 real-data cases (10/10). Known keyword limits remain: explicit
+negation ("nu recomand …") resolves to `neutral` not `negative` (the pos stem
+also matches), and any non-RO/EN language or novel phrasing is still uncovered.
+**The long-term fix stays open:** LLM-based classification of the brand clause
+(multilingual, nuance-aware) — a cost/latency decision (§8.2 lens (d)), not the
+whack-a-mole lexicon path.
+
 ### 1.2 `brand_position` blends list-rank with sentence-index (two different units)
 
 **Where:** `analyseResponse` position logic + `detectListPosition` fallback.
@@ -112,6 +138,16 @@ when it's a genuine list rank and leave prose mentions `null`, or (b) add a
 `position_kind` ('list_rank' | 'prose_order') so stats can filter. Never average
 the two.
 
+**✅ FIXED 2026-07-09 (audit step 4).** Took option (a) — no schema change.
+`detectListPosition` no longer falls back to the sentence index; a prose mention
+(brand present but not in a numbered list) now returns `null`, so `brand_position`
+holds only genuine list ranks and `avgPos` is computed from ranks alone. Also
+added a `1..50` guard so a year/price that leads a line ("2019. Brand expanded…")
+isn't read as rank 2019. Verified: real list rank kept (2), rank #7 beyond the
+top-5 parser still recovered, prose mentions → null (were sentence indices 1/3),
+"2019." → null. `brand_mentioned` is unchanged for prose mentions (still true) —
+only the fake rank is removed.
+
 ### 1.3 Mention detection is substring matching with no word boundaries
 
 **Where:** `matchesAlias` + the `mentionedInText` block.
@@ -141,6 +177,22 @@ a `true` that should be `false`.
 alias length or require whole-token match for short aliases, and drop or
 tightly guard the space-stripped pass (keep it only for known multi-word brands
 where it's demonstrably needed, e.g. "Bucate pe Roate" → "bucateperoate").
+
+**✅ FIXED 2026-07-09 (audit step 3).** Replaced substring matching (and the
+inlined `mentionedInText` substring check — the real headline-metric path) with a
+per-alias **boundary-anchored, separator-flexible regex**: `buildAliasRegex`
+turns "brand geo" into `(?<![\p{L}\p{N}])brand[\s_.-]*geo(?![\p{L}\p{N}])`, so it
+matches "brand geo"/"brandgeo"/"brand-geo" but never inside a larger word.
+Unicode `\p{L}\p{N}` boundaries so Romanian diacritics count as letters.
+`buildBrandMatchers(cfg)` precompiles the alias+website matchers once;
+`matchesAlias(text, matchers)`, `detectListPosition`, `extractBrandContext`,
+`scanForKnownCompetitors` and the snippet centring all use it. Verified against
+the real client aliases: "bpr" matches standalone but not inside "subprocess";
+"brandgeo" no longer matches inside "rebrandgeography"; smushed/dashed/website/
+phrase forms still match. **Known gap left open (a false-*negative*, separate
+from 1.3's false-positive focus):** matching is diacritic-sensitive, so an ASCII
+alias ("paunescu si asociatii") still won't match diacritic text ("Păunescu și
+Asociații") — worth a later diacritic-folding pass.
 
 ### 1.4 Claude's 2500-char abort turns low-ranked brands into false negatives
 
@@ -181,15 +233,34 @@ the full (shorter) response complete. Either way, stop cutting mid-list.
 
 ## 2. Cross-cutting accuracy multiplier
 
-### 2.1 `analyseResponse` is copied into three files (§2.1, reaffirmed)
+### 2.1 `analyseResponse` was copied into three files — ✅ EXTRACTED 2026-07-09
 
-Every Tier 1 fix above must be made **identically in three places**
-(`collect-prompt.js`, `collect-claude.js`, `collect-chatgpt.js`). They are
-currently byte-identical, but three copies means a fix can land in two and
-drift in the third — and there is no test asserting they match. **This is the
-enabling risk for all of Section 1:** extracting `_analysis.js` first makes the
-accuracy fixes a one-place change and lets them be unit-tested. Recommended as
-the *first* concrete step of any accuracy work, before touching the logic.
+Every Tier 1 fix must be made **once**, not three times. This was the enabling
+risk for all of Section 1, so it was done first.
+
+**Done:** extracted the whole analysis pipeline (`normalizeText`,
+`extractTopRankedResults`, `matchesAlias`, `NOT_A_COMPANY`/`isCompanyName`,
+`scanForKnownCompetitors`, `detectListPosition`, `analyseResponse`) into
+`netlify/functions/_analysis.js` (underscore-prefixed so Netlify doesn't expose
+it as an endpoint, same convention as `_auth.js`). All three collectors now
+`require('./_analysis')` and call the shared `analyseResponse`; ~175 duplicated
+lines removed from each. Pure functions, no I/O — unit-testable, and the
+helpers are exported for the upcoming fixes' fixtures.
+
+**The drift was already real, not hypothetical.** A byte-level diff before
+extraction found `collect-chatgpt.js` split ranked-list names on `[--]` (two
+ASCII hyphens) while `collect-prompt.js`/`collect-claude.js` used `[–—]`
+(en/em-dash). So ChatGPT had been extracting competitor/brand names slightly
+differently from the other engines — exactly the §2.1 drift this warns about.
+The shared module standardises on `[–—]` (the majority form, and the one LLM
+listicles actually emit: "Brand — tagline"). This is the **one intentional
+behavioural change** in the refactor; everything else is byte-preserving.
+
+**Verification:** all four files pass `node --check`; the shared module was
+runtime-tested on a fixture (brand matched at correct list position, competitors
+extracted, em/en-dash split working). Not yet built on Netlify or committed —
+see the handoff. The next fixes (sentiment → mention → position → truncation)
+now land in this one file, each behind a fixture.
 
 ---
 
@@ -229,14 +300,19 @@ rediscover them.
 
 ---
 
-## 4. Suggested sequence for the accuracy work (if pursued)
+## 4. Suggested sequence for the accuracy work
 
-1. **Extract `analyseResponse` → `_analysis.js`** (§2.1). Enables everything
-   else as a one-place, testable change. No behaviour change — safe first step.
-2. **Fix sentiment (1.1)** — brand-clause-scoped, not whole-document. Highest
-   trust impact (whole page depends on it).
-3. **Fix mention matching (1.3)** — word boundaries + short-alias guard.
-4. **Fix position (1.2)** — stop blending units.
+1. ✅ **DONE 2026-07-09 — Extract `analyseResponse` → `_analysis.js`** (§2.1).
+   One-place, testable. Behaviour-preserving except the ChatGPT dash
+   reconciliation noted in §2.1. Not yet committed/deployed.
+2. ✅ **DONE 2026-07-09 — Fix sentiment (1.1a)** — brand-clause-scoped via
+   `extractBrandContext`, both/neither → neutral. Fixture at
+   `tests/analysis.test.js`. Part (b), multilingual, still open.
+3. ✅ **DONE 2026-07-09 — Fix mention matching (1.3)** — boundary-anchored,
+   separator-flexible per-alias regex (`buildBrandMatchers`/`buildAliasRegex`).
+   Diacritic-folding for the paunescu-type false-negative left open.
+4. ✅ **DONE 2026-07-09 — Fix position (1.2)** — prose mentions → null (no
+   sentence-index fallback), list-rank guarded to 1..50.
 5. **Fix Claude truncation (1.4)** — time-bound, not char-bound.
 6. Add a small **unit-test fixture** of real response snippets asserting each
    of the above, so the three-copy drift risk (§2.1) can't silently reappear.

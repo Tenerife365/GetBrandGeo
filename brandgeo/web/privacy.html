@@ -2,18 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- Honor the visitor's saved light/dark preference (set via the toggle on other pages) before paint, so this page matches the rest of the site -->
+  <script>(function(){try{var t=localStorage.getItem('bgTheme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
   <title>Privacy Policy — BrandGEO</title>
+  <meta name="description" content="BrandGEO's privacy policy: what data we collect, how it is used, and your rights as a user of our AI visibility platform." />
   <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://getbrandgeo.com/privacy.html" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0b0f1a; --surface: #13192a; --border: #1e2740;
-      --text: #f0f4ff; --muted: #6b7a9e; --accent: #6c63ff;
+      --bg: #050508; --surface: #0e0e17; --border: rgba(255,255,255,.07);
+      --text: #ffffff; --muted: rgba(255,255,255,.5); --accent: #6c63ff;
+    }
+    [data-theme="light"] {
+      --bg: #f7f7fc; --surface: #ffffff; --border: rgba(0,0,0,.08);
+      --text: #09090f; --muted: rgba(9,9,15,.55);
     }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.7; }
     nav { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
@@ -25,8 +36,8 @@
     h1 { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
     .meta { color: var(--muted); font-size: 0.88rem; margin-bottom: 48px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
     h2 { font-size: 1.1rem; font-weight: 700; margin: 36px 0 12px; color: var(--text); }
-    p { color: #c0cae0; margin-bottom: 14px; }
-    ul { color: #c0cae0; padding-left: 20px; margin-bottom: 14px; }
+    p { color: var(--text); margin-bottom: 14px; }
+    ul { color: var(--text); padding-left: 20px; margin-bottom: 14px; }
     ul li { margin-bottom: 6px; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -34,6 +45,9 @@
     .gdpr-box p { margin: 0; }
     footer { text-align: center; padding: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
 </head>
 <body>
 
@@ -123,7 +137,7 @@
 </main>
 
 <footer>
-  <p>&copy; BrandGEO Global &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Worldwide &nbsp;·&nbsp; Registered in Spain 🇪🇸 (EU) &nbsp;·&nbsp; <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
+  <p>&copy; BrandGEO Global &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Worldwide &nbsp;·&nbsp; Based in Spain 🇪🇸 (EU) &nbsp;·&nbsp; <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
 </footer>
 
 </body>

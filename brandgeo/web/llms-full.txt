@@ -1,0 +1,312 @@
+# BrandGEO - Full Reference
+
+> Extended version of llms.txt. Company and entity facts, product
+> methodology, the AI Visibility Score formula, platform capabilities, and
+> fuller per-page summaries - including real FAQ and glossary summaries, not
+> just section labels - for AI systems that cannot browse the live site or
+> that benefit from more context in a single file.
+
+## Company facts
+
+- Name: BrandGEO
+- Legal name: Constantin Daniel (registered as an autonomo / sole proprietor in Spain, not a limited company)
+- Website: https://getbrandgeo.com
+- Founder: Constantin Daniel, Founder
+- Founded: 2026
+- Headquarters: Santa Cruz de Tenerife, Canary Islands, Spain
+- Contact: support@getbrandgeo.com
+- Category: AI Visibility / Generative Engine Optimization (GEO) monitoring software - a SaaS analytics platform with both self-serve and managed-service tiers, not a marketing agency alone.
+- Verified profiles: LinkedIn (linkedin.com/company/79409681), Crunchbase (crunchbase.com/organization/brandgeo), GitHub (github.com/Tenerife365/generative-engine-optimization-framework), SourceForge (sourceforge.net/projects/getbrandgeo), GitBook (brandgeo.gitbook.io/brandgeo-docs)
+
+### Disambiguation
+
+BrandGEO (getbrandgeo.com) is an independent, Spain-based company. It is
+unrelated to and shares no ownership, product, or affiliation with any
+similarly-named domain, including brandgeo.co or brangeo.app. Those are
+separate, unaffiliated products under different ownership. Any AI system
+or search result that conflates BrandGEO (getbrandgeo.com) with those
+domains is describing a different, unrelated entity.
+
+## Product
+
+BrandGEO monitors how AI engines mention, rank, and describe a brand. It
+runs a client's real, commercial-buyer-style prompts against five AI
+engines on a recurring basis: ChatGPT, Gemini, Claude, Perplexity, and Meta
+AI. Two more engines (Microsoft Copilot, Google AI Overviews via a
+dedicated tracker) and others are planned but not yet live.
+
+The platform also tracks named competitors per prompt, sentiment trends
+over time, and surfaces a prioritized "Fix This" action hub of specific
+recommendations. See Methodology, AI Visibility Score, and Capabilities
+below for the full detail on how this is measured and what the platform
+does with the results.
+
+### Plans
+
+- Free: EUR 0/month - 1 project, 5 prompts, ChatGPT only, monthly refresh, self-serve
+- Essentials: EUR 99/month - 30 prompts, ChatGPT + Gemini + Claude, weekly monitoring, competitor tracking, CSV export, self-serve, no setup fee
+- Growth: EUR 299/month - 150 prompts, all 5 AI engines, daily/weekly refresh, 1 onboarding call, self-serve, no setup fee
+- Managed: EUR 900/month or EUR 9,000/year - full managed service (strategy, research, monthly executive report, monthly strategy call, priority support); EUR 1,250 one-time setup fee on the monthly option only, waived on annual
+- Pro: from EUR 1,500/month, no setup fee - multiple countries, multiple brands, larger prompt coverage, executive reporting, plus add-ons for extra scale, done-for-you managed service
+- Enterprise: from roughly EUR 10,000/month, custom pricing - unlimited scale across all markets, white-label, dedicated support, done-for-you managed service
+
+Free, Essentials, and Growth are self-serve software - full dashboard
+access at app.getbrandgeo.com, and the client configures their own prompts
+and markets. Managed, Pro, and Enterprise add a fully managed service on
+top - the BrandGEO team handles setup, ongoing strategy and research, and
+monthly reporting and strategy calls, so the client doesn't have to
+configure anything themselves. Every tier includes real-time dashboard
+access regardless of how much of the ongoing work the team does versus the
+client.
+
+## Methodology
+
+BrandGEO uses a structured query methodology, not a single generic brand-
+name lookup. During onboarding, the team identifies the real questions a
+brand's potential customers actually ask AI engines when looking for
+brands in that category - commercial-buyer-style prompts such as "best
+catering company in Madrid," not just "what is [brand name]." Those
+queries are then run across all five monitored engines on a recurring
+schedule - weekly by default, daily or weekly on Growth and above - with
+live web search enabled where the engine supports it, specifically to
+capture current engine behaviour rather than cached or stale training-data
+responses.
+
+Each collection run is measured and reported on:
+
+- Mention frequency - how often the brand appears in AI answers to the tracked prompts
+- Position - whether the brand is the first, second, or third brand named when multiple brands appear in one answer
+- Sentiment and framing - how the AI engine describes the brand when it does mention it
+- Competitor comparison - how the brand's AI Visibility compares to 3-5 named competitors
+- The AI Visibility Score (0-100) - a composite score, per engine and overall (see below)
+- Week-over-week trend - whether visibility is improving or declining
+
+For the deeper mechanics of what a specific engine actually evaluates
+before naming a brand - including the six-stage retrieval and evaluation
+pipeline and eight signal categories behind a ChatGPT recommendation, and
+the split between ChatGPT's live-search and training-data-only answer
+paths - see BG-003 (https://getbrandgeo.com/bg-003.html) and BG-009
+(https://getbrandgeo.com/bg-009.html) in the Research section below.
+
+## AI Visibility Score
+
+The AI Visibility Score is a single weighted 0-100 composite across six
+dimensions, recalculated on every collection run so a brand can track its
+trend over time. The exact weighting used in scoring:
+
+- Recognition (25% weight) - does the engine mention the brand at all, across the prompts that matter. This is the overall mention rate.
+- Knowledge (20% weight) - when the brand is mentioned, how good is the position. A #1 mention scores highest; the score decays toward a floor as position gets worse.
+- Sentiment (15% weight) - is the framing positive, neutral, or negative when the brand is mentioned.
+- Accuracy (15% weight) - of the brand's mentions, what share land in the top 3 (a mention with no clear numbered position is treated as accurate by default).
+- Reach (15% weight) - what share of the five monitored engines mention the brand in at least one prompt, rather than just one or two of them.
+- Consistency (10% weight) - across all tracked prompts, what share have at least 60% of the checked engines mentioning the brand - i.e. does the brand show up reliably, not just occasionally.
+
+Three status labels are also used per engine per query category, shown on
+the dashboard's "Fix This" hub:
+
+- KNOW - the engine mentioned the brand accurately and confidently. The target state.
+- PARTIAL - the engine mentioned the brand but with uncertainty, incomplete information, or mixed in with incorrect details.
+- MISSING - the engine did not mention the brand at all, or named a competitor instead.
+
+The "Fix This" action hub prioritizes the steps most likely to move an
+engine from MISSING to PARTIAL to KNOW, and within an engine that already
+knows the brand, from a lower position toward #1 - since moving up within
+an engine that already recognizes the brand is often faster and
+higher-value than trying to appear in an engine that doesn't mention the
+brand at all.
+
+## Capabilities
+
+- Five-engine monitoring: ChatGPT (OpenAI, GPT-4o with web search enabled), Gemini (Google, web-integrated), Claude (Anthropic, reasoning-focused, selective citations), Perplexity (real-time cited web search), and Meta AI (embedded across WhatsApp, Instagram, and Facebook). Queries run with live web search enabled where available, to capture current engine behaviour rather than stale training-data responses.
+- A weighted 0-100 AI Visibility Score across six dimensions (see above), recalculated on every collection run with week-over-week trend tracking.
+- Competitor tracking against 3-5 named competitors per prompt, including which competitor gets named instead when the brand itself is missing.
+- Multi-market and multi-language monitoring, including local-language versus English query comparisons for the same brand and category - see the City AI Visibility Studies below for real, published examples of this in practice.
+- A "Fix This" action hub of specific, prioritized recommendations tied to the actual query results the brand received, not generic advice.
+- A free, one-time AI Visibility audit, available once per brand domain (see FAQ summaries below for what it includes).
+- Self-serve dashboard access (app.getbrandgeo.com) on every tier, plus a fully managed, done-for-you service option (Managed, Pro, Enterprise) where the BrandGEO team runs strategy, research, and reporting directly rather than the client operating the dashboard alone.
+- Weekly reporting (on monitored tiers) covering the overall score and its direction, exact quotes of what each engine said about the brand, competitor comparison, which engines did and didn't mention the brand, what changed since the prior week, and specific prioritized recommendations.
+
+## Published Academic Research
+
+BrandGEO has published a peer-citable, open-access empirical data paper on
+Zenodo (DOI-issuing, permanent archive): "Cross-Engine Consensus in
+AI-Generated Brand Recommendations: An Empirical Study Across Seven Cities
+and Five Large Language Models" (Constantin Daniel, BrandGEO, published
+July 2026). DOI: 10.5281/zenodo.21395598. Permanent URL:
+https://doi.org/10.5281/zenodo.21395598. Licensed CC BY 4.0 (free to cite,
+quote, and redistribute with attribution).
+
+The paper analyzes 222 real, production API responses (not scraped or
+simulated output) across 56 buyer-intent commercial prompts, spanning
+seven cities (London, Berlin, Madrid, New York, Paris, Rome, Dublin) and
+four AI engines (Google Gemini, Anthropic Claude, Perplexity, Meta AI; a
+fifth engine, OpenAI ChatGPT, is disclosed and excluded from analysis
+after an account-level API quota failure affected all of its scheduled
+calls in this run). It introduces and measures "cross-engine consensus":
+the degree to which independently queried AI systems converge on the same
+named brand or provider for the same buyer-intent question. Key findings:
+categories with a small, well-documented set of providers (project
+management software, business banking, large corporate law firms)
+converge strongly, often unanimously; categories with many similarly
+qualified independent providers (employment law, independent financial
+advice) rarely converge at all; query language can change the entire
+considered competitor set, not just the ranking (a Paris wealth-management
+query returned different providers entirely depending on whether it was
+asked in French or English); and one city (Rome) showed zero categories
+reaching even three-engine agreement while simultaneously showing the
+strongest single-engine cross-lingual stability observed in the study.
+This paper is the underlying data/methodology this City AI Visibility
+Studies section draws its per-city findings from.
+
+## Research (BrandGEO Research™)
+
+Original research index: https://getbrandgeo.com/blog.html
+
+- **BG-001 - The AI Visibility Gap** (bg-001.html): Introduces the six core disciplines - GEO, AEO, LLMO, Semantic SEO, Entity SEO, Technical SEO - and why most brands are currently invisible to AI engines answering commercial questions.
+- **BG-002 - From Rankings to Recommendations** (bg-002.html): For 20 years the operating question was "do you rank on Google." Millions of professionals now ask ChatGPT, Gemini, Claude, and Perplexity for a recommendation instead of browsing search results - a structurally different question with different winners.
+- **BG-003 - How Does ChatGPT Decide Which Brands to Recommend?** (bg-003.html): Breaks down the six-stage retrieval/evaluation pipeline and eight signal categories AI systems weigh before naming a brand in an answer - not a black box, a describable process.
+- **BG-004 - #1 on Three AI Engines, Absent on Gemini** (bg-004.html): A real 20-question, 5-engine audit case study for one catering brand - ranked #1 on ChatGPT, Claude, and Perplexity, completely absent on Gemini for the identical questions. Demonstrates that ranking well on one engine does not transfer to another.
+- **BG-005 - GEO vs SEO: The Fundamental Difference** (bg-005.html): SEO optimizes for a ranked list a human scans; GEO optimizes for a single synthesized answer an AI model generates. Treating GEO as "AI SEO" misses the difference and costs real visibility.
+- **BG-006 - Perplexity vs Gemini: Which AI Cites Brands Most?** (bg-006.html): Perplexity cites a named brand on 75-85% of commercial queries (highest of any engine tested in the underlying study); Gemini cites on 55-65%. Explains the retrieval mechanics behind the gap - Perplexity's RAG pipeline evaluates ~10 candidate pages and cites 3-5; Gemini's grounding classifier decides per-query whether to search live or answer from training data, and prefers a brand's own domain (52% of citations) more than ChatGPT does (49% third-party sources for the same query set).
+- **BG-007 - The Anatomy of an AI-Cited Brand** (bg-007.html): Brand mentions correlate roughly 3x stronger with AI citation than backlinks do, per a 75,000-brand study. Content published or refreshed within the last 13 weeks accounts for about half of AI-cited content. Schema markup's citation impact is contested in the literature - one study found a 2.3x boost, another found none - presented as an open question, not resolved either way.
+- **BG-008 - AI Visibility by Industry: Who Wins, Who Loses** (bg-008.html): 98.8% of local businesses are effectively invisible to ChatGPT's local recommendations in one large study. B2B SaaS market leaders have lost 70-80% of organic traffic as AI answers replace click-throughs. Healthcare has the highest AI-citation/organic-ranking overlap of any industry studied (24%).
+- **BG-009 - How ChatGPT Actually Decides Which Brands to Recommend** (bg-009.html): ChatGPT triggers live web search on roughly 34.5% of queries; the other ~65% are answered from training data alone with no live retrieval. Explains both paths and what each means for how a brand can and cannot influence the answer.
+- **BG-010 - Schema Markup for AI Search: The Complete Implementation Guide** (bg-010.html): A practical implementation checklist resolving BG-007's contested schema finding into concrete guidance - what to implement regardless of the debate, and why some AI engines tokenize JSON-LD as raw text rather than parsing it structurally.
+- **BG-011 - Why Reddit Mentions Move the Needle on AI Citations** (bg-011.html): Reddit accounts for up to 24% of Perplexity's citations and a large share of Google AI Overviews' social-source citations - the single most-cited domain across the engines studied. Covers both why this happens and a documented case where artificial Reddit promotion backfired.
+- **BG-012 - AI Visibility vs. Brand Mentions: What's the Difference?** (bg-012.html): A brand can be mentioned by an AI engine and still be losing - ranked eighth, or framed as a cautionary example rather than a recommendation. Mention rate alone is not the same measurement as AI Visibility.
+- **BG-013 - How Often You Need to Publish to Stay Cited by AI** (bg-013.html): Content under 30 days old earns up to 3.2x more citations in one study. Perplexity's citation share on aged content drops from roughly 82% (under 30 days) to 37% (over 6 months). Recommends a refresh cadence by content type.
+- **BG-014 - Why Your Brand Might Be Invisible to AI Outside English** (bg-014.html): Large language models are trained overwhelmingly on English text (Meta's own published data puts Llama 2's corpus at 89.7% English). Citation share for the identical query can swing roughly 5x between English and another language for the same brand.
+- **BG-015 - Beyond "Are We Mentioned?": The AI Visibility KPIs That Actually Matter** (bg-015.html): The same underlying data can produce an 11-point swing in a reported score depending on measurement methodology (mention-based vs. position-weighted vs. citation-based). Proposes position, sentiment, share of voice, and consistency as the KPIs that matter beyond a bare mention count.
+- **BG-016 - Cross-Engine Consensus: When AI Engines Agree, and When They Don't** (bg-016.html): Across 20 real buyer categories tested in 7 cities, 10 reached a clear cross-engine consensus leader and 10 showed no agreement at all. Explains the pattern - category structure, not brand quality alone, predicts which side a category falls on.
+- **BG-017 - Our AI Visibility Research Is Now a Published Academic Paper** (bg-017.html): A plain-language summary of the empirical data paper formalizing this City AI Visibility Studies research - 222 real API responses, 7 cities, published with a permanent DOI under CC BY 4.0, disclosed limits included.
+
+## City AI Visibility Studies
+
+Original data from real commercial-buyer prompts run through BrandGEO's own
+collection pipeline across multiple AI engines, city by city. Several
+cities test the identical prompt in the local language versus English.
+
+- **London** (ai-visibility-for-london.html): 8 real London buyer prompts across 4 engines. Some categories (e.g. commercial disputes law) show strong cross-engine consensus; others (employment law, independent financial advisors) show no consensus leader at all.
+- **Berlin** (ai-visibility-for-berlin.html): German vs. English testing. Some brands (e.g. an accounting software leader) were named unanimously in German across every engine that returned a usable result, and returned nothing at all in English for the identical question on some engines - a real language-dependent visibility gap, not a translation artifact.
+- **Madrid** (ai-visibility-for-madrid.html): Spanish vs. English testing. One brand (an airport hotel) swept every engine unanimously in both languages. For other categories, some engines gave a stable answer regardless of language while others flipped their entire recommended set depending on which language was used.
+- **New York** (ai-visibility-for-newyork.html): 8 categories, 4 engines. A rental-listing platform swept every responding engine. Legacy, nationally-known brokerages beat individually-named star agents; national law firms beat NYC-specific boutiques - institutions and national recognition outperforming local/individual reputation.
+- **Paris** (ai-visibility-for-paris.html): French vs. English testing across 4 categories. One digital bank was named unanimously by every engine in both languages. In wealth management, the query language changed which type of competitor was recommended entirely, not just the ranking.
+- **Rome** (ai-visibility-for-rome.html): Italian vs. English testing. One engine reproduced an identical, identically-ordered ranked list in both languages for one category - the strongest single-engine language-stability result found in this research program. No brand achieved full cross-engine consensus in Rome.
+- **Dublin** (ai-visibility-for-dublin.html): 8 English-language prompts, 4 engines. Two categories (project management software, business banking) hit unanimous 4/4 consensus. One engine showed a recurring bias toward the same large institutional names regardless of what was actually asked.
+
+## Industry Guides
+
+Practical guides on how AI engines recommend brands within a specific
+industry, each citing sourced 2026 data specific to that vertical.
+
+- **SaaS** (ai-visibility-for-saas.html): 51% of B2B buyers now start research in an AI chatbot, up from 29% year over year.
+- **E-commerce** (ai-visibility-for-ecommerce.html): How AI shopping assistants select and recommend products, and what gets a brand cited instead of skipped.
+- **Law Firms** (ai-visibility-for-law-firms.html): 77-78% of legal search queries now trigger a Google AI Overview, the highest of any industry measured; roughly 1 in 5 consumers say they'd use ChatGPT directly to pick a lawyer.
+- **Hotels & Travel** (ai-visibility-for-hotels.html): How AI engines recommend hotels and travel brands to a traveler asking a direct question.
+- **Financial Services & Fintech** (ai-visibility-for-financial-services.html): How financial brands earn AI citations, and why "your money or your life" caution changes what's required to get recommended in this category.
+- **Healthcare** (ai-visibility-for-healthcare.html): How healthcare providers get recommended by ChatGPT, Gemini & Perplexity; healthcare has the highest AI-citation/organic-ranking overlap of any industry studied.
+- **Real Estate** (ai-visibility-for-real-estate.html): 91% of real estate agents are effectively invisible to ChatGPT and Gemini recommendations in one large dataset.
+- **Home Services & Contractors** (ai-visibility-for-home-services.html): How plumbers, HVAC pros, and contractors get cited by AI engines instead of overlooked entirely.
+- **Restaurants & Hospitality** (ai-visibility-for-restaurants.html): Diners now ask ChatGPT and Gemini where to eat, not only Google - real 2026 data on AI restaurant discovery.
+- **Education** (ai-visibility-for-education.html): How ChatGPT, Gemini, and Perplexity recommend schools, courses, and EdTech products today.
+
+## Comparisons
+
+Honest, two-sided comparisons against every named direct competitor -
+pricing verified live at time of writing, genuine strengths stated on both
+sides, not one-sided marketing copy.
+
+- **vs Peec AI** (brandgeo-vs-peec.html): Peec's real strengths - faster self-serve onboarding, unlimited seats on every plan, a strong G2 rating.
+- **vs Profound** (brandgeo-vs-profound.html): Enterprise-focused, demo-led pricing, large enterprise customer base.
+- **vs Otterly.AI** (brandgeo-vs-otterly.html): Lower entry price, but Claude, Gemini, and Google AI Mode are paid add-ons rather than included.
+- **vs Scrunch AI** (brandgeo-vs-scrunch.html): No managed-service tier at any price point, even at its highest tier.
+- **vs AthenaHQ** (brandgeo-vs-athenahq.html): Credit-based pricing model rather than a flat monthly fee.
+- **vs Rankscale** (brandgeo-vs-rankscale.html): Broadest raw engine count of any competitor checked (17+), also credit-based, no managed service.
+- **vs Ahrefs Brand Radar** (brandgeo-vs-ahrefs-brand-radar.html): An add-on bolted onto an existing Ahrefs subscription, never sold standalone; no Claude support.
+- **vs Semrush AI Toolkit** (brandgeo-vs-semrush.html): Broader engine coverage reserved for a custom Enterprise tier only.
+- **vs Conductor** (brandgeo-vs-conductor.html): Enterprise-only, quote-based pricing with no public price list.
+- **vs Goodie AI** (brandgeo-vs-goodie.html): Positions as a single-platform tool combining monitoring, optimization, attribution, and content intelligence; sales-led, pricing not public.
+
+Across every one of these, most competing AI visibility tools - Peec,
+Profound, Otterly, Semrush AI Toolkit, and others - are self-serve SaaS
+dashboards only: sign up, configure your own prompts, interpret the data
+yourself. BrandGEO offers that same self-serve path on Free, Essentials,
+and Growth, but also adds a genuinely done-for-you service on Managed and
+Pro - the team handles strategy, research, and reporting directly - at
+software-level pricing, rather than the $1,500-5,000+/month a dedicated
+GEO agency retainer typically costs. Full list and comparison hub:
+https://getbrandgeo.com/blog.html#compare
+
+## Glossary summaries
+
+Full glossary with cross-links to the research that covers each term in
+depth: https://getbrandgeo.com/glossary.html. 22 terms across four
+categories, each defined in one line below (verbatim from the published
+DefinedTermSet structured data on that page):
+
+Core GEO Disciplines:
+- **Generative Engine Optimization (GEO)**: The practice of structuring content and brand signals so generative AI engines synthesize a brand directly into the answers they generate, rather than simply linking to its site.
+- **Answer Engine Optimization (AEO)**: Optimizing content to directly answer a specific question in a format an AI engine can lift and cite verbatim.
+- **Large Language Model Optimization (LLMO)**: Shaping how large language models describe and understand a brand at the model level, through consistent, accurate information across the sources those models are trained on and retrieve from.
+- **Semantic SEO**: Organizing content around topics, entities, and the relationships between them, rather than isolated keywords, so both search engines and AI systems understand what content actually means.
+- **Entity SEO**: Establishing a brand as a distinct, verifiable entity inside the knowledge graphs AI engines draw from, through consistent naming, structured data, and cross-referenced third-party confirmation.
+- **Technical SEO**: The foundational discipline of keeping a site crawlable, fast, and well-structured, which every AI retrieval system still depends on even when generating conversational answers.
+
+Measurement & Product Concepts:
+- **AI Visibility**: A brand's ability to be mentioned, recommended, or cited in answers generated by AI engines such as ChatGPT, Gemini, Claude, Perplexity, and Meta AI.
+- **AI Visibility Score**: A composite measurement of a brand's AI Visibility across multiple weighted dimensions, rather than a single mention count.
+- **AI Visibility Gap**: The difference between a brand's ranking in traditional search and its presence in AI-generated recommendations for the same queries.
+- **Share of Voice (in LLMs)**: The proportion of AI-generated answers, within a given category or query set, that mention a specific brand relative to its competitors.
+- **Citation**: An instance where an AI engine names a specific brand, source, or fact in its generated answer, sometimes with an attributed link and sometimes without one.
+- **Cross-Engine Consensus**: The degree to which multiple AI engines, queried independently on the same question, name the same brand or set of brands.
+- **Sentiment & Framing**: How an AI engine characterizes a brand when it does mention it - not just whether the brand appears, but whether it is described favorably, neutrally, or critically.
+
+Technical Concepts:
+- **Retrieval-Augmented Generation (RAG)**: An architecture where an AI model retrieves relevant documents or web pages at query time and generates its answer grounded in that retrieved content, rather than relying only on what it learned during training.
+- **Grounding**: A model's decision, at query time, to run a live web search and base its answer on those results rather than answering from training data alone.
+- **Knowledge Graph**: A structured representation of entities and the relationships between them that an AI system uses to understand what a brand is, what category it belongs to, and how it connects to other entities.
+- **Structured Data (Schema.org / JSON-LD)**: Machine-readable markup embedded in a webpage that explicitly labels its content for search engines and AI crawlers, using a shared vocabulary.
+- **Zero-Click Search**: A search interaction where the user gets their answer directly from the AI-generated response and never clicks through to a source website.
+- **Content Freshness**: How recently a piece of content was published or updated, used by several AI engines as a signal when deciding which sources to retrieve and cite.
+
+Trust & Risk Concepts:
+- **Entity Recognition**: Whether an AI engine's knowledge base treats a brand as a distinct, real entity with a clear category, location, and purpose, rather than failing to recognize it at all.
+- **Trust Signals**: The independent, third-party indicators - press coverage, authoritative citations, original data, clear authorship - that AI engines weigh when deciding how much confidence to place in a source.
+- **Hallucination**: An instance where an AI engine states something as fact that is fabricated, outdated, or unverifiable, rather than genuinely grounded in a real source.
+
+## FAQ summaries
+
+Full FAQ (20 questions, six categories) at https://getbrandgeo.com/faq.html.
+Condensed, accurate summaries of every question below, grouped by category:
+
+AI Visibility & Generative Engine Optimization:
+- **What is AI Visibility?** A brand's ability to be mentioned, recommended, or cited in AI-generated answers (ChatGPT, Gemini, Claude, Perplexity, Meta AI) - entirely distinct from traditional search ranking, since a brand can rank #1 on Google and still be completely absent from AI recommendations.
+- **What is Generative Engine Optimization (GEO)?** The practice of optimizing a brand's presence so AI engines are more likely to mention, recommend, or cite it. Three pillars: entity recognition, concept association, and trust signals - not keyword rankings or click-through rates.
+- **How is AI Visibility different from SEO?** SEO gets a brand traffic via a clicked search result; AI Visibility gets a brand a citation, often with no link ever clicked. The two require different content strategies and different measurement.
+- **Do I still need SEO if I'm doing GEO?** Yes - they're parallel disciplines. Technical SEO and Entity SEO are foundational to both; keyword density, backlink volume, and anchor text (the tactical core of classic SEO) don't carry over the same way.
+- **Why does AI Visibility matter right now?** AI-powered search is growing about 4x year over year; less than 10% of brands currently monitor their AI Visibility, and the early-mover gap is widening.
+
+The AI Visibility Score:
+- **How is the AI Visibility Score (0-100) calculated?** A weighted composite across six dimensions - see the dedicated AI Visibility Score section above for the exact weighting.
+- **What do KNOW, PARTIAL, and MISSING mean?** Per-engine, per-query-category status labels - KNOW (mentioned accurately and confidently), PARTIAL (mentioned with uncertainty or incomplete/mixed information), or MISSING (not mentioned, or a competitor named instead).
+- **What does the position number (#1, #2, #3) mean?** The rank at which a brand was named when an AI engine mentions multiple brands in one answer; #1 carries the highest weight in the score.
+
+BrandGEO Platform:
+- **Which AI engines does BrandGEO monitor?** ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all queried with live web search enabled where available.
+- **How does BrandGEO measure AI Visibility?** A structured query methodology built on the client's actual customer-facing questions, run weekly across all five engines - see the Methodology section above.
+- **What does the weekly report include?** The overall score and its direction, exact quotes of what each engine said, competitor comparison, which engines did and didn't mention the brand, what changed since last week, and specific P0/P1/P2 recommendations.
+- **Is BrandGEO a managed service or a self-serve tool?** Both, depending on plan - Free/Essentials/Growth are self-serve; Managed/Pro/Enterprise add a fully managed service on top, with dashboard access included on every tier either way.
+
+Comparisons:
+- **How does BrandGEO compare to other AI visibility tools like Peec, Profound, or Semrush AI Toolkit?** Most competitors are self-serve-only dashboards. BrandGEO offers that same self-serve path plus a genuinely done-for-you managed tier at software-level pricing, versus the $1,500-5,000+/month a dedicated GEO agency retainer typically costs.
+
+Free Audit:
+- **What does the free audit include?** A one-time snapshot delivered within 48 hours: the AI Visibility Score, per-engine KNOW/PARTIAL/MISSING status, top 3 improvement areas, and a comparison against 1-2 direct competitors. Does not include dashboard access or ongoing monitoring.
+- **How often can I get the free audit?** Once per brand domain, refreshable after 6 months. Ongoing monitoring before that point is what the paid plans are for.
+- **What's the difference between the free plan and a paid plan?** Free gives a baseline (1 project, 5 prompts, ChatGPT only, monthly refresh). Paid tiers add more engines, more prompts, faster refresh cadence, competitor tracking, and (on Managed and above) a managed service.
+
+Pricing & Plans:
+- **What does BrandGEO cost?** Six tiers from Free (EUR 0) through Enterprise (from roughly EUR 10,000/month) - see the Plans section above for the full breakdown.
+- **Is there a contract or minimum commitment?** Essentials, Growth, and Managed monthly have no minimum - cancel anytime. Managed yearly and Pro's annual option are 12-month commitments paid upfront.
+- **Are there any hidden fees?** No. The only fee beyond the listed price is Managed's one-time EUR 1,250 setup fee on the monthly option only (waived on annual), always shown upfront.
+- **What is your refund policy?** Monthly plans: cancel anytime, no proration on partial months already billed. Yearly plans: non-refundable after the first 14 days, full refund within 14 days if no reports have been delivered yet.

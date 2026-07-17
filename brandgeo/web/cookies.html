@@ -3,28 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <title>Cookie Policy — BrandGEO</title>
+  <meta name="description" content="How BrandGEO uses cookies and similar technologies on getbrandgeo.com, and how to manage your preferences." />
   <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://getbrandgeo.com/cookies.html" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0b0f1a; --surface: #13192a; --border: #1e2740;
-      --text: #f0f4ff; --muted: #6b7a9e; --accent: #6c63ff;
+      --bg: #050508; --surface: #0e0e17; --border: rgba(255,255,255,.07);
+      --text: #ffffff; --muted: rgba(255,255,255,.5); --accent: #6c63ff;
     }
     [data-theme="light"] {
-      --bg: #f5f5fa;
+      --bg: #f7f7fc;
       --surface: #ffffff;
-      --border: #dddde8;
-      --text: #0a0a1e;
-      --muted: #666688;
+      --border: rgba(0,0,0,.08);
+      --text: #09090f;
+      --muted: rgba(9,9,15,.55);
     }
-    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    [data-theme="light"] nav { background: rgba(247,247,252,0.88); }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.7; transition: background .3s, color .3s; }
     nav { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: rgba(11,15,26,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo-text { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .nav-right { display: flex; align-items: center; gap: 16px; }
     .back { font-size: 0.88rem; color: var(--muted); text-decoration: none; }
     .back:hover { color: var(--text); }
@@ -35,19 +41,22 @@
     h1 { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
     .meta { color: var(--muted); font-size: 0.88rem; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
     h2 { font-size: 1.1rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
-    p { color: #c0cae0; margin-bottom: 14px; }
-    ul { color: #c0cae0; padding-left: 20px; margin-bottom: 14px; }
+    p { color: var(--text); margin-bottom: 14px; }
+    ul { color: var(--text); padding-left: 20px; margin-bottom: 14px; }
     ul li { margin-bottom: 6px; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     footer { text-align: center; padding: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
 </head>
 <body>
 
 <nav>
   <a href="/" class="logo">
-    <img src="/logo.png" alt="BrandGEO icon" style="height:32px;width:auto;display:block;">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:32px;width:auto;display:block;">
     <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
   </a>
   <div class="nav-right">
@@ -87,21 +96,7 @@
   <p>&copy; 2026 BrandGEO &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
 </footer>
 
-<script>
-  (function() {
-    const btn = document.getElementById('themeBtn');
-    const saved = localStorage.getItem('bgTheme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
-    btn.textContent = saved === 'dark' ? '🌙' : '☀️';
-    btn.addEventListener('click', function() {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      btn.textContent = next === 'dark' ? '🌙' : '☀️';
-      localStorage.setItem('bgTheme', next);
-    });
-  })();
-</script>
+<script src="site.js"></script>
 
 </body>
 </html>

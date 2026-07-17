@@ -18,9 +18,20 @@
 
   # Content Security Policy
   # - Plausible analytics (plausible.io)
+  # - Google Analytics / GA4 (googletagmanager.com loader; google-analytics.com
+  #   and its regional subdomains for the actual hit-collection endpoint —
+  #   without these, gtag.js loads but every hit is silently blocked)
   # - Google Fonts (fonts.googleapis.com, fonts.gstatic.com)
   # - FormSubmit.co contact form
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://plausible.io https://formsubmit.co; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
+  # NOTE: inline <script> blocks are NOT allowed by this policy (no
+  # 'unsafe-inline' in script-src, deliberately). Any script logic must live
+  # in an external, same-origin .js file (e.g. site.js, ga4-init.js) or it
+  # will be silently blocked by the browser with no visible error to a normal
+  # user — this bit the GA4 rollout and every page with its own inline
+  # theme-toggle script on 2026-07-13. Verify any new inline script actually
+  # runs (check window/document state in a live browser), don't just confirm
+  # the tag exists in page source.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://plausible.io https://formsubmit.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
 </IfModule>
 
 # ─── Force HTTPS ───────────────────────────────────────────────────────────────

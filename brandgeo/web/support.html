@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <!-- Privacy-friendly analytics by Plausible -->
+  <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
+  <script src="plausible-init.js"></script>
+  <title>Support — BrandGEO Help Center</title>
+  <meta name="description" content="Get help with your BrandGEO account, dashboard, AI Visibility Score, and billing. Browse the FAQ, sign in to your dashboard, or email our support team directly.">
+  <link rel="canonical" href="https://getbrandgeo.com/support.html">
+  <meta property="og:title" content="Support — BrandGEO Help Center">
+  <meta property="og:description" content="Get help with your BrandGEO account, dashboard, AI Visibility Score, and billing. Browse the FAQ, sign in to your dashboard, or email our support team directly.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://getbrandgeo.com/support.html">
+  <meta property="og:image" content="https://getbrandgeo.com/logo.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:image" content="https://getbrandgeo.com/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508; --s: #0e0e17; --s2: #12121c;
+      --bd: rgba(255,255,255,.07); --bd2: rgba(255,255,255,.13);
+      --ac: #6c63ff; --ac2: #00d4aa;
+      --t: #ffffff; --t2: rgba(255,255,255,.6); --t3: rgba(255,255,255,.35);
+      --nav: rgba(5,5,8,.85); --r: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f7f7fc; --s: #ffffff; --s2: #f4f4fb;
+      --bd: rgba(0,0,0,.08); --bd2: rgba(0,0,0,.14);
+      --t: #09090f; --t2: rgba(9,9,15,.58); --t3: rgba(9,9,15,.35);
+      --nav: rgba(247,247,252,.88);
+    }
+    body { background: var(--bg); color: var(--t); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; transition: background .3s, color .3s; }
+
+    /* NAV */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid var(--bd); position: sticky; top: 0; background: var(--nav); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
+    nav a:hover { color: var(--t); }
+    .nav-cta { background: var(--ac) !important; color: #fff !important; padding: 8px 18px; border-radius: 8px; font-weight: 700; margin-left: 16px !important; }
+    .nav-cta:hover { opacity: .9; }
+    .theme-toggle { background: none; border: 1px solid var(--bd2); color: var(--t2); cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-left: 12px; flex-shrink: 0; transition: border-color .15s, color .15s; }
+    .theme-toggle:hover { border-color: var(--ac); color: var(--ac); }
+
+    /* HERO */
+    .page-hero { padding: 64px 40px 48px; max-width: 760px; margin: 0 auto; text-align: center; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.25); color: rgba(180,175,255,.9); padding: 6px 14px; border-radius: 30px; font-size: 0.72rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 24px; }
+    .page-hero h1 { font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 900; letter-spacing: -.05em; margin-bottom: 14px; color: var(--t); }
+    .page-hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--ac), var(--ac2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .page-hero p { color: var(--t2); font-size: 0.95rem; line-height: 1.7; }
+
+    /* QUICK ACTIONS */
+    .quick-wrap { max-width: 980px; margin: 0 auto; padding: 0 40px 16px; }
+    .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .quick-card { background: var(--s); border: 1px solid var(--bd); border-radius: 16px; padding: 26px 24px; text-decoration: none; display: block; transition: border-color .15s, transform .15s; }
+    .quick-card:hover { border-color: var(--ac); transform: translateY(-2px); }
+    .quick-card .qc-icon { font-size: 1.5rem; margin-bottom: 12px; display: block; }
+    .quick-card .qc-title { font-size: 1rem; font-weight: 700; color: var(--t); margin-bottom: 6px; letter-spacing: -.01em; }
+    .quick-card .qc-desc { font-size: 0.84rem; color: var(--t2); line-height: 1.55; }
+    .quick-card .qc-link { display: inline-block; margin-top: 12px; font-size: 0.82rem; font-weight: 700; color: var(--ac); }
+
+    /* CATEGORIES */
+    .cat-wrap { max-width: 980px; margin: 0 auto; padding: 56px 40px 0; }
+    .cat-wrap > .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--ac2); margin-bottom: 24px; }
+    .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 8px; }
+    .cat-card { background: var(--s); border: 1px solid var(--bd); border-radius: var(--r); padding: 24px; }
+    .cat-card h3 { font-size: 0.98rem; font-weight: 700; color: var(--t); margin-bottom: 10px; letter-spacing: -.01em; }
+    .cat-card p { font-size: 0.86rem; color: var(--t2); line-height: 1.65; margin-bottom: 12px; }
+    .cat-card ul { list-style: none; }
+    .cat-card li { margin-bottom: 8px; }
+    .cat-card li:last-child { margin-bottom: 0; }
+    .cat-card a { font-size: 0.85rem; color: var(--ac); text-decoration: none; font-weight: 600; }
+    .cat-card a:hover { text-decoration: underline; }
+    .cat-card .cc-sub { color: var(--t3); font-weight: 400; }
+
+    /* CONTACT */
+    .contact-block { max-width: 760px; margin: 56px auto 0; padding: 0 40px 80px; }
+    .contact-card { background: var(--s); border: 1px solid var(--bd); border-radius: 20px; padding: 48px; text-align: center; }
+    .contact-card h3 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.03em; color: var(--t); margin-bottom: 10px; }
+    .contact-card p { color: var(--t2); margin-bottom: 24px; font-size: 0.9rem; }
+    .btn-primary { display: inline-block; background: var(--ac); color: #fff; padding: 12px 28px; border-radius: var(--r); font-size: 0.9rem; font-weight: 700; text-decoration: none; transition: opacity .15s; }
+    .btn-primary:hover { opacity: .9; }
+    .btn-secondary { display: inline-block; border: 1.5px solid var(--bd2); color: var(--t); padding: 12px 28px; border-radius: var(--r); font-size: 0.9rem; font-weight: 600; text-decoration: none; margin-left: 12px; transition: border-color .15s; }
+    .btn-secondary:hover { border-color: var(--ac); color: var(--ac); }
+    .contact-email { display: block; margin-top: 18px; font-size: 0.82rem; color: var(--t3); }
+    .contact-email a { color: var(--t3); text-decoration: none; }
+    .contact-email a:hover { color: var(--t); text-decoration: underline; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--bd); padding: 28px 40px; }
+    .footer-bottom { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 0.78rem; color: var(--t3); }
+    .footer-bottom a { color: var(--t3); text-decoration: none; transition: color .15s; }
+    .footer-bottom a:hover { color: var(--t); }
+
+    @media(max-width:760px) {
+      .quick-grid { grid-template-columns: 1fr; }
+      .cat-grid { grid-template-columns: 1fr; }
+    }
+    @media(max-width:640px) {
+      nav { padding: 14px 20px; }
+      nav a:not(.nav-cta) { display: none; }
+      .page-hero, .quick-wrap, .cat-wrap, .contact-block { padding-left: 20px; padding-right: 20px; }
+      .contact-card { padding: 32px 20px; }
+      .btn-secondary { margin-left: 0; margin-top: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="logo-nav.png" alt="BrandGEO" style="height:30px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="https://app.getbrandgeo.com/login" target="_blank" rel="noopener" class="nav-cta">Sign in</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
+  </div>
+</nav>
+
+<div class="page-hero">
+  <div class="hero-badge">Support</div>
+  <h1>How can we<br><em>help you?</em></h1>
+  <p>Sign in to your dashboard, browse answers to common questions, or reach our support team directly &mdash; whichever gets you there fastest.</p>
+</div>
+
+<div class="quick-wrap">
+  <div class="quick-grid">
+    <a href="https://app.getbrandgeo.com/login" target="_blank" rel="noopener" class="quick-card">
+      <span class="qc-icon">&#x1F510;</span>
+      <div class="qc-title">Go to your dashboard</div>
+      <div class="qc-desc">Sign in at app.getbrandgeo.com to view your AI Visibility Score, engine breakdown, and reports.</div>
+      <span class="qc-link">Sign in &rarr;</span>
+    </a>
+    <a href="/faq.html" class="quick-card">
+      <span class="qc-icon">&#x1F4D6;</span>
+      <div class="qc-title">Browse the FAQ</div>
+      <div class="qc-desc">20 answered questions on AI Visibility, the scoring methodology, plans, and billing.</div>
+      <span class="qc-link">Read the FAQ &rarr;</span>
+    </a>
+    <a href="mailto:support@getbrandgeo.com" class="quick-card">
+      <span class="qc-icon">&#x2709;&#xFE0F;</span>
+      <div class="qc-title">Email support</div>
+      <div class="qc-desc">Can't find what you need? Reach our support team directly at support@getbrandgeo.com.</div>
+      <span class="qc-link">Email us &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="cat-wrap">
+  <div class="section-label">Browse by topic</div>
+  <div class="cat-grid">
+
+    <div class="cat-card">
+      <h3>Account &amp; Login</h3>
+      <p>Trouble signing in, resetting your password, or finding your dashboard.</p>
+      <ul>
+        <li><a href="https://app.getbrandgeo.com/login" target="_blank" rel="noopener">Sign in to your dashboard</a></li>
+        <li><span class="cc-sub">Forgot your password? Go to the login page and click &ldquo;Forgot password?&rdquo; &mdash; we'll email you a reset link.</span></li>
+        <li><a href="mailto:support@getbrandgeo.com">Still can't get in? Email support &rarr;</a></li>
+      </ul>
+    </div>
+
+    <div class="cat-card">
+      <h3>Getting Started</h3>
+      <p>New to BrandGEO, or want a free snapshot before committing to a plan.</p>
+      <ul>
+        <li><a href="/faq.html">What does the free audit include?</a></li>
+        <li><a href="/faq.html">How often can I get the free audit?</a></li>
+        <li><a href="/#contact">Request your free audit &rarr;</a></li>
+      </ul>
+    </div>
+
+    <div class="cat-card">
+      <h3>Understanding Your AI Visibility Score</h3>
+      <p>What the 0&ndash;100 score means, and how to read KNOW / PARTIAL / MISSING.</p>
+      <ul>
+        <li><a href="/faq.html">How is the AI Visibility Score calculated?</a></li>
+        <li><a href="/faq.html">What do KNOW, PARTIAL, and MISSING mean?</a></li>
+        <li><a href="/bg-003.html">How does ChatGPT decide which brands to recommend?</a></li>
+      </ul>
+    </div>
+
+    <div class="cat-card">
+      <h3>Billing &amp; Plans</h3>
+      <p>Pricing, what's included at each tier, contracts, and refunds.</p>
+      <ul>
+        <li><a href="/faq.html">What does BrandGEO cost?</a></li>
+        <li><a href="/faq.html">Is there a contract or minimum commitment?</a></li>
+        <li><a href="/terms.html">Terms &amp; Conditions</a></li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="contact-block">
+  <div class="contact-card">
+    <h3>Still need help?</h3>
+    <p>Our team reads every message that comes through &mdash; tell us what's going on and we'll get back to you.</p>
+    <a href="mailto:support@getbrandgeo.com" class="btn-primary">Email support@getbrandgeo.com</a>
+    <a href="/faq.html" class="btn-secondary">Browse the FAQ</a>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; BrandGEO Global &nbsp;&middot;&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;&middot;&nbsp; Based in Spain &#x1F1EA;&#x1F1F8; (EU)</span>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <a href="/blog.html">Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/faq.html">FAQ</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+      <a href="mailto:support@getbrandgeo.com">support@getbrandgeo.com</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

@@ -75,6 +75,19 @@ better for an unauthenticated route. `Signup.tsx`'s password field is removed.
 Windows). `createUser` no longer appears anywhere in the function except in the
 warning comments.
 
+✅ **SHIPPED + VERIFIED END-TO-END 2026-07-13.** Deployed; the stranded account
+was cleared and signup re-tested for real. Live result: client 19
+(`talentwelove`, plan `free`, `brand_website` populated) →
+**`role = 'viewer'`**, `email_confirmed_at` SET, `last_sign_in_at` SET — the
+invite email arrived, was clicked, the password was set, and the user logged
+in. `admin` profile count still exactly **1**. **Self-serve signup works
+end-to-end for the first time.**
+
+⚠️ **Verification gotcha:** the invite flow populates `auth.users.invited_at`,
+**not** `confirmation_sent_at`. Checking `confirmation_sent_at` on an invited
+user yields a false "no email sent". Use `email_confirmed_at` /
+`last_sign_in_at` as the real proof of delivery.
+
 ---
 
 ## 0.5 Remediation status (updated 2026-07-13)
@@ -91,8 +104,15 @@ work. Built, committed, pushed; Netlify deploy confirmed **Published**; the
 | **F2** — no throttle on public signup | ✅ **FIXED + LIVE** — honeypot + per-IP daily cap (3/day) |
 | *(new)* signup was never functional | ✅ **FIXED + LIVE** — both broken inserts corrected |
 | *(new)* self-serve users can't add prompts | ✅ **FIXED + LIVE** — RLS + frontend deployed |
-| F3 — `search_path` on RLS helpers | ⏳ open (SQL ready in §F3) |
+| F3 — `search_path` on RLS helpers | ✅ **FIXED + LIVE** — pinned to `''`, isolation re-verified |
 | F4/F5/F7 | ⏳ open (low priority) |
+
+> ⚠️ **This file is a REPORT, not a SQL script.** Do not paste it into the
+> Supabase SQL editor — it's markdown and will fail with
+> `syntax error at or near "#"`. Only the individual ```sql``` blocks inside it
+> are runnable. All RLS changes described here have **already been applied** as
+> migrations (`prompts_own_client_writes`, `pin_search_path_on_rls_helpers`) —
+> there is nothing left for you to run by hand.
 
 **The critical cross-tenant landmine is closed.** No `role: 'admin'` assignment
 exists anywhere outside `onboard-client.js`, which is gated behind

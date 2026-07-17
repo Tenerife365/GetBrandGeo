@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
   <title>BrandGEO Research™ — AI Visibility Intelligence Blog</title>
   <meta name="description" content="BrandGEO Research publishes original data, analysis, and frameworks on AI Visibility, Generative Engine Optimization (GEO), and how AI engines like ChatGPT, Gemini, Claude, and Perplexity surface brands.">
   <meta property="og:title" content="BrandGEO Research™ — AI Visibility Intelligence">
-  <meta property="og:description" content="Original research on AI Visibility, GEO, and how brands show up in ChatGPT, Gemini, Claude, Perplexity, Microsoft Copilot, Meta AI, and Grok.">
+  <meta property="og:description" content="Original research on AI Visibility, GEO, and how brands show up in ChatGPT, Gemini, Claude, Perplexity, and Meta AI.">
+  <link rel="canonical" href="https://getbrandgeo.com/blog.html">
+  <meta property="og:type" content="blog">
+  <meta property="og:url" content="https://getbrandgeo.com/blog.html">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -40,7 +46,7 @@
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover, nav a.active { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -112,11 +118,11 @@
 
     /* FOOTER */
     footer { border-top: 1px solid var(--border); padding: 56px 40px 32px; color: var(--muted); font-size: 0.88rem; }
-    .footer-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 48px; }
+    .footer-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; gap: 32px; margin-bottom: 48px; }
     .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
     .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 800; line-height: 1; }
     .footer-brand .footer-logo-text .brand { color: var(--text); }
-    .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .footer-brand p { line-height: 1.6; margin-bottom: 16px; font-size: 0.85rem; }
     .footer-social { display: flex; gap: 10px; }
     .footer-social a { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); color: var(--muted); text-decoration: none; transition: border-color .2s, color .2s; font-size: 0.8rem; }
@@ -140,13 +146,38 @@
       .page-hero, .featured-wrap, .posts-wrap { padding-left: 20px; padding-right: 20px; }
       .footer-grid { grid-template-columns: 1fr; }
     }
+    .simple-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .simple-card { display: block; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; text-decoration: none; transition: border-color .2s, transform .2s; }
+    .simple-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .simple-card h5 { color: var(--text); font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
+    .simple-card p { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin: 0; }
+    @media(max-width:820px) { .simple-grid { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:640px) { .simple-grid { grid-template-columns: 1fr; } }
+
+    /* LATEST FROM BRANDGEO */
+    .latest-wrap { max-width: 1100px; margin: 0 auto 64px; padding: 0 40px; }
+    .latest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .latest-card { display: block; padding: 20px 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; transition: border-color .2s, transform .2s; }
+    .latest-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .latest-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .latest-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+    .latest-tag-news { color: var(--accent2); background: rgba(0,212,170,.12); border: 1px solid rgba(0,212,170,.25); }
+    .latest-tag-research { color: var(--accent); background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25); }
+    .latest-date { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+    .latest-card h5 { color: var(--text); font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; line-height: 1.35; }
+    .latest-card p { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin: 0; }
+    @media(max-width:820px) { .latest-grid { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:640px) { .latest-grid { grid-template-columns: 1fr; } }
   </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
 </head>
 <body>
 
 <nav>
   <a href="/" class="logo">
-    <img src="/logo.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
     <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
   </a>
   <div style="display:flex;align-items:center;">
@@ -154,6 +185,7 @@
     <a href="/#pricing">Pricing</a>
     <a href="/faq.html">FAQ</a>
     <a href="/blog.html" class="active">Blog</a>
+    <a href="/news/">News</a>
     <a href="/#contact" class="nav-cta">Get started</a>
     <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
   </div>
@@ -165,29 +197,73 @@
   <p>Data, analysis, and frameworks on Generative Engine Optimization — how brands show up (or don't) when customers ask AI for recommendations.</p>
 </div>
 
-<!-- FEATURED: BG-004 -->
+<!-- LATEST FROM BRANDGEO -->
+<div class="latest-wrap">
+  <div class="featured-label">● Latest from BrandGEO</div>
+  <div class="latest-grid">
+    <a href="/bg-017.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 16, 2026</span>
+      </div>
+      <h5>Our AI Visibility Research Is Now a Published Academic Paper</h5>
+      <p>222 real AI responses, 7 cities, published open access with a permanent DOI under CC BY 4.0.</p>
+    </a>
+    <a href="/news/ai-visibility-index-launch/" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-news">Press Release</span>
+        <span class="latest-date">Jul 14, 2026</span>
+      </div>
+      <h5>BrandGEO Publishes Its First AI Visibility Index Report</h5>
+      <p>419 real AI responses, 7 cities, 5 engines &mdash; published with its early-stage limits stated directly.</p>
+    </a>
+    <a href="/bg-016.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 14, 2026</span>
+      </div>
+      <h5>Cross-Engine Consensus: When AI Engines Agree, and When They Don't</h5>
+      <p>10 of 20 real buyer categories reached a clear AI consensus leader. The rest showed no agreement at all.</p>
+    </a>
+    <a href="/bg-015.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h5>Beyond &ldquo;Are We Mentioned?&rdquo;: The AI Visibility KPIs That Actually Matter</h5>
+      <p>Mention rate alone hides more than it shows &mdash; a practical framework for the KPIs that actually matter.</p>
+    </a>
+    <a href="/bg-014.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h5>Why Your Brand Might Be Invisible to AI Outside English</h5>
+      <p>Most AI models are trained overwhelmingly in English &mdash; what that means for global brand citations.</p>
+    </a>
+  </div>
+</div>
+
+<!-- FEATURED: BG-016 -->
 <div class="featured-wrap">
   <div class="featured-label">● Featured Research</div>
-  <a href="/bg-004.html" class="featured-card">
-    <div class="featured-visual">
-      <img src="/images/bg-004-hero.png" alt="BG-004: Ranked #1 on three AI engines, completely absent on Gemini." loading="lazy">
-    </div>
+  <a href="/bg-017.html" class="featured-card">
+    <div class="featured-visual" style="background-image: linear-gradient(180deg, rgba(10,10,15,.15) 0%, rgba(10,10,15,.55) 100%), url('/images/bg-017-hero.png'); background-size: cover; background-position: center top;"></div>
     <div class="featured-body">
       <div class="post-meta">
-        <span class="post-id">BG-004</span>
-        <span class="post-tag">Case Study</span>
-        <span class="post-tag">Gemini</span>
+        <span class="post-id">BG-017</span>
+        <span class="post-tag">Published Research</span>
+        <span class="post-tag">Academic Paper</span>
         <span class="post-date">July 2026</span>
       </div>
-      <h2>Ranked #1 on Three AI Engines. Completely Absent on Gemini.</h2>
-      <p>We tested 20 real customer questions across 5 AI engines for a market-leading catering brand. Same brand, same questions — one platform where it simply doesn't exist.</p>
+      <h2>Our AI Visibility Research Is Now a Published Academic Paper</h2>
+      <p>Our seven-city AI visibility dataset is now a formal, DOI-backed empirical paper: 222 real API responses, openly licensed under CC BY 4.0, disclosed limits and all.</p>
       <div class="finding-pills">
-        <span class="finding-pill">20 questions · 5 AI engines</span>
-        <span class="finding-pill">#1 on 3 platforms</span>
-        <span class="finding-pill">0% on Gemini</span>
-        <span class="finding-pill">Free visibility audit</span>
+        <span class="finding-pill">222 real AI responses analyzed</span>
+        <span class="finding-pill">7 cities, 56 buyer-intent prompts</span>
+        <span class="finding-pill">Permanent DOI, CC BY 4.0 license</span>
       </div>
-      <span class="read-link">Read BG-004</span>
+      <span class="read-link">Read BG-017</span>
     </div>
   </a>
 </div>
@@ -199,6 +275,201 @@
     <span class="coming-soon-note">New research published weekly</span>
   </div>
   <div class="posts-grid">
+
+    <a href="/bg-017.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-017-hero.png');">
+        <span class="post-card-id">BG-017</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Our AI Visibility Research Is Now a Published Academic Paper</h4>
+        <p>222 real AI responses across 7 cities and 56 buyer-intent prompts, formalized into a DOI-backed empirical paper, openly licensed under CC BY 4.0.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Published Research · Academic Paper · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-016.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-016-hero.png');">
+        <span class="post-card-id">BG-016</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Cross-Engine Consensus: When AI Engines Agree, and When They Don't</h4>
+        <p>10 of 20 real buyer categories tested across 7 cities reached a clear AI consensus leader. The other 10 showed no agreement at all, and the split follows a pattern.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Research Methodology · City Research · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-015.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-015-hero.png');">
+        <span class="post-card-id">BG-015</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Beyond "Are We Mentioned?": The AI Visibility KPIs That Actually Matter</h4>
+        <p>Mention rate alone hides more than it shows. A practical framework for the AI visibility KPIs that matter — position, sentiment, share of voice, consistency.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Measurement · KPIs · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-014.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-014-hero.png');">
+        <span class="post-card-id">BG-014</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Why Your Brand Might Be Invisible to AI Outside English</h4>
+        <p>Most AI models are trained overwhelmingly in English — here's what that means for brand citations when customers search in their own language.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Multilingual · Global GEO · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-013.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-013-hero.png');">
+        <span class="post-card-id">BG-013</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>How Often You Need to Publish to Stay Cited by AI</h4>
+        <p>Content under 30 days old earns up to 3.2x more AI citations. Here's the real refresh cadence — by content type — that keeps you cited.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Content Strategy · Freshness · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-012.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-012-hero.png');">
+        <span class="post-card-id">BG-012</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>AI Visibility vs. Brand Mentions: What's the Difference?</h4>
+        <p>A brand can be mentioned by ChatGPT and still be losing — ranked #8, framed as a warning. Mentions and AI Visibility measure different things.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Definitions · Measurement · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-011.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-011-hero.png');">
+        <span class="post-card-id">BG-011</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Why Reddit Mentions Move the Needle on AI Citations</h4>
+        <p>Reddit is the most-cited domain across ChatGPT, Gemini, and Perplexity — up to 24% of citations on some engines. Here's why, and what actually earns it.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Reddit · AI Citations · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-010.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-010-hero.png');">
+        <span class="post-card-id">BG-010</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Schema Markup for AI Search: The Complete Implementation Guide</h4>
+        <p>Schema's AI-citation boost is contested — 2.3x in one study, none in another. Here's what actually matters to implement, and why.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Schema · Technical GEO · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-009.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-009-hero.png');">
+        <span class="post-card-id">BG-009</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>How ChatGPT Actually Decides Which Brands to Recommend</h4>
+        <p>ChatGPT only searches the live web on 34.5% of queries. The other 65% run on training data alone. Here's the mechanics of both paths.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">ChatGPT · AI Search · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-008.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-008-hero.png');">
+        <span class="post-card-id">BG-008</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>AI Visibility by Industry: Who Wins, Who Loses</h4>
+        <p>Which industries are most exposed to AI disruption in search — and which sectors already have strong AI Visibility without knowing it.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Industry Analysis · AI Search · Data · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-007.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-007-hero.png');">
+        <span class="post-card-id">BG-007</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>The Anatomy of an AI-Cited Brand</h4>
+        <p>What do the brands that consistently appear in AI recommendations have in common? We reverse-engineered the pattern.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Brand Strategy · AI Citations · GEO · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-006.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-006-hero.png');">
+        <span class="post-card-id">BG-006</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>Perplexity vs Gemini: Which AI Cites Brands Most?</h4>
+        <p>Comparing citation behavior across the two fastest-growing AI search engines — and what it means for your brand strategy.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Perplexity · Gemini · Comparison · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-005.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-005-hero.png');">
+        <span class="post-card-id">BG-005</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>GEO vs SEO: The Fundamental Difference</h4>
+        <p>Why ranking in Google and being cited by AI are completely different problems — with completely different solutions.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">GEO · SEO · Strategy · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
 
     <a href="/bg-004.html" class="post-card">
       <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-004-hero.png');">
@@ -260,62 +531,75 @@
       </div>
     </a>
 
-    <div class="post-card" style="opacity:.5;cursor:default;">
-      <div class="post-card-visual">
-        <span class="post-card-id">BG-005</span>
-        <span class="post-card-status status-coming">Coming soon</span>
-      </div>
-      <div class="post-card-body">
-        <h4>GEO vs SEO: The Fundamental Difference</h4>
-        <p>Why ranking in Google and being cited by AI are completely different problems — with completely different solutions.</p>
-        <div class="post-card-footer">
-          <span class="post-card-tag">GEO · SEO · Strategy</span>
-        </div>
-      </div>
-    </div>
 
-    <div class="post-card" style="opacity:.5;cursor:default;">
-      <div class="post-card-visual">
-        <span class="post-card-id">BG-006</span>
-        <span class="post-card-status status-coming">Coming soon</span>
-      </div>
-      <div class="post-card-body">
-        <h4>Perplexity vs Gemini: Which AI Cites Brands Most?</h4>
-        <p>Comparing citation behavior across the two fastest-growing AI search engines — and what it means for your brand strategy.</p>
-        <div class="post-card-footer">
-          <span class="post-card-tag">Perplexity · Gemini · Comparison</span>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
 
-    <div class="post-card" style="opacity:.5;cursor:default;">
-      <div class="post-card-visual">
-        <span class="post-card-id">BG-007</span>
-        <span class="post-card-status status-coming">Coming soon</span>
-      </div>
-      <div class="post-card-body">
-        <h4>The Anatomy of an AI-Cited Brand</h4>
-        <p>What do the brands that consistently appear in AI recommendations have in common? We reverse-engineered the pattern.</p>
-        <div class="post-card-footer">
-          <span class="post-card-tag">Brand Strategy · AI Citations · GEO</span>
-        </div>
-      </div>
-    </div>
+<!-- MONTHLY REPORTS -->
+<div class="posts-wrap" id="reports">
+  <div class="posts-header">
+    <h3>The AI Visibility Index</h3>
+    <span class="coming-soon-note">Monthly, from real collected data</span>
+  </div>
+  <div class="simple-grid">
+    <a href="/ai-visibility-index-2026-07.html" class="simple-card"><h5>Issue #1 &middot; July 2026</h5><p>419 real AI responses across 7 cities and 5 engines, published with its early limits stated directly.</p></a>
+  </div>
+</div>
 
-    <div class="post-card" style="opacity:.5;cursor:default;">
-      <div class="post-card-visual">
-        <span class="post-card-id">BG-008</span>
-        <span class="post-card-status status-coming">Coming soon</span>
-      </div>
-      <div class="post-card-body">
-        <h4>AI Visibility by Industry: Who Wins, Who Loses</h4>
-        <p>Which industries are most exposed to AI disruption in search — and which sectors already have strong AI Visibility without knowing it.</p>
-        <div class="post-card-footer">
-          <span class="post-card-tag">Industry Analysis · AI Search · Data</span>
-        </div>
-      </div>
-    </div>
+<!-- COMPARE BRANDGEO -->
+<div class="posts-wrap" id="compare">
+  <div class="posts-header">
+    <h3>Compare BrandGEO</h3>
+    <span class="coming-soon-note">Honest, sourced comparisons</span>
+  </div>
+  <div class="simple-grid">
+    <a href="/brandgeo-vs-peec.html" class="simple-card"><h5>BrandGEO vs Peec AI</h5><p>Self-serve brand perception vs. done-for-you service.</p></a>
+    <a href="/brandgeo-vs-profound.html" class="simple-card"><h5>BrandGEO vs Profound</h5><p>Broadest engine coverage vs. accessible pricing.</p></a>
+    <a href="/brandgeo-vs-otterly.html" class="simple-card"><h5>BrandGEO vs Otterly.AI</h5><p>Lean DIY monitoring vs. multi-market depth.</p></a>
+    <a href="/brandgeo-vs-scrunch.html" class="simple-card"><h5>BrandGEO vs Scrunch AI</h5><p>Self-serve actionability vs. a real managed team.</p></a>
+    <a href="/brandgeo-vs-athenahq.html" class="simple-card"><h5>BrandGEO vs AthenaHQ</h5><p>Credit-based billing vs. flat, predictable pricing.</p></a>
+    <a href="/brandgeo-vs-rankscale.html" class="simple-card"><h5>BrandGEO vs Rankscale</h5><p>Agency dashboards vs. a genuine managed service.</p></a>
+    <a href="/brandgeo-vs-ahrefs-brand-radar.html" class="simple-card"><h5>BrandGEO vs Ahrefs Brand Radar</h5><p>An SEO-suite add-on vs. a purpose-built GEO platform.</p></a>
+    <a href="/brandgeo-vs-semrush.html" class="simple-card"><h5>BrandGEO vs Semrush AI Toolkit</h5><p>Bundled marketing-suite add-on vs. purpose-built GEO.</p></a>
+    <a href="/brandgeo-vs-conductor.html" class="simple-card"><h5>BrandGEO vs Conductor</h5><p>Enterprise-only contracts vs. accessible entry tiers.</p></a>
+    <a href="/brandgeo-vs-goodie.html" class="simple-card"><h5>BrandGEO vs Goodie AI</h5><p>Sales-led enterprise GEO vs. self-serve + managed.</p></a>
+  </div>
+</div>
 
+<!-- AI VISIBILITY BY INDUSTRY -->
+<div class="posts-wrap">
+  <div class="posts-header">
+    <h3>AI Visibility by Industry</h3>
+    <span class="coming-soon-note">Practical guides for your vertical</span>
+  </div>
+  <div class="simple-grid">
+    <a href="/ai-visibility-for-saas.html" class="simple-card"><h5>SaaS Companies</h5><p>How B2B software buyers now ask AI before they Google.</p></a>
+    <a href="/ai-visibility-for-ecommerce.html" class="simple-card"><h5>E-commerce Brands</h5><p>Getting recommended by AI shopping assistants.</p></a>
+    <a href="/ai-visibility-for-law-firms.html" class="simple-card"><h5>Law Firms</h5><p>How prospective clients ask AI before they call.</p></a>
+    <a href="/ai-visibility-for-hotels.html" class="simple-card"><h5>Hotels &amp; Travel Brands</h5><p>Getting recommended when AI plans the whole trip.</p></a>
+    <a href="/ai-visibility-for-financial-services.html" class="simple-card"><h5>Financial Services &amp; Fintech</h5><p>Earning citations on cautious, YMYL-sensitive queries.</p></a>
+    <a href="/ai-visibility-for-healthcare.html" class="simple-card"><h5>Healthcare Providers</h5><p>The one industry where AI citation and SEO overlap most.</p></a>
+    <a href="/ai-visibility-for-real-estate.html" class="simple-card"><h5>Real Estate Agencies</h5><p>Why 91% of agents are invisible to AI buyer research.</p></a>
+    <a href="/ai-visibility-for-home-services.html" class="simple-card"><h5>Home Services &amp; Contractors</h5><p>Getting called before the AI recommends someone else.</p></a>
+    <a href="/ai-visibility-for-restaurants.html" class="simple-card"><h5>Restaurants &amp; Hospitality</h5><p>Real case-study proof from BrandGEO's own audit work.</p></a>
+    <a href="/ai-visibility-for-education.html" class="simple-card"><h5>Education &amp; Online Learning</h5><p>The fastest-growing AI Overview category studied.</p></a>
+  </div>
+</div>
+
+<!-- CITY RESEARCH -->
+<div class="posts-wrap" id="cities">
+  <div class="posts-header">
+    <h3>AI Visibility by City</h3>
+    <span class="coming-soon-note">Original data, city by city</span>
+  </div>
+  <div class="simple-grid">
+    <a href="/ai-visibility-for-london.html" class="simple-card"><h5>London</h5><p>8 real buyer prompts, 4 engines &mdash; where AI agrees, and where it's wide open.</p></a>
+    <a href="/ai-visibility-for-berlin.html" class="simple-card"><h5>Berlin</h5><p>Same question, German vs. English &mdash; two engines answered one and went silent on the other.</p></a>
+    <a href="/ai-visibility-for-madrid.html" class="simple-card"><h5>Madrid</h5><p>Spanish vs. English, but the gap flips direction per engine &mdash; no simple rule wins.</p></a>
+    <a href="/ai-visibility-for-newyork.html" class="simple-card"><h5>New York</h5><p>Legacy brokerages beat star agents. National law firms beat local boutiques. StreetEasy sweeps every engine.</p></a>
+    <a href="/ai-visibility-for-paris.html" class="simple-card"><h5>Paris</h5><p>One bank swept every engine, in both languages. One category changed its entire competitive set by language.</p></a>
+    <a href="/ai-visibility-for-rome.html" class="simple-card"><h5>Rome</h5><p>One engine repeated an identical ranked list word for word in two languages. No brand won cross-engine consensus.</p></a>
+    <a href="/ai-visibility-for-dublin.html" class="simple-card"><h5>Dublin</h5><p>Two brands swept every engine unanimously &mdash; but one engine kept giving the same big-name answer regardless of the question.</p></a>
   </div>
 </div>
 
@@ -338,10 +622,10 @@
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="footer-logo">
-        <img src="/logo.png" alt="BrandGEO icon" style="height:32px;width:auto;display:block;">
+        <img src="/logo-nav.png" alt="BrandGEO icon" style="height:32px;width:auto;display:block;">
         <div class="footer-logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
       </div>
-      <p>AI Visibility Intelligence for brands that want to stay ahead. Monitor and measure your presence across every major AI engine — ChatGPT, Gemini, Claude, Perplexity, Copilot, Meta AI, and Grok.</p>
+      <p>AI Visibility Intelligence for brands that want to stay ahead. Monitor and measure your presence across ChatGPT, Gemini, Claude, Perplexity, and Meta AI.</p>
     </div>
     <div class="footer-col">
       <h4>Product</h4>
@@ -356,16 +640,41 @@
       <h4>Research</h4>
       <ul>
         <li><a href="/blog.html">All Research</a></li>
-        <li><a href="/bg-004.html">BG-004 — #1 on 3 Engines, Absent on Gemini</a></li>
-        <li><a href="/bg-003.html">BG-003 — How ChatGPT Recommends Brands</a></li>
-        <li><a href="/bg-002.html">BG-002 — From Rankings to Recommendations</a></li>
+        <li><a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener">Published Study: Cross-Engine Consensus (DOI)</a></li>
+        <li><a href="/bg-017.html">BG-017: Our Research Is Now a Published Paper</a></li>
+        <li><a href="/ai-visibility-index-2026-07.html">AI Visibility Index, Issue #1</a></li>
+        <li><a href="/bg-016.html">BG-016: Cross-Engine Consensus</a></li>
+        <li><a href="/bg-015.html">BG-015 — AI Visibility KPIs</a></li>
+        <li><a href="/bg-012.html">BG-012 — AI Visibility vs. Mentions</a></li>
+        <li><a href="/bg-009.html">BG-009 — How ChatGPT Decides</a></li>
         <li><a href="/bg-001.html">BG-001 — AI Visibility Gap</a></li>
+        <li><a href="/glossary.html">Glossary</a></li>
         <li><a href="/faq.html">FAQ</a></li>
+        <li><a href="/news/">Newsroom</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Compare &amp; Industries</h4>
+      <ul>
+        <li><a href="/blog.html#compare">Compare BrandGEO</a></li>
+        <li><a href="/brandgeo-vs-peec.html">BrandGEO vs Peec AI</a></li>
+        <li><a href="/brandgeo-vs-profound.html">BrandGEO vs Profound</a></li>
+        <li><a href="/ai-visibility-for-saas.html">AI Visibility for SaaS</a></li>
+        <li><a href="/ai-visibility-for-ecommerce.html">AI Visibility for E-commerce</a></li>
+        <li><a href="/ai-visibility-for-law-firms.html">AI Visibility for Law Firms</a></li>
+        <li><a href="/ai-visibility-for-london.html">AI Visibility in London</a></li>
+        <li><a href="/ai-visibility-for-berlin.html">AI Visibility in Berlin</a></li>
+        <li><a href="/ai-visibility-for-madrid.html">AI Visibility in Madrid</a></li>
+        <li><a href="/ai-visibility-for-newyork.html">AI Visibility in New York</a></li>
+        <li><a href="/ai-visibility-for-paris.html">AI Visibility in Paris</a></li>
+        <li><a href="/ai-visibility-for-rome.html">AI Visibility in Rome</a></li>
+        <li><a href="/ai-visibility-for-dublin.html">AI Visibility in Dublin</a></li>
       </ul>
     </div>
     <div class="footer-col">
       <h4>Contact</h4>
       <ul>
+        <li><a href="/support.html">Support</a></li>
         <li><a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></li>
         <li><a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener">LinkedIn</a></li>
         <li><a href="/#contact">Request a call</a></li>
@@ -375,23 +684,10 @@
   <div class="footer-bottom">
     <span>&copy; 2026 BrandGEO &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a></span>
     <a href="/privacy.html">Privacy Policy</a>
+    <a href="/cookies.html">Cookies</a>
   </div>
 </footer>
 
-<script>
-  (function() {
-    const btn = document.getElementById('themeBtn');
-    const saved = localStorage.getItem('bgTheme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
-    btn.textContent = saved === 'dark' ? '🌙' : '☀️';
-    btn.addEventListener('click', function() {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      btn.textContent = next === 'dark' ? '🌙' : '☀️';
-      localStorage.setItem('bgTheme', next);
-    });
-  })();
-</script>
+<script src="site.js"></script>
 </body>
 </html>

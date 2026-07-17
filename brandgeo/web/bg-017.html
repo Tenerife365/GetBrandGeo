@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-017: Our AI Visibility Research Is Now a Published Academic Paper | BrandGEO Research™</title>
+  <meta name="description" content="Our seven-city AI visibility dataset is now a published, DOI-backed academic paper: 222 real API responses, openly licensed, fully citable, disclosed limits and all.">
+  <meta property="og:title" content="Our AI Visibility Research Is Now a Published Academic Paper: BrandGEO Research™">
+  <meta property="og:description" content="222 real production AI responses, 56 buyer-intent prompts, seven cities, four engines. We wrote it up as a formal empirical paper, published it with a permanent DOI, and licensed it for anyone, including AI systems, to freely cite.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-017-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-017.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-017.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-017-hero.png">
+  <meta property="article:published_time" content="2026-07-16">
+  <meta name="keywords" content="AI visibility research paper, cross-engine consensus paper, generative engine optimization research, GEO academic paper, Zenodo DOI, AI search brand recommendation study">
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Our AI Visibility Research Is Now a Published Academic Paper",
+    "description": "BrandGEO Research: how our seven-city, four-engine cross-engine consensus dataset became a formal empirical paper, published on Zenodo with a permanent DOI under a CC BY 4.0 license, and what publishing it openly actually required.",
+    "image": "https://getbrandgeo.com/images/bg-017-hero.png",
+    "datePublished": "2026-07-16",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"},
+    "about": ["AI Visibility", "Cross-Engine Consensus", "Generative Engine Optimization", "Academic Research", "Open Access"],
+    "citation": "https://doi.org/10.5281/zenodo.21395598",
+    "mentions": [
+      {"@type": "SoftwareApplication", "name": "ChatGPT", "creator": {"@type": "Organization", "name": "OpenAI"}},
+      {"@type": "SoftwareApplication", "name": "Gemini", "creator": {"@type": "Organization", "name": "Google"}},
+      {"@type": "SoftwareApplication", "name": "Claude", "creator": {"@type": "Organization", "name": "Anthropic"}},
+      {"@type": "SoftwareApplication", "name": "Perplexity", "creator": {"@type": "Organization", "name": "Perplexity AI"}},
+      {"@type": "SoftwareApplication", "name": "Meta AI", "creator": {"@type": "Organization", "name": "Meta"}}
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p:last-child { margin: 0; }
+    .callout a { color: var(--accent2); }
+
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-017</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-017</span>
+    <span class="badge-tag">Published Paper</span>
+    <span class="badge-tag">Open Access</span>
+    <span class="badge-tag">Cross-Engine Consensus</span>
+  </div>
+  <h1>We Turned Our City Research Into <em>a Published Academic Paper</em></h1>
+  <p class="article-subtitle">The dataset behind BG-016 and our seven city studies is now a formal empirical paper, published in the open with a permanent DOI. Here's what's in it, and why we published the data itself rather than just our conclusions about it.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 16, 2026</span>
+    <span class="meta-item">6 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-017</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-017-hero.png" alt="An announcement graphic for BrandGEO's published academic paper on cross-engine consensus in AI-generated brand recommendations, showing the paper's dataset size, city count, and open license." loading="eager">
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Findings: BG-017</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">222</div>
+        <div class="finding-desc">Real production AI responses read and analyzed by hand across four engines</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">7</div>
+        <div class="finding-desc">Cities covered: London, Berlin, Madrid, New York, Paris, Rome, and Dublin</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">56</div>
+        <div class="finding-desc">Buyer-intent prompts, written to resemble real commercial questions, not synthetic tests</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">CC BY 4.0</div>
+        <div class="finding-desc">Openly licensed, so anyone, including AI systems, can freely cite and quote it</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+
+  <h2 id="why-a-paper">Why we wrote this up as a paper, not just another article</h2>
+  <p>Everything BrandGEO publishes on this site, including <a href="/bg-016.html">BG-016</a> and every one of our seven <a href="/blog.html#cities">city research pages</a>, comes from the same underlying activity: we run real buyer questions through real AI engines, using BrandGEO's own production collection pipeline, and we read what comes back. That's the same measurement the product itself performs for a paying client, just aimed at a research question instead of a single brand.</p>
+  <p>A blog post is the right format for a specific finding. It isn't the right format for the full dataset, the exact methodology, every disclosed limitation, and a citable, permanent record that someone else could actually check against. So we wrote the whole thing up properly: as a real empirical paper, with a data-and-methods section, a results table for all seven cities, an explicit definition of what we mean by "consensus," and a section that states plainly where the data is incomplete. Then we published it to <strong>Zenodo</strong>, a CERN-run open-access repository, which issued it a permanent, citable DOI: <strong>10.5281/zenodo.21395598</strong>, under a CC BY 4.0 license.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">Read the paper directly</div>
+    <p>The full text, the complete per-city results table, the methodology, and the disclosed limitations are open access at the permanent record: <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener">doi.org/10.5281/zenodo.21395598</a>. No account, no paywall, no email required.</p>
+  </div>
+
+  <h2 id="whats-in-it">What's actually in it</h2>
+  <p>Between July 9 and July 10, 2026, we ran 56 realistic, high commercial-intent buyer questions (the kind a real person might actually type into an AI assistant, like "which law firm should I use for an employment dispute in Dublin") across seven cities and five AI engines: ChatGPT, Gemini, Claude, Perplexity, and Meta AI. Two cities, London and Dublin, used eight distinct English prompts each. The other five, Berlin, Madrid, Paris, and Rome, used a paired design: the same four categories asked once in the local language and once in English, specifically so language could be studied as its own variable rather than tangled up with the city.</p>
+  <p>Of the 280 possible engine-level responses that design implied, 278 were actually recorded. We disclose this precisely rather than round it off: two rows, both Meta AI, were lost to a transient collection gap. A further 56 rows, all of them ChatGPT, came back as a recorded API error rather than a real answer, caused by a sustained account-level quota failure on the OpenAI account used for collection during the exact window we were gathering data. We exclude ChatGPT from the paper's analysis rather than quietly treat its absence as a real finding about ChatGPT. The paper's actual analytic dataset is <strong>222 completed responses across four engines</strong>, and the paper says so on page one, not in a footnote.</p>
+
+  <h2 id="headline-finding">The clearest finding, holding across every city we tested</h2>
+  <p>Categories with a small number of well-documented, easily distinguished, frequently reviewed providers converge, often to full unanimity across every engine. Categories with a long tail of similarly-qualified, less differentiated providers, especially individually named professionals, almost never converge at all. This held independently in London, New York, and Dublin, three cities that don't share the bilingual design, so it can't be explained away as a language artifact.</p>
+  <p>New York gave the pattern its own sharp variant. Three long-established brokerages, Douglas Elliman, Corcoran, and Brown Harris Stevens, each reached three-of-four engine consensus for real estate, while individually named "star" agents in the exact same responses never reached agreement above a single engine. The same shape showed up in law: for startup incorporation, two nationally recognized firms, Fenwick &amp; West and Cooley, beat every New York-specific boutique to three-of-four consensus.</p>
+  <p>Dublin added a distinct engine-level wrinkle worth knowing about on its own: Meta AI showed the highest overall consensus rate of any city (a corporate litigation prompt converged on Ireland's five largest law firms across every responding engine, and two separate prompts hit full 4-of-4 unanimity, on Monday.com and Revolut Business respectively) alongside a specific failure mode, in which Meta AI answered three genuinely different financial-advisory questions with nearly the same list of large institutions, regardless of whether the question explicitly asked for a boutique or independent option. Claude, Gemini, and Perplexity, asked the identical prompts, told the two scenarios apart cleanly. A single-engine visibility check would have missed that this was one engine's blind spot, not the real market.</p>
+
+  <h2 id="rome-anomaly">Rome: zero cross-engine agreement, and the opposite result inside one engine</h2>
+  <p>Rome is the one city in the whole dataset where not a single category reached even three-engine agreement. Every one of its four tested categories fragmented. And yet Rome also produced the single strongest within-engine stability result anywhere in the paper: for a business-dinner restaurant prompt, Meta AI gave an identical, identically ordered five-restaurant list in both Italian and English, an exact reproduction, not just an overlapping one. No engine agreed with any other engine in Rome. Each engine, on its own, was completely consistent with itself.</p>
+
+  <h2 id="paris-language">Paris: language changed the entire competitor set, not just the order</h2>
+  <p>The paper's most theoretically significant result concerns wealth management in Paris. Asked in French, every responding engine converged on independent, boutique French patrimoine firms. Asked the identical question in English, they converged instead on major international private banking divisions, near-unanimous once combined, and almost entirely absent from the French-language runs. That's not the same list re-ranked by language. It's a different category of provider considered at all, purely as a function of which language the question was asked in. The same city also produced the paper's cleanest unanimous result overall: every engine that answered named Qonto as its top pick for French small-business banking, in both languages, with zero exceptions.</p>
+
+  <h2 id="why-open">Why we published the disclosed limits along with the findings</h2>
+  <p>Every dataset like this one has real, honest gaps, and this paper names them rather than smoothing them over. ChatGPT's exclusion is disclosed and explained. A Gemini-specific extraction pattern, where the model clearly named brands in prose but our automated pipeline didn't parse a structured list from bold or bulleted text, is disclosed and flagged separately from genuine cross-engine disagreement wherever it materially affects a result, most severely in Rome and New York. One Madrid response naming an apparently closed restaurant, and one Madrid response with a geographic mismatch, are both disclosed rather than quietly kept in as if they were clean data. One Rome response judged, on manual review, to be the most noise-corrupted single response in the whole program is called out by name.</p>
+  <p>This is the same standard BrandGEO already holds itself to on every research page we publish: a real, sourced, checkable claim, or a disclosed limitation, never an invented number and never a silently smoothed-over gap. A paper that can be checked is worth more than a paper that only sounds authoritative, and publishing under a CC BY 4.0 license means anyone, including the AI systems this whole paper is about, can freely read, quote, and cite it.</p>
+
+  <div class="callout">
+    <div class="callout-label">How to cite this paper</div>
+    <p>Constantin Daniel (2026). <em>Cross-Engine Consensus in AI-Generated Brand Recommendations: An Empirical Study Across Seven Cities and Five Large Language Models.</em> Zenodo. <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.21395598</a></p>
+  </div>
+
+  <div class="section-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:48px 0 16px;">● Related Research</div>
+  <div class="related-grid">
+    <a href="/bg-016.html" class="related-card">
+      <div class="related-id">BG-016</div>
+      <div class="related-title">Cross-Engine Consensus: When AI Engines Agree, and When They Don't</div>
+      <div class="related-hook">The plain-language findings this paper formalizes, expands to seven cities, and makes citable.</div>
+    </a>
+    <a href="/ai-visibility-for-paris.html" class="related-card">
+      <div class="related-id">City Research</div>
+      <div class="related-title">AI Visibility in Paris</div>
+      <div class="related-hook">The full data behind Qonto's unanimous sweep and the wealth-management language finding.</div>
+    </a>
+    <a href="/ai-visibility-for-rome.html" class="related-card">
+      <div class="related-id">City Research</div>
+      <div class="related-title">AI Visibility in Rome</div>
+      <div class="related-hook">The one city in the dataset where zero categories reached cross-engine consensus.</div>
+    </a>
+    <a href="/ai-visibility-index-2026-07.html" class="related-card">
+      <div class="related-id">Monthly Report</div>
+      <div class="related-title">AI Visibility Index, Issue #1</div>
+      <div class="related-hook">This same research program, summarized issue by issue as real client trend data accumulates.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>See where your own brand stands in the same kind of test</h3>
+    <p>We'll run your real buyer questions across five AI engines and show you exactly where consensus already exists, and where it's still wide open.</p>
+    <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
+    <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener" class="btn-secondary">Read the full paper</a>
+    <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/blog.html" style="color:inherit;text-decoration:none;">Browse all BrandGEO Research</a></div>
+  </div>
+  <a href="/blog.html" class="next-link">View all research</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-017</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
