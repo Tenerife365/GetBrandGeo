@@ -120,23 +120,30 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         }
       } else {
         const cid = profile.client_id ?? 1
-        setActiveClientIdState(cid)
-        setClients([])
-        const { data: myClient, error: myClientErr } = await supabase
-          .from('clients')
-          .select(CLIENT_SELECT)
-          .eq('id', cid)
-          .single()
-        if (myClientErr) {
-          console.warn('[ClientCtx] client select failed (run DB migration):', myClientErr.message)
-          const { data: fallback } = await supabase
-            .from('clients')
-            .select('id, name, slug')
-            .eq('id', cid)
-            .single()
-          if (fallback) setActiveClient({ ...fallback, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' } as Client)
-        } else if (myClient) {
-          setActiveClient(myClient as Client)
+        // Member brands (multi-brand, option C) = their primary client + any
+        // brands an admin has attached via user_clients. That table is
+        // RLS-scoped to the user's own rows; missing/empty just means one brand.
+        let ids: number[] = [cid]
+        try {
+          const { data: links } = await supabase.from('user_clients').select('client_id')
+          if (links && links.length) ids = Array.from(new Set([cid, ...links.map(l => l.client_id as number)]))
+        } catch { /* table missing / not linked — single brand */ }
+
+        const { data: myClients, error: myErr } = await supabase
+          .from('clients').select(CLIENT_SELECT).in('id', ids).order('id')
+        if (myErr || !myClients) {
+          console.warn('[ClientCtx] client select failed (run DB migration):', myErr?.message)
+          const { data: fb } = await supabase.from('clients').select('id, name, slug').eq('id', cid).single()
+          const one = (fb ? [{ ...fb, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' }] : []) as Client[]
+          setClients(one)
+          setActiveClientIdState(cid)
+          setActiveClient(one[0] ?? null)
+        } else {
+          const list = myClients as Client[]
+          setClients(list)   // members now get their accessible brands (for the switcher + Compare)
+          const validId = list.find(c => c.id === saved)?.id ?? list.find(c => c.id === cid)?.id ?? list[0]?.id ?? cid
+          setActiveClientIdState(validId)
+          setActiveClient(list.find(c => c.id === validId) ?? list[0] ?? null)
         }
       }
       setLoading(false)

@@ -136,7 +136,7 @@ export default function BrandSentiment() {
 
   const [events, setEvents] = useState<SentimentEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly')
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
   const [filterSentiment, setFilterSentiment] = useState<SentimentFilter>('all')
   const [filterEngine, setFilterEngine] = useState<EngineFilter>('all')
   const [expanded, setExpanded] = useState<number | null>(null)

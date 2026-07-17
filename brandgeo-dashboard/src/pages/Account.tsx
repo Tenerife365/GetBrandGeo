@@ -1,17 +1,29 @@
 /**
- * Account.tsx — "My Account" for any signed-in user (viewer or admin).
- * Profile (brand, email, access level, plan), plan/billing management, and a
- * self-serve password change. Non-admins finally have a home for their own info.
+ * Account.tsx — "My Profile" for any signed-in user (viewer or admin).
+ * Profile (logo pulled from their website + brand, email, access level, plan),
+ * plan-as-blocks with the current tier highlighted and upgrades in reach,
+ * subscription status + renewal date, change-email, and a secure change-password
+ * flow (current password required, then an emailed confirmation code).
  */
 import { useEffect, useState } from 'react'
 import {
-  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Building2,
+  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Building2, RefreshCw, Crown,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS } from '../lib/planConfig'
 
-/** Brand initials for the avatar — "Bucate pe Roate" -> "BR", "Qonto" -> "QO". */
+/** Plan ladder for the "plans as blocks" section — display prices only (source
+ *  of truth for billing is Stripe / PRICING-SPEC.md). */
+const PLAN_TIERS: { id: string; label: string; price: string }[] = [
+  { id: 'free',       label: 'Free',       price: '€0' },
+  { id: 'essentials', label: 'Essentials', price: '€99 / mo' },
+  { id: 'growth',     label: 'Growth',     price: '€299 / mo' },
+  { id: 'managed',    label: 'Managed',    price: '€900 / mo' },
+  { id: 'pro',        label: 'Pro',        price: 'from €1,500 / mo' },
+  { id: 'enterprise', label: 'Enterprise', price: 'Custom' },
+]
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
@@ -19,36 +31,90 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+function domainOf(url?: string | null): string | null {
+  if (!url) return null
+  try {
+    const u = url.includes('://') ? url : `https://${url}`
+    return new URL(u).hostname.replace(/^www\./, '')
+  } catch { return null }
+}
+
+const fmtDate = (unixSec: number) =>
+  new Date(unixSec * 1000).toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })
+
+interface SubInfo {
+  active?: boolean
+  status?: string
+  current_period_end?: number
+  cancel_at_period_end?: boolean
+}
+
 export default function Account() {
   const { activeClient, activeClientId, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
   const [email, setEmail] = useState('')
+  const [website, setWebsite] = useState<string | null>(null)
+  const [logoSrc, setLogoSrc] = useState<string | null>(null)
+  const [sub, setSub] = useState<SubInfo | null>(null)
 
+  // change email
+  const [newEmail, setNewEmail] = useState('')
+  const [emailSaving, setEmailSaving] = useState(false)
+  const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // change password (current pw -> emailed code -> new pw)
+  const [oldPw, setOldPw] = useState('')
   const [pw1, setPw1] = useState('')
   const [pw2, setPw2] = useState('')
+  const [pwStage, setPwStage] = useState<'form' | 'code'>('form')
+  const [pwCode, setPwCode] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const [billingLoading, setBillingLoading] = useState(false)
 
+  // Load email, website (for the logo), and subscription status.
   useEffect(() => {
     if (isDemoMode) { setEmail('demo@getbrandgeo.com'); return }
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ''))
-  }, [])
+    if (activeClientId) {
+      supabase.from('clients').select('brand_website').eq('id', activeClientId).single()
+        .then(({ data }) => setWebsite(data?.brand_website ?? null))
+    }
+  }, [activeClientId])
 
-  const changePassword = async () => {
-    setPwMsg(null)
-    if (pw1.length < 8) { setPwMsg({ ok: false, text: 'Password must be at least 8 characters.' }); return }
-    if (pw1 !== pw2)    { setPwMsg({ ok: false, text: 'The two passwords do not match.' }); return }
-    setPwSaving(true)
-    const { error } = await supabase.auth.updateUser({ password: pw1 })
-    setPwSaving(false)
-    if (error) { setPwMsg({ ok: false, text: error.message }); return }
-    setPw1(''); setPw2('')
-    setPwMsg({ ok: true, text: 'Password updated.' })
+  // Logo: try Clearbit (crisp brand logos), fall back to the site favicon, then
+  // to the initials avatar — "we already know your brand" trust signal.
+  const domain = domainOf(website)
+  useEffect(() => {
+    setLogoSrc(domain ? `https://logo.clearbit.com/${domain}` : null)
+  }, [domain])
+  const onLogoError = () => {
+    if (domain && logoSrc && logoSrc.includes('clearbit')) {
+      setLogoSrc(`https://www.google.com/s2/favicons?sz=128&domain_url=https://${domain}`)
+    } else {
+      setLogoSrc(null)
+    }
   }
 
-  // Opens the Stripe Customer Portal (same path as the sidebar "Manage billing").
+  // Subscription status + renewal date (Netlify function → Stripe). No-ops in dev
+  // preview (functions don't run under `vite`); shows after deploy.
+  useEffect(() => {
+    if (isDemoMode || !activeClientId) return
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token ?? ''
+        const res = await fetch('/.netlify/functions/get-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ client_id: activeClientId }),
+        })
+        if (res.ok) setSub(await res.json())
+      } catch { /* function unavailable (e.g. dev) — just hide the date */ }
+    })()
+  }, [activeClientId])
+
   const openBilling = async () => {
     if (billingLoading) return
     setBillingLoading(true)
@@ -67,20 +133,73 @@ export default function Account() {
     setBillingLoading(false)
   }
 
+  const changeEmail = async () => {
+    setEmailMsg(null)
+    if (!/^\S+@\S+\.\S+$/.test(newEmail.trim())) { setEmailMsg({ ok: false, text: 'Enter a valid email address.' }); return }
+    setEmailSaving(true)
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
+    setEmailSaving(false)
+    if (error) { setEmailMsg({ ok: false, text: error.message }); return }
+    setNewEmail('')
+    setEmailMsg({ ok: true, text: 'Confirmation sent — check both your old and new inbox to complete the change.' })
+  }
+
+  // Step 1: verify the current password, then email a confirmation code.
+  const startPasswordChange = async () => {
+    setPwMsg(null)
+    if (!oldPw)          { setPwMsg({ ok: false, text: 'Enter your current password.' }); return }
+    if (pw1.length < 8)  { setPwMsg({ ok: false, text: 'New password must be at least 8 characters.' }); return }
+    if (pw1 !== pw2)     { setPwMsg({ ok: false, text: 'The two new passwords do not match.' }); return }
+    setPwSaving(true)
+    // Prove they know the current password.
+    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: oldPw })
+    if (signErr) { setPwSaving(false); setPwMsg({ ok: false, text: 'Your current password is incorrect.' }); return }
+    // Prove they own the email — Supabase emails a one-time code.
+    const { error: reauthErr } = await supabase.auth.reauthenticate()
+    setPwSaving(false)
+    if (reauthErr) { setPwMsg({ ok: false, text: reauthErr.message }); return }
+    setPwStage('code')
+    setPwMsg({ ok: true, text: 'We emailed you a confirmation code. Enter it below to finish.' })
+  }
+
+  // Step 2: apply the new password with the emailed code (nonce).
+  const confirmPasswordChange = async () => {
+    setPwMsg(null)
+    if (!pwCode.trim()) { setPwMsg({ ok: false, text: 'Enter the code from your email.' }); return }
+    setPwSaving(true)
+    const { error } = await supabase.auth.updateUser({ password: pw1, nonce: pwCode.trim() })
+    setPwSaving(false)
+    if (error) { setPwMsg({ ok: false, text: error.message }); return }
+    setOldPw(''); setPw1(''); setPw2(''); setPwCode(''); setPwStage('form')
+    setPwMsg({ ok: true, text: 'Password updated.' })
+  }
+
   const planLabel = activeClient
     ? (PLAN_LABELS[activeClient.plan as keyof typeof PLAN_LABELS] ?? activeClient.plan)
     : '—'
   const hasStripe = !!activeClient?.stripe_customer_id
+  const currentIdx = PLAN_TIERS.findIndex(p => p.id === activeClient?.plan)
+
+  const upgradeTo = (tier: { id: string; label: string }) => {
+    if (hasStripe) return openBilling()
+    window.location.href =
+      `mailto:support@getbrandgeo.com?subject=${encodeURIComponent(`Upgrade to ${tier.label}`)}`
+  }
+
+  const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
+  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50'
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-3xl mx-auto">
-      {/* Header + avatar — a bit of "this is mine" ownership. */}
+      {/* Header — brand logo (or initials) + identity */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center text-lg font-bold shrink-0">
-          {initials(brandName)}
+        <div className="w-14 h-14 rounded-2xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden">
+          {logoSrc
+            ? <img src={logoSrc} alt={brandName} onError={onLogoError} className="w-full h-full object-contain bg-white" />
+            : initials(brandName)}
         </div>
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-white tracking-tight">My Account</h1>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">My Profile</h1>
           <p className="text-sm text-slate-400 mt-0.5 truncate">
             Signed in for <span className="text-slate-200 font-medium">{brandName}</span>
           </p>
@@ -94,52 +213,126 @@ export default function Account() {
           <Field icon={<Building2 size={15} />}   label="Brand"        value={brandName} />
           <Field icon={<Mail size={15} />}        label="Email"        value={email || '—'} />
           <Field icon={<ShieldCheck size={15} />} label="Access level" value={isAdmin ? 'Admin' : 'Member'} />
-          <Field icon={<CreditCard size={15} />}  label="Plan"         value={planLabel} />
+          <Field icon={<CreditCard size={15} />}  label="Current plan" value={planLabel} />
         </div>
       </div>
 
       {/* Plan & billing */}
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
         <h2 className="text-sm font-semibold text-slate-300 mb-1">Plan &amp; billing</h2>
-        <p className="text-xs text-slate-500 mb-4">
-          You&apos;re on the <span className="text-slate-300 font-medium">{planLabel}</span> plan.
-        </p>
-        {hasStripe ? (
-          <button onClick={openBilling} disabled={billingLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-60">
-            {billingLoading ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
-            Manage billing &amp; plan
-          </button>
-        ) : (
-          <a href="mailto:support@getbrandgeo.com?subject=Plan%20change%20request"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors">
-            <CreditCard size={15} /> Contact us to change your plan
-          </a>
+
+        {/* Subscription status line */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs mb-5">
+          {sub?.active ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Active subscription
+              </span>
+              {sub.current_period_end && (
+                <span className="text-slate-500">
+                  · {sub.cancel_at_period_end ? 'ends' : 'renews'} on{' '}
+                  <span className="text-slate-300">{fmtDate(sub.current_period_end)}</span>
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-slate-500">You&apos;re on the <span className="text-slate-300 font-medium">{planLabel}</span> plan.</span>
+          )}
+          {hasStripe && (
+            <button onClick={openBilling} disabled={billingLoading}
+              className="ml-auto inline-flex items-center gap-1.5 text-brand-400 hover:text-brand-300 font-medium">
+              {billingLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Manage &amp; renew
+            </button>
+          )}
+        </div>
+
+        {/* Plans as blocks — current highlighted, higher tiers upgradeable */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {PLAN_TIERS.map((tier, i) => {
+            const isCurrent = tier.id === activeClient?.plan
+            const isUpgrade = currentIdx >= 0 && i > currentIdx
+            return (
+              <div key={tier.id}
+                className={`rounded-xl p-4 border flex flex-col ${
+                  isCurrent
+                    ? 'border-brand-500/50 bg-brand-500/10 ring-1 ring-brand-500/30'
+                    : 'border-dark-700 bg-dark-800'
+                }`}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-sm font-semibold ${isCurrent ? 'text-brand-200' : 'text-slate-200'}`}>{tier.label}</span>
+                  {isCurrent && <Crown size={12} className="text-brand-300" />}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">{tier.price}</div>
+                {isCurrent ? (
+                  <span className="mt-3 text-[10px] font-bold uppercase tracking-wide text-brand-300">Your plan</span>
+                ) : isUpgrade ? (
+                  <button onClick={() => upgradeTo(tier)}
+                    className="mt-3 text-xs font-medium text-brand-400 hover:text-brand-300 text-left">
+                    Upgrade →
+                  </button>
+                ) : (
+                  <span className="mt-3 text-[10px] text-slate-600">Included below</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        {!hasStripe && (
+          <p className="text-[11px] text-slate-600 mt-3">Managed plans are handled by our team — upgrading opens an email to us.</p>
         )}
+      </div>
+
+      {/* Change email */}
+      <div className="bg-dark-800 rounded-xl p-6 mb-6">
+        <h2 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2"><Mail size={15} className="text-slate-500" /> Change email</h2>
+        <p className="text-xs text-slate-500 mb-4">We&apos;ll email both your old and new address to confirm the change.</p>
+        <div className="space-y-3 max-w-sm">
+          <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="New email address"
+            aria-label="New email address" className={inputCls} />
+          <div className="flex items-center gap-3">
+            <button onClick={changeEmail} disabled={emailSaving || !newEmail} className={primaryBtn}>
+              {emailSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Update email
+            </button>
+            {emailMsg && <span className={`text-xs ${emailMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{emailMsg.text}</span>}
+          </div>
+        </div>
       </div>
 
       {/* Change password */}
       <div className="bg-dark-800 rounded-xl p-6">
-        <h2 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2">
-          <KeyRound size={15} className="text-slate-500" /> Change password
-        </h2>
-        <p className="text-xs text-slate-500 mb-4">Set a new password for signing in.</p>
+        <h2 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2"><KeyRound size={15} className="text-slate-500" /> Change password</h2>
+        <p className="text-xs text-slate-500 mb-4">For your security, confirm your current password, then a code we email you.</p>
         <div className="space-y-3 max-w-sm">
-          <input type="password" value={pw1} onChange={e => setPw1(e.target.value)} placeholder="New password"
-            aria-label="New password"
-            className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
-          <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Confirm new password"
-            aria-label="Confirm new password"
-            onKeyDown={e => e.key === 'Enter' && changePassword()}
-            className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
-          <div className="flex items-center gap-3">
-            <button onClick={changePassword} disabled={pwSaving || !pw1 || !pw2}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50">
-              {pwSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-              Update password
-            </button>
-            {pwMsg && <span className={`text-xs ${pwMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg.text}</span>}
-          </div>
+          {pwStage === 'form' ? (
+            <>
+              <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} placeholder="Current password"
+                aria-label="Current password" className={inputCls} />
+              <input type="password" value={pw1} onChange={e => setPw1(e.target.value)} placeholder="New password"
+                aria-label="New password" className={inputCls} />
+              <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Confirm new password"
+                aria-label="Confirm new password" onKeyDown={e => e.key === 'Enter' && startPasswordChange()} className={inputCls} />
+              <div className="flex items-center gap-3">
+                <button onClick={startPasswordChange} disabled={pwSaving || !oldPw || !pw1 || !pw2} className={primaryBtn}>
+                  {pwSaving ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} Continue
+                </button>
+                {pwMsg && <span className={`text-xs ${pwMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg.text}</span>}
+              </div>
+            </>
+          ) : (
+            <>
+              <input value={pwCode} onChange={e => setPwCode(e.target.value)} placeholder="6-digit code from your email"
+                aria-label="Email confirmation code" onKeyDown={e => e.key === 'Enter' && confirmPasswordChange()} className={inputCls} />
+              <div className="flex items-center gap-3">
+                <button onClick={confirmPasswordChange} disabled={pwSaving || !pwCode} className={primaryBtn}>
+                  {pwSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Confirm new password
+                </button>
+                <button onClick={() => { setPwStage('form'); setPwMsg(null); setPwCode('') }}
+                  className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+              </div>
+              {pwMsg && <span className={`text-xs ${pwMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg.text}</span>}
+            </>
+          )}
         </div>
       </div>
     </div>

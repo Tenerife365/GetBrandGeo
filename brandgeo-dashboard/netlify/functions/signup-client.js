@@ -68,6 +68,37 @@
  * ─────────────────────────────────────────────────────────────────────────────
  *
  * POST body: { email, brand_domain, company_website? (honeypot) }
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 FIXED 2026-07-17 — this endpoint could DELETE an existing user's account.
+ *
+ *   Scenario that actually happened in production: an admin invites a real
+ *   client (creates their `clients` row + `user_profiles` row + sends a
+ *   Supabase invite by hand). The invited person then, confused, uses the
+ *   public "Start for free" signup form on the marketing site with the SAME
+ *   email instead of clicking the invite link in their inbox.
+ *
+ *   `inviteUserByEmail()` is IDEMPOTENT for an already-invited-but-unconfirmed
+ *   user — it does not error, it just re-sends the invite and returns the
+ *   EXISTING user object. Step 3 then tries to INSERT a user_profiles row
+ *   with that same `id` — but one already exists (PK conflict, `user_profiles.id`
+ *   is the primary key) — so `profileError` fires. The old rollback treated
+ *   *any* profileError as "we just created this auth user seconds ago, undo
+ *   it" and called `deleteUser(userId)` unconditionally. For this scenario
+ *   that user was NOT newly created — it was someone's real, already-working
+ *   account — and this deleted it, silently logging them out of an account
+ *   that had nothing to do with the free-tier signup they were confused into
+ *   attempting.
+ *
+ *   Fix: a PK-conflict profileError (code 23505) means "this auth user
+ *   already has a profile/client elsewhere" — a completely different, much
+ *   friendlier case than "our own insert failed for some other reason". In
+ *   that case we roll back ONLY the orphaned `clients` row this call just
+ *   created (never claimed by anyone) and NEVER touch the auth user. Any
+ *   other profileError still gets the full rollback, since in that case this
+ *   call really did just create the auth user seconds ago and undoing it is
+ *   correct and safe.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const { createClient } = require('@supabase/supabase-js')
@@ -253,9 +284,26 @@ exports.handler = async (event) => {
 
   if (profileError) {
     console.error('[signup] user_profiles insert failed:', profileError.message)
-    await supabase.auth.admin.deleteUser(userId)                      // rollback
-    await supabase.from('clients').delete().eq('id', clientData.id)   // rollback
-    return fail(500, 'Account setup failed. Please try again.')
+
+    // 23505 = unique_violation on user_profiles' PK (id). This means the auth
+    // user we just got back from inviteUserByEmail() ALREADY had a profile —
+    // i.e. it is a pre-existing account (most likely: someone who was already
+    // invited by an admin, hitting this public form with the same email
+    // instead of using their invite link). That account is real and must
+    // never be deleted here — see the 2026-07-17 header note above.
+    const preExistingAccount = profileError.code === '23505'
+
+    if (!preExistingAccount) {
+      await supabase.auth.admin.deleteUser(userId)   // safe: this call just created it
+    }
+    await supabase.from('clients').delete().eq('id', clientData.id)   // always orphaned, always safe to remove
+
+    return fail(
+      preExistingAccount ? 409 : 500,
+      preExistingAccount
+        ? 'An account with this email already exists. Check your email for a sign-in link, or use "Forgot password" on the login page.'
+        : 'Account setup failed. Please try again.',
+    )
   }
 
   console.log(`[signup] New free account: ${cleanEmail} → client ${clientData.id} (viewer, invite sent)`)

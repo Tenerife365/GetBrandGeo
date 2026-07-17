@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
@@ -190,6 +190,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const closeSidebar = () => setSidebarOpen(false)
   const brandInitials = (activeClient?.name ?? '?').trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
+  // The profile page has no historical data, so hide the global time-filter bar there.
+  const hideTimeFilter = useLocation().pathname === '/account'
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
@@ -389,7 +391,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </span>
               <span className="min-w-0 text-left">
                 <span className="block text-sm font-medium text-slate-200 truncate">{activeClient.name}</span>
-                <span className="block text-[11px] text-slate-500 group-hover:text-slate-400">View account</span>
+                <span className="block text-[11px] text-slate-500 group-hover:text-slate-400">View profile</span>
               </span>
             </NavLink>
           </div>
@@ -480,7 +482,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <NavLink to="/account" onClick={closeSidebar}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             <User size={16} />
-            My Account
+            My Profile
           </NavLink>
           <div className="relative" ref={langMenuRef}>
             <button
@@ -565,7 +567,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        {/* Global time filter bar */}
+        {/* Global time filter bar — hidden on the profile page (no historical data there) */}
+        {!hideTimeFilter && (
         <div className="flex-shrink-0 border-b border-dark-700/40 bg-dark-800/60 backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
           {((['7d', '30d', '90d', 'all'] as const)).map(r => (
             <button
@@ -582,6 +585,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           ))}
         </div>
+        )}
 
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
           {children}

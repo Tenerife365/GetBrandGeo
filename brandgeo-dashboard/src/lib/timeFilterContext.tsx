@@ -9,13 +9,15 @@ interface TimeFilterCtx {
 }
 
 const Ctx = createContext<TimeFilterCtx>({
-  timeRange: '30d',
+  timeRange: '7d',
   setTimeRange: () => {},
   getStartDate: () => null,
 })
 
 export function TimeFilterProvider({ children }: { children: ReactNode }) {
-  const [timeRange, setTimeRange] = useState<TimeRange>('30d')
+  // Default to Last 7 days everywhere — one consistent starting window across
+  // every tab (was 30d; per-tab trend charts default to the Weekly view to match).
+  const [timeRange, setTimeRange] = useState<TimeRange>('7d')
 
   const getStartDate = (): Date | null => {
     if (timeRange === 'all') return null

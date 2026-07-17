@@ -192,7 +192,7 @@ export default function Competitors() {
   const [newWebsite, setNewWebsite] = useState('')
   const [saving, setSaving] = useState(false)
   const [manualComps, setManualComps] = useState<any[]>([])
-  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly')
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
 
   const load = async () => {
     setLoading(true)
