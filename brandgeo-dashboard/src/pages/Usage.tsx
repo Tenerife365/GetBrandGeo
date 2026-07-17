@@ -128,7 +128,7 @@ export default function Usage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+        <div className="bg-dark-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={15} className="text-emerald-400" />
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">API Cost (metered)</span>
@@ -141,7 +141,7 @@ export default function Usage() {
           </p>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+        <div className="bg-dark-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Cpu size={15} className="text-blue-400" />
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
@@ -150,7 +150,7 @@ export default function Usage() {
           <p className="text-xs text-slate-500 mt-1">LLM responses collected</p>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+        <div className="bg-dark-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp size={15} className="text-brand-400" />
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
@@ -163,7 +163,7 @@ export default function Usage() {
       </div>
 
       {/* Per-client table */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
           Per-client breakdown
         </div>

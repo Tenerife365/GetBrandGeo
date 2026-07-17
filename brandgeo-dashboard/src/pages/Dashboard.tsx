@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line
 } from 'recharts'
-import { TrendingUp, Eye, Target, Hash, RefreshCw, Sparkles } from 'lucide-react'
+import { RefreshCw, Sparkles, ChevronDown, ChevronUp, TrendingUp, Target, Hash, Eye } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
@@ -19,6 +19,7 @@ import {
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
 import MotionCard from '../components/MotionCard'
 import Skeleton from '../components/Skeleton'
+import Collapse from '../components/Collapse'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
@@ -132,6 +133,11 @@ export default function Dashboard() {
   const { getStartDate, timeRange } = useTimeFilter()
   const { theme } = useTheme()
   const brandName = activeClient?.name ?? 'your brand'
+  // Personalised, time-of-day greeting — "this is my dashboard" ownership touch.
+  const greeting = (() => {
+    const h = new Date().getHours()
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  })()
   // Gates the Recharts draw-in animation below (DASHBOARD-UX-2026.md §6 Phase C).
   // Not covered by App.tsx's <MotionConfig> — Recharts isn't a Motion component,
   // same reason useCountUp checks this itself in motion.ts.
@@ -143,6 +149,8 @@ export default function Dashboard() {
   const [loading, setLoading]     = useState(true)
   const [topRecs, setTopRecs]     = useState<TopRec[]>([])
   const [recsLoaded, setRecsLoaded] = useState(false)
+  // Progressive disclosure (Hick's Law) — detail charts/lists start hidden.
+  const [showDetails, setShowDetails] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -290,8 +298,8 @@ export default function Dashboard() {
   // so the page doesn't visually jump/reflow once data arrives (CLS). Replaces
   // the old centered "pulsing text" spinner.
   if (loading) return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-10">
         <div className="space-y-2">
           <Skeleton className="h-7 w-40" />
           <Skeleton className="h-4 w-56" />
@@ -299,21 +307,21 @@ export default function Dashboard() {
         <Skeleton className="h-9 w-28 rounded-lg" />
       </div>
 
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+      <div className="bg-dark-800 rounded-xl p-6 sm:p-10 mb-8 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 shrink-0">
           <Skeleton className="w-36 h-36 sm:w-48 sm:h-48 rounded-full" />
           <Skeleton className="h-3 w-24" />
         </div>
-        <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-4 space-y-3">
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-5 space-y-3">
             <Skeleton className="h-4 w-4 rounded" />
             <Skeleton className="h-7 w-16" />
             <Skeleton className="h-3 w-20" />
@@ -321,9 +329,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-6 space-y-4">
+          <div key={i} className="bg-dark-800 rounded-xl p-6 space-y-4">
             <Skeleton className="h-4 w-32" />
             <Skeleton className="h-3 w-48" />
             <Skeleton className="h-[200px] w-full rounded-lg" />
@@ -333,7 +341,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-6 space-y-3">
+          <div key={i} className="bg-dark-800 rounded-xl p-6 space-y-3">
             <Skeleton className="h-4 w-36" />
             {Array.from({ length: 5 }).map((_, j) => (
               <Skeleton key={j} className="h-9 w-full rounded-lg" />
@@ -345,13 +353,11 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">GEO Overview</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            AI visibility snapshot for <span className="text-slate-200 font-medium">{brandName}</span>
-          </p>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">{greeting}, {brandName}</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Here&apos;s your AI visibility snapshot.</p>
         </div>
         <button onClick={load}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
@@ -360,7 +366,7 @@ export default function Dashboard() {
 
       {scoreData && (
         <motion.div
-          className="relative overflow-hidden bg-dark-800 bg-gradient-to-br from-brand-500/5 via-transparent to-transparent border border-dark-700 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-8"
+          className="bg-dark-800 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <div className="flex flex-col items-center gap-3 shrink-0">
@@ -400,9 +406,9 @@ export default function Dashboard() {
             <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</div>
           </div>
 
-          <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             {DIMENSION_LABELS.map(([key, label]) => (
-              <div key={key} className="bg-dark-700/60 rounded-lg px-3 py-2">
+              <div key={key}>
                 <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">{label}</div>
                 <div className="text-lg font-bold text-white tabular-nums">{scoreData.dimensions[key]}%</div>
               </div>
@@ -421,7 +427,7 @@ export default function Dashboard() {
           empty/loading callout would just be noise above the fold. */}
       {recsLoaded && topRecs.length > 0 && (
         <motion.div
-          className="mb-8 p-5 bg-dark-800 border border-violet-500/15 rounded-xl"
+          className="mb-6 p-6 bg-dark-800 rounded-xl"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <div className="flex items-center gap-2 mb-3">
@@ -448,65 +454,57 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* Island 3 — KPI strip. One card, four quiet stats (Hick's Law: one island,
+          not four separate cards). Values stay neutral; color appears only on a
+          genuine anomaly (Gestalt Focal-Point Law). */}
       {stats && (
         <motion.div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
-          variants={staggerContainer} initial="hidden" animate="show"
+          className="bg-dark-800 rounded-xl p-6 sm:p-7 mb-6"
+          variants={heroReveal} initial="hidden" animate="show"
         >
-          <KpiCard
-            icon={<TrendingUp size={18} className="text-brand-400" />}
-            label={t.dash_statMentionRate}
-            value={
-              <div className={`text-2xl font-bold tabular-nums ${stats.mentionRate >= 50 ? 'text-emerald-400' : stats.mentionRate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>
-                {stats.mentionRate}%
-              </div>
-            }
-            sub={t.dash_statMentionRateSub}
-            sparklineData={spark.mentionRate}
-            sparklineColor="#a78bfa"
-          />
-          <KpiCard
-            icon={<Target size={18} className="text-cyan-400" />}
-            label={t.dash_statAvgPos}
-            value={
-              /* Threshold coloring — lower position is better (DASHBOARD-UX-2026.md §9.4).
-                 Neutral (white) when there's no ranked-position data (null). */
-              <div className={`text-2xl font-bold tabular-nums ${
-                stats.avgPosition == null ? 'text-white'
-                : stats.avgPosition <= 3 ? 'text-emerald-400'
-                : stats.avgPosition <= 6 ? 'text-amber-400'
-                : 'text-red-400'
-              }`}>
-                {stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
-              </div>
-            }
-            sub={t.dash_statAvgPosSub}
-            sparklineData={avgPosSpark}
-            sparklineColor="#22d3ee"
-            connectNulls
-          />
-          <KpiCard
-            icon={<Hash size={18} className="text-blue-400" />}
-            label={t.dash_statPrompts}
-            value={<div className="text-2xl font-bold text-white tabular-nums">{stats.promptCount}</div>}
-            sub={t.dash_statPromptsSub}
-          />
-          <KpiCard
-            icon={<Eye size={18} className="text-emerald-400" />}
-            label={t.dash_statChecks}
-            value={<div className="text-2xl font-bold text-white tabular-nums">{stats.totalChecks}</div>}
-            sub={t.dash_statChecksDesc}
-            sparklineData={spark.volume}
-            sparklineColor="#34d399"
-          />
+          <h2 className="text-sm font-semibold text-slate-300 mb-4">Key metrics</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
+            <Stat
+              icon={<TrendingUp size={15} />}
+              label={t.dash_statMentionRate}
+              value={`${stats.mentionRate}%`}
+              sub={t.dash_statMentionRateSub}
+              tone={stats.mentionRate < 25 ? 'alert' : stats.mentionRate < 50 ? 'warn' : 'neutral'}
+              spark={spark.mentionRate}
+            />
+            <Stat
+              icon={<Target size={15} />}
+              label={t.dash_statAvgPos}
+              value={stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
+              sub={t.dash_statAvgPosSub}
+              tone={stats.avgPosition != null && stats.avgPosition > 6 ? 'warn' : 'neutral'}
+              spark={avgPosSpark}
+              connectNulls
+            />
+            <Stat icon={<Hash size={15} />} label={t.dash_statPrompts} value={String(stats.promptCount)} sub={t.dash_statPromptsSub} />
+            <Stat icon={<Eye size={15} />} label={t.dash_statChecks} value={String(stats.totalChecks)} sub={t.dash_statChecksDesc} spark={spark.volume} />
+          </div>
         </motion.div>
       )}
 
+      {/* Progressive disclosure (Hick's Law): the engine-breakdown charts and the
+          recent-activity lists are secondary detail — pulled out of the primary
+          sightline behind an intentional, text-labeled toggle. */}
+      <button
+        onClick={() => setShowDetails(v => !v)}
+        aria-expanded={showDetails}
+        className="flex items-center justify-between gap-2 w-full sm:w-auto px-4 py-2.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-sm font-medium text-slate-300 transition-colors mb-4"
+      >
+        <span>{showDetails ? 'Hide breakdown & recent activity' : 'Show engine breakdown & recent activity'}</span>
+        {showDetails ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+      </button>
+      <Collapse open={showDetails}>
+      <div className="space-y-6 pb-2">
       <motion.div
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         variants={staggerContainer} initial="hidden" animate="show"
       >
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_mentionRate}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionRateDesc, { brand: brandName })}</p>
           {llmData.length === 0 ? (
@@ -522,31 +520,30 @@ export default function Dashboard() {
                   formatter={(v: any) => [`${v}%`, 'Mention rate']}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
+                {/* Single calm brand hue — the x-axis label already identifies each
+                    engine, so 5 different bar colors was decorative rainbow, not
+                    meaning (Gestalt Focal-Point Law). */}
                 <Bar
                   dataKey="rate"
+                  fill="#8b5cf6"
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={!prefersReducedMotion}
                   animationDuration={700}
                   animationEasing="ease-out"
-                >
-                  {llmData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Bar>
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
           <div className="flex flex-wrap gap-2 mt-3">
             {llmData.map(d => (
-              <div key={d.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-dark-600 text-slate-400">
-                <span className="w-2 h-2 rounded-full" style={{ background: d.color }} />
+              <div key={d.label} className="px-2.5 py-1 rounded-full text-xs border border-dark-600 text-slate-400">
                 {d.label} · {d.rate}%
               </div>
             ))}
           </div>
         </MotionCard>
 
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-4">{t.dash_brandVisibility}</h2>
           {stats && stats.totalChecks > 0 ? (
             <>
@@ -565,9 +562,9 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {llmData.map(d => (
                   <div key={d.label} className="flex items-center gap-3">
-                    <div className={`text-xs font-medium w-20 ${d.textColor}`}>{d.label}</div>
+                    <div className="text-xs font-medium w-20 text-slate-300">{d.label}</div>
                     <div className="flex-1 bg-dark-700 rounded-full h-2 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ background: d.color, width: `${d.rate}%` }} />
+                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${d.rate}%` }} />
                     </div>
                     <div className="text-xs text-slate-500 w-10 text-right">{d.rate}%</div>
                   </div>
@@ -584,7 +581,7 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         variants={staggerContainer} initial="hidden" animate="show"
       >
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
           {recentMentioned.length === 0 ? (
@@ -602,7 +599,7 @@ export default function Dashboard() {
           )}
         </MotionCard>
 
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
           {recentNotMentioned.length === 0 ? (
@@ -624,6 +621,8 @@ export default function Dashboard() {
           )}
         </MotionCard>
       </motion.div>
+      </div>
+      </Collapse>
     </div>
   )
 }
@@ -631,7 +630,7 @@ export default function Dashboard() {
 const LLM_COLOR: Record<string, string> = {
   chatgpt:    'text-emerald-400 bg-emerald-400/10',
   gemini:     'text-blue-400 bg-blue-400/10',
-  claude:     'text-purple-400 bg-purple-400/10',
+  claude:     'text-orange-400 bg-orange-400/10',
   perplexity: 'text-cyan-400 bg-cyan-400/10',
   meta:       'text-amber-400 bg-amber-400/10',
 }
@@ -697,26 +696,28 @@ function Sparkline({ data, color, connectNulls = false }: {
   )
 }
 
-function KpiCard({ icon, label, value, sub, sparklineData, sparklineColor, connectNulls }: {
-  icon: React.ReactNode; label: string; value: React.ReactNode; sub: string
-  sparklineData?: SparkPoint[]; sparklineColor?: string; connectNulls?: boolean
+// Quiet KPI stat (Gestalt Focal-Point Law): neutral by default; the value only
+// takes a semantic color when it's a genuine ANOMALY (tone 'warn'/'alert'), so
+// color stays meaningful and the eye isn't pulled four directions at once.
+// Rendered inside ONE shared KPI card (Hick's Law — one island, not four). The
+// muted icon + one-line descriptor keep each number self-explanatory for a
+// first-time reader without adding color noise.
+function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }: {
+  icon: React.ReactNode; label: string; value: string; sub: string
+  tone?: 'neutral' | 'warn' | 'alert'; spark?: SparkPoint[]; connectNulls?: boolean
 }) {
-  // Compact tier (p-4), not Standard (p-5) — these are small data tiles, not
-  // content cards, and the tighter padding reads closer to the "precision-
-  // machined" density research flags on premium dashboards (DASHBOARD-UX-
-  // 2026.md §8). DESIGN-SYSTEM.md already named this 3-tier system; this is
-  // the first place it's actually enforced rather than just documented.
+  const valueColor = tone === 'alert' ? 'text-red-400' : tone === 'warn' ? 'text-amber-400' : 'text-white'
   return (
-    <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-3">
+    <div>
+      <div className="flex items-center gap-1.5 mb-2 text-slate-500">
         {icon}
-        <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      {value}
-      {sparklineData && sparklineData.length >= 2 && sparklineColor && (
-        <Sparkline data={sparklineData} color={sparklineColor} connectNulls={connectNulls} />
+      <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
+      {spark && spark.length >= 2 && (
+        <Sparkline data={spark} color="#94a3b8" connectNulls={connectNulls} />
       )}
-      <p className="text-xs text-slate-600 mt-1">{sub}</p>
-    </MotionCard>
+      <p className="text-xs text-slate-500 mt-1.5 leading-snug">{sub}</p>
+    </div>
   )
 }

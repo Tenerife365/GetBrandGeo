@@ -21,6 +21,7 @@ import BrandSentiment from './pages/BrandSentiment'
 import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
 import Usage from './pages/Usage'
+import Account from './pages/Account'
 import AuditRequest from './pages/AuditRequest'
 import AuditReport from './pages/AuditReport'
 
@@ -85,6 +86,7 @@ export default function App() {
               <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
               <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><Layout><Usage /></Layout></PrivateRoute>} />
+              <Route path="/account" element={<PrivateRoute><Layout><Account /></Layout></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

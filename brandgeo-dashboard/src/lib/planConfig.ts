@@ -82,7 +82,7 @@ export const ENGINE_META: Record<EngineId, {
 }> = {
   chatgpt:    { label: 'ChatGPT',   color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com',              chartColor: '#10b981' },
   gemini:     { label: 'Gemini',    color: 'text-blue-400',    bg: 'bg-blue-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com',       chartColor: '#3b82f6' },
-  claude:     { label: 'Claude',    color: 'text-purple-400',  bg: 'bg-purple-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#a855f7' },
+  claude:     { label: 'Claude',    color: 'text-orange-400',  bg: 'bg-orange-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#f97316' },
   perplexity: { label: 'Perplexity',color: 'text-cyan-400',    bg: 'bg-cyan-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#06b6d4' },
   meta:       { label: 'Meta AI',   color: 'text-amber-400',   bg: 'bg-amber-400/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#f59e0b' },
   google_ai:  { label: 'Google AI Mode', color: 'text-red-400', bg: 'bg-red-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#ef4444' },

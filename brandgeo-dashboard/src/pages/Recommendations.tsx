@@ -27,6 +27,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
+import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -427,7 +428,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
   const imp = IMPACT_STYLE[rec.impact]
 
   return (
-    <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+    <div className="bg-dark-800 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
@@ -821,32 +822,45 @@ export default function Recommendations() {
         </div>
       ) : (
         <>
-          {/* LLM score grid */}
+          {/* Per-engine visibility — horizontal engine cards matching the AI
+              Visibility page (logo tile left, name + status pill, % + avg position
+              right, subtle status-coloured border). */}
           {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
-              {stats.llmStats.map(s => (
-                <div key={s.llm} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-center">
-                  <div className="text-xs text-slate-500 mb-1">{LLM_LABEL[s.llm]}</div>
-                  <div className={`text-lg font-bold ${s.rate >= 0.85 ? 'text-emerald-400' : s.rate >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>
-                    {Math.round(s.rate * 100)}%
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+              {stats.llmStats.map(s => {
+                const meta = ENGINE_META[s.llm as EngineId]
+                const pct  = Math.round(s.rate * 100)
+                const tone = s.rate >= 0.85
+                  ? { label: 'Strong',  badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30', dot: 'bg-emerald-400', card: 'border-emerald-500/20 hover:border-emerald-500/40' }
+                  : s.rate >= 0.5
+                  ? { label: 'Partial', badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',       dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' }
+                  : { label: 'Low',     badge: 'bg-red-500/15 text-red-300 border border-red-500/30',             dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40' }
+                return (
+                  <div key={s.llm} className={`bg-dark-800 border rounded-xl p-3 flex items-center gap-3 transition-colors ${tone.card}`}>
+                    <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60">
+                      <img src={meta?.logoUrl} alt={meta?.label ?? LLM_LABEL[s.llm]} className="w-7 h-7 object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 pr-1">
+                        <span className="text-sm font-semibold text-white truncate">{meta?.label ?? LLM_LABEL[s.llm]}</span>
+                        <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${tone.badge}`}>
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${tone.dot}`} />{tone.label}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className={`text-lg font-bold tabular-nums leading-none ${s.rate >= 0.85 ? 'text-emerald-400' : 'text-slate-200'}`}>{pct}%</span>
+                        {s.avgPos !== null && <span className="text-[11px] text-slate-500">avg #{s.avgPos}</span>}
+                      </div>
+                    </div>
                   </div>
-                  {s.avgPos !== null && (
-                    <div className="text-[10px] text-slate-600 mt-0.5">avg #{s.avgPos}</div>
-                  )}
-                  <div className="flex justify-center mt-1">
-                    {s.rate >= 0.85
-                      ? <CheckCircle size={13} className="text-emerald-500" />
-                      : <AlertTriangle size={13} className={s.rate < 0.5 ? 'text-red-500' : 'text-amber-500'} />
-                    }
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
           {/* Competitor context */}
           {stats && stats.competitors.length > 0 && (
-            <div className="mb-6 p-4 bg-dark-800 border border-dark-700 rounded-xl">
+            <div className="mb-6 p-4 bg-dark-800 rounded-xl">
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Competitors in AI responses</div>
               <div className="flex flex-wrap gap-2">
                 {stats.competitors.map(c => (

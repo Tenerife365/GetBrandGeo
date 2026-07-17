@@ -244,7 +244,7 @@ export default function BrandSentiment() {
           </div>
           <div className={`text-xs mt-0.5 ${scoreColor}`}>{scoreLabel}</div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Smile size={12} className="text-emerald-400" />
             <span className="text-xs text-slate-500">Positive</span>
@@ -252,7 +252,7 @@ export default function BrandSentiment() {
           <div className="text-2xl font-bold text-emerald-400 tabular-nums">{counts.positive}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Meh size={12} className="text-slate-400" />
             <span className="text-xs text-slate-500">Neutral</span>
@@ -260,7 +260,7 @@ export default function BrandSentiment() {
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{counts.neutral}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Frown size={12} className="text-red-400" />
             <span className="text-xs text-slate-500">Negative</span>
@@ -271,7 +271,7 @@ export default function BrandSentiment() {
       </div>
 
       {total === 0 ? (
-        <div className="bg-dark-800 border border-dark-700 rounded-xl py-16 text-center mb-6">
+        <div className="bg-dark-800 rounded-xl py-16 text-center mb-6">
           <Meh size={28} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-500 text-sm mb-1">No sentiment data yet</p>
           <p className="text-xs text-slate-600">Run a collection from the AI Visibility tab — sentiment appears here once AI engines mention {brandName}.</p>
@@ -279,7 +279,7 @@ export default function BrandSentiment() {
       ) : (
         <>
           {/* Overall breakdown bar */}
-          <div className="bg-dark-800 border border-dark-700 rounded-xl p-5 mb-6">
+          <div className="bg-dark-800 rounded-xl p-5 mb-6">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
               Overall Breakdown
             </h2>
@@ -297,7 +297,7 @@ export default function BrandSentiment() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             {/* Sentiment by engine */}
-            <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+            <div className="bg-dark-800 rounded-xl p-5">
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
                 Sentiment by Engine
               </h2>
@@ -326,7 +326,7 @@ export default function BrandSentiment() {
             </div>
 
             {/* Trend over time */}
-            <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+            <div className="bg-dark-800 rounded-xl p-5">
               <div className="flex items-center justify-between mb-0.5">
                 <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   Sentiment Over Time
@@ -393,7 +393,7 @@ export default function BrandSentiment() {
               <button onClick={() => setFilterEngine('all')}
                 aria-pressed={filterEngine === 'all'}
                 className={`px-2.5 py-1 rounded-lg text-xs transition-colors border ${
-                  filterEngine === 'all' ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
+                  filterEngine === 'all' ? 'bg-brand-500/30 text-brand-300 border-brand-500/40' : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
                 }`}>
                 All engines
               </button>
@@ -416,7 +416,7 @@ export default function BrandSentiment() {
                 const meta = ENGINE_META[e.llm as EngineId] ?? ENGINE_META.chatgpt
                 const isOpen = expanded === e.id
                 return (
-                  <div key={e.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+                  <div key={e.id} className="bg-dark-800 rounded-xl overflow-hidden">
                     <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
                       onClick={() => setExpanded(isOpen ? null : e.id)}
                       aria-expanded={isOpen}>

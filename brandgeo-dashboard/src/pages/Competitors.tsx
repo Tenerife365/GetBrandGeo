@@ -144,11 +144,14 @@ const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : 
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
     { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#8b5cf6', isYou: true },
-    ...topCompetitors.map((c, i) => ({
+    ...topCompetitors.map(c => ({
       name: short(c.name),
       fullName: c.name,
       mentions: c.totalMentions,
-      fill: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#f97316'][i],
+      // Competitors share one quiet hue — the brand's violet bar is the focal
+      // point (you vs them), and the x-axis label already identifies each
+      // competitor, so 5 different bar colors was decorative rainbow, not meaning.
+      fill: '#64748b',
       isYou: false,
     })),
   ]
@@ -283,14 +286,14 @@ export default function Competitors() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{brandMentions}</div>
           <div className="text-xs text-slate-500 mt-0.5">
             {brandAvgPos ? `Avg position #${brandAvgPos}` : 'No position data'}
           </div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Top competitor</div>
           <div className="text-sm font-bold text-red-300 leading-tight mt-1">
             {topCompetitors[0]?.name ?? '—'}
@@ -299,12 +302,12 @@ export default function Competitors() {
             {topCompetitors[0] ? `${topCompetitors[0].totalMentions} AI mentions` : 'None found yet'}
           </div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Competitors tracked</div>
           <div className="text-2xl font-bold text-white tabular-nums">{topCompetitors.length}</div>
           <div className="text-xs text-slate-500 mt-0.5">from AI responses</div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">AI responses analysed</div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{totalResponses}</div>
           <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engines</div>
@@ -313,7 +316,7 @@ export default function Competitors() {
 
       {/* Add manually */}
       {showAdd && (
-        <div className="mb-5 bg-dark-800 border border-brand-500/30 rounded-xl p-4 flex gap-3 items-end">
+        <div className="mb-5 bg-dark-800 rounded-xl p-4 flex gap-3 items-end">
           <div className="flex-1 space-y-2">
             <div>
               <label htmlFor="competitor-name-input" className="text-xs text-slate-500 mb-1 block">Competitor name</label>
@@ -348,7 +351,7 @@ export default function Competitors() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
 
           {/* Bar chart — AI mention counts */}
-          <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+          <div className="bg-dark-800 rounded-xl p-6">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
               AI Mention Count
             </h2>
@@ -372,7 +375,7 @@ export default function Competitors() {
           </div>
 
           {/* Grouped bar chart — visibility % per AI engine per brand */}
-          <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+          <div className="bg-dark-800 rounded-xl p-6">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
               Visibility by Engine
             </h2>
@@ -399,7 +402,7 @@ export default function Competitors() {
       )}
 
       {/* Competitors table */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden mb-4">
+      <div className="bg-dark-800 rounded-xl overflow-hidden mb-4">
         <div className="grid border-b border-dark-700 bg-dark-700/40"
           style={{ gridTemplateColumns: '1fr 7rem 7rem 7rem 1fr' }}>
           <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Competitor</div>
@@ -446,8 +449,7 @@ export default function Competitors() {
               <div key={c.name} className="grid border-b border-dark-700/50 last:border-0 hover:bg-dark-700/20 transition-colors"
                 style={{ gridTemplateColumns: '1fr 7rem 7rem 7rem 1fr' }}>
                 <div className="px-4 py-3 flex items-center gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                    style={{ background: ['#ef444420','#f59e0b20','#8b5cf620','#06b6d420','#10b98120'][idx], color: ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#10b981'][idx] }}>
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-dark-700 text-slate-400">
                     {idx + 1}
                   </span>
                   <span className="text-sm text-slate-200 font-medium">{c.name}</span>
@@ -482,7 +484,7 @@ export default function Competitors() {
 
       {/* Manually tracked (secondary) */}
       {manualComps.length > 0 && (
-        <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+        <div className="bg-dark-800 rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
             Manually tracked
           </div>
@@ -509,7 +511,7 @@ export default function Competitors() {
       )}
 
       {/* Performance Over Time */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-5 mt-4">
+      <div className="bg-dark-800 rounded-xl p-6 mt-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-300">Performance Over Time</h2>

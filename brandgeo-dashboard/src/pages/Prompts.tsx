@@ -3,32 +3,13 @@ import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle } from 'lucide-re
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
-import type { Prompt, PromptCategory } from '../types'
+import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
+import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
 
-// Known category display map — any unknown category falls back to a generic style
-const CATEGORY_META: Record<string, { label: string; color: string }> = {
-  general:        { label: 'General',        color: 'bg-slate-500/20 text-slate-300'    },
-  local:          { label: 'Local',          color: 'bg-teal-500/20 text-teal-300'      },
-  comparison:     { label: 'Comparison',     color: 'bg-cyan-500/20 text-cyan-300'      },
-  use_case:       { label: 'Use Case',       color: 'bg-violet-500/20 text-violet-300'  },
-  // legacy BpR categories kept for display compat
-  mid:            { label: 'Mid (100-200)',   color: 'bg-blue-500/20 text-blue-300'     },
-  large:          { label: 'Large (500+)',    color: 'bg-purple-500/20 text-purple-300' },
-  very_large:     { label: 'Very Large (1k+)',color: 'bg-amber-500/20 text-amber-300'   },
-  large_scale:    { label: 'Large Scale',    color: 'bg-amber-500/20 text-amber-300'   },
-  events:         { label: 'Events',         color: 'bg-pink-500/20 text-pink-300'     },
-  delivery:       { label: 'Delivery',       color: 'bg-orange-500/20 text-orange-300' },
-  corporate:      { label: 'Corporate',      color: 'bg-indigo-500/20 text-indigo-300' },
-  // BrandGEO-specific kept for display compat
-  tool_discovery: { label: 'Tool Discovery', color: 'bg-emerald-500/20 text-emerald-300'},
-  geo_category:   { label: 'GEO / AIO',      color: 'bg-blue-500/20 text-blue-300'     },
-  problem_based:  { label: 'Problem-based',  color: 'bg-amber-500/20 text-amber-300'   },
-  direct_brand:   { label: 'Direct Brand',   color: 'bg-violet-500/20 text-violet-300' },
-}
-
-const getCategoryMeta = (cat: string) =>
-  CATEGORY_META[cat] ?? { label: cat.replace(/_/g, ' '), color: 'bg-slate-500/20 text-slate-300' }
+// Category is a grouping, not an alert — one quiet neutral chip everywhere, and
+// the label comes from the shared general taxonomy (lib/promptCategories.ts).
+const CAT_BADGE = 'bg-dark-700 text-slate-400'
 
 function buildSystemPrompt(name?: string, website?: string) {
   const brandLine = name    ? `Business: ${name}`       : ''
@@ -58,7 +39,6 @@ Respond with ONLY a valid JSON array — no markdown, no extra text:
 
 interface SuggestedPrompt {
   text: string
-  category: PromptCategory
   added?: boolean
 }
 
@@ -68,24 +48,23 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId } = useClient()
+  const { activeClientId, activeClient } = useClient()
+  const brandName = activeClient?.name
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterCat, setFilterCat] = useState<PromptCategory | 'all'>('all')
+  const [filterCat, setFilterCat] = useState<string>('all')
   const [editId, setEditId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
-  const [editCat, setEditCat] = useState<PromptCategory>('general')
   const [showAdd, setShowAdd] = useState(false)
   const [newText, setNewText] = useState('')
-  const [newCat, setNewCat] = useState<PromptCategory>('general')
   const [saving, setSaving] = useState(false)
 
   const [showDiscover, setShowDiscover] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you. For example: \"We are a corporate catering company in Bucharest serving events of 100-2000 people.\""
+      content: "Hi! Describe your business and I'll generate the best AI monitoring prompts for you. For example: \"We're a project-management SaaS for small teams\" or \"We run a boutique law firm in Berlin.\""
     }
   ])
   const [userInput, setUserInput] = useState('')
@@ -149,7 +128,6 @@ export default function Prompts() {
         const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
         setSuggestions(parsed.map(p => ({
           text: p.text,
-          category: (p.category || 'general') as PromptCategory,
           added: prompts.some(existing => existing.text === p.text),
         })))
         setChatMessages(prev => [...prev, {
@@ -184,13 +162,14 @@ export default function Prompts() {
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
 
-  const startEdit = (p: Prompt) => { setEditId(p.id); setEditText(p.text); setEditCat(p.category) }
+  const startEdit = (p: Prompt) => { setEditId(p.id); setEditText(p.text) }
 
   const saveEdit = async () => {
     if (!editId) return
     setSaving(true)
-    if (!isDemoMode) await supabase.from('prompts').update({ text: editText, category: editCat }).eq('id', editId)
-    setPrompts(prev => prev.map(p => p.id === editId ? { ...p, text: editText, category: editCat } : p))
+    const cat = categorizePrompt(editText, brandName)   // re-categorise from the edited text
+    if (!isDemoMode) await supabase.from('prompts').update({ text: editText, category: cat }).eq('id', editId)
+    setPrompts(prev => prev.map(p => p.id === editId ? { ...p, text: editText, category: cat } : p))
     setEditId(null)
     setSaving(false)
   }
@@ -200,10 +179,13 @@ export default function Prompts() {
     setPrompts(prev => prev.filter(p => p.id !== id))
   }
 
-  const addPrompt = async (text?: string, category?: PromptCategory) => {
+  const addPrompt = async (text?: string) => {
     const promptText = (text ?? newText).trim()
-    const cat = category ?? newCat
     if (!promptText) return
+    // Category is auto-assigned from the prompt text (general taxonomy), not
+    // chosen by the user — clients are diverse, so the old per-client picker is
+    // gone. See lib/promptCategories.ts.
+    const cat = categorizePrompt(promptText, brandName)
     setSaving(true)
     const position = prompts.length + 1
     if (!isDemoMode) {
@@ -221,13 +203,13 @@ export default function Prompts() {
   }
 
   const addSuggestion = async (s: SuggestedPrompt, idx: number) => {
-    await addPrompt(s.text, s.category)
+    await addPrompt(s.text)
     setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
   }
 
   const addAllSuggestions = async () => {
     const toAdd = suggestions.filter(s => !s.added && !prompts.some(p => p.text === s.text))
-    for (const s of toAdd) await addPrompt(s.text, s.category)
+    for (const s of toAdd) await addPrompt(s.text)
     setSuggestions(prev => prev.map(s => ({ ...s, added: true })))
   }
 
@@ -277,7 +259,6 @@ export default function Prompts() {
         const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
         setSuggestions(parsed.map(p => ({
           text: p.text,
-          category: (p.category || 'general') as PromptCategory,
           added: prompts.some(existing => existing.text === p.text),
         })))
         setChatMessages(prev => [...prev, {
@@ -356,22 +337,20 @@ export default function Prompts() {
           >
             All · {prompts.length}
           </button>
-          {usedCategories.map(cat => {
-            const meta = getCategoryMeta(cat)
-            return (
-              <button
-                key={cat}
-                onClick={() => setFilterCat(filterCat === cat ? 'all' : (cat as PromptCategory))}
-                aria-pressed={filterCat === cat}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  filterCat === cat ? 'border-brand-500/50 bg-brand-500/10 text-brand-300' : 'border-dark-700 bg-dark-800 hover:border-dark-600'
-                }`}
-              >
-                <span className={`${meta.color} px-1.5 py-0.5 rounded-full mr-1.5`}>{meta.label}</span>
-                <span className="text-slate-400">{catCounts[cat]}</span>
-              </button>
-            )
-          })}
+          {usedCategories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}
+              aria-pressed={filterCat === cat}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                filterCat === cat
+                  ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
+                  : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
+              }`}
+            >
+              {promptCategoryLabel(cat)} · {catCounts[cat]}
+            </button>
+          ))}
         </div>
       )}
 
@@ -423,8 +402,8 @@ export default function Prompts() {
                 <div key={i} className={`flex items-start gap-2 p-2 rounded-lg border transition-colors ${
                   s.added ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-dark-700/50 border-dark-600/50 hover:border-dark-500'
                 }`}>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${getCategoryMeta(s.category).color}`}>
-                    {getCategoryMeta(s.category).label}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${CAT_BADGE}`}>
+                    {promptCategoryLabel(categorizePrompt(s.text, brandName))}
                   </span>
                   <span className="text-xs text-slate-300 flex-1">{s.text}</span>
                   <button
@@ -478,16 +457,7 @@ export default function Prompts() {
               aria-label="New prompt text"
               className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
             />
-            <select
-              value={newCat}
-              onChange={e => setNewCat(e.target.value as PromptCategory)}
-              aria-label="Prompt category"
-              className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-brand-500"
-            >
-              {Object.entries(CATEGORY_META).map(([cat, meta]) => (
-                <option key={cat} value={cat}>{meta.label}</option>
-              ))}
-            </select>
+            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text — no need to pick one.</p>
           </div>
           <div className="flex gap-2 pt-0.5">
             <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"><Check size={16} /></button>
@@ -498,12 +468,11 @@ export default function Prompts() {
 
       <div className="space-y-1.5">
         {filtered.map((p, i) => {
-          const meta = getCategoryMeta(p.category)
           const isEditing = editId === p.id
           return (
             <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-4 group hover:border-dark-600 transition-colors">
               <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${meta.color}`}>{meta.label}</span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${CAT_BADGE}`}>{promptCategoryLabel(p.category)}</span>
               {isEditing ? (
                 <div className="flex-1 flex gap-2 items-center">
                   <input
@@ -514,16 +483,6 @@ export default function Prompts() {
                     aria-label="Edit prompt text"
                     className="flex-1 bg-dark-700 border border-brand-500/50 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
                   />
-                  <select
-                    value={editCat}
-                    onChange={e => setEditCat(e.target.value as PromptCategory)}
-                    aria-label="Prompt category"
-                    className="bg-dark-700 border border-dark-600 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
-                  >
-                    {Object.keys(CATEGORY_META).map(cat => (
-                      <option key={cat} value={cat}>{getCategoryMeta(cat).label}</option>
-                    ))}
-                  </select>
                   <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>
                   <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600"><X size={14} /></button>
                 </div>

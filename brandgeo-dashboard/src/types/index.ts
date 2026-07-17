@@ -65,7 +65,9 @@ export interface Competitor {
 export interface Prompt {
   id: number
   text: string
-  category: PromptCategory
+  // Free-form since categories are now a general, auto-assigned taxonomy
+  // (lib/promptCategories.ts) rather than the old fixed per-client union.
+  category: string
   is_active: boolean
   position: number
   created_at: string

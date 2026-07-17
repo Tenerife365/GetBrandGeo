@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
-  Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock,
+  Play, Loader2, Globe2, Copy, CheckCheck, Check, Minus, Zap, Settings, X, Lock, Clock, Info,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
@@ -17,8 +17,9 @@ import {
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
-import { MOTION_BASE, EASE_OUT } from '../lib/motion'
+import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
+import { promptCategoryLabel } from '../lib/promptCategories'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -41,27 +42,11 @@ const CATEGORY_LABEL: Record<string, string> = {
   portfolio:      'Portfolio',
 }
 
-const CATEGORY_COLOR: Record<string, string> = {
-  mid:            'bg-blue-500/20 text-blue-300',
-  large:          'bg-purple-500/20 text-purple-300',
-  very_large:     'bg-amber-500/20 text-amber-300',
-  general:        'bg-slate-500/20 text-slate-300',
-  tool_discovery: 'bg-emerald-500/20 text-emerald-300',
-  geo_category:   'bg-blue-500/20 text-blue-300',
-  problem_based:  'bg-amber-500/20 text-amber-300',
-  direct_brand:   'bg-violet-500/20 text-violet-300',
-  large_scale:    'bg-purple-500/20 text-purple-300',
-  corporate:      'bg-sky-500/20 text-sky-300',
-  wedding:        'bg-pink-500/20 text-pink-300',
-  galas:          'bg-amber-500/20 text-amber-300',
-  quality:        'bg-emerald-500/20 text-emerald-300',
-  location:       'bg-teal-500/20 text-teal-300',
-  competitive:    'bg-red-500/20 text-red-300',
-  portfolio:      'bg-indigo-500/20 text-indigo-300',
-}
-
-const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? cat
-const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
+const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(cat)
+// A category is a grouping, not an alert — so its badge stays neutral (Gestalt
+// Focal-Point Law: color is reserved for meaning, not decoration). One quiet
+// chip for every category; the label text still identifies which one it is.
+const getCatColor = (_cat: string) => 'bg-dark-700 text-slate-400'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -190,6 +175,13 @@ export default function AIVisibility() {
   const [prompts, setPrompts]           = useState<Prompt[]>([])
   const [results, setResults]           = useState<ResultMap>(new Map())
   const [errorEngines, setErrorEngines] = useState<Set<LLMName>>(new Set())
+  // Engines that had SOME failed checks but also some OK results (mixed case) —
+  // distinct from errorEngines (fully-failed only). Nielsen audit: the mixed case
+  // silently showed a percentage with no hint that anything failed to sync.
+  const [partialErrorEngines, setPartialErrorEngines] = useState<Set<LLMName>>(new Set())
+  // Fix This hub: show top 3 by default, reveal the rest on demand (Nielsen audit
+  // edge case: "add a Show all when there are more than 3 items").
+  const [showAllFixes, setShowAllFixes] = useState(false)
   const [loading, setLoading]           = useState(true)
   const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
@@ -292,6 +284,8 @@ export default function AIVisibility() {
     }
     // Engine is "unavailable" only when it has errors AND zero ok results
     setErrorEngines(new Set([...errEngines].filter(e => !okEngines.has(e))))
+    // Mixed/partial: engine had at least one failed check AND at least one OK result.
+    setPartialErrorEngines(new Set([...errEngines].filter(e => okEngines.has(e))))
 
     if (pData) setPrompts(pData)
     setResults(map)
@@ -322,6 +316,12 @@ export default function AIVisibility() {
     activeLLMs.map(l => l.id),
   )
   const overallPct = dimensions.recognition
+
+  // Score count-up (0 → aiScore) once data has loaded — matches the Overview hero's
+  // flow (useCountUp + ring sweep, DASHBOARD-UX-2026.md §6 Phase B). Called here,
+  // unconditionally, so it stays before the `if (loading) return` early-return below
+  // (Rules of Hooks).
+  const displayedScore = useCountUp(aiScore, !loading)
 
   const competitorFreq = (() => {
     const freq: Record<string, { count: number; positions: number[] }> = {}
@@ -459,7 +459,7 @@ export default function AIVisibility() {
   }
 
   // Total columns in prompt table = active engines only
-  const tableColsTemplate = `2rem 1fr repeat(${activeLLMs.length}, 8rem)`
+  const tableColsTemplate = `2.75rem 1fr repeat(${activeLLMs.length}, 8rem)`
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
@@ -557,7 +557,10 @@ export default function AIVisibility() {
       </div>
 
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
-      <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
+      <motion.div
+        className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center"
+        variants={heroReveal} initial="hidden" animate="show"
+      >
         <div className="flex flex-col items-center gap-3">
           <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
@@ -571,19 +574,36 @@ export default function AIVisibility() {
               </filter>
             </defs>
             <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-            <circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} strokeDashoffset={`${dashOffset}`} transform="rotate(-90 60 60)"
-              filter="url(#scoreGlow)" opacity="0.3" style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
-            <circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} strokeDashoffset={`${dashOffset}`} transform="rotate(-90 60 60)"
-              style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(.4,0,.2,1)' }} />
+            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
+              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+              filter="url(#scoreGlow)" opacity="0.3"
+              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+              transition={{ duration: 1.4, ease: EASE_OUT }} />
+            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
+              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+              transition={{ duration: 1.4, ease: EASE_OUT }} />
             <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{aiScore}</tspan>
+              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
               <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
             </text>
           </svg>
           <div className="text-center -mt-1">
-            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-2">AI Visibility Score</div>
+            {/* Score-weighting transparency (Nielsen audit): an info affordance explaining
+                how the headline number derives from the 6 sub-dimensions. Weights mirror
+                aiVisibilityScore.ts exactly. Reachable by keyboard (focus), not hover-only. */}
+            <div className="flex items-center justify-center gap-1 mb-2">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</span>
+              <span className="relative group inline-flex" tabIndex={0} aria-label="How the AI Visibility Score is calculated">
+                <Info size={11} className="text-slate-500 hover:text-slate-300 cursor-help" />
+                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block group-focus-within:block w-60 z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal">
+                  <span className="block text-[11px] font-semibold text-slate-200 mb-1.5">How this score is calculated</span>
+                  <span className="block text-[10px] text-slate-400 leading-relaxed">
+                    A weighted average of six signals: Recognition 25%, Knowledge 20%, Sentiment 15%, Accuracy 15%, Reach 15%, Consistency 10%.
+                  </span>
+                </span>
+              </span>
+            </div>
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
               aiScore >= 60 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -608,64 +628,89 @@ export default function AIVisibility() {
                 </span>
               </div>
               <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all bg-brand-500"
-                  style={{ width: `${d.value}%` }}
+                <motion.div
+                  className="h-full rounded-full bg-brand-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${d.value}%` }}
+                  transition={{ duration: 1, ease: EASE_OUT, delay: 0.15 }}
                 />
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Engine status grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+      {/* Compact horizontal cards: logo tile on the left, condensed details on the
+          right (name + status pill, then %/stats). Fewer, wider columns than the old
+          5-up so each card can lay out horizontally. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
 
         {/* Active engine cards */}
         {engineStatusCards.map(e => {
           const statusStyles = {
-            KNOW:        { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20' },
-            PARTIAL:     { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20' },
-            MISSING:     { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20'   },
+            KNOW:        { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20 hover:border-brand-500/40' },
+            PARTIAL:     { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' },
+            MISSING:     { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40'   },
             UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
           }[e.status]
           return (
-            <div key={e.id} className={`relative bg-dark-800 border rounded-xl p-4 flex flex-col items-center gap-2 ${statusStyles.card}`}>
+            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-3 flex items-center gap-3 transition-colors ${statusStyles.card}`}>
               {isAdmin && (
                 <button
                   onClick={() => handleRefreshEngine(e.id)}
                   disabled={collecting || refreshingEngine !== null}
-                  className="absolute top-2 right-2 p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-200 transition-colors disabled:opacity-30"
+                  className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-dark-600 text-slate-500 hover:text-slate-200 transition-all disabled:opacity-30"
                   title={`Force refresh ${e.label} only — re-runs all prompts on ${e.label} and charges for this engine alone`}
                   aria-label={`Force refresh ${e.label} only`}
                 >
                   <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
                 </button>
               )}
-              <img src={e.logoUrl} alt={e.label} className={`w-8 h-8 rounded-lg object-contain ${e.isUnavailable ? 'opacity-40 grayscale' : ''}`} />
-              <div className={`text-sm font-semibold ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</div>
-              <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusStyles.badge}`}>
-                {e.isUnavailable
-                  ? <><AlertTriangle size={9} className="inline mr-1" style={{ verticalAlign: 'middle' }} />UNAVAIL</>
-                  : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`} style={{ verticalAlign: 'middle' }} />{e.status}</>
-                }
+
+              {/* Logo tile — left */}
+              <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60 ${e.isUnavailable ? 'opacity-40' : ''}`}>
+                <img src={e.logoUrl} alt={e.label} className={`w-7 h-7 object-contain ${e.isUnavailable ? 'grayscale' : ''}`} />
               </div>
-              {e.isUnavailable ? (
-                <div className="text-center">
-                  <div className="text-xs text-amber-400/80 mt-1">Temporarily unavailable</div>
-                  <div className="text-[10px] text-slate-600 mt-1">Force Refresh to retry</div>
+
+              {/* Details — right */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 pr-4">
+                  <span className={`text-sm font-semibold truncate ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</span>
+                  <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
+                    {e.isUnavailable
+                      ? <><AlertTriangle size={8} className="mr-0.5" />UNAVAIL</>
+                      : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusStyles.dot}`} />{e.status}</>
+                    }
+                  </span>
                 </div>
-              ) : (
-                <div className="text-center">
-                  <div className={`text-2xl font-bold tabular-nums ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>
-                    {e.pct}%
-                  </div>
-                  <div className="text-xs text-slate-600 mt-0.5">{e.mentioned}/{e.checked} prompts</div>
-                  {e.bestPos !== null && (
-                    <div className="text-xs text-slate-500 mt-0.5">best pos #{e.bestPos}</div>
-                  )}
-                </div>
-              )}
+
+                {e.isUnavailable ? (
+                  <div className="text-[10px] text-amber-400/80 mt-1">Temporarily unavailable · Force Refresh to retry</div>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className={`text-lg font-bold tabular-nums leading-none ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>{e.pct}%</span>
+                      <span className="text-[11px] text-slate-500">{e.mentioned}/{e.checked} prompts</span>
+                      {e.bestPos !== null && (
+                        <span className="text-[11px] text-slate-600">· best #{e.bestPos}</span>
+                      )}
+                    </div>
+                    {/* Mixed-case fetch failure (Nielsen audit): some checks errored while others
+                        succeeded, so the % above is partial. Admins retry via the refresh icon (hover). */}
+                    {partialErrorEngines.has(e.id) && (
+                      <div
+                        className="flex items-center gap-1 text-[10px] text-amber-400/80 mt-0.5"
+                        title={isAdmin
+                          ? 'Some checks failed to sync — this % is partial. Hover the card and use the refresh icon to retry this engine.'
+                          : 'Some checks failed to sync, so this percentage is partial.'}
+                      >
+                        <AlertTriangle size={9} /> Some checks failed
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )
         })}
@@ -674,15 +719,18 @@ export default function AIVisibility() {
         {comingSoonEngines.map(id => {
           const meta = ENGINE_META[id]
           return (
-            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-4 flex flex-col items-center gap-2 opacity-60">
-              <img src={meta.logoUrl} alt={meta.label} className="w-8 h-8 rounded-lg object-contain grayscale" />
-              <div className="text-sm font-semibold text-slate-500">{meta.label}</div>
-              <div className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-700/50 text-slate-500 border border-slate-600/30 flex items-center gap-1">
-                <Clock size={10} />
-                Coming Soon
+            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-3 flex items-center gap-3 opacity-70">
+              <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/40">
+                <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 object-contain grayscale" />
               </div>
-              <div className="text-center">
-                <div className="text-xs text-slate-600 mt-1">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-slate-500 truncate">{meta.label}</span>
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full text-[9px] font-bold px-1.5 py-0.5 bg-slate-700/50 text-slate-500 border border-slate-600/30">
+                    <Clock size={9} /> Soon
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-600 mt-1">
                   {COMING_SOON_ENGINES.has(id) ? 'Not yet built' : 'Paused by admin'}
                 </div>
               </div>
@@ -690,32 +738,38 @@ export default function AIVisibility() {
           )
         })}
 
-        {/* Locked engine cards (not in plan) */}
-        {lockedEngines.map(id => {
-          const meta        = ENGINE_META[id]
-          const unlockPlan  = ENGINE_UNLOCK_PLAN[id]
-          const planLabel   = PLAN_LABELS[unlockPlan]
-          return (
-            <div key={id} className="bg-dark-800/30 border border-dark-700/30 rounded-xl p-4 flex flex-col items-center gap-2 opacity-40">
-              <img src={meta.logoUrl} alt={meta.label} className="w-8 h-8 rounded-lg object-contain grayscale" />
-              <div className="text-sm font-semibold text-slate-600">{meta.label}</div>
-              <div className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-slate-600 border border-slate-700/30 flex items-center gap-1">
-                <Lock size={9} />
-                Locked
-              </div>
-              <div className="text-center">
-                <div className="text-[10px] text-slate-700 mt-1">{planLabel}+</div>
-              </div>
-            </div>
-          )
-        })}
       </div>
+
+      {/* Locked engines — compact chip strip (least important; keeps the active +
+          coming-soon grid to a clean 4-up, and reads as a subtle upgrade prompt). */}
+      {lockedEngines.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-[10px] font-medium text-slate-600 uppercase tracking-wider mr-0.5 flex items-center gap-1">
+            <Lock size={10} /> Locked
+          </span>
+          {lockedEngines.map(id => {
+            const meta      = ENGINE_META[id]
+            const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40"
+                title={`${meta.label} — unlocks on the ${planLabel} plan`}
+              >
+                <img src={meta.logoUrl} alt={meta.label} className="w-4 h-4 object-contain grayscale opacity-70" />
+                <span className="text-xs font-medium text-slate-500">{meta.label}</span>
+                <span className="text-[10px] text-slate-600">{planLabel}+</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Fix This hub ─────────────────────────────────────────────────────── */}
       {fixItems.length > 0 && (
-        <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+        <div className="mb-4 bg-dark-800 rounded-xl overflow-hidden">
           <button
-            className="w-full flex items-center justify-between px-5 py-3.5 text-left"
+            className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors"
             onClick={() => setShowFixHub(v => !v)}
             aria-expanded={showFixHub}
           >
@@ -736,8 +790,15 @@ export default function AIVisibility() {
           </button>
 
           <Collapse open={showFixHub}>
-            <div className="border-t border-dark-700/50 divide-y divide-dark-700/50">
-              {fixItems.map((item, idx) => {
+            <div className="border-t border-dark-700/50">
+              {/* Workflow explainer — the Nielsen audit flagged that the intended
+                  action was ambiguous. State it plainly rather than add a non-functional
+                  "Apply Fix" button (these are content actions, no in-app automation). */}
+              <div className="px-5 py-2.5 text-[11px] text-slate-500 bg-dark-700/20 border-b border-dark-700/50">
+                Copy each recommended fix and apply it to your site or content. P0 items move your score the most.
+              </div>
+              <div className="divide-y divide-dark-700/50">
+              {(showAllFixes ? fixItems : fixItems.slice(0, 3)).map((item, idx) => {
                 const pStyles = {
                   P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'   },
                   P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300' },
@@ -772,92 +833,20 @@ export default function AIVisibility() {
                   </div>
                 )
               })}
-            </div>
-          </Collapse>
-        </div>
-      )}
-
-      {/* ── Competitor insights ──────────────────────────────────────────────── */}
-      {competitorFreq.length > 0 && (
-        <div className="mb-4 bg-dark-800 border border-amber-500/30 rounded-xl overflow-hidden">
-          <button
-            className="w-full flex items-center justify-between px-5 py-3 text-left"
-            onClick={() => setShowInsights(v => !v)}
-            aria-expanded={showInsights}
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={15} className="text-amber-400" />
-              <span className="text-sm font-semibold text-amber-300">
-                Top competitors in AI recommendations
-                {gapCount > 0 && (
-                  <span className="ml-2 font-normal text-amber-500/70 text-xs">
-                    ({brandName} absent {gapCount} of {totalChecked} checks)
-                  </span>
-                )}
-              </span>
-            </div>
-            {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
-          </button>
-
-          <Collapse open={showInsights}>
-            <div className="px-5 pb-4 border-t border-dark-700/50">
-              <p className="text-xs text-slate-500 mt-3 mb-3">
-                Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {competitorFreq.map(({ name, count, avgPos }) => (
-                  <div key={name} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <Target size={11} className="text-red-400" />
-                    <span className="text-sm font-medium text-red-300">{name}</span>
-                    <span className="text-xs text-red-500/70">{count}x</span>
-                    {avgPos !== null && <span className="text-xs text-slate-600">avg #{avgPos}</span>}
-                  </div>
-                ))}
               </div>
+              {/* Pagination (Nielsen audit edge case): only top 3 shown by default. */}
+              {fixItems.length > 3 && (
+                <button
+                  onClick={() => setShowAllFixes(v => !v)}
+                  className="w-full px-5 py-2.5 text-xs font-medium text-brand-400 hover:text-brand-300 hover:bg-dark-700/30 border-t border-dark-700/50 transition-colors"
+                >
+                  {showAllFixes ? 'Show fewer' : `Show all ${fixItems.length} actions`}
+                </button>
+              )}
             </div>
           </Collapse>
         </div>
       )}
-
-      {/* ── Category breakdown ───────────────────────────────────────────────── */}
-      {(() => {
-        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
-        const catStats = activeCats.map(cat => {
-          const catPrompts = prompts.filter(p => p.category === cat)
-          let mentioned = 0, checked = 0
-          catPrompts.forEach(p => {
-            activeLLMs.forEach(llm => {
-              const r = results.get(p.id)?.get(llm.id)
-              if (r) { checked++; if (r.brand_mentioned) mentioned++ }
-            })
-          })
-          return { cat, label: getCatLabel(cat), pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0, checked, mentioned }
-        }).sort((a, b) => b.pct - a.pct)
-
-        if (catStats.length > 0) return (
-          <div className="mb-4 bg-dark-800 border border-dark-700 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
-              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {catStats.map(({ cat, label, pct, checked, mentioned }) => (
-                <div key={cat} className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`}>{label}</span>
-                    <span className={`text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
-                    <div className={`h-full rounded-full ${pct >= 50 ? 'bg-emerald-400' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-[10px] text-slate-600">{mentioned}/{checked} checks</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-        return null
-      })()}
 
       {/* ── Category filter ──────────────────────────────────────────────────── */}
       {(() => {
@@ -905,18 +894,19 @@ export default function AIVisibility() {
       })()}
 
       {/* ── Prompt table (active engines only) ──────────────────────────────── */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
         <div className="min-w-[640px]">
         <div
           className="grid border-b border-dark-700 bg-dark-700/50"
           style={{ gridTemplateColumns: tableColsTemplate }}
         >
-          <div className="px-3 py-3 text-xs text-slate-600">#</div>
-          <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">{t.aiv_prompt}</div>
+          <div className="px-2 py-3 text-[11px] font-medium text-slate-600 uppercase tracking-wide self-center">#</div>
+          <div className="px-4 py-3 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
           {activeLLMs.map(llm => (
-            <div key={llm.id} className={`px-2 py-3 text-xs font-medium text-center ${llm.color}`}>
-              {llm.label}
+            <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
+              <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
+              <span className={`text-[11px] font-semibold ${llm.color}`}>{llm.label}</span>
             </div>
           ))}
         </div>
@@ -953,55 +943,85 @@ export default function AIVisibility() {
                   }
                 }}
               >
-                <div className="px-3 py-3 text-xs text-slate-600 self-center">{prompt.position || i + 1}</div>
+                <div className="px-2 py-3.5 self-center">
+                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-md bg-dark-700 text-[11px] font-semibold text-slate-500 tabular-nums">
+                    {prompt.position || i + 1}
+                  </span>
+                </div>
 
-                <div className="px-4 py-3 self-center">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(prompt.category)}`}>
+                <div className="px-4 py-3.5 self-center min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getCatColor(prompt.category)}`}>
                       {getCatLabel(prompt.category)}
                     </span>
-                    {hasData && (
-                      <span className={`text-xs font-semibold ${mentionCount >= activeLLMs.length * 0.8 ? 'text-emerald-400' : mentionCount >= activeLLMs.length * 0.4 ? 'text-amber-400' : 'text-red-400'}`}>
-                        {mentionCount}/{activeLLMs.filter(l => rowResults?.has(l.id)).length} LLMs
-                      </span>
-                    )}
+                    {hasData && (() => {
+                      const checkedLLMs = activeLLMs.filter(l => rowResults?.has(l.id)).length
+                      const ratio = checkedLLMs > 0 ? mentionCount / checkedLLMs : 0
+                      const cls = ratio >= 0.8 ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                        : ratio >= 0.4 ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                        : 'bg-red-500/10 text-red-300 border-red-500/20'
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border tabular-nums ${cls}`}>
+                          {mentionCount}/{checkedLLMs} engines
+                        </span>
+                      )
+                    })()}
                     {isAdmin && (
-                      <span className="ml-auto text-[10px] text-slate-600" title="Expand this row to re-run a single engine">
+                      <span className="ml-auto text-[10px] text-slate-600 hidden md:inline" title="Expand this row to re-run a single engine">
                         expand to refresh per engine
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-slate-300 truncate max-w-md">{prompt.text}</div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-slate-200 truncate flex-1">{prompt.text}</p>
+                    <span className="shrink-0 text-slate-600" aria-hidden="true">
+                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </span>
+                  </div>
                 </div>
 
                 {activeLLMs.map(llm => {
                   const r = rowResults?.get(llm.id)
                   if (!r) return (
-                    <div key={llm.id} className="px-2 py-3 flex items-center justify-center">
-                      <span className="text-slate-700 text-xs">-</span>
+                    <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60" title="Not checked">
+                        <Minus size={13} />
+                      </span>
                     </div>
                   )
                   const competitors = parseCompetitors(r.competitors_mentioned)
                   const topComp = competitors[0] ?? null
                   return (
-                    <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
+                    <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
                       {r.brand_mentioned ? (
                         <>
-                          <span className="text-emerald-400 font-bold text-sm">{t.aiv_yes}</span>
+                          <span
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
+                            title={t.aiv_mentioned} aria-label={t.aiv_mentioned}
+                          >
+                            <Check size={15} strokeWidth={2.5} />
+                          </span>
                           {r.brand_position && (
-                            <span className="text-[10px] text-emerald-500 font-medium">pos #{r.brand_position}</span>
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded tabular-nums">
+                              #{r.brand_position}
+                            </span>
                           )}
                           {topComp && r.brand_position && topComp.pos < r.brand_position && (
-                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-[70px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
+                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-[72px] truncate" title={`#${topComp.pos} ${topComp.name} ranks above`}>
                               #{topComp.pos} above
                             </span>
                           )}
                         </>
                       ) : (
                         <>
-                          <span className="text-red-400 font-bold text-sm">{t.aiv_no}</span>
+                          <span
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500/10 text-red-400/90 ring-1 ring-red-500/25"
+                            title={t.aiv_absent} aria-label={t.aiv_absent}
+                          >
+                            <X size={14} strokeWidth={2.5} />
+                          </span>
                           {topComp && (
-                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-[70px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
+                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-[72px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
                               #{topComp.pos} {topComp.name}
                             </span>
                           )}
@@ -1117,6 +1137,88 @@ export default function AIVisibility() {
         <span>{t.aiv_legend2}</span>
         <span>{t.aiv_legend3}</span>
       </div>
+
+      {/* ── Competitor insights (supplementary — sits below the prompt table) ──── */}
+      {competitorFreq.length > 0 && (
+        <div className="mt-6 mb-4 bg-dark-800 rounded-xl overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-5 py-3 text-left"
+            onClick={() => setShowInsights(v => !v)}
+            aria-expanded={showInsights}
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={15} className="text-amber-400" />
+              <span className="text-sm font-semibold text-amber-300">
+                Top competitors in AI recommendations
+                {gapCount > 0 && (
+                  <span className="ml-2 font-normal text-amber-500/70 text-xs">
+                    ({brandName} absent {gapCount} of {totalChecked} checks)
+                  </span>
+                )}
+              </span>
+            </div>
+            {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
+          </button>
+
+          <Collapse open={showInsights}>
+            <div className="px-5 pb-4 border-t border-dark-700/50">
+              <p className="text-xs text-slate-500 mt-3 mb-3">
+                Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {competitorFreq.map(({ name, count, avgPos }) => (
+                  <div key={name} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <Target size={11} className="text-red-400" />
+                    <span className="text-sm font-medium text-red-300">{name}</span>
+                    <span className="text-xs text-red-500/70">{count}x</span>
+                    {avgPos !== null && <span className="text-xs text-slate-600">avg #{avgPos}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Collapse>
+        </div>
+      )}
+
+      {/* ── Category breakdown (supplementary — sits below the prompt table) ───── */}
+      {(() => {
+        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
+        const catStats = activeCats.map(cat => {
+          const catPrompts = prompts.filter(p => p.category === cat)
+          let mentioned = 0, checked = 0
+          catPrompts.forEach(p => {
+            activeLLMs.forEach(llm => {
+              const r = results.get(p.id)?.get(llm.id)
+              if (r) { checked++; if (r.brand_mentioned) mentioned++ }
+            })
+          })
+          return { cat, label: getCatLabel(cat), pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0, checked, mentioned }
+        }).sort((a, b) => b.pct - a.pct)
+
+        if (catStats.length > 0) return (
+          <div className="mb-4 bg-dark-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
+              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {catStats.map(({ cat, label, pct, checked, mentioned }) => (
+                <div key={cat} className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`}>{label}</span>
+                    <span className={`text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
+                    <div className={`h-full rounded-full ${pct >= 50 ? 'bg-emerald-400' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[10px] text-slate-600">{mentioned}/{checked} checks</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+        return null
+      })()}
     </div>
   )
 }

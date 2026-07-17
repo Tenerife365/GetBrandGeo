@@ -6,6 +6,7 @@ import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
 import type { LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
+import { promptCategoryLabel } from '../lib/promptCategories'
 
 interface MentionEvent {
   id: number
@@ -37,7 +38,7 @@ interface RawMentionRow {
 const LLM_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   chatgpt:    { label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25', dot: 'bg-emerald-400' },
   gemini:     { label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-500/15 border-blue-500/25',       dot: 'bg-blue-400'    },
-  claude:     { label: 'Claude',     color: 'text-purple-400',  bg: 'bg-purple-500/15 border-purple-500/25',   dot: 'bg-purple-400'  },
+  claude:     { label: 'Claude',     color: 'text-orange-400',  bg: 'bg-orange-500/15 border-orange-500/25',   dot: 'bg-orange-400'  },
   perplexity: { label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-500/15 border-cyan-500/25',       dot: 'bg-cyan-400'    },
   meta:       { label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-500/15 border-amber-500/25',     dot: 'bg-amber-400'   },
 }
@@ -64,7 +65,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   direct_brand:   'bg-violet-500/20 text-violet-300',
 }
 
-const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? cat
+const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(cat)
 const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
 
 type FilterLLM = LLMName | 'all'
@@ -160,21 +161,21 @@ export default function Mentions() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <TrendingUp size={20} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-white tabular-nums">{totalMentions}</div>
             <div className="text-xs text-slate-500 mt-0.5">{t.men_totalMentions}</div>
           </div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <Award size={20} className="text-amber-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-white tabular-nums">#{avgPosition || '-'}</div>
             <div className="text-xs text-slate-500 mt-0.5">{t.men_avgPosition}</div>
           </div>
         </div>
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <Bot size={20} className="text-blue-400 shrink-0" />
           <div>
             <div className="text-2xl font-bold text-emerald-400 tabular-nums">{positiveSentiment}</div>
@@ -215,7 +216,7 @@ export default function Mentions() {
             aria-pressed={filterCat === cat}
             className={`px-3 py-1 rounded-lg text-xs transition-colors border ${
               filterCat === cat
-                ? 'bg-slate-700 text-slate-200 border-slate-600'
+                ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
                 : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
             }`}>
             {cat === 'all' ? t.men_allCategories : getCatLabel(cat)}
@@ -228,7 +229,7 @@ export default function Mentions() {
           const llmMeta = LLM_META[m.llm] ?? LLM_META['chatgpt']
           const isOpen = expanded === m.id
           return (
-            <div key={m.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden">
+            <div key={m.id} className="bg-dark-800 rounded-xl overflow-hidden">
               <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
                 onClick={() => setExpanded(isOpen ? null : m.id)}
                 aria-expanded={isOpen}>

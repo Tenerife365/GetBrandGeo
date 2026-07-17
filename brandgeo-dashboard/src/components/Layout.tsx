@@ -3,12 +3,13 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard,
+  StopCircle, Plus, DollarSign, Smile, CreditCard, User,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { Building2 } from 'lucide-react'
+import SupportWidget from './SupportWidget'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
@@ -149,7 +150,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Stronger active-state indicator: left accent bar + bg tint, not just a bg tint (§7.4 Phase 2)
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     [
-      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors border-l-2',
+      'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors border-l-2',
       isActive
         ? 'bg-brand-500/15 text-brand-300 font-medium border-brand-400'
         : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700 border-transparent',
@@ -188,6 +189,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
+  const brandInitials = (activeClient?.name ?? '?').trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
@@ -213,12 +215,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <aside className={[
         'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700/60 flex flex-col',
         'transition-transform duration-200 ease-in-out',
-        'md:relative md:w-56 md:flex-shrink-0',
+        'md:relative md:w-64 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ].join(' ')}>
 
         {/* Logo */}
-        <div className="px-4 py-4 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo />
           <div className="flex items-center gap-2">
             {isDemoMode && (
@@ -263,13 +265,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
-        <nav className="flex-1 p-3 space-y-4 overflow-y-auto" aria-label="Primary">
+        <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
-              <div className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-1">
+              <div className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-2">
                 {group.label}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {group.items.map(({ to, icon: Icon, label }) => (
                   <NavLink key={to} to={to} end={to === '/'}
                     onClick={closeSidebar}
@@ -286,7 +288,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Client switcher — admin only */}
         {isAdmin && clients.length > 0 && (
-          <div className="p-3 border-t border-dark-700/60 flex-shrink-0">
+          <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
@@ -300,7 +302,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   })
                   setShowAddMarket(false); setShowLangs(false)
                 }}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showClients}
               >
@@ -375,8 +377,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
+        {/* Brand identity for non-admins (viewers) — the client switcher above is
+            admin-only, so this is where a signed-in member sees whose dashboard
+            this is and reaches their own account. (Ownership) */}
+        {!isAdmin && activeClient && (
+          <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
+            <NavLink to="/account" onClick={closeSidebar}
+              className="flex items-center gap-2.5 px-1 py-1 rounded-lg hover:bg-dark-700 transition-colors group">
+              <span className="w-9 h-9 rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center text-xs font-bold shrink-0">
+                {brandInitials}
+              </span>
+              <span className="min-w-0 text-left">
+                <span className="block text-sm font-medium text-slate-200 truncate">{activeClient.name}</span>
+                <span className="block text-[11px] text-slate-500 group-hover:text-slate-400">View account</span>
+              </span>
+            </NavLink>
+          </div>
+        )}
+
         {/* Market selector — multi-select with per-market region pickers */}
-        <div className="p-3 border-t border-dark-700/60 space-y-1.5 flex-shrink-0">
+        <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
 
           {/* Selected market chips */}
@@ -456,11 +476,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Bottom actions */}
-        <div className="p-3 border-t border-dark-700/60 space-y-0.5 flex-shrink-0">
+        <div className="p-4 border-t border-dark-700/60 space-y-1 flex-shrink-0">
+          <NavLink to="/account" onClick={closeSidebar}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+            <User size={16} />
+            My Account
+          </NavLink>
           <div className="relative" ref={langMenuRef}>
             <button
               onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
               aria-haspopup="listbox"
               aria-expanded={showLangs}
             >
@@ -490,7 +515,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={openBilling}
               disabled={billingLoading}
-              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-60"
             >
               {billingLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
               {t.sidebar_billing}
@@ -505,7 +530,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={toggle}
             role="switch"
             aria-checked={theme === 'dark'}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
           >
             <Moon size={16} />
             <span className="flex-1 text-left">{t.sidebar_darkMode}</span>
@@ -516,7 +541,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${theme === 'dark' ? 'translate-x-5' : 'translate-x-1'}`} />
             </span>
           </button>
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             <LogOut size={16} />
             {t.sidebar_signOut}
           </button>
@@ -584,6 +609,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Floating support widget — present on every dashboard page. */}
+      <SupportWidget />
     </div>
   )
 }
