@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
-  ChevronDown, Sun, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
+  ChevronDown, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -497,9 +497,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           )}
 
-          <button onClick={toggle} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            {theme === 'dark' ? t.sidebar_lightMode : t.sidebar_darkMode}
+          {/* Dark mode as a real toggle SWITCH (label left, switch right), not a
+              nav-item-styled link — it now reads as a setting, not a page (Nielsen
+              audit). role="switch"+aria-checked so assistive tech announces the state;
+              the switch conveys on/off, so the label is the static setting name. */}
+          <button
+            onClick={toggle}
+            role="switch"
+            aria-checked={theme === 'dark'}
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+          >
+            <Moon size={16} />
+            <span className="flex-1 text-left">{t.sidebar_darkMode}</span>
+            <span
+              aria-hidden="true"
+              className={`relative inline-flex h-5 w-10 flex-shrink-0 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-brand-500' : 'bg-dark-600'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${theme === 'dark' ? 'translate-x-5' : 'translate-x-1'}`} />
+            </span>
           </button>
           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
             <LogOut size={16} />

@@ -498,7 +498,7 @@ export default function AIVisibility() {
             {t.aiv_subtitle}
             {lastChecked && (
               <span className="ml-2 text-slate-600">
-                - {t.aiv_lastChecked} {new Date(lastChecked).toLocaleDateString()}
+                - {fmt(t.aiv_lastChecked, { date: new Date(lastChecked).toLocaleDateString() })}
               </span>
             )}
           </p>
@@ -506,19 +506,23 @@ export default function AIVisibility() {
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {isAdmin && (
             <>
+              {/* Secondary/neutral outlined — consistent with Force Refresh + Reload.
+                  Nielsen audit: reserve the one solid-violet fill for the primary action. */}
               <button
                 onClick={() => setShowEngineModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
                 title="Configure engines for this client"
                 aria-label="Configure engines for this client"
               >
                 <Settings size={14} />
                 <span className="hidden sm:inline" aria-hidden="true">Engines</span>
               </button>
+              {/* PRIMARY action — the only solid-violet button in the header, so the
+                  eye lands on it (Nielsen audit: "reserve solid purple for the primary CTA"). */}
               <button
                 onClick={runCollection}
                 disabled={collecting || loading}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-brand-500/30 bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {collecting
                   ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
@@ -530,17 +534,21 @@ export default function AIVisibility() {
                 disabled={collecting || loading}
                 title="Force Refresh — wipes existing results and re-runs all engines"
                 aria-label="Force refresh — wipes existing results and re-runs all engines"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                /* Grouped with the other secondary actions (same outlined base), but keeps a
+                   muted orange label/border so it still reads as the destructive one — Error
+                   Prevention cue preserved, per the Nielsen audit's own praise for it. */
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RotateCcw size={14} />
                 <span className="hidden sm:inline" aria-hidden="true">Force Refresh</span>
               </button>
             </>
           )}
+          {/* Secondary/neutral outlined — same base as Engines + Force Refresh. */}
           <button
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-dark-700 text-slate-400 hover:text-slate-200"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             {refreshed ? <span className="text-emerald-400">{t.aiv_refreshed}</span> : t.aiv_reload}
