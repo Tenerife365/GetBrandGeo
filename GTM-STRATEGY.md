@@ -268,6 +268,53 @@ Why "done-for-you" wins this buyer worldwide, not just locally:
 - **EU/Spain-governed entity** (per terms.html governing law) — clean for EU
   buyers on data/GDPR, and no barrier to selling outside the EU.
 
+### 4.2b Refinement — drop criterion (a); the audit creates the awareness (decided 2026-07-18)
+
+Real inbound revealed that the §4.2 ICP's criterion **(a) "knows AI answers are
+starting to matter" is the friction, not a requirement.** The strongest interest
+is coming from the *less* sophisticated end of the band: small/local businesses
+that do not understand SEO at all, often with **inaccurate or outdated public
+information and old or missing websites**. These are genuine low-hanging fruit,
+and pursuing them is an extension of the §4.2 done-for-you strategy, not a pivot.
+
+**Why they are the better wedge right now:**
+- **Only the managed model can serve them.** They cannot operate a self-serve
+  dashboard, so Peec/Profound/Otterly structurally cannot sell to them — this is
+  §4.2's differentiator at its strongest.
+- **They are a testimonial/case-study factory.** A broken presence has huge,
+  fast, visible wins available (fix GBP, NAP consistency, basic schema, a few
+  real articles) → clean before/after score jumps → the exact proof asset the
+  business lacks.
+- **The audit hits harder here.** "You are invisible, and your public info is
+  wrong" lands more viscerally on a genuinely broken presence than on a savvy
+  marketing team. Better hook, not worse.
+- **Lower price sensitivity.** Their only alternative is a €2-5k/mo agency, so
+  €900 Managed reads as cheap.
+
+**The decision:** pursue this segment as a **distinct packaged funnel, not a
+rebrand.** Do NOT dilute the premium GEO positioning (research paper, comparison
+pages) built for the sophisticated buyer, and do not drop into the commoditized
+local-SEO-agency pool. Instead:
+1. **Own funnel:** a plain-language, audit-first landing page —
+   `brandgeo/web/get-found-online.html` (live 2026-07-18) — leading with the
+   outcome ("customers and AI can't find you / your info is wrong, we fix it,
+   done for you"), never with "GEO." The AI Visibility Score is the proof/
+   reporting layer, not the pitch.
+2. **Productized delivery:** the repeatable checklist + intake scoping in
+   `MANAGED-SERVICE-SOP.md`, so full-service delivery for unsophisticated SMBs
+   stays margin-safe and does not become an unscalable bespoke agency.
+3. **Integrity gates:** Wikipedia only where genuinely notable; no scaled/spun
+   content; no fake reviews (`rules/content-integrity.md`). The "we do everything"
+   menu must stay legitimate.
+
+**Named tension (unchanged from §4.4):** this leans BrandGEO further toward
+*productized service* (cash-flowing, labor-bound) vs *scalable SaaS*. That is
+consistent with the doc's **sequencing** resolution — managed-first for revenue
+and reference logos now, self-serve scale later — *provided* delivery is kept
+productized per the SOP. Run it as one ladder (§5.2): Segment B is the cash
+engine + proof factory now; the SaaS/measurement product is what it wraps around
+and graduates toward.
+
 ### 4.3 Secondary ICP (expansion / scale, later)
 
 **Worldwide SaaS / e-commerce / travel marketing teams and small agencies** —
