@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
-  ChevronDown, Moon, Globe2, Menu, X, Languages, UserPlus, Loader2,
+  ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -484,35 +484,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <User size={16} />
             My Profile
           </NavLink>
-          <div className="relative" ref={langMenuRef}>
-            <button
-              onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
-              aria-haspopup="listbox"
-              aria-expanded={showLangs}
-            >
-              <Languages size={16} />
-              <span className="flex-1 text-left">
-                <img src={`https://flagcdn.com/w20/${currentLang.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm inline-block mr-1.5 -mt-0.5" />
-                {currentLang.label}
-              </span>
-              <ChevronDown size={13} className="text-slate-500" />
-            </button>
-            {showLangs && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
-                {LANGUAGES.map(l => (
-                  <button key={l.id}
-                    onClick={() => { setLang(l.id); setShowLangs(false) }}
-                    className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
-                  >
-                    <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
-                    <span>{l.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
+          {/* Billing (only when the client has a Stripe subscription) stays its own row */}
           {activeClient?.stripe_customer_id && (
             <button
               onClick={openBilling}
@@ -524,29 +496,59 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           )}
 
-          {/* Dark mode as a real toggle SWITCH (label left, switch right), not a
-              nav-item-styled link — it now reads as a setting, not a page (Nielsen
-              audit). role="switch"+aria-checked so assistive tech announces the state;
-              the switch conveys on/off, so the label is the static setting name. */}
-          <button
-            onClick={toggle}
-            role="switch"
-            aria-checked={theme === 'dark'}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
-          >
-            <Moon size={16} />
-            <span className="flex-1 text-left">{t.sidebar_darkMode}</span>
-            <span
-              aria-hidden="true"
-              className={`relative inline-flex h-5 w-10 flex-shrink-0 items-center rounded-full transition-colors ${theme === 'dark' ? 'bg-brand-500' : 'bg-dark-600'}`}
+          {/* Compact controls: language · theme · sign out on ONE line — reclaims
+              vertical space so the nav above isn't squeezed on short screens (13").
+              The old lucide "Languages" glyph is dropped; the flag already identifies
+              the language. Theme is a sun/moon icon toggle (keeps role=switch a11y);
+              sign out is an icon button (red on hover). */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <div className="relative flex-1 min-w-0" ref={langMenuRef}>
+              <button
+                onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+                aria-haspopup="listbox"
+                aria-expanded={showLangs}
+                title="Language"
+              >
+                <img src={`https://flagcdn.com/w20/${currentLang.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
+                <span className="flex-1 text-left truncate">{currentLang.label}</span>
+                <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+              </button>
+              {showLangs && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                  {LANGUAGES.map(l => (
+                    <button key={l.id}
+                      onClick={() => { setLang(l.id); setShowLangs(false) }}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                    >
+                      <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
+                      <span>{l.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={toggle}
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={t.sidebar_darkMode}
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${theme === 'dark' ? 'translate-x-5' : 'translate-x-1'}`} />
-            </span>
-          </button>
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
-            <LogOut size={16} />
-            {t.sidebar_signOut}
-          </button>
+              {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+
+            <button
+              onClick={handleLogout}
+              aria-label={t.sidebar_signOut}
+              title={t.sidebar_signOut}
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </aside>
 
