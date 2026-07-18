@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
 import { supabase, isDemoMode } from './supabase'
 import {
   getEngineStates,
@@ -59,6 +59,15 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Always holds the LIVE active client id. init() (below) is re-run by the
+  // onAuthStateChange listener, which Supabase fires on tab-focus/token-refresh
+  // as well as real sign-ins — i.e. after almost any interaction. Reading a
+  // stale mount-time snapshot there snapped the admin back to the first client
+  // (BpR, id 1) on every such re-run; init() now reads this ref instead so the
+  // user's current in-session selection always wins. (Fix 2026-07-18.)
+  const activeClientIdRef = useRef(activeClientId)
+  useEffect(() => { activeClientIdRef.current = activeClientId }, [activeClientId])
+
   // Derived from activeClient — recomputed whenever activeClient changes
   const activeEngines = activeClient
     ? getActiveEngines(activeClient.plan, activeClient.engines_enabled)
@@ -72,6 +81,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
     async function init() {
       setLoading(true)
+      // Prefer the user's CURRENT in-session selection (survives re-inits fired
+      // on tab-focus/token-refresh), then the freshly-persisted value, then the
+      // default. Do NOT use the stale mount-time `saved` closure here.
+      const desired = activeClientIdRef.current
+        || parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setIsAdmin(false)
@@ -108,13 +122,13 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           if (fallback) {
             const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' }))
             setClients(withDefaults as Client[])
-            const validId = withDefaults.find(c => c.id === saved)?.id ?? withDefaults[0]?.id ?? 1
+            const validId = withDefaults.find(c => c.id === desired)?.id ?? withDefaults[0]?.id ?? 1
             setActiveClientIdState(validId)
             setActiveClient((withDefaults.find(c => c.id === validId) ?? withDefaults[0] ?? null) as Client | null)
           }
         } else if (allClients) {
           setClients(allClients as Client[])
-          const validId = allClients.find(c => c.id === saved)?.id ?? allClients[0]?.id ?? 1
+          const validId = allClients.find(c => c.id === desired)?.id ?? allClients[0]?.id ?? 1
           setActiveClientIdState(validId)
           setActiveClient((allClients.find(c => c.id === validId) ?? allClients[0] ?? null) as Client | null)
         }
@@ -141,7 +155,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         } else {
           const list = myClients as Client[]
           setClients(list)   // members now get their accessible brands (for the switcher + Compare)
-          const validId = list.find(c => c.id === saved)?.id ?? list.find(c => c.id === cid)?.id ?? list[0]?.id ?? cid
+          const validId = list.find(c => c.id === desired)?.id ?? list.find(c => c.id === cid)?.id ?? list[0]?.id ?? cid
           setActiveClientIdState(validId)
           setActiveClient(list.find(c => c.id === validId) ?? list[0] ?? null)
         }
