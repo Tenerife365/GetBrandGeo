@@ -54,7 +54,7 @@ async function emailLeadToTeam({ name, email, domain, need, reason }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
         from: 'BrandGEO Assistant <noreply@mail.getbrandgeo.com>',
-        to: ['support@getbrandgeo.com'],
+        to: ['constantin@getbrandgeo.com'],
         reply_to: email || undefined,
         subject: `[Assistant lead] ${name} — ${reason}`,
         html,
