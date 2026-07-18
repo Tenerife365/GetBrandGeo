@@ -106,3 +106,15 @@
 # header comment for the real limits of what this API actually guarantees).
 [functions."force-index"]
   timeout = 15
+
+# ── Public site chat assistant (ASSISTANT-SPEC.md) ───────────────────────────
+# Proxies Claude Haiku; the function's own internal Haiku timeout is 18s, so it
+# MUST have more than Netlify's default 10s or a slightly-slow model call (or a
+# cold start) gets killed mid-flight and returns a non-JSON 502 — which the
+# widget can only surface as a generic error. 26s gives the 18s call full room.
+[functions."assistant"]
+  timeout = 26
+
+# Lead capture — fast DB write + parallel HubSpot/Resend calls; 15s is plenty.
+[functions."assistant-lead"]
+  timeout = 15

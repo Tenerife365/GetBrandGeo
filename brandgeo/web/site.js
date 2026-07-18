@@ -785,6 +785,27 @@
     }
   }
 
+  // Supportive, actionable fallback when the assistant can't answer (offline,
+  // timeout, error). Never dead-ends the visitor — offers the core paths right
+  // in the widget so they can still run the free audit, see pricing, or reach a
+  // human without leaving the page.
+  function fallbackHelp(){
+    addBubble('assistant', "I'm having a brief hiccup on my end — but I can still point you the right way:");
+    var wrap = el('div', 'bg-asst-msg bg-asst-assistant');
+    var box = el('div', 'bg-asst-actions');
+    var audit = el('a', 'bg-asst-btn', 'Run my free audit →');
+    audit.href = SIGNUP_URL; audit.target = '_blank'; audit.rel = 'noopener noreferrer';
+    var price = el('a', 'bg-asst-btn bg-asst-btn-sec', 'See pricing');
+    price.href = 'https://getbrandgeo.com/#pricing'; price.target = '_blank'; price.rel = 'noopener noreferrer';
+    var human = el('button', 'bg-asst-btn bg-asst-btn-sec', 'Talk to a human'); human.type = 'button';
+    human.addEventListener('click', function(){
+      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      showLeadForm('sales', null);
+    });
+    box.appendChild(audit); box.appendChild(price); box.appendChild(human);
+    wrap.appendChild(box); msgs.appendChild(wrap); scrollDown();
+  }
+
   function send(text){
     text = String(text || '').trim();
     if (!text || busy) return;
@@ -801,14 +822,16 @@
     fetchJson(ASSISTANT_ENDPOINT, { messages: history }).then(function(res){
       hideTyping();
       var d = res.data || {};
-      var reply = typeof d.reply === 'string' && d.reply ? d.reply
-        : "Sorry — I couldn't reach my knowledge base just now. You can email the team at " + SUPPORT_EMAIL + ".";
-      addBubble('assistant', reply);
-      if (res.ok) history.push({ role: 'assistant', content: reply });
-      if (res.ok && d.action) renderAction(d.action);
+      if (typeof d.reply === 'string' && d.reply) {
+        addBubble('assistant', d.reply);
+        if (res.ok) history.push({ role: 'assistant', content: d.reply });
+        if (res.ok && d.action) renderAction(d.action);
+      } else {
+        fallbackHelp();
+      }
     }).catch(function(){
       hideTyping();
-      addBubble('assistant', "Sorry — something went wrong on my end. You can reach the team at " + SUPPORT_EMAIL + ", or tap “Talk to a human” below.");
+      fallbackHelp();
     }).then(function(){ busy = false; setBusy(false); if (ta) ta.focus(); });
   }
 
