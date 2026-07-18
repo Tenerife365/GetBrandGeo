@@ -69,6 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
+  const [showMarketEditor, setShowMarketEditor] = useState(false)  // market area collapses to a summary by default (set-once, rarely changes)
   const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
   const [catSaving, setCatSaving]       = useState(false)
 
@@ -399,8 +400,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Market selector — multi-select with per-market region pickers */}
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
-          <div className="text-xs text-slate-600 uppercase tracking-wider px-1">{t.sidebar_market}</div>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs text-slate-600 uppercase tracking-wider">{t.sidebar_market}</span>
+            <button
+              onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              aria-expanded={showMarketEditor}
+            >
+              {showMarketEditor ? 'Done' : 'Edit'}
+              <ChevronDown size={11} className={`transition-transform ${showMarketEditor ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
 
+          {/* Collapsed summary — one compact line per market (flag · region).
+              This area is set at onboarding and rarely changes, so it stays out
+              of the way until you tap Edit. */}
+          {!showMarketEditor && (
+            <div className="space-y-0.5">
+              {selections.map(sel => (
+                <div key={sel.market.id} className="flex items-center gap-2 px-1 py-1 text-sm text-slate-300">
+                  {sel.market.flagCode === 'un'
+                    ? <Globe2 size={14} className="text-slate-400 flex-shrink-0" />
+                    : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
+                  }
+                  <span className="truncate">
+                    {sel.market.label}
+                    {sel.region.id !== 'ALL' && <span className="text-slate-500"> · {sel.region.label}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showMarketEditor && (
+          <div className="space-y-2">
           {/* Selected market chips */}
           <div className="space-y-1">
             {selections.map(sel => (
@@ -474,6 +507,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
+          )}
+          </div>
           )}
         </div>
 
