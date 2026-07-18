@@ -63,7 +63,23 @@ export const MARKETS: Market[] = [
   },
   {
     id: 'ES', label: 'Spain', flag: '', flagCode: 'es',
-    regions: [{ id: 'ALL', label: 'All regions' }, { id: 'MAD', label: 'Madrid' }, { id: 'BCN', label: 'Barcelona' }, { id: 'VAL', label: 'Valencia' }],
+    regions: [
+      { id: 'ALL', label: 'All regions'  },
+      { id: 'MAD', label: 'Madrid'       },
+      { id: 'BCN', label: 'Barcelona'    },
+      { id: 'VAL', label: 'Valencia'     },
+      { id: 'SVQ', label: 'Seville'      },
+      { id: 'AGP', label: 'Málaga'       },
+      { id: 'BIO', label: 'Bilbao'       },
+      { id: 'ZAZ', label: 'Zaragoza'     },
+      // Canary Islands — Tenerife is where BrandGEO is based and where local
+      // clients (e.g. Restaurante Transilvania) operate, so "general Spain"
+      // was too coarse for their buyer-intent queries.
+      { id: 'TF',  label: 'Tenerife'     },
+      { id: 'LPA', label: 'Las Palmas'   },
+      { id: 'IBZ', label: 'Ibiza'        },
+      { id: 'PMI', label: 'Palma de Mallorca' },
+    ],
   },
   {
     id: 'NL', label: 'Netherlands', flag: '', flagCode: 'nl',
