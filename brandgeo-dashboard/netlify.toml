@@ -118,3 +118,11 @@
 # Lead capture — fast DB write + parallel HubSpot/Resend calls; 15s is plenty.
 [functions."assistant-lead"]
   timeout = 15
+
+# ── Auto-notify search engines of new/changed pages (ping-sitemap.js) ─────────
+# Daily: diff the live sitemap against the sitemap_pings table, ping new/changed
+# URLs to Google + IndexNow. Automatic replacement for firing force-index by hand.
+# 26s so a first-run batch (auth reused across URLs, capped at 25) fits comfortably.
+[functions."ping-sitemap"]
+  schedule = "0 5 * * *"
+  timeout = 26

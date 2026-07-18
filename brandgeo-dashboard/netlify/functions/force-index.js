@@ -53,7 +53,7 @@
  * anyway (this just fails fast, locally, with a clearer message).
  */
 
-const { google } = require('googleapis');
+const { pingUrl } = require('./_indexing');
 
 const ALLOWED_HOSTS = new Set([
   'getbrandgeo.com',
@@ -106,65 +106,27 @@ exports.handler = async (event) => {
     };
   }
 
-  if (!process.env.GOOGLE_JSON_KEY) {
-    console.error('[force-index] GOOGLE_JSON_KEY is not set');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials not configured' }) };
-  }
-
-  let credentials;
+  // Delegate the actual Google + IndexNow notification to the shared _indexing
+  // helper (also used by the scheduled ping-sitemap.js). pingUrl publishes to
+  // Google (throws on credential/API failure) then submits to IndexNow (never
+  // throws). The error-to-HTTP-status mapping below preserves this endpoint's
+  // original contract exactly (500 for missing/bad creds, 502 for API failure).
   try {
-    credentials = JSON.parse(process.env.GOOGLE_JSON_KEY);
-    if (typeof credentials.private_key === 'string') {
-      // Netlify env vars are stored as single-line strings; if the key was
-      // pasted with literal "\n" escapes rather than real newlines, this
-      // restores them. If it was pasted with real newlines already, this is
-      // a harmless no-op (there's nothing to replace).
-      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-    }
-  } catch (err) {
-    console.error('[force-index] GOOGLE_JSON_KEY did not parse as JSON:', err.message);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials malformed' }) };
-  }
-
-  try {
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/indexing'],
-    });
-    const authClient = await auth.getClient();
-    const indexing = google.indexing({ version: 'v3', auth: authClient });
-
-    const response = await indexing.urlNotifications.publish({
-      requestBody: { url: parsed.toString(), type },
-    });
-
-    console.log(`[force-index] ok | google | ${type} | ${parsed.toString()}`);
-
-    // IndexNow — deliberately wrapped in its own try/catch and never allowed
-    // to fail the whole request. Google's result is what this function's
-    // callers actually depend on; an IndexNow hiccup (key not configured yet,
-    // the endpoint being briefly down) should degrade to "skipped"/"failed"
-    // in the response, not turn a working Google notification into a 502.
-    let bing = { ok: false, skipped: true };
-    if (process.env.INDEXNOW_KEY) {
-      try {
-        const indexNowUrl = `https://api.indexnow.org/indexnow?url=${encodeURIComponent(parsed.toString())}&key=${process.env.INDEXNOW_KEY}`;
-        const bingResponse = await fetch(indexNowUrl);
-        bing = { ok: bingResponse.ok, status: bingResponse.status };
-        console.log(`[force-index] ${bingResponse.ok ? 'ok' : 'failed'} | indexnow | ${bingResponse.status} | ${parsed.toString()}`);
-      } catch (err) {
-        bing = { ok: false, error: err.message };
-        console.error('[force-index] IndexNow call failed:', err.message);
-      }
-    } else {
-      console.log('[force-index] INDEXNOW_KEY not set — skipping IndexNow (Bing/Yandex/etc.)');
-    }
-
+    const { google: googleData, bing } = await pingUrl(parsed.toString(), type);
+    console.log(`[force-index] ok | google | ${type} | ${parsed.toString()} | indexnow:${bing.ok ? 'ok' : (bing.skipped ? 'skipped' : 'failed')}`);
     return {
       statusCode: 200,
-      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: response.data, bing }),
+      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: googleData, bing }),
     };
   } catch (err) {
+    if (err.code === 'NO_CREDENTIALS') {
+      console.error('[force-index] GOOGLE_JSON_KEY is not set');
+      return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials not configured' }) };
+    }
+    if (err.code === 'BAD_CREDENTIALS') {
+      console.error('[force-index] GOOGLE_JSON_KEY did not parse as JSON:', err.message);
+      return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials malformed' }) };
+    }
     console.error('[force-index] Google Indexing API call failed:', err.message);
     return { statusCode: 502, body: JSON.stringify({ error: 'Google Indexing API call failed', detail: err.message }) };
   }
