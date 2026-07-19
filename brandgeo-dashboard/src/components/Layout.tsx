@@ -382,17 +382,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Brand identity for non-admins (viewers) — the client switcher above is
             admin-only, so this is where a signed-in member sees whose dashboard
-            this is and reaches their own account. (Ownership) */}
+            this is. STATIC identity only (logo + name): the actual profile link
+            is the single "My Profile" entry in the bottom actions, so this no
+            longer duplicates it. (Ownership; de-duped 2026-07-19) */}
         {!isAdmin && activeClient && (
           <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
-            <NavLink to="/account" onClick={closeSidebar}
-              className="flex items-center gap-2.5 px-1 py-1 rounded-lg hover:bg-dark-700 transition-colors group">
+            <div className="flex items-center gap-2.5 px-1 py-1">
               <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
               <span className="min-w-0 text-left">
                 <span className="block text-sm font-medium text-slate-200 truncate">{activeClient.name}</span>
-                <span className="block text-[11px] text-slate-500 group-hover:text-slate-400">View profile</span>
+                <span className="block text-[11px] text-slate-500">Your dashboard</span>
               </span>
-            </NavLink>
+            </div>
           </div>
         )}
 
