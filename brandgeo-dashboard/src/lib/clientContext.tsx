@@ -17,6 +17,10 @@ export interface Client {
   default_region_id: string | null
   stripe_customer_id: string | null
   category:          string   // active | free | test | research | archived (admin switcher grouping)
+  brand_website:     string | null   // powers the brand logo (Clearbit/favicon) app-wide
+  created_at:        string | null   // fallback for "client since" on the profile
+  subscription_started_at: string | null  // manual billing date (Managed/Pro, non-Stripe)
+  paid_until:        string | null   // manual "paid until" date (Managed/Pro, non-Stripe)
 }
 
 interface ClientCtx {
@@ -49,7 +53,7 @@ const Ctx = createContext<ClientCtx>({
   updateClientCategory:    async () => {},
 })
 
-const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category'
+const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category, brand_website, created_at, subscription_started_at, paid_until'
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const saved = parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
@@ -120,7 +124,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             .select('id, name, slug')
             .order('id')
           if (fallback) {
-            const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' }))
+            const withDefaults = fallback.map(c => ({ ...c, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active', brand_website: null, created_at: null, subscription_started_at: null, paid_until: null }))
             setClients(withDefaults as Client[])
             const validId = withDefaults.find(c => c.id === desired)?.id ?? withDefaults[0]?.id ?? 1
             setActiveClientIdState(validId)
@@ -148,7 +152,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         if (myErr || !myClients) {
           console.warn('[ClientCtx] client select failed (run DB migration):', myErr?.message)
           const { data: fb } = await supabase.from('clients').select('id, name, slug').eq('id', cid).single()
-          const one = (fb ? [{ ...fb, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active' }] : []) as Client[]
+          const one = (fb ? [{ ...fb, plan: 'essentials', engines_enabled: null, default_market_id: null, default_region_id: null, stripe_customer_id: null, category: 'active', brand_website: null, created_at: null, subscription_started_at: null, paid_until: null }] : []) as Client[]
           setClients(one)
           setActiveClientIdState(cid)
           setActiveClient(one[0] ?? null)

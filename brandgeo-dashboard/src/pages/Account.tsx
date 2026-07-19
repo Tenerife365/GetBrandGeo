@@ -1,17 +1,18 @@
 /**
- * Account.tsx — "My Profile" for any signed-in user (viewer or admin).
- * Profile (logo pulled from their website + brand, email, access level, plan),
- * plan-as-blocks with the current tier highlighted and upgrades in reach,
- * subscription status + renewal date, change-email, and a secure change-password
- * flow (current password required, then an emailed confirmation code).
+ * Account.tsx — the client's profile page (viewer or admin).
+ * Header reads as the brand's own profile (logo + brand name + site + plan).
+ * Shows plan-as-blocks with the current tier highlighted, subscription status +
+ * billing dates (started / paid-until — manual for non-Stripe Managed clients,
+ * editable by admins), change-email, and a secure change-password flow.
  */
 import { useEffect, useState } from 'react'
 import {
-  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Building2, RefreshCw, Crown,
+  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS } from '../lib/planConfig'
+import BrandLogo from '../components/BrandLogo'
 
 /** Plan ladder for the "plans as blocks" section — display prices only (source
  *  of truth for billing is Stripe / PRICING-SPEC.md). */
@@ -24,13 +25,6 @@ const PLAN_TIERS: { id: string; label: string; price: string }[] = [
   { id: 'enterprise', label: 'Enterprise', price: 'Custom' },
 ]
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
 function domainOf(url?: string | null): string | null {
   if (!url) return null
   try {
@@ -39,8 +33,17 @@ function domainOf(url?: string | null): string | null {
   } catch { return null }
 }
 
-const fmtDate = (unixSec: number) =>
+/** Format a Stripe unix-seconds timestamp. */
+const fmtUnix = (unixSec: number) =>
   new Date(unixSec * 1000).toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })
+
+/** Format a date string (YYYY-MM-DD or a full timestamp). Returns null if unusable. */
+const fmtDateStr = (s?: string | null): string | null => {
+  if (!s) return null
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })
+}
 
 interface SubInfo {
   active?: boolean
@@ -52,10 +55,18 @@ interface SubInfo {
 export default function Account() {
   const { activeClient, activeClientId, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
+  const website = activeClient?.brand_website ?? null
+  const domain = domainOf(website)
   const [email, setEmail] = useState('')
-  const [website, setWebsite] = useState<string | null>(null)
-  const [logoSrc, setLogoSrc] = useState<string | null>(null)
   const [sub, setSub] = useState<SubInfo | null>(null)
+
+  // billing dates (admin editor) — localDates overrides activeClient after a save
+  const [localDates, setLocalDates] = useState<{ started: string | null; paid: string | null } | null>(null)
+  const [editingDates, setEditingDates] = useState(false)
+  const [startedInput, setStartedInput] = useState('')
+  const [paidInput, setPaidInput] = useState('')
+  const [datesSaving, setDatesSaving] = useState(false)
+  const [datesMsg, setDatesMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // change email
   const [newEmail, setNewEmail] = useState('')
@@ -73,32 +84,18 @@ export default function Account() {
 
   const [billingLoading, setBillingLoading] = useState(false)
 
-  // Load email, website (for the logo), and subscription status.
+  // Reset any local date override when switching clients.
+  useEffect(() => { setLocalDates(null); setEditingDates(false); setDatesMsg(null) }, [activeClientId])
+
+  // Load the signed-in user's email.
   useEffect(() => {
     if (isDemoMode) { setEmail('demo@getbrandgeo.com'); return }
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ''))
-    if (activeClientId) {
-      supabase.from('clients').select('brand_website').eq('id', activeClientId).single()
-        .then(({ data }) => setWebsite(data?.brand_website ?? null))
-    }
   }, [activeClientId])
 
-  // Logo: try Clearbit (crisp brand logos), fall back to the site favicon, then
-  // to the initials avatar — "we already know your brand" trust signal.
-  const domain = domainOf(website)
-  useEffect(() => {
-    setLogoSrc(domain ? `https://logo.clearbit.com/${domain}` : null)
-  }, [domain])
-  const onLogoError = () => {
-    if (domain && logoSrc && logoSrc.includes('clearbit')) {
-      setLogoSrc(`https://www.google.com/s2/favicons?sz=128&domain_url=https://${domain}`)
-    } else {
-      setLogoSrc(null)
-    }
-  }
-
   // Subscription status + renewal date (Netlify function → Stripe). No-ops in dev
-  // preview (functions don't run under `vite`); shows after deploy.
+  // preview (functions don't run under `vite`); shows after deploy. Only relevant
+  // for Stripe self-serve clients; Managed/Pro are covered by the manual dates below.
   useEffect(() => {
     if (isDemoMode || !activeClientId) return
     ;(async () => {
@@ -151,10 +148,8 @@ export default function Account() {
     if (pw1.length < 8)  { setPwMsg({ ok: false, text: 'New password must be at least 8 characters.' }); return }
     if (pw1 !== pw2)     { setPwMsg({ ok: false, text: 'The two new passwords do not match.' }); return }
     setPwSaving(true)
-    // Prove they know the current password.
     const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: oldPw })
     if (signErr) { setPwSaving(false); setPwMsg({ ok: false, text: 'Your current password is incorrect.' }); return }
-    // Prove they own the email — Supabase emails a one-time code.
     const { error: reauthErr } = await supabase.auth.reauthenticate()
     setPwSaving(false)
     if (reauthErr) { setPwMsg({ ok: false, text: reauthErr.message }); return }
@@ -186,22 +181,66 @@ export default function Account() {
       `mailto:support@getbrandgeo.com?subject=${encodeURIComponent(`Upgrade to ${tier.label}`)}`
   }
 
+  // ── Effective billing dates ────────────────────────────────────────────────
+  const startedRaw = localDates ? localDates.started : (activeClient?.subscription_started_at ?? null)
+  const paidRaw    = localDates ? localDates.paid    : (activeClient?.paid_until ?? null)
+  const startedStr = fmtDateStr(startedRaw ?? activeClient?.created_at)  // fall back to record creation
+  const paidUntilStr = paidRaw
+    ? fmtDateStr(paidRaw)
+    : (sub?.active && sub.current_period_end ? fmtUnix(sub.current_period_end) : null)
+
+  const openDateEditor = () => {
+    setStartedInput((startedRaw ?? activeClient?.created_at ?? '').slice(0, 10))
+    setPaidInput(paidRaw ?? '')
+    setDatesMsg(null)
+    setEditingDates(true)
+  }
+
+  const saveDates = async () => {
+    setDatesMsg(null); setDatesSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/set-client-billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          client_id: activeClientId,
+          subscription_started_at: startedInput || null,
+          paid_until: paidInput || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Could not save dates.')
+      setLocalDates({ started: startedInput || null, paid: paidInput || null })
+      setEditingDates(false)
+      setDatesMsg({ ok: true, text: 'Billing dates saved.' })
+    } catch (e) {
+      setDatesMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setDatesSaving(false)
+    }
+  }
+
   const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
   const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50'
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-3xl mx-auto">
-      {/* Header — brand logo (or initials) + identity */}
+      {/* Header — brand identity: logo + name + site + plan */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden">
-          {logoSrc
-            ? <img src={logoSrc} alt={brandName} onError={onLogoError} className="w-full h-full object-contain bg-white" />
-            : initials(brandName)}
-        </div>
+        <BrandLogo name={brandName} website={website} sizeClass="w-14 h-14" roundedClass="rounded-2xl" textClass="text-lg" />
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-white tracking-tight">My Profile</h1>
-          <p className="text-sm text-slate-400 mt-0.5 truncate">
-            Signed in for <span className="text-slate-200 font-medium">{brandName}</span>
+          <h1 className="text-2xl font-semibold text-white tracking-tight truncate">{brandName}</h1>
+          <p className="text-sm text-slate-400 mt-0.5 truncate flex items-center gap-2 flex-wrap">
+            {domain && (
+              <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer"
+                className="text-brand-400 hover:text-brand-300 inline-flex items-center gap-1">
+                <Globe size={13} /> {domain}
+              </a>
+            )}
+            {domain && <span className="text-slate-600">·</span>}
+            <span>{planLabel} plan</span>
           </p>
         </div>
       </div>
@@ -210,7 +249,7 @@ export default function Account() {
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
         <h2 className="text-sm font-semibold text-slate-300 mb-4">Profile</h2>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
-          <Field icon={<Building2 size={15} />}   label="Brand"        value={brandName} />
+          <Field icon={<Globe size={15} />}       label="Website"      value={domain || '—'} />
           <Field icon={<Mail size={15} />}        label="Email"        value={email || '—'} />
           <Field icon={<ShieldCheck size={15} />} label="Access level" value={isAdmin ? 'Admin' : 'Member'} />
           <Field icon={<CreditCard size={15} />}  label="Current plan" value={planLabel} />
@@ -222,7 +261,7 @@ export default function Account() {
         <h2 className="text-sm font-semibold text-slate-300 mb-1">Plan &amp; billing</h2>
 
         {/* Subscription status line */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs mb-5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs mb-4">
           {sub?.active ? (
             <>
               <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
@@ -231,7 +270,7 @@ export default function Account() {
               {sub.current_period_end && (
                 <span className="text-slate-500">
                   · {sub.cancel_at_period_end ? 'ends' : 'renews'} on{' '}
-                  <span className="text-slate-300">{fmtDate(sub.current_period_end)}</span>
+                  <span className="text-slate-300">{fmtUnix(sub.current_period_end)}</span>
                 </span>
               )}
             </>
@@ -246,6 +285,52 @@ export default function Account() {
             </button>
           )}
         </div>
+
+        {/* Billing dates — client since / paid until (manual for non-Stripe clients) */}
+        <div className="flex flex-wrap items-center gap-x-10 gap-y-3 mb-5 pb-5 border-b border-dark-700">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Client since</div>
+            <div className="text-sm text-slate-200 font-medium">{startedStr ?? '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Paid until</div>
+            <div className={`text-sm font-medium ${paidUntilStr ? 'text-slate-200' : 'text-slate-500'}`}>{paidUntilStr ?? 'Not set'}</div>
+          </div>
+          {isAdmin && !editingDates && (
+            <button onClick={openDateEditor}
+              className="ml-auto inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-medium">
+              <Pencil size={12} /> Edit dates
+            </button>
+          )}
+          {datesMsg && !editingDates && (
+            <span className={`text-xs w-full ${datesMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{datesMsg.text}</span>
+          )}
+        </div>
+
+        {/* Admin date editor */}
+        {isAdmin && editingDates && (
+          <div className="mb-5 pb-5 border-b border-dark-700">
+            <div className="grid sm:grid-cols-2 gap-4 max-w-md">
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Client since</span>
+                <input type="date" value={startedInput} onChange={e => setStartedInput(e.target.value)} className={inputCls} />
+              </label>
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Paid until</span>
+                <input type="date" value={paidInput} onChange={e => setPaidInput(e.target.value)} className={inputCls} />
+              </label>
+            </div>
+            <div className="flex items-center gap-3 mt-3">
+              <button onClick={saveDates} disabled={datesSaving} className={primaryBtn}>
+                {datesSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Save dates
+              </button>
+              <button onClick={() => { setEditingDates(false); setDatesMsg(null) }}
+                className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+              {datesMsg && <span className={`text-xs ${datesMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{datesMsg.text}</span>}
+            </div>
+            <p className="text-[11px] text-slate-600 mt-2">Leave a field empty to clear it. Used for Managed/Pro clients billed outside the self-serve card flow.</p>
+          </div>
+        )}
 
         {/* Plans as blocks — current highlighted, higher tiers upgradeable */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

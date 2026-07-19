@@ -68,6 +68,10 @@
 [functions."set-client-category"]
   timeout = 15
 
+# Admin-only: set a client's manual billing dates (started / paid-until).
+[functions."set-client-billing"]
+  timeout = 15
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26

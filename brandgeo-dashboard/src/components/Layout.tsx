@@ -10,6 +10,7 @@ import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
+import BrandLogo from './BrandLogo'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
@@ -190,7 +191,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
-  const brandInitials = (activeClient?.name ?? '?').trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   // The profile page has no historical data, so hide the global time-filter bar there.
   const hideTimeFilter = useLocation().pathname === '/account'
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
@@ -309,7 +309,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 aria-haspopup="listbox"
                 aria-expanded={showClients}
               >
-                <Building2 size={13} className="text-brand-400 flex-shrink-0" />
+                <BrandLogo name={activeClient?.name ?? '?'} website={activeClient?.brand_website} sizeClass="w-5 h-5" roundedClass="rounded-md" textClass="text-[9px]" />
                 <span className="flex-1 text-left truncate font-medium">
                   {clients.find(c => c.id === activeClientId)?.name ?? t.sidebar_selectClient}
                 </span>
@@ -387,9 +387,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
             <NavLink to="/account" onClick={closeSidebar}
               className="flex items-center gap-2.5 px-1 py-1 rounded-lg hover:bg-dark-700 transition-colors group">
-              <span className="w-9 h-9 rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center text-xs font-bold shrink-0">
-                {brandInitials}
-              </span>
+              <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
               <span className="min-w-0 text-left">
                 <span className="block text-sm font-medium text-slate-200 truncate">{activeClient.name}</span>
                 <span className="block text-[11px] text-slate-500 group-hover:text-slate-400">View profile</span>
