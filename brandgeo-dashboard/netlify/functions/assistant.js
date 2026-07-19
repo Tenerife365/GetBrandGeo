@@ -171,6 +171,39 @@ function parseModelReply(text) {
   return { reply: obj.reply.trim() || fallback.reply, action, intent }
 }
 
+/**
+ * One Anthropic Messages call with a bounded timeout. Returns the parsed
+ * {reply, action, intent} on success, or null on ANY failure (non-200, error
+ * body, timeout, throw, empty reply) so the caller can fall back to another model.
+ */
+async function callAnthropic(model, apiKey, messages, timeoutMs) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system: SYSTEM_PROMPT, messages }),
+    })
+    if (!r.ok) { console.error(`[Assistant] ${model} non-200:`, r.status); return null }
+    const msg = await r.json()
+    if (msg?.error) { console.error(`[Assistant] ${model} error body:`, JSON.stringify(msg.error).slice(0, 200)); return null }
+    const rawText = msg?.content?.[0]?.type === 'text' ? msg.content[0].text : ''
+    const parsed = parseModelReply(rawText)
+    return parsed.reply ? parsed : null
+  } catch (e) {
+    console.error(`[Assistant] ${model} threw:`, e.message)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || event.headers['Origin'] || ''
   if (event.httpMethod === 'OPTIONS') return preflight(origin)
@@ -234,46 +267,30 @@ exports.handler = async (event) => {
   // Model routing: once a conversation has gone "hot" (the client echoes back
   // hot:true after any turn we classified hot), the senior specialist — Sonnet 5 —
   // takes over for consultative depth. Everyone else stays on fast/cheap Haiku.
-  const model = body.hot === true ? SONNET_MODEL : HAIKU_MODEL
+  const hot = body.hot === true
+  let parsed = null
+  let usedModel = HAIKU_MODEL
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages,
-      }),
-    })
-    if (!r.ok) {
-      console.error('[Assistant] Anthropic non-200:', r.status)
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
+  if (hot) {
+    // Try the senior model first (shorter budget so a Haiku fallback still fits
+    // inside Netlify's 26s window), then fall back to Haiku — a HOT lead must
+    // never hit the dead-end human-fallback just because Sonnet is unavailable.
+    usedModel = SONNET_MODEL
+    parsed = await callAnthropic(SONNET_MODEL, apiKey, messages, 14000)
+    if (!parsed) {
+      console.warn('[Assistant] senior model failed — falling back to Haiku')
+      usedModel = HAIKU_MODEL
+      parsed = await callAnthropic(HAIKU_MODEL, apiKey, messages, 10000)
     }
-    const msg = await r.json()
-    if (msg?.error) {
-      console.error('[Assistant] Anthropic error body:', JSON.stringify(msg.error).slice(0, 200))
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
-    }
-    const rawText = msg?.content?.[0]?.type === 'text' ? msg.content[0].text : ''
-    const parsed = parseModelReply(rawText)
-    if (!parsed.reply) parsed.reply = HUMAN_FALLBACK
-    console.log(`[Assistant] model:${model} intent:${parsed.intent || 'none'} action:${parsed.action?.type || 'none'}`)
-    return { statusCode: 200, headers, body: JSON.stringify(parsed) }
-  } catch (e) {
-    console.error('[Assistant] call threw:', e.message)
-    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
-  } finally {
-    clearTimeout(timer)
+  } else {
+    parsed = await callAnthropic(HAIKU_MODEL, apiKey, messages, TIMEOUT_MS)
   }
+
+  if (!parsed) {
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
+  }
+  console.log(`[Assistant] model:${usedModel} intent:${parsed.intent || 'none'} action:${parsed.action?.type || 'none'}`)
+  return { statusCode: 200, headers, body: JSON.stringify(parsed) }
 }
 
 // Exported for unit testing (no network involved).
