@@ -37,11 +37,12 @@ function esc(s){ return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','
  * support-request.js. Never throws; failure just means the DB row + any HubSpot
  * push remain the record.
  */
-async function emailLeadToTeam({ name, email, domain, need, reason }) {
+async function emailLeadToTeam({ name, email, domain, need, reason, hot }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   if (!RESEND_API_KEY) { console.log('[Assistant-Lead] RESEND_API_KEY not set — no team email'); return { sent: false } }
   const html =
-    `<h2 style="margin:0 0 8px">New assistant lead</h2>` +
+    `<h2 style="margin:0 0 8px">${hot ? '🔥 HOT lead' : 'New assistant lead'}</h2>` +
+    (hot ? `<p style="margin:2px 0;color:#c0392b"><strong>Priority: HOT</strong> — the visitor showed strong buying signals. Follow up fast.</p>` : '') +
     `<p style="margin:2px 0"><strong>Name:</strong> ${esc(name)}</p>` +
     `<p style="margin:2px 0"><strong>Email:</strong> ${esc(email)}</p>` +
     `<p style="margin:2px 0"><strong>Reason:</strong> ${esc(reason)}</p>` +
@@ -56,7 +57,7 @@ async function emailLeadToTeam({ name, email, domain, need, reason }) {
         from: 'BrandGEO Assistant <noreply@mail.getbrandgeo.com>',
         to: ['constantin@getbrandgeo.com'],
         reply_to: email || undefined,
-        subject: `[Assistant lead] ${name} — ${reason}`,
+        subject: `${hot ? '🔥 HOT lead' : '[Assistant lead]'} ${name} — ${reason}`,
         html,
       }),
     })
@@ -68,7 +69,7 @@ async function emailLeadToTeam({ name, email, domain, need, reason }) {
 }
 
 /** Push an assistant lead into HubSpot as a contact. Degrades gracefully. */
-async function pushAssistantLead({ name, email, domain, need, reason }) {
+async function pushAssistantLead({ name, email, domain, need, reason, hot }) {
   const apiKey = process.env.HUBSPOT_API_KEY
   if (!apiKey) {
     console.log('[Assistant-Lead] HUBSPOT_API_KEY not set — logged locally only')
@@ -84,7 +85,8 @@ async function pushAssistantLead({ name, email, domain, need, reason }) {
           firstname: name || undefined,
           website: domain || undefined,
           lifecyclestage: 'lead',
-          hs_lead_status: 'NEW',
+          // A hot lead comes in already "open" so it surfaces above cold NEW rows.
+          hs_lead_status: hot ? 'OPEN' : 'NEW',
           // Custom properties — HubSpot silently drops any it doesn't recognise,
           // so these are safe to send before the fields exist in the portal
           // (they simply won't populate until created). The full lead is also
@@ -92,6 +94,7 @@ async function pushAssistantLead({ name, email, domain, need, reason }) {
           brandgeo_lead_source: 'assistant',
           brandgeo_lead_reason: reason || undefined,
           brandgeo_lead_message: need || undefined,
+          brandgeo_lead_hot: hot ? 'true' : 'false',
         },
       }),
     })
@@ -136,6 +139,7 @@ exports.handler = async (event) => {
   const reason = ['sales', 'audit', 'support'].includes(reasonRaw) ? reasonRaw : 'sales'
   const domain = body.domain && isPlausibleDomain(normalizeDomain(body.domain))
     ? normalizeDomain(body.domain) : ''
+  const hot = body.hot === true   // conversation reached "hot" intent → prioritise
 
   if (!name || !EMAIL_RE.test(email)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Please share your name and a valid email.' }) }
@@ -164,17 +168,17 @@ exports.handler = async (event) => {
   const { error: logErr } = await supabase.from('assistant_events').insert([{
     ip_hash: ipHash,
     kind: 'lead',
-    meta: { name, email, need, reason, domain: domain || null },
+    meta: { name, email, need, reason, domain: domain || null, hot },
   }])
   if (logErr) console.error('[Assistant-Lead] local log failed:', logErr.message)
 
   // HubSpot push + team email are both best-effort and independent of the DB
   // backup above; run them in parallel so neither adds latency to the other.
   const [hs, mail] = await Promise.all([
-    pushAssistantLead({ name, email, domain, need, reason }),
-    emailLeadToTeam({ name, email, domain, need, reason }),
+    pushAssistantLead({ name, email, domain, need, reason, hot }),
+    emailLeadToTeam({ name, email, domain, need, reason, hot }),
   ])
-  console.log(`[Assistant-Lead] ${email} reason:${reason} hubspot:${hs.synced ? 'synced' : 'local-only:' + hs.reason} email:${mail.sent ? 'sent' : 'skipped'}`)
+  console.log(`[Assistant-Lead] ${email} reason:${reason} hot:${hot} hubspot:${hs.synced ? 'synced' : 'local-only:' + hs.reason} email:${mail.sent ? 'sent' : 'skipped'}`)
 
   return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
 }

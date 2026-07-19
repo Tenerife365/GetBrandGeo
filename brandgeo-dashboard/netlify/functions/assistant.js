@@ -29,7 +29,8 @@ const { createClient } = require('@supabase/supabase-js')
 const { corsHeaders, preflight, hashIp } = require('./_prospect_guard')
 const { ASSISTANT_KB } = require('./_assistant_kb')
 
-const MODEL = 'claude-haiku-4-5-20251001'
+const HAIKU_MODEL  = 'claude-haiku-4-5-20251001' // default: fast, cheap, grounded lookups
+const SONNET_MODEL = 'claude-sonnet-5'           // "hot" leads: consultative depth (gated by body.hot)
 const TIMEOUT_MS = 18000       // inside Netlify's 26s window, with headroom
 const MAX_TOKENS = 700
 const MAX_HISTORY = 14         // last N turns kept — bounds context/cost
@@ -43,14 +44,14 @@ const HUMAN_FALLBACK =
   'details along.'
 
 const SYSTEM_PROMPT =
-`You are the BrandGEO assistant — a concise, honest product specialist on the BrandGEO marketing website (getbrandgeo.com). BrandGEO is an AI Visibility / Generative Engine Optimization (GEO) monitoring platform.
+`You are Jamie, the BrandGEO assistant — a concise, honest product specialist on the BrandGEO marketing website (getbrandgeo.com). BrandGEO is an AI Visibility / Generative Engine Optimization (GEO) monitoring platform.
 
 YOUR JOB
 - Answer questions about BrandGEO accurately: what it does, the AI Visibility Score, the five engines, pricing tiers, the free audit, methodology, research.
 - Help a visitor start the free audit, talk to sales, or (if they're an existing customer) reach support.
 
 VOICE
-- First person singular ("I"). Name yourself only if it's natural; don't repeat it.
+- First person singular ("I"). You're Jamie — introduce yourself by name once at the start when it fits naturally, then don't keep repeating it. You are an AI assistant; never pretend to be a person, and when you hand someone to sales or support, that's the human team taking over.
 - Short sentences, plain words. Confident but honest. Never hypey, never pushy, no fake urgency.
 - No emoji in your prose.
 - Always leave a human hand-off available; never gatekeep.
@@ -62,14 +63,21 @@ HARD RULES (do not break these)
 - Keep replies short — usually 1-4 sentences. Link with plain URLs from the facts when useful.
 - For a broad "what does it cost / what are your plans" question, give a SHORT plain-text overview — the three self-serve tiers (Free, Essentials, Growth; €0 to €299/month) and the three managed tiers (Managed, Pro, Enterprise; done-for-you, from €900/month) — then offer the pricing page (https://getbrandgeo.com/#pricing) or to dig into whichever tier fits. Do NOT reproduce every tier's full feature list unless they ask about a specific tier.
 
-STRUCTURED ACTIONS
+STRUCTURED OUTPUT
 Reply as a single JSON object and nothing else:
-{"reply": "<your message to the visitor>", "action": <null or an action object>}
-Emit an action ONLY when the visitor clearly wants that next step:
+{"reply": "<your message to the visitor>", "action": <null or an action object>, "intent": "browsing" | "considering" | "hot"}
+
+ACTIONS — emit ONLY when the visitor clearly wants that next step:
 - Free audit: once you have a domain, {"type":"start_audit","domain":"<their-domain.com>"}. If they want the audit but haven't given a domain, ask for it in "reply" and keep action null.
 - Talk to sales / book a call / "email me" / a demo: {"type":"capture_lead","reason":"sales"}. Put a one-line lead-in in "reply" (e.g. that you'll grab a few details).
 - Existing customer needing help: {"type":"route_support"}.
 Otherwise action is null. Never emit more than one action. Keep "reply" natural — the widget shows buttons for the action, so don't dump raw URLs for it.
+
+INTENT — honestly classify THIS visitor's buying readiness from the whole conversation so far:
+- "browsing": general or early questions — what GEO is, how it works, definitions, curiosity. Most visitors are here.
+- "considering": actively evaluating — comparing tiers, asking pricing detail, weighing you against a competitor, asking whether it fits their specific business.
+- "hot": strong buying signals — asking for a demo or a call, asking specifically about Pro/Enterprise or the managed (done-for-you) service, mentioning a budget, a timeline, multiple brands or countries, or how to get started / sign up for a paid plan. When intent is "hot", proactively offer to connect them with the team (a quick call or an email follow-up) and, if they agree, emit capture_lead.
+Be honest — never inflate intent. Only mark "hot" on genuine buying signals; when unsure, use the lower level.
 
 GROUNDED FACTS
 ${ASSISTANT_KB}`
@@ -85,6 +93,7 @@ function sanitizeMessages(raw) {
 
 const VALID_ACTIONS = new Set(['start_audit', 'capture_lead', 'route_support'])
 const VALID_REASONS = new Set(['sales', 'audit', 'support'])
+const VALID_INTENTS = new Set(['browsing', 'considering', 'hot'])
 
 /**
  * Extract the FIRST brace-balanced JSON object from a string, ignoring any
@@ -124,7 +133,7 @@ function recoverReply(raw) {
 /** Tolerantly parse the model's JSON object; validate the action shape. */
 function parseModelReply(text) {
   const raw = String(text || '').trim()
-  const fallback = { reply: recoverReply(raw).trim(), action: null }
+  const fallback = { reply: recoverReply(raw).trim(), action: null, intent: null }
   let s = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
   const jsonStr = firstJsonObject(s)
   if (!jsonStr) return fallback
@@ -158,7 +167,8 @@ function parseModelReply(text) {
       action = { type: 'route_support' }
     }
   }
-  return { reply: obj.reply.trim() || fallback.reply, action }
+  const intent = VALID_INTENTS.has(obj.intent) ? obj.intent : null
+  return { reply: obj.reply.trim() || fallback.reply, action, intent }
 }
 
 exports.handler = async (event) => {
@@ -218,8 +228,13 @@ exports.handler = async (event) => {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     console.error('[Assistant] ANTHROPIC_API_KEY not set — returning fail-closed fallback')
-    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null }) }
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
   }
+
+  // Model routing: once a conversation has gone "hot" (the client echoes back
+  // hot:true after any turn we classified hot), the senior specialist — Sonnet 5 —
+  // takes over for consultative depth. Everyone else stays on fast/cheap Haiku.
+  const model = body.hot === true ? SONNET_MODEL : HAIKU_MODEL
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -233,7 +248,7 @@ exports.handler = async (event) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         max_tokens: MAX_TOKENS,
         system: SYSTEM_PROMPT,
         messages,
@@ -241,20 +256,21 @@ exports.handler = async (event) => {
     })
     if (!r.ok) {
       console.error('[Assistant] Anthropic non-200:', r.status)
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null }) }
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
     }
     const msg = await r.json()
     if (msg?.error) {
       console.error('[Assistant] Anthropic error body:', JSON.stringify(msg.error).slice(0, 200))
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null }) }
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
     }
     const rawText = msg?.content?.[0]?.type === 'text' ? msg.content[0].text : ''
     const parsed = parseModelReply(rawText)
     if (!parsed.reply) parsed.reply = HUMAN_FALLBACK
+    console.log(`[Assistant] model:${model} intent:${parsed.intent || 'none'} action:${parsed.action?.type || 'none'}`)
     return { statusCode: 200, headers, body: JSON.stringify(parsed) }
   } catch (e) {
     console.error('[Assistant] call threw:', e.message)
-    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null }) }
+    return { statusCode: 200, headers, body: JSON.stringify({ reply: HUMAN_FALLBACK, action: null, intent: null }) }
   } finally {
     clearTimeout(timer)
   }
