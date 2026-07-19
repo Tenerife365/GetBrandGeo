@@ -86,14 +86,59 @@ function sanitizeMessages(raw) {
 const VALID_ACTIONS = new Set(['start_audit', 'capture_lead', 'route_support'])
 const VALID_REASONS = new Set(['sales', 'audit', 'support'])
 
+/**
+ * Extract the FIRST brace-balanced JSON object from a string, ignoring any
+ * trailing junk the model appends after it (Haiku occasionally emits e.g.
+ * `{...}"}` or a stray `</...>` tag after the object). Tracks string/escape
+ * state so a `}` inside a quoted value doesn't close the object early.
+ */
+function firstJsonObject(s) {
+  const start = s.indexOf('{')
+  if (start === -1) return null
+  let depth = 0, inStr = false, esc = false
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i]
+    if (esc) { esc = false; continue }
+    if (ch === '\\') { if (inStr) esc = true; continue }
+    if (ch === '"') { inStr = !inStr; continue }
+    if (inStr) continue
+    if (ch === '{') depth++
+    else if (ch === '}') { depth--; if (depth === 0) return s.slice(start, i + 1) }
+  }
+  return null
+}
+
+/**
+ * Last-resort recovery: pull the "reply" string value straight out of a
+ * malformed envelope with a regex, so a raw {"reply": ...} blob can NEVER be
+ * shown to the visitor. Falls back to the raw text only if there's no envelope.
+ */
+function recoverReply(raw) {
+  const m = raw.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (m) {
+    try { return JSON.parse('"' + m[1] + '"') } catch { return m[1] }
+  }
+  return raw
+}
+
 /** Tolerantly parse the model's JSON object; validate the action shape. */
 function parseModelReply(text) {
-  const fallback = { reply: String(text || '').trim(), action: null }
-  let s = String(text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
-  const start = s.indexOf('{'), end = s.lastIndexOf('}')
-  if (start === -1 || end === -1 || end < start) return fallback
+  const raw = String(text || '').trim()
+  const fallback = { reply: recoverReply(raw).trim(), action: null }
+  let s = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  const jsonStr = firstJsonObject(s)
+  if (!jsonStr) return fallback
   let obj
-  try { obj = JSON.parse(s.slice(start, end + 1)) } catch { return fallback }
+  try { obj = JSON.parse(jsonStr) } catch { return fallback }
+
+  // Unwrap accidental double-encoding: {"reply":"{\"reply\":\"...\",\"action\":...}"}
+  let guard = 0
+  while (obj && typeof obj.reply === 'string' && /^\s*\{\s*"reply"\s*:/.test(obj.reply) && guard < 3) {
+    const inner = firstJsonObject(obj.reply)
+    if (!inner) break
+    try { obj = JSON.parse(inner) } catch { break }
+    guard++
+  }
   if (!obj || typeof obj.reply !== 'string') return fallback
 
   let action = null
