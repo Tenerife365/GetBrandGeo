@@ -26,6 +26,16 @@ const RULES = {
   linkedin:  { limit: 3000,  guide: 'Professional but not stiff. Open with a concrete claim or number, then 3 to 5 short paragraphs of substance, then 3 to 5 hashtags. No "excited to announce".' },
   gbp:       { limit: 1500,  guide: 'Google Business Profile post. Local and factual, 1 to 3 short paragraphs, no hashtags, and a clear call to action at the end.' },
   x:         { limit: 280,   guide: 'One tight post under 280 characters. One idea, no thread, at most 1 hashtag.' },
+  // The rest of Ayrshare's networks. A client may connect any of these, so the
+  // generator must not be narrower than what they can actually publish to.
+  bluesky:   { limit: 300,   guide: 'Short and plain, under 300 characters. No hashtag padding.' },
+  threads:   { limit: 500,   guide: 'Casual and direct, under 500 characters. Conversational, 1 to 2 hashtags at most.' },
+  tiktok:    { limit: 2200,  guide: 'Caption for a short video. Hook in the first line, a few relevant hashtags. Assumes a video is attached.' },
+  youtube:   { limit: 5000,  guide: 'Video description. First two lines carry the summary, then detail, then links.' },
+  pinterest: { limit: 500,   guide: 'Describes what the image shows and who it helps. Keyword-clear, no hashtag spam. Assumes an image is attached.' },
+  reddit:    { limit: 10000, guide: 'Plain, non-promotional, community-first. No hashtags, no marketing voice. Lead with the useful substance.' },
+  telegram:  { limit: 4096,  guide: 'Direct broadcast to subscribers. Short paragraphs, no hashtags.' },
+  snapchat:  { limit: 250,   guide: 'Very short and casual, under 250 characters.' },
 };
 
 function buildPrompt({ brand, website, brief, voice, platforms }) {

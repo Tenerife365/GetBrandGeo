@@ -221,6 +221,50 @@ client's profile from the live list → paste its Profile Key from the Ayrshare
 dashboard (Profiles → key icon) → Verify and link. The reply states how many
 channels came back, which is the confirmation that the right profile was bound.
 
+### ✅ Tenant isolation, unlimited channels, client self-service (2026-07-20)
+
+**1. Isolation — VERIFIED ON LIVE DATA, not assumed.** Impersonated the real
+Talentwelove (client 19) viewer JWT against the live DB. Across all four social
+tables: `own` rows visible, **`other` = 0 everywhere** (accounts own=4 other=0,
+posts 0/0, targets 0/0, profiles own=1 other=0). Selecting `profile_key` as that
+viewer raises `permission denied`, so the Ayrshare credential is unreadable even
+on the client's OWN row. Three independent layers hold this up: RLS
+(`is_admin() OR client_id = get_my_client_id()`), the column-level revoke from
+the binding migration, and the per-function `profile.client_id` check. Re-run the
+impersonation test after any RLS or grant change.
+
+**2. No cap on channels — all 13 networks, any number of accounts.** Previously
+capped at 5 in three places that would each have silently broken a client:
+`TO_AYR`/`FROM_AYR` **dropped** unknown networks from `listAccounts`, and the DB
+`check (platform in (...))` on `social_accounts` + `social_post_targets` would
+have **rejected the insert outright** for e.g. a TikTok account. Now all 13
+Ayrshare ids (`bluesky, facebook, gmb, instagram, linkedin, pinterest, reddit,
+snapchat, telegram, threads, tiktok, twitter, youtube`, docs-verified) are
+supported end to end: provider maps (`FROM_AYR` is now *derived* from `TO_AYR` so
+they cannot drift), `PLATFORMS`, the `SocialPlatform` type, `social-generate`'s
+per-network `RULES`, and both check constraints
+(`supabase-social-all-networks-migration.sql`, **APPLIED + VERIFIED**).
+UI: the four focus networks always show; any other network appears once the
+client actually connects it. The Accounts grid renders **one card per connected
+account, not per network**, so several Facebook Pages or Google Business
+locations all appear (`Facebook · 2 of 3`) instead of only the first. `NEEDS_MEDIA`
+now covers Instagram, TikTok, YouTube and Pinterest rather than Instagram alone.
+
+**3. Client self-service connecting (no shared passwords).** Ayrshare's SSO/JWT
+flow, and `createLinkingUrl` was already built for it: BrandGEO mints a
+short-lived JWT server-side, the client opens Ayrshare's hosted page, authorises
+each network with **that network's own OAuth login**, and comes back. No social
+username or password ever reaches BrandGEO, and nothing is stored here but the
+provider's revocable tokens. **Docs-verified: available on Launch**, not just
+Business, so the current trial covers it. The URL is valid **5 minutes** and is
+minted fresh per click. The Accounts tab now leads with a "Connect your channels"
+card stating the no-password-sharing guarantee, and the account list auto-refreshes
+when the user returns to the tab (the hosted page reports nothing back to us).
+🔴 **BLOCKED on two env vars** — `AYRSHARE_DOMAIN` (the exact domain Ayrshare
+assigns at onboarding) and `AYRSHARE_PRIVATE_KEY` (RSA key from the dashboard).
+Until they are set, `social-link` returns `url: null` plus a hint naming exactly
+what is missing, and accounts must be linked inside the Ayrshare dashboard.
+
 ### ⏳ Still pending
 - Bulk/campaign generation ("8 launch posts across 2 weeks"), brand-kit image gen.
 - Editing/canceling a scheduled post from the Calendar (the provider exposes

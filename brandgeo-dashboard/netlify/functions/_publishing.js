@@ -55,7 +55,10 @@
 
 // Internal platform ids used everywhere in the app + DB. Providers translate
 // these to their own vendor ids internally (e.g. Ayrshare: gbp->gmb, x->twitter).
-const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'gbp', 'x'];
+const PLATFORMS = [
+  'instagram', 'facebook', 'linkedin', 'gbp', 'x',
+  'bluesky', 'pinterest', 'reddit', 'snapchat', 'telegram', 'threads', 'tiktok', 'youtube',
+];
 
 const ayrshare = require('./_publishing_ayrshare');
 

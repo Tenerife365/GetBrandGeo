@@ -99,7 +99,9 @@ export interface DashboardStats {
 // ── AI Social ────────────────────────────────────────────────────────────────
 // Internal platform ids (mirror the DB check constraints + _publishing.js).
 // Ayrshare translation (gbp->gmb, x->twitter) is hidden inside the provider.
-export type SocialPlatform = 'instagram' | 'facebook' | 'linkedin' | 'gbp' | 'x'
+export type SocialPlatform =
+  | 'instagram' | 'facebook' | 'linkedin' | 'gbp' | 'x'
+  | 'bluesky' | 'pinterest' | 'reddit' | 'snapchat' | 'telegram' | 'threads' | 'tiktok' | 'youtube'
 
 export type SocialPostStatus =
   | 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'partial' | 'canceled'

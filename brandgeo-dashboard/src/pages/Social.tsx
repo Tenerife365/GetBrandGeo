@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Instagram, Facebook, Linkedin, MapPin, Twitter, Link2, RefreshCw, Send,
   CalendarClock, CheckCircle2, AlertTriangle, Clock, Sparkles, ExternalLink, Plus,
+  AtSign, Cloud, Music2, Youtube, Image, MessagesSquare, Ghost, ShieldCheck,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -10,22 +11,37 @@ import type {
 } from '../types'
 
 // ── Platform metadata ────────────────────────────────────────────────────────
-// Internal ids mirror _publishing.js PLATFORMS + the DB check constraints.
-// X is listed but disabled for the MVP (paid API) — see AI-SOCIAL.md.
+// All 13 networks Ayrshare supports (mirrors _publishing.js PLATFORMS + the DB
+// check constraints). A client may connect any subset — one account or all of
+// them — so nothing here caps that. `focus` marks the four the product leads
+// with: they sort first and are always shown, while the rest surface once the
+// client actually has that network connected, keeping the UI honest without
+// limiting it.
 const PLATFORMS: {
   id: SocialPlatform
   label: string
   icon: typeof Instagram
   limit: number
   hint: string
-  mvp: boolean
+  focus: boolean
 }[] = [
-  { id: 'instagram', label: 'Instagram',             icon: Instagram, limit: 2200,  hint: 'Needs at least one image or video.', mvp: true },
-  { id: 'facebook',  label: 'Facebook',              icon: Facebook,  limit: 63206, hint: 'Conversational tone works best.',    mvp: true },
-  { id: 'linkedin',  label: 'LinkedIn',              icon: Linkedin,  limit: 3000,  hint: '3 to 5 hashtags, professional.',     mvp: true },
-  { id: 'gbp',       label: 'Google Business',       icon: MapPin,    limit: 1500,  hint: 'Include a clear call to action.',    mvp: true },
-  { id: 'x',         label: 'X',                     icon: Twitter,   limit: 280,   hint: 'Paid API, not enabled yet.',         mvp: false },
+  { id: 'instagram', label: 'Instagram',       icon: Instagram, limit: 2200,  hint: 'Needs at least one image or video.', focus: true },
+  { id: 'facebook',  label: 'Facebook',        icon: Facebook,  limit: 63206, hint: 'Conversational tone works best.',    focus: true },
+  { id: 'linkedin',  label: 'LinkedIn',        icon: Linkedin,  limit: 3000,  hint: '3 to 5 hashtags, professional.',     focus: true },
+  { id: 'gbp',       label: 'Google Business', icon: MapPin,    limit: 1500,  hint: 'Include a clear call to action.',    focus: true },
+  { id: 'x',         label: 'X',               icon: Twitter,   limit: 280,   hint: 'One idea, at most 1 hashtag.',       focus: false },
+  { id: 'threads',   label: 'Threads',         icon: AtSign,    limit: 500,   hint: 'Casual and direct.',                 focus: false },
+  { id: 'bluesky',   label: 'Bluesky',         icon: Cloud,     limit: 300,   hint: 'Short and plain.',                   focus: false },
+  { id: 'tiktok',    label: 'TikTok',          icon: Music2,    limit: 2200,  hint: 'Caption for a video. Needs media.',  focus: false },
+  { id: 'youtube',   label: 'YouTube',         icon: Youtube,   limit: 5000,  hint: 'Video description. Needs media.',    focus: false },
+  { id: 'pinterest', label: 'Pinterest',       icon: Image,     limit: 500,   hint: 'Needs an image.',                    focus: false },
+  { id: 'reddit',    label: 'Reddit',          icon: MessagesSquare, limit: 10000, hint: 'Community-first, no marketing voice.', focus: false },
+  { id: 'telegram',  label: 'Telegram',        icon: Send,      limit: 4096,  hint: 'Broadcast to subscribers.',          focus: false },
+  { id: 'snapchat',  label: 'Snapchat',        icon: Ghost,     limit: 250,   hint: 'Very short and casual.',             focus: false },
 ]
+
+// Networks that cannot publish without an image or video attached.
+const NEEDS_MEDIA: SocialPlatform[] = ['instagram', 'tiktok', 'youtube', 'pinterest']
 
 const platformMeta = (id: SocialPlatform) => PLATFORMS.find(p => p.id === id)
 
@@ -161,6 +177,14 @@ export default function Social() {
     [accounts],
   )
 
+  // What to show: the four focus networks always, plus any other network this
+  // client has actually connected. A client with a single Bluesky account sees
+  // Bluesky; a client with nine networks sees all nine.
+  const visiblePlatforms = useMemo(
+    () => PLATFORMS.filter(p => p.focus || connected.has(p.id)),
+    [connected],
+  )
+
   // Admin: read the current binding (and the key hint, which social-accounts
   // does not carry). Non-admins get their binding state from social-accounts.
   const loadBinding = useCallback(async () => {
@@ -272,7 +296,14 @@ export default function Social() {
       const data = await authedPost<{ url: string | null; hint?: string; error?: string }>(
         'social-link', { client_id: activeClientId },
       )
-      if (data.url) { window.open(data.url, '_blank', 'noopener'); return }
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener')
+        // The linking page is a separate tab and tells us nothing when it
+        // finishes, so refresh the list when the user comes back to this one.
+        const onReturn = () => { loadAccounts(); window.removeEventListener('focus', onReturn) }
+        window.addEventListener('focus', onReturn)
+        return
+      }
       setAccountsNote(data.hint || data.error || 'In-app linking is not available on this plan.')
     } catch (e) {
       setAccountsNote((e as Error).message)
@@ -300,7 +331,7 @@ export default function Social() {
   const [autoSelected, setAutoSelected] = useState(false)
   useEffect(() => {
     if (autoSelected || accountsLoading) return
-    const initial = PLATFORMS.filter(p => p.mvp && connected.has(p.id)).map(p => p.id)
+    const initial = PLATFORMS.filter(p => connected.has(p.id)).map(p => p.id)
     if (initial.length) { setSelected(initial); setAutoSelected(true) }
   }, [accountsLoading, connected, autoSelected])
 
@@ -325,7 +356,7 @@ export default function Social() {
         {
           client_id: activeClientId,
           brief: brief.trim(),
-          platforms: selected.length ? selected : PLATFORMS.filter(p => p.mvp).map(p => p.id),
+          platforms: selected.length ? selected : visiblePlatforms.map(p => p.id),
         },
       )
       if (data.base_text) setBaseText(data.base_text)
@@ -333,7 +364,7 @@ export default function Social() {
         setOverrides(prev => ({ ...prev, ...data.platforms }))
         // Surface what was generated so the per-platform cards are open to review.
         const generated = Object.keys(data.platforms) as SocialPlatform[]
-        setSelected(prev => Array.from(new Set([...prev, ...generated.filter(p => platformMeta(p)?.mvp)])))
+        setSelected(prev => Array.from(new Set([...prev, ...generated.filter(p => !!platformMeta(p))])))
       }
     } catch (e) {
       setGenError((e as Error).message)
@@ -347,8 +378,10 @@ export default function Social() {
     setResult(null)
     if (!selected.length) { setResult({ ok: false, text: 'Pick at least one platform.' }); return }
     const media = parseMedia(mediaRaw)
-    if (selected.includes('instagram') && !media.length) {
-      setResult({ ok: false, text: 'Instagram needs at least one image or video URL.' })
+    const needsMedia = selected.filter(p => NEEDS_MEDIA.includes(p))
+    if (needsMedia.length && !media.length) {
+      const names = needsMedia.map(p => platformMeta(p)?.label ?? p).join(' and ')
+      setResult({ ok: false, text: `${names} need${needsMedia.length > 1 ? '' : 's'} at least one image or video URL.` })
       return
     }
     const tooLong = selected.find(p => {
@@ -616,18 +649,32 @@ export default function Social() {
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-slate-400">
-              Accounts connected to this workspace. Linking happens in your publishing
-              provider, then shows up here.
-            </p>
-            <div className="flex gap-2 shrink-0">
-              <button onClick={loadAccounts} className={secondaryBtn} disabled={accountsLoading}>
-                <RefreshCw size={15} className={accountsLoading ? 'animate-spin' : ''} /> Refresh
-              </button>
-              <button onClick={startLinking} className={primaryBtn} disabled={linking || !configured}>
-                <Link2 size={15} /> Connect
-              </button>
+          {/* Self-service connect. The button opens a one-time secure page where
+              the client authorises each network with that network's own login.
+              Passwords never reach BrandGEO, and we store no social credentials —
+              only the provider's revocable tokens. */}
+          <div className={`${card} p-5`}>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0 max-w-2xl">
+                <h2 className="text-sm font-medium text-white">Connect your channels</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Connect as many accounts as you like, on any of the supported networks.
+                  You sign in with each network directly, so you never share a username or
+                  password with us, and you can disconnect any account at any time.
+                </p>
+                <p className="text-xs text-slate-500 mt-2 inline-flex items-center gap-1.5">
+                  <ShieldCheck size={13} className="text-emerald-400" />
+                  The secure link is valid for 5 minutes and is created fresh each time.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={loadAccounts} className={secondaryBtn} disabled={accountsLoading}>
+                  <RefreshCw size={15} className={accountsLoading ? 'animate-spin' : ''} /> Refresh
+                </button>
+                <button onClick={startLinking} className={primaryBtn} disabled={linking || !configured}>
+                  <Link2 size={15} /> {linking ? 'Opening…' : 'Connect accounts'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -635,26 +682,46 @@ export default function Social() {
             <p className="text-xs text-slate-400 bg-dark-800 border border-dark-700 rounded-lg p-3">{accountsNote}</p>
           )}
 
+          {/* One card per CONNECTED ACCOUNT, not per network: a client may run
+              several Facebook Pages or Google Business locations, and collapsing
+              them to one row per network would hide the extras. Networks with
+              nothing connected still get a placeholder card so the four focus
+              networks are visibly available to connect. */}
           <div className="grid gap-3 sm:grid-cols-2">
-            {PLATFORMS.map(p => {
-              const acc = accounts.find(a => a.platform === p.id)
+            {visiblePlatforms.flatMap(p => {
+              const mine = accounts.filter(a => a.platform === p.id)
               const Icon = p.icon
-              return (
-                <div key={p.id} className={`${card} p-4 flex items-center gap-3`}>
+              if (!mine.length) {
+                return [(
+                  <div key={p.id} className={`${card} p-4 flex items-center gap-3`}>
+                    <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center shrink-0">
+                      <Icon size={18} className="text-slate-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-white font-medium">{p.label}</p>
+                      <p className="text-xs text-slate-500 truncate">Not connected</p>
+                    </div>
+                    <span className="text-xs text-slate-600">—</span>
+                  </div>
+                )]
+              }
+              return mine.map((acc, i) => (
+                <div key={`${p.id}-${acc.externalId ?? i}`} className={`${card} p-4 flex items-center gap-3`}>
                   <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center shrink-0">
-                    <Icon size={18} className={acc ? 'text-brand-300' : 'text-slate-500'} />
+                    <Icon size={18} className="text-brand-300" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-white font-medium">{p.label}</p>
+                    <p className="text-sm text-white font-medium">
+                      {p.label}
+                      {mine.length > 1 && <span className="text-slate-500 font-normal"> · {i + 1} of {mine.length}</span>}
+                    </p>
                     <p className="text-xs text-slate-500 truncate">
-                      {acc ? (acc.displayName || acc.externalId || 'Connected') : (p.mvp ? 'Not connected' : p.hint)}
+                      {acc.displayName || acc.externalId || 'Connected'}
                     </p>
                   </div>
-                  {acc
-                    ? <StatusBadge status={acc.status === 'connected' ? 'published' : 'failed'} />
-                    : <span className="text-xs text-slate-600">—</span>}
+                  <StatusBadge status={acc.status === 'connected' ? 'published' : 'failed'} />
                 </div>
-              )
+              ))
             })}
           </div>
         </section>
@@ -739,7 +806,7 @@ export default function Social() {
           <div className={`${card} p-5`}>
             <h2 className="text-sm font-medium text-white mb-3">Platforms</h2>
             <div className="flex flex-wrap gap-2 mb-5">
-              {PLATFORMS.map(p => {
+              {visiblePlatforms.map(p => {
                 const Icon = p.icon
                 const on = selected.includes(p.id)
                 const isConnected = connected.has(p.id)
@@ -747,9 +814,8 @@ export default function Social() {
                   <button
                     key={p.id}
                     onClick={() => togglePlatform(p.id)}
-                    disabled={!p.mvp}
                     aria-pressed={on}
-                    title={!p.mvp ? p.hint : isConnected ? 'Connected' : 'Not connected yet — publishing will fail until it is linked'}
+                    title={isConnected ? 'Connected' : 'Not connected yet — publishing will fail until it is linked'}
                     className={[
                       'inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                       on
@@ -758,7 +824,7 @@ export default function Social() {
                     ].join(' ')}
                   >
                     <Icon size={15} /> {p.label}
-                    {p.mvp && !isConnected && <span className="text-[10px] text-amber-400">not linked</span>}
+                    {!isConnected && <span className="text-[10px] text-amber-400">not linked</span>}
                   </button>
                 )
               })}

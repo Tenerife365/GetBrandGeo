@@ -19,13 +19,33 @@
 const API_BASE = 'https://api.ayrshare.com/api';
 const TIMEOUT_MS = 23000; // return before Netlify's 26s hard kill
 
-// internal id -> Ayrshare platform id
-const TO_AYR = { instagram: 'instagram', facebook: 'facebook', linkedin: 'linkedin', gbp: 'gmb', x: 'twitter' };
-// Ayrshare platform id -> internal id
-const FROM_AYR = { instagram: 'instagram', facebook: 'facebook', linkedin: 'linkedin', gmb: 'gbp', twitter: 'x' };
+// ALL 13 networks Ayrshare supports. A client may link any subset -- one
+// account or all of them -- so nothing here (or in the DB check constraints,
+// see supabase-social-all-networks-migration.sql) may cap that. A network
+// missing from these maps is silently DROPPED by listAccounts and rejected by
+// publish, which is why the full set is listed rather than just the four the
+// product currently focuses on.
+//
+// Internal ids equal Ayrshare's own ids except the two historical translations:
+// gbp <-> gmb and x <-> twitter.
+const TO_AYR = {
+  instagram: 'instagram', facebook: 'facebook', linkedin: 'linkedin', gbp: 'gmb', x: 'twitter',
+  bluesky: 'bluesky', pinterest: 'pinterest', reddit: 'reddit', snapchat: 'snapchat',
+  telegram: 'telegram', threads: 'threads', tiktok: 'tiktok', youtube: 'youtube',
+};
+// Ayrshare platform id -> internal id (inverse of TO_AYR, derived so the two
+// can never drift apart).
+const FROM_AYR = Object.fromEntries(Object.entries(TO_AYR).map(([internal, ayr]) => [ayr, internal]));
 
-// Ayrshare per-platform options key for each internal platform
-const OPTIONS_KEY = { instagram: 'instagramOptions', facebook: 'faceBookOptions', linkedin: 'linkedInOptions', gbp: 'gmbOptions', x: 'twitterOptions' };
+// Ayrshare per-platform options key for each internal platform. Note the
+// irregular casing Ayrshare uses (faceBookOptions, linkedInOptions) -- these are
+// their spellings, not typos.
+const OPTIONS_KEY = {
+  instagram: 'instagramOptions', facebook: 'faceBookOptions', linkedin: 'linkedInOptions',
+  gbp: 'gmbOptions', x: 'twitterOptions', bluesky: 'blueskyOptions', pinterest: 'pinterestOptions',
+  reddit: 'redditOptions', snapchat: 'snapchatOptions', telegram: 'telegramOptions',
+  threads: 'threadsOptions', tiktok: 'tikTokOptions', youtube: 'youTubeOptions',
+};
 
 function apiKey() {
   return process.env.AYRSHARE_API_KEY || '';

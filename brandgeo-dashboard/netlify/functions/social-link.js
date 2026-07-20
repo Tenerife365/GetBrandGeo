@@ -43,7 +43,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         url: null,
-        hint: 'In-app linking needs the Ayrshare multi-profile SSO env vars (AYRSHARE_DOMAIN + AYRSHARE_PRIVATE_KEY). On the Premium plan, link your accounts directly in the Ayrshare dashboard, then they appear here.',
+        hint: 'Self-service connecting is not switched on yet. It needs the Ayrshare SSO credentials in Netlify: AYRSHARE_DOMAIN (the exact domain Ayrshare gives you at onboarding) and AYRSHARE_PRIVATE_KEY (the RSA private key from the Ayrshare dashboard). Until then, accounts have to be linked inside the Ayrshare dashboard by whoever holds that login.',
       }),
     };
   } catch (e) {
