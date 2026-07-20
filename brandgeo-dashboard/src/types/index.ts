@@ -95,3 +95,56 @@ export interface DashboardStats {
   mentionsCount: number
   competitorOpportunities: number
 }
+
+// ── AI Social ────────────────────────────────────────────────────────────────
+// Internal platform ids (mirror the DB check constraints + _publishing.js).
+// Ayrshare translation (gbp->gmb, x->twitter) is hidden inside the provider.
+export type SocialPlatform = 'instagram' | 'facebook' | 'linkedin' | 'gbp' | 'x'
+
+export type SocialPostStatus =
+  | 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'partial' | 'canceled'
+
+export type SocialTargetStatus =
+  | 'pending' | 'scheduled' | 'published' | 'failed' | 'skipped'
+
+export interface SocialMedia {
+  url: string
+  type?: 'image' | 'video'
+  alt?: string
+}
+
+export interface SocialAccount {
+  platform: SocialPlatform
+  displayName: string | null
+  externalId: string | null
+  status: 'connected' | 'disconnected' | 'error'
+}
+
+export interface SocialPostTarget {
+  id: number
+  post_id: number
+  platform: SocialPlatform
+  text_override: string | null
+  media_override: SocialMedia[] | null
+  status: SocialTargetStatus
+  provider_ref: string | null
+  permalink: string | null
+  error: string | null
+  published_at: string | null
+}
+
+export interface SocialPost {
+  id: number
+  client_id: number
+  status: SocialPostStatus
+  source: 'manual' | 'ai'
+  brief: string | null
+  base_text: string | null
+  base_media: SocialMedia[]
+  scheduled_at: string | null
+  provider_post_id: string | null
+  error: string | null
+  created_at: string
+  updated_at: string
+  targets?: SocialPostTarget[]
+}
