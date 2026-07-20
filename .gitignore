@@ -39,3 +39,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Ayrshare SSO integration package: contains the RSA private key and the
+# account API key. Never commit it.
+integration-guides_*.zip
+*-private-key.key
+*.pem

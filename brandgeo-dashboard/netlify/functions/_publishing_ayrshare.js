@@ -166,16 +166,42 @@ async function verifyProfileKey({ profileKey } = {}) {
 // Returns null when SSO env isn't configured (Premium: link in the Ayrshare
 // dashboard instead) so callers can fall back to guidance.
 async function createLinkingUrl({ profileKey } = {}) {
-  const domain = process.env.AYRSHARE_DOMAIN;
-  const privateKey = process.env.AYRSHARE_PRIVATE_KEY;
+  const domain = (process.env.AYRSHARE_DOMAIN || '').trim();
+  const privateKey = normalizePem(process.env.AYRSHARE_PRIVATE_KEY);
+  // Genuinely not configured -> null, so the caller can show setup guidance.
   if (!domain || !privateKey) return null;
 
   const body = { domain, privateKey };
   if (profileKey) body.profileKey = profileKey;
 
-  const { ok, json } = await ayr('/profiles/generateJWT', { method: 'POST', body });
-  if (!ok || !json.url) return null;
+  const { ok, statusCode, json } = await ayr('/profiles/generateJWT', { method: 'POST', body });
+  if (!ok || !json.url) {
+    // Configured but REJECTED. Returning null here would make the caller say
+    // "not switched on yet", sending whoever just set these vars back to set
+    // them again. Say what Ayrshare actually answered instead.
+    throw new Error(
+      `Ayrshare rejected the SSO credentials (HTTP ${statusCode}): ${json.message || json.error || 'no url returned'}. ` +
+      'Check AYRSHARE_DOMAIN is the exact domain Ayrshare gave at onboarding, and that AYRSHARE_PRIVATE_KEY is the whole RSA private key including the BEGIN and END lines.',
+    );
+  }
   return { url: json.url };
+}
+
+// Netlify env vars are single-line in practice: a pasted PEM arrives either with
+// real newlines, with literal backslash-n, or base64 encoded. Accept all three,
+// because a mangled key fails with an opaque rejection rather than saying so.
+function normalizePem(raw) {
+  let v = (raw || '').trim();
+  if (!v) return '';
+  if (v.includes('\\n')) v = v.replace(/\\n/g, '\n');
+  if (!/BEGIN [A-Z ]*PRIVATE KEY/.test(v)) {
+    // No PEM header: assume base64 of the whole PEM and decode it.
+    try {
+      const decoded = Buffer.from(v, 'base64').toString('utf8');
+      if (/BEGIN [A-Z ]*PRIVATE KEY/.test(decoded)) return decoded.trim();
+    } catch { /* fall through and return as-is so the API reports the real problem */ }
+  }
+  return v;
 }
 
 // -- publish -----------------------------------------------------------------
