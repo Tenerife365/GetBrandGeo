@@ -98,11 +98,21 @@ exports.handler = async (event) => {
       const key = String(body.profile_key || '').trim();
       if (!key) return fail('profile_key required');
 
+      // Catch the credential mix-up the Ayrshare dashboard invites: the RSA SSO
+      // "Private Key" sits next to the "Profile Key" and its rejection message
+      // ("The Profile Key is invalid") gives no hint that the wrong KIND of
+      // credential was pasted. A Profile Key is a short dashed token.
+      if (/BEGIN [A-Z ]*PRIVATE KEY/i.test(key) || key.length > 120) {
+        return fail('That looks like the RSA Private Key (the long -----BEGIN PRIVATE KEY----- block), not a Profile Key. The Profile Key is a short dashed token like 7TVRLEZ-24A43C0-NJW0Z82-F11984N, found in the Ayrshare dashboard under Profiles via the key icon. The Private Key belongs in the AYRSHARE_PRIVATE_KEY Netlify variable instead.');
+      }
+
       // Verify BEFORE storing: a wrong key that silently persisted would send
       // this client's posts to another brand's channels.
       if (typeof provider.verifyProfileKey === 'function') {
         const check = await provider.verifyProfileKey({ profileKey: key });
-        if (!check.ok) return fail(check.error || 'That profile key was rejected.');
+        if (!check.ok) {
+          return fail(`${check.error || 'That profile key was rejected.'} Check you copied the Profile Key (short dashed token, via the key icon next to the profile in Ayrshare) and not the API key or the RSA Private Key.`);
+        }
 
         const { error } = await supabase.from('social_profiles').update({
           profile_key: key,
