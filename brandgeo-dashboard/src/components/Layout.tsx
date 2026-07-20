@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard, User,
+  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -143,6 +143,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       label: 'Manage',
       items: [
         { to: '/prompts', icon: BookText, label: t.nav_prompts },
+        // AI Social is internal-first (AI-SOCIAL.md) — admin-only until it graduates
+        // into a customer-facing feature.
+        ...(isAdmin ? [{ to: '/social', icon: Share2, label: 'AI Social' }] : []),
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],

@@ -130,3 +130,18 @@
 [functions."ping-sitemap"]
   schedule = "0 5 * * *"
   timeout = 26
+
+# ── AI Social publishing (social-*.js) ────────────────────────────────────────
+# social-publish/social-status loop one provider (Ayrshare) call per platform,
+# so up to ~5 sequential HTTP calls -> give them the full 26s window rather than
+# the default 10s. social-accounts/social-link make a single call and are quick.
+[functions."social-publish"]
+  timeout = 26
+
+[functions."social-status"]
+  timeout = 26
+
+# Phase 2: one Claude call (internal timeout 20s) that writes per-platform copy.
+# Needs more than the default 10s for the same reason assistant.js does.
+[functions."social-generate"]
+  timeout = 26
