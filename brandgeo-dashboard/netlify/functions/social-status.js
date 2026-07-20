@@ -5,7 +5,7 @@
 // ============================================================================
 const { requireAuth } = require('./_auth');
 const { getProvider } = require('./_publishing');
-const { ensureSocialProfile, rollupPostStatus } = require('./_social');
+const { ensureSocialProfile, requireBoundProfile, rollupPostStatus } = require('./_social');
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
@@ -35,6 +35,11 @@ exports.handler = async (event) => {
     if (!targets || !targets.length) return { statusCode: 404, headers, body: JSON.stringify({ error: 'no targets for post' }) };
 
     const sp = await ensureSocialProfile(supabase, client_id);
+    // Same reason as social-accounts: a null key would query the primary
+    // profile and report another workspace's post state as this one's.
+    const unbound = requireBoundProfile(sp);
+    if (unbound) return { statusCode: 200, headers, body: JSON.stringify({ error: unbound, unbound: true }) };
+
     const refs = targets.filter((t) => t.provider_ref).map((t) => ({ platform: t.platform, ref: t.provider_ref }));
     const statuses = await provider.getStatus({ refs, profileKey: sp.profile_key });
 

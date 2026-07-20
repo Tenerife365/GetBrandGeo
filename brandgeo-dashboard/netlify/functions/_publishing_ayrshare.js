@@ -91,6 +91,56 @@ async function listAccounts({ profileKey } = {}) {
     .filter(Boolean);
 }
 
+// -- listProfiles ------------------------------------------------------------
+// GET /profiles -> every User Profile on the Ayrshare account (the Primary
+// Profile itself is excluded by Ayrshare).
+//
+// IMPORTANT, and the reason binding needs a human paste: Ayrshare NEVER returns
+// profileKey here ("For security, the Profile Keys are not returned via this GET
+// call"). It is returned only by createProfile() below, or copied out of the
+// Ayrshare dashboard. So this list is for IDENTIFYING which profile is which
+// (title / refId / which channels it already has), not for obtaining its key.
+async function listProfiles() {
+  const { ok, json } = await ayr('/profiles', { method: 'GET' });
+  if (!ok) return [];
+  const arr = Array.isArray(json.profiles) ? json.profiles : Array.isArray(json) ? json : [];
+  return arr.map((p) => ({
+    title: p.title || p.displayTitle || null,
+    refId: p.refId || null,
+    status: p.status || null,
+    suspended: !!p.suspended,
+    // Translate to our internal ids and drop networks we don't surface.
+    platforms: (Array.isArray(p.activeSocialAccounts) ? p.activeSocialAccounts : [])
+      .map((a) => FROM_AYR[a]).filter(Boolean),
+  }));
+}
+
+// -- createProfile -----------------------------------------------------------
+// POST /profiles/profile -> { refId, profileKey }. This is the ONLY API path
+// that yields a profileKey, so the key must be persisted here and now.
+// A freshly created profile has NO social accounts linked yet.
+async function createProfile({ title } = {}) {
+  if (!title) throw new Error('title required');
+  const { ok, json } = await ayr('/profiles/profile', { method: 'POST', body: { title } });
+  if (!ok || !json.profileKey) {
+    throw new Error(json.message || `create profile failed (HTTP ${json.status || '?'})`);
+  }
+  return { title: json.title || title, refId: json.refId || null, profileKey: json.profileKey };
+}
+
+// -- verifyProfileKey --------------------------------------------------------
+// Prove a pasted key is real (and see whose channels it owns) BEFORE storing it,
+// by calling GET /user with it. Returns the connected accounts on success.
+async function verifyProfileKey({ profileKey } = {}) {
+  if (!profileKey) return { ok: false, error: 'missing profile key' };
+  const { ok, statusCode, json } = await ayr('/user', { method: 'GET', profileKey });
+  if (!ok) {
+    return { ok: false, error: json.message || `Ayrshare rejected this profile key (HTTP ${statusCode})` };
+  }
+  const accounts = await listAccounts({ profileKey });
+  return { ok: true, title: json.title || json.displayTitle || null, refId: json.refId || null, accounts };
+}
+
 // -- createLinkingUrl --------------------------------------------------------
 // Mints a JWT + hosted linking URL (Business/Launch multi-profile SSO).
 // Returns null when SSO env isn't configured (Premium: link in the Ayrshare
@@ -187,4 +237,7 @@ async function deletePost({ ref, profileKey } = {}) {
   return { ok, error: ok ? undefined : (json.message || 'delete failed') };
 }
 
-module.exports = { isConfigured, listAccounts, createLinkingUrl, publish, getStatus, deletePost };
+module.exports = {
+  isConfigured, listAccounts, createLinkingUrl, publish, getStatus, deletePost,
+  listProfiles, createProfile, verifyProfileKey,
+};

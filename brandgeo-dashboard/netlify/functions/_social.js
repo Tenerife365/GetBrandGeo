@@ -8,7 +8,7 @@
 async function ensureSocialProfile(supabase, clientId) {
   const { data: existing } = await supabase
     .from('social_profiles')
-    .select('client_id, provider, profile_key, ref_id, brand_voice')
+    .select('client_id, provider, profile_key, ref_id, profile_title, brand_voice')
     .eq('client_id', clientId)
     .maybeSingle();
   if (existing) return existing;
@@ -16,10 +16,26 @@ async function ensureSocialProfile(supabase, clientId) {
   const { data: created, error } = await supabase
     .from('social_profiles')
     .insert({ client_id: clientId })
-    .select('client_id, provider, profile_key, ref_id, brand_voice')
+    .select('client_id, provider, profile_key, ref_id, profile_title, brand_voice')
     .single();
   if (error) throw new Error(`ensureSocialProfile: ${error.message}`);
   return created;
+}
+
+// Guard: refuse to act on a workspace that is not bound to a provider profile.
+//
+// WHY THIS IS NOT OPTIONAL. A null profile_key omits the Profile-Key header,
+// which makes Ayrshare fall back to the account's PRIMARY profile. On an account
+// with one profile per client that means a post composed for client A publishes
+// to whatever channels the primary profile owns -- the wrong brand's audience,
+// silently, with a success response. So an unbound workspace is a hard error.
+//
+// Escape hatch for a genuine single-profile (Ayrshare Premium) setup, where the
+// default profile IS the only workspace: set AYRSHARE_SINGLE_PROFILE=true.
+function requireBoundProfile(sp) {
+  if (String(process.env.AYRSHARE_SINGLE_PROFILE || '').toLowerCase() === 'true') return null;
+  if (sp && sp.profile_key) return null;
+  return 'This workspace is not linked to a social profile yet. An admin needs to bind its Ayrshare profile key on the Accounts tab before anything can be published.';
 }
 
 // Pull plain media URLs out of a [{url, type, alt}] media array.
@@ -41,4 +57,4 @@ function rollupPostStatus(targetStatuses) {
   return 'publishing';
 }
 
-module.exports = { ensureSocialProfile, mediaUrlsFrom, rollupPostStatus };
+module.exports = { ensureSocialProfile, requireBoundProfile, mediaUrlsFrom, rollupPostStatus };

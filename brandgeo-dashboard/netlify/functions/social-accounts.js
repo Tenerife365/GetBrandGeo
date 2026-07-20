@@ -4,7 +4,7 @@
 // ============================================================================
 const { requireAuth } = require('./_auth');
 const { getProvider } = require('./_publishing');
-const { ensureSocialProfile } = require('./_social');
+const { ensureSocialProfile, requireBoundProfile } = require('./_social');
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
@@ -29,6 +29,18 @@ exports.handler = async (event) => {
 
   try {
     const sp = await ensureSocialProfile(supabase, client_id);
+
+    // Unbound workspace: do NOT call the provider. With no Profile-Key header
+    // Ayrshare answers for the PRIMARY profile, which would render another
+    // brand's channels as this client's own -- worse than showing nothing.
+    const unbound = requireBoundProfile(sp);
+    if (unbound) {
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ configured: true, bound: false, accounts: [], hint: unbound }),
+      };
+    }
+
     const accounts = await provider.listAccounts({ profileKey: sp.profile_key });
 
     // Best-effort cache refresh so the UI can render instantly next time.
@@ -41,7 +53,10 @@ exports.handler = async (event) => {
       }
     } catch (e) { console.warn('[SocialAccounts] cache upsert failed:', e.message); }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ configured: true, accounts }) };
+    return {
+      statusCode: 200, headers,
+      body: JSON.stringify({ configured: true, bound: true, profile_title: sp.profile_title || null, accounts }),
+    };
   } catch (e) {
     console.error('[SocialAccounts] error:', e.message);
     return { statusCode: 200, headers, body: JSON.stringify({ configured: true, accounts: [], error: String(e.message || e) }) };

@@ -34,6 +34,23 @@
 //
 //   deletePost({ ref, profileKey }): Promise<{ ok, error? }>
 //       Cancel a scheduled post / delete a published one.
+//
+// MULTI-TENANT PROFILE MANAGEMENT (optional -- only providers that model one
+// isolated workspace per tenant implement these; social-profile.js degrades
+// gracefully when they are absent):
+//
+//   listProfiles(): Promise<Profile[]>
+//       Profile = { title, refId, status, suspended, platforms[] }
+//       Identifies the tenant workspaces that exist at the provider. NOTE: it
+//       does NOT return the secret key -- see verifyProfileKey.
+//
+//   createProfile({ title }): Promise<{ title, refId, profileKey }>
+//       Creates a workspace AND returns its key (often the only moment the key
+//       is ever disclosed, so the caller must persist it immediately).
+//
+//   verifyProfileKey({ profileKey }): Promise<{ ok, title?, refId?, accounts?, error? }>
+//       Proves a key is valid, and reveals which accounts it controls, BEFORE
+//       it gets bound to a client.
 // ============================================================================
 
 // Internal platform ids used everywhere in the app + DB. Providers translate

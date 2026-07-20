@@ -88,8 +88,24 @@ async function authedPost<T>(fn: string, body: unknown): Promise<T> {
   return data as T
 }
 
+interface AyrProfile {
+  title: string | null
+  refId: string | null
+  status: string | null
+  suspended: boolean
+  platforms: SocialPlatform[]
+  claimed_by: number | null
+}
+
+interface Binding {
+  bound: boolean
+  profile_title: string | null
+  ref_id: string | null
+  key_hint: string | null
+}
+
 export default function Social() {
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, isAdmin } = useClient()
   const [tab, setTab] = useState<Tab>('composer')
 
   // ── Accounts ───────────────────────────────────────────────────────────────
@@ -99,16 +115,37 @@ export default function Social() {
   const [accountsNote, setAccountsNote] = useState<string | null>(null)
   const [linking, setLinking] = useState(false)
 
+  // ── Profile binding (which Ayrshare workspace this client publishes to) ────
+  const [binding, setBinding] = useState<Binding | null>(null)
+  const [profiles, setProfiles] = useState<AyrProfile[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [profilesLoading, setProfilesLoading] = useState(false)
+  const [chosenRef, setChosenRef] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [newTitle, setNewTitle] = useState('')
+  const [bindBusy, setBindBusy] = useState(false)
+  const [bindMsg, setBindMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   const loadAccounts = useCallback(async () => {
     if (!activeClientId || isDemoMode) { setAccountsLoading(false); return }
     setAccountsLoading(true)
     try {
-      const data = await authedPost<{ configured: boolean; accounts: SocialAccount[]; hint?: string; error?: string }>(
+      const data = await authedPost<{ configured: boolean; bound?: boolean; profile_title?: string | null; accounts: SocialAccount[]; hint?: string; error?: string }>(
         'social-accounts', { client_id: activeClientId },
       )
       setConfigured(data.configured !== false)
       setAccounts(data.accounts ?? [])
       setAccountsNote(data.hint ?? data.error ?? null)
+      // social-accounts reports binding too, so a non-admin also sees why the
+      // list is empty rather than an unexplained blank tab.
+      if (data.bound !== undefined) {
+        setBinding(prev => ({
+          bound: !!data.bound,
+          profile_title: data.profile_title ?? prev?.profile_title ?? null,
+          ref_id: prev?.ref_id ?? null,
+          key_hint: prev?.key_hint ?? null,
+        }))
+      }
     } catch (e) {
       setAccountsNote((e as Error).message)
       setAccounts([])
@@ -123,6 +160,111 @@ export default function Social() {
     () => new Set(accounts.filter(a => a.status !== 'disconnected').map(a => a.platform)),
     [accounts],
   )
+
+  // Admin: read the current binding (and the key hint, which social-accounts
+  // does not carry). Non-admins get their binding state from social-accounts.
+  const loadBinding = useCallback(async () => {
+    if (!activeClientId || isDemoMode || !isAdmin) return
+    try {
+      const data = await authedPost<Binding & { error?: string }>(
+        'social-profile', { client_id: activeClientId, action: 'get' },
+      )
+      if (!data.error) setBinding(data)
+    } catch { /* the Accounts tab still renders; binding UI just stays collapsed */ }
+  }, [activeClientId, isAdmin])
+
+  useEffect(() => { loadBinding() }, [loadBinding])
+
+  // Reset the picker when switching clients — a half-entered key must never
+  // carry over to a different workspace.
+  useEffect(() => {
+    setPickerOpen(false); setChosenRef(null); setKeyInput(''); setNewTitle(''); setBindMsg(null)
+  }, [activeClientId])
+
+  const loadProfiles = async () => {
+    setProfilesLoading(true); setBindMsg(null)
+    try {
+      const data = await authedPost<{ profiles: AyrProfile[]; hint?: string; error?: string }>(
+        'social-profile', { client_id: activeClientId, action: 'list' },
+      )
+      if (data.error) { setBindMsg({ ok: false, text: data.error }); return }
+      setProfiles(data.profiles ?? [])
+      if (!data.profiles?.length) {
+        setBindMsg({ ok: false, text: data.hint || 'No profiles found on the Ayrshare account.' })
+      }
+    } catch (e) {
+      setBindMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setProfilesLoading(false)
+    }
+  }
+
+  const openPicker = () => { setPickerOpen(true); if (!profiles.length) loadProfiles() }
+
+  const bindProfile = async () => {
+    if (!keyInput.trim() || bindBusy) return
+    setBindBusy(true); setBindMsg(null)
+    const chosen = profiles.find(p => p.refId === chosenRef)
+    try {
+      const data = await authedPost<Binding & { accounts?: SocialAccount[]; error?: string }>(
+        'social-profile',
+        {
+          client_id: activeClientId,
+          action: 'bind',
+          profile_key: keyInput.trim(),
+          ref_id: chosen?.refId ?? null,
+          profile_title: chosen?.title ?? null,
+        },
+      )
+      if (data.error) { setBindMsg({ ok: false, text: data.error }); return }
+      setBinding(data)
+      setKeyInput(''); setPickerOpen(false)
+      const n = data.accounts?.length ?? 0
+      setBindMsg({
+        ok: true,
+        text: `Linked to ${data.profile_title || 'the profile'}. ${n} channel${n === 1 ? '' : 's'} connected.`,
+      })
+      loadAccounts()
+    } catch (e) {
+      setBindMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setBindBusy(false)
+    }
+  }
+
+  const createProfile = async () => {
+    if (!newTitle.trim() || bindBusy) return
+    setBindBusy(true); setBindMsg(null)
+    try {
+      const data = await authedPost<Binding & { hint?: string; error?: string }>(
+        'social-profile', { client_id: activeClientId, action: 'create', title: newTitle.trim() },
+      )
+      if (data.error) { setBindMsg({ ok: false, text: data.error }); return }
+      setBinding(data)
+      setNewTitle(''); setPickerOpen(false)
+      setBindMsg({ ok: true, text: data.hint || 'Profile created and linked.' })
+      loadAccounts()
+    } catch (e) {
+      setBindMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setBindBusy(false)
+    }
+  }
+
+  const unbindProfile = async () => {
+    if (bindBusy) return
+    setBindBusy(true); setBindMsg(null)
+    try {
+      await authedPost('social-profile', { client_id: activeClientId, action: 'unbind' })
+      setBinding({ bound: false, profile_title: null, ref_id: null, key_hint: null })
+      setAccounts([])
+      setBindMsg({ ok: true, text: 'Unlinked. Publishing is blocked for this client until a profile is linked again.' })
+    } catch (e) {
+      setBindMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setBindBusy(false)
+    }
+  }
 
   const startLinking = async () => {
     setLinking(true)
@@ -346,6 +488,134 @@ export default function Social() {
       {/* ── ACCOUNTS ─────────────────────────────────────────────────────── */}
       {tab === 'accounts' && (
         <section className="space-y-4">
+          {/* Which Ayrshare workspace this client publishes to. Ayrshare runs one
+              profile per client, each with its own key; an unbound client is
+              blocked from publishing rather than falling through to the primary
+              profile (which would post to the wrong brand). */}
+          <div className={`${card} p-5`}>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <h2 className="text-sm font-medium text-white">Publishing profile</h2>
+                {binding?.bound ? (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {activeClient?.name ?? 'This client'} publishes to{' '}
+                    <span className="text-slate-200">{binding.profile_title || 'a linked profile'}</span>
+                    {binding.ref_id && <span className="text-slate-600"> · {binding.ref_id.slice(0, 8)}…</span>}
+                    {binding.key_hint && <span className="text-slate-600"> · key {binding.key_hint}</span>}
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-400 mt-1 max-w-xl">
+                    Not linked to a profile yet. Publishing is blocked for this client until
+                    an admin links one, so nothing can go out on another brand's channels.
+                  </p>
+                )}
+              </div>
+              {isAdmin && (
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={openPicker} className={secondaryBtn} disabled={bindBusy}>
+                    {binding?.bound ? 'Change' : 'Link profile'}
+                  </button>
+                  {binding?.bound && (
+                    <button onClick={unbindProfile} className={secondaryBtn} disabled={bindBusy}>Unlink</button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {bindMsg && (
+              <p className={`text-xs mt-3 ${bindMsg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{bindMsg.text}</p>
+            )}
+
+            {isAdmin && pickerOpen && (
+              <div className="mt-4 pt-4 border-t border-dark-700 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-slate-400 max-w-2xl">
+                    Pick this client's profile, then paste its Profile Key from the Ayrshare
+                    dashboard (Profiles, then the key icon). Ayrshare never returns keys through
+                    its API, so this one paste is unavoidable. The key is verified against
+                    Ayrshare before it is saved, and is never sent back to the browser.
+                  </p>
+                  <button onClick={loadProfiles} className={secondaryBtn} disabled={profilesLoading}>
+                    <RefreshCw size={14} className={profilesLoading ? 'animate-spin' : ''} /> Reload
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {profiles.map(p => (
+                    <label
+                      key={p.refId ?? p.title ?? Math.random()}
+                      className={[
+                        'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        chosenRef === p.refId
+                          ? 'bg-brand-500/10 border-brand-500/40'
+                          : 'bg-dark-700/40 border-dark-600 hover:border-dark-500',
+                      ].join(' ')}
+                    >
+                      <input
+                        type="radio"
+                        name="ayr-profile"
+                        className="mt-1 accent-violet-500"
+                        checked={chosenRef === p.refId}
+                        onChange={() => setChosenRef(p.refId)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm text-white">{p.title || '(untitled profile)'}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {p.platforms.length
+                            ? p.platforms.map(pl => platformMeta(pl)?.label ?? pl).join(', ')
+                            : 'No channels linked yet'}
+                          {p.suspended && <span className="text-rose-400"> · suspended</span>}
+                        </span>
+                        {p.claimed_by != null && (
+                          <span className="block text-xs text-amber-400 mt-0.5">
+                            Already linked to client #{p.claimed_by}. Linking it here too would let
+                            two clients post to the same channels.
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                  {!profilesLoading && profiles.length === 0 && (
+                    <p className="text-xs text-slate-500">No profiles returned.</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    className={inputCls}
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Paste the Profile Key for the selected profile"
+                    value={keyInput}
+                    onChange={e => setKeyInput(e.target.value)}
+                  />
+                  <button onClick={bindProfile} className={primaryBtn} disabled={bindBusy || !keyInput.trim()}>
+                    <Link2 size={15} /> {bindBusy ? 'Verifying…' : 'Verify and link'}
+                  </button>
+                </div>
+
+                <div className="pt-3 border-t border-dark-700">
+                  <p className="text-xs text-slate-500 mb-2">
+                    Or create a brand new profile. Its key is captured automatically, but it
+                    starts with no channels, so you would link Instagram, Facebook, LinkedIn and
+                    Google Business to it in Ayrshare afterwards.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      className={inputCls}
+                      placeholder={`New profile title, e.g. ${activeClient?.name ?? 'Client name'}`}
+                      value={newTitle}
+                      onChange={e => setNewTitle(e.target.value)}
+                    />
+                    <button onClick={createProfile} className={secondaryBtn} disabled={bindBusy || !newTitle.trim()}>
+                      <Plus size={15} /> Create profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-slate-400">
               Accounts connected to this workspace. Linking happens in your publishing
@@ -393,6 +663,24 @@ export default function Social() {
       {/* ── COMPOSER ─────────────────────────────────────────────────────── */}
       {tab === 'composer' && (
         <section className="space-y-6">
+          {configured && binding && !binding.bound && (
+            <div className={`${card} p-4 flex items-start gap-3`}>
+              <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-slate-300">
+                <p className="font-medium text-white">
+                  {activeClient?.name ?? 'This client'} is not linked to a publishing profile.
+                </p>
+                <p className="text-slate-400 mt-1">
+                  You can still write and generate copy, but publishing is blocked until the
+                  profile is linked, so a post cannot reach another brand's channels.{' '}
+                  <button onClick={() => setTab('accounts')} className="text-brand-300 hover:underline">
+                    Go to Accounts
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* AI brief */}
           <div className={`${card} p-5`}>
             <div className="flex items-center gap-2 mb-3">
@@ -539,7 +827,12 @@ export default function Social() {
                   onChange={e => setScheduledAt(e.target.value)}
                 />
               </div>
-              <button onClick={publish} className={primaryBtn} disabled={publishing || !configured}>
+              <button
+                onClick={publish}
+                className={primaryBtn}
+                disabled={publishing || !configured || binding?.bound === false}
+                title={binding?.bound === false ? 'This client is not linked to a publishing profile yet.' : undefined}
+              >
                 {scheduledAt ? <CalendarClock size={15} /> : <Send size={15} />}
                 {publishing ? 'Working…' : scheduledAt ? 'Schedule' : 'Publish now'}
               </button>

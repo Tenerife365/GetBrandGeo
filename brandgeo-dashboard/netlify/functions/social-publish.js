@@ -17,7 +17,7 @@
 // ============================================================================
 const { requireAuth } = require('./_auth');
 const { getProvider } = require('./_publishing');
-const { ensureSocialProfile, mediaUrlsFrom, rollupPostStatus } = require('./_social');
+const { ensureSocialProfile, requireBoundProfile, mediaUrlsFrom, rollupPostStatus } = require('./_social');
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
@@ -39,6 +39,18 @@ exports.handler = async (event) => {
   if (!provider.isConfigured()) {
     return { statusCode: 200, headers, body: JSON.stringify({ error: 'Publishing not configured (set AYRSHARE_API_KEY in Netlify).' }) };
   }
+
+  // ---- refuse to publish an unbound workspace -------------------------------
+  // Checked BEFORE any row is written, so a misconfigured client never leaves
+  // half-created post/target rows behind (and never reaches the wrong profile).
+  let socialProfile;
+  try {
+    socialProfile = await ensureSocialProfile(supabase, client_id);
+  } catch (e) {
+    return { statusCode: 200, headers, body: JSON.stringify({ error: String(e.message || e) }) };
+  }
+  const unbound = requireBoundProfile(socialProfile);
+  if (unbound) return { statusCode: 200, headers, body: JSON.stringify({ error: unbound, unbound: true }) };
 
   // ---- resolve the post + its targets (load existing, or create new) --------
   let post;
@@ -99,8 +111,7 @@ exports.handler = async (event) => {
   // ---- publish through the provider -----------------------------------------
   let result;
   try {
-    const sp = await ensureSocialProfile(supabase, client_id);
-    result = await provider.publish({ profileKey: sp.profile_key, targets: provTargets, scheduleDate });
+    result = await provider.publish({ profileKey: socialProfile.profile_key, targets: provTargets, scheduleDate });
   } catch (e) {
     console.error('[SocialPublish] publish error:', e.message);
     await supabase.from('social_posts').update({ status: 'failed', error: String(e.message || e) }).eq('id', post.id);

@@ -141,6 +141,11 @@
 [functions."social-status"]
   timeout = 26
 
+# Admin-only profile binding. 'list'/'bind' each make 1-2 Ayrshare calls whose
+# own client timeout is 23s, so it needs more than Netlify's default 10s.
+[functions."social-profile"]
+  timeout = 26
+
 # Phase 2: one Claude call (internal timeout 20s) that writes per-platform copy.
 # Needs more than the default 10s for the same reason assistant.js does.
 [functions."social-generate"]

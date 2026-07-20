@@ -121,6 +121,68 @@ underscore-prefixed helpers bundle and resolve correctly).
   manual writing instead of breaking. Reuses `ANTHROPIC_API_KEY`, no new env var.
 - `netlify.toml` → `[functions."social-generate"] timeout = 26`.
 
+### ✅ Multi-profile tenancy — one Ayrshare profile per client (2026-07-20)
+
+**The bug this closes.** `social_profiles.profile_key` existed but **nothing ever
+wrote it**, so `ensureSocialProfile` returned `null` for every client, the
+`Profile-Key` header was omitted, and Ayrshare fell back to the account's
+**primary profile**. On an account with one profile per client that means a post
+composed for client A publishes to whichever brand owns the primary profile,
+silently, with a success response. The provider plumbing was always correct; only
+the assignment was missing.
+
+**Hard API constraint (verified against Ayrshare docs, 2026-07-20).**
+`GET /profiles` returns `title`, `refId`, `status`, `activeSocialAccounts` but
+**never `profileKey`**: *"For security, the Profile Keys are not returned via
+this GET call."* A key is disclosed **only** by `POST /profiles/profile` at
+creation, or by copying it from the dashboard. So profiles that already exist
+cannot be auto-discovered, and binding them requires one human paste per client.
+Founder's call: **paste keys once per client**, keeping the already-linked
+IG/FB/LinkedIn/GBP accounts intact (the alternative, recreating profiles from the
+app, would have meant re-linking every channel).
+
+**Built:**
+- `_publishing_ayrshare.js` → `listProfiles()` (identify, no keys),
+  `createProfile({title})` (the one path that yields a key, so it must be
+  persisted immediately), `verifyProfileKey({profileKey})` (proves a pasted key
+  works and reveals whose channels it owns, **before** it is stored).
+  Declared in `_publishing.js`'s interface docs as OPTIONAL provider methods, so
+  a future Postiz/Mixpost provider without profiles degrades gracefully.
+- **`social-profile.js`** (NEW, `adminOnly:true`) — actions `get` / `list` /
+  `bind` / `create` / `unbind`. Binding is verified against Ayrshare first; a
+  wrong key is rejected rather than silently persisted. The key is **never
+  returned to the browser**, only a masked `key_hint` (`7TVR…984N`). `list`
+  flags profiles already claimed by another client so two clients cannot be
+  pointed at the same channels by accident.
+- **`requireBoundProfile(sp)` in `_social.js`** — the guard. Enforced in
+  `social-publish` (checked **before any row is written**, so a misconfigured
+  client leaves no half-created post/target rows), `social-accounts` (an unbound
+  client must NOT call the provider: with no key Ayrshare answers for the primary
+  profile and would render another brand's channels as this client's own) and
+  `social-status` (same reasoning for post state). Escape hatch for a genuine
+  single-profile Premium setup: `AYRSHARE_SINGLE_PROFILE=true`.
+- **`Social.tsx`** — a "Publishing profile" panel on the Accounts tab: current
+  binding (title, refId, masked key), admin-only picker listing the live Ayrshare
+  profiles with the channels each one owns, password-type key field, Verify and
+  link, Create profile, Unlink. The Composer shows an amber unbound banner and
+  **disables Publish** when the client is unbound; non-admins see the same state
+  (surfaced by `social-accounts`) so an empty tab is never unexplained.
+- **`supabase-social-profile-binding-migration.sql`** — ✅ **APPLIED + VERIFIED
+  LIVE.** Adds `profile_title`, and revokes column-level `SELECT` on
+  `profile_key` from `anon`/`authenticated`. That column is a credential and the
+  table's RLS let a client read its own row, which would have exposed it to the
+  browser; the functions use the service key, which bypasses both RLS and column
+  grants. Note the revoke is paired with an explicit re-`GRANT` of the other
+  columns, because a column-level revoke alone does not bite while a table-wide
+  grant stands. Verified: `information_schema.column_privileges` lists every
+  column except `profile_key` for both roles.
+- `netlify.toml` → `[functions."social-profile"] timeout = 26`.
+
+**Binding a client, start to finish:** Accounts tab → Link profile → pick the
+client's profile from the live list → paste its Profile Key from the Ayrshare
+dashboard (Profiles → key icon) → Verify and link. The reply states how many
+channels came back, which is the confirmation that the right profile was bound.
+
 ### ⏳ Still pending
 - Bulk/campaign generation ("8 launch posts across 2 weeks"), brand-kit image gen.
 - Editing/canceling a scheduled post from the Calendar (the provider exposes
