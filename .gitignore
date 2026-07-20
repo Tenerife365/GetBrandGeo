@@ -45,3 +45,4 @@ MANIFEST
 integration-guides_*.zip
 *-private-key.key
 *.pem
+integration-guides_*/

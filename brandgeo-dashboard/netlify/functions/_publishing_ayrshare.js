@@ -190,18 +190,37 @@ async function createLinkingUrl({ profileKey } = {}) {
 // Netlify env vars are single-line in practice: a pasted PEM arrives either with
 // real newlines, with literal backslash-n, or base64 encoded. Accept all three,
 // because a mangled key fails with an opaque rejection rather than saying so.
+// A pasted PEM comes back mangled in a different way depending on how it was
+// entered: newlines stripped entirely, turned into literal \n, double-escaped to
+// \\n, base64 of the whole file, or just the body with the BEGIN/END lines lost.
+// Every one of those fails at Ayrshare with the same opaque "must be an
+// asymmetric key" error, so rather than detect which mangling happened, rebuild
+// a canonical PEM from whatever arrives: take the base64 body, rewrap it at 64
+// columns, and put the header and footer back.
 function normalizePem(raw) {
   let v = (raw || '').trim();
   if (!v) return '';
-  if (v.includes('\\n')) v = v.replace(/\\n/g, '\n');
-  if (!/BEGIN [A-Z ]*PRIVATE KEY/.test(v)) {
-    // No PEM header: assume base64 of the whole PEM and decode it.
+
+  // \n and \\n (and any deeper escaping) all become real newlines.
+  v = v.replace(/\\+n/g, '\n');
+
+  // base64 of an entire PEM file -> decode to the PEM itself.
+  if (!/BEGIN [A-Z ]*PRIVATE KEY/.test(v) && /^[A-Za-z0-9+/=\s]+$/.test(v)) {
     try {
       const decoded = Buffer.from(v, 'base64').toString('utf8');
-      if (/BEGIN [A-Z ]*PRIVATE KEY/.test(decoded)) return decoded.trim();
-    } catch { /* fall through and return as-is so the API reports the real problem */ }
+      if (/BEGIN [A-Z ]*PRIVATE KEY/.test(decoded)) v = decoded.trim();
+    } catch { /* not base64 of a PEM; fall through */ }
   }
-  return v;
+
+  // Keep whatever label the key carries: PRIVATE KEY (PKCS#8) and RSA PRIVATE
+  // KEY (PKCS#1) are different encodings, so swapping them breaks the key.
+  const label = (v.match(/BEGIN ([A-Z ]*PRIVATE KEY)/) || [, 'PRIVATE KEY'])[1];
+  const body = v
+    .replace(/-----(BEGIN|END)[^-]*-----/g, '')
+    .replace(/[^A-Za-z0-9+/=]/g, '');
+  if (!body) return v;
+
+  return `-----BEGIN ${label}-----\n${(body.match(/.{1,64}/g) || []).join('\n')}\n-----END ${label}-----`;
 }
 
 // -- publish -----------------------------------------------------------------
