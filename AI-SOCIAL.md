@@ -32,9 +32,24 @@ card) — covers BrandGEO + TalentWeLove + first ~8 customers, cancel anytime.
 Decide to pay only after the trial proves the <10-min success test. The build is
 tier-agnostic (`profile_key`-per-workspace), so any tier needs zero code change.
 
-## Status — Phase 1 COMPLETE (backend + frontend) + Phase 2 generator built (2026-07-20)
+## Status — Phase 1 COMPLETE + Phase 2 generator ✅ DEPLOYED LIVE (2026-07-20)
 
-### ✅ Built + verified (2026-07-20) — NOT yet deployed/applied
+⚠️ **Deploy gotcha, cost one failed build — read before the next AI Social commit.**
+The Phase-1 backend (`_publishing.js`, `_publishing_ayrshare.js`, `_social.js`,
+`social-accounts|link|publish|status.js`) and the `src/types/index.ts` AI Social
+block were **written but never committed** by the backend session. "NOT yet
+deployed" in this file meant *not committed*, not *committed but unpushed*. The
+frontend commit therefore shipped `Social.tsx` + `social-generate.js` without
+them and Netlify failed with `TS2305: Module '"../types"' has no exported member
+'SocialPlatform'` (plus a cascading TS7006). A local `npm run build` passes in
+that state because the files are on disk, so **the build result proves nothing
+about the commit** — check `git status --porcelain` on the touched dirs before
+pushing. Fixed by a follow-up commit adding all 8 files + the migration SQL.
+**Verified live after deploy:** POSTing unauthenticated to all five
+`social-*` endpoints returns **401** (not 404 = deployed, not 500 = the
+underscore-prefixed helpers bundle and resolve correctly).
+
+### ✅ Built + verified (2026-07-20) — DEPLOYED LIVE; migration applied
 - **`supabase-social-migration.sql`** (repo root) — 4 tables, all with RLS
   mirroring `recommendations`: `social_profiles` (client→profile_key + brand_voice),
   `social_accounts` (connected-account cache), `social_posts` (base compose +
@@ -65,7 +80,7 @@ tier-agnostic (`profile_key`-per-workspace), so any tier needs zero code change.
   These are Netlify functions — `npm run build` does NOT exercise them; Netlify's
   esbuild bundling at deploy is the real validation (same as every other function).
 
-### ✅ Phase 1 FRONTEND built + build-verified (2026-07-20) — NOT yet deployed
+### ✅ Phase 1 FRONTEND (2026-07-20) — DEPLOYED LIVE
 - **`src/pages/Social.tsx`** — three tabs.
   - **Composer** (default tab): AI brief box → `social-generate`; base text +
     media URLs (one per line, parsed into `SocialMedia[]`, `.mp4/.mov/.webm` →
@@ -91,7 +106,7 @@ tier-agnostic (`profile_key`-per-workspace), so any tier needs zero code change.
   deliberately untouched (space-constrained 7-icon bar).
 - Verified: `npx tsc --noEmit` clean and `npm run build` succeeds on Windows.
 
-### ✅ Phase 2 generator built (2026-07-20) — NOT yet deployed
+### ✅ Phase 2 generator (2026-07-20) — DEPLOYED LIVE
 - **`netlify/functions/social-generate.js`** — `POST {client_id, brief,
   platforms?, premium?}` → `{base_text, platforms:{...}}`. Claude **Haiku** by
   default, **Sonnet** when `premium:true` **with a Haiku fallback** if Sonnet
