@@ -113,6 +113,17 @@ interface AyrProfile {
   claimed_by: number | null
 }
 
+interface RemotePost {
+  ref: string | null
+  text: string
+  platforms: SocialPlatform[]
+  scheduledAt: string | null
+  status: string
+  permalink: string | null
+  createdAt: string | null
+  external: boolean
+}
+
 interface Binding {
   bound: boolean
   profile_title: string | null
@@ -453,6 +464,27 @@ export default function Social() {
   }, [activeClientId])
 
   useEffect(() => { loadPosts() }, [loadPosts])
+
+  // The provider's own queue, including posts scheduled outside BrandGEO. Shown
+  // so nobody schedules a duplicate of something already lined up.
+  const [remoteQueue, setRemoteQueue] = useState<RemotePost[]>([])
+  const [queueLoading, setQueueLoading] = useState(false)
+
+  const loadQueue = useCallback(async () => {
+    if (!activeClientId || isDemoMode) return
+    setQueueLoading(true)
+    try {
+      const data = await authedPost<{ posts: RemotePost[] }>(
+        'social-queue', { client_id: activeClientId, scheduled_only: true },
+      )
+      setRemoteQueue(data.posts ?? [])
+    } catch { setRemoteQueue([]) } finally { setQueueLoading(false) }
+  }, [activeClientId])
+
+  useEffect(() => { if (tab === 'calendar') loadQueue() }, [tab, loadQueue])
+
+  // Only the ones BrandGEO did not create — ours already render from social_posts.
+  const externalQueue = remoteQueue.filter(p => p.external)
 
   const refreshStatus = async (postId: number) => {
     setRefreshingId(postId)
@@ -939,14 +971,57 @@ export default function Social() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-400">Scheduled posts and everything published so far.</p>
-            <button onClick={loadPosts} className={secondaryBtn} disabled={postsLoading}>
-              <RefreshCw size={15} className={postsLoading ? 'animate-spin' : ''} /> Refresh
+            <button
+              onClick={() => { loadPosts(); loadQueue() }}
+              className={secondaryBtn}
+              disabled={postsLoading || queueLoading}
+            >
+              <RefreshCw size={15} className={postsLoading || queueLoading ? 'animate-spin' : ''} /> Refresh
             </button>
           </div>
 
+          {/* Already scheduled at the provider but NOT created here — e.g. queued
+              straight in Ayrshare. Shown read-only so nobody schedules a duplicate. */}
+          {externalQueue.length > 0 && (
+            <div>
+              <h2 className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+                Already scheduled elsewhere
+              </h2>
+              <p className="text-xs text-slate-500 mb-3 max-w-2xl">
+                These are queued on the connected accounts but were not created in BrandGEO,
+                so they are shown read-only. Check here before scheduling something similar.
+              </p>
+              <div className="space-y-3">
+                {externalQueue.map((p, i) => (
+                  <article key={p.ref ?? i} className={`${card} p-4 border-dashed`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-200 whitespace-pre-wrap line-clamp-3">
+                          {p.text || '(no text)'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-2">
+                          {p.scheduledAt ? `For ${new Date(p.scheduledAt).toLocaleString()}` : 'No date'}
+                          {p.platforms.length > 0 && (
+                            <span> · {p.platforms.map(pl => platformMeta(pl)?.label ?? pl).join(', ')}</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-dark-600 rounded px-1.5 py-0.5">
+                          Outside BrandGEO
+                        </span>
+                        <StatusBadge status={p.status} />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
           {postsLoading && <div className={`${card} p-6 text-sm text-slate-500`}>Loading posts…</div>}
 
-          {!postsLoading && posts.length === 0 && (
+          {!postsLoading && posts.length === 0 && externalQueue.length === 0 && (
             <div className={`${card} p-8 text-center`}>
               <p className="text-white font-medium">Nothing scheduled yet</p>
               <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">

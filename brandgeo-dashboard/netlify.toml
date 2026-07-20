@@ -141,6 +141,10 @@
 [functions."social-status"]
   timeout = 26
 
+# Reads the provider's own scheduled queue (posts created outside BrandGEO too).
+[functions."social-queue"]
+  timeout = 26
+
 # Admin-only profile binding. 'list'/'bind' each make 1-2 Ayrshare calls whose
 # own client timeout is 23s, so it needs more than Netlify's default 10s.
 [functions."social-profile"]

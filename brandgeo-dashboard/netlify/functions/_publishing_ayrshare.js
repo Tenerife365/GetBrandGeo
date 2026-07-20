@@ -249,6 +249,38 @@ async function getStatus({ refs, profileKey } = {}) {
   return out;
 }
 
+// -- listRemotePosts ---------------------------------------------------------
+// GET /history -> what this profile has scheduled/published AT THE PROVIDER,
+// including posts created outside BrandGEO (Ayrshare's own dashboard, or even
+// posted natively on the network). Used to show the true queue so a user does
+// not schedule a duplicate of something already lined up.
+//
+// scheduledOnly: type=scheduled + status=pending is Ayrshare's definition of
+// "not yet published" (a future scheduleDate that has not been processed).
+async function listRemotePosts({ profileKey, scheduledOnly = false, limit = 50, lastDays = 60 } = {}) {
+  const qs = new URLSearchParams({ limit: String(limit), lastDays: String(lastDays) });
+  if (scheduledOnly) { qs.set('type', 'scheduled'); qs.set('status', 'pending'); }
+
+  const { ok, json } = await ayr(`/history?${qs.toString()}`, { method: 'GET', profileKey });
+  if (!ok) return [];
+
+  const arr = Array.isArray(json.history) ? json.history : Array.isArray(json.posts) ? json.posts : Array.isArray(json) ? json : [];
+  return arr.map((h) => {
+    const when = typeof h.scheduleDate === 'object' && h.scheduleDate ? h.scheduleDate.utc : h.scheduleDate;
+    const s = String(h.status || '').toLowerCase();
+    return {
+      ref: h.id || null,
+      text: h.post || '',
+      // Drop networks we don't model rather than surfacing raw vendor ids.
+      platforms: (Array.isArray(h.platforms) ? h.platforms : []).map((p) => FROM_AYR[p]).filter(Boolean),
+      scheduledAt: when || null,
+      status: s === 'success' ? 'published' : s === 'error' ? 'failed' : s === 'pending' ? 'scheduled' : s || 'scheduled',
+      permalink: (Array.isArray(h.postIds) && h.postIds.find((p) => p.postUrl)?.postUrl) || null,
+      createdAt: (typeof h.created === 'object' && h.created ? h.created.utc : h.created) || null,
+    };
+  });
+}
+
 // -- deletePost --------------------------------------------------------------
 // DELETE /post -> cancels a scheduled post or removes a published one.
 async function deletePost({ ref, profileKey } = {}) {
@@ -259,5 +291,5 @@ async function deletePost({ ref, profileKey } = {}) {
 
 module.exports = {
   isConfigured, listAccounts, createLinkingUrl, publish, getStatus, deletePost,
-  listProfiles, createProfile, verifyProfileKey,
+  listProfiles, createProfile, verifyProfileKey, listRemotePosts,
 };

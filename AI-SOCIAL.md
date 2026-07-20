@@ -265,6 +265,35 @@ assigns at onboarding) and `AYRSHARE_PRIVATE_KEY` (RSA key from the dashboard).
 Until they are set, `social-link` returns `url: null` plus a hint naming exactly
 what is missing, and accounts must be linked inside the Ayrshare dashboard.
 
+### ✅ True self-service + the provider's real queue (2026-07-20)
+
+**🔴 Flaw found and fixed: self-service would have linked a client's accounts into
+ANOTHER tenant's workspace.** `social-link` never checked whether the client had a
+profile bound. For an unbound client (e.g. Edyta) it minted a JWT with
+`profileKey: undefined`, and Ayrshare resolves that to the **primary profile** —
+so her Instagram/Facebook would have been linked into Talentwelove's workspace.
+**Fix: `social-link` now AUTO-PROVISIONS** the client's own profile first
+(`createProfile` titled after the client, retried with a ` (client_id)` suffix
+since Ayrshare requires unique titles), stores the key immediately, and only then
+mints the linking URL. This is also what makes true zero-admin self-service
+possible: a client clicks Connect, gets their own isolated profile, authorises
+each network via that network's OAuth, done. Skipped when
+`AYRSHARE_SINGLE_PROFILE=true`. If the profile is created but the key cannot be
+stored, it says so loudly rather than looping (Ayrshare never re-discloses a key).
+⚠️ Each auto-provision consumes a profile slot (Launch = 10).
+
+**Existing scheduled posts are now visible, so nothing gets double-posted.**
+`social_posts` only ever knew about posts made through BrandGEO, so a client with
+next week already queued in Ayrshare would have seen an empty calendar and
+scheduled it twice. New **`social-queue.js`** + provider `listRemotePosts()` read
+`GET /history` (`type=scheduled&status=pending` is Ayrshare's definition of
+not-yet-published; docs-verified) and match each returned `ref` against our stored
+`social_post_targets.provider_ref`. Anything unmatched is flagged `external:true`
+and rendered in the Calendar under **"Already scheduled elsewhere"**, dashed and
+read-only, with its platforms and time. Note Ayrshare's history also covers posts
+made natively on the networks, so this doubles as a light content-audit view.
+Same `requireBoundProfile` guard as everywhere else, for the same reason.
+
 ### ⏳ Still pending
 - Bulk/campaign generation ("8 launch posts across 2 weeks"), brand-kit image gen.
 - Editing/canceling a scheduled post from the Calendar (the provider exposes
