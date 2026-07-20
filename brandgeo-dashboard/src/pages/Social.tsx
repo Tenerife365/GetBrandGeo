@@ -542,10 +542,17 @@ export default function Social() {
           <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
           <div className="text-sm text-slate-300">
             <p className="font-medium text-white">Publishing is not configured yet.</p>
-            <p className="text-slate-400 mt-1">
-              Add <code className="text-slate-300">AYRSHARE_API_KEY</code> to the Netlify environment
-              variables, then reload this page.
-            </p>
+            {isAdmin ? (
+              <p className="text-slate-400 mt-1">
+                Add <code className="text-slate-300">AYRSHARE_API_KEY</code> to the Netlify environment
+                variables, then reload this page.
+              </p>
+            ) : (
+              <p className="text-slate-400 mt-1">
+                Publishing is temporarily unavailable. You can still write and generate copy.
+                We are on it, and it will come back on its own.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -556,7 +563,11 @@ export default function Social() {
           {/* Which Ayrshare workspace this client publishes to. Ayrshare runs one
               profile per client, each with its own key; an unbound client is
               blocked from publishing rather than falling through to the primary
-              profile (which would post to the wrong brand). */}
+              profile (which would post to the wrong brand).
+              Admin-only: this is internal plumbing, and a client's own workspace
+              is provisioned automatically the first time they connect a channel,
+              so there is nothing here for them to act on. */}
+          {isAdmin && (
           <div className={`${card} p-5`}>
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="min-w-0">
@@ -680,6 +691,7 @@ export default function Social() {
               </div>
             )}
           </div>
+          )}
 
           {/* Self-service connect. The button opens a one-time secure page where
               the client authorises each network with that network's own login.
@@ -767,11 +779,14 @@ export default function Social() {
               <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
               <div className="text-sm text-slate-300">
                 <p className="font-medium text-white">
-                  {activeClient?.name ?? 'This client'} is not linked to a publishing profile.
+                  {isAdmin
+                    ? `${activeClient?.name ?? 'This client'} is not linked to a publishing profile.`
+                    : 'No channels connected yet.'}
                 </p>
                 <p className="text-slate-400 mt-1">
-                  You can still write and generate copy, but publishing is blocked until the
-                  profile is linked, so a post cannot reach another brand's channels.{' '}
+                  {isAdmin
+                    ? 'You can still write and generate copy, but publishing is blocked until the profile is linked, so a post cannot reach another brand’s channels. '
+                    : 'You can still write and generate copy. To publish, connect at least one account first. '}
                   <button onClick={() => setTab('accounts')} className="text-brand-300 hover:underline">
                     Go to Accounts
                   </button>

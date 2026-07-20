@@ -143,9 +143,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       label: 'Manage',
       items: [
         { to: '/prompts', icon: BookText, label: t.nav_prompts },
-        // AI Social is internal-first (AI-SOCIAL.md) — admin-only until it graduates
-        // into a customer-facing feature.
-        ...(isAdmin ? [{ to: '/social', icon: Share2, label: 'AI Social' }] : []),
+        // AI Social is customer-facing for every plan for now (AI-SOCIAL.md).
+        // Planned next: show it locked for plans that don't include it, with an
+        // add-feature / upgrade prompt, rather than hiding it.
+        { to: '/social', icon: Share2, label: 'AI Social' },
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],

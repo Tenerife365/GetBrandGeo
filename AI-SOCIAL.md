@@ -294,7 +294,31 @@ read-only, with its platforms and time. Note Ayrshare's history also covers post
 made natively on the networks, so this doubles as a light content-audit view.
 Same `requireBoundProfile` guard as everywhere else, for the same reason.
 
+### ✅ Now visible to clients, not admin-only (2026-07-20)
+Constantin logged in as a real BpR viewer and saw no AI Social tab. That was by
+design (`Layout.tsx` gated the nav entry on `isAdmin`, "internal-first until it
+graduates"), not a bug — and note the ROUTE was never gated, only the nav link,
+so `/social` was always reachable by typing the URL.
+
+Decision: **show it on every plan now**; later show it LOCKED for plans that do
+not include it, with an add-feature / upgrade prompt, rather than hiding it.
+That locked state is not built yet and AI Social is still absent from
+`planConfig.ts` — adding it there is the natural first step when it lands.
+
+Client-facing copy fixed at the same time, since viewers now see this page:
+- The unconfigured banner no longer tells a client to "add `AYRSHARE_API_KEY` to
+  Netlify"; admins still get that, clients get a neutral unavailable message.
+- The "Publishing profile" card is now **admin-only**. It is internal plumbing,
+  and a client's own Ayrshare workspace is auto-provisioned on their first
+  Connect, so there was nothing there for them to act on (and the old copy told
+  them to wait for an admin, which self-service made untrue).
+- The composer's unbound warning reads "No channels connected yet / connect at
+  least one account" for clients, keeping the profile-linking wording for admins.
+
+`npx tsc --noEmit` clean. Files: `Layout.tsx`, `Social.tsx`.
+
 ### ⏳ Still pending
+- Locked/upgrade state for plans that do not include AI Social (see above).
 - Bulk/campaign generation ("8 launch posts across 2 weeks"), brand-kit image gen.
 - Editing/canceling a scheduled post from the Calendar (the provider exposes
   `deletePost`, but no endpoint or UI wraps it yet).
