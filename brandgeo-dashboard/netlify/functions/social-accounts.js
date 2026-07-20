@@ -44,14 +44,24 @@ exports.handler = async (event) => {
     const accounts = await provider.listAccounts({ profileKey: sp.profile_key });
 
     // Best-effort cache refresh so the UI can render instantly next time.
+    //
+    // REPLACE, don't upsert. Two reasons, both bugs seen on live data:
+    //  1. Google Business returns no account id, so external_id is NULL -- and in
+    //     Postgres NULL <> NULL, so the (client_id, platform, external_id) unique
+    //     constraint never matched and every refresh inserted ANOTHER gbp row.
+    //  2. Upserting only ever adds: a channel later disconnected at the provider
+    //     would linger in the cache forever, shown as still connected.
+    // Deleting this client's rows and reinserting what the provider just reported
+    // makes the cache a faithful snapshot and fixes both at once.
     try {
-      for (const a of accounts) {
-        await supabase.from('social_accounts').upsert({
+      await supabase.from('social_accounts').delete().eq('client_id', client_id);
+      if (accounts.length) {
+        await supabase.from('social_accounts').insert(accounts.map((a) => ({
           client_id, platform: a.platform, external_id: a.externalId,
           display_name: a.displayName, status: a.status || 'connected',
-        }, { onConflict: 'client_id,platform,external_id' });
+        })));
       }
-    } catch (e) { console.warn('[SocialAccounts] cache upsert failed:', e.message); }
+    } catch (e) { console.warn('[SocialAccounts] cache refresh failed:', e.message); }
 
     return {
       statusCode: 200, headers,

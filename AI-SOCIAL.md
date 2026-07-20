@@ -178,6 +178,44 @@ app, would have meant re-linking every channel).
   column except `profile_key` for both roles.
 - `netlify.toml` → `[functions."social-profile"] timeout = 26`.
 
+**✅ PROVEN ON LIVE DATA 2026-07-20.** Talentwelove (client 19) → "Primary
+Profile", BrandGEO (client 2) → its own "BrandGEO" profile, distinct refIds and
+distinct key fingerprints. **Multi-profile works on the Launch trial** — the
+Business-plan gate below did NOT bite, so no $599 upgrade is needed for
+per-client isolation. Channels as linked in Ayrshare: Talentwelove has all four
+(IG/FB/LI/GBP); **BrandGEO has only LinkedIn + Google Business** ("BrandGEO
+Global"), so IG/FB publishing for BrandGEO fails until they are linked there.
+
+**Three real dead ends hit while binding the first client — check these first if
+it ever fails again:**
+1. **Plan gate (a red herring, but documented as real):** Ayrshare's docs say a
+   Profile Key "is only available for Business or Enterprise plans". Empirically
+   the Launch trial accepts them fine. Don't upgrade on the strength of the docs.
+2. **`refId` pasted instead of the key.** The 40-hex value shown next to a
+   profile (`2e4d2d8a…`) is the refId, NOT the key. The real Profile Key is 35
+   chars, short and dashed, revealed by the **key icon**. `social-profile.js` now
+   rejects an obvious RSA PEM paste up front and names the likely cause on any
+   rejection.
+3. **The `AYRSHARE_API_KEY` in Netlify was not an API key at all** (a refId had
+   been pasted there too) — every call failed with `code 102 API Key not valid`
+   before profiles were ever reached. Fixed by taking the key from the **primary
+   account's** API Key section. **Netlify env changes need a redeploy to take
+   effect**; without one the functions keep the old value and nothing appears to
+   change. `curl -H "Authorization: Bearer KEY" https://api.ayrshare.com/api/profiles`
+   is the fastest way to prove a key before touching Netlify.
+
+**Two live-data bugs found by inspecting the result and fixed the same day:**
+- **Cross-brand cache poisoning (the exact hazard the guard exists for).** Before
+  the guard shipped, Bucate pe Roate (unbound) had called `listAccounts`, received
+  the PRIMARY profile's accounts, and cached Talentwelove's 4 channels as its own.
+  Nothing was published, so it was stale cache only; those rows were deleted.
+- **GBP rows duplicated on every refresh.** Google Business returns no account id,
+  so `external_id` is NULL, and `NULL <> NULL` in Postgres means the
+  `(client_id, platform, external_id)` unique index never matched: each Accounts
+  refresh inserted another gbp row. `social-accounts.js` now **replaces** a
+  client's cached rows (delete + insert) instead of upserting, which also drops
+  channels that were disconnected at the provider. Existing duplicates purged.
+
 **Binding a client, start to finish:** Accounts tab → Link profile → pick the
 client's profile from the live list → paste its Profile Key from the Ayrshare
 dashboard (Profiles → key icon) → Verify and link. The reply states how many
