@@ -19,7 +19,11 @@ export type EngineId =
   | 'deepseek'
   | 'grok'
 
-export type Plan = 'free' | 'essentials' | 'growth' | 'managed' | 'pro' | 'enterprise'
+// PRICING-STRATEGY-2026-07.md ladder: Free → Essentials → Growth → Growth PRO
+// (self-serve) → Managed → Enterprise (done-for-you). `pro` is LEGACY (old €1,500
+// tier merged into Managed) — kept only so existing pro clients don't fall back
+// until they migrate at renewal; no new signups use it.
+export type Plan = 'free' | 'essentials' | 'growth' | 'growth_pro' | 'managed' | 'pro' | 'enterprise'
 
 export type EngineState = 'active' | 'coming_soon' | 'locked'
 
@@ -36,10 +40,14 @@ export type EngineState = 'active' | 'coming_soon' | 'locked'
 // (2026-07-16). Meta (Llama, training-data only, no web search) was low-signal;
 // Google AI Mode is what real Google users now see. `meta` is retired from every
 // plan set (kept in ENGINE_META below only so historical meta rows still render).
+// PRICING-STRATEGY-2026-07.md §3: Growth = 4 engines (NO Google AI Mode);
+// Google AI Mode (SerpApi, the expensive engine) is Growth PRO and up only, to
+// protect SerpApi spend. Essentials = 3.
 export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity'],
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
   enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
@@ -66,7 +74,7 @@ export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
   claude:     'essentials',
   perplexity: 'growth',
   meta:       'growth',   // retired (no plan includes it) — kept for type completeness
-  google_ai:  'growth',   // Google AI Mode is now the 5th live engine, from Growth up
+  google_ai:  'growth_pro',  // AI Mode (SerpApi) is Growth PRO and up only (PRICING-STRATEGY-2026-07)
   copilot:    'pro',
   deepseek:   'pro',
   grok:       'pro',
@@ -134,21 +142,27 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
 // must be kept numerically in sync with _cost.js by hand, same tradeoff as
 // ENGINE_COST_EUR above. See _cost.js for the full 9%-of-plan-price
 // derivation.
+// PRICING-STRATEGY-2026-07.md §3: hard monthly collection budget = 12% of price
+// (up from the old 9%), giving ~88% gross margin and ~weekly collection at the
+// §6 prompt counts. This is the hard cost ceiling; the cooldown (below) is the
+// frequency limiter. Keep in sync with _cost.js (the server-enforced copy).
 export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
-  free: 0.30,
-  essentials: 8.91,
-  growth: 26.91,
-  managed: 81.00,
-  pro: 135.00,
-  enterprise: 900.00,
+  free:       0.30,
+  essentials: 11.88,    // 12% of €99
+  growth:     35.88,    // 12% of €299
+  growth_pro: 53.88,    // 12% of €449
+  managed:    180.00,   // 12% of €1,500 floor
+  pro:        180.00,   // legacy (treated as Managed)
+  enterprise: 1200.00,  // custom; generous default
 }
 
-export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'managed', 'pro', 'enterprise']
+export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise']
 
 export const PLAN_LABELS: Record<Plan, string> = {
   free:       'Free',
   essentials: 'Essentials',
   growth:     'Growth',
+  growth_pro: 'Growth PRO',
   managed:    'Managed',
   pro:        'Pro',
   enterprise: 'Enterprise',
@@ -160,14 +174,13 @@ export const PLAN_LABELS: Record<Plan, string> = {
 // <FeatureLocked feature=… /> for plans below it. All plan gating lives here.
 export type FeatureId = 'ai_social' | 'ai_seo'
 
-// Minimum plan that unlocks each feature. Everything below shows the locked /
-// upgrade state. (AI Social: Growth and up — 2026-07-21, Constantin's call.
-// AI SEO: Growth too, for parity — they're one loop, easiest to bundle;
-// AI-SEO-SPEC.md's own recommendation for the Opportunities half. Revisit if
-// the Phase 2 crawl/audit half warrants Managed-gating.)
+// Minimum plan that unlocks each feature (PRICING-STRATEGY-2026-07.md §3):
+//   AI SEO   — from Essentials (1 landing page; 10 on Growth, 30 on Growth PRO).
+//   AI Social — from Growth (1 channel; 3 on Growth PRO). Per-tier depth is in
+//   the PLAN_* limit tables below, not here.
 export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
   ai_social: 'growth',
-  ai_seo:    'growth',
+  ai_seo:    'essentials',
 }
 
 // Copy for the locked/upgrade screen.
@@ -180,6 +193,107 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
     label: 'AI SEO',
     blurb: 'Turn your AI visibility gaps into ready-to-write content briefs, then generate full, GEO-scored drafts built to be cited by AI answer engines, and hand them straight to AI Social.',
   },
+}
+
+// ── Per-plan usage limits (PRICING-STRATEGY-2026-07.md §3) ───────────────────
+// Single source of truth for every metered dimension. The Netlify functions that
+// ENFORCE these (collect-* , seo-*, social-*) can't import this Vite module, so
+// they carry hand-synced CommonJS copies of the numbers they need (same tradeoff
+// as ENGINE_COST_EUR <-> _cost.js). Update BOTH when a number changes.
+// managed/pro/enterprise are done-for-you / custom — generous placeholders, not
+// self-serve caps.
+
+/** Buyer prompts included per plan. */
+export const PLAN_PROMPTS: Record<Plan, number> = {
+  free: 5, essentials: 20, growth: 75, growth_pro: 100,
+  managed: 1000, pro: 1000, enterprise: 100000,
+}
+
+/** Minimum hours between manual collection runs (the Run-Collection cooldown).
+ *  The button shows a live countdown until this elapses; the monthly € budget
+ *  (PLAN_MONTHLY_API_BUDGET_EUR) is the separate hard cost cap. free = monthly. */
+export const PLAN_COLLECTION_COOLDOWN_HOURS: Record<Plan, number> = {
+  free: 720, essentials: 72, growth: 48, growth_pro: 36,
+  managed: 0, pro: 0, enterprise: 0,
+}
+
+/** AI SEO — max pages that can be crawled/audited (0 = feature locked). */
+export const PLAN_SEO_PAGE_CAP: Record<Plan, number> = {
+  free: 0, essentials: 1, growth: 10, growth_pro: 30,
+  managed: 100, pro: 100, enterprise: 500,
+}
+
+/** AI SEO — max page audits per week. */
+export const PLAN_SEO_AUDITS_PER_WEEK: Record<Plan, number> = {
+  free: 0, essentials: 1, growth: 1, growth_pro: 1,
+  managed: 3, pro: 3, enterprise: 7,
+}
+
+/** AI SEO — max content drafts generated per month. */
+export const PLAN_SEO_DRAFTS_PER_MONTH: Record<Plan, number> = {
+  free: 0, essentials: 2, growth: 10, growth_pro: 30,
+  managed: 60, pro: 60, enterprise: 200,
+}
+
+/** AI Social — number of channels the client may connect/target (0 = locked). */
+export const PLAN_SOCIAL_CHANNEL_LIMIT: Record<Plan, number> = {
+  free: 0, essentials: 0, growth: 1, growth_pro: 3,
+  managed: 13, pro: 13, enterprise: 13,
+}
+
+/** AI Social — max posts per channel per month (composer + scheduling). */
+export const PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH: Record<Plan, number> = {
+  free: 0, essentials: 0, growth: 12, growth_pro: 30,
+  managed: 100, pro: 100, enterprise: 100,
+}
+
+// ── AI Social channel entitlements (cost-of-delivery tiering, §4) ────────────
+// Channel ids mirror types/index.ts SocialPlatform (kept as strings so this
+// module has no import).
+//   included ("easy for us"): LinkedIn, Google Business Profile, Facebook —
+//     count against PLAN_SOCIAL_CHANNEL_LIMIT.
+//   addon ("harder": needs media + support): Instagram, TikTok — Growth PRO and
+//     up only, purchased as an add-on; not part of the base channel count.
+//   other networks (x/threads/bluesky/pinterest/reddit/telegram/snapchat/
+//     youtube) are done-for-you (Managed+) only for now.
+export const INCLUDED_CHANNELS = ['linkedin', 'gbp', 'facebook'] as const
+export const ADDON_CHANNELS = ['instagram', 'tiktok'] as const
+
+export type ChannelTier = 'included' | 'addon' | 'managed_only'
+
+/** How a channel is offered (independent of whether the client bought the add-on). */
+export function channelTier(channel: string): ChannelTier {
+  if ((INCLUDED_CHANNELS as readonly string[]).includes(channel)) return 'included'
+  if ((ADDON_CHANNELS as readonly string[]).includes(channel)) return 'addon'
+  return 'managed_only'
+}
+
+/**
+ * Whether a plan can use a channel WITHOUT an add-on purchase.
+ *   - included channels: available once the plan has AI Social (Growth+).
+ *   - addon channels (IG/TikTok): Growth PRO and up, and only if bought
+ *     (entitlement stored on the client; enforced server-side). Managed+ get all.
+ */
+export function channelBaseAvailable(plan: string, channel: string): boolean {
+  const tier = channelTier(channel)
+  if (planRank(plan) >= planRank('managed')) return true
+  if (tier === 'included') return hasFeature(plan, 'ai_social')
+  return false   // addon + managed_only require an add-on / higher plan
+}
+
+/** Convenience: all self-serve limits for a plan, for UI display + gating. */
+export function getPlanLimits(plan: string) {
+  const p = (PLAN_ORDER.includes(plan as Plan) ? plan : 'free') as Plan
+  return {
+    prompts:               PLAN_PROMPTS[p],
+    collectionCooldownH:   PLAN_COLLECTION_COOLDOWN_HOURS[p],
+    apiBudgetEur:          PLAN_MONTHLY_API_BUDGET_EUR[p],
+    seoPages:              PLAN_SEO_PAGE_CAP[p],
+    seoAuditsPerWeek:      PLAN_SEO_AUDITS_PER_WEEK[p],
+    seoDraftsPerMonth:     PLAN_SEO_DRAFTS_PER_MONTH[p],
+    socialChannels:        PLAN_SOCIAL_CHANNEL_LIMIT[p],
+    socialPostsPerChannel: PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH[p],
+  }
 }
 
 /** Position of a plan in the ladder (unknown/legacy -> 0 = free). */
