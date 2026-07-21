@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { useTheme } from '../lib/themeContext'
+import SocialAuthButtons from '../components/SocialAuthButtons'
 
 function BrandGeoLogo() {
   const { theme } = useTheme()
@@ -21,15 +22,11 @@ const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 tex
 const bc = 'w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
 
 export default function Signup() {
-  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
-  const [brandDomain, setBrandDomain] = useState(searchParams.get('domain') || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-  // Honeypot (SECURITY-AUDIT.md F2): a hidden field a real user never sees and
-  // never fills, but a form-filling bot will. If it comes back non-empty, the
-  // server silently drops the request. Must stay empty in normal use.
+  // Honeypot (SECURITY-AUDIT.md F2): a hidden field a real user never fills.
   const [companyWebsite, setCompanyWebsite] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,14 +34,12 @@ export default function Signup() {
     if (loading) return
     setError('')
     setLoading(true)
-
     try {
       const res = await fetch('/.netlify/functions/signup-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          brand_domain: brandDomain.trim(),
           company_website: companyWebsite,   // honeypot — expected to be ''
         }),
       })
@@ -58,7 +53,7 @@ export default function Signup() {
     }
   }
 
-  // ── Confirmation screen ───────────────────────────────────────────────────
+  // ── Confirmation screen (email path) ──────────────────────────────────────
   if (done) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
@@ -70,7 +65,7 @@ export default function Signup() {
             <p className="text-sm text-slate-400 mb-6">
               We sent a link to{' '}
               <strong className="text-slate-300">{email}</strong>.<br />
-              Click it to set your password and activate your account.
+              Click it to set your password, then we'll help you set up what to track.
             </p>
             <Link to="/login" className={bc} style={{ textDecoration: 'none' }}>
               Go to Login →
@@ -90,18 +85,25 @@ export default function Signup() {
     )
   }
 
-  // ── Signup form ───────────────────────────────────────────────────────────
+  // ── Signup screen ─────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
         <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
           <h1 className="text-lg font-semibold text-white mb-1">Start for free</h1>
-          <p className="text-sm text-slate-400 mb-6">No credit card required</p>
+          <p className="text-sm text-slate-400 mb-6">Track a company or your personal brand in AI answers. No credit card required.</p>
+
+          <SocialAuthButtons onError={setError} />
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="h-px flex-1 bg-dark-600" />
+            <span className="text-xs text-slate-600">or</span>
+            <div className="h-px flex-1 bg-dark-600" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Honeypot — hidden from humans and screen readers; only bots fill it.
-                Not `display:none` (some bots skip those), just moved off-screen. */}
+            {/* Honeypot — hidden from humans and screen readers; only bots fill it. */}
             <input
               type="text"
               name="company_website"
@@ -114,34 +116,18 @@ export default function Signup() {
             />
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5 font-medium">Work email</label>
+              <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email</label>
               <input
                 type="email"
                 required
-                autoFocus
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder="you@example.com"
                 className={ic}
               />
-            </div>
-
-            {/* No password field by design. Signup sends an invite email and the
-                user sets their own password on /reset-password — so no password
-                ever transits this public endpoint. See signup-client.js. */}
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-1.5 font-medium">Brand domain</label>
-              <input
-                type="text"
-                required
-                value={brandDomain}
-                onChange={e => setBrandDomain(e.target.value)}
-                placeholder="yourcompany.com"
-                className={ic}
-              />
-              <p className="text-xs text-slate-600 mt-1.5">The website you want to track in AI results</p>
+              {/* No password field by design. Signup sends an invite email and the
+                  user sets their own password on /reset-password. */}
             </div>
 
             {error && (
@@ -152,7 +138,7 @@ export default function Signup() {
 
             <button type="submit" disabled={loading} className={bc}>
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Creating account…' : 'Create free account →'}
+              {loading ? 'Sending link…' : 'Continue with email →'}
             </button>
           </form>
         </div>

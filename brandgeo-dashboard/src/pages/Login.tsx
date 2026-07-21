@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useTheme } from '../lib/themeContext'
+import SocialAuthButtons from '../components/SocialAuthButtons'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
@@ -90,6 +91,16 @@ export default function Login() {
               <h1 className="text-lg font-semibold text-white mb-1">Sign in</h1>
               <p className="text-sm text-slate-400 mb-6">Access your GEO dashboard</p>
               {isDemoMode && <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">Demo mode</div>}
+              {!isDemoMode && (
+                <>
+                  <SocialAuthButtons onError={setError} />
+                  <div className="flex items-center gap-3 my-5">
+                    <div className="h-px flex-1 bg-dark-600" />
+                    <span className="text-xs text-slate-600">or</span>
+                    <div className="h-px flex-1 bg-dark-600" />
+                  </div>
+                </>
+              )}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email</label>

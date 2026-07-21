@@ -4,7 +4,7 @@ import { MotionConfig } from 'motion/react'
 import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
 import { ThemeProvider } from './lib/themeContext'
-import { ClientProvider } from './lib/clientContext'
+import { ClientProvider, useClient } from './lib/clientContext'
 import { I18nProvider } from './lib/i18nContext'
 import { CollectionProvider } from './lib/collectionContext'
 import { TimeFilterProvider } from './lib/timeFilterContext'
@@ -12,6 +12,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import Signup from './pages/Signup'
+import Welcome from './pages/Welcome'
 import Dashboard from './pages/Dashboard'
 import Mentions from './pages/Mentions'
 import Competitors from './pages/Competitors'
@@ -47,6 +48,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return authed ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+// Sits between PrivateRoute (authed?) and Layout: a freshly-authenticated user
+// who has no profile/client yet (email or social signup) is routed to /welcome
+// to finish onboarding. Existing users (needsOnboarding=false) pass straight
+// through. Waits for ClientProvider to finish loading to avoid a flash.
+function OnboardGate({ children }: { children: React.ReactNode }) {
+  const { loading, needsOnboarding } = useClient()
+  if (loading) return null
+  if (needsOnboarding) return <Navigate to="/welcome" replace />
+  return <>{children}</>
+}
+
 function DemoLoginInterceptor() {
   useEffect(() => {
     if (isDemoMode) sessionStorage.setItem('demo_logged_in', 'true')
@@ -74,21 +86,24 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<DemoLoginInterceptor />} />
               <Route path="/signup" element={<Signup />} />
+              {/* Post-auth onboarding — authed but not yet provisioned. No Layout,
+                  and NOT behind OnboardGate (that would loop). */}
+              <Route path="/welcome" element={<PrivateRoute><Welcome /></PrivateRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Public, unauthenticated — Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10) */}
               <Route path="/audit" element={<AuditRequest />} />
               <Route path="/audit/:token" element={<AuditReport />} />
-              <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
-              <Route path="/mentions" element={<PrivateRoute><Layout><Mentions /></Layout></PrivateRoute>} />
-              <Route path="/competitors" element={<PrivateRoute><Layout><Competitors /></Layout></PrivateRoute>} />
-              <Route path="/prompts" element={<PrivateRoute><Layout><Prompts /></Layout></PrivateRoute>} />
-              <Route path="/ai-visibility" element={<PrivateRoute><Layout><AIVisibility /></Layout></PrivateRoute>} />
-              <Route path="/sentiment" element={<PrivateRoute><Layout><BrandSentiment /></Layout></PrivateRoute>} />
-              <Route path="/recommendations" element={<PrivateRoute><Layout><Recommendations /></Layout></PrivateRoute>} />
-              <Route path="/onboard" element={<PrivateRoute><Layout><Onboard /></Layout></PrivateRoute>} />
-              <Route path="/social" element={<PrivateRoute><Layout><Social /></Layout></PrivateRoute>} />
-              <Route path="/usage" element={<PrivateRoute><Layout><Usage /></Layout></PrivateRoute>} />
-              <Route path="/account" element={<PrivateRoute><Layout><Account /></Layout></PrivateRoute>} />
+              <Route path="/" element={<PrivateRoute><OnboardGate><Layout><Dashboard /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/mentions" element={<PrivateRoute><OnboardGate><Layout><Mentions /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/competitors" element={<PrivateRoute><OnboardGate><Layout><Competitors /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/prompts" element={<PrivateRoute><OnboardGate><Layout><Prompts /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/ai-visibility" element={<PrivateRoute><OnboardGate><Layout><AIVisibility /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/sentiment" element={<PrivateRoute><OnboardGate><Layout><BrandSentiment /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/recommendations" element={<PrivateRoute><OnboardGate><Layout><Recommendations /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/onboard" element={<PrivateRoute><OnboardGate><Layout><Onboard /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/social" element={<PrivateRoute><OnboardGate><Layout><Social /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Usage /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

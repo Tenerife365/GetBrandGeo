@@ -33,6 +33,7 @@ interface ClientCtx {
   clients:           Client[]           // populated for admin only
   isAdmin:           boolean
   loading:           boolean
+  needsOnboarding:   boolean            // authed but no profile yet -> /welcome onboarding
   // ── Engine gating ────────────────────────────────────────────────────────
   activeEngines:     EngineId[]                        // engines collecting right now
   engineStates:      Record<EngineId, EngineState>     // full state map
@@ -51,6 +52,7 @@ const Ctx = createContext<ClientCtx>({
   clients:                 [],
   isAdmin:                 false,
   loading:                 true,
+  needsOnboarding:         false,
   activeEngines:           DEFAULT_ENGINES,
   engineStates:            DEFAULT_STATES,
   setClientEngineOverride: async () => {},
@@ -67,6 +69,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
   // Always holds the LIVE active client id. init() (below) is re-run by the
   // onAuthStateChange listener, which Supabase fires on tab-focus/token-refresh
@@ -100,6 +103,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false)
         setClients([])
         setActiveClient(null)
+        setNeedsOnboarding(false)
         setLoading(false)
         return
       }
@@ -110,7 +114,11 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         .eq('id', user.id)
         .single()
 
-      if (!profile) { setLoading(false); return }
+      // No profile = a freshly-authenticated self-serve user (email or social)
+      // who has not been provisioned yet. The onboarding gate routes them to
+      // /welcome, where provision-account.js creates their client + profile.
+      if (!profile) { setNeedsOnboarding(true); setLoading(false); return }
+      setNeedsOnboarding(false)
 
       const admin = profile.role === 'admin'
       setIsAdmin(admin)
@@ -187,6 +195,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false)
         setClients([])
         setActiveClient(null)
+        setNeedsOnboarding(false)
         setLoading(false)
       }
     })
@@ -266,6 +275,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       clients,
       isAdmin,
       loading,
+      needsOnboarding,
       activeEngines,
       engineStates,
       setClientEngineOverride,

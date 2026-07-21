@@ -65,6 +65,9 @@
 [functions."signup-client"]
   timeout = 15
 
+[functions."provision-account"]
+  timeout = 15
+
 [functions."resend-invite"]
   timeout = 15
 
