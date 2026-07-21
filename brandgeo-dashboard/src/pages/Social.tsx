@@ -3,6 +3,7 @@ import {
   Instagram, Facebook, Linkedin, MapPin, Twitter, Link2, RefreshCw, Send,
   CalendarClock, CheckCircle2, AlertTriangle, Clock, Sparkles, ExternalLink, Plus,
   AtSign, Cloud, Music2, Youtube, Image, MessagesSquare, Ghost, ShieldCheck,
+  Pencil, Ban,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -89,6 +90,16 @@ function parseMedia(raw: string): SocialMedia[] {
     .map(s => s.trim())
     .filter(Boolean)
     .map(url => ({ url, type: /\.(mp4|mov|m4v|webm)(\?|$)/i.test(url) ? 'video' as const : 'image' as const }))
+}
+
+// ISO timestamp -> the value a <input type="datetime-local"> expects (local
+// wall-clock, no timezone), so an edited post keeps its scheduled time.
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 async function authedPost<T>(fn: string, body: unknown): Promise<T> {
@@ -331,6 +342,9 @@ export default function Social() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; targets?: PublishTargetResult[] } | null>(null)
+  // Set when the composer is editing an existing scheduled post: on a successful
+  // re-publish the original is canceled at the provider so it does not double-post.
+  const [editingPostId, setEditingPostId] = useState<number | null>(null)
 
   // AI generation (Phase 2 — social-generate.js)
   const [brief, setBrief] = useState('')
@@ -350,6 +364,7 @@ export default function Social() {
   useEffect(() => {
     setBaseText(''); setMediaRaw(''); setSelected([]); setOverrides({})
     setScheduledAt(''); setResult(null); setBrief(''); setGenError(null); setAutoSelected(false)
+    setEditingPostId(null)
   }, [activeClientId])
 
   const togglePlatform = (id: SocialPlatform) => {
@@ -428,13 +443,32 @@ export default function Social() {
       )
       if (data.error) { setResult({ ok: false, text: data.error }); return }
       const failed = (data.targets ?? []).filter(t => t.status === 'failed')
+      const ok = data.status === 'published' || data.status === 'scheduled'
+
+      // If this was an edit, retire the original post now that the replacement
+      // is live, so the old copy does not also go out.
+      let editNote = ''
+      if (ok && editingPostId) {
+        try {
+          const del = await authedPost<{ status?: string; error?: string }>(
+            'social-delete', { client_id: activeClientId, post_id: editingPostId },
+          )
+          editNote = del.error
+            ? ' The previous scheduled post could not be canceled automatically — cancel it from the Calendar.'
+            : ' The previous scheduled post was canceled.'
+        } catch {
+          editNote = ' The previous scheduled post could not be canceled automatically — cancel it from the Calendar.'
+        }
+        setEditingPostId(null)
+      }
+
       setResult({
-        ok: data.status === 'published' || data.status === 'scheduled',
-        text: data.status === 'scheduled'
+        ok,
+        text: (data.status === 'scheduled'
           ? 'Scheduled.'
           : failed.length
             ? `Published with ${failed.length} failure${failed.length > 1 ? 's' : ''}.`
-            : 'Published.',
+            : 'Published.') + editNote,
         targets: data.targets,
       })
       loadPosts()
@@ -449,6 +483,9 @@ export default function Social() {
   const [posts, setPosts] = useState<(SocialPost & { targets: SocialPostTarget[] })[]>([])
   const [postsLoading, setPostsLoading] = useState(true)
   const [refreshingId, setRefreshingId] = useState<number | null>(null)
+  const [cancelingId, setCancelingId] = useState<number | null>(null)
+  const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null)
+  const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const loadPosts = useCallback(async () => {
     if (!activeClientId || isDemoMode) { setPostsLoading(false); return }
@@ -493,6 +530,49 @@ export default function Social() {
       await loadPosts()
     } catch { /* status refresh is best-effort — the stored status stays */ }
     setRefreshingId(null)
+  }
+
+  // Cancel a scheduled post at the provider (deletePost per target), then reload
+  // so it moves out of Scheduled with a Canceled badge.
+  const cancelPost = async (postId: number) => {
+    setCancelingId(postId); setActionMsg(null)
+    try {
+      const data = await authedPost<{ status?: string; error?: string; targets?: { platform: string; ok: boolean; error?: string | null }[] }>(
+        'social-delete', { client_id: activeClientId, post_id: postId },
+      )
+      if (data.error) {
+        setActionMsg({ ok: false, text: data.error })
+      } else {
+        const failed = (data.targets ?? []).filter(t => !t.ok)
+        setActionMsg(failed.length
+          ? { ok: false, text: `Canceled, but ${failed.length} platform${failed.length > 1 ? 's' : ''} could not be canceled at the provider.` }
+          : { ok: true, text: 'Scheduled post canceled.' })
+      }
+      await loadPosts()
+    } catch (e) {
+      setActionMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setCancelingId(null); setConfirmingCancelId(null)
+    }
+  }
+
+  // Load a scheduled post back into the Composer to edit it. The original stays
+  // scheduled until a successful re-publish, which then cancels it (see publish()).
+  const editPost = (post: SocialPost & { targets: SocialPostTarget[] }) => {
+    setBaseText(post.base_text ?? '')
+    setMediaRaw((post.base_media ?? []).map(m => m.url).join('\n'))
+    setSelected((post.targets ?? []).map(t => t.platform))
+    const ov: Partial<Record<SocialPlatform, string>> = {}
+    for (const t of post.targets ?? []) {
+      if (t.text_override != null) ov[t.platform] = t.text_override
+    }
+    setOverrides(ov)
+    setScheduledAt(toLocalInput(post.scheduled_at))
+    setEditingPostId(post.id)
+    setResult(null)
+    setActionMsg(null)
+    setAutoSelected(true) // keep the loaded selection; don't let auto-select stomp it
+    setTab('composer')
   }
 
   const scheduled = posts.filter(p => p.status === 'scheduled')
@@ -774,6 +854,22 @@ export default function Social() {
       {/* ── COMPOSER ─────────────────────────────────────────────────────── */}
       {tab === 'composer' && (
         <section className="space-y-6">
+          {editingPostId && (
+            <div className={`${card} p-4 flex items-start gap-3 border-brand-500/40`}>
+              <Pencil size={18} className="text-brand-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-slate-300 flex-1">
+                <p className="font-medium text-white">Editing a scheduled post</p>
+                <p className="text-slate-400 mt-1">
+                  Publishing or scheduling creates the updated post and cancels the original,
+                  so it is never sent twice.
+                </p>
+              </div>
+              <button onClick={() => setEditingPostId(null)} className="text-xs text-slate-400 hover:text-slate-200 shrink-0">
+                Stop editing
+              </button>
+            </div>
+          )}
+
           {configured && binding && !binding.bound && (
             <div className={`${card} p-4 flex items-start gap-3`}>
               <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
@@ -947,7 +1043,11 @@ export default function Social() {
                 title={binding?.bound === false ? 'This client is not linked to a publishing profile yet.' : undefined}
               >
                 {scheduledAt ? <CalendarClock size={15} /> : <Send size={15} />}
-                {publishing ? 'Working…' : scheduledAt ? 'Schedule' : 'Publish now'}
+                {publishing
+                  ? 'Working…'
+                  : editingPostId
+                    ? (scheduledAt ? 'Update schedule' : 'Publish now')
+                    : (scheduledAt ? 'Schedule' : 'Publish now')}
               </button>
             </div>
 
@@ -994,6 +1094,16 @@ export default function Social() {
               <RefreshCw size={15} className={postsLoading || queueLoading ? 'animate-spin' : ''} /> Refresh
             </button>
           </div>
+
+          {actionMsg && (
+            <div className={`rounded-lg border p-3 text-sm ${
+              actionMsg.ok
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}>
+              {actionMsg.text}
+            </div>
+          )}
 
           {/* Already scheduled at the provider but NOT created here — e.g. queued
               straight in Ayrshare. Shown read-only so nobody schedules a duplicate. */}
@@ -1080,6 +1190,45 @@ export default function Social() {
                         >
                           <RefreshCw size={14} className={refreshingId === post.id ? 'animate-spin' : ''} />
                         </button>
+                        {post.status === 'scheduled' && (
+                          confirmingCancelId === post.id ? (
+                            <span className="inline-flex items-center gap-1">
+                              <button
+                                onClick={() => cancelPost(post.id)}
+                                disabled={cancelingId === post.id}
+                                className="px-2 py-1 rounded-md text-xs bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 disabled:opacity-50"
+                              >
+                                {cancelingId === post.id ? 'Canceling…' : 'Confirm cancel'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmingCancelId(null)}
+                                disabled={cancelingId === post.id}
+                                className="px-2 py-1 rounded-md text-xs text-slate-400 hover:text-slate-200"
+                              >
+                                Keep
+                              </button>
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => editPost(post)}
+                                className="p-1.5 rounded-md text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+                                aria-label={`Edit scheduled post ${post.id}`}
+                                title="Edit"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                onClick={() => { setConfirmingCancelId(post.id); setActionMsg(null) }}
+                                className="p-1.5 rounded-md text-slate-500 hover:text-rose-300 hover:bg-dark-700 transition-colors"
+                                aria-label={`Cancel scheduled post ${post.id}`}
+                                title="Cancel"
+                              >
+                                <Ban size={14} />
+                              </button>
+                            </>
+                          )
+                        )}
                       </div>
                     </div>
 

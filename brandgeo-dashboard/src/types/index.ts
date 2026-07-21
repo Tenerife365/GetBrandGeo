@@ -107,7 +107,7 @@ export type SocialPostStatus =
   | 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'partial' | 'canceled'
 
 export type SocialTargetStatus =
-  | 'pending' | 'scheduled' | 'published' | 'failed' | 'skipped'
+  | 'pending' | 'scheduled' | 'published' | 'failed' | 'skipped' | 'canceled'
 
 export interface SocialMedia {
   url: string

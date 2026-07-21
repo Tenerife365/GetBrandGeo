@@ -141,6 +141,11 @@
 [functions."social-status"]
   timeout = 26
 
+# Cancels a scheduled post: one provider deletePost call per platform target, so
+# it can loop several calls (each with a 23s internal timeout) like social-publish.
+[functions."social-delete"]
+  timeout = 26
+
 # Reads the provider's own scheduled queue (posts created outside BrandGEO too).
 [functions."social-queue"]
   timeout = 26
