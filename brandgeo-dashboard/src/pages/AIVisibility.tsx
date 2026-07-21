@@ -504,45 +504,52 @@ export default function AIVisibility() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Engine configuration is an admin-only concern (sets what every client
+              on a plan collects). Kept admin-gated. */}
           {isAdmin && (
-            <>
-              {/* Secondary/neutral outlined — consistent with Force Refresh + Reload.
-                  Nielsen audit: reserve the one solid-violet fill for the primary action. */}
-              <button
-                onClick={() => setShowEngineModal(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
-                title="Configure engines for this client"
-                aria-label="Configure engines for this client"
-              >
-                <Settings size={14} />
-                <span className="hidden sm:inline" aria-hidden="true">Engines</span>
-              </button>
-              {/* PRIMARY action — the only solid-violet button in the header, so the
-                  eye lands on it (Nielsen audit: "reserve solid purple for the primary CTA"). */}
-              <button
-                onClick={runCollection}
-                disabled={collecting || loading}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {collecting
-                  ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
-                  : <><Play size={14} /> Run Collection</>
-                }
-              </button>
-              <button
-                onClick={forceCollection}
-                disabled={collecting || loading}
-                title="Force Refresh — wipes existing results and re-runs all engines"
-                aria-label="Force refresh — wipes existing results and re-runs all engines"
-                /* Grouped with the other secondary actions (same outlined base), but keeps a
-                   muted orange label/border so it still reads as the destructive one — Error
-                   Prevention cue preserved, per the Nielsen audit's own praise for it. */
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RotateCcw size={14} />
-                <span className="hidden sm:inline" aria-hidden="true">Force Refresh</span>
-              </button>
-            </>
+            <button
+              onClick={() => setShowEngineModal(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
+              title="Configure engines for this client"
+              aria-label="Configure engines for this client"
+            >
+              <Settings size={14} />
+              <span className="hidden sm:inline" aria-hidden="true">Engines</span>
+            </button>
+          )}
+          {/* PRIMARY action — the only solid-violet button in the header, so the
+              eye lands on it (Nielsen audit: "reserve solid purple for the primary CTA").
+              Visible to VIEWERS too, not just admins: a self-serve client MUST be able
+              to trigger their own collection — the backend already authorises a viewer
+              to run collection for their own client (_auth.js step 5) and budget-caps it
+              (checkCollectionLimits). Without this, a free signup can add prompts but
+              never see a single result — the product is inert for them. */}
+          <button
+            onClick={runCollection}
+            disabled={collecting || loading}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {collecting
+              ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
+              : <><Play size={14} /> Run Collection</>
+            }
+          </button>
+          {/* Force Refresh WIPES all existing results before re-running — destructive.
+              Kept admin-only so a client can't accidentally delete their own history. */}
+          {isAdmin && (
+            <button
+              onClick={forceCollection}
+              disabled={collecting || loading}
+              title="Force Refresh — wipes existing results and re-runs all engines"
+              aria-label="Force refresh — wipes existing results and re-runs all engines"
+              /* Grouped with the other secondary actions (same outlined base), but keeps a
+                 muted orange label/border so it still reads as the destructive one — Error
+                 Prevention cue preserved, per the Nielsen audit's own praise for it. */
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline" aria-hidden="true">Force Refresh</span>
+            </button>
           )}
           {/* Secondary/neutral outlined — same base as Engines + Force Refresh. */}
           <button
@@ -686,7 +693,7 @@ export default function AIVisibility() {
                 </div>
 
                 {e.isUnavailable ? (
-                  <div className="text-[10px] text-amber-400/80 mt-1">Temporarily unavailable · Force Refresh to retry</div>
+                  <div className="text-[10px] text-amber-400/80 mt-1">Temporarily unavailable · {isAdmin ? 'Force Refresh' : 'Run Collection'} to retry</div>
                 ) : (
                   <>
                     <div className="flex items-baseline gap-1.5 mt-1">
