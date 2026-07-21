@@ -9,17 +9,18 @@
 // cards. The user picks one; social-generate.js then does the actual writing,
 // with the idea's `context` passed in as grounding.
 //
+// The GEO signal gathering now lives in the shared _geo_signals.js so AI SEO's
+// seo-opportunities draws from the same source of truth (AI-SEO-SPEC.md). This
+// file keeps its exact idea-building/slicing -- no behaviour change.
+//
 // POST { client_id }
 //   -> { ideas: [{ source, title, why, brief, context }], brand, has_data }
 //   -> { ideas: [], has_data:false, hint } when there is nothing to boost from.
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { gatherGeoSignals } = require('./_geo_signals');
 
-const GAP_LOOKBACK_DAYS = 90;
 const MAX_IDEAS = 8;
-
-// Statuses that mean a recommendation is already handled -> don't resurface it.
-const DONE_STATUSES = new Set(['done', 'dismissed', 'actioned', 'resolved', 'archived']);
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
@@ -38,59 +39,8 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { data: client } = await supabase
-      .from('clients').select('name, brand_name, brand_website').eq('id', client_id).single();
-    const brand = client?.brand_name || client?.name || 'your brand';
-
-    // ── Competitors (names only; used to enrich gap context + one counter idea) ──
-    const { data: comps } = await supabase
-      .from('competitors').select('name').eq('client_id', client_id).limit(12);
-    const compNames = Array.from(new Set((comps || []).map((c) => c.name).filter(Boolean)));
-
-    // ── Visibility gaps: prompts that got checked but where the brand rarely/never appears ──
-    const { data: prompts } = await supabase
-      .from('prompts').select('id, text').eq('client_id', client_id).eq('is_active', true);
-    const promptById = new Map((prompts || []).map((p) => [p.id, p.text]));
-
-    const since = new Date(Date.now() - GAP_LOOKBACK_DAYS * 86_400_000).toISOString();
-    const { data: results } = await supabase
-      .from('ai_results')
-      .select('prompt_id, brand_mentioned, status')
-      .eq('client_id', client_id)
-      .gte('checked_at', since);
-
-    const stat = new Map(); // prompt_id -> { checks, mentions }
-    for (const r of results || []) {
-      if (r.status && r.status !== 'ok') continue;
-      const s = stat.get(r.prompt_id) || { checks: 0, mentions: 0 };
-      s.checks += 1;
-      if (r.brand_mentioned) s.mentions += 1;
-      stat.set(r.prompt_id, s);
-    }
-
-    const gaps = [];
-    for (const [pid, s] of stat.entries()) {
-      if (s.checks < 1) continue;
-      const rate = s.mentions / s.checks;
-      if (rate >= 1) continue;                 // fully mentioned already -> not a gap
-      const text = promptById.get(pid);
-      if (!text) continue;
-      gaps.push({ text, rate, checks: s.checks, mentions: s.mentions });
-    }
-    gaps.sort((a, b) => a.rate - b.rate);       // biggest gap (lowest mention rate) first
-
-    // ── Recommendations (open only) ──
-    const { data: recsRaw } = await supabase
-      .from('recommendations')
-      .select('title, insight, action, priority, status, created_at')
-      .eq('client_id', client_id)
-      .order('created_at', { ascending: false })
-      .limit(15);
-    const seenRec = new Set();
-    const recs = (recsRaw || [])
-      .filter((r) => !DONE_STATUSES.has(String(r.status || '').toLowerCase()))
-      .filter((r) => r.title && !seenRec.has(r.title) && seenRec.add(r.title))
-      .slice(0, 4);
+    const { brand, competitors: compNames, gaps, recommendations } = await gatherGeoSignals(supabase, client_id);
+    const recs = recommendations.slice(0, 4);
 
     // ── Build the idea cards, interleaving sources so it isn't all one kind ──
     const ideas = [];

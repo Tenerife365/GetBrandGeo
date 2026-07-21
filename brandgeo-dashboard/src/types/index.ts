@@ -164,3 +164,34 @@ export interface ClientNotification {
   created_at: string
   dismissed_at: string | null
 }
+
+// ── AI SEO (content-action layer) ────────────────────────────────────────────
+// A new-content opportunity derived from a client's GEO data (seo_briefs).
+// Deterministic briefs (seo-opportunities.js) with an on-demand GEO-scored
+// draft (seo-draft.js).
+export type SeoBriefSource = 'visibility_gap' | 'recommendation' | 'competitor' | 'manual'
+export type SeoBriefStatus = 'idea' | 'drafting' | 'drafted' | 'published' | 'dismissed'
+
+export interface SeoGeoScore {
+  seo: number | null
+  geo: number | null
+  verdict: 'ready' | 'needs_revision'
+  notes: string
+}
+
+export interface SeoBrief {
+  id: number
+  source: SeoBriefSource
+  source_ref?: string
+  title: string
+  target_prompt: string | null
+  outline: string[]
+  guidance: string | null
+  target_entities: { brand?: string; competitors?: string[] } | null
+  status: SeoBriefStatus
+  draft_text?: string | null
+  geo_score: SeoGeoScore | null
+  context?: string | null
+  drafted_at: string | null
+  updated_at?: string
+}

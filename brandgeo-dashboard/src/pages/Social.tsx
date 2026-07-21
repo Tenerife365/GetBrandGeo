@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Instagram, Facebook, Linkedin, MapPin, Twitter, Link2, RefreshCw, Send,
   CalendarClock, CheckCircle2, AlertTriangle, Clock, Sparkles, ExternalLink, Plus,
@@ -22,6 +22,27 @@ const boostBadge = (s: string) =>
   : s === 'recommendation' ? 'bg-brand-500/15 text-brand-300'
   : s === 'competitor' ? 'bg-cyan-500/15 text-cyan-300'
   : 'bg-slate-600/30 text-slate-300'
+
+// Brand Kit (social-brandkit.js): the real facts + voice the generator writes
+// from. Stored in social_profiles.brand_voice. The richer this is, the more
+// concrete (and less placeholder-y) the generated posts.
+type BrandKit = {
+  about: string; tone: string; audience: string; cta: string; logo_url: string
+  key_facts: string[]; hashtags: string[]; banned_words: string[]; colors: string[]
+}
+const EMPTY_KIT: BrandKit = {
+  about: '', tone: '', audience: '', cta: '', logo_url: '',
+  key_facts: [], hashtags: [], banned_words: [], colors: [],
+}
+function KitField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-white mb-1">{label}</label>
+      {hint && <p className="text-[11px] text-slate-500 mb-1.5">{hint}</p>}
+      {children}
+    </div>
+  )
+}
 
 // ── Platform metadata ────────────────────────────────────────────────────────
 // All 13 networks Ayrshare supports (mirrors _publishing.js PLATFORMS + the DB
@@ -58,7 +79,7 @@ const NEEDS_MEDIA: SocialPlatform[] = ['instagram', 'tiktok', 'youtube', 'pinter
 
 const platformMeta = (id: SocialPlatform) => PLATFORMS.find(p => p.id === id)
 
-type Tab = 'accounts' | 'composer' | 'calendar'
+type Tab = 'accounts' | 'composer' | 'calendar' | 'brandkit'
 
 interface PublishTargetResult {
   platform: SocialPlatform
@@ -370,6 +391,14 @@ export default function Social() {
   const [boostHint, setBoostHint] = useState<string | null>(null)
   const [boostContext, setBoostContext] = useState('')   // grounding for a picked idea
 
+  // Brand Kit (social-brandkit.js)
+  const [kit, setKit] = useState<BrandKit>(EMPTY_KIT)
+  const [kitLoaded, setKitLoaded] = useState(false)
+  const [kitLoading, setKitLoading] = useState(false)
+  const [kitSaving, setKitSaving] = useState(false)
+  const [kitSuggesting, setKitSuggesting] = useState(false)
+  const [kitMsg, setKitMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   // Pre-select the connected MVP platforms once accounts load, without stomping
   // a selection the user has already made.
   const [autoSelected, setAutoSelected] = useState(false)
@@ -385,6 +414,28 @@ export default function Social() {
     setScheduledAt(''); setResult(null); setBrief(''); setGenError(null); setAutoSelected(false)
     setEditingPostId(null)
     setBoostIdeas([]); setBoostLoaded(false); setBoostHint(null); setBoostContext('')
+    setKit(EMPTY_KIT); setKitLoaded(false); setKitMsg(null)
+  }, [activeClientId])
+
+  // Handoff from AI SEO: a brief "Send to AI Social" stashes a prefill, then
+  // routes here. Apply it into the composer's brief + grounding (same shape
+  // Social Boost uses in-page). Keyed on activeClientId and applied only once,
+  // so it runs AFTER the workspace-reset effect above on the render where the
+  // client id settles (null -> value) instead of being wiped by it.
+  const prefillApplied = useRef(false)
+  useEffect(() => {
+    if (prefillApplied.current || !activeClientId) return
+    let raw: string | null = null
+    try { raw = sessionStorage.getItem('brandgeo_social_prefill') } catch { raw = null }
+    prefillApplied.current = true
+    if (!raw) return
+    try { sessionStorage.removeItem('brandgeo_social_prefill') } catch { /* ignore */ }
+    try {
+      const p = JSON.parse(raw) as { brief?: string; context?: string }
+      if (p.brief) setBrief(p.brief)
+      if (p.context) setBoostContext(p.context)
+      setTab('composer')
+    } catch { /* malformed prefill — ignore */ }
   }, [activeClientId])
 
   const togglePlatform = (id: SocialPlatform) => {
@@ -443,6 +494,51 @@ export default function Social() {
     setBrief(idea.brief)
     setBoostContext(idea.context)
     setGenError(null)
+  }
+
+  // ── Brand Kit ──────────────────────────────────────────────────────────────
+  const loadKit = useCallback(async () => {
+    setKitLoading(true)
+    try {
+      const data = await authedPost<{ brand_kit?: Partial<BrandKit> }>(
+        'social-brandkit', { client_id: activeClientId, action: 'load' },
+      )
+      setKit({ ...EMPTY_KIT, ...(data.brand_kit || {}) })
+    } catch { /* leave empty */ } finally {
+      setKitLoading(false); setKitLoaded(true)
+    }
+  }, [activeClientId])
+
+  const saveKit = async () => {
+    if (kitSaving) return
+    setKitSaving(true); setKitMsg(null)
+    try {
+      const data = await authedPost<{ ok?: boolean; brand_kit?: BrandKit; error?: string }>(
+        'social-brandkit', { client_id: activeClientId, action: 'save', brand_kit: kit },
+      )
+      if (data.error) throw new Error(data.error)
+      if (data.brand_kit) setKit({ ...EMPTY_KIT, ...data.brand_kit })
+      setKitMsg({ ok: true, text: 'Brand kit saved. New posts will use it.' })
+    } catch (e) {
+      setKitMsg({ ok: false, text: (e as Error).message })
+    } finally { setKitSaving(false) }
+  }
+
+  const suggestKit = async () => {
+    if (kitSuggesting) return
+    setKitSuggesting(true); setKitMsg(null)
+    try {
+      const data = await authedPost<{ brand_kit?: BrandKit; error?: string }>(
+        'social-brandkit', { client_id: activeClientId, action: 'suggest' },
+      )
+      if (data.error) throw new Error(data.error)
+      if (data.brand_kit) {
+        setKit({ ...EMPTY_KIT, ...data.brand_kit })
+        setKitMsg({ ok: true, text: 'Drafted from your brand. Review the facts and edit before saving.' })
+      }
+    } catch (e) {
+      setKitMsg({ ok: false, text: (e as Error).message })
+    } finally { setKitSuggesting(false) }
   }
 
   const publish = async () => {
@@ -565,6 +661,7 @@ export default function Social() {
   }, [activeClientId])
 
   useEffect(() => { if (tab === 'calendar') loadQueue() }, [tab, loadQueue])
+  useEffect(() => { if (tab === 'brandkit' && !kitLoaded) loadKit() }, [tab, kitLoaded, loadKit])
 
   // Only the ones BrandGEO did not create — ours already render from social_posts.
   const externalQueue = remoteQueue.filter(p => p.external)
@@ -636,6 +733,7 @@ export default function Social() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'composer', label: 'Composer' },
     { id: 'calendar', label: 'Calendar' },
+    { id: 'brandkit', label: 'Brand kit' },
     { id: 'accounts', label: 'Accounts' },
   ]
 
@@ -689,6 +787,99 @@ export default function Social() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── BRAND KIT ────────────────────────────────────────────────────── */}
+      {tab === 'brandkit' && (
+        <section className="space-y-4 max-w-2xl">
+          <div className={`${card} p-5`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-medium text-white">Brand kit</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  The real facts and voice the AI writes from. The more accurate this is, the more
+                  concrete every generated post. New posts use it automatically.
+                </p>
+              </div>
+              <button onClick={suggestKit} disabled={kitSuggesting || kitLoading} className={secondaryBtn}>
+                <Sparkles size={14} className={kitSuggesting ? 'animate-pulse' : ''} />
+                {kitSuggesting ? 'Drafting…' : 'Auto-fill from my brand'}
+              </button>
+            </div>
+
+            {kitLoading ? (
+              <p className="text-sm text-slate-500">Loading…</p>
+            ) : (
+              <div className="space-y-4">
+                <KitField label="About" hint="One or two plain sentences: what the brand does and who for.">
+                  <textarea rows={2} className={inputCls} value={kit.about}
+                    onChange={e => setKit(k => ({ ...k, about: e.target.value }))}
+                    placeholder="e.g. BrandGEO measures and improves how brands appear in AI answers." />
+                </KitField>
+
+                <KitField label="Key facts" hint="One per line. Only true, verifiable facts — the AI may use these and invent no others. Review anything that was auto-filled before saving.">
+                  <textarea rows={5} className={inputCls} value={kit.key_facts.join('\n')}
+                    onChange={e => setKit(k => ({ ...k, key_facts: e.target.value.split('\n') }))}
+                    placeholder={'Monitors ChatGPT, Gemini, Claude, Perplexity and Google AI\nShows exactly where a brand is missing in AI answers\nManaged service, not just a dashboard'} />
+                </KitField>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <KitField label="Tone">
+                    <input className={inputCls} value={kit.tone}
+                      onChange={e => setKit(k => ({ ...k, tone: e.target.value }))}
+                      placeholder="e.g. direct, expert, warm" />
+                  </KitField>
+                  <KitField label="Audience">
+                    <input className={inputCls} value={kit.audience}
+                      onChange={e => setKit(k => ({ ...k, audience: e.target.value }))}
+                      placeholder="e.g. marketing leaders at B2B SaaS" />
+                  </KitField>
+                  <KitField label="Default call to action">
+                    <input className={inputCls} value={kit.cta}
+                      onChange={e => setKit(k => ({ ...k, cta: e.target.value }))}
+                      placeholder="e.g. Run a free AI visibility check" />
+                  </KitField>
+                  <KitField label="Preferred hashtags" hint="one per line">
+                    <textarea rows={3} className={inputCls} value={kit.hashtags.join('\n')}
+                      onChange={e => setKit(k => ({ ...k, hashtags: e.target.value.split('\n') }))}
+                      placeholder={'#AIvisibility\n#GEO'} />
+                  </KitField>
+                </div>
+
+                <KitField label="Words to avoid" hint="one per line, optional">
+                  <textarea rows={2} className={inputCls} value={kit.banned_words.join('\n')}
+                    onChange={e => setKit(k => ({ ...k, banned_words: e.target.value.split('\n') }))}
+                    placeholder={'revolutionary\ngame-changer'} />
+                </KitField>
+
+                <div className="pt-3 border-t border-dark-700">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-3">
+                    Visual identity <span className="normal-case text-slate-600">(saved for upcoming branded images)</span>
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <KitField label="Logo URL">
+                      <input className={inputCls} value={kit.logo_url}
+                        onChange={e => setKit(k => ({ ...k, logo_url: e.target.value }))}
+                        placeholder="https://…/logo.png" />
+                    </KitField>
+                    <KitField label="Brand colors" hint="comma-separated hex">
+                      <input className={inputCls} value={kit.colors.join(', ')}
+                        onChange={e => setKit(k => ({ ...k, colors: e.target.value.split(',').map(c => c.trim()) }))}
+                        placeholder="#8b5cf6, #0f172a" />
+                    </KitField>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button onClick={saveKit} disabled={kitSaving} className={primaryBtn}>
+                    <CheckCircle2 size={15} /> {kitSaving ? 'Saving…' : 'Save brand kit'}
+                  </button>
+                  {kitMsg && <span className={`text-xs ${kitMsg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{kitMsg.text}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {/* ── ACCOUNTS ─────────────────────────────────────────────────────── */}

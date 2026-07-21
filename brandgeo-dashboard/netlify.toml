@@ -186,3 +186,19 @@
 # competitors) to build grounded post ideas. DB-only and fast; small margin.
 [functions."social-boost"]
   timeout = 15
+
+# Brand Kit: load/save is a fast DB op; the 'suggest' action makes one Haiku call
+# (internal timeout 20s) to draft the kit, so it needs the full window.
+[functions."social-brandkit"]
+  timeout = 26
+
+# ── AI SEO (content-action layer, AI-SEO-SPEC.md) ─────────────────────────────
+# seo-opportunities: deterministic, reads GEO signals (shared _geo_signals.js)
+# and upserts content briefs. DB-only and fast; small margin over the default.
+[functions."seo-opportunities"]
+  timeout = 15
+
+# seo-draft: one Claude call (internal timeout 22s) that writes a full GEO-scored
+# draft. Needs more than the default 10s, same reason as social-generate.
+[functions."seo-draft"]
+  timeout = 26

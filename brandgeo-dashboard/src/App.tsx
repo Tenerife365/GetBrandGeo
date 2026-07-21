@@ -23,6 +23,7 @@ import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
 import Usage from './pages/Usage'
 import Social from './pages/Social'
+import SEO from './pages/SEO'
 import Account from './pages/Account'
 import AuditRequest from './pages/AuditRequest'
 import AuditReport from './pages/AuditReport'
@@ -111,6 +112,7 @@ export default function App() {
               <Route path="/recommendations" element={<PrivateRoute><OnboardGate><Layout><Recommendations /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/onboard" element={<PrivateRoute><OnboardGate><Layout><Onboard /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/social" element={<PrivateRoute><OnboardGate><Layout><Social /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Usage /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />

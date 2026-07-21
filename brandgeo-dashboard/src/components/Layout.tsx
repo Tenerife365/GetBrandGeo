@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock,
+  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -143,6 +143,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // AI Social is a Growth+ feature; below that it's shown in the nav with a lock
   // and routes to the upgrade screen. Admins always have access.
   const socialLocked = !isAdmin && !hasFeature(activeClient?.plan ?? 'free', 'ai_social')
+  const seoLocked    = !isAdmin && !hasFeature(activeClient?.plan ?? 'free', 'ai_seo')
 
   const navGroups: { label: string; items: typeof nav }[] = [
     {
@@ -169,6 +170,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // Planned next: show it locked for plans that don't include it, with an
         // add-feature / upgrade prompt, rather than hiding it.
         { to: '/social', icon: Share2, label: 'AI Social' },
+        // AI SEO — the content-action layer (Growth+; below that shown locked,
+        // routing to the upgrade screen). Admins always have access.
+        { to: '/seo', icon: FileSearch, label: 'AI SEO' },
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],
@@ -310,6 +314,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <Icon size={16} />
                     {label}
                     {to === '/social' && socialLocked && <Lock size={12} className="ml-auto text-slate-500" />}
+                    {to === '/seo' && seoLocked && <Lock size={12} className="ml-auto text-slate-500" />}
                   </NavLink>
                 ))}
               </div>

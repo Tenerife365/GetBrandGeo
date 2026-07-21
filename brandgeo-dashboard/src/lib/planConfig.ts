@@ -158,12 +158,16 @@ export const PLAN_LABELS: Record<Plan, string> = {
 // Engines are gated above; whole FEATURES (pages/tools) are gated here. Add a
 // feature id + its minimum plan, and gate the page with hasFeature() + render
 // <FeatureLocked feature=… /> for plans below it. All plan gating lives here.
-export type FeatureId = 'ai_social'
+export type FeatureId = 'ai_social' | 'ai_seo'
 
 // Minimum plan that unlocks each feature. Everything below shows the locked /
-// upgrade state. (AI Social: Growth and up — 2026-07-21, Constantin's call.)
+// upgrade state. (AI Social: Growth and up — 2026-07-21, Constantin's call.
+// AI SEO: Growth too, for parity — they're one loop, easiest to bundle;
+// AI-SEO-SPEC.md's own recommendation for the Opportunities half. Revisit if
+// the Phase 2 crawl/audit half warrants Managed-gating.)
 export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
   ai_social: 'growth',
+  ai_seo:    'growth',
 }
 
 // Copy for the locked/upgrade screen.
@@ -171,6 +175,10 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
   ai_social: {
     label: 'AI Social',
     blurb: 'Write a post once, adapt it for each network, and schedule or publish to all your social channels from one place, with AI drafting copy built to be quoted by AI answer engines.',
+  },
+  ai_seo: {
+    label: 'AI SEO',
+    blurb: 'Turn your AI visibility gaps into ready-to-write content briefs, then generate full, GEO-scored drafts built to be cited by AI answer engines, and hand them straight to AI Social.',
   },
 }
 
