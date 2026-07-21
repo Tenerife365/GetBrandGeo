@@ -3,7 +3,7 @@ import {
   Instagram, Facebook, Linkedin, MapPin, Twitter, Link2, RefreshCw, Send,
   CalendarClock, CheckCircle2, AlertTriangle, Clock, Sparkles, ExternalLink, Plus,
   AtSign, Cloud, Music2, Youtube, Image, MessagesSquare, Ghost, ShieldCheck,
-  Pencil, Ban,
+  Pencil, Ban, Zap,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -12,6 +12,16 @@ import FeatureLocked from '../components/FeatureLocked'
 import type {
   SocialAccount, SocialMedia, SocialPlatform, SocialPost, SocialPostTarget, SocialTargetStatus,
 } from '../types'
+
+// Social Boost (social-boost.js): a GEO-derived post idea + its grounding context.
+type BoostIdea = { source: string; title: string; why: string; brief: string; context: string }
+const boostLabel = (s: string) =>
+  s === 'visibility_gap' ? 'Gap' : s === 'recommendation' ? 'Fix' : s === 'competitor' ? 'Vs' : 'Idea'
+const boostBadge = (s: string) =>
+  s === 'visibility_gap' ? 'bg-amber-500/15 text-amber-300'
+  : s === 'recommendation' ? 'bg-brand-500/15 text-brand-300'
+  : s === 'competitor' ? 'bg-cyan-500/15 text-cyan-300'
+  : 'bg-slate-600/30 text-slate-300'
 
 // ── Platform metadata ────────────────────────────────────────────────────────
 // All 13 networks Ayrshare supports (mirrors _publishing.js PLATFORMS + the DB
@@ -353,6 +363,13 @@ export default function Social() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
+  // Social Boost (social-boost.js) — post ideas from this client's GEO data.
+  const [boostIdeas, setBoostIdeas] = useState<BoostIdea[]>([])
+  const [boostLoading, setBoostLoading] = useState(false)
+  const [boostLoaded, setBoostLoaded] = useState(false)
+  const [boostHint, setBoostHint] = useState<string | null>(null)
+  const [boostContext, setBoostContext] = useState('')   // grounding for a picked idea
+
   // Pre-select the connected MVP platforms once accounts load, without stomping
   // a selection the user has already made.
   const [autoSelected, setAutoSelected] = useState(false)
@@ -367,6 +384,7 @@ export default function Social() {
     setBaseText(''); setMediaRaw(''); setSelected([]); setOverrides({})
     setScheduledAt(''); setResult(null); setBrief(''); setGenError(null); setAutoSelected(false)
     setEditingPostId(null)
+    setBoostIdeas([]); setBoostLoaded(false); setBoostHint(null); setBoostContext('')
   }, [activeClientId])
 
   const togglePlatform = (id: SocialPlatform) => {
@@ -385,6 +403,8 @@ export default function Social() {
           client_id: activeClientId,
           brief: brief.trim(),
           platforms: selected.length ? selected : visiblePlatforms.map(p => p.id),
+          // Social Boost grounding, when the brief came from a GEO idea.
+          context: boostContext || undefined,
         },
       )
       if (data.base_text) setBaseText(data.base_text)
@@ -399,6 +419,30 @@ export default function Social() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  // Social Boost: pull GEO-derived post ideas for this client.
+  const loadBoost = async () => {
+    if (boostLoading) return
+    setBoostLoading(true); setBoostHint(null)
+    try {
+      const data = await authedPost<{ ideas?: BoostIdea[]; hint?: string | null; error?: string }>(
+        'social-boost', { client_id: activeClientId },
+      )
+      setBoostIdeas(data.ideas ?? [])
+      setBoostHint(data.hint ?? data.error ?? null)
+    } catch (e) {
+      setBoostHint((e as Error).message)
+    } finally {
+      setBoostLoaded(true); setBoostLoading(false)
+    }
+  }
+
+  // Picking an idea fills the brief and stashes its GEO grounding for generate().
+  const pickIdea = (idea: BoostIdea) => {
+    setBrief(idea.brief)
+    setBoostContext(idea.context)
+    setGenError(null)
   }
 
   const publish = async () => {
@@ -911,6 +955,53 @@ export default function Social() {
               Describe what you want to say. Each platform gets its own version, written
               to be quotable by AI answer engines.
             </p>
+
+            {/* Social Boost — post ideas grounded in this client's GEO data
+                (AI Visibility gaps + Recommendations + Competitors). */}
+            <div className="mb-3">
+              {!boostLoaded ? (
+                <button
+                  onClick={loadBoost}
+                  disabled={boostLoading}
+                  className="inline-flex items-center gap-1.5 text-xs text-brand-300 hover:text-brand-200 border border-brand-500/30 bg-brand-500/10 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-60"
+                >
+                  <Zap size={13} className={boostLoading ? 'animate-pulse' : ''} />
+                  {boostLoading ? 'Finding your gaps…' : 'Social Boost: ideas from your AI visibility gaps'}
+                </button>
+              ) : boostIdeas.length ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-wide text-slate-500">Ideas from your GEO data</span>
+                    <button onClick={loadBoost} className="text-[11px] text-slate-500 hover:text-slate-300">refresh</button>
+                  </div>
+                  <div className="grid gap-1.5">
+                    {boostIdeas.map((idea, i) => (
+                      <button
+                        key={i}
+                        onClick={() => pickIdea(idea)}
+                        className="text-left rounded-lg border border-dark-600 bg-dark-800/60 hover:border-brand-500/40 hover:bg-brand-500/5 px-3 py-2 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${boostBadge(idea.source)}`}>{boostLabel(idea.source)}</span>
+                          <span className="text-xs font-medium text-slate-200 truncate">{idea.title}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">{idea.why}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">{boostHint || 'No GEO data to boost from yet.'}</p>
+              )}
+            </div>
+
+            {boostContext && (
+              <div className="flex items-center gap-1.5 mb-2 text-[11px] text-brand-300">
+                <Zap size={12} /> Grounded in your GEO data
+                <button onClick={() => setBoostContext('')} className="ml-1 text-slate-500 hover:text-slate-300">clear</button>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 className={inputCls}

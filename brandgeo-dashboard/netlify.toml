@@ -181,3 +181,8 @@
 # Needs more than the default 10s for the same reason assistant.js does.
 [functions."social-generate"]
   timeout = 26
+
+# Social Boost: reads the client's GEO data (prompts/results/recommendations/
+# competitors) to build grounded post ideas. DB-only and fast; small margin.
+[functions."social-boost"]
+  timeout = 15

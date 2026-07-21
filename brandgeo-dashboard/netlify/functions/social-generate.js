@@ -38,7 +38,7 @@ const RULES = {
   snapchat:  { limit: 250,   guide: 'Very short and casual, under 250 characters.' },
 };
 
-function buildPrompt({ brand, website, brief, voice, platforms }) {
+function buildPrompt({ brand, website, brief, voice, platforms, context }) {
   const voiceLines = [];
   if (voice?.tone)     voiceLines.push(`Tone: ${voice.tone}`);
   if (voice?.audience) voiceLines.push(`Audience: ${voice.audience}`);
@@ -56,7 +56,7 @@ function buildPrompt({ brand, website, brief, voice, platforms }) {
 
 The brief: ${brief}
 
-${voiceLines.length ? `Brand voice:\n${voiceLines.join('\n')}\n` : ''}
+${context ? `GEO grounding (this post exists to improve how ${brand} shows up in AI answers). Use ONLY the real facts below as the angle, and invent nothing beyond them:\n${context}\n\n` : ''}${voiceLines.length ? `Brand voice:\n${voiceLines.join('\n')}\n` : ''}
 Write one version per platform:
 ${perPlatform}
 
@@ -171,6 +171,8 @@ exports.handler = async (event) => {
       brief: String(brief).trim().slice(0, 1000),
       voice: sp?.brand_voice || {},
       platforms,
+      // GEO grounding from Social Boost (social-boost.js). Optional; capped.
+      context: typeof body.context === 'string' ? body.context.trim().slice(0, 1500) : '',
     });
 
     // Premium asks for Sonnet, but a Sonnet outage must not dead-end the user:
