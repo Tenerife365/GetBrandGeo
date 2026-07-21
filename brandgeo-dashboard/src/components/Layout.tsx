@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2,
+  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -12,6 +12,7 @@ import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
 import ClientBanner from './ClientBanner'
+import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
@@ -58,6 +59,12 @@ const CLIENT_GROUPS: { key: ClientGroupKey; label: string }[] = [
   { key: 'research', label: 'Research' },
   { key: 'archived', label: 'Archived' },
 ]
+// Customer-facing subscribers vs internal-use workspaces. Research (and archived)
+// are internal tooling (content generation / other purposes), NOT subscribers, so
+// they're pulled OUT of the customer switcher into a separate admin-only
+// "Internal / Research" control below it (2026-07-21, Constantin's call).
+const CUSTOMER_GROUP_KEYS: ClientGroupKey[] = ['active', 'free', 'test']
+const INTERNAL_GROUP_KEYS: ClientGroupKey[] = ['research', 'archived']
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -74,6 +81,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [showMarketEditor, setShowMarketEditor] = useState(false)  // market area collapses to a summary by default (set-once, rarely changes)
   const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
   const [catSaving, setCatSaving]       = useState(false)
+  const [showInternal, setShowInternal] = useState(false)   // separate "Internal / Research" control
 
   // Refs for the three dropdown menus below — used only to detect outside clicks
   // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
@@ -81,6 +89,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const clientMenuRef = useRef<HTMLDivElement>(null)
   const marketMenuRef = useRef<HTMLDivElement>(null)
   const langMenuRef   = useRef<HTMLDivElement>(null)
+  const internalMenuRef = useRef<HTMLDivElement>(null)
 
   // Close any open dropdown on outside click or Escape — none of the 3 dropdowns below
   // previously had this, so keyboard/screen-reader users had no way to dismiss one short
@@ -91,12 +100,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (showClients && clientMenuRef.current && !clientMenuRef.current.contains(target)) setShowClients(false)
       if (showAddMarket && marketMenuRef.current && !marketMenuRef.current.contains(target)) setShowAddMarket(false)
       if (showLangs && langMenuRef.current && !langMenuRef.current.contains(target)) setShowLangs(false)
+      if (showInternal && internalMenuRef.current && !internalMenuRef.current.contains(target)) setShowInternal(false)
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setShowClients(false)
         setShowAddMarket(false)
         setShowLangs(false)
+        setShowInternal(false)
       }
     }
     document.addEventListener('mousedown', handlePointerDown)
@@ -105,7 +116,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showClients, showAddMarket, showLangs])
+  }, [showClients, showAddMarket, showLangs, showInternal])
 
   // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
   // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
@@ -118,6 +129,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/',                icon: LayoutDashboard, label: t.nav_overview        },
     { to: '/prompts',         icon: BookText,        label: t.nav_prompts         },
   ]
+
+  // Bucket clients once for both the customer switcher and the separate Internal control.
+  const groupedClients: Record<ClientGroupKey, typeof clients> = { active: [], free: [], test: [], research: [], archived: [] }
+  clients.forEach(c => { groupedClients[clientBucket(c)].push(c) })
+  const internalCount = INTERNAL_GROUP_KEYS.reduce((n, k) => n + groupedClients[k].length, 0)
 
   // Desktop sidebar: same pages, grouped into sections for a stronger information hierarchy
   // (Master-Redesign Phase 2, 2026-07-09 — see CLAUDE.md §7.4). Overview leads Insights since
@@ -231,6 +247,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo />
           <div className="flex items-center gap-2">
+            <AdminBell />
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
             )}
@@ -321,12 +338,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
               </button>
               {showClients && (() => {
-                // Bucket every client, then show tabs for the non-empty groups
-                // and the list for the selected one (Master-DashboardDesign).
-                const grouped: Record<ClientGroupKey, typeof clients> = { active: [], free: [], test: [], research: [], archived: [] }
-                clients.forEach(c => { grouped[clientBucket(c)].push(c) })
-                const tabs = CLIENT_GROUPS.filter(g => grouped[g.key].length > 0)
-                const current: ClientGroupKey = grouped[clientGroup].length ? clientGroup : (tabs[0]?.key ?? 'active')
+                // Customer switcher shows ONLY subscriber buckets (active/free/test).
+                // Research + archived live in the separate Internal control below.
+                const tabs = CLIENT_GROUPS.filter(g => CUSTOMER_GROUP_KEYS.includes(g.key) && groupedClients[g.key].length > 0)
+                const current: ClientGroupKey = tabs.find(tb => tb.key === clientGroup)?.key ?? (tabs[0]?.key ?? 'active')
                 return (
                   <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
                     <div className="flex flex-wrap gap-1 p-2 border-b border-dark-600 bg-dark-800/40" role="tablist">
@@ -337,12 +352,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           onClick={() => setClientGroup(g.key)}
                           className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${current === g.key ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-600 border border-transparent'}`}
                         >
-                          {g.label} <span className="opacity-60">{grouped[g.key].length}</span>
+                          {g.label} <span className="opacity-60">{groupedClients[g.key].length}</span>
                         </button>
                       ))}
                     </div>
                     <div className="max-h-72 overflow-y-auto">
-                      {grouped[current].map(c => (
+                      {groupedClients[current].map(c => (
                         <button key={c.id}
                           onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
                           className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
@@ -380,6 +395,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <option value="research">Research</option>
                   <option value="archived">Archived</option>
                 </select>
+              </div>
+            )}
+
+            {/* Internal / Research — a separate admin-only control, deliberately
+                kept OUT of the customer switcher above. These are internal-use
+                workspaces (content generation / research), not subscribers. */}
+            {internalCount > 0 && (
+              <div className="relative mt-2" ref={internalMenuRef}>
+                <button
+                  onClick={() => { setShowInternal(v => !v); setShowClients(false) }}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[11px] text-slate-400 bg-dark-700/40 border border-dark-600/60 hover:text-slate-200 hover:border-dark-500 transition-colors"
+                  aria-haspopup="listbox"
+                  aria-expanded={showInternal}
+                  title="Internal research workspaces for content and other uses — not customer accounts"
+                >
+                  <FlaskConical size={12} className="flex-shrink-0" />
+                  <span className="flex-1 text-left">Internal / Research</span>
+                  <span className="opacity-60">{internalCount}</span>
+                  <ChevronDown size={12} className="text-slate-500 flex-shrink-0" />
+                </button>
+                {showInternal && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50 max-h-72 overflow-y-auto">
+                    {INTERNAL_GROUP_KEYS.map(key => groupedClients[key].length > 0 && (
+                      <div key={key}>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-500 px-3 pt-2 pb-1 bg-dark-800/40">
+                          {CLIENT_GROUPS.find(g => g.key === key)?.label}
+                        </div>
+                        {groupedClients[key].map(c => (
+                          <button key={c.id}
+                            onClick={() => { setActiveClientId(c.id); setShowInternal(false) }}
+                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                          >
+                            <Building2 size={12} className="flex-shrink-0" />
+                            <span className="truncate">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
