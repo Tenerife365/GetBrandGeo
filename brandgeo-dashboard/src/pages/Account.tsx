@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil, Gift,
+  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil, Gift, Trash2,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -109,6 +109,11 @@ export default function Account() {
   const [events, setEvents] = useState<ClientEvent[]>([])
   const [clientUsers, setClientUsers] = useState<{ email: string | null; role: string; last_sign_in_at: string | null; confirmed: boolean }[]>([])
 
+  // Admin: delete-account (danger zone)
+  const [delConfirm, setDelConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [delMsg, setDelMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   // Reset any local date override when switching clients.
   useEffect(() => { setLocalDates(null); setEditingDates(false); setDatesMsg(null) }, [activeClientId])
 
@@ -117,6 +122,7 @@ export default function Account() {
     setPlanInput((activeClient?.plan as Plan) ?? 'free')
     setGrantType('manual'); setGrantDays(30); setPlanNote(''); setPlanMessage('')
     setNotifyClient(true); setPlanMsg(null)
+    setDelConfirm(''); setDelMsg(null); setDeleting(false)
   }, [activeClientId, activeClient?.plan])
 
   // Admin: recent plan-change audit trail for this client.
@@ -192,6 +198,31 @@ export default function Account() {
       setPlanMsg({ ok: false, text: (e as Error).message })
     } finally {
       setPlanSaving(false)
+    }
+  }
+
+  const deleteAccount = async () => {
+    if (deleting) return
+    setDelMsg(null); setDeleting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/delete-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ client_id: activeClientId, confirm: delConfirm.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || (data as { error?: string }).error) throw new Error((data as { error?: string }).error || 'Could not delete the account.')
+      const warnings = (data as { warnings?: string[] }).warnings
+      setDelMsg({
+        ok: true,
+        text: `Deleted "${(data as { name?: string }).name ?? 'the account'}".${warnings?.length ? ` (${warnings.length} warning(s) logged.)` : ''} Reloading…`,
+      })
+      setTimeout(() => window.location.reload(), 1400)  // re-init picks a remaining client
+    } catch (e) {
+      setDelMsg({ ok: false, text: (e as Error).message })
+      setDeleting(false)
     }
   }
 
@@ -651,6 +682,39 @@ export default function Account() {
           )}
         </div>
       </div>
+
+      {/* Danger zone (admin) — delete the whole account + its login user(s) */}
+      {isAdmin && (
+        <div className="bg-dark-800 rounded-xl p-6 mt-6 border border-red-500/20">
+          <h2 className="text-sm font-semibold text-red-300 mb-1 flex items-center gap-2">
+            <Trash2 size={15} /> Delete account
+            <span className="text-[10px] font-normal uppercase tracking-wide text-slate-500 border border-dark-600 rounded px-1.5 py-0.5">Admin</span>
+          </h2>
+          <p className="text-xs text-slate-500 mb-4 max-w-xl">
+            Permanently deletes <span className="text-slate-300">{brandName}</span>, all of its data
+            (prompts, results, competitors, recommendations, social posts, notifications) and its
+            login user(s). This cannot be undone. Blocked if an admin user is attached.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 max-w-md">
+            <input
+              value={delConfirm}
+              onChange={e => setDelConfirm(e.target.value)}
+              placeholder={`Type "${activeClient?.slug ?? ''}" to confirm`}
+              aria-label="Type the account slug to confirm deletion"
+              autoComplete="off"
+              className={inputCls}
+            />
+            <button
+              onClick={deleteAccount}
+              disabled={deleting || !activeClient?.slug || delConfirm.trim() !== activeClient.slug}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-500/90 text-white hover:bg-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Delete
+            </button>
+          </div>
+          {delMsg && <p className={`text-xs mt-3 ${delMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{delMsg.text}</p>}
+        </div>
+      )}
     </div>
   )
 }

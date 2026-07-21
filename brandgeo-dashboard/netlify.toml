@@ -59,6 +59,11 @@
 [functions."client-users"]
   timeout = 26
 
+# Admin-only: permanently delete a client, its data, and its login user(s).
+# Loops auth.admin.deleteUser per user + several table deletes, so needs > 10s.
+[functions."delete-client"]
+  timeout = 26
+
 [functions."purge-old-results"]
   schedule = "0 3 * * *"
 
