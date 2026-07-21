@@ -154,6 +154,42 @@ export const PLAN_LABELS: Record<Plan, string> = {
   enterprise: 'Enterprise',
 }
 
+// ── Feature gating (non-engine capabilities gated by plan) ───────────────────
+// Engines are gated above; whole FEATURES (pages/tools) are gated here. Add a
+// feature id + its minimum plan, and gate the page with hasFeature() + render
+// <FeatureLocked feature=… /> for plans below it. All plan gating lives here.
+export type FeatureId = 'ai_social'
+
+// Minimum plan that unlocks each feature. Everything below shows the locked /
+// upgrade state. (AI Social: Growth and up — 2026-07-21, Constantin's call.)
+export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
+  ai_social: 'growth',
+}
+
+// Copy for the locked/upgrade screen.
+export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> = {
+  ai_social: {
+    label: 'AI Social',
+    blurb: 'Write a post once, adapt it for each network, and schedule or publish to all your social channels from one place, with AI drafting copy built to be quoted by AI answer engines.',
+  },
+}
+
+/** Position of a plan in the ladder (unknown/legacy -> 0 = free). */
+export function planRank(plan: string): number {
+  const i = PLAN_ORDER.indexOf(plan as Plan)
+  return i < 0 ? 0 : i
+}
+
+/** True if `plan` includes `feature` (i.e. is at or above its minimum plan). */
+export function hasFeature(plan: string, feature: FeatureId): boolean {
+  return planRank(plan) >= planRank(FEATURE_MIN_PLAN[feature])
+}
+
+/** The minimum plan that unlocks a feature (for the "Upgrade to X" prompt). */
+export function featureUnlockPlan(feature: FeatureId): Plan {
+  return FEATURE_MIN_PLAN[feature]
+}
+
 // ── State derivation ──────────────────────────────────────────────────────────
 
 /**

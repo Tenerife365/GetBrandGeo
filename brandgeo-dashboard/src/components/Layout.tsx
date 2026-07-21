@@ -3,11 +3,12 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical,
+  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
+import { hasFeature } from '../lib/planConfig'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
@@ -139,6 +140,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // (Master-Redesign Phase 2, 2026-07-09 — see CLAUDE.md §7.4). Overview leads Insights since
   // it's the "/" landing route; Onboard Client and Usage & Costs (both admin-only) are folded
   // into Manage instead of their own standalone bordered blocks further down the sidebar.
+  // AI Social is a Growth+ feature; below that it's shown in the nav with a lock
+  // and routes to the upgrade screen. Admins always have access.
+  const socialLocked = !isAdmin && !hasFeature(activeClient?.plan ?? 'free', 'ai_social')
+
   const navGroups: { label: string; items: typeof nav }[] = [
     {
       label: 'Insights',
@@ -304,6 +309,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Icon size={16} />
                     {label}
+                    {to === '/social' && socialLocked && <Lock size={12} className="ml-auto text-slate-500" />}
                   </NavLink>
                 ))}
               </div>

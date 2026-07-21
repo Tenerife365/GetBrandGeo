@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
+import { hasFeature } from '../lib/planConfig'
+import FeatureLocked from '../components/FeatureLocked'
 import type {
   SocialAccount, SocialMedia, SocialPlatform, SocialPost, SocialPostTarget, SocialTargetStatus,
 } from '../types'
@@ -577,6 +579,14 @@ export default function Social() {
 
   const scheduled = posts.filter(p => p.status === 'scheduled')
   const history = posts.filter(p => p.status !== 'scheduled')
+
+  // ── Plan gate ────────────────────────────────────────────────────────────
+  // AI Social is a Growth+ feature. Admins keep access for every client (they
+  // manage/set up publishing); a client on a plan below it sees the upgrade
+  // screen. Placed after all hooks so hook order is stable.
+  if (!isAdmin && !hasFeature(activeClient?.plan ?? 'free', 'ai_social')) {
+    return <FeatureLocked feature="ai_social" />
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string }[] = [
