@@ -698,7 +698,11 @@ export default function Social() {
   }, [activeClientId])
 
   useEffect(() => { if (tab === 'calendar') loadQueue() }, [tab, loadQueue])
-  useEffect(() => { if (tab === 'brandkit' && !kitLoaded) loadKit() }, [tab, kitLoaded, loadKit])
+  // Load the kit on the Brand kit tab AND the Composer (the cover-image tool
+  // reads it to nudge the user when colours/logo are not set yet).
+  useEffect(() => {
+    if ((tab === 'brandkit' || tab === 'composer') && !kitLoaded) loadKit()
+  }, [tab, kitLoaded, loadKit])
 
   // Only the ones BrandGEO did not create — ours already render from social_posts.
   const externalQueue = remoteQueue.filter(p => p.external)
@@ -1284,6 +1288,33 @@ export default function Social() {
               Generate a clean, on-brand card from a short headline, added to your media above.
               Networks like Instagram, TikTok and Pinterest need an image to publish.
             </p>
+
+            {/* Nudge: without brand colours/logo the card falls back to defaults +
+                initials, so push the user to the Brand kit before they generate. */}
+            {kitLoaded && (kit.colors.filter(Boolean).length === 0 || !kit.logo_url.trim()) && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-200/90">
+                  <p>
+                    For an image that matches your brand, add your{' '}
+                    <span className="font-medium">
+                      {[
+                        kit.colors.filter(Boolean).length === 0 ? 'brand colors' : null,
+                        !kit.logo_url.trim() ? 'logo' : null,
+                      ].filter(Boolean).join(' and ')}
+                    </span>{' '}
+                    in the Brand kit first. Without them the card falls back to default colors and initials.
+                  </p>
+                  <button
+                    onClick={() => setTab('brandkit')}
+                    className="mt-1.5 text-amber-300 hover:text-amber-200 underline underline-offset-2"
+                  >
+                    Open Brand kit
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 className={inputCls}
