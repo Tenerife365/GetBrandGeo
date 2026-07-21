@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { supabase, isDemoMode } from './lib/supabase'
@@ -54,7 +54,16 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 // through. Waits for ClientProvider to finish loading to avoid a flash.
 function OnboardGate({ children }: { children: React.ReactNode }) {
   const { loading, needsOnboarding } = useClient()
-  if (loading) return null
+  // Only blank on the VERY FIRST load. ClientProvider re-runs init() on later
+  // SIGNED_IN events (Supabase fires these on tab refocus / token refresh, not
+  // just real logins), which flips `loading` true again. Returning null then
+  // would UNMOUNT the whole page and wipe in-progress work (e.g. a half-written
+  // social post + generated copy). After we've settled once, keep rendering the
+  // children through subsequent re-inits; the redirect below still fires if the
+  // user genuinely has no profile.
+  const settledOnce = useRef(false)
+  if (!loading) settledOnce.current = true
+  if (loading && !settledOnce.current) return null
   if (needsOnboarding) return <Navigate to="/welcome" replace />
   return <>{children}</>
 }
