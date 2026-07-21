@@ -384,6 +384,12 @@ export default function Social() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
+  // Cover image (social-image.js) — an on-brand card built from a headline.
+  const [imgHeadline, setImgHeadline] = useState('')
+  const [imgBusy, setImgBusy] = useState(false)
+  const [imgErr, setImgErr] = useState<string | null>(null)
+  const [imgPreview, setImgPreview] = useState<string | null>(null)
+
   // Social Boost (social-boost.js) — post ideas from this client's GEO data.
   const [boostIdeas, setBoostIdeas] = useState<BoostIdea[]>([])
   const [boostLoading, setBoostLoading] = useState(false)
@@ -415,6 +421,7 @@ export default function Social() {
     setEditingPostId(null)
     setBoostIdeas([]); setBoostLoaded(false); setBoostHint(null); setBoostContext('')
     setKit(EMPTY_KIT); setKitLoaded(false); setKitMsg(null)
+    setImgHeadline(''); setImgErr(null); setImgPreview(null)
   }, [activeClientId])
 
   // Handoff from AI SEO: a brief "Send to AI Social" stashes a prefill, then
@@ -443,6 +450,36 @@ export default function Social() {
   }
 
   const textFor = (id: SocialPlatform) => overrides[id] ?? baseText
+
+  // First sentence/line of the base post, trimmed for a cover-image headline.
+  const firstSentence = (t: string) => {
+    const s = (t || '').replace(/\s+/g, ' ').trim()
+    if (!s) return ''
+    const cut = s.search(/[.!?](\s|$)/)
+    const head = cut > 0 ? s.slice(0, cut + 1) : s
+    return head.length > 90 ? head.slice(0, 89).trimEnd() + '…' : head
+  }
+
+  // Generate an on-brand cover card (social-image.js) and attach its URL.
+  const genImage = async () => {
+    const headline = (imgHeadline.trim() || firstSentence(baseText)).trim()
+    if (!headline) { setImgErr('Write the post, or type a headline for the image.'); return }
+    if (imgBusy) return
+    setImgBusy(true); setImgErr(null)
+    try {
+      const data = await authedPost<{ url?: string; error?: string }>(
+        'social-image', { client_id: activeClientId, headline },
+      )
+      if (data.error || !data.url) { setImgErr(data.error || 'Could not generate the image.'); return }
+      setImgPreview(data.url)
+      // Add the image URL to the media field so it publishes with the post.
+      setMediaRaw(prev => prev.trim() ? `${prev.trim()}\n${data.url}` : data.url!)
+    } catch (e) {
+      setImgErr((e as Error).message)
+    } finally {
+      setImgBusy(false)
+    }
+  }
 
   const generate = async () => {
     if (!brief.trim() || generating) return
@@ -1235,6 +1272,42 @@ export default function Social() {
                 onChange={e => setMediaRaw(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Cover image — on-brand card generated from a headline (social-image.js) */}
+          <div className={`${card} p-5`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Image size={16} className="text-brand-400" />
+              <h2 className="text-sm font-medium text-white">Cover image</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Generate a clean, on-brand card from a short headline, added to your media above.
+              Networks like Instagram, TikTok and Pinterest need an image to publish.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                className={inputCls}
+                placeholder={firstSentence(baseText) || 'Headline for the image, e.g. Catering for 200+ guests'}
+                value={imgHeadline}
+                onChange={e => setImgHeadline(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') genImage() }}
+              />
+              <button onClick={genImage} className={primaryBtn} disabled={imgBusy}>
+                <Image size={15} className={imgBusy ? 'animate-pulse' : ''} />
+                {imgBusy ? 'Making…' : 'Generate image'}
+              </button>
+            </div>
+            {imgErr && <p className="text-xs text-rose-400 mt-2">{imgErr}</p>}
+            {imgPreview && (
+              <div className="mt-3">
+                <img
+                  src={imgPreview}
+                  alt="Generated cover"
+                  className="w-40 h-40 object-cover rounded-lg border border-dark-600"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Added to your media. Generate again to make another.</p>
+              </div>
+            )}
           </div>
 
           {/* Platform picker + per-platform overrides */}

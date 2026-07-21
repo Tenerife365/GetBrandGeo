@@ -192,6 +192,14 @@
 [functions."social-brandkit"]
   timeout = 26
 
+# Cover-image renderer: composes an on-brand PNG with @napi-rs/canvas (a native
+# module) + an embedded font, fetches the client logo, and uploads to Supabase
+# Storage. external_node_modules ships the native binary as-is instead of letting
+# esbuild try to bundle the .node file. 26s covers the logo fetch + encode + upload.
+[functions."social-image"]
+  timeout = 26
+  external_node_modules = ["@napi-rs/canvas"]
+
 # ── AI SEO (content-action layer, AI-SEO-SPEC.md) ─────────────────────────────
 # seo-opportunities: deterministic, reads GEO signals (shared _geo_signals.js)
 # and upserts content briefs. DB-only and fast; small margin over the default.
