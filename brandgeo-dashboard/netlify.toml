@@ -210,3 +210,13 @@
 # draft. Needs more than the default 10s, same reason as social-generate.
 [functions."seo-draft"]
   timeout = 26
+
+# seo-crawl: records a crawl run then fires the background worker fire-and-forget.
+# Fast; the actual crawl happens in seo-crawl-background (a Netlify Background
+# Function — the `-background` suffix gives it up to 15 min, no timeout entry).
+[functions."seo-crawl"]
+  timeout = 15
+
+# seo-audit-page: one Haiku call (internal timeout 20s) scoring a crawled page.
+[functions."seo-audit-page"]
+  timeout = 26

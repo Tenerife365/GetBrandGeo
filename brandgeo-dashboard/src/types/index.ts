@@ -195,3 +195,28 @@ export interface SeoBrief {
   drafted_at: string | null
   updated_at?: string
 }
+
+// Phase 2 — crawled pages + per-page GEO audit (seo_pages / seo_crawls).
+export type SeoPageStatus = 'crawled' | 'audited' | 'stale'
+export interface SeoPageAudit {
+  summary: string
+  issues: { severity: 'high' | 'med' | 'low'; text: string }[]
+  suggestions: string[]
+}
+export interface SeoPage {
+  id: number
+  url: string
+  title: string | null
+  geo_score: number | null
+  audit: SeoPageAudit | null
+  status: SeoPageStatus
+  fetched_at: string | null
+}
+export interface SeoCrawl {
+  id: number
+  status: 'running' | 'done' | 'error'
+  pages: number
+  error: string | null
+  started_at: string
+  finished_at: string | null
+}
