@@ -53,24 +53,18 @@ exports.handler = async (event) => {
   }
 
   try {
+    // NOTE: the clients table has NO brand_name column (only `name`). Selecting a
+    // non-existent column makes PostgREST reject the whole query -> null client ->
+    // the "Your brand" bug. Select only real columns.
     const { data: client } = await supabase
-      .from('clients').select('name, brand_name, brand_website').eq('id', client_id).single();
+      .from('clients').select('name, brand_website').eq('id', client_id).single();
     // Brand Kit (colours / logo / CTA the user configured for AI Social).
     const sp = await ensureSocialProfile(supabase, client_id);
     const kit = (sp && typeof sp.brand_voice === 'object' && sp.brand_voice) || {};
 
     const website = domainOf(client?.brand_website);
     // Never show the generic "Your brand": fall back to the domain label.
-    const brand = client?.brand_name || client?.name || titleFromDomain(website) || 'Your brand';
-
-    // Palette from the kit's colours, else the default violet/blue.
-    const kitColors = (Array.isArray(kit.colors) ? kit.colors : [])
-      .map(toReadableHsl).filter(Boolean);
-    const primary = kitColors[0] || DEFAULT_PRIMARY;
-    const secondary = kitColors[1] || (kitColors[0]
-      ? { h: (primary.h + 24) % 360, s: primary.s, l: Math.min(primary.l + 6, 74) }
-      : DEFAULT_SECONDARY);
-
+    const brand = client?.name || titleFromDomain(website) || 'Your brand';
     const cta = typeof kit.cta === 'string' ? kit.cta.trim() : '';
 
     // Logo: the kit's explicit logo_url first, then the client's Clearbit logo.
@@ -79,6 +73,21 @@ exports.handler = async (event) => {
       logo = await fetchImage(kit.logo_url);
     }
     if (!logo && website) logo = await fetchImage(`https://logo.clearbit.com/${website}?size=256`);
+
+    // Palette: the kit's saved colours first; else auto-derive the accent from
+    // the logo's dominant colour (so the card matches the brand even with no
+    // colours set); else the default violet/blue.
+    const kitColors = (Array.isArray(kit.colors) ? kit.colors : [])
+      .map(toReadableHsl).filter(Boolean);
+    let primary, secondary;
+    if (kitColors[0]) {
+      primary = kitColors[0];
+      secondary = kitColors[1] || secondaryFrom(primary);
+    } else {
+      const fromLogo = logo ? dominantHsl(logo) : null;
+      primary = fromLogo || DEFAULT_PRIMARY;
+      secondary = fromLogo ? secondaryFrom(fromLogo) : DEFAULT_SECONDARY;
+    }
 
     const png = await renderCard({ brand, website, headline, logo, primary, secondary, cta });
 
@@ -244,18 +253,43 @@ function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Parse a hex string ("#abc", "#aabbcc", "aabbcc") into a READABLE {h,s,l}:
-// saturation/lightness clamped so a brand colour always reads on the dark card
-// (a navy or near-black brand colour still shows as a visible accent). Returns
-// null for anything unparseable (named colours, rgb(), etc.).
+// Clamp an h/s/l (s,l as 0-100) into a range that stays readable on the dark
+// card WITHOUT distorting the hue: only genuinely dark/washed colours are
+// nudged, so a saved brand red (#c0392b, l~46%) renders as red, not orange.
+function clampReadable(h, s, l) {
+  return {
+    h: ((Math.round(h) % 360) + 360) % 360,
+    s: Math.round(Math.max(38, Math.min(96, s))),
+    l: Math.round(Math.max(42, Math.min(80, l))),
+  };
+}
+
+// A companion colour for gradients: a small hue shift + slightly lighter.
+function secondaryFrom(p) {
+  return clampReadable((p.h + 22) % 360, p.s, p.l + 6);
+}
+
+// Parse a hex string ("#abc", "#aabbcc", "aabbcc") into a readable {h,s,l}.
+// Returns null for anything unparseable (named colours, rgb(), etc.).
 function toReadableHsl(str) {
+  const rgb = hexToRgb(str);
+  if (!rgb) return null;
+  const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  return clampReadable(h, s * 100, l * 100);
+}
+
+function hexToRgb(str) {
   const m = String(str || '').trim().replace(/^#/, '');
-  let r, g, b;
   if (/^[0-9a-f]{3}$/i.test(m)) {
-    r = parseInt(m[0] + m[0], 16); g = parseInt(m[1] + m[1], 16); b = parseInt(m[2] + m[2], 16);
-  } else if (/^[0-9a-f]{6}$/i.test(m)) {
-    r = parseInt(m.slice(0, 2), 16); g = parseInt(m.slice(2, 4), 16); b = parseInt(m.slice(4, 6), 16);
-  } else { return null; }
+    return { r: parseInt(m[0] + m[0], 16), g: parseInt(m[1] + m[1], 16), b: parseInt(m[2] + m[2], 16) };
+  }
+  if (/^[0-9a-f]{6}$/i.test(m)) {
+    return { r: parseInt(m.slice(0, 2), 16), g: parseInt(m.slice(2, 4), 16), b: parseInt(m.slice(4, 6), 16) };
+  }
+  return null;
+}
+
+function rgbToHsl(r, g, b) {
   const rn = r / 255, gn = g / 255, bn = b / 255;
   const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn), d = max - min;
   let h = 0;
@@ -267,11 +301,33 @@ function toReadableHsl(str) {
   }
   const l = (max + min) / 2;
   const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-  return {
-    h: Math.round(h),
-    s: Math.round(Math.max(0.45, Math.min(0.9, s)) * 100),
-    l: Math.round(Math.max(0.56, Math.min(0.72, l)) * 100),
-  };
+  return { h, s, l };
+}
+
+// The dominant vibrant colour of a logo image, as a readable {h,s,l}. Samples a
+// small copy, buckets by hue weighted by saturation, and ignores near-white,
+// near-black and greyish pixels. Returns null if nothing colourful is found.
+function dominantHsl(img) {
+  try {
+    const n = 48;
+    const c = createCanvas(n, n);
+    const cx = c.getContext('2d');
+    cx.drawImage(img, 0, 0, n, n);
+    const data = cx.getImageData(0, 0, n, n).data;
+    const buckets = Array.from({ length: 36 }, () => ({ w: 0, s: 0, l: 0 }));
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 128) continue;                    // transparent
+      const { h, s, l } = rgbToHsl(data[i], data[i + 1], data[i + 2]);
+      if (l < 0.12 || l > 0.92 || s < 0.28) continue;     // black/white/grey
+      const b = Math.floor(h / 10) % 36;
+      buckets[b].w += s; buckets[b].s += s * s; buckets[b].l += l * s;
+    }
+    let best = -1, bestW = 0;
+    for (let i = 0; i < 36; i++) if (buckets[i].w > bestW) { bestW = buckets[i].w; best = i; }
+    if (best < 0) return null;
+    const bk = buckets[best];
+    return clampReadable(best * 10 + 5, (bk.s / bk.w) * 100, (bk.l / bk.w) * 100);
+  } catch { return null; }
 }
 
 function hsl({ h, s, l }, a) {
@@ -336,3 +392,6 @@ function wrapText(ctx, text, maxW, maxLines) {
 
 // Exported for the local visual test.
 exports.renderCard = renderCard;
+exports.toReadableHsl = toReadableHsl;
+exports.dominantHsl = dominantHsl;
+exports.secondaryFrom = secondaryFrom;

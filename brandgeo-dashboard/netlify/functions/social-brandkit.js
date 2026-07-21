@@ -67,6 +67,7 @@ ${category ? `Category: ${category}.` : ''}
 ${competitors && competitors.length ? `Known competitors: ${competitors.slice(0, 8).join(', ')}.` : ''}
 ${posts ? `Recent posts from this brand, for VOICE reference only:\n${posts}\n` : ''}
 Draft a brand kit. Base it on what you can reasonably infer from the name, website, and category. Do NOT invent specific statistics, awards, years, or customer names. Facts should be safe, general, and likely true; the human will verify them.
+Describe ${brand} itself: its own products or services and who it serves. Do NOT describe the website's technology, hosting, or e-commerce platform (for example Shopify, WordPress, Wix), and never confuse ${brand} with a tool or platform it merely uses. If you are unsure what ${brand} does, keep the facts general and strictly about ${brand} by name, and never substitute a different, unrelated company.
 
 Reply with ONLY a JSON object, no markdown fences:
 {"about":"1 to 2 plain sentences: what ${brand} does and who it is for",
@@ -131,12 +132,12 @@ exports.handler = async (event) => {
 
     if (action === 'suggest') {
       const { data: client } = await supabase
-        .from('clients').select('name, brand_name, brand_website, category, known_competitors').eq('id', client_id).single();
+        .from('clients').select('name, brand_website, category, known_competitors').eq('id', client_id).single();
       const { data: recent } = await supabase
         .from('social_posts').select('base_text').eq('client_id', client_id).order('created_at', { ascending: false }).limit(5);
 
       const draft = await suggestKit({
-        brand: client?.brand_name || client?.name || 'this brand',
+        brand: client?.name || 'this brand',
         website: client?.brand_website || '',
         category: client?.category || '',
         competitors: Array.isArray(client?.known_competitors) ? client.known_competitors : [],

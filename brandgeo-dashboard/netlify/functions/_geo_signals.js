@@ -34,8 +34,9 @@ const DONE_STATUSES = new Set(['done', 'dismissed', 'actioned', 'resolved', 'arc
  */
 async function gatherGeoSignals(supabase, clientId) {
   const { data: client } = await supabase
-    .from('clients').select('name, brand_name, brand_website').eq('id', clientId).single();
-  const brand = client?.brand_name || client?.name || 'your brand';
+    .from('clients').select('name, brand_website').eq('id', clientId).single();
+  // clients has NO brand_name column — selecting it would 400 the whole query.
+  const brand = client?.name || 'your brand';
   const website = client?.brand_website || '';
 
   // ── Competitors (names only) ──

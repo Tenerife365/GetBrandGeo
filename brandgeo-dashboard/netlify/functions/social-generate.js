@@ -187,10 +187,11 @@ exports.handler = async (event) => {
 
   try {
     const { data: client } = await supabase
-      .from('clients').select('name, brand_name, brand_website').eq('id', client_id).single();
+      .from('clients').select('name, brand_website').eq('id', client_id).single();
     const sp = await ensureSocialProfile(supabase, client_id);
 
-    const brandName = client?.brand_name || client?.name || 'this brand';
+    // clients has NO brand_name column — selecting it would 400 the whole query.
+    const brandName = client?.name || 'this brand';
     const prompt = buildPrompt({
       brand: brandName,
       website: client?.brand_website || '',

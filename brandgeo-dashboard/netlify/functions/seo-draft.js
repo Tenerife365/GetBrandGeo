@@ -159,8 +159,9 @@ exports.handler = async (event) => {
     }
 
     const { data: client } = await supabase
-      .from('clients').select('name, brand_name, brand_website, plan').eq('id', client_id).single();
-    const brand = client?.brand_name || client?.name || 'this brand';
+      .from('clients').select('name, brand_website, plan').eq('id', client_id).single();
+    // clients has NO brand_name column — selecting it would 400 the whole query.
+    const brand = client?.name || 'this brand';
     const website = client?.brand_website || '';
 
     // ── Per-plan monthly draft cap (cost control). Admins bypass it. ──
