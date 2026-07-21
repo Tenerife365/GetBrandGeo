@@ -45,6 +45,16 @@
 [functions."onboard-client"]
   timeout = 26
 
+# Admin plan change / trial-comp grant: updates clients, writes an audit event,
+# resolves client emails and sends a branded notification. Multiple sequential
+# calls (Supabase + auth.admin + Resend) need more than the default 10s.
+[functions."set-client-plan"]
+  timeout = 26
+
+# Daily: revert expired trial/comp grants to Free, notify client + admin.
+[functions."expire-plan-grants"]
+  schedule = "0 6 * * *"
+
 [functions."purge-old-results"]
   schedule = "0 3 * * *"
 

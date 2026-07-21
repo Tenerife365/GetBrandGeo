@@ -150,3 +150,17 @@ export interface SocialPost {
   updated_at: string
   targets?: SocialPostTarget[]
 }
+
+// ── Client-facing in-dashboard notifications (plan grants, changes, expiries) ──
+export interface ClientNotification {
+  id: number
+  client_id: number
+  kind: 'plan_grant' | 'plan_change' | 'trial_expired'
+  title: string
+  body: string
+  meta: Record<string, unknown>
+  cta_label: string | null
+  cta_url: string | null
+  created_at: string
+  dismissed_at: string | null
+}

@@ -11,6 +11,7 @@ import { useClient } from '../lib/clientContext'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
+import ClientBanner from './ClientBanner'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
@@ -628,6 +629,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
+          <ClientBanner />
           {children}
         </main>
       </div>

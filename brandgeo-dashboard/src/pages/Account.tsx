@@ -5,14 +5,27 @@
  * billing dates (started / paid-until — manual for non-Stripe Managed clients,
  * editable by admins), change-email, and a secure change-password flow.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil,
+  Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil, Gift,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { PLAN_LABELS } from '../lib/planConfig'
+import { PLAN_LABELS, PLAN_ORDER, type Plan } from '../lib/planConfig'
 import BrandLogo from '../components/BrandLogo'
+
+interface ClientEvent {
+  id: number
+  type: string
+  from_plan: string | null
+  to_plan: string | null
+  created_at: string
+  meta: { grant_until?: string | null; note?: string | null } | null
+}
+
+const GRANT_TYPE_LABELS: Record<string, string> = {
+  manual: 'Assign plan', trial: 'Free trial', comp: 'Complimentary', stripe: 'Stripe', signup: 'Signup', expired: 'Expired',
+}
 
 /** Plan ladder for the "plans as blocks" section — display prices only (source
  *  of truth for billing is Stripe / PRICING-SPEC.md). */
@@ -53,7 +66,7 @@ interface SubInfo {
 }
 
 export default function Account() {
-  const { activeClient, activeClientId, isAdmin } = useClient()
+  const { activeClient, activeClientId, isAdmin, patchClient } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
   const website = activeClient?.brand_website ?? null
   const domain = domainOf(website)
@@ -84,8 +97,85 @@ export default function Account() {
 
   const [billingLoading, setBillingLoading] = useState(false)
 
+  // ── Admin: manage plan / grant a trial or comp ──────────────────────────────
+  const [planInput, setPlanInput] = useState<Plan>('free')
+  const [grantType, setGrantType] = useState<'manual' | 'trial' | 'comp'>('manual')
+  const [grantDays, setGrantDays] = useState(30)
+  const [planNote, setPlanNote] = useState('')
+  const [notifyClient, setNotifyClient] = useState(true)
+  const [planMessage, setPlanMessage] = useState('')
+  const [planSaving, setPlanSaving] = useState(false)
+  const [planMsg, setPlanMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [events, setEvents] = useState<ClientEvent[]>([])
+
   // Reset any local date override when switching clients.
   useEffect(() => { setLocalDates(null); setEditingDates(false); setDatesMsg(null) }, [activeClientId])
+
+  // Seed + reset the plan editor when the client changes.
+  useEffect(() => {
+    setPlanInput((activeClient?.plan as Plan) ?? 'free')
+    setGrantType('manual'); setGrantDays(30); setPlanNote(''); setPlanMessage('')
+    setNotifyClient(true); setPlanMsg(null)
+  }, [activeClientId, activeClient?.plan])
+
+  // Admin: recent plan-change audit trail for this client.
+  const loadEvents = useCallback(async () => {
+    if (!isAdmin || !activeClientId || isDemoMode) { setEvents([]); return }
+    try {
+      const { data } = await supabase
+        .from('client_events')
+        .select('id, type, from_plan, to_plan, created_at, meta')
+        .eq('client_id', activeClientId)
+        .order('created_at', { ascending: false })
+        .limit(6)
+      setEvents((data as ClientEvent[]) ?? [])
+    } catch { setEvents([]) } // table not migrated yet
+  }, [isAdmin, activeClientId])
+  useEffect(() => { loadEvents() }, [loadEvents])
+
+  const grantEndPreview = (() => {
+    if (grantType === 'manual') return null
+    const d = new Date(); d.setDate(d.getDate() + grantDays)
+    return d.toLocaleDateString(undefined, { day: '2-digit', month: 'long', year: 'numeric' })
+  })()
+
+  const savePlan = async () => {
+    setPlanMsg(null); setPlanSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/set-client-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          client_id: activeClientId,
+          plan: planInput,
+          grant_type: grantType,
+          ...(grantType !== 'manual' ? { period_days: grantDays } : {}),
+          note: planNote || null,
+          notify: notifyClient,
+          message: planMessage || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || (data as { error?: string }).error) {
+        throw new Error((data as { error?: string }).error || 'Could not update the plan.')
+      }
+      const d = data as { plan_source?: string; plan_grant_until?: string | null; warning?: string; email?: { sent?: boolean; skipped?: boolean } }
+      patchClient(activeClientId, {
+        plan: planInput, plan_source: d.plan_source ?? grantType, plan_grant_until: d.plan_grant_until ?? null,
+      })
+      const parts = [`Plan set to ${PLAN_LABELS[planInput]}.`]
+      if (notifyClient) parts.push(d.email?.sent ? 'Client notified by email + banner.' : d.email?.skipped ? 'Banner shown; email skipped (no client email on file).' : 'Client banner shown.')
+      if (d.warning) parts.push(d.warning)
+      setPlanMsg({ ok: true, text: parts.join(' ') })
+      loadEvents()
+    } catch (e) {
+      setPlanMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setPlanSaving(false)
+    }
+  }
 
   // Load the signed-in user's email.
   useEffect(() => {
@@ -367,6 +457,108 @@ export default function Account() {
           <p className="text-[11px] text-slate-600 mt-3">Managed plans are handled by our team — upgrading opens an email to us.</p>
         )}
       </div>
+
+      {/* Manage plan (admin) */}
+      {isAdmin && (
+        <div className="bg-dark-800 rounded-xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2">
+            <Gift size={15} className="text-brand-400" /> Manage plan
+            <span className="text-[10px] font-normal uppercase tracking-wide text-slate-500 border border-dark-600 rounded px-1.5 py-0.5">Admin</span>
+          </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Change this client&apos;s tier, or grant a one-off trial or complimentary plan for a period.
+            Trials and comps revert to Free automatically when they end.
+          </p>
+
+          {/* current state */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 text-xs">
+            <div><span className="text-slate-500">Current: </span><span className="text-slate-200 font-medium">{planLabel}</span></div>
+            {activeClient?.plan_source && (
+              <div><span className="text-slate-500">Source: </span><span className="text-slate-300">{GRANT_TYPE_LABELS[activeClient.plan_source] ?? activeClient.plan_source}</span></div>
+            )}
+            {activeClient?.plan_grant_until && (
+              <div><span className="text-slate-500">Reverts to Free: </span><span className="text-amber-300">{fmtDateStr(activeClient.plan_grant_until)}</span></div>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-xl">
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Plan</span>
+              <select value={planInput} onChange={e => setPlanInput(e.target.value as Plan)} className={inputCls}>
+                {PLAN_ORDER.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Type</span>
+              <select value={grantType} onChange={e => setGrantType(e.target.value as 'manual' | 'trial' | 'comp')} className={inputCls}>
+                <option value="manual">Assign plan (no expiry)</option>
+                <option value="trial">Free trial (reverts to Free)</option>
+                <option value="comp">Complimentary (reverts to Free)</option>
+              </select>
+            </label>
+          </div>
+
+          {grantType !== 'manual' && (
+            <div className="mt-4 flex flex-wrap items-end gap-4 max-w-xl">
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Period (days)</span>
+                <input type="number" min={1} max={3650} value={grantDays}
+                  onChange={e => setGrantDays(Math.max(1, Math.min(3650, parseInt(e.target.value || '0', 10) || 1)))}
+                  className={`${inputCls} w-32`} />
+              </label>
+              {grantEndPreview && (
+                <span className="text-xs text-slate-400 pb-2">Ends <span className="text-slate-200">{grantEndPreview}</span></span>
+              )}
+            </div>
+          )}
+
+          <label className="block mt-4 max-w-xl">
+            <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Internal note (optional)</span>
+            <input value={planNote} onChange={e => setPlanNote(e.target.value)} placeholder="e.g. Managed launch bonus" className={inputCls} />
+          </label>
+
+          <label className="flex items-center gap-2 mt-4 text-sm text-slate-300 cursor-pointer">
+            <input type="checkbox" checked={notifyClient} onChange={e => setNotifyClient(e.target.checked)} className="accent-violet-500 w-4 h-4" />
+            Notify the client (dashboard banner + email)
+          </label>
+
+          {notifyClient && (
+            <label className="block mt-3 max-w-xl">
+              <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Extra line in the message (optional)</span>
+              <textarea rows={2} value={planMessage} onChange={e => setPlanMessage(e.target.value)}
+                placeholder="e.g. Thanks for being an early supporter — enjoy Managed on us." className={inputCls} />
+            </label>
+          )}
+
+          <div className="flex items-center gap-3 mt-5 flex-wrap">
+            <button onClick={savePlan} disabled={planSaving} className={primaryBtn}>
+              {planSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {grantType === 'manual' ? 'Apply plan' : grantType === 'trial' ? 'Grant trial' : 'Grant complimentary'}
+            </button>
+            {planMsg && <span className={`text-xs ${planMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{planMsg.text}</span>}
+          </div>
+
+          {/* audit trail */}
+          {events.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-dark-700">
+              <h3 className="text-[10px] uppercase tracking-wide text-slate-500 mb-2">Recent changes</h3>
+              <ul className="space-y-1.5">
+                {events.map(ev => (
+                  <li key={ev.id} className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-500">{fmtDateStr(ev.created_at)}</span>
+                    <span className="text-slate-300">
+                      {ev.from_plan ? `${PLAN_LABELS[ev.from_plan as Plan] ?? ev.from_plan} → ` : ''}
+                      {PLAN_LABELS[ev.to_plan as Plan] ?? ev.to_plan ?? '—'}
+                    </span>
+                    <span className="text-slate-600">· {ev.type.replace(/_/g, ' ')}</span>
+                    {ev.meta?.grant_until && <span className="text-amber-400/80">until {fmtDateStr(ev.meta.grant_until)}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Change email */}
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
