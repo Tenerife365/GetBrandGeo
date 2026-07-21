@@ -55,6 +55,10 @@
 [functions."expire-plan-grants"]
   schedule = "0 6 * * *"
 
+# Admin-only: resolve a client's login users (one auth.admin lookup per user).
+[functions."client-users"]
+  timeout = 26
+
 [functions."purge-old-results"]
   schedule = "0 3 * * *"
 

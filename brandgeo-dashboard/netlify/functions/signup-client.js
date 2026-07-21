@@ -103,6 +103,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { hashIp, isPlausibleDomain, normalizeDomain } = require('./_prospect_guard')
+const { recordAdminEvent } = require('./_admin_notify')
 
 const ALLOWED_ORIGINS = [
   'https://app.getbrandgeo.com',
@@ -307,6 +308,15 @@ exports.handler = async (event) => {
   }
 
   console.log(`[signup] New free account: ${cleanEmail} → client ${clientData.id} (viewer, invite sent)`)
+
+  // Proactively notify the admin (dashboard bell + email) — best-effort.
+  await recordAdminEvent(supabase, {
+    type: 'new_signup',
+    client_id: clientData.id,
+    title: `New signup: ${companyName}`,
+    body: `${cleanEmail} signed up for a free account (${cleanDomain}).`,
+    meta: { email: cleanEmail, domain: cleanDomain, plan: 'free' },
+  })
 
   return {
     statusCode: 201,

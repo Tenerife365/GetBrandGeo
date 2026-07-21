@@ -107,6 +107,7 @@ export default function Account() {
   const [planSaving, setPlanSaving] = useState(false)
   const [planMsg, setPlanMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [events, setEvents] = useState<ClientEvent[]>([])
+  const [clientUsers, setClientUsers] = useState<{ email: string | null; role: string; last_sign_in_at: string | null; confirmed: boolean }[]>([])
 
   // Reset any local date override when switching clients.
   useEffect(() => { setLocalDates(null); setEditingDates(false); setDatesMsg(null) }, [activeClientId])
@@ -132,6 +133,23 @@ export default function Account() {
     } catch { setEvents([]) } // table not migrated yet
   }, [isAdmin, activeClientId])
   useEffect(() => { loadEvents() }, [loadEvents])
+
+  // Admin: the login users attached to this client (email + last sign-in), so a
+  // wrong/test address on file is visible without opening Supabase.
+  const loadClientUsers = useCallback(async () => {
+    if (!isAdmin || !activeClientId || isDemoMode) { setClientUsers([]); return }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token ?? ''
+      const res = await fetch('/.netlify/functions/client-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ client_id: activeClientId }),
+      })
+      if (res.ok) { const d = await res.json(); setClientUsers(d.users ?? []) } else setClientUsers([])
+    } catch { setClientUsers([]) }
+  }, [isAdmin, activeClientId])
+  useEffect(() => { loadClientUsers() }, [loadClientUsers])
 
   const grantEndPreview = (() => {
     if (grantType === 'manual') return null
@@ -478,6 +496,27 @@ export default function Account() {
             )}
             {activeClient?.plan_grant_until && (
               <div><span className="text-slate-500">Reverts to Free: </span><span className="text-amber-300">{fmtDateStr(activeClient.plan_grant_until)}</span></div>
+            )}
+          </div>
+
+          {/* Login users on this account — so a wrong/test email (who a notification
+              would go to) is visible without opening Supabase. */}
+          <div className="mb-5">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Users on this account (notifications go here)</div>
+            {clientUsers.length === 0 ? (
+              <p className="text-xs text-slate-500">No login user attached yet — a grant will show the dashboard banner but has no address to email.</p>
+            ) : (
+              <ul className="space-y-1">
+                {clientUsers.map((u, i) => (
+                  <li key={i} className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                    <Mail size={12} className="text-slate-500 shrink-0" />
+                    <span className="text-slate-200">{u.email ?? '—'}</span>
+                    <span className="text-slate-600">· {u.role}</span>
+                    {!u.confirmed && <span className="text-amber-400/80">· not confirmed</span>}
+                    <span className="text-slate-600">· {u.last_sign_in_at ? `last in ${fmtDateStr(u.last_sign_in_at)}` : 'never signed in'}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

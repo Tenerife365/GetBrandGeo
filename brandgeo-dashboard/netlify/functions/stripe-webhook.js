@@ -25,6 +25,8 @@
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const { createClient } = require('@supabase/supabase-js')
+const { recordAdminEvent } = require('./_admin_notify')
+const { PLAN_LABELS } = require('./_plans')
 
 const APP_URL = 'https://app.getbrandgeo.com'
 
@@ -163,6 +165,11 @@ async function handleCheckoutCompleted(session, log) {
         .eq('id', profile.client_id)
       if (updErr) throw new Error(`clients update failed: ${updErr.message}`)
       log(`existing user ${existingUser.id} → client ${profile.client_id} set to ${plan}`)
+      await recordAdminEvent(supabase, {
+        type: 'subscription_new', client_id: profile.client_id,
+        title: `Subscription: ${PLAN_LABELS[plan] || plan}`,
+        body: `${email} subscribed to ${PLAN_LABELS[plan] || plan}.`, meta: { email, plan },
+      })
       return
     }
 
@@ -177,6 +184,11 @@ async function handleCheckoutCompleted(session, log) {
       throw new Error(`user_profiles insert failed: ${linkErr.message}`)
     }
     log(`existing user ${existingUser.id} linked to new client ${client.id} (${plan})`)
+    await recordAdminEvent(supabase, {
+      type: 'subscription_new', client_id: client.id,
+      title: `New subscription: ${PLAN_LABELS[plan] || plan}`,
+      body: `${email} subscribed to ${PLAN_LABELS[plan] || plan}.`, meta: { email, plan },
+    })
     return
   }
 
@@ -203,6 +215,11 @@ async function handleCheckoutCompleted(session, log) {
   }
 
   log(`new client ${client.id} provisioned + invite sent to ${email} (${plan})`)
+  await recordAdminEvent(supabase, {
+    type: 'subscription_new', client_id: client.id,
+    title: `New paid signup: ${PLAN_LABELS[plan] || plan}`,
+    body: `${email} subscribed to the ${PLAN_LABELS[plan] || plan} plan.`, meta: { email, plan },
+  })
 }
 
 async function handleSubscriptionUpdated(sub, log) {
@@ -229,6 +246,13 @@ async function handleSubscriptionUpdated(sub, log) {
     return
   }
   log(`subscription.updated: cust ${custId} → plan ${plan} (${data.length} client row(s))`)
+  for (const row of data) {
+    await recordAdminEvent(supabase, {
+      type: 'subscription_changed', client_id: row.id,
+      title: `Subscription changed to ${PLAN_LABELS[plan] || plan}`,
+      body: `A client's subscription changed to ${PLAN_LABELS[plan] || plan}.`, meta: { plan, cust: custId },
+    })
+  }
 }
 
 async function handleSubscriptionDeleted(sub, log) {
@@ -247,6 +271,12 @@ async function handleSubscriptionDeleted(sub, log) {
     return
   }
   log(`subscription.deleted: cust ${custId} downgraded to free (${data.length} client row(s))`)
+  for (const row of data) {
+    await recordAdminEvent(supabase, {
+      type: 'subscription_canceled', client_id: row.id,
+      title: 'Subscription canceled', body: 'A client canceled and was downgraded to Free.', meta: { cust: custId },
+    })
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

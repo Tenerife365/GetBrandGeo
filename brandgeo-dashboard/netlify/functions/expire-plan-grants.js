@@ -11,6 +11,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { PLAN_LABELS } = require('./_plans');
 const { sendBrandedEmail, APP_URL } = require('./_email');
+const { recordAdminEvent } = require('./_admin_notify');
 
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'constantin@getbrandgeo.com';
 
@@ -53,6 +54,14 @@ exports.handler = async () => {
       title: `Your complimentary ${PLAN_LABELS[fromPlan] || fromPlan} plan has ended`,
       body: `Your BrandGEO workspace has returned to the Free plan. To keep the ${PLAN_LABELS[fromPlan] || fromPlan} features, reach out and we'll help you continue.`,
       meta: { from_plan: fromPlan }, cta_label: 'View plans', cta_url: `${APP_URL}/account`,
+    });
+
+    // Bell row for the admin feed (email:false — the summary email below covers it).
+    await recordAdminEvent(supabase, {
+      type: 'trial_expired', client_id: c.id, email: false,
+      title: `Trial expired: ${c.name || `client ${c.id}`}`,
+      body: `Reverted from ${PLAN_LABELS[fromPlan] || fromPlan} to Free.`,
+      meta: { from_plan: fromPlan },
     });
 
     expired.push({ id: c.id, name: c.name || `client ${c.id}`, fromPlan });
