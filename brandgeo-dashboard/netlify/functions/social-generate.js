@@ -61,14 +61,16 @@ Write one version per platform:
 ${perPlatform}
 
 Every version must also work as a source an AI assistant would quote when someone asks about this topic. That means:
-- State the specific, checkable facts (what, who it is for, the number or result) in plain sentences rather than implying them.
+- State the checkable facts you were actually given (what it is, who it is for, the concrete detail) in plain sentences rather than implying them.
 - Name ${brand} explicitly at least once instead of saying "we" throughout, so the post is attributable on its own.
-- Prefer concrete nouns over adjectives, and avoid claims you were not given in the brief. Never invent statistics, customer names, or results.
+- Prefer concrete nouns over adjectives, and avoid claims you were not given. Never invent statistics, customer names, dates, or results.
 
 Voice rules, strictly:
 - Never use em dashes or en dashes. Use commas, periods, or parentheses.
 - No "not just X, it's Y", no "in today's landscape", no "let's dive in", no three-item rhetorical lists.
 - Write like a person who knows the subject, not like marketing copy.
+- Use the real brand name "${brand}" written out literally. NEVER write a placeholder such as [Brand], [Company], [your brand], or {{brand}}.
+- Do NOT use square-bracket placeholders of ANY kind (for example [number], [X], [date], [location], [product], [benefit]). If you do not have a specific figure, write a truthful qualitative statement or leave it out. Never leave a blank for the reader to fill in.
 
 Reply with ONLY a JSON object, no markdown fences and no commentary:
 {"base_text": "a platform-neutral version, 2 to 4 sentences", ${platforms.map((p) => `"${p}": "..."`).join(', ')}}`
@@ -131,6 +133,18 @@ function deDash(text) {
   return String(text || '').replace(/\s*[—–]\s*/g, ', ');
 }
 
+// Safety net for the placeholder rule: if the model still emits a brand-name
+// placeholder despite the prompt, swap it for the real brand name rather than
+// shipping "[Brand]" to the user. Only touches brand/company placeholders (safe);
+// other bracketed placeholders are prevented by the prompt, not stripped here
+// (a post can legitimately contain brackets).
+function fillBrandPlaceholders(text, brand) {
+  if (!brand) return String(text || '');
+  return String(text || '')
+    .replace(/\{\{\s*(?:brand|company|business)(?:[_\s]?name)?\s*\}\}/gi, brand)
+    .replace(/\[\s*(?:your\s+)?(?:brand|company|business)(?:\s+name)?\s*\]/gi, brand);
+}
+
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
   if (auth.response) return auth.response;
@@ -165,8 +179,9 @@ exports.handler = async (event) => {
       .from('clients').select('name, brand_name, brand_website').eq('id', client_id).single();
     const sp = await ensureSocialProfile(supabase, client_id);
 
+    const brandName = client?.brand_name || client?.name || 'this brand';
     const prompt = buildPrompt({
-      brand: client?.brand_name || client?.name || 'this brand',
+      brand: brandName,
       website: client?.brand_website || '',
       brief: String(brief).trim().slice(0, 1000),
       voice: sp?.brand_voice || {},
@@ -190,10 +205,12 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'Could not read the generated copy. Please try again.' }) };
     }
 
+    const clean = (t) => deDash(fillBrandPlaceholders(t, brandName));
+
     const out = {};
     for (const p of platforms) {
       if (typeof parsed[p] === 'string' && parsed[p].trim()) {
-        out[p] = deDash(parsed[p]).slice(0, RULES[p].limit);
+        out[p] = clean(parsed[p]).slice(0, RULES[p].limit);
       }
     }
 
@@ -201,7 +218,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        base_text: typeof parsed.base_text === 'string' ? deDash(parsed.base_text) : '',
+        base_text: typeof parsed.base_text === 'string' ? clean(parsed.base_text) : '',
         platforms: out,
       }),
     };
