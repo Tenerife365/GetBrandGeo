@@ -46,6 +46,17 @@ function buildPrompt({ brand, website, brief, voice, platforms, context }) {
   if (Array.isArray(voice?.hashtags) && voice.hashtags.length) {
     voiceLines.push(`Brand hashtags to prefer: ${voice.hashtags.join(' ')}`);
   }
+  if (Array.isArray(voice?.banned_words) && voice.banned_words.length) {
+    voiceLines.push(`Never use these words or phrases: ${voice.banned_words.join(', ')}`);
+  }
+
+  // Real brand facts (from the Brand Kit) — the substance that lets the model
+  // write concretely instead of reaching for placeholders.
+  const factsBlock = [];
+  if (voice?.about) factsBlock.push(`About ${brand}: ${voice.about}`);
+  if (Array.isArray(voice?.key_facts) && voice.key_facts.length) {
+    factsBlock.push(`Verified facts about ${brand} you may use (these are true; use them and invent no others):\n${voice.key_facts.map((f) => `- ${f}`).join('\n')}`);
+  }
 
   const perPlatform = platforms
     .map((p) => `- "${p}" (max ${RULES[p].limit} characters): ${RULES[p].guide}`)
@@ -56,7 +67,7 @@ function buildPrompt({ brand, website, brief, voice, platforms, context }) {
 
 The brief: ${brief}
 
-${context ? `GEO grounding (this post exists to improve how ${brand} shows up in AI answers). Use ONLY the real facts below as the angle, and invent nothing beyond them:\n${context}\n\n` : ''}${voiceLines.length ? `Brand voice:\n${voiceLines.join('\n')}\n` : ''}
+${factsBlock.length ? factsBlock.join('\n\n') + '\n\n' : ''}${context ? `GEO grounding (this post exists to improve how ${brand} shows up in AI answers). Use ONLY the real facts below as the angle, and invent nothing beyond them:\n${context}\n\n` : ''}${voiceLines.length ? `Brand voice:\n${voiceLines.join('\n')}\n` : ''}
 Write one version per platform:
 ${perPlatform}
 
