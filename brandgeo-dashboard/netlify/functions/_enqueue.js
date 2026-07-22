@@ -26,7 +26,7 @@
  * newest-per-(prompt,engine)); doing it now would inflate those aggregates.
  */
 
-const { activeEnginesFor, WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS } = require('./_cost')
+const { activeEnginesFor, WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS, PLAN_COLLECTION_COOLDOWN_HOURS } = require('./_cost')
 
 // ISO 3166-1 alpha-2 → country name, for scheduled runs that resolve geo from
 // the client's default_market_id (manual runs pass full labels from the browser).
@@ -68,10 +68,14 @@ async function enqueueClientCollection(supabase, {
     .single()
   if (!client) return { runId: null, totalJobs: 0, skipped: true, reason: 'client not found' }
 
-  // 2. Engines
-  const engines = Array.isArray(activeEngines) && activeEngines.length > 0
+  // 2. Engines — the browser passes its plan-active set, but re-gate server-side
+  // against the plan's live engines so a stale/forged request can't run an engine
+  // the plan doesn't include (e.g. Google AI Mode is Growth PRO and up only).
+  const allowed = new Set(activeEnginesFor(client.plan, client.engines_enabled))
+  const requested = Array.isArray(activeEngines) && activeEngines.length > 0
     ? activeEngines
-    : activeEnginesFor(client.plan, client.engines_enabled)
+    : [...allowed]
+  const engines = requested.filter(e => allowed.has(e))
   if (!engines || engines.length === 0)
     return { runId: null, totalJobs: 0, skipped: true, reason: 'no active engines' }
 
@@ -222,4 +226,41 @@ async function triggerWorker() {
   }
 }
 
-module.exports = { enqueueClientCollection, triggerWorker, COUNTRY_NAMES }
+/**
+ * checkCollectionCooldown(supabase, clientId) ->
+ *   { blocked, hoursRemaining?, nextAvailableAt?, message? }
+ *
+ * PRICING-STRATEGY-2026-07 §6 — blocks a MANUAL "Run collection" if the client
+ * ran one within its plan's cooldown window (72/48/36h; free monthly; managed+
+ * = 0 = no cooldown). Only manual runs count (trigger='manual'); scheduled
+ * refresh is bounded by cadence + budget, not this. Callers apply admin bypass.
+ */
+async function checkCollectionCooldown(supabase, clientId) {
+  const { data: client } = await supabase.from('clients').select('plan').eq('id', clientId).single()
+  const cooldownH = PLAN_COLLECTION_COOLDOWN_HOURS[client?.plan] ?? PLAN_COLLECTION_COOLDOWN_HOURS.essentials
+  if (!cooldownH || cooldownH <= 0) return { blocked: false }
+
+  const { data: last } = await supabase
+    .from('collection_runs')
+    .select('created_at')
+    .eq('client_id', clientId)
+    .eq('trigger', 'manual')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!last?.created_at) return { blocked: false }
+
+  const windowMs = cooldownH * 3_600_000
+  const remainingMs = windowMs - (Date.now() - new Date(last.created_at).getTime())
+  if (remainingMs <= 0) return { blocked: false }
+
+  const hoursRemaining = Math.ceil(remainingMs / 3_600_000)
+  return {
+    blocked: true,
+    hoursRemaining,
+    nextAvailableAt: new Date(Date.now() + remainingMs).toISOString(),
+    message: `Collection is on cooldown for your plan. The next run is available in about ${hoursRemaining} hour${hoursRemaining === 1 ? '' : 's'}.`,
+  }
+}
+
+module.exports = { enqueueClientCollection, triggerWorker, checkCollectionCooldown, COUNTRY_NAMES }

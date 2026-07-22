@@ -11,9 +11,11 @@
 // ============================================================================
 const { requireAuth } = require('./_auth');
 
-// Pages per crawl by plan (the real cost control). ai_seo is Growth+; free/
-// essentials are only reachable by an admin, who still gets a useful cap.
-const CRAWL_PAGE_CAP = { free: 25, essentials: 25, growth: 25, managed: 50, pro: 100, enterprise: 200 };
+// Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Essentials+
+// (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
+const CRAWL_PAGE_CAP = { free: 0, essentials: 1, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
+// One crawl/audit cycle per week per client (the "max 1 audit / week" cap).
+const CRAWL_COOLDOWN_DAYS = 7;
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
@@ -38,7 +40,10 @@ exports.handler = async (event) => {
     if (!domain) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'This client has no website set, so there is nothing to crawl. Add a website to the client first.' }) };
     }
-    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 25;
+    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 1;
+    if (maxPages <= 0) {
+      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Essentials or higher to audit your pages.' }) };
+    }
 
     // Don't start a second crawl while one is already running for this client.
     const { data: running } = await supabase
@@ -46,6 +51,22 @@ exports.handler = async (event) => {
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (running) {
       return { statusCode: 200, headers, body: JSON.stringify({ crawl_id: running.id, status: 'running', max_pages: maxPages, note: 'A crawl is already running.' }) };
+    }
+
+    // Weekly cooldown (§3: max 1 audit/week). Admins bypass (support/testing).
+    if (profile.role !== 'admin') {
+      const since = new Date(Date.now() - CRAWL_COOLDOWN_DAYS * 86400000).toISOString();
+      const { data: recent } = await supabase
+        .from('seo_crawls').select('created_at').eq('client_id', client_id)
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (recent?.created_at) {
+        const nextAt = new Date(new Date(recent.created_at).getTime() + CRAWL_COOLDOWN_DAYS * 86400000);
+        const daysLeft = Math.max(1, Math.ceil((nextAt.getTime() - Date.now()) / 86400000));
+        return { statusCode: 200, headers, body: JSON.stringify({
+          error: `You can audit your site once per week. Next audit available in about ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`,
+          reason: 'cooldown', next_available_at: nextAt.toISOString(),
+        }) };
+      }
     }
 
     const { data: crawl, error: insErr } = await supabase

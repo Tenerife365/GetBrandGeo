@@ -104,10 +104,13 @@ function costForRow(llm, errorCode) {
  */
 // Google AI Mode (google_ai, via SerpApi) replaced Meta AI as the 5th live
 // engine 2026-07-16. Keep in sync with planConfig.ts's PLAN_ENGINES.
+// PRICING-STRATEGY-2026-07 §3: Growth = 4 engines (NO google_ai); Google AI Mode
+// (SerpApi, expensive) is Growth PRO and up only. Keep in sync with planConfig.ts.
 const PLAN_LIVE_ENGINES = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity'],
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
@@ -162,13 +165,28 @@ function activeEnginesFor(plan, enginesEnabled) {
  * real cost_eur data accumulates (SCALE-SPEC §2.1's own stated intent).
  * Keep in sync with src/lib/planConfig.ts's copy of the same map.
  */
+// PRICING-STRATEGY-2026-07 §3: repriced to 12% of monthly plan price (was 9%),
+// giving ~88% gross margin at the §3 prompt counts + ~weekly collection. This is
+// the hard cost ceiling; PLAN_COLLECTION_COOLDOWN_HOURS below is the separate
+// frequency limiter. Keep in sync with planConfig.ts.
 const PLAN_MONTHLY_API_BUDGET_EUR = {
-  free: 0.30,
-  essentials: 8.91,
-  growth: 26.91,
-  managed: 81.00,
-  pro: 135.00,
-  enterprise: 900.00,
+  free:       0.30,
+  essentials: 11.88,   // 12% of €99
+  growth:     35.88,   // 12% of €299
+  growth_pro: 53.88,   // 12% of €449
+  managed:    180.00,  // 12% of €1,500 floor
+  pro:        180.00,  // legacy (treated as Managed)
+  enterprise: 1200.00, // custom; generous default
+}
+
+// PRICING-STRATEGY-2026-07 §6 — minimum hours between MANUAL collection runs (the
+// Run-Collection button cooldown), enforced in enqueue-collection.js via
+// checkCollectionCooldown (_enqueue.js). Separate from the € budget above: this
+// stops prompt-thrash (edit prompts, re-run repeatedly). free = monthly;
+// managed/pro/enterprise = 0 (on-demand). Keep in sync with planConfig.ts.
+const PLAN_COLLECTION_COOLDOWN_HOURS = {
+  free: 720, essentials: 72, growth: 48, growth_pro: 36,
+  managed: 0, pro: 0, enterprise: 0,
 }
 
 // Engines capped at 1 run per (client, prompt) per WEEKLY_CAP_DAYS — a hard
@@ -187,6 +205,7 @@ module.exports = {
   PLAN_LIVE_ENGINE_COUNT,
   activeEnginesFor,
   PLAN_MONTHLY_API_BUDGET_EUR,
+  PLAN_COLLECTION_COOLDOWN_HOURS,
   WEEKLY_CAPPED_ENGINES,
   WEEKLY_CAP_DAYS,
 }

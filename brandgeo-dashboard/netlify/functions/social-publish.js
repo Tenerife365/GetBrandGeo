@@ -19,6 +19,59 @@ const { requireAuth } = require('./_auth');
 const { getProvider } = require('./_publishing');
 const { ensureSocialProfile, requireBoundProfile, mediaUrlsFrom, rollupPostStatus } = require('./_social');
 
+// ── Plan fair-use (PRICING-STRATEGY-2026-07 §3-4). Keep in sync with planConfig.ts.
+// AI Social is Growth+ (rank 2). Growth = 1 channel, Growth PRO = 3, from the
+// INCLUDED set (LinkedIn/GBP/Facebook). Instagram/TikTok are a Growth PRO add-on
+// and are not yet purchasable, so self-serve is limited to the included set;
+// Managed+ get every channel. Posts/channel/month cap on top.
+const PLAN_RANK = { free: 0, essentials: 1, growth: 2, growth_pro: 3, managed: 4, pro: 5, enterprise: 6 };
+const AI_SOCIAL_MIN_RANK = PLAN_RANK.growth;
+const INCLUDED_CHANNELS = ['linkedin', 'gbp', 'facebook'];
+const PLAN_SOCIAL_CHANNEL_LIMIT = { free: 0, essentials: 0, growth: 1, growth_pro: 3, managed: 13, pro: 13, enterprise: 13 };
+const PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH = { free: 0, essentials: 0, growth: 12, growth_pro: 30, managed: 100, pro: 100, enterprise: 100 };
+
+function channelAllowedForPlan(plan, channel) {
+  const rank = PLAN_RANK[plan] ?? 0;
+  if (rank >= PLAN_RANK.managed) return true;                      // done-for-you: all channels
+  if (rank >= PLAN_RANK.growth) return INCLUDED_CHANNELS.includes(channel); // self-serve: included only
+  return false;
+}
+function monthStartIso() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+
+/** Enforce plan gate + channel entitlement + channel-count + monthly post cap for a
+ *  NEW compose. Returns { error, reason } to block, or { ok: true }. */
+async function enforceSocialLimits(supabase, clientId, targets) {
+  const { data: client } = await supabase.from('clients').select('plan').eq('id', clientId).single();
+  const plan = client?.plan || 'free';
+  if ((PLAN_RANK[plan] ?? 0) < AI_SOCIAL_MIN_RANK) {
+    return { error: 'AI Social is not included on this plan. Upgrade to Growth or higher.', reason: 'plan' };
+  }
+  const platforms = [...new Set(targets.map((t) => t && t.platform).filter(Boolean))];
+
+  const blocked = platforms.filter((p) => !channelAllowedForPlan(plan, p));
+  if (blocked.length) {
+    return { error: `These channels are not available on your plan: ${blocked.join(', ')}. Instagram and TikTok are a Growth PRO add-on.`, reason: 'channel' };
+  }
+  const limit = PLAN_SOCIAL_CHANNEL_LIMIT[plan] ?? 0;
+  if (platforms.length > limit) {
+    return { error: `Your plan allows ${limit} social channel${limit === 1 ? '' : 's'} per post; you selected ${platforms.length}.`, reason: 'channel_count' };
+  }
+  const cap = PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH[plan] ?? 0;
+  const { data: rows } = await supabase
+    .from('social_post_targets').select('platform, status')
+    .eq('client_id', clientId).in('platform', platforms).gte('created_at', monthStartIso());
+  const counts = {};
+  for (const r of rows || []) {
+    if (['failed', 'canceled', 'skipped'].includes(r.status)) continue;
+    counts[r.platform] = (counts[r.platform] || 0) + 1;
+  }
+  const over = platforms.filter((p) => (counts[p] || 0) >= cap);
+  if (over.length) {
+    return { error: `You have reached this month's post limit (${cap} per channel) for: ${over.join(', ')}. It resets next month.`, reason: 'posts_cap' };
+  }
+  return { ok: true };
+}
+
 exports.handler = async (event) => {
   const auth = await requireAuth(event);
   if (auth.response) return auth.response;
@@ -33,6 +86,13 @@ exports.handler = async (event) => {
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
   if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) };
+  }
+
+  // Plan fair-use: only for a NEW compose (has targets[]); a retry (post_id)
+  // re-sends already-validated targets. Admins bypass.
+  if (profile.role !== 'admin' && !post_id && Array.isArray(body.targets) && body.targets.length) {
+    const gate = await enforceSocialLimits(supabase, client_id, body.targets);
+    if (gate.error) return { statusCode: 200, headers, body: JSON.stringify({ error: gate.error, reason: gate.reason }) };
   }
 
   const provider = getProvider();

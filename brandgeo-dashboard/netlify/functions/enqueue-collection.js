@@ -17,7 +17,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
-const { enqueueClientCollection, triggerWorker } = require('./_enqueue')
+const { enqueueClientCollection, triggerWorker, checkCollectionCooldown } = require('./_enqueue')
 
 exports.handler = async (event) => {
   const auth = await requireAuth(event)
@@ -36,6 +36,19 @@ exports.handler = async (event) => {
   // Ownership — viewers may only enqueue for their own client
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
+
+  // PRICING-STRATEGY-2026-07 §6 — Run-Collection cooldown (per-plan frequency
+  // limit). Admins bypass (support / testing / managed done-for-you). Applies to
+  // manual runs incl. Force Refresh, so the countdown can't be bypassed.
+  if (auth.profile.role !== 'admin') {
+    const cd = await checkCollectionCooldown(auth.supabase, client_id)
+    if (cd.blocked) {
+      return { statusCode: 429, headers: auth.headers, body: JSON.stringify({
+        error: cd.message, reason: 'cooldown',
+        retry_after_hours: cd.hoursRemaining, next_available_at: cd.nextAvailableAt,
+      }) }
+    }
   }
 
   // SCALE-SPEC §2 — refuse to enqueue if the client is over its hourly ceiling or

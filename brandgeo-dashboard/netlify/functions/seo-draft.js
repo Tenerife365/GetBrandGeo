@@ -23,8 +23,9 @@ const TIMEOUT_MS = 22000;
 // in AI-SEO-SPEC.md). Admins bypass it -- they run the managed/done-for-you work
 // across many clients. A client below the AI SEO min plan never reaches here
 // (the page + nav are feature-gated), so free/essentials are 0 for completeness.
+// PRICING-STRATEGY-2026-07 §3. Keep in sync with planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH.
 const DRAFT_MONTHLY_CAP = {
-  free: 0, essentials: 0, growth: 10, managed: 30, pro: 60, enterprise: 200,
+  free: 0, essentials: 2, growth: 10, growth_pro: 30, managed: 60, pro: 60, enterprise: 200,
 };
 
 function monthStartIso() {
