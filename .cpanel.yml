@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/getbran1/getbrandgeo.com/
+    # Copy ONLY the generated dist/ contents to public_html
+    - /bin/cp -R dist/* $DEPLOYPATH
