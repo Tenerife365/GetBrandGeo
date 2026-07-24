@@ -4,6 +4,11 @@
 [build]
   command = "npm install && npm run build"
   publish = "dist"
+  # Repo is shared with the marketing site (brandgeo/web/) and blog content
+  # (brandgeo/*.md). Without this, Netlify rebuilds+redeploys the dashboard on
+  # EVERY push to main regardless of what changed. Skip the build (exit 0)
+  # unless something under this directory actually changed.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
 
 [build.environment]
   NODE_VERSION = "22"
