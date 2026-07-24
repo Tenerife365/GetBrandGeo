@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-019-hero.png", "BG-019 · Rank Detection",
-    [[("Why our scorer ", 'w')], [("returns null", 'g')], [("instead of a rank.", 'w')]],
-    ["Three signals earn a brand a rank in our AI Visibility",
-     "scoring pipeline. Everything else honestly returns null."],
-    [("3", "signal types accepted as a real rank", "BrandGEO methodology, _analysis.js"),
-     ("25", "ordering phrases required to rank a bullet list", "RANK_CUES, _analysis.js"),
-     ("17", "counter-phrases that override a rank cue", "NO_RANK_CUES, _analysis.js"),
-     ("1–50", "the only trusted band for a numbered digit", "detectListPosition guard")],
-    "Rank Detection Methodology")
+make("bg-020-hero.png", "BG-020 · Reliability",
+    [[("When our outage", 'w')], [("looked like", 'w')], [("your", 'g'), (" problem.", 'w')]],
+    ["A failed API call and a real \"never heard of you\" used to",
+     "score identically. Four honest states replaced that binary."],
+    [("4", "honest per-engine states, not a binary yes/no", "computeEngineStates, _score.js"),
+     ("0", "rows an engine writes when it fails outright", "enginesWithResults, _score.js"),
+     ("60%", "mention-rate threshold, reused not invented", "same cutoff as consistency dim."),
+     ("#109", "the tracked issue this fix closed", "referenced directly in shipped code")],
+    "Reliability & Scoring Accuracy")
