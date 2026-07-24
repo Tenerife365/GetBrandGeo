@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-021-hero.png", "BG-021 · Scoring Formula",
-    [[("How the score is", 'w')], [("actually", 'g'), (" weighted.", 'w')]],
-    ["Six dimensions, unequal weights, one composite number.",
-     "The exact formula behind BrandGEO's AI Visibility Score."],
-    [("6", "dimensions folded into one weighted score", "computeAuditScore, _score.js"),
-     ("25%", "recognition's weight, the largest single share", "aiScore formula"),
-     ("10%", "consistency's weight, the smallest, by design", "aiScore formula"),
-     ("20", "position-decay floor reached by rank 5", "knowledge dimension curve")],
-    "AI Visibility Score Formula")
+make("bg-022-hero.png", "BG-022 · AI SEO",
+    [[("What \"notifying", 'w')], [("Google\"", 'g'), (" actually", 'w')], [("does.", 'w')]],
+    ["A 200 response isn't a crawl-priority guarantee for most",
+     "pages. The honest scope of our indexing pipeline."],
+    [("2", "page types Google documents this API as accelerating", "JobPosting, BroadcastEvent only"),
+     ("4", "engines IndexNow directly notifies", "Bing, Yandex, Seznam, Naver"),
+     ("2", "channels fired per new/changed page", "Google Indexing API + IndexNow"),
+     ("25", "URLs capped per daily automated run", "one auth-reused batch, _indexing.js")],
+    "Search Indexing, Honestly Scoped")
