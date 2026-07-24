@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-019: Why Our Scorer Returns Null Instead of a Rank It Can't Prove | BrandGEO Research™</title>
+  <meta name="description" content="BrandGEO only reports a rank when one of three explicit signals fires in an AI engine's answer. Everything else, including a plausible sentence position, returns null rather than a guess. Here is how, and why.">
+  <meta property="og:title" content="Why Our Scorer Returns Null Instead of a Rank It Can't Prove: BrandGEO Research™">
+  <meta property="og:description" content="Three signal types earn a rank in BrandGEO's scoring: a numbered list, an explicitly ordered bullet list, and a stated prose superlative. A fourth, plausible-looking signal was deliberately rejected. Here is the code and the tests behind that decision.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-019-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-019.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-019.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-019-hero.png">
+  <meta property="article:published_time" content="2026-07-24">
+  <meta name="keywords" content="AI visibility rank detection, GEO measurement methodology, AI response position scoring, brand rank AI search, AI visibility measurement accuracy, competitor rank extraction">
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Why Our Scorer Returns Null Instead of a Rank It Can't Prove",
+    "description": "How BrandGEO's scoring pipeline decides when an AI engine's answer actually states a rank, across three distinct signal types, and why a fourth, plausible-looking signal was deliberately rejected.",
+    "image": "https://getbrandgeo.com/images/bg-019-hero.png",
+    "datePublished": "2026-07-24",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"},
+    "about": ["AI Visibility Measurement", "Generative Engine Optimization", "Rank Detection", "Measurement Accuracy", "Software Engineering"],
+    "mentions": [
+      {"@type": "SoftwareApplication", "name": "ChatGPT", "creator": {"@type": "Organization", "name": "OpenAI"}},
+      {"@type": "SoftwareApplication", "name": "Gemini", "creator": {"@type": "Organization", "name": "Google"}},
+      {"@type": "SoftwareApplication", "name": "Claude", "creator": {"@type": "Organization", "name": "Anthropic"}},
+      {"@type": "SoftwareApplication", "name": "Perplexity", "creator": {"@type": "Organization", "name": "Perplexity AI"}}
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+    .article-body code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; font-family: 'Cascadia Code', Consolas, monospace; color: var(--accent2); }
+
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p:last-child { margin: 0; }
+    .callout a { color: var(--accent2); }
+
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-019</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-019</span>
+    <span class="badge-tag">Methodology</span>
+    <span class="badge-tag">Measurement Accuracy</span>
+  </div>
+  <h1>Why Our Scorer Returns <em>Null</em> Instead of a Rank It Can't Prove</h1>
+  <p class="article-subtitle">BrandGEO only reports a rank when an AI engine's answer makes one of three explicit claims. Everything else, including a sentence position that looks like a plausible rank, returns null. Here is the code and the tests behind that decision.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 24, 2026</span>
+    <span class="meta-item">6 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-019</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-019-hero.png" alt="An illustration of BrandGEO's three accepted rank signals — numbered list, ordered bullet list, stated superlative — versus the rejected sentence-index signal, with stat cards on the RANK_CUES phrase list and the 1 to 50 guard band." loading="eager">
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Findings: BG-019</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">3</div>
+        <div class="finding-desc">Distinct signal types accepted as a real rank: numbered list, ordered bullets, stated superlative</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">25</div>
+        <div class="finding-desc">Ordering-language phrases required before a bullet list counts as ranked at all</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">17</div>
+        <div class="finding-desc">Counter-phrases like "a few" or "no particular order" that override even a rank cue</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">1–50</div>
+        <div class="finding-desc">The only band a numbered-list digit is trusted in, so a stray year or price can't be misread as a rank</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+
+  <h2 id="the-hook">A "few good options" isn't a ranking, even if your brand is bullet one</h2>
+  <p>A bulleted list of "a few good caterers in Bucharest" and a genuinely ranked "top 3 caterers, in order" look identical to a parser that only checks for bullet characters. Score the first as if it were the second, and you have manufactured a rank the AI engine never actually claimed. That is a subtler failure than the extraction bugs we <a href="/bg-018.html">wrote about last week</a>, because it does not add a wrong name to a list, it adds a wrong number to a real one.</p>
+  <p>The rule we settled on, after finding this exact failure in our own <a href="/glossary.html#term-ai-visibility-score">AI Visibility Score</a> pipeline, is narrower than it might sound: a brand only gets a numeric position when the engine's answer makes one of three specific, checkable claims. Anything short of that, including a sentence position that happens to look plausible, returns <code>null</code>.</p>
+
+  <h2 id="signal-one">Signal one: a numbered list, bounded 1 through 50</h2>
+  <p><code>detectListPosition</code> reads genuine numbered-list markup, "1. Fratelli Catering", "2. Bucate pe Roate", and nothing else. It runs on text that has already had rank-prefix markdown noise stripped, so a heading like "### 🥇 1. **Brand**" still resolves correctly. The digit itself is only trusted between 1 and 50: outside that band it is treated as something else entirely, most often a year or a price leading a line, not a rank.</p>
+  <p>That guard exists because of a real case in our own test data: <em>"2019. Bucate pe Roate a fost premiată în acel an"</em> ("2019. Bucate pe Roate was awarded that year"). Without the band, the leading "2019." reads exactly like a numbered-list marker, and the brand would have scored rank 2019 rather than the correct answer, mentioned but not ranked at all.</p>
+
+  <h2 id="signal-two">Signal two: a bulleted list, but only if the lead-in says so</h2>
+  <p>Bullets are harder, because markdown bullets carry no inherent order the way a numbered list does. <code>detectBulletPosition</code> collects each bulleted block, then checks the few lines immediately above it for one of 25 explicit ordering phrases, "ranked," "in order of," "from best to," "în ordinea," "clasament," before it will read bullet position as rank at all.</p>
+  <p>17 separate counter-phrases override that check even when an ordering word is also present: "a few," "several," "some of," "no particular order," "câteva," "fără o anumită ordine." An answer that says "here are a few of the top-rated options" contains the word "top," but the "a few" framing wins, and the list scores no rank, correctly, even if the brand happens to be the first bullet.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why both lists exist</div>
+    <p>A single "contains a ranking word" check would have been simpler to write and wrong more often. Real AI answers routinely use ranking-adjacent language, "top," "best," "leading," to describe calibre rather than order: "top firms in the area" describes quality, it does not promise the list below it is sequenced. Requiring an explicit ordering phrase, and letting an explicit disclaimer override it, is the narrower and more defensible bar.</p>
+  </div>
+
+  <h2 id="signal-three">Signal three: a stated superlative, anchored to a copula</h2>
+  <p>The third signal covers prose rather than lists: an engine that names a single brand as the top choice in a sentence, without using a list at all. <em>"Cea mai recomandată firmă de catering este Bucate pe Roate"</em> ("The most recommended catering firm is Bucate pe Roate") is a real, checkable claim of rank 1, just not a list-shaped one.</p>
+  <p><code>detectSuperlativeRank</code> only accepts this when the superlative is grammatically predicated of the brand through a copula, "este," "is," "remains," sitting immediately before or after the brand name. Co-occurrence in the same sentence is not enough, and membership language is explicitly excluded: <em>"Cele mai bune firme includ Bucate pe Roate"</em> ("The best firms include Bucate pe Roate") contains the same superlative and the same brand name, but "includ" signals membership in a set, not the superlative itself, so it correctly scores no rank.</p>
+
+  <table class="compare-table">
+    <thead><tr><th>Sentence pattern</th><th>Rank scored</th></tr></thead>
+    <tbody>
+      <tr><td>"Cea mai recomandată ESTE Brand"</td><td>1 (copula anchors superlative to brand)</td></tr>
+      <tr><td>"Brand ESTE cea mai bună opțiune"</td><td>1 (copula anchors from the other side)</td></tr>
+      <tr><td>"Cele mai bune firme INCLUD Brand"</td><td>null (membership, not superlative-of-brand)</td></tr>
+      <tr><td>"Premier ESTE cea mai bună, iar Brand este a doua"</td><td>null (superlative belongs to the rival)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="rejected-signal">The signal we deliberately rejected: sentence index</h2>
+  <p>An earlier version of this pipeline fell back to sentence position when neither a list nor a superlative fired: if a brand was named in the third sentence of the answer, it scored rank 3. That felt like a reasonable fallback and was wrong on its own terms, because "third sentence to mention the brand" and "third-ranked recommendation" are not the same unit, and averaging them together into one <code>brand_position</code> column silently blended two different measurements into one number.</p>
+  <p>The fix was to remove the fallback entirely rather than tighten it. A prose mention with no list and no stated superlative now returns <code>null</code>, full stop, whether the brand is named in the first sentence or the last.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">Locked in by the test suite</div>
+    <p>Five assertions in our regression suite exist specifically to keep this decision from quietly regressing: a genuine numbered-list rank is kept, a prose mention with no list scores null rather than its sentence index, a prose mention deep in a long answer still scores null rather than a high sentence number, a rank beyond the top five is still correctly recovered from a numbered list, and the "2019." case scores null rather than rank 2019. All five, alongside the rest of the suite, must still pass before any change to this pipeline ships.</p>
+  </div>
+
+  <h2 id="what-this-means">What a null position tells you that a number can't</h2>
+  <p>A visibility score that never returns a null position for a mentioned brand is not more precise than one that does, it is more willing to guess. The honest state of "the brand was mentioned, but no rank was actually claimed" is real information for a marketer deciding where to focus, and collapsing it into a fabricated number, whether that number comes from sentence order or any other proxy, removes information rather than adding it.</p>
+  <p>The same three questions we raised in our <a href="/bg-018.html">last piece</a> about extraction apply here to rank: does the methodology test against real production answers, does it disclose the fallback it removed and why, and is there a regression suite standing behind the current behavior. A vendor whose scorer always produces a number, never a null, has usually just moved the guessing somewhere less visible.</p>
+
+  <div class="section-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:48px 0 16px;">● Related Research</div>
+  <div class="related-grid">
+    <a href="/bg-018.html" class="related-card">
+      <div class="related-id">BG-018</div>
+      <div class="related-title">We Fixed 5 Rounds of False Positives in Our AI Visibility Scoring</div>
+      <div class="related-hook">The extraction pipeline this rank logic runs downstream of, and the same discipline of disclosing what broke.</div>
+    </a>
+    <a href="/bg-016.html" class="related-card">
+      <div class="related-id">BG-016</div>
+      <div class="related-title">Cross-Engine Consensus: When AI Engines Agree, and When They Don't</div>
+      <div class="related-hook">The same production data these rank signals are checked against, read for what engines agree on.</div>
+    </a>
+    <a href="/bg-015.html" class="related-card">
+      <div class="related-id">BG-015</div>
+      <div class="related-title">Beyond "Are We Mentioned?": The AI Visibility KPIs That Actually Matter</div>
+      <div class="related-hook">Why position is one KPI among several, and why a null position is a different signal than a low one.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>See a score that tells you when it doesn't know</h3>
+    <p>We'll run your real buyer questions across five AI engines and show you exactly which mentions were ranked, and which honestly weren't.</p>
+    <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
+    <a href="/faq.html" class="btn-secondary">Read the FAQ</a>
+    <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/blog.html" style="color:inherit;text-decoration:none;">Browse all BrandGEO Research</a></div>
+  </div>
+  <a href="/blog.html" class="next-link">View all research</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-019</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
