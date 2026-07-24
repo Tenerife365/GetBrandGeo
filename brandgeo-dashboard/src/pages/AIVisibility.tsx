@@ -14,11 +14,14 @@ import { useCollection } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
+  getPlanLimits,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
 import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
+import AllowanceMeter from '../components/AllowanceMeter'
+import CooldownCountdown from '../components/CooldownCountdown'
 import { promptCategoryLabel } from '../lib/promptCategories'
 
 // ── Category display helpers ──────────────────────────────────────────────────
@@ -298,6 +301,55 @@ export default function AIVisibility() {
   useEffect(() => { load() }, [activeClientId, activeEngines.join(',')])
   useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
 
+  // ── Collection allowance (PRICING-STRATEGY-2026-07 §12 T2a) ─────────────────
+  // Mirrors, client-side, the exact checks enqueue-collection.js enforces
+  // (checkCollectionCooldown / checkCollectionLimits — netlify/functions/
+  // _enqueue.js + _auth.js) so the countdown/meter shown here always matches
+  // what the server will actually block on. Display-only: the server call is
+  // still the authority at click time.
+  const [collectionAllowance, setCollectionAllowance] = useState<{
+    nextAvailableAt: string | null
+    budgetSpentEur: number
+    budgetCapEur: number
+  }>({ nextAvailableAt: null, budgetSpentEur: 0, budgetCapEur: 0 })
+
+  useEffect(() => {
+    if (isDemoMode || !activeClientId) return
+    let cancelled = false
+    const loadAllowance = async () => {
+      const plan = activeClient?.plan ?? 'free'
+      const { collectionCooldownH, apiBudgetEur } = getPlanLimits(plan)
+
+      const monthStart = new Date()
+      monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+
+      const [{ data: lastRun }, { data: costRows }] = await Promise.all([
+        collectionCooldownH > 0
+          ? supabase.from('collection_runs')
+              .select('created_at')
+              .eq('client_id', activeClientId).eq('trigger', 'manual')
+              .order('created_at', { ascending: false }).limit(1).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase.from('ai_results')
+          .select('cost_eur')
+          .eq('client_id', activeClientId)
+          .gte('checked_at', monthStart.toISOString()),
+      ])
+      if (cancelled) return
+
+      let nextAvailableAt: string | null = null
+      if (lastRun?.created_at && collectionCooldownH > 0) {
+        const next = new Date(new Date(lastRun.created_at).getTime() + collectionCooldownH * 3_600_000)
+        if (next.getTime() > Date.now()) nextAvailableAt = next.toISOString()
+      }
+      const budgetSpentEur = (costRows || []).reduce((s, r) => s + ((r as { cost_eur: number | null }).cost_eur || 0), 0)
+
+      setCollectionAllowance({ nextAvailableAt, budgetSpentEur, budgetCapEur: apiBudgetEur })
+    }
+    loadAllowance()
+    return () => { cancelled = true }
+  }, [activeClientId, activeClient?.plan, lastCompletedAt])
+
   const filtered = filterCats.size === 0 ? prompts : prompts.filter(p => filterCats.has(p.category ?? ''))
 
   // ── Stats computed over active engines only ───────────────────────────────
@@ -526,7 +578,7 @@ export default function AIVisibility() {
               never see a single result — the product is inert for them. */}
           <button
             onClick={runCollection}
-            disabled={collecting || loading}
+            disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {collecting
@@ -562,6 +614,23 @@ export default function AIVisibility() {
           </button>
         </div>
       </div>
+
+      {/* Collection allowance row (PRICING-STRATEGY-2026-07 §12 T2a) — cooldown
+          countdown (viewers only; admins bypass the cooldown server-side) +
+          monthly € budget meter (applies to everyone, admins included). */}
+      {!isDemoMode && (collectionAllowance.nextAvailableAt || collectionAllowance.budgetCapEur > 0) && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {!isAdmin && collectionAllowance.nextAvailableAt && (
+            <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
+          )}
+          <AllowanceMeter
+            label="Monthly API budget"
+            used={collectionAllowance.budgetSpentEur}
+            cap={collectionAllowance.budgetCapEur}
+            format={n => `€${n.toFixed(2)}`}
+          />
+        </div>
+      )}
 
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
       <motion.div

@@ -6,9 +6,19 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { hasFeature } from '../lib/planConfig'
+import { hasFeature, getPlanLimits } from '../lib/planConfig'
 import FeatureLocked from '../components/FeatureLocked'
+import AllowanceMeter from '../components/AllowanceMeter'
+import CooldownCountdown from '../components/CooldownCountdown'
 import type { SeoBrief, SeoPage, SeoCrawl } from '../types'
+
+// Mirrors netlify/functions/seo-crawl.js's CRAWL_COOLDOWN_DAYS — one crawl/audit
+// cycle per week, FLAT across every plan (not the varying per-plan number in
+// planConfig.ts's PLAN_SEO_AUDITS_PER_WEEK, which nothing server-side currently
+// reads — that constant is aspirational until seo-crawl.js is updated to key off
+// it). Kept in sync by hand, same tradeoff as every other client/server pricing
+// mirror in this codebase (see _cost.js's header comment).
+const CRAWL_COOLDOWN_DAYS = 7
 
 type Tab = 'opportunities' | 'audit' | 'consistency'
 
@@ -442,6 +452,19 @@ export default function SEO() {
     return <FeatureLocked feature="ai_seo" />
   }
 
+  // ── Allowance meters (PRICING-STRATEGY-2026-07 §12 T2a) ────────────────────
+  // Derived from state already loaded above — no extra queries. Mirrors the
+  // exact caps seo-draft.js / seo-crawl.js enforce server-side.
+  const seoLimits = getPlanLimits(activeClient?.plan ?? 'free')
+  const draftsMonthStart = new Date(); draftsMonthStart.setDate(1); draftsMonthStart.setHours(0, 0, 0, 0)
+  const draftsUsed = briefs.filter(b => b.drafted_at && new Date(b.drafted_at) >= draftsMonthStart).length
+  const pagesUsed = pages.length
+  let crawlNextAvailableAt: string | null = null
+  if (crawl?.status !== 'running' && crawl?.started_at) {
+    const next = new Date(new Date(crawl.started_at).getTime() + CRAWL_COOLDOWN_DAYS * 86_400_000)
+    if (next.getTime() > Date.now()) crawlNextAvailableAt = next.toISOString()
+  }
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'opportunities', label: 'Opportunities' },
     { id: 'audit', label: 'Site audit' },
@@ -493,11 +516,14 @@ export default function SEO() {
                   GEO-scored draft for any of them, then send it to AI Social.
                 </p>
               </div>
-              <button onClick={generate} disabled={generating} className={primaryBtn}>
-                {generating
-                  ? <><Loader2 size={15} className="animate-spin" /> Finding…</>
-                  : <><Search size={15} /> {briefs.length ? 'Refresh opportunities' : 'Find opportunities'}</>}
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                <button onClick={generate} disabled={generating} className={primaryBtn}>
+                  {generating
+                    ? <><Loader2 size={15} className="animate-spin" /> Finding…</>
+                    : <><Search size={15} /> {briefs.length ? 'Refresh opportunities' : 'Find opportunities'}</>}
+                </button>
+                <AllowanceMeter label="Drafts this month" used={draftsUsed} cap={seoLimits.seoDraftsPerMonth} />
+              </div>
             </div>
             {note && <p className="text-xs text-slate-400 mt-3">{note}</p>}
             {error && <p className="text-xs text-rose-400 mt-3">{error}</p>}
@@ -553,11 +579,15 @@ export default function SEO() {
                   for AI answer engines, with specific edits to make. We only read your pages; nothing on your site changes.
                 </p>
               </div>
-              <button onClick={startCrawl} disabled={crawling || crawl?.status === 'running'} className={primaryBtn}>
-                {(crawling || crawl?.status === 'running')
-                  ? <><Loader2 size={15} className="animate-spin" /> Crawling…</>
-                  : <><Search size={15} /> {pages.length ? 'Re-crawl site' : 'Crawl my site'}</>}
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                <button onClick={startCrawl} disabled={crawling || crawl?.status === 'running' || !!crawlNextAvailableAt} className={primaryBtn}>
+                  {(crawling || crawl?.status === 'running')
+                    ? <><Loader2 size={15} className="animate-spin" /> Crawling…</>
+                    : <><Search size={15} /> {pages.length ? 'Re-crawl site' : 'Crawl my site'}</>}
+                </button>
+                {crawlNextAvailableAt && <CooldownCountdown nextAvailableAt={crawlNextAvailableAt} label="Next crawl in" />}
+                <AllowanceMeter label="Pages crawled" used={pagesUsed} cap={seoLimits.seoPages} />
+              </div>
             </div>
             {crawl && (
               <p className={`text-xs mt-3 ${crawl.status === 'error' ? 'text-rose-400' : 'text-slate-400'}`}>

@@ -3,12 +3,13 @@ import {
   Instagram, Facebook, Linkedin, MapPin, Twitter, Link2, RefreshCw, Send,
   CalendarClock, CheckCircle2, AlertTriangle, Clock, Sparkles, ExternalLink, Plus,
   AtSign, Cloud, Music2, Youtube, Image, MessagesSquare, Ghost, ShieldCheck,
-  Pencil, Ban, Zap,
+  Pencil, Ban, Zap, Lock,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { hasFeature } from '../lib/planConfig'
+import { hasFeature, getPlanLimits, channelBaseAvailable, channelTier } from '../lib/planConfig'
 import FeatureLocked from '../components/FeatureLocked'
+import AllowanceMeter from '../components/AllowanceMeter'
 import type {
   SocialAccount, SocialMedia, SocialPlatform, SocialPost, SocialPostTarget, SocialTargetStatus,
 } from '../types'
@@ -239,6 +240,27 @@ export default function Social() {
     () => PLATFORMS.filter(p => p.focus || connected.has(p.id)),
     [connected],
   )
+
+  // ── Posts-per-channel-this-month usage (PRICING-STRATEGY-2026-07 §12 T2a) ──
+  // Mirrors social-publish.js's enforceSocialLimits() count exactly (same
+  // table, same status exclusions) so the meter matches what the server will
+  // actually block on. Display-only — the server call is still the authority
+  // at publish time.
+  const [channelPostCounts, setChannelPostCounts] = useState<Record<string, number>>({})
+  const loadChannelPostCounts = useCallback(async () => {
+    if (!activeClientId || isDemoMode) { setChannelPostCounts({}); return }
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    const { data } = await supabase
+      .from('social_post_targets').select('platform, status')
+      .eq('client_id', activeClientId).gte('created_at', monthStart.toISOString())
+    const counts: Record<string, number> = {}
+    for (const r of data || []) {
+      if (['failed', 'canceled', 'skipped'].includes(r.status)) continue
+      counts[r.platform] = (counts[r.platform] ?? 0) + 1
+    }
+    setChannelPostCounts(counts)
+  }, [activeClientId])
+  useEffect(() => { loadChannelPostCounts() }, [loadChannelPostCounts])
 
   // Admin: read the current binding (and the key hint, which social-accounts
   // does not carry). Non-admins get their binding state from social-accounts.
@@ -651,6 +673,7 @@ export default function Social() {
         targets: data.targets,
       })
       loadPosts()
+      loadChannelPostCounts()
     } catch (e) {
       setResult({ ok: false, text: (e as Error).message })
     } finally {
@@ -1343,12 +1366,39 @@ export default function Social() {
 
           {/* Platform picker + per-platform overrides */}
           <div className={`${card} p-5`}>
-            <h2 className="text-sm font-medium text-white mb-3">Platforms</h2>
+            <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+              <h2 className="text-sm font-medium text-white">Platforms</h2>
+              <AllowanceMeter
+                label="Channels selected"
+                used={selected.length}
+                cap={getPlanLimits(activeClient?.plan ?? 'free').socialChannels}
+              />
+            </div>
             <div className="flex flex-wrap gap-2 mb-5">
               {visiblePlatforms.map(p => {
                 const Icon = p.icon
                 const on = selected.includes(p.id)
                 const isConnected = connected.has(p.id)
+                // Add-on channels (Instagram/TikTok, PRICING-STRATEGY-2026-07 §4) —
+                // locked for self-serve plans until the add-on is purchasable
+                // (channelBaseAvailable mirrors social-publish.js's
+                // channelAllowedForPlan exactly). Admins keep full access
+                // (they act on behalf of every plan, incl. Managed+).
+                const addonLocked = !isAdmin && channelTier(p.id) === 'addon'
+                  && !channelBaseAvailable(activeClient?.plan ?? 'free', p.id)
+                if (addonLocked) {
+                  return (
+                    <button
+                      key={p.id}
+                      disabled
+                      title="Growth PRO add-on — not yet available for self-serve purchase. Contact us to enable it."
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 bg-dark-800/60 text-slate-600 cursor-not-allowed"
+                    >
+                      <Lock size={13} /> {p.label}
+                      <span className="text-[10px] text-slate-600">Add-on</span>
+                    </button>
+                  )
+                }
                 return (
                   <button
                     key={p.id}
@@ -1368,6 +1418,19 @@ export default function Social() {
                 )
               })}
             </div>
+
+            {selected.length > 0 && (
+              <div className="flex flex-wrap gap-4 mb-5 -mt-2">
+                {selected.map(id => (
+                  <AllowanceMeter
+                    key={id}
+                    label={`${platformMeta(id)?.label ?? id} posts/mo`}
+                    used={channelPostCounts[id] ?? 0}
+                    cap={getPlanLimits(activeClient?.plan ?? 'free').socialPostsPerChannel}
+                  />
+                ))}
+              </div>
+            )}
 
             {selected.length === 0 && (
               <p className="text-xs text-slate-500">Pick a platform to see its version of the post.</p>
