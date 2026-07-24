@@ -212,6 +212,13 @@
   </url>
 
   <url>
+    <loc>https://getbrandgeo.com/bg-024.html</loc>
+    <lastmod>2026-07-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
     <loc>https://getbrandgeo.com/glossary.html</loc>
     <lastmod>2026-07-10</lastmod>
     <changefreq>monthly</changefreq>

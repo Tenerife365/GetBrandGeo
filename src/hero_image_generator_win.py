@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-023-hero.png", "BG-023 · AI SEO Crawler",
-    [[("Auditing AI-readiness", 'w')], [("without", 'g'), (" a paid API.", 'w')]],
-    ["Sitemap-first discovery, robots.txt respect, regex-based",
-     "structure detection. Free by design, not by accident."],
-    [("25", "pages crawled per audit by default", "sitemap-first, _seo_crawl.js"),
-     ("8s", "fetch timeout per page", "FETCH_TIMEOUT_MS"),
-     ("1.5MB", "max page size read, truncated not skipped", "MAX_HTML_BYTES"),
-     ("5", "structural signals detected per page", "JSON-LD, FAQ, tables, lists, H1")],
-    "Free AI-Readiness Site Crawler")
+make("bg-024-hero.png", "BG-024 · Trust & Safety",
+    [[("Guardrails", 'w')], [("without", 'g'), (" a CAPTCHA.", 'w')]],
+    ["A honeypot that lies to bots. IP rate limiting that never",
+     "stores a real IP. How our public audit stays protected."],
+    [("3", "audits per IP per day, enforced via a hash only", "IP_RATE_LIMIT_PER_DAY"),
+     ("0", "CAPTCHAs a real visitor ever solves", "guardPublicRequest, _prospect_guard.js"),
+     ("5", "origins explicitly allowlisted", "PUBLIC_ALLOWED_ORIGINS"),
+     ("202", "fake-success status code returned to a caught bot", "honeypot handling")],
+    "Public Endpoint Guardrails")
