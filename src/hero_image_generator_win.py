@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-022-hero.png", "BG-022 · AI SEO",
-    [[("What \"notifying", 'w')], [("Google\"", 'g'), (" actually", 'w')], [("does.", 'w')]],
-    ["A 200 response isn't a crawl-priority guarantee for most",
-     "pages. The honest scope of our indexing pipeline."],
-    [("2", "page types Google documents this API as accelerating", "JobPosting, BroadcastEvent only"),
-     ("4", "engines IndexNow directly notifies", "Bing, Yandex, Seznam, Naver"),
-     ("2", "channels fired per new/changed page", "Google Indexing API + IndexNow"),
-     ("25", "URLs capped per daily automated run", "one auth-reused batch, _indexing.js")],
-    "Search Indexing, Honestly Scoped")
+make("bg-023-hero.png", "BG-023 · AI SEO Crawler",
+    [[("Auditing AI-readiness", 'w')], [("without", 'g'), (" a paid API.", 'w')]],
+    ["Sitemap-first discovery, robots.txt respect, regex-based",
+     "structure detection. Free by design, not by accident."],
+    [("25", "pages crawled per audit by default", "sitemap-first, _seo_crawl.js"),
+     ("8s", "fetch timeout per page", "FETCH_TIMEOUT_MS"),
+     ("1.5MB", "max page size read, truncated not skipped", "MAX_HTML_BYTES"),
+     ("5", "structural signals detected per page", "JSON-LD, FAQ, tables, lists, H1")],
+    "Free AI-Readiness Site Crawler")
