@@ -2,12 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme CSS variables */
+/* Theme CSS variables.
+ *
+ * Dark-mode surfaces are the marketing site's own tokens (brandgeo/web/index.html
+ * :root), not Tailwind's slate ramp. The dashboard previously sat on slate —
+ * a navy-tinted neutral — while getbrandgeo.com sits on a true neutral black.
+ * Different neutral TEMPERATURE, not just different values, which is why the
+ * two read as separate products regardless of layout:
+ *
+ *            site        dashboard (was)
+ *   page     #050508     #0a0f1e  navy
+ *   card     #0e0e17     #0f172a  slate-800
+ *
+ * The site separates border (--bd) from raised surface (--s2); the dashboard's
+ * --dark-700 does both jobs, so a literal 1:1 map would collapse borders into
+ * the card. --dark-700/-600 are therefore the site's --bd / --bd2 FLATTENED
+ * against --s, which preserves the 4-step ramp's semantics at the site's exact
+ * rendered values:
+ *   --bd  rgba(255,255,255,.07) over #0e0e17 -> rgb(31 31 39)
+ *   --bd2 rgba(255,255,255,.13) over #0e0e17 -> rgb(45 45 53)
+ *
+ * Contrast is not weakened by this: the new card surface is DARKER than
+ * slate-800 (relative luminance 0.0047 vs 0.0088), so every measured text
+ * ratio improves — e.g. text-slate-400 goes 6.96:1 -> 7.49:1.
+ *
+ * Light mode is deliberately unchanged: it already matched the site almost
+ * exactly (#f7f7fb vs the site's #f7f7fc page, #fff card in both).
+ */
 :root {
-  --dark-900: 10 15 30;
-  --dark-800: 15 23 42;
-  --dark-700: 30 41 59;
-  --dark-600: 51 65 85;
+  --dark-900: 5 5 8;      /* page background — site --bg  #050508 */
+  --dark-800: 14 14 23;   /* card / raised   — site --s   #0e0e17 */
+  --dark-700: 31 31 39;   /* border / hover  — site --bd  flattened */
+  --dark-600: 45 45 53;   /* stronger border — site --bd2 flattened */
 
   --text-base:    241 245 249;
   --text-secondary: 148 163 184;
@@ -84,16 +110,19 @@ html.light .text-blue-300    { color: rgb(29 78 216) !important; }
 html.light .text-purple-300  { color: rgb(109 40 217) !important; }
 html.light .text-cyan-400    { color: rgb(8 145 178) !important; }
 
-/* CTA contrast fix (both themes): bg-brand-500 (#8b5cf6) + white text = 4.23:1,
-   fails 4.5:1 AA at button-label sizes (14px medium/semibold — not "bold large
-   text" per WCAG's technical definition). Bump the fill one step down the
-   brand scale; brand-600 clears 5.70:1. The paired hover:bg-brand-400 state
-   was worse — 2.72:1 — so darken on hover instead of lightening, matching the
-   darken-on-hover direction used elsewhere. Every CTA in the app pairs
-   bg-brand-500 with a literal text-white class, so these two selectors catch
-   every instance without editing each call site. */
-.bg-brand-500.text-white { background-color: #7c3aed !important; }
-.text-white.hover\:bg-brand-400:hover { background-color: #6d28d9 !important; }
+/* CTA contrast fix (both themes): bg-brand-500 + white text fails 4.5:1 AA at
+   button-label sizes (14px medium/semibold — not "bold large text" per WCAG's
+   technical definition). Bump the fill one step down the brand scale, and
+   DARKEN on hover rather than lightening: the paired hover:bg-brand-400 was the
+   worse of the two, and darken-on-hover matches the direction used elsewhere.
+   Every CTA in the app pairs bg-brand-500 with a literal text-white class, so
+   these two selectors catch every instance without editing each call site.
+
+   Values track the brand ramp in tailwind.config.js — keep them in sync by hand
+   (a Tailwind theme colour can't be read from plain CSS). Now on the site's
+   accent line: brand-600 #4a3fff = 6.09:1, brand-700 #2a1cf5 = 8.13:1. */
+.bg-brand-500.text-white { background-color: #4a3fff !important; }
+.text-white.hover\:bg-brand-400:hover { background-color: #2a1cf5 !important; }
 
 /* White text sitting on a SOLID brand button must stay white in light mode.
    The global `.text-white → dark` override above is meant for primary text on

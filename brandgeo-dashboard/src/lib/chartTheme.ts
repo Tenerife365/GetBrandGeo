@@ -53,18 +53,22 @@ export interface ChartTheme {
   legend: string
 }
 
+// Dark values are neutral, not slate: the app's dark surfaces are the marketing
+// site's true-neutral black (see index.css :root), so slate-tinted chart chrome
+// reads visibly blue against them. axisTick #9b9bab measures 7.01:1 on
+// --dark-800 — it is text, so it clears 4.5:1.
 const DARK: ChartTheme = {
-  grid: '#334155',
-  axisTick: '#94a3b8',
+  grid: '#2d2d35',
+  axisTick: '#9b9bab',
   tooltipContent: {
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: '#1f1f27',
+    border: '1px solid #2d2d35',
     borderRadius: 8,
-    boxShadow: '0 8px 24px rgb(0 0 0 / 0.45)',
+    boxShadow: '0 8px 24px rgb(0 0 0 / 0.55)',
   },
-  tooltipLabel: { color: '#e2e8f0', fontSize: 12 },
-  tooltipItem: { color: '#cbd5e1', fontSize: 11 },
-  legend: '#94a3b8',
+  tooltipLabel: { color: '#f0f0f4', fontSize: 12 },
+  tooltipItem: { color: '#c9c9d4', fontSize: 11 },
+  legend: '#9b9bab',
 }
 
 const LIGHT: ChartTheme = {

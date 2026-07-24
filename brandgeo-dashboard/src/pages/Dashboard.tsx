@@ -376,7 +376,7 @@ export default function Dashboard() {
               <defs>
                 <linearGradient id="overviewScoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#c4b5fd" />
-                  <stop offset="100%" stopColor="#6d28d9" />
+                  <stop offset="100%" stopColor="#2a1cf5" />
                 </linearGradient>
                 <filter id="overviewScoreGlow" x="-30%" y="-30%" width="160%" height="160%">
                   <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
@@ -527,7 +527,7 @@ export default function Dashboard() {
                     meaning (Gestalt Focal-Point Law). */}
                 <Bar
                   dataKey="rate"
-                  fill="#8b5cf6"
+                  fill="#6c63ff"
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={!prefersReducedMotion}
                   animationDuration={700}

@@ -144,7 +144,7 @@ const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : 
 
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
-    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#8b5cf6', isYou: true },
+    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#6c63ff', isYou: true },
     ...topCompetitors.map(c => ({
       name: short(c.name),
       fullName: c.name,
@@ -255,10 +255,10 @@ export default function Competitors() {
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
   const barData         = buildBarData(brandName, brandMentions, topCompetitors)
   const engineGroupData = buildEngineGroupData(brandName, engineStats, topCompetitors, activeEngines as LLMName[])
-  const groupColors     = ['#8b5cf6', '#ef4444', '#f59e0b', '#3b82f6']
+  const groupColors     = ['#6c63ff', '#ef4444', '#f59e0b', '#3b82f6']
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendData       = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
-  const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
+  const trendColors = ['#ef4444', '#f59e0b', '#6c63ff', '#06b6d4']
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
@@ -567,7 +567,7 @@ export default function Competitors() {
               <Line
                 type="monotone"
                 dataKey={brandName}
-                stroke="#8b5cf6"
+                stroke="#6c63ff"
                 strokeWidth={2.5}
                 dot={false}
                 activeDot={{ r: 4 }}

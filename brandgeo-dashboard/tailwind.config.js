@@ -13,18 +13,32 @@ export default {
         sans: ['Inter', ...defaultTheme.fontFamily.sans],
       },
       colors: {
+        // Accent ramp rebuilt around the marketing site's --ac (#6c63ff), which
+        // becomes brand-500 exactly. The old scale was Tailwind's violet — hue
+        // ~258, noticeably warmer than the site's ~243 blue-violet, so the app
+        // and getbrandgeo.com never quite matched.
+        //
+        // Ramp holds H 243.5 / S 100% and walks lightness, so tints and shades
+        // stay on the same hue line as the site's accent rather than drifting.
+        //
+        // Contrast checked at the two steps that carry text (index.css remaps
+        // brand-500 CTA fills to -600, hover to -700):
+        //   white on brand-600 #4a3fff ... 6.09:1  PASS (old violet was 5.70:1)
+        //   white on brand-700 #2a1cf5 ... 8.13:1  PASS, darkens on hover
+        //   brand-300 on the brand-500/15 nav tint over --dark-800 ... 7.47:1
+        //   brand-400 link text on --dark-800 ....................... 6.21:1
         brand: {
-          50:  '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065',
+          50:  '#f2f1ff',
+          100: '#e5e3ff',
+          200: '#ccc9ff',
+          300: '#aaa4ff',
+          400: '#8b83ff',
+          500: '#6c63ff',   // site --ac
+          600: '#4a3fff',
+          700: '#2a1cf5',
+          800: '#2116c9',
+          900: '#1b12a3',
+          950: '#100a66',
         },
         dark: {
           900: 'rgb(var(--dark-900) / <alpha-value>)',
