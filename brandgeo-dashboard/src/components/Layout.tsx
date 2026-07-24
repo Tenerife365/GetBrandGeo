@@ -179,13 +179,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     },
   ]
 
-  // Stronger active-state indicator: left accent bar + bg tint, not just a bg tint (§7.4 Phase 2)
+  // Stronger active-state indicator: left accent rail + bg tint, not just a bg tint (§7.4 Phase 2)
+  //
+  // The rail is a centered pseudo-element pill, NOT a border-l: a 2px left
+  // border on an element with rounded-lg gets clipped by the corner radius into
+  // a short curved smear rather than reading as a rail.
+  //
+  // Inactive items sit at slate-300, not slate-400. The dark-mode contrast fix
+  // in index.css remaps text-slate-600 (the nav group headers) onto
+  // text-slate-400's value, so slate-400 nav items had become the exact same
+  // colour as the "INSIGHTS"/"STRATEGY" headers above them and the hierarchy
+  // went flat. Brightening the items — rather than re-dimming the headers,
+  // which would fail AA again — restores the ordering: active accent >
+  // item (slate-300, ~11.4:1) > group header (slate-400, 6.96:1).
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     [
-      'flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors border-l-2',
+      'relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors',
+      'before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2',
+      'before:w-[3px] before:rounded-full before:transition-all',
       isActive
-        ? 'bg-brand-500/15 text-brand-300 font-medium border-brand-400'
-        : 'text-slate-400 hover:text-slate-200 hover:bg-dark-700 border-transparent',
+        ? 'bg-brand-500/15 text-brand-300 font-medium hover:bg-brand-500/25 before:h-5 before:bg-brand-400'
+        : 'text-slate-300 hover:text-white hover:bg-dark-700 before:h-0 before:bg-transparent',
     ].join(' ')
 
   const handleLogout = async () => {
@@ -302,7 +316,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
-              <div className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-2">
+              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
                 {group.label}
               </div>
               <div className="space-y-1">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
 import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, type Plan } from '../lib/planConfig'
@@ -86,7 +86,10 @@ export default function Onboard() {
   }, [collectionProgress])
 
   if (!isAdmin) return (
-    <div className="p-8 text-slate-500 text-sm">Access restricted to admins.</div>
+    <div className="p-8 text-slate-500 text-sm">
+      Access restricted to admins.{' '}
+      <Link to="/" className="text-brand-400 hover:text-brand-300 font-medium">Back to Dashboard</Link>
+    </div>
   )
 
   // ── Helpers ──────────────────────────────────────────────────────────────

@@ -55,6 +55,14 @@ html.light {
   }
 }
 
+/* Dark-mode AA fix: default text-slate-500 (100,116,139) is 3.75:1 on
+   --dark-800 and 4.01:1 on --dark-900 — both fail the 4.5:1 normal-text
+   minimum. Remap to text-slate-400's value (148,163,184 → 6.97:1). Scoped to
+   dark mode only — html.light's own text-slate-500 override below still wins
+   via source order + !important. */
+.text-slate-500,
+.text-slate-600 { color: rgb(148 163 184) !important; }
+
 /* Text color theme overrides (light mode) */
 html.light .text-white       { color: rgb(15 23 42) !important; }
 html.light .text-slate-100   { color: rgb(15 23 42) !important; }
@@ -75,6 +83,17 @@ html.light .text-amber-300   { color: rgb(180 83 9) !important; }
 html.light .text-blue-300    { color: rgb(29 78 216) !important; }
 html.light .text-purple-300  { color: rgb(109 40 217) !important; }
 html.light .text-cyan-400    { color: rgb(8 145 178) !important; }
+
+/* CTA contrast fix (both themes): bg-brand-500 (#8b5cf6) + white text = 4.23:1,
+   fails 4.5:1 AA at button-label sizes (14px medium/semibold — not "bold large
+   text" per WCAG's technical definition). Bump the fill one step down the
+   brand scale; brand-600 clears 5.70:1. The paired hover:bg-brand-400 state
+   was worse — 2.72:1 — so darken on hover instead of lightening, matching the
+   darken-on-hover direction used elsewhere. Every CTA in the app pairs
+   bg-brand-500 with a literal text-white class, so these two selectors catch
+   every instance without editing each call site. */
+.bg-brand-500.text-white { background-color: #7c3aed !important; }
+.text-white.hover\:bg-brand-400:hover { background-color: #6d28d9 !important; }
 
 /* White text sitting on a SOLID brand button must stay white in light mode.
    The global `.text-white → dark` override above is meant for primary text on
@@ -198,10 +217,34 @@ html.light .border-slate-600\/40,
 html.light .border-slate-600\/30,
 html.light .border-slate-700\/30 { border-color: rgb(203 213 225) !important; }
 
+/* Thin themed scrollbars are the app DEFAULT, not an opt-in class. The
+   .scrollbar-thin utility below had been applied to 1 of the 11 scroll
+   containers in the app — the left nav, the client switcher, the market picker
+   and 7 others all fell back to the raw OS scrollbar. An opt-in that gets
+   missed 10 times out of 11 is the wrong mechanism, so the styling moves here.
+
+   The thumb value is fixed rather than themed: --dark-600 was 1.7-1.8:1 (dark)
+   / 1.4:1 (light) against its own track, failing the 3:1 non-text/UI-component
+   minimum (WCAG 1.4.11) in BOTH themes. rgb(100 116 139) clears 3:1 against
+   every surface in both — 3.75:1 on dark-800, 4.01:1 on dark-900, 4.76:1 on
+   white — so no theme swap is needed. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139) transparent;
+}
+
+/* Safari has no scrollbar-color support at all; WebKit pseudo-elements cover it. */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(100 116 139); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
+
 @layer utilities {
+  /* Retained for the existing call site on <main>; the global rules above now
+     produce the same result everywhere, so new code needn't reach for it. */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgb(var(--dark-600)) transparent;
+    scrollbar-color: rgb(100 116 139) transparent;
   }
 
   /* iOS safe-area padding for bottom nav */
