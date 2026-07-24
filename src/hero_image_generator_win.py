@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-020-hero.png", "BG-020 · Reliability",
-    [[("When our outage", 'w')], [("looked like", 'w')], [("your", 'g'), (" problem.", 'w')]],
-    ["A failed API call and a real \"never heard of you\" used to",
-     "score identically. Four honest states replaced that binary."],
-    [("4", "honest per-engine states, not a binary yes/no", "computeEngineStates, _score.js"),
-     ("0", "rows an engine writes when it fails outright", "enginesWithResults, _score.js"),
-     ("60%", "mention-rate threshold, reused not invented", "same cutoff as consistency dim."),
-     ("#109", "the tracked issue this fix closed", "referenced directly in shipped code")],
-    "Reliability & Scoring Accuracy")
+make("bg-021-hero.png", "BG-021 · Scoring Formula",
+    [[("How the score is", 'w')], [("actually", 'g'), (" weighted.", 'w')]],
+    ["Six dimensions, unequal weights, one composite number.",
+     "The exact formula behind BrandGEO's AI Visibility Score."],
+    [("6", "dimensions folded into one weighted score", "computeAuditScore, _score.js"),
+     ("25%", "recognition's weight, the largest single share", "aiScore formula"),
+     ("10%", "consistency's weight, the smallest, by design", "aiScore formula"),
+     ("20", "position-decay floor reached by rank 5", "knowledge dimension curve")],
+    "AI Visibility Score Formula")
