@@ -51,3 +51,8 @@ integration-guides_*.zip
 *-private-key.key
 *.pem
 integration-guides_*/
+
+# Quarantined stray copies from the 2026-07-24 repo reorg — redundant dups of
+# now-tracked files, the 3 differing spec variants, and local-only secrets.
+# Review and delete when confirmed unneeded. Never commit (contains secrets).
+/_reorg-stray/
