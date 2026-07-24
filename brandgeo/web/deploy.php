@@ -14,10 +14,14 @@
  *     signature (GitHub's X-Hub-Signature-256 header) and logs to a file
  *     outside the web root instead of the HTTP response.
  *
+ * The heavy work (git pull + file copies) can take longer than GitHub's ~10s
+ * webhook timeout, especially on the first run when every file is copied. So
+ * this script ACKNOWLEDGES GitHub immediately (202) and closes the connection,
+ * then finishes the deploy in the background where no timeout applies.
+ *
  * Only files under brandgeo/web/ that changed since the last successful run
- * are copied (honouring "upload only what changed, nothing else"). Deletions
- * are intentionally NOT propagated -- removing a file from the repo leaves the
- * live copy in place, which is the safe default for a site with live users.
+ * are copied. Deletions are intentionally NOT propagated -- removing a file
+ * from the repo leaves the live copy in place, the safe default for a live site.
  *
  * One-time setup:
  *  - Upload deploy-secret.php next to this file (it is git-ignored, so a pull
@@ -47,33 +51,48 @@ $MARKER     = $DEPLOYPATH . '.last_webhook_deploy_commit';
 $LOGFILE    = '/home/getbran1/repositories/deploy.log'; // outside the web root
 $LOCKFILE   = '/home/getbran1/repositories/deploy.lock';
 
-function respond(int $code, string $msg): void {
-    http_response_code($code);
-    echo $msg;
-    exit;
-}
-
-// --- Verify the request genuinely came from GitHub. ---
+// --- Verify the request genuinely came from GitHub (fast, before we ack). ---
 $payload = file_get_contents('php://input');
 $sigHeader = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
 if ($payload === '' || $sigHeader === '') {
-    respond(403, 'Forbidden');
+    http_response_code(403);
+    exit('Forbidden');
 }
 $expected = 'sha256=' . hash_hmac('sha256', $payload, DEPLOY_WEBHOOK_SECRET);
 if (!hash_equals($expected, $sigHeader)) {
-    respond(403, 'Forbidden');
+    http_response_code(403);
+    exit('Forbidden');
 }
 
-// --- Only deploy for pushes to main. ---
+// --- Only deploy for pushes to main (fast, before we ack). ---
 $event = json_decode($payload, true);
 if (($event['ref'] ?? '') !== 'refs/heads/main') {
-    respond(200, 'Ignored (not main)');
+    http_response_code(200);
+    exit('Ignored (not main)');
 }
+
+// --- Acknowledge GitHub immediately, then keep running in the background so
+//     the git pull + copy never hit GitHub's ~10s webhook timeout. ---
+ignore_user_abort(true);
+$ack = 'Accepted';
+http_response_code(202);
+header('Content-Type: text/plain');
+if (function_exists('fastcgi_finish_request')) {
+    echo $ack;
+    fastcgi_finish_request();          // PHP-FPM: flush response, keep executing
+} else {
+    header('Connection: close');
+    header('Content-Length: ' . strlen($ack));
+    echo $ack;
+    @ob_end_flush();
+    @flush();                          // best-effort connection close for other SAPIs
+}
+@set_time_limit(180);                  // background work may take a while on first run
 
 // --- Serialise runs so two near-simultaneous pushes can't interleave. ---
 $lock = fopen($LOCKFILE, 'c');
 if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
-    respond(202, 'Busy'); // another deploy is already running; it will pick up HEAD
+    exit; // another deploy is already running; it will pull HEAD and cover this push
 }
 
 function run(string $cmd): string {
@@ -131,5 +150,3 @@ file_put_contents($LOGFILE, implode("\n", $log) . "\n", FILE_APPEND | LOCK_EX);
 
 flock($lock, LOCK_UN);
 fclose($lock);
-
-respond(202, 'Accepted');
