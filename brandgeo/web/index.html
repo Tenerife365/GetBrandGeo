@@ -10,10 +10,10 @@
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
-  <title>BrandGEO — AI Visibility Intelligence</title>
+  <title>BrandGEO | AI Visibility Intelligence</title>
   <meta name="description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Meta AI. BrandGEO monitors, scores, and tracks your AI presence.">
   <link rel="canonical" href="https://getbrandgeo.com/">
-  <meta property="og:title" content="BrandGEO — Be the brand AI recommends">
+  <meta property="og:title" content="BrandGEO: Be the brand AI recommends">
   <meta property="og:description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Meta AI. BrandGEO monitors, scores, and tracks your AI presence.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://getbrandgeo.com/">
@@ -66,7 +66,7 @@
         "@id": "https://getbrandgeo.com/#website",
         "url": "https://getbrandgeo.com/",
         "name": "BrandGEO",
-        "description": "AI Visibility Intelligence — monitor and improve how your brand is mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Meta AI.",
+        "description": "AI Visibility Intelligence that monitors and improves how your brand is mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Meta AI.",
         "publisher": {"@id": "https://getbrandgeo.com/#organization"},
         "inLanguage": "en"
       },
@@ -81,9 +81,8 @@
           {"@type": "Offer", "name": "BrandGEO Free", "price": "0", "priceCurrency": "EUR"},
           {"@type": "Offer", "name": "BrandGEO Essentials", "price": "99", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "99", "priceCurrency": "EUR", "unitText": "MONTH"}},
           {"@type": "Offer", "name": "BrandGEO Growth", "price": "299", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "299", "priceCurrency": "EUR", "unitText": "MONTH"}},
-          {"@type": "Offer", "name": "BrandGEO Managed", "price": "900", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "900", "priceCurrency": "EUR", "unitText": "MONTH"}},
-          {"@type": "Offer", "name": "BrandGEO Pro", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "minPrice": "1500", "priceCurrency": "EUR", "unitText": "MONTH"}},
-          {"@type": "Offer", "name": "BrandGEO Enterprise", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "minPrice": "10000", "priceCurrency": "EUR", "unitText": "MONTH"}}
+          {"@type": "Offer", "name": "BrandGEO Growth PRO", "price": "449", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "449", "priceCurrency": "EUR", "unitText": "MONTH"}},
+          {"@type": "Offer", "name": "BrandGEO Managed", "price": "1500", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "1500", "priceCurrency": "EUR", "unitText": "MONTH"}}
         ]
       }
     ]
@@ -102,7 +101,8 @@
       --s2:   #12121c;
       --bd:   rgba(255,255,255,.07);
       --bd2:  rgba(255,255,255,.13);
-      --ac:   #6c63ff;
+      --ac:   #8b5cf6;         /* unified with dashboard brand-500 (was #6c63ff indigo) */
+      --ac-strong: #7c3aed;    /* AA-safe solid fill for white-text CTAs (dashboard brand-600) */
       --ac2:  #00d4aa;
       --t:    #ffffff;
       --t2:   rgba(255,255,255,.6);
@@ -111,8 +111,8 @@
       --r:    12px;
       --dot:  rgba(255,255,255,.13);
       --badge-text: rgba(180,175,255,.9);
-      --badge-bg:   rgba(108,99,255,.1);
-      --badge-bd:   rgba(108,99,255,.28);
+      --badge-bg:   rgba(139,92,246,.1);
+      --badge-bd:   rgba(139,92,246,.28);
     }
     [data-theme="light"] {
       --bg:   #f7f7fc;
@@ -126,8 +126,8 @@
       --nav:  rgba(247,247,252,.88);
       --dot:  rgba(9,9,15,.065);
       --badge-text: #5732d6;
-      --badge-bg:   rgba(108,99,255,.08);
-      --badge-bd:   rgba(108,99,255,.32);
+      --badge-bg:   rgba(139,92,246,.08);
+      --badge-bd:   rgba(139,92,246,.32);
     }
 
     body {
@@ -182,7 +182,7 @@
     nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
     nav a:hover { color: var(--t); }
     .nav-cta {
-      background: var(--ac) !important;
+      background: var(--ac-strong) !important;
       color: #fff !important;
       padding: 8px 18px;
       border-radius: 8px;
@@ -251,7 +251,7 @@
       width: min(1500px, 96vw);
       height: 560px;
       background: radial-gradient(ellipse at 50% 30%,
-        rgba(108,99,255,.20) 0%,
+        rgba(139,92,246,.20) 0%,
         rgba(0,212,170,.08) 42%,
         transparent 75%);
       animation: heroOrbDrift1 18s ease-in-out infinite;
@@ -265,20 +265,20 @@
       height: 460px;
       background: radial-gradient(ellipse at 62% 55%,
         rgba(0,212,170,.14) 0%,
-        rgba(108,99,255,.05) 48%,
+        rgba(139,92,246,.05) 48%,
         transparent 76%);
       animation: heroOrbDrift2 23s ease-in-out infinite;
     }
     [data-theme="light"] .hero-orb {
       background: radial-gradient(ellipse at 50% 30%,
-        rgba(108,99,255,.13) 0%,
+        rgba(139,92,246,.13) 0%,
         rgba(0,212,170,.06) 42%,
         transparent 75%);
     }
     [data-theme="light"] .hero-orb-2 {
       background: radial-gradient(ellipse at 62% 55%,
         rgba(0,212,170,.10) 0%,
-        rgba(108,99,255,.04) 48%,
+        rgba(139,92,246,.04) 48%,
         transparent 76%);
     }
     @keyframes heroOrbDrift1 {
@@ -291,6 +291,21 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .hero-orb, .hero-orb-2 { animation: none; }
+    }
+    /* AI Knowledge Graph canvas — sits above the atmospheric orbs but below all
+       hero content. Fades in on init so a slow first paint never flashes. */
+    .hero-graph {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    .hero-graph.is-live { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-graph { transition: none; }
     }
     .hero > *:not(.hero-bg) { position: relative; z-index: 1; }
     .hero-badge {
@@ -318,10 +333,12 @@
       flex-shrink: 0;
     }
     .hero h1 {
-      font-size: clamp(2.6rem, 6vw, 3.8rem);
+      /* Larger, tighter anchor so the eye lands on the promise in the first
+         second (audit weakness #2 — flat first-screen hierarchy). */
+      font-size: clamp(2.85rem, 6.4vw, 4.2rem);
       font-weight: 900;
-      line-height: 1.08;
-      letter-spacing: -.06em;
+      line-height: 1.04;
+      letter-spacing: -.055em;
       margin-bottom: 22px;
       color: var(--t);
     }
@@ -361,14 +378,14 @@
     .engines-strip .es-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
     /* ── RESEARCH CREDIBILITY BAND ── */
-    .research-band { max-width: 1060px; margin: 32px auto 0; display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding: 22px 26px; background: linear-gradient(120deg, rgba(108,99,255,.07), rgba(0,212,170,.05)); border: 1px solid var(--bd); border-radius: 16px; }
-    .research-band .rb-badge { width: 50px; height: 50px; border-radius: 12px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .research-band { max-width: 1060px; margin: 32px auto 0; display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding: 22px 26px; background: linear-gradient(120deg, rgba(139,92,246,.07), rgba(0,212,170,.05)); border: 1px solid var(--bd); border-radius: 16px; }
+    .research-band .rb-badge { width: 50px; height: 50px; border-radius: 12px; background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.3); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
     .research-band h3 { font-size: 1rem; font-weight: 800; margin-bottom: 4px; color: var(--t); }
     .research-band p { font-size: .88rem; color: var(--t2); margin: 0; max-width: 64ch; line-height: 1.6; }
     .research-band .rb-links { display: flex; gap: 10px; flex-shrink: 0; }
     .research-band .rb-links a { white-space: nowrap; font-size: .85rem; font-weight: 700; text-decoration: none; padding: 9px 15px; border-radius: 9px; border: 1px solid var(--bd2); color: var(--t); transition: border-color .15s, opacity .15s; }
     .research-band .rb-links a:hover { border-color: var(--ac); }
-    .research-band .rb-links a.rb-pri { background: var(--ac); border-color: var(--ac); color: #fff; }
+    .research-band .rb-links a.rb-pri { background: var(--ac-strong); border-color: var(--ac-strong); color: #fff; }
     .research-band .rb-links a.rb-pri:hover { opacity: .9; }
     @media (max-width: 760px) {
       .research-band { grid-template-columns: 1fr; text-align: center; justify-items: center; }
@@ -377,7 +394,7 @@
 
     /* ── SEARCH BAR ── */
     .search-wrap {
-      background: linear-gradient(135deg, rgba(108,99,255,.5), rgba(0,212,170,.4));
+      background: linear-gradient(135deg, rgba(139,92,246,.5), rgba(0,212,170,.4));
       border-radius: 14px;
       padding: 1.5px;
       max-width: 560px;
@@ -403,7 +420,7 @@
     }
     .search-inner input::placeholder { color: var(--t3); }
     .search-btn {
-      background: var(--ac);
+      background: var(--ac-strong);
       color: #fff;
       border: none;
       border-radius: 10px;
@@ -545,7 +562,7 @@
     .engine-chip.is-active {
       transform: translateY(-2px);
       border-color: var(--chip-accent, var(--ac));
-      box-shadow: 0 8px 18px -8px var(--chip-shadow, rgba(108,99,255,.35));
+      box-shadow: 0 8px 18px -8px var(--chip-shadow, rgba(139,92,246,.35));
       color: var(--t);
     }
     .engine-chip:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
@@ -634,7 +651,7 @@
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 580px; height: 340px;
-      background: radial-gradient(ellipse, rgba(108,99,255,.2) 0%, transparent 70%);
+      background: radial-gradient(ellipse, rgba(139,92,246,.2) 0%, transparent 70%);
       pointer-events: none;
     }
     .preview-card {
@@ -800,12 +817,12 @@
       transition: border-color .2s, transform .2s;
       cursor: default;
     }
-    .feature-card:hover { border-color: rgba(108,99,255,.4); transform: translateY(-3px); }
+    .feature-card:hover { border-color: rgba(139,92,246,.4); transform: translateY(-3px); }
     .feature-icon {
       width: 44px; height: 44px;
       border-radius: 10px;
-      background: rgba(108,99,255,.12);
-      border: 1px solid rgba(108,99,255,.2);
+      background: rgba(139,92,246,.12);
+      border: 1px solid rgba(139,92,246,.2);
       display: flex; align-items: center; justify-content: center;
       font-size: 1.2rem;
       margin-bottom: 16px;
@@ -816,7 +833,7 @@
     /* ── TESTIMONIALS (styles live here; the section is a commented-out skeleton near pricing) ── */
     .testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 8px; }
     .testimonial-card { background: var(--s); border: 1px solid var(--bd); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 16px; transition: transform .2s ease, border-color .2s ease; }
-    .testimonial-card:hover { transform: translateY(-3px); border-color: rgba(108,99,255,.35); }
+    .testimonial-card:hover { transform: translateY(-3px); border-color: rgba(139,92,246,.35); }
     .testimonial-card blockquote { font-size: 0.98rem; line-height: 1.6; color: var(--t); }
     .testimonial-card figcaption { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
     .testimonial-card .tc-name { font-weight: 700; font-size: 0.88rem; color: var(--t); }
@@ -836,11 +853,11 @@
       text-decoration: none;
       transition: border-color .2s, transform .2s;
     }
-    .latest-card:hover { border-color: rgba(108,99,255,.4); transform: translateY(-3px); }
+    .latest-card:hover { border-color: rgba(139,92,246,.4); transform: translateY(-3px); }
     .latest-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
     .latest-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
     .latest-tag-news { color: var(--ac2); background: rgba(0,212,170,.12); border: 1px solid rgba(0,212,170,.25); }
-    .latest-tag-research { color: var(--ac); background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25); }
+    .latest-tag-research { color: var(--ac); background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.25); }
     .latest-date { font-size: 0.76rem; color: var(--t3); white-space: nowrap; }
     .latest-card h3 { font-size: 0.92rem; font-weight: 700; color: var(--t); line-height: 1.35; margin-bottom: 8px; }
     .latest-card p { color: var(--t2); font-size: 0.82rem; line-height: 1.55; margin: 0; }
@@ -944,14 +961,14 @@
       transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
     }
     .pricing-box:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -12px rgba(0,0,0,.4); }
-    .pricing-box:not(.featured):hover { border-color: rgba(108,99,255,.35); }
+    .pricing-box:not(.featured):hover { border-color: rgba(139,92,246,.35); }
     [data-theme="light"] .pricing-box {
       border-color: rgba(0,0,0,.08);
       box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.06);
     }
     .pricing-box.featured {
       border: 2px solid var(--ac);
-      box-shadow: 0 0 0 3px rgba(108,99,255,.09), 0 4px 18px rgba(108,99,255,.13);
+      box-shadow: 0 0 0 3px rgba(139,92,246,.09), 0 4px 18px rgba(139,92,246,.13);
     }
 
     /*
@@ -1070,7 +1087,7 @@
     }
     .btn-plan:hover { opacity: .88; }
     .pricing-box.featured .btn-plan {
-      box-shadow: 0 3px 10px rgba(108,99,255,.32);
+      box-shadow: 0 3px 10px rgba(139,92,246,.32);
     }
     .btn-plan:has(+ .plan-checkout-note) { margin-bottom: 8px; }
     .plan-checkout-note {
@@ -1115,7 +1132,7 @@
     .upgrade-timeline-label { font-size: 0.72rem; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 20px; }
     .upgrade-steps { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
     .upgrade-step { background: var(--s); border: 1px solid var(--bd); border-radius: 10px; padding: 12px 16px; min-width: 130px; }
-    .upgrade-step.upgrade-step-featured { border-color: var(--ac); background: rgba(108,99,255,.06); }
+    .upgrade-step.upgrade-step-featured { border-color: var(--ac); background: rgba(139,92,246,.06); }
     .upgrade-step-name { font-size: 0.8rem; font-weight: 800; color: var(--t); margin-bottom: 2px; }
     .upgrade-step.upgrade-step-featured .upgrade-step-name { color: var(--ac); }
     .upgrade-step-desc { font-size: 0.72rem; color: var(--t3); }
@@ -1144,11 +1161,27 @@
     .mode-switch { display: inline-flex; background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 4px; gap: 4px; max-width: 100%; }
     .mode-btn { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; color: var(--t2); font-family: inherit; font-size: 0.9rem; font-weight: 700; padding: 10px 20px; border-radius: 9px; cursor: pointer; transition: color .2s, background .2s; white-space: nowrap; }
     .mode-btn .m-sub { font-weight: 500; font-size: 0.76rem; color: var(--t3); }
-    .mode-btn.active { background: var(--ac); color: #fff; box-shadow: 0 3px 10px rgba(108,99,255,.32); }
+    .mode-btn.active { background: var(--ac); color: #fff; box-shadow: 0 3px 10px rgba(139,92,246,.32); }
     .mode-btn.active .m-sub { color: rgba(255,255,255,.8); }
     .mode-caption { text-align: center; font-size: 0.8rem; color: var(--t3); max-width: 520px; margin: 0 auto 24px; }
     .pricing-grid.pricing-grid-modes { max-width: 1000px; margin: 0 auto; }
     .pricing-grid[hidden] { display: none; }
+    /* Mode grids (2026-07 ladder): self-serve = 4 across (Free / Essentials /
+       Growth / Growth PRO); done-for-you = 2 across (Managed + Custom
+       Enterprise). #id specificity overrides the generic 3-col base. */
+    #grid-self    { grid-template-columns: repeat(4, 1fr); max-width: 1180px; }
+    #grid-managed { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
+    /* the generic `.featured { grid-column: span 2 }` further down is for the old
+       3-up layout — neutralise it inside the mode grids so cards keep their column */
+    #grid-self .pricing-box.featured,
+    #grid-managed .pricing-box.featured { grid-column: auto; }
+    @media (max-width: 940px) {
+      #grid-self { grid-template-columns: repeat(2, 1fr); max-width: 560px; }
+    }
+    @media (max-width: 560px) {
+      #grid-self, #grid-managed { grid-template-columns: 1fr; max-width: 380px; }
+    }
+    .mode-ic { display: inline-block; vertical-align: -2px; margin-right: 4px; }
     .btn-plan.ghost { background: transparent; color: var(--t); border: 1px solid var(--bd2); }
     .btn-plan.ghost:hover { border-color: var(--ac); opacity: 1; }
     .trust-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; margin: 34px auto 0; font-size: 0.82rem; color: var(--t2); }
@@ -1300,13 +1333,18 @@
     <div class="hero-grid"></div>
     <div class="hero-orb"></div>
     <div class="hero-orb-2"></div>
+    <!-- Showpiece: "AI Knowledge Graph" — the 5 engines routing citation
+         pulses into your brand node. Self-contained 2D canvas (no libraries,
+         no build step), cursor-reactive, comfort-tuned, honours reduced-motion
+         and pauses off-screen/hidden. Falls back silently to orbs+grid. -->
+    <canvas id="aiGraph" class="hero-graph" aria-hidden="true"></canvas>
   </div>
   <div class="hero-split">
     <!-- LEFT: copy + audit -->
     <div class="hero-copy">
       <div class="hero-badge">AI Visibility Platform</div>
       <h1>Be the brand<br><em>AI recommends.</em></h1>
-      <p>Every day your customers ask ChatGPT, Gemini, Claude, Perplexity and Meta AI for recommendations. See exactly where you stand &mdash; then fix it.</p>
+      <p>Every day your customers ask ChatGPT, Gemini, Claude, Perplexity and Meta AI for recommendations. See exactly where you stand, then fix it.</p>
       <div class="search-wrap">
         <div class="search-inner">
           <input type="text" id="brandInput" placeholder="yourcompany.com or brand name" aria-label="Enter your brand or domain">
@@ -1332,7 +1370,7 @@
         <div class="preview-glow"></div>
         <div class="live-ticker" aria-hidden="true">
           <span class="ticker-dot"></span>
-          <span id="tickerText">ChatGPT mentioned your brand &mdash; 2 min ago</span>
+          <span id="tickerText">ChatGPT mentioned your brand, 2 min ago</span>
         </div>
         <div class="preview-card">
           <!-- Score + Dimensions -->
@@ -1383,7 +1421,7 @@
             <div class="pe-card missing"><div class="pe-name">Meta AI</div><div class="pe-pos" style="color:#f87171">&mdash;</div><span class="pe-status missing">MISSING</span></div>
           </div>
           <!-- Fix This -->
-          <div class="preview-fix-label">Fix This &mdash; prioritised actions</div>
+          <div class="preview-fix-label">Fix This: prioritised actions</div>
           <div class="fix-row p0">
             <span class="fix-badge p0">P0</span>
             <div>
@@ -1425,7 +1463,7 @@
   <div class="rb-badge">&#x1F52C;</div>
   <div>
     <h3>Built on peer-reviewed research.</h3>
-    <p>Our cross-engine visibility methodology is published and citable (DOI), and we release the AI Visibility Index tracking how brands surface across engines &mdash; credibility most tools can&rsquo;t point to.</p>
+    <p>Our cross-engine visibility methodology is published and citable (DOI), and we release the AI Visibility Index tracking how brands surface across engines, the kind of credibility most tools can&rsquo;t point to.</p>
   </div>
   <div class="rb-links">
     <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener" class="rb-pri">Read the study &rarr;</a>
@@ -1444,7 +1482,7 @@
     <div class="feature-card">
       <div class="feature-icon">&#x1F4E1;</div>
       <h3>5-engine coverage</h3>
-      <p>ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; all queried with live web search enabled, every week, with the exact queries your customers use.</p>
+      <p>ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all queried with live web search enabled, every week, with the exact queries your customers use.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">&#x1F4CA;</div>
@@ -1454,7 +1492,7 @@
     <div class="feature-card">
       <div class="feature-icon">&#x1F3AF;</div>
       <h3>Prioritised fix list</h3>
-      <p>P0/P1/P2 actions ranked by impact &mdash; schema markup, entity pages, FAQ content &mdash; with copy-paste implementations ready to go.</p>
+      <p>P0/P1/P2 actions ranked by impact (schema markup, entity pages, FAQ content) with copy-paste implementations ready to go.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon">&#x1F514;</div>
@@ -1469,7 +1507,7 @@
     <div class="feature-card">
       <div class="feature-icon">&#x1F6E0;</div>
       <h3>Fully managed</h3>
-      <p>No tools to learn, no dashboards to maintain. We handle everything &mdash; you receive insights, act on them, and grow.</p>
+      <p>No tools to learn, no dashboards to maintain. We handle everything, so you get the insights and act on them.</p>
     </div>
   </div>
 </section>
@@ -1482,18 +1520,18 @@
     <div class="sentiment-copy">
       <div class="section-label">Beyond mentions</div>
       <h2>It's not just if AI mentions you. It's how.</h2>
-      <p>A brand mention isn't automatically good news. BrandGEO reads every AI response for tone &mdash; positive, neutral, or negative &mdash; so you know whether ChatGPT is recommending you or quietly warning people off.</p>
+      <p>A brand mention isn't automatically good news. BrandGEO reads every AI response for tone (positive, neutral, or negative) so you know whether ChatGPT is recommending you or quietly warning people off.</p>
       <ul class="sentiment-points">
-        <li>Every response, across all 5 engines, is scored for sentiment &mdash; not just presence.</li>
+        <li>Every response, across all 5 engines, is scored for sentiment, not just presence.</li>
         <li>See the actual language AI models use when they describe your brand.</li>
         <li>Catch a negative shift in tone before it shows up in lost customers.</li>
-        <li>Compare sentiment engine-by-engine &mdash; ChatGPT and Perplexity don't always agree.</li>
+        <li>Compare sentiment engine-by-engine, since ChatGPT and Perplexity don't always agree.</li>
       </ul>
       <a href="https://app.getbrandgeo.com/sentiment" class="btn-plan" style="display:inline-block;width:auto;padding:12px 28px;">See Brand Sentiment live &rarr;</a>
     </div>
     <div class="sentiment-visual">
       <div class="sentiment-card">
-        <div class="sentiment-card-label">Sentiment breakdown &mdash; last 7 days</div>
+        <div class="sentiment-card-label">Sentiment breakdown: last 7 days</div>
         <div class="sentiment-bars">
           <div class="sentiment-bar-row">
             <div class="sentiment-bar-top"><span class="name">Positive</span><span class="val" style="color:#34d399">61%</span></div>
@@ -1534,7 +1572,7 @@
     <div class="step">
       <div class="step-num">2</div>
       <h3>We query 5 AI engines</h3>
-      <p>We run 20+ tailored queries across ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; all with live web search active.</p>
+      <p>We run 20+ tailored queries across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all with live web search active.</p>
     </div>
     <div class="step">
       <div class="step-num">3</div>
@@ -1579,14 +1617,14 @@
   <div class="pricing-head">
     <div class="section-label">Pricing</div>
     <h2>Start free. Fix your visibility <em>when you're ready.</em></h2>
-    <p class="hook-sub">See exactly where AI engines mention you &mdash; or hand your customers to a competitor instead. Start with a free audit, upgrade only once you see the gap. No credit card to start, cancel anytime.</p>
+    <p class="hook-sub">See exactly where AI engines mention you, or hand your customers to a competitor instead. Start with a free audit, upgrade only once you see the gap. No credit card to start, cancel anytime.</p>
   </div>
 
   <!-- Path: run it yourself vs done-for-you -->
   <div class="mode-switch-row">
     <div class="mode-switch" role="tablist" aria-label="Choose how you want to run BrandGEO">
-      <button class="mode-btn active" data-mode="self" role="tab" aria-selected="true">&#x1F680; Run it yourself <span class="m-sub">from &euro;0</span></button>
-      <button class="mode-btn" data-mode="managed" role="tab" aria-selected="false">&#x1F3AF; Done for you <span class="m-sub">from &euro;900</span></button>
+      <button class="mode-btn active" data-mode="self" role="tab" aria-selected="true"><svg class="mode-ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.6" fill="currentColor" stroke="none"/><circle cx="15" cy="16" r="2.6" fill="currentColor" stroke="none"/></svg>Run it yourself <span class="m-sub">from &euro;0</span></button>
+      <button class="mode-btn" data-mode="managed" role="tab" aria-selected="false"><svg class="mode-ic" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><path d="M18.5 13l.85 2.55 2.55.85-2.55.85-.85 2.55-.85-2.55L17 16.4l2.55-.85z"/></svg>Done for you <span class="m-sub">from &euro;1,500</span></button>
     </div>
   </div>
 
@@ -1599,7 +1637,7 @@
     <span class="toggle-label" id="toggle-yearly-lbl" style="color:var(--t2);">Yearly <span class="savings-pill">Save 17%</span></span>
   </div>
 
-  <div class="mode-caption" id="modeCaption">Run it yourself &mdash; subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.</div>
+  <div class="mode-caption" id="modeCaption">Run it yourself: subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.</div>
 
   <!-- SELF-SERVE -->
   <div class="pricing-grid pricing-grid-modes" id="grid-self">
@@ -1656,16 +1694,39 @@
         <div class="savings-tag billing-yearly" style="display:none;">Save &#x20AC;598</div>
       </div>
       <div class="plan-sub-row">
-        <div class="plan-sub">All 5 engines &middot; the full picture.</div>
+        <div class="plan-sub">4 engines &middot; serious coverage.</div>
       </div>
       <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="growth">Subscribe</a>
       <div class="plan-checkout-note">Secure Stripe checkout</div>
       <div class="plan-features-label">Everything in Essentials, plus</div>
       <ul class="pricing-features">
         <li>150 commercial prompts</li>
-        <li><strong>All 5 AI engines</strong></li>
+        <li><strong>4 AI engines</strong> &middot; + Perplexity</li>
         <li>Daily/weekly refresh</li>
         <li>1 onboarding call + email support</li>
+      </ul>
+    </div>
+
+    <!-- Growth PRO -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow">&#x26A1; Power tier</div>
+      <div class="plan-name">BrandGEO Growth PRO</div>
+      <div class="plan-price-row">
+        <div class="plan-price billing-monthly">&#x20AC;449 <span>/mo</span></div>
+        <div class="plan-price billing-yearly" style="display:none;">&#x20AC;4,490 <span>/yr</span></div>
+        <div class="savings-tag billing-yearly" style="display:none;">Save &#x20AC;898</div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub">All 5 engines &middot; incl. Google AI Mode.</div>
+      </div>
+      <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="growth_pro">Subscribe</a>
+      <div class="plan-checkout-note">Secure Stripe checkout</div>
+      <div class="plan-features-label">Everything in Growth, plus</div>
+      <ul class="pricing-features">
+        <li><strong>Google AI Mode</strong> &middot; the 5th engine</li>
+        <li>Faster refresh &middot; priority queue</li>
+        <li>AI SEO: 30 pages &middot; AI Social: 3 channels</li>
+        <li>Instagram &amp; TikTok add-ons</li>
       </ul>
     </div>
 
@@ -1679,62 +1740,42 @@
       <div class="plan-eyebrow">&#x2B50; Most Popular</div>
       <div class="plan-name">BrandGEO Managed</div>
       <div class="plan-price-row">
-        <div class="plan-price billing-monthly">&#x20AC;900 <span>/mo</span></div>
-        <div class="plan-price billing-yearly" style="display:none;">&#x20AC;9,000 <span>/yr</span></div>
-        <div class="savings-tag billing-yearly" style="display:none;">+ setup waived</div>
+        <div class="plan-price billing-monthly">&#x20AC;1,500 <span>/mo</span></div>
+        <div class="plan-price billing-yearly" style="display:none;">&#x20AC;15,000 <span>/yr</span></div>
+        <div class="savings-tag billing-yearly" style="display:none;">Save &#x20AC;3,000</div>
       </div>
       <div class="plan-sub-row">
-        <div class="plan-sub billing-monthly">+ &#x20AC;1,250 setup &middot; <strong>waived on annual</strong></div>
-        <div class="plan-sub billing-yearly" style="display:none;"><strong>Setup fee waived</strong> &middot; annual commitment</div>
+        <div class="plan-sub">Done for you &middot; we run your AI visibility.</div>
       </div>
       <a href="#contact" class="btn-plan">Book Consultation</a>
       <div class="plan-checkout-note">&nbsp;</div>
-      <div class="plan-features-label">Everything in Growth, plus</div>
+      <div class="plan-features-label">Everything in Growth PRO, plus</div>
       <ul class="pricing-features">
         <li>AI visibility strategy + prompt research</li>
         <li>Competitor + website AI audit</li>
         <li>Monthly executive report + strategy call</li>
-        <li>Priority support</li>
+        <li>Priority support &middot; all channels managed</li>
       </ul>
     </div>
 
-    <!-- Pro -->
+    <!-- Custom Enterprise -->
     <div class="pricing-box">
       <div class="plan-eyebrow"></div>
-      <div class="plan-name">BrandGEO Pro</div>
+      <div class="plan-name">Custom Enterprise</div>
       <div class="plan-price-row">
-        <div class="plan-price-custom">From &#x20AC;1,500 <span>/mo</span></div>
+        <div class="plan-price-custom">Let&rsquo;s talk</div>
       </div>
       <div class="plan-sub-row">
-        <div class="plan-sub">Tailored to scale &middot; <strong>no setup fee</strong>.</div>
+        <div class="plan-sub">Tailored to your organisation &middot; custom scope.</div>
       </div>
       <a href="#contact" class="btn-plan ghost">Contact Sales</a>
       <div class="plan-checkout-note">&nbsp;</div>
       <div class="plan-features-label">Everything in Managed, plus</div>
       <ul class="pricing-features">
-        <li>Multiple countries &amp; brands</li>
-        <li>Larger prompt coverage</li>
-        <li>Executive reporting + add-ons</li>
-      </ul>
-    </div>
-
-    <!-- Enterprise -->
-    <div class="pricing-box">
-      <div class="plan-eyebrow"></div>
-      <div class="plan-name">Enterprise</div>
-      <div class="plan-price-row">
-        <div class="plan-price-custom">From &#x20AC;10,000 <span>/mo</span></div>
-      </div>
-      <div class="plan-sub-row">
-        <div class="plan-sub">Custom &middot; tailored to your organisation.</div>
-      </div>
-      <a href="#contact" class="btn-plan ghost">Contact Sales</a>
-      <div class="plan-checkout-note">&nbsp;</div>
-      <div class="plan-features-label">Everything in Pro, plus</div>
-      <ul class="pricing-features">
-        <li>Unlimited scale, all markets</li>
-        <li>White-label</li>
-        <li>Dedicated support</li>
+        <li>Multiple brands &amp; markets</li>
+        <li>More engines: Copilot, DeepSeek, Grok</li>
+        <li>White-label + dedicated support</li>
+        <li>Custom integrations &amp; SLAs</li>
       </ul>
     </div>
 
@@ -1778,7 +1819,7 @@
         <span class="latest-date">Jul 9, 2026</span>
       </div>
       <h3>Beyond &ldquo;Are We Mentioned?&rdquo;: The AI Visibility KPIs That Actually Matter</h3>
-      <p>Mention rate alone hides more than it shows &mdash; a practical framework for the KPIs that actually matter.</p>
+      <p>Mention rate alone hides more than it shows. Here's a practical framework for the KPIs that actually matter.</p>
     </a>
     <a href="/bg-014.html" class="latest-card">
       <div class="latest-card-top">
@@ -1786,7 +1827,7 @@
         <span class="latest-date">Jul 9, 2026</span>
       </div>
       <h3>Why Your Brand Might Be Invisible to AI Outside English</h3>
-      <p>Most AI models are trained overwhelmingly in English &mdash; what that means for global brand citations.</p>
+      <p>Most AI models are trained overwhelmingly in English, and here's what that means for global brand citations.</p>
     </a>
     <a href="/bg-013.html" class="latest-card">
       <div class="latest-card-top">
@@ -1794,7 +1835,7 @@
         <span class="latest-date">Jul 9, 2026</span>
       </div>
       <h3>How Often You Need to Publish to Stay Cited by AI</h3>
-      <p>Content under 30 days old earns up to 3.2x more AI citations &mdash; the real refresh cadence that keeps you cited.</p>
+      <p>Content under 30 days old earns up to 3.2x more AI citations, which points to the real refresh cadence that keeps you cited.</p>
     </a>
     <a href="/bg-012.html" class="latest-card">
       <div class="latest-card-top">
@@ -1802,7 +1843,7 @@
         <span class="latest-date">Jul 9, 2026</span>
       </div>
       <h3>AI Visibility vs. Brand Mentions: What&rsquo;s the Difference?</h3>
-      <p>A brand can be mentioned by ChatGPT and still be losing &mdash; mentions and AI Visibility measure different things.</p>
+      <p>A brand can be mentioned by ChatGPT and still be losing, because mentions and AI Visibility measure different things.</p>
     </a>
   </div>
   <div class="latest-more">
@@ -1831,23 +1872,23 @@
   <div class="faq-list">
     <details class="faq-item">
       <summary>What is GEO (Generative Engine Optimization)?</summary>
-      <p>GEO is the practice of measuring and improving how your brand appears in answers from AI engines like ChatGPT, Gemini, Claude, Perplexity and Meta AI &mdash; the new layer where customers get recommendations before they ever reach a website. It&rsquo;s what SEO was for Google, applied to AI answers.</p>
+      <p>GEO is the practice of measuring and improving how your brand appears in answers from AI engines like ChatGPT, Gemini, Claude, Perplexity and Meta AI. It's the new layer where customers get recommendations before they ever reach a website. It&rsquo;s what SEO was for Google, applied to AI answers.</p>
     </details>
     <details class="faq-item">
       <summary>Which AI engines does BrandGEO monitor?</summary>
-      <p>Five: ChatGPT, Gemini, Claude, Perplexity and Meta AI &mdash; all queried with live web search enabled, every week, using the exact prompts your customers actually ask.</p>
+      <p>Five: ChatGPT, Gemini, Claude, Perplexity and Meta AI, all queried with live web search enabled, every week, using the exact prompts your customers actually ask.</p>
     </details>
     <details class="faq-item">
       <summary>How is the AI Visibility Score calculated?</summary>
-      <p>It&rsquo;s a single 0&ndash;100 number across six dimensions: recognition, knowledge, sentiment, accuracy, reach and consistency. You can track the trend week over week and drill into any engine or dimension.</p>
+      <p>It&rsquo;s a single 0 to 100 number across six dimensions: recognition, knowledge, sentiment, accuracy, reach and consistency. You can track the trend week over week and drill into any engine or dimension.</p>
     </details>
     <details class="faq-item">
       <summary>How quickly do I get results?</summary>
-      <p>Your free audit lands within 48 hours &mdash; a full score, a per-engine breakdown, and a prioritised P0/P1/P2 fix list you can act on straight away.</p>
+      <p>Your free audit lands within 48 hours: a full score, a per-engine breakdown, and a prioritised P0/P1/P2 fix list you can act on straight away.</p>
     </details>
     <details class="faq-item">
       <summary>Can I cancel anytime?</summary>
-      <p>Yes. The self-serve software plans (Free, Essentials, Growth) can be upgraded, downgraded or cancelled anytime &mdash; no lock-in, no credit card required to start.</p>
+      <p>Yes. The self-serve software plans (Free, Essentials, Growth, Growth PRO) can be upgraded, downgraded or cancelled anytime, with no lock-in and no credit card required to start.</p>
     </details>
     <details class="faq-item">
       <summary>Do you offer a done-for-you option?</summary>
@@ -1864,7 +1905,7 @@
   <div class="contact-inner">
     <div class="section-label" style="display:inline-block;margin-bottom:12px;">Free audit</div>
     <h2>Request your free AI audit.</h2>
-    <p>Find out how visible your brand is across every major AI engine &mdash; free, no commitment, results within 48 hours.</p>
+    <p>Find out how visible your brand is across every major AI engine. Free, no commitment, results within 48 hours.</p>
     <form action="https://formsubmit.co/contact@getbrandgeo.com" method="POST">
       <input type="hidden" name="_subject" value="New BrandGEO Audit Request">
       <input type="hidden" name="_captcha" value="false">
@@ -1999,5 +2040,208 @@
 </footer>
 
 <script src="site.js"></script>
+<!-- ── AI KNOWLEDGE GRAPH (hero showpiece) ──────────────────────────────────
+     Vanilla 2D canvas. No libraries, no build step, ~5KB. Visualises the 5 AI
+     engines routing citation pulses into your brand node. Cursor-reactive
+     parallax + intensity. Honours prefers-reduced-motion (single static frame),
+     caps DPR, and pauses when the hero is off-screen or the tab is hidden. -->
+<script>
+(function () {
+  var canvas = document.getElementById('aiGraph');
+  if (!canvas) return;
+  var ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return; // silent fallback: orbs + grid remain
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var host = canvas.parentNode; // .hero-bg
+  var W = 0, H = 0, DPR = 1;
+
+  // Brand node + the 5 engines clustered in the hero's left/top negative space
+  // so the product card on the right stays clean (positions are normalised).
+  var brand = { bx: 0.50, by: 0.42, phase: 0, sp: 0.0 };
+  var engines = [
+    { name: 'ChatGPT',    bx: 0.15, by: 0.20, phase: 0.4, sp: 0.55 },
+    { name: 'Gemini',     bx: 0.31, by: 0.66, phase: 1.7, sp: 0.42 },
+    { name: 'Claude',     bx: 0.60, by: 0.15, phase: 2.9, sp: 0.60 },
+    { name: 'Perplexity', bx: 0.73, by: 0.52, phase: 4.1, sp: 0.48 },
+    { name: 'Meta AI',    bx: 0.09, by: 0.47, phase: 5.3, sp: 0.51 }
+  ];
+  var pulses = [];   // {ei, t, speed}
+  var particles = []; // ambient depth cloud
+
+  function palette() {
+    var light = document.documentElement.getAttribute('data-theme') === 'light';
+    return light ? {
+      violet: '139,92,246', teal: '0,168,150',
+      line: '90,70,190', label: '9,9,15',
+      lineA: 0.16, nodeA: 0.9, labelA: 0.42, particleA: 0.5
+    } : {
+      violet: '139,92,246', teal: '0,212,170',
+      line: '190,180,255', label: '255,255,255',
+      lineA: 0.11, nodeA: 1, labelA: 0.34, particleA: 0.6
+    };
+  }
+  var PAL = palette();
+
+  function resize() {
+    W = host.offsetWidth; H = host.offsetHeight;
+    DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  // seed ambient particles
+  for (var i = 0; i < 26; i++) {
+    particles.push({ x: Math.random(), y: Math.random(),
+      vx: (Math.random() - 0.5) * 0.00016, vy: (Math.random() - 0.5) * 0.00016,
+      r: 0.7 + Math.random() * 1.4, a: 0.25 + Math.random() * 0.5,
+      teal: Math.random() > 0.62 });
+  }
+
+  // pointer parallax + interaction intensity
+  var pTargetX = 0, pTargetY = 0, pX = 0, pY = 0;
+  var intensity = 0.35, intensityTarget = 0.35;
+  window.addEventListener('pointermove', function (e) {
+    pTargetX = (e.clientX / window.innerWidth) - 0.5;
+    pTargetY = (e.clientY / window.innerHeight) - 0.5;
+    intensityTarget = 1;
+  }, { passive: true });
+
+  function fadeR(xn) { // fade elements out toward the right (behind product card)
+    if (xn <= 0.55) return 1;
+    if (xn >= 0.92) return 0;
+    var t = (xn - 0.55) / 0.37; return 1 - (t * t * (3 - 2 * t));
+  }
+
+  function nodePos(n, t, depth) {
+    var dx = Math.sin(t * n.sp + n.phase) * 0.009;
+    var dy = Math.cos(t * n.sp * 0.9 + n.phase) * 0.009;
+    return {
+      x: (n.bx + dx) * W + pX * depth,
+      y: (n.by + dy) * H + pY * depth,
+      xn: n.bx + dx
+    };
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    var bp = nodePos(brand, t, 5);
+
+    // edges + travelling citation pulses
+    for (var e = 0; e < engines.length; e++) {
+      var np = nodePos(engines[e], t, 11);
+      var f = fadeR((np.xn + brand.bx) / 2);
+      // line
+      ctx.strokeStyle = 'rgba(' + PAL.line + ',' + (PAL.lineA * f).toFixed(3) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(np.x, np.y); ctx.lineTo(bp.x, bp.y); ctx.stroke();
+      // engine node
+      drawNode(np.x, np.y, 3.4, PAL.violet, PAL.nodeA * f * 0.9);
+      // label
+      if (f > 0.14) {
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(' + PAL.label + ',' + (PAL.labelA * f).toFixed(3) + ')';
+        ctx.fillText(engines[e].name, np.x + 8, np.y - 7);
+      }
+    }
+
+    // pulses
+    for (var p = pulses.length - 1; p >= 0; p--) {
+      var pu = pulses[p];
+      pu.t += pu.speed * (0.5 + intensity * 0.9);
+      if (pu.t >= 1) { pulses.splice(p, 1); brand.hit = 1; continue; }
+      var s = nodePos(engines[pu.ei], t, 11);
+      var f2 = fadeR((s.xn + brand.bx) / 2);
+      var px = s.x + (bp.x - s.x) * pu.t;
+      var py = s.y + (bp.y - s.y) * pu.t;
+      var col = pu.teal ? PAL.teal : PAL.violet;
+      drawNode(px, py, 2.2, col, (0.55 + intensity * 0.45) * f2);
+    }
+
+    // ambient particle cloud
+    for (var c = 0; c < particles.length; c++) {
+      var q = particles[c];
+      q.x += q.vx; q.y += q.vy;
+      if (q.x < 0) q.x = 1; if (q.x > 1) q.x = 0;
+      if (q.y < 0) q.y = 1; if (q.y > 1) q.y = 0;
+      var fx = fadeR(q.x);
+      var qx = q.x * W + pX * 16, qy = q.y * H + pY * 16;
+      ctx.fillStyle = 'rgba(' + (q.teal ? PAL.teal : PAL.violet) + ',' + (q.a * PAL.particleA * fx * 0.5).toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(qx, qy, q.r, 0, 6.2832); ctx.fill();
+    }
+
+    // brand node — the convergence target, with a soft reactive halo
+    var hit = brand.hit || 0;
+    var halo = 16 + hit * 10 + intensity * 6;
+    var g = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, halo);
+    g.addColorStop(0, 'rgba(' + PAL.violet + ',' + (0.5 + hit * 0.4).toFixed(2) + ')');
+    g.addColorStop(0.55, 'rgba(' + PAL.teal + ',0.12)');
+    g.addColorStop(1, 'rgba(' + PAL.violet + ',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(bp.x, bp.y, halo, 0, 6.2832); ctx.fill();
+    drawNode(bp.x, bp.y, 5.2, PAL.violet, 1);
+    ctx.strokeStyle = 'rgba(' + PAL.teal + ',' + (0.6 + hit * 0.4).toFixed(2) + ')';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(bp.x, bp.y, 9 + hit * 3, 0, 6.2832); ctx.stroke();
+    brand.hit *= 0.9;
+  }
+
+  function drawNode(x, y, r, rgb, a) {
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+    g.addColorStop(0, 'rgba(' + rgb + ',' + Math.min(a, 1).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r * 3, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = 'rgba(' + rgb + ',' + Math.min(a, 1).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+  }
+
+  var spawnAcc = 0, last = 0, running = false, rafId = 0;
+  function frame(now) {
+    if (!running) return;
+    var dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now;
+    var t = now / 1000;
+    // ease pointer + intensity
+    pX += (pTargetX - pX) * 0.06; pY += (pTargetY - pY) * 0.06;
+    intensityTarget = 0.35 + (intensityTarget - 0.35) * 0.95; // decay toward base
+    intensity += (intensityTarget - intensity) * 0.08;
+    // spawn pulses
+    spawnAcc += dt * (1.1 + intensity * 1.6);
+    while (spawnAcc >= 0.5) {
+      spawnAcc -= 0.5;
+      var ei = (Math.random() * engines.length) | 0;
+      pulses.push({ ei: ei, t: 0, speed: 0.006 + Math.random() * 0.004, teal: Math.random() > 0.5 });
+      if (pulses.length > 26) pulses.shift();
+    }
+    draw(t);
+    rafId = requestAnimationFrame(frame);
+  }
+  function start() { if (running) return; running = true; last = 0; rafId = requestAnimationFrame(frame); }
+  function stop() { running = false; if (rafId) cancelAnimationFrame(rafId); }
+
+  // init
+  resize();
+  requestAnimationFrame(function () { canvas.classList.add('is-live'); });
+
+  if (reduce) {
+    // one calm static frame — nodes + edges, no motion
+    for (var k = 0; k < 5; k++) pulses.push({ ei: k, t: 0.5, speed: 0, teal: k % 2 === 0 });
+    draw(0);
+  } else {
+    if ('ResizeObserver' in window) new ResizeObserver(function () { resize(); if (reduce) draw(0); }).observe(host);
+    else window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', function () { document.hidden ? stop() : start(); });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (ents) {
+        ents.forEach(function (en) { en.isIntersecting ? start() : stop(); });
+      }, { threshold: 0.04 }).observe(canvas);
+    } else { start(); }
+    // repaint palette on theme toggle
+    new MutationObserver(function () { PAL = palette(); }).observe(
+      document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+})();
+</script>
 </body>
 </html>
