@@ -126,12 +126,12 @@ def make(fname, kicker, lines, sub, stats, footer_note):
     img.save(out, "PNG")
     print("saved", out)
 
-make("bg-024-hero.png", "BG-024 · Trust & Safety",
-    [[("Guardrails", 'w')], [("without", 'g'), (" a CAPTCHA.", 'w')]],
-    ["A honeypot that lies to bots. IP rate limiting that never",
-     "stores a real IP. How our public audit stays protected."],
-    [("3", "audits per IP per day, enforced via a hash only", "IP_RATE_LIMIT_PER_DAY"),
-     ("0", "CAPTCHAs a real visitor ever solves", "guardPublicRequest, _prospect_guard.js"),
-     ("5", "origins explicitly allowlisted", "PUBLIC_ALLOWED_ORIGINS"),
-     ("202", "fake-success status code returned to a caught bot", "honeypot handling")],
-    "Public Endpoint Guardrails")
+make("bg-025-hero.png", "BG-025 · Cost Control",
+    [[("Why one spend limit", 'w')], [("wasn't", 'g'), (" enough.", 'w')]],
+    ["A monthly budget can't see a fast burst coming. Two",
+     "independent circuit breakers close that gap."],
+    [("2", "independent circuit breakers, scoped differently", "_prospect_guard.js"),
+     ("200 EUR", "default monthly budget ceiling", "checkMonthlyBudget"),
+     ("100", "global hourly request cap, deliberately generous", "checkGlobalHourlyLimit"),
+     ("0", "separate running counters — one source of truth", "derived live, not double-tracked")],
+    "Two Independent Circuit Breakers")
