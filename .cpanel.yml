@@ -2,5 +2,15 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/getbran1/getbrandgeo.com/
-    # Copy ONLY the generated dist/ contents to public_html
-    - /bin/cp -R dist/* $DEPLOYPATH
+    # cPanel Git Version Control runs these tasks sequentially in ONE shell
+    # session (exported vars persist across lines) from the checked-out repo
+    # root on every push. Previous version copied a dist/ folder that does
+    # not exist anywhere in this repo — this replaces that with a diff-based
+    # sync so ONLY files that actually changed under brandgeo/web/ (the real
+    # marketing-site source) get copied to the live docroot. Nothing else on
+    # the live server is touched.
+    - export MARKER="${DEPLOYPATH}.last_deploy_commit"
+    - export PREV=$(test -f "$MARKER" && cat "$MARKER" || git rev-list --max-parents=0 HEAD)
+    - git diff --name-only --diff-filter=ACMR "$PREV" HEAD -- brandgeo/web/ > /tmp/brandgeo_changed_files.txt
+    - for f in $(cat /tmp/brandgeo_changed_files.txt); do rel=${f#brandgeo/web/}; mkdir -p "$DEPLOYPATH$(dirname "$rel")"; cp "$f" "$DEPLOYPATH$rel"; done
+    - git rev-parse HEAD > "$MARKER"
