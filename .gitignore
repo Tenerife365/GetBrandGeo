@@ -1,6 +1,11 @@
 # brandgeo/ — ignore everything except the public website files
 brandgeo/*
 !brandgeo/web/
+# ...but never the deploy webhook secret or its log. These live only on the
+# server (uploaded by hand), must stay out of git, and must never be copied
+# into the public docroot by the webhook deploy.
+brandgeo/web/deploy-secret.php
+brandgeo/web/deploy.log
 
 
 # Secrets — never commit these
