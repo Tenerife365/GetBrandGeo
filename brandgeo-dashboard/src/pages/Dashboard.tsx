@@ -17,6 +17,7 @@ import {
   type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
+import { useChartTheme } from '../lib/chartTheme'
 import MotionCard from '../components/MotionCard'
 import Skeleton from '../components/Skeleton'
 import Collapse from '../components/Collapse'
@@ -132,6 +133,7 @@ export default function Dashboard() {
   const { t } = useI18n()
   const { getStartDate, timeRange } = useTimeFilter()
   const { theme } = useTheme()
+  const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'your brand'
   // Personalised, time-of-day greeting — "this is my dashboard" ownership touch.
   const greeting = (() => {
@@ -512,11 +514,11 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={llmData} margin={{ left: -20, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+                <XAxis dataKey="label" tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                  labelStyle={{ color: '#cbd5e1' }} itemStyle={{ color: '#94a3b8' }}
+                  contentStyle={chart.tooltipContent}
+                  labelStyle={chart.tooltipLabel} itemStyle={chart.tooltipItem}
                   formatter={(v: any) => [`${v}%`, 'Mention rate']}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
@@ -707,6 +709,9 @@ function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }
   tone?: 'neutral' | 'warn' | 'alert'; spark?: SparkPoint[]; connectNulls?: boolean
 }) {
   const valueColor = tone === 'alert' ? 'text-red-400' : tone === 'warn' ? 'text-amber-400' : 'text-white'
+  // The sparkline stroke was hardcoded #94a3b8, which measures 2.56:1 against a
+  // white page — below the 3:1 graphical minimum in light mode.
+  const chart = useChartTheme()
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-2 text-slate-500">
@@ -715,7 +720,7 @@ function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }
       </div>
       <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
       {spark && spark.length >= 2 && (
-        <Sparkline data={spark} color="#94a3b8" connectNulls={connectNulls} />
+        <Sparkline data={spark} color={chart.axisTick} connectNulls={connectNulls} />
       )}
       <p className="text-xs text-slate-500 mt-1.5 leading-snug">{sub}</p>
     </div>

@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
+import { motion } from 'motion/react'
 import { Smile, Meh, Frown, Bot, ChevronDown, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
@@ -19,6 +20,9 @@ import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { useChartTheme } from '../lib/chartTheme'
+import { staggerContainer } from '../lib/motion'
+import MotionCard from '../components/MotionCard'
 import { SentimentDot } from '../components/ScoreBadge'
 import type { LLMName, Sentiment } from '../types'
 
@@ -132,6 +136,7 @@ export default function BrandSentiment() {
   const { primaryMarket } = useMarket()
   const { activeClientId, activeClient, activeEngines } = useClient()
   const { getStartDate, timeRange } = useTimeFilter()
+  const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [events, setEvents] = useState<SentimentEvent[]>([])
@@ -231,9 +236,17 @@ export default function BrandSentiment() {
         </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
+      {/* Summary cards. Every card carries a border: the score card previously had
+          border-brand-500/30 while the other three had none at all, so the row read
+          as one boxed card next to three floating patches. The score card keeps the
+          brand-tinted border to mark it as the primary metric — the difference is now
+          the border's COLOUR, not its existence. Stagger entrance matches the other
+          insight pages (Dashboard, AI Visibility), which this page lacked entirely. */}
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
+        variants={staggerContainer} initial="hidden" animate="show"
+      >
+        <MotionCard stagger className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Sparkles size={12} className="text-brand-400" />
             <span className="text-xs text-slate-500">Sentiment score</span>
@@ -243,32 +256,32 @@ export default function BrandSentiment() {
             {score !== null && <span className="text-sm text-slate-500 font-normal">/100</span>}
           </div>
           <div className={`text-xs mt-0.5 ${scoreColor}`}>{scoreLabel}</div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
+        </MotionCard>
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Smile size={12} className="text-emerald-400" />
             <span className="text-xs text-slate-500">Positive</span>
           </div>
           <div className="text-2xl font-bold text-emerald-400 tabular-nums">{counts.positive}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
+        </MotionCard>
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Meh size={12} className="text-slate-400" />
             <span className="text-xs text-slate-500">Neutral</span>
           </div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{counts.neutral}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
+        </MotionCard>
+        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Frown size={12} className="text-red-400" />
             <span className="text-xs text-slate-500">Negative</span>
           </div>
           <div className="text-2xl font-bold text-red-400 tabular-nums">{counts.negative}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.negative)}% of mentions</div>
-        </div>
-      </div>
+        </MotionCard>
+      </motion.div>
 
       {total === 0 ? (
         <div className="bg-dark-800 rounded-xl py-16 text-center mb-6">
@@ -307,16 +320,16 @@ export default function BrandSentiment() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={engineData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="engine" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
+                    <XAxis dataKey="engine" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
                     <Tooltip
-                      contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                      labelStyle={{ color: '#cbd5e1', fontSize: 12 }}
-                      itemStyle={{ fontSize: 11 }}
+                      contentStyle={chart.tooltipContent}
+                      labelStyle={chart.tooltipLabel}
+                      itemStyle={chart.tooltipItem}
                       formatter={(v: any) => [`${v}%`]}
                     />
-                    <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 6 }} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 6 }} />
                     <Bar dataKey="Positive" stackId="s" fill="#10b981" radius={[0, 0, 0, 0]} maxBarSize={28} />
                     <Bar dataKey="Neutral" stackId="s" fill="#64748b" maxBarSize={28} />
                     <Bar dataKey="Negative" stackId="s" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={28} />
@@ -352,15 +365,15 @@ export default function BrandSentiment() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={trendData} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
-                    <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
+                    <XAxis dataKey="period" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip
-                      contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                      labelStyle={{ color: '#cbd5e1', fontSize: 11 }}
-                      itemStyle={{ fontSize: 11 }}
+                      contentStyle={chart.tooltipContent}
+                      labelStyle={chart.tooltipLabel}
+                      itemStyle={chart.tooltipItem}
                     />
-                    <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 8 }} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 8 }} />
                     <Line type="monotone" dataKey="Positive" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
                     <Line type="monotone" dataKey="Neutral" stroke="#64748b" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
                     <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
@@ -372,7 +385,10 @@ export default function BrandSentiment() {
 
           {/* Recent sentiment signals */}
           <div>
-            <h2 className="text-sm font-semibold text-slate-300 mb-3">Recent Sentiment Signals</h2>
+            {/* Matches the section-heading treatment used by the cards above —
+                this was text-sm/slate-300 while the sibling section headings on
+                the same screen were text-xs/uppercase/slate-400. */}
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Recent Sentiment Signals</h2>
 
             <div className="flex flex-wrap gap-2 mb-3">
               {(['all', 'positive', 'neutral', 'negative'] as const).map(s => (

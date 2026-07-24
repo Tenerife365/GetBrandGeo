@@ -17,6 +17,7 @@ import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { ENGINE_META } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
+import { useChartTheme } from '../lib/chartTheme'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
@@ -182,6 +183,7 @@ function buildEngineGroupData(
 export default function Competitors() {
   const { primaryMarket } = useMarket()
   const { activeClientId, activeClient, activeEngines } = useClient()
+  const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [data, setData] = useState<ReturnType<typeof computeData> | null>(null)
@@ -357,13 +359,13 @@ export default function Competitors() {
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={barData} margin={{ left: -20, bottom: 10, right: 8 }}>
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false}
+                <XAxis dataKey="name" tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false}
                   interval={0} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                  labelStyle={{ color: '#cbd5e1', fontSize: 12 }}
-                  itemStyle={{ color: '#94a3b8' }}
+                  contentStyle={chart.tooltipContent}
+                  labelStyle={chart.tooltipLabel}
+                  itemStyle={chart.tooltipItem}
                   labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName ?? ''}
                   formatter={(v: any) => [v, 'AI mentions']}
                 />
@@ -382,16 +384,16 @@ export default function Competitors() {
             <p className="text-[11px] text-slate-600 mb-3">% of prompts where each brand appears, per AI engine</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={engineGroupData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="engine" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
+                <XAxis dataKey="engine" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                  labelStyle={{ color: '#cbd5e1', fontSize: 12 }}
-                  itemStyle={{ fontSize: 11 }}
+                  contentStyle={chart.tooltipContent}
+                  labelStyle={chart.tooltipLabel}
+                  itemStyle={chart.tooltipItem}
                   formatter={(v: any) => [`${v}%`]}
                 />
-                <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 6 }} />
+                <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 6 }} />
                 {groupKeys.map((key, i) => (
                   <Bar key={key} dataKey={key} fill={groupColors[i]} radius={[3, 3, 0, 0]} maxBarSize={28} />
                 ))}
@@ -543,25 +545,25 @@ export default function Competitors() {
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+              <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
               <XAxis
                 dataKey="period"
-                tick={{ fill: '#64748b', fontSize: 10 }}
+                tick={{ fill: chart.axisTick, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: '#64748b', fontSize: 10 }}
+                tick={{ fill: chart.axisTick, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
               />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                labelStyle={{ color: '#cbd5e1', fontSize: 11 }}
-                itemStyle={{ fontSize: 11 }}
+                contentStyle={chart.tooltipContent}
+                labelStyle={chart.tooltipLabel}
+                itemStyle={chart.tooltipItem}
               />
-              <Legend wrapperStyle={{ fontSize: 10, color: '#94a3b8', paddingTop: 8 }} />
+              <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 8 }} />
               <Line
                 type="monotone"
                 dataKey={brandName}
