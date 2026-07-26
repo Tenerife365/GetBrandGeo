@@ -28,15 +28,20 @@ const GRANT_TYPE_LABELS: Record<string, string> = {
 }
 
 /** Plan ladder for the "plans as blocks" section — display prices only (source
- *  of truth for billing is Stripe / PRICING-SPEC.md). */
+ *  of truth for billing is Stripe / PRICING-STRATEGY-2026-07.md §2). 'pro' is
+ *  deliberately excluded here (legacy, no new signups — see planConfig.ts) and
+ *  re-appended dynamically below ONLY for a client still on it, so existing Pro
+ *  clients keep seeing their tier highlighted without it being offered to anyone
+ *  else as an upgrade target. */
 const PLAN_TIERS: { id: string; label: string; price: string }[] = [
   { id: 'free',       label: 'Free',       price: '€0' },
   { id: 'essentials', label: 'Essentials', price: '€99 / mo' },
   { id: 'growth',     label: 'Growth',     price: '€299 / mo' },
-  { id: 'managed',    label: 'Managed',    price: '€900 / mo' },
-  { id: 'pro',        label: 'Pro',        price: 'from €1,500 / mo' },
+  { id: 'growth_pro', label: 'Growth PRO', price: '€449 / mo' },
+  { id: 'managed',    label: 'Managed',    price: 'from €1,500 / mo' },
   { id: 'enterprise', label: 'Enterprise', price: 'Custom' },
 ]
+const PRO_TIER_LEGACY = { id: 'pro', label: 'Pro (legacy)', price: 'from €1,500 / mo' }
 
 function domainOf(url?: string | null): string | null {
   if (!url) return null
@@ -312,7 +317,14 @@ export default function Account() {
     ? (PLAN_LABELS[activeClient.plan as keyof typeof PLAN_LABELS] ?? activeClient.plan)
     : '—'
   const hasStripe = !!activeClient?.stripe_customer_id
-  const currentIdx = PLAN_TIERS.findIndex(p => p.id === activeClient?.plan)
+  // Show the legacy Pro block only for a client still on it (see PLAN_TIERS comment
+  // above). Insert it where planConfig.ts's PLAN_ORDER puts it, before Enterprise,
+  // not appended last — otherwise currentIdx lands on the final block and Enterprise
+  // stops reading as an upgrade for the one client type that can still be on Pro.
+  const displayedTiers = activeClient?.plan === 'pro'
+    ? PLAN_TIERS.flatMap(t => t.id === 'enterprise' ? [PRO_TIER_LEGACY, t] : [t])
+    : PLAN_TIERS
+  const currentIdx = displayedTiers.findIndex(p => p.id === activeClient?.plan)
 
   const upgradeTo = (tier: { id: string; label: string }) => {
     if (hasStripe) return openBilling()
@@ -362,7 +374,7 @@ export default function Account() {
   }
 
   const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50'
+  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-3xl mx-auto">
@@ -473,7 +485,7 @@ export default function Account() {
 
         {/* Plans as blocks — current highlighted, higher tiers upgradeable */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {PLAN_TIERS.map((tier, i) => {
+          {displayedTiers.map((tier, i) => {
             const isCurrent = tier.id === activeClient?.plan
             const isUpgrade = currentIdx >= 0 && i > currentIdx
             return (
