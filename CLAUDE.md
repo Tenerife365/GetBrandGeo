@@ -82,11 +82,15 @@ BG-001 through BG-019 are live in `brandgeo/web/` (19 `bg-*.html` files,
 counted). Recent `ROADMAP-*.md` and `linkedin-posts-*.md` live in `docs/`, not
 the repo root, per reorg commit `5326a59`.
 
-### Dashboard: committed 2026-07-26, NOT YET PUSHED
+### Dashboard: shipped and verified live 2026-07-26
 
-Three commits sit on local `main` unpushed, so they are not live. Pushing is the
-first dashboard deploy since `2c0f281` (2026-07-24) and Netlify WILL build this
-time, because `brandgeo-dashboard/` finally changed.
+Pushed, built by Netlify, and confirmed against the running bundle. This was the
+first dashboard deploy since `2c0f281` (2026-07-24). The served bundle is
+`index-DzC066bP.js`; its prices read €0, €99, €299, €449, from €1,500, `€900` is
+gone, and `Pro (legacy)` and `promotions-admin` are both present. An
+unauthenticated POST to `/.netlify/functions/promotions-admin` returns
+`401 Unauthorized: missing token`, so the function deployed and its auth gate
+works.
 
 - `34e41bb` `fix(app)`: aligns `PLAN_TIERS` with the 2026 ladder (Free,
   Essentials €99, Growth €299, Growth PRO €449, Managed from €1,500, Enterprise
@@ -101,12 +105,16 @@ time, because `brandgeo-dashboard/` finally changed.
   `requireAuth({ adminOnly: true })`), plus `db/supabase-promotions-migration.sql`.
 - `97b3723` `docs`: superseded by this restore, see the note at the end.
 
-**The promotions migration has NOT been applied.** Until it is, every query fails
-with Postgres 42P01 and `promotions-admin.js` returns 404, which is the exact
-signal `PromotionsPanel.tsx` keys its "backend isn't deployed yet" banner off
-(`:77`, `:113`, `:124`). Deploying ahead of the migration is safe and degrades
-visibly. Nothing on the checkout path reads the table and no Stripe coupon is
-created, so applying it cannot change what any customer is charged.
+**The promotions migration was APPLIED 2026-07-26** and verified: `pg_policies`
+returns exactly three rows for `promotions` (`promotions_select`,
+`promotions_insert`, `promotions_update`). There is no delete policy by design,
+so promotions deactivate and never disappear, and `promotions-admin.js` exposes
+no delete action to match. `db/supabase-promotions-migration.sql` is now a record
+of a migration already run, like the rest of `db/`, and is safe to re-run.
+
+The table records which promotions exist. It prices nothing. Nothing on the
+checkout path reads it and no Stripe coupon is created, so no promotion created
+here changes what any customer is charged until the Stripe wiring is built.
 
 `promotions-admin.js` validates plans against `_cost.js`, not `_plans.js`.
 Validating against the drifted mirror would reject a promo targeting Growth PRO,
@@ -168,10 +176,11 @@ Ordered. Top item costs money today.
 - [ ] **Fix `_plans.js` drift (C1 and C2).** A paying Growth customer is promised
       an engine they do not receive, and the €449 tier cannot be sold or
       assigned. `bg-verify` first, then `bg-backend`.
-- [ ] **Push `34e41bb` and `3dadd8b`**, then apply
-      `db/supabase-promotions-migration.sql`. Until the push the pricing mismatch
-      is still live; until the migration the Promotions panel shows its "not
-      deployed yet" banner (correct, not a bug).
+- [ ] **Confirm the Promotions panel renders for an admin** on the live Account
+      page: the amber "backend isn't deployed yet" banner should be gone and
+      replaced by "No promotions yet." plus a New promotion button. Everything
+      either side of that call is verified; this last hop needs an admin login,
+      which no agent has.
 - [ ] **Run B1 (`bg-verify`) before any product build**, mandate widened to
       adjudicate C1/C2 and to independently confirm the `role` provisioning path.
       `provision-account.js:57` writes `role: 'viewer'` and `signup-client.js:21`
@@ -195,6 +204,10 @@ Ordered. Top item costs money today.
 - [ ] Shared authentication / SSO with TalentWeLove and RecruiterAI portals.
 
 Closed 2026-07-26:
+- ~~Dashboard plan ladder vs marketing site pricing mismatch.~~ `34e41bb` shipped
+  and is live; the served bundle no longer contains €900.
+- ~~Promotions panel had no backend.~~ `3dadd8b` shipped `promotions-admin.js`
+  and the migration is applied and verified.
 - ~~Confirm cPanel re-upload of `index.html` + `site.js` (CSP fix landing).~~
   Verified live, see Deploy pipelines above.
 - ~~Scheduled background triggers for engine evaluation runs.~~ Already built:
