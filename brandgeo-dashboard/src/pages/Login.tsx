@@ -7,17 +7,24 @@ import SocialAuthButtons from '../components/SocialAuthButtons'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
+// Unauthenticated shell, so the wordmark links to the marketing site, NOT to "/"
+// — that route is gated and would bounce straight back here. Before this the only
+// way off the sign-in screen was the browser back button.
 function BrandGeoLogo() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   return (
-    <div className="flex items-center gap-2.5">
-      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '40px', width: 'auto', display: 'block' }} />
+    <a
+      href="https://getbrandgeo.com"
+      aria-label="BrandGEO — go to getbrandgeo.com"
+      className="flex items-center gap-2.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
+      <img src="/logo.png" alt="" style={{ height: '40px', width: 'auto', display: 'block' }} />
       <span className="text-2xl font-bold tracking-tight">
         <span className={isDark ? 'text-white' : 'text-slate-900'}>Brand</span>
         <span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
       </span>
-    </div>
+    </a>
   )
 }
 

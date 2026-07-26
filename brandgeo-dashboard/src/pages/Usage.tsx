@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { DollarSign, TrendingUp, Cpu } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -109,7 +110,16 @@ export default function Usage() {
     load()
   }, [isAdmin, timeRange]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!isAdmin) return null
+  // A viewer who reaches /usage by URL used to get a blank screen. The route is
+  // hidden from their sidebar and the data is enforced server-side regardless,
+  // so this is presentation only — it explains and offers a way out, matching
+  // Onboard.tsx's handling of the same case.
+  if (!isAdmin) return (
+    <div className="p-8 text-slate-500 text-sm">
+      Access restricted to admins.{' '}
+      <Link to="/" className="text-brand-400 hover:text-brand-300 font-medium">Back to Dashboard</Link>
+    </div>
+  )
 
   const grandTotal     = rows.reduce((s, r) => s + r.totalCost, 0)
   const grandResponses = rows.reduce((s, r) => s + r.totalResponses, 0)

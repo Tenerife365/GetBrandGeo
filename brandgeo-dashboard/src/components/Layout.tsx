@@ -20,17 +20,26 @@ import { useCollection } from '../lib/collectionContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import type { TimeRange } from '../lib/timeFilterContext'
 
-function BrandGeoLogo() {
+// The wordmark is a link to Overview in both shells (sidebar + mobile header).
+// It used to be an inert <div>, so the most-clicked "take me home" affordance on
+// the web did nothing here. img alt is empty on purpose: the wordmark text that
+// follows already names the brand, and the link carries its own aria-label.
+function BrandGeoLogo({ onNavigate }: { onNavigate?: () => void }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   return (
-    <div className="flex items-center gap-2">
-      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '32px', width: 'auto', display: 'block' }} />
+    <NavLink
+      to="/"
+      onClick={onNavigate}
+      aria-label="BrandGEO — go to Overview"
+      className="flex items-center gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
+      <img src="/logo.png" alt="" style={{ height: '32px', width: 'auto', display: 'block' }} />
       <div className="leading-none">
         <span className={`font-bold text-base tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Brand</span>
         <span className="font-bold text-base tracking-tight" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
       </div>
-    </div>
+    </NavLink>
   )
 }
 
@@ -236,7 +245,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const closeSidebar = () => setSidebarOpen(false)
   // The profile page has no historical data, so hide the global time-filter bar there.
-  const hideTimeFilter = useLocation().pathname === '/account'
+  const { pathname } = useLocation()
+  const hideTimeFilter = pathname === '/account'
+
+  // Scroll resets to the top on every route change. <main> is the scroll
+  // container (not the window), so this resets that element, and react-router's
+  // <ScrollRestoration> is not an option here — it requires a data router and
+  // this app mounts <BrowserRouter>. Without this, arriving on a page mid-scroll
+  // lands the reader below the H1 and the headline stats.
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [pathname])
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
@@ -268,7 +286,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Logo */}
         <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
-          <BrandGeoLogo />
+          <BrandGeoLogo onNavigate={closeSidebar} />
           <div className="flex items-center gap-2">
             <AdminBell />
             {isDemoMode && (
@@ -708,7 +726,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         )}
 
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
           <ClientBanner />
           {children}
         </main>
