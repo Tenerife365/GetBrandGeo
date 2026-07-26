@@ -257,14 +257,27 @@ presses it, sees the spinner flash, and gets nothing. This is the single worst
 moment on the activation path, because it is the one place the user does the
 right thing and the product appears to break.
 
-`_enqueue.js` returns four other skip reasons through the same silent branch:
-`'client not found'` (`:69`), `'no active engines'` (`:80`),
-`'nothing to collect (already up to date)'` (`:177`), and two insert-failure
-reasons (`:185`, `:204`). The 429 responses from `enqueue-collection.js:47` and
-`:59` (cooldown and budget) also land here, because
-`collectionContext.tsx:89`-`:98` parses the body without checking
-`resp.status`, so a 429's `error` and `reason` fields fall into the same
-`resp.skipped || !resp.run_id` branch and are console-logged.
+**Nine distinct outcomes drain through that one branch.** The 429s land there
+too, because `collectionContext.tsx:89`-`:98` parses the response body without
+ever checking `resp.status`, so a 429's `error` and `reason` fall into the same
+`resp.skipped || !resp.run_id` test. The complete list, for `bg-design` to map to
+surfaces without recounting:
+
+| # | Outcome | Source |
+|---|---|---|
+| 1 | `'client not found'` | `_enqueue.js:69` |
+| 2 | `'no active engines'` | `_enqueue.js:80` |
+| 3 | `'no active prompts'` | `_enqueue.js:90` |
+| 4 | `'nothing to collect (already up to date)'` | `_enqueue.js:177` |
+| 5 | `run insert failed: <msg>` | `_enqueue.js:185` |
+| 6 | `jobs insert failed: <msg>` | `_enqueue.js:204` |
+| 7 | 429 cooldown, carries `retry_after_hours` and `next_available_at` | `enqueue-collection.js:47` |
+| 8 | 429 budget or hourly ceiling | `enqueue-collection.js:59` |
+| 9 | `!resp`, the fetch itself failed or returned unparseable JSON | `collectionContext.tsx:98`, `:102` |
+
+They are not one message. 3 is a setup gap, 4 is success, 7 and 8 are plan
+limits, and 1, 5, 6 and 9 are faults. A single generic failure string would be
+wrong for at least five of the nine.
 
 **Contract for the builder:** `runCollection` must surface a typed outcome to
 its caller rather than swallowing it. The reason strings above are the
@@ -468,14 +481,34 @@ protect SerpApi spend." `_cost.js:112` enforces the four. The customer is
 promised an engine the product will never collect for them, in writing, at the
 moment they pay more.
 
-A third, latent: `PLAN_BLURB` (`_plans.js:38`-`:45`) has no `growth_pro` key, so
-`planUnlocks('growth_pro').blurb` would be `undefined` and the notification body
-would render an empty section. Unreachable today only because C1 blocks the plan
-from ever being set.
+**C3. An unrecognised plan does not fail loudly. It silently becomes Free.**
+This was verified by execution, not by reading; the evidence is in
+`docs/qa/plans-divergence-b1.md`. `planUnlocks()` opens with
+`const key = isValidPlan(plan) ? plan : 'free'` (`_plans.js:58`), so every fact it
+returns for `growth_pro` is Free's: one engine, and the blurb "A single AI engine
+(ChatGPT) so you can see where your brand stands." `planRank('growth_pro')`
+returns `0` for the same reason (`:51`-`:54` returns `0` when the plan is not in
+`PLAN_ORDER`), so `set-client-plan.js:47`-`:48` would classify a move from Growth
+to Growth PRO as a **downgrade**. `PLAN_LABELS['growth_pro']` is `undefined`,
+making `set-client-plan.js:150`'s `plan_grant_note` read "undefined trial".
+
+This is more dangerous than the missing-key case, because nothing anywhere throws
+or renders blank. A €449 tier would be described to its buyer as a one-engine
+Free plan, in a downgrade-toned email. It is latent today only because C1 stops
+the plan from being set through the one path that writes it, which means the fix
+for C1 must not land before the fix for C3, or assigning Growth PRO starts
+working and immediately sends that email.
 
 ### 3.4 Fix direction
 
 Stated as a specification, not as code. For `bg-backend`, after `bg-verify`.
+`bg-verify` has since run this section's checks by execution; the evidence and
+the harness are in `docs/qa/plans-divergence-b1.md`.
+
+**Land items 1 to 3 as one commit.** Do not fix `isValidPlan` on its own. C1 is
+currently the thing preventing C3 from reaching a customer, so unblocking
+Growth PRO assignment before the ladder and blurb are correct converts a latent
+defect into a sent email describing a €449 plan as one-engine Free.
 
 1. Regenerate `_plans.js`'s `PLAN_ORDER`, `PLAN_LABELS` and `PLAN_BLURB` from
    `planConfig.ts:159`, `:161`-`:169`, adding `growth_pro` in ladder position 3.
