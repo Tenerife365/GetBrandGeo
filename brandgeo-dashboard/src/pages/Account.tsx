@@ -13,6 +13,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS, PLAN_ORDER, type Plan } from '../lib/planConfig'
 import BrandLogo from '../components/BrandLogo'
+import PromotionsPanel from '../components/PromotionsPanel'
 
 interface ClientEvent {
   id: number
@@ -641,6 +642,9 @@ export default function Account() {
           )}
         </div>
       )}
+
+      {/* Promotions (admin, platform-wide — PRICING-STRATEGY-2026-07.md §8, §12 T2b) */}
+      {isAdmin && <PromotionsPanel />}
 
       {/* Change email */}
       <div className="bg-dark-800 rounded-xl p-6 mb-6">

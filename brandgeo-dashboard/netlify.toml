@@ -99,6 +99,12 @@
 [functions."set-client-billing"]
   timeout = 15
 
+# Admin-only: platform-wide promotion codes (list / create / toggle). One DB op
+# per call, so the default would do; 15s matches the other admin endpoints and
+# leaves room for a cold start.
+[functions."promotions-admin"]
+  timeout = 15
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26
