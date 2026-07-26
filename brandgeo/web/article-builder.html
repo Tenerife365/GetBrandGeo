@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BrandGEO — Article Builder</title>
+  <title>BrandGEO: Article Builder</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
@@ -96,7 +96,7 @@
   <!-- ══════════ LEFT: FORM ══════════ -->
   <div class="panel">
     <div class="panel-title">📝 Article Builder</div>
-    <div class="panel-sub">BrandGEO Research™ — fill in, generate, copy HTML + blog card.</div>
+    <div class="panel-sub">BrandGEO Research™: fill in, generate, copy HTML + blog card.</div>
 
     <div class="steps-hint">
       <strong>How to publish:</strong>
@@ -201,14 +201,14 @@
     <div class="output-pane" id="pane-blog">
       <div class="blog-card-pane">
         <div class="blog-card-section">
-          <div class="blog-card-label">Grid Card — paste into blog.html</div>
+          <div class="blog-card-label">Grid Card: paste into blog.html</div>
           <div class="blog-card-instructions">
             Find the matching <strong>BG-00X "coming soon"</strong> card in blog.html and replace it with this block. If there's no placeholder for this ID yet, paste it inside the <code>&lt;div class="posts-grid"&gt;</code>.
           </div>
           <pre class="blog-card-code" id="blogCardCode">← Generate HTML first</pre>
         </div>
         <div class="blog-card-section">
-          <div class="blog-card-label">Featured Card — optional, replaces the top hero</div>
+          <div class="blog-card-label">Featured Card: optional, replaces the top hero</div>
           <div class="blog-card-instructions">
             Only use this if you want to make the new article the <strong>Featured Research</strong> at the top of blog.html. Replace the existing <code>&lt;a href="..." class="featured-card"&gt;</code> block.
           </div>
@@ -246,7 +246,7 @@ function addSection(heading='', body='') {
       <input type="text" class="sec-heading" placeholder="e.g. The Shift Nobody Saw Coming" value="${heading}">
     </div>
     <div class="field">
-      <label>Body — new line = new paragraph · • for bullets · > for blockquote · *word* for bold</label>
+      <label>Body: new line = new paragraph · • for bullets · > for blockquote · *word* for bold</label>
       <textarea class="sec-body" rows="6" placeholder="Paragraph one.\n\n• Bullet one\n• Bullet two\n\n> Key insight quote">${body}</textarea>
     </div>`;
   c.appendChild(div);
@@ -400,9 +400,9 @@ function generate() {
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>${id} — ${titlePlain} | BrandGEO Research™</title>
+  <title>${id}: ${titlePlain} | BrandGEO Research™</title>
   <meta name="description" content="${subtitle}">
-  <meta property="og:title" content="${id}: ${titlePlain} — BrandGEO Research™">
+  <meta property="og:title" content="${id}: ${titlePlain} | BrandGEO Research™">
   <meta property="og:description" content="${subtitle}">
   <meta property="og:type" content="article">
   <meta property="article:published_time" content="${pubDate}">${ogImage}
@@ -522,7 +522,7 @@ function generate() {
 
     <div class="cta-box">
       <h3>See how visible your brand is to AI engines</h3>
-      <p>Get your free AI Visibility Snapshot — delivered within 48 hours, no commitment.</p>
+      <p>Get your free AI Visibility Snapshot, delivered within 48 hours, no commitment.</p>
       <a href="/#contact" class="cta-btn">Request Free Audit →</a>
     </div>
   </div>
@@ -575,7 +575,7 @@ function generate() {
     </div>`;
 
   const findingPills = findings.slice(0,4).map(f =>
-    `<span class="finding-pill">${f.stat}${f.stat && f.desc ? ' — ' : ''}${f.desc}</span>`
+    `<span class="finding-pill">${f.stat}${f.stat && f.desc ? ': ' : ''}${f.desc}</span>`
   ).join('\n        ');
 
   const featuredCard = `<a href="/${filename}" class="featured-card">

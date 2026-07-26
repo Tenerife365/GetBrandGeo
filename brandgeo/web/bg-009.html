@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BG-009 — How ChatGPT Actually Decides Which Brands to Recommend | BrandGEO Research™</title>
+  <title>BG-009: How ChatGPT Actually Decides Which Brands to Recommend | BrandGEO Research™</title>
   <meta name="description" content="ChatGPT only searches the live web on 34.5% of queries. The other 65% run on training data alone. Here's the mechanics of both paths.">
-  <meta property="og:title" content="How ChatGPT Actually Decides Which Brands to Recommend — BrandGEO Research™">
+  <meta property="og:title" content="How ChatGPT Actually Decides Which Brands to Recommend | BrandGEO Research™">
   <meta property="og:description" content="A mechanics deep-dive into ChatGPT's web_search_preview tool, its retrieval-to-citation funnel, and the open question of whether it evaluates brands live or leans on training-data bias.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-009-hero.png">
@@ -21,7 +21,7 @@
     "@context": "https://schema.org",
     "@type": "Article",
     "headline": "How ChatGPT Actually Decides Which Brands to Recommend",
-    "description": "BrandGEO Research: a mechanics deep-dive into how ChatGPT's web_search_preview tool retrieves, filters, and cites sources — and the open question of whether its brand recommendations are driven by live evaluation or training-data bias.",
+    "description": "BrandGEO Research: a mechanics deep-dive into how ChatGPT's web_search_preview tool retrieves, filters, and cites sources, and the open question of whether its brand recommendations are driven by live evaluation or training-data bias.",
     "image": "https://getbrandgeo.com/images/bg-009-hero.png",
     "datePublished": "2026-07-09",
     "author": {"@type": "Organization", "name": "BrandGEO Research"},
@@ -204,7 +204,7 @@
     <span class="badge-tag">GEO</span>
   </div>
   <h1>How ChatGPT Actually Decides <em>Which Brands to Recommend</em></h1>
-  <p class="article-subtitle">Most ChatGPT answers never touch the live web at all. Here's what happens on the query that does — and the query that doesn't.</p>
+  <p class="article-subtitle">Most ChatGPT answers never touch the live web at all. Here's what happens on the query that does, and the query that doesn't.</p>
   <div class="article-meta">
     <span class="meta-item"><strong>BrandGEO Research</strong></span>
     <span class="meta-item">July 9, 2026</span>
@@ -214,17 +214,17 @@
 </div>
 
 <div class="article-hero">
-  <img src="/images/bg-009-hero.png" alt="How ChatGPT decides which brands to recommend — the split between queries answered from training data and queries that trigger a live web_search_preview call, and what happens to a page once it's retrieved." loading="eager">
+  <img src="/images/bg-009-hero.png" alt="How ChatGPT decides which brands to recommend: the split between queries answered from training data and queries that trigger a live web_search_preview call, and what happens to a page once it's retrieved." loading="eager">
 </div>
 
 <!-- KEY FINDINGS -->
 <div class="findings-bar">
   <div class="findings-inner">
-    <div class="findings-label">● Key Findings — BG-009</div>
+    <div class="findings-label">● Key Findings: BG-009</div>
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">34.5%</div>
-        <div class="finding-desc">Of ChatGPT queries actually trigger a live web search — down from 46% in late 2024</div>
+        <div class="finding-desc">Of ChatGPT queries actually trigger a live web search, down from 46% in late 2024</div>
       </div>
       <div class="finding">
         <div class="finding-number">15%</div>
@@ -246,20 +246,20 @@
 <div class="article-body">
 
   <h2 id="direct-answer">The direct answer</h2>
-  <p>ChatGPT doesn't evaluate every brand recommendation live. Most of the time, it doesn't search the web at all — it answers from what it already learned during training, which means the brands it names are whatever names showed up most, and most positively, in that training data. Only when a query needs something training data can't supply does ChatGPT open its <strong>web_search_preview</strong> tool, retrieve a batch of live pages, and cite a small fraction of what it read. Two genuinely different processes produce a "ChatGPT recommended you" outcome, and they reward almost entirely different things — which is the part most brand-visibility advice skips.</p>
+  <p>ChatGPT doesn't evaluate every brand recommendation live. Most of the time, it doesn't search the web at all. It answers from what it already learned during training, which means the brands it names are whatever names showed up most, and most positively, in that training data. Only when a query needs something training data can't supply does ChatGPT open its <strong>web_search_preview</strong> tool, retrieve a batch of live pages, and cite a small fraction of what it read. Two genuinely different processes produce a "ChatGPT recommended you" outcome, and they reward almost entirely different things, which is the part most brand-visibility advice skips.</p>
 
   <h2 id="does-it-search">Does ChatGPT even search the web for your recommendation query?</h2>
-  <p>Per OpenAI's own developer documentation, the <code>web_search_preview</code> and <code>web_search</code> tools support two distinct modes. Non-reasoning search sends the query straight to the search tool and passes along whatever comes back — fast, and with no real planning behind it. Agentic search, used by reasoning models, actively manages the process: it runs searches as part of its own chain of thought, reads what comes back, and decides whether to search again before answering. Either way, search is a tool the model chooses to invoke, not a step every query passes through.</p>
-  <p>That choice is selective, and it's trending more selective over time. Per Semrush's 17-month clickstream analysis of ChatGPT traffic, the web search feature was enabled on just <strong>34.5% of queries as of February 2026 — down from 46% in late 2024</strong>. In practice, search tends to trigger for anything time-sensitive or fact-dependent — "who's the best X right now," current pricing, recent reviews — and stays off for queries a model could have answered the same way two years ago, which it answers from parametric memory alone.</p>
-  <p>The stakes of that decision are real. OpenAI's own GPT-5 evaluation data, cross-checked against an independent peer-reviewed analysis published in a medical-writing journal, shows the model's hallucination rate on fact-seeking tasks at roughly 47% with browsing disabled, dropping to about 9.6% with browsing enabled — a reduction bigger than switching to an entirely different model. A brand named in a no-browsing answer is a brand the model is recalling, not verifying.</p>
+  <p>Per OpenAI's own developer documentation, the <code>web_search_preview</code> and <code>web_search</code> tools support two distinct modes. Non-reasoning search sends the query straight to the search tool and passes along whatever comes back: fast, with no real planning behind it. Agentic search, used by reasoning models, actively manages the process: it runs searches as part of its own chain of thought, reads what comes back, and decides whether to search again before answering. Either way, search is a tool the model chooses to invoke, not a step every query passes through.</p>
+  <p>That choice is selective, and it's trending more selective over time. Per Semrush's 17-month clickstream analysis of ChatGPT traffic, the web search feature was enabled on just <strong>34.5% of queries as of February 2026, down from 46% in late 2024</strong>. In practice, search tends to trigger for anything time-sensitive or fact-dependent ("who's the best X right now," current pricing, recent reviews) and stays off for queries a model could have answered the same way two years ago, which it answers from parametric memory alone.</p>
+  <p>The stakes of that decision are real. OpenAI's own GPT-5 evaluation data, cross-checked against an independent peer-reviewed analysis published in a medical-writing journal, shows the model's hallucination rate on fact-seeking tasks at roughly 47% with browsing disabled, dropping to about 9.6% with browsing enabled, a reduction bigger than switching to an entirely different model. A brand named in a no-browsing answer is a brand the model is recalling, not verifying.</p>
 
   <h2 id="funnel">The retrieval-to-citation funnel: what happens once it does search</h2>
-  <p>When search does trigger, most of what gets retrieved never makes it into the answer. AirOps analyzed 548,534 pages retrieved across 15,000 original prompts — a set that expanded to 43,233 queries once ChatGPT's own follow-up "fan-out" searches were counted, since 89.6% of prompts triggered two or more sub-searches. Of everything retrieved across that whole process, <strong>ChatGPT cited only 15%</strong>. The other 85% was pulled in, evaluated against the query, and discarded.</p>
-  <p>Ranking well on Google helps, but it isn't close to sufficient. The same study found pages ranked #1 on Google get cited by ChatGPT 43.2% of the time — 3.5x more often than pages outside the top 20 — which still means fewer than half of the single best-ranked pages for a query end up cited. And nearly a third of all citations (32.9%) came from ChatGPT's own fan-out queries, not the prompt's original keywords — meaning a page can be irrelevant to what the user literally typed and still get cited, if it answers the sub-question ChatGPT generated on its own.</p>
+  <p>When search does trigger, most of what gets retrieved never makes it into the answer. AirOps analyzed 548,534 pages retrieved across 15,000 original prompts, a set that expanded to 43,233 queries once ChatGPT's own follow-up "fan-out" searches were counted, since 89.6% of prompts triggered two or more sub-searches. Of everything retrieved across that whole process, <strong>ChatGPT cited only 15%</strong>. The other 85% was pulled in, evaluated against the query, and discarded.</p>
+  <p>Ranking well on Google helps, but it isn't close to sufficient. The same study found pages ranked #1 on Google get cited by ChatGPT 43.2% of the time (3.5x more often than pages outside the top 20), which still means fewer than half of the single best-ranked pages for a query end up cited. And nearly a third of all citations (32.9%) came from ChatGPT's own fan-out queries, not the prompt's original keywords, meaning a page can be irrelevant to what the user literally typed and still get cited, if it answers the sub-question ChatGPT generated on its own.</p>
 
   <h2 id="what-it-trusts">What ChatGPT actually trusts once it looks</h2>
-  <p>Two signals dominate what survives that 15% cut: where the content lives, and how recently it changed. On source type, per Muck Rack's May 2026 analysis of over 25 million cited links across ChatGPT, Claude, and Gemini spanning 17 industries, <strong>earned, third-party media accounts for 84% of all AI citations</strong> — a figure that lines up closely with University of Toronto researchers' independent controlled experiments across AI search platforms, which put the earned-media share at 82-89%. Wikipedia, LinkedIn, Reddit, and established editorial domains dominate the source pool ChatGPT actually draws from; brand-owned pages are structurally underrepresented relative to how much brands invest in them.</p>
-  <p>On recency, per ConvertMate's analysis of ChatGPT citation patterns, <strong>76.4% of ChatGPT citations come from content updated within the last 30 days</strong> — the strongest recency preference measured of any major AI engine when cross-checked against Ahrefs' separate 17-million-citation freshness study. A page's age matters less than when it was last meaningfully touched.</p>
+  <p>Two signals dominate what survives that 15% cut: where the content lives, and how recently it changed. On source type, per Muck Rack's May 2026 analysis of over 25 million cited links across ChatGPT, Claude, and Gemini spanning 17 industries, <strong>earned, third-party media accounts for 84% of all AI citations</strong>, a figure that lines up closely with University of Toronto researchers' independent controlled experiments across AI search platforms, which put the earned-media share at 82-89%. Wikipedia, LinkedIn, Reddit, and established editorial domains dominate the source pool ChatGPT actually draws from; brand-owned pages are structurally underrepresented relative to how much brands invest in them.</p>
+  <p>On recency, per ConvertMate's analysis of ChatGPT citation patterns, <strong>76.4% of ChatGPT citations come from content updated within the last 30 days</strong>, the strongest recency preference measured of any major AI engine when cross-checked against Ahrefs' separate 17-million-citation freshness study. A page's age matters less than when it was last meaningfully touched.</p>
 
   <div class="callout teal">
     <div class="callout-label">The reframe</div>
@@ -267,9 +267,9 @@
   </div>
 
   <h2 id="contested">The open question: live evaluation, or incumbent bias?</h2>
-  <p>This is the point where the research genuinely splits, and it's worth stating both sides rather than picking the one that sells better. One camp — most GEO advice, including much of what's above — treats ChatGPT's recommendations as the output of a live evaluation: retrieve, filter, weigh authority and freshness, cite the winners. That model is real and well-documented for the 34.5% of queries that actually search.</p>
-  <p>The other camp points at what happens the other 65.5% of the time. A 2026 academic paper on "Incumbent Advantage" in LLM recommendation systems documents a phenomenon its authors call the <strong>Conditional Monopoly</strong>: when compared options are roughly equivalent, well-known brands get recommended close to 100% of the time — not because a live signal favored them, but because they're simply better-represented, more positively, in the training data. That dominance can evaporate the moment a competitor gets even a marginal edge (the paper cites a swing from a small rating advantage), which suggests the bias is a soft default rather than a hard lock — but a default is still what most no-search answers are running on. Separate bias research adds a related wrinkle: LLMs are tuned to avoid recommending anything that reads as controversial or unverified, which mechanically favors brands already large enough to be "safe," independent of whether a smaller competitor is actually better.</p>
-  <p>Neither camp is wrong. They're describing two different code paths inside the same product. The honest takeaway is that ChatGPT visibility work has to hit both: earning the live-retrieval signals above for the third of queries that search, while accepting that the other two-thirds are shaped by whatever's already in the training corpus about your brand — which is a slower-moving, much harder lever to pull, and the reason a single strong month of citations doesn't fix a brand's baseline recall the way a month of link-building used to move a Google ranking.</p>
+  <p>This is the point where the research genuinely splits, and it's worth stating both sides rather than picking the one that sells better. One camp (most GEO advice, including much of what's above) treats ChatGPT's recommendations as the output of a live evaluation: retrieve, filter, weigh authority and freshness, cite the winners. That model is real and well-documented for the 34.5% of queries that actually search.</p>
+  <p>The other camp points at what happens the other 65.5% of the time. A 2026 academic paper on "Incumbent Advantage" in LLM recommendation systems documents a phenomenon its authors call the <strong>Conditional Monopoly</strong>: when compared options are roughly equivalent, well-known brands get recommended close to 100% of the time, not because a live signal favored them, but because they're simply better-represented, more positively, in the training data. That dominance can evaporate the moment a competitor gets even a marginal edge (the paper cites a swing from a small rating advantage), which suggests the bias is a soft default rather than a hard lock, but a default is still what most no-search answers are running on. Separate bias research adds a related wrinkle: LLMs are tuned to avoid recommending anything that reads as controversial or unverified, which mechanically favors brands already large enough to be "safe," independent of whether a smaller competitor is actually better.</p>
+  <p>Neither camp is wrong. They're describing two different code paths inside the same product. The honest takeaway is that ChatGPT visibility work has to hit both: earning the live-retrieval signals above for the third of queries that search, while accepting that the other two-thirds are shaped by whatever's already in the training corpus about your brand, which is a slower-moving, much harder lever to pull, and the reason a single strong month of citations doesn't fix a brand's baseline recall the way a month of link-building used to move a Google ranking.</p>
 
   <h2 id="side-by-side">ChatGPT's mechanics, at a glance</h2>
   <div class="compare-table-wrap">
@@ -278,20 +278,20 @@
       <tr><td>Search decision</td><td>34.5% of queries trigger <code>web_search_preview</code>; the rest answer from training data</td><td>Query recency-sensitivity, not brand quality</td></tr>
       <tr><td>Retrieval</td><td>A search plus fan-out sub-searches (avg. 2-3 per query) pull in dozens of candidate pages</td><td>Broad topical coverage, including sub-questions the user never typed</td></tr>
       <tr><td>Citation</td><td>Only ~15% of retrieved pages are actually cited in the answer</td><td>Earned-media source type (84%) and recent updates (76.4% &lt;30 days)</td></tr>
-      <tr><td>No-search answers</td><td>Model recalls names from training data alone</td><td>Training-corpus prominence — the "Incumbent Advantage" / Conditional Monopoly effect</td></tr>
-      <tr><td>Geo-targeting</td><td><code>user_location</code> (country/city/region/timezone) passed to the search tool, only when search runs</td><td>Local relevance — but only on the third of queries that actually browse</td></tr>
+      <tr><td>No-search answers</td><td>Model recalls names from training data alone</td><td>Training-corpus prominence: the "Incumbent Advantage" / Conditional Monopoly effect</td></tr>
+      <tr><td>Geo-targeting</td><td><code>user_location</code> (country/city/region/timezone) passed to the search tool, only when search runs</td><td>Local relevance, but only on the third of queries that actually browse</td></tr>
     </table>
   </div>
 
-  <p>The mechanics above run on a different pipeline than the other two engines this research has already mapped. <a href="/bg-006.html" style="color:var(--accent2)">BG-006</a> covers Perplexity's RAG process — which evaluates 8-10 candidate sources per query on every single query, no on/off switch — and Gemini's grounding classifier, which decides per-query whether to run a live search at all, much closer to ChatGPT's own selective behavior than Perplexity's is. If you're building an AI-visibility strategy around a single engine's mechanics, it likely won't transfer to the next one.</p>
+  <p>The mechanics above run on a different pipeline than the other two engines this research has already mapped. <a href="/bg-006.html" style="color:var(--accent2)">BG-006</a> covers Perplexity's RAG process (which evaluates 8-10 candidate sources per query on every single query, no on/off switch) and Gemini's grounding classifier, which decides per-query whether to run a live search at all, much closer to ChatGPT's own selective behavior than Perplexity's is. If you're building an AI-visibility strategy around a single engine's mechanics, it likely won't transfer to the next one.</p>
 
   <hr class="divider">
 
   <h2 id="what-this-means">What this means for your brand</h2>
-  <p>Two separate problems need two separate fixes, and most brands are only working on one of them. For the third of queries that trigger a live search, the earned-media and freshness signals above are the actual scoreboard — see <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> for the fuller data on which specific signals correlate most with getting cited once retrieval happens. For the other two-thirds, answered from training data alone, the lever is slower: consistent, positive, independently-sourced mentions accumulated over time, since that's the material the next training run — or the next fine-tune — actually learns from. A brand that only exists in a well-optimized way on its own domain, chasing the live-search signals, is invisible to the much larger share of ChatGPT answers that never search in the first place.</p>
+  <p>Two separate problems need two separate fixes, and most brands are only working on one of them. For the third of queries that trigger a live search, the earned-media and freshness signals above are the actual scoreboard. See <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> for the fuller data on which specific signals correlate most with getting cited once retrieval happens. For the other two-thirds, answered from training data alone, the lever is slower: consistent, positive, independently-sourced mentions accumulated over time, since that's the material the next training run (or the next fine-tune) actually learns from. A brand that only exists in a well-optimized way on its own domain, chasing the live-search signals, is invisible to the much larger share of ChatGPT answers that never search in the first place.</p>
 
   <h2 id="brandgeo-different">How BrandGEO treats this differently</h2>
-  <p>BrandGEO's ChatGPT collector already passes a real <code>user_location</code> object — country, and city or region where set — into the <code>web_search_preview</code> tool for every prompt, derived from the client's own selected market rather than assumed from a prompt prefix (see our platform's <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">geo context injection</a> work, part of the technical-SEO discipline this measures). What this article adds is the honest caveat: that geo-targeting only fires on the subset of prompts that actually trigger a live search. BrandGEO tracks brand mentions across both paths — the live-search answers and the training-data answers — instead of assuming every ChatGPT response ran the same way, because treating them as one signal hides exactly the split this research shows is real.</p>
+  <p>BrandGEO's ChatGPT collector already passes a real <code>user_location</code> object (country, and city or region where set) into the <code>web_search_preview</code> tool for every prompt, derived from the client's own selected market rather than assumed from a prompt prefix (see our platform's <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">geo context injection</a> work, part of the technical-SEO discipline this measures). What this article adds is the honest caveat: that geo-targeting only fires on the subset of prompts that actually trigger a live search. BrandGEO tracks brand mentions across both paths (the live-search answers and the training-data answers) instead of assuming every ChatGPT response ran the same way, because treating them as one signal hides exactly the split this research shows is real.</p>
 
   <h2 id="related-research">Related research</h2>
   <p>The mechanics and case data referenced above, in full:</p>
@@ -299,7 +299,7 @@
     <a href="/bg-006.html" class="related-card">
       <div class="related-id">BG-006</div>
       <div class="related-title">Perplexity vs Gemini: Which AI Cites Brands Most?</div>
-      <div class="related-hook">The two other engines' retrieval mechanics, including Gemini's own grounding classifier — the closest parallel to ChatGPT's search decision.</div>
+      <div class="related-hook">The two other engines' retrieval mechanics, including Gemini's own grounding classifier, the closest parallel to ChatGPT's search decision.</div>
     </a>
     <a href="/bg-001.html" class="related-card">
       <div class="related-id">BG-001</div>
@@ -309,19 +309,19 @@
     <a href="/bg-007.html" class="related-card">
       <div class="related-id">BG-007</div>
       <div class="related-title">The Anatomy of an AI-Cited Brand</div>
-      <div class="related-hook">The specific signals — mentions, freshness, cross-source presence — that decide the 15% of retrieved pages that actually get cited.</div>
+      <div class="related-hook">The specific signals (mentions, freshness, cross-source presence) that decide the 15% of retrieved pages that actually get cited.</div>
     </a>
     <a href="/bg-003.html" class="related-card">
       <div class="related-id">BG-003</div>
       <div class="related-title">How Does ChatGPT Decide Which Brands to Recommend?</div>
-      <div class="related-hook">The six-stage measurement path BrandGEO runs against real customer questions — the practical companion to this article's mechanics.</div>
+      <div class="related-hook">The six-stage measurement path BrandGEO runs against real customer questions: the practical companion to this article's mechanics.</div>
     </a>
   </div>
 
   <!-- CTA -->
   <div class="cta-box">
     <h3>Find out whether ChatGPT is citing you live, recalling you from training, or missing you on both paths</h3>
-    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <p>We'll run your brand through the same real-question, multi-engine audit, free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
