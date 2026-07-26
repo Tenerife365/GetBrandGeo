@@ -9,9 +9,21 @@
  *   1. Verify the request is a genuine GitHub push (HMAC-SHA256 signature).
  *   2. Read the push payload, which lists exactly which files each commit
  *      added/modified.
- *   3. For every changed file under brandgeo/web/, download that one file from
+ *   3. Answer GitHub with 202 and close the connection BEFORE doing any work.
+ *   4. For every changed file under brandgeo/web/, download that one file from
  *      GitHub's raw endpoint (public repo, no auth needed), pinned to the pushed
  *      commit SHA, and write it into the live docroot.
+ *
+ * Step 3 is not cosmetic. GitHub abandons a webhook delivery after 10 seconds.
+ * This script used to answer only after the whole fetch loop had finished, and
+ * on this host the fixed cost of getting that far is already about 9.9 seconds:
+ * on 2026-07-26 a one-file push was recorded OK at 9.89s and a two-file push in
+ * the same minute timed out at 504 and deployed nothing at all. Answering first
+ * takes the deploy off GitHub's clock entirely.
+ *
+ * Consequence worth knowing: GitHub now reports 202 whether or not the copy
+ * succeeded, so the delivery list is no longer evidence of a deploy. $LOGFILE
+ * below, and the Last-Modified header on the live file, are.
  *
  * Only changed web files are fetched (not the whole repo), so a normal push
  * transfers a handful of small files. Deletions are NOT propagated (removing a
@@ -53,6 +65,34 @@ if (!is_array($event) || ($event['ref'] ?? '') !== 'refs/heads/main') {
 $sha = $event['after'] ?? '';
 if (!preg_match('/^[0-9a-f]{40}$/', $sha)) { http_response_code(200); exit('No commit'); }
 
+// --- Acknowledge now, copy afterwards. ------------------------------------
+// Everything above this line is cheap and has already decided the request is a
+// genuine push to main, so it is safe to answer. Everything below is the slow
+// part and must not run on GitHub's 10 second clock. See the note at the top.
+ignore_user_abort(true);          // keep going once the connection is released
+@set_time_limit(120);             // the fetch loop can take a while on a big push
+// Compression would make the Content-Length below a lie, and a client waiting
+// for bytes that never come is exactly the hang this change exists to remove.
+@ini_set('zlib.output_compression', '0');
+http_response_code(202);
+header('Content-Type: text/plain; charset=utf-8');
+header('Connection: close');
+$ack = "Accepted\n";
+header('Content-Length: ' . strlen($ack));
+echo $ack;
+// Clear any buffering in front of us. Bounded: ob_end_flush() can refuse to
+// pop a buffer it does not own, and an unbounded loop on that is a hang.
+for ($i = 0; $i < 10 && ob_get_level() > 0; $i++) { @ob_end_flush(); }
+@flush();
+// Release the connection. php-fpm and LiteSpeed's lsapi each expose their own
+// call for this; if neither exists, the Content-Length and Connection headers
+// above are enough for the client to treat the response as complete.
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} elseif (function_exists('litespeed_finish_request')) {
+    litespeed_finish_request();
+}
+
 // --- Collect changed files under the web prefix across all commits. -------
 $changed = [];
 foreach (($event['commits'] ?? []) as $commit) {
@@ -89,8 +129,8 @@ foreach ($changed as $i => $path) {
 $log[] = "=== done: $done/" . count($changed) . ' file(s) ===';
 @file_put_contents($LOGFILE, implode("\n", $log) . "\n", FILE_APPEND | LOCK_EX);
 
-http_response_code(202);
-exit('Accepted');
+// The 202 already went out above. Nothing left to say to a closed connection.
+exit;
 
 // --- HTTPS GET helper: curl first, then allow_url_fopen fallback. ---------
 function httpGet(string $url): ?string {
