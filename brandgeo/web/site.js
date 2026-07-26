@@ -1,3 +1,4 @@
+/* build: 2026-07-26 hook-rebuild */
 (function() {
   // Theme toggle (all pages)
   var themeBtn = document.getElementById('themeBtn');
