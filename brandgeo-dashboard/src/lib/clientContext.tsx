@@ -31,7 +31,16 @@ interface ClientCtx {
   activeClient:      Client | null
   setActiveClientId: (id: number) => void
   clients:           Client[]           // populated for admin only
+  // EFFECTIVE admin, not the real one. When an admin turns on "View as user"
+  // this reads false, so every existing `isAdmin` consumer hides its admin
+  // affordances with no change at the call site. This is PRESENTATION ONLY:
+  // it mints no token, changes no role, and every Netlify function still
+  // decides on the real JWT via requireAuth({ adminOnly: true }). A viewer
+  // gains nothing from this flag existing — it can only ever take away.
   isAdmin:           boolean
+  isRealAdmin:       boolean            // the true role; only the toggle + banner may read this
+  viewingAsUser:     boolean
+  setViewingAsUser:  (v: boolean) => void
   loading:           boolean
   needsOnboarding:   boolean            // authed but no profile yet -> /welcome onboarding
   // ── Engine gating ────────────────────────────────────────────────────────
@@ -51,6 +60,9 @@ const Ctx = createContext<ClientCtx>({
   setActiveClientId:       () => {},
   clients:                 [],
   isAdmin:                 false,
+  isRealAdmin:             false,
+  viewingAsUser:           false,
+  setViewingAsUser:        () => {},
   loading:                 true,
   needsOnboarding:         false,
   activeEngines:           DEFAULT_ENGINES,
@@ -68,6 +80,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [activeClient, setActiveClient]           = useState<Client | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
+  // Deliberately NOT persisted. A reload always returns a real admin to the
+  // admin view, so nobody can be left impersonating without knowing it.
+  const [viewingAsUser, setViewingAsUserState] = useState(false)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
@@ -273,7 +288,12 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       activeClient,
       setActiveClientId,
       clients,
-      isAdmin,
+      // The hide-only invariant. Non-admins can never set viewingAsUser to
+      // anything meaningful, so this expression can only ever remove access.
+      isAdmin: isAdmin && !viewingAsUser,
+      isRealAdmin: isAdmin,
+      viewingAsUser,
+      setViewingAsUser: (v: boolean) => setViewingAsUserState(isAdmin ? v : false),
       loading,
       needsOnboarding,
       activeEngines,

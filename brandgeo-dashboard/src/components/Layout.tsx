@@ -4,6 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
+  Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -79,7 +80,7 @@ const INTERNAL_GROUP_KEYS: ClientGroupKey[] = ['research', 'archived']
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
-  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, updateClientCategory } = useClient()
+  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
@@ -288,6 +289,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo onNavigate={closeSidebar} />
           <div className="flex items-center gap-2">
+            {/* Enter view-as-user. Exiting is deliberately NOT here — this
+                control disappears the moment it is used, because the whole
+                point is that the admin chrome goes away. The exit lives in the
+                banner, which is always visible while impersonating. */}
+            {isRealAdmin && !viewingAsUser && (
+              <button
+                onClick={() => setViewingAsUser(true)}
+                title="View this client as one of its users"
+                aria-label="View as user"
+                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <Eye size={16} />
+              </button>
+            )}
             <AdminBell />
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
@@ -691,6 +706,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* View-as-user banner. Sits outside the scroll container on purpose, so
+            it cannot be scrolled out of sight — an admin must never mistake an
+            impersonated view for the real product. Amber, not brand violet,
+            because it is a state warning and not a feature. */}
+        {viewingAsUser && (
+          <div className="flex-shrink-0 bg-amber-500/15 border-b border-amber-500/40 px-4 sm:px-6 py-2 flex items-center gap-3">
+            <Eye size={14} className="text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-200 min-w-0">
+              Viewing as a user of <strong className="font-semibold">{activeClient?.name ?? 'this client'}</strong>.
+              <span className="hidden sm:inline text-amber-200/70"> Admin controls are hidden. Your own permissions are unchanged.</span>
+            </p>
+            <button
+              onClick={() => setViewingAsUser(false)}
+              className="ml-auto flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-amber-100 bg-amber-500/25 hover:bg-amber-500/40 border border-amber-500/40 rounded-md px-2.5 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            >
+              <EyeOff size={13} /> Exit
+            </button>
+          </div>
+        )}
 
         {/* Mobile header */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
