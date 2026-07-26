@@ -1,4 +1,4 @@
-# CLAUDE.md — BrandGEO Platform Memory
+﻿# CLAUDE.md — BrandGEO Platform Memory
 
 > ⚠️ **§0 through §7 below were last updated 2026-07-08 and are PARTLY STALE.**
 > The "CURRENT STATE" section immediately below this header was verified against
@@ -251,7 +251,36 @@ State of the protocol, corrected 2026-07-26 20:45:
 
 ### Priority backlog
 
-Ordered. Top item costs money today.
+Rewritten 2026-07-26 23:10 against the full commit history of the day and every
+artifact on disk. Ordered by exposure, then revenue, then everything else. The
+top two are live and reachable by anyone on the internet right now.
+
+#### Live exposure
+
+- [ ] **All five scheduled Netlify functions accept an unauthenticated public
+      POST and do real work.** `docs/qa/deploy-pipeline-netlify.md` F1, escalated
+      to Opus by that audit and re-confirmed here from source: none of
+      `expire-plan-grants.js`, `purge-old-results.js`, `purge-old-audits.js`,
+      `schedule-collections.js` or `ping-sitemap.js` calls `requireAuth`, wraps
+      itself in `schedule()`, or checks any secret. The only thing protecting
+      them is that the URL is not advertised. Consequences if hit:
+      `purge-old-results` and `purge-old-audits` DELETE rows,
+      `expire-plan-grants` reverts customer plans to Free and emails them,
+      `schedule-collections` enqueues collection runs and spends LLM budget.
+      Fix needs an auth design decision (Netlify's own scheduled-invocation
+      signal, or a shared secret header) so it is `bg-architect` then
+      `bg-backend`, and it must not break the cron path. **Cron registration is
+      separately UNPROVEN** (`deploy-pipeline-netlify.md` §5.2): every probe
+      returned 200 with a real body, which is not what a registered scheduled
+      function does, so the schedules may not be running at all. Settle both in
+      one pass.
+- [ ] **Files never meant to be public are live in the cPanel docroot.**
+      `docs/qa/deploy-pipeline-cpanel.md` F1, confirmed over HTTP, owner
+      `bg-web`. F3 is adjacent and latent: `deploy-secret.php` sits inside the
+      public docroot with no deny rule, so it is one PHP misconfiguration away
+      from serving the webhook secret as text.
+
+#### Revenue
 
 - [ ] **Run packet `008`: the onboarding plan coercion.** `bg-backend` on Opus,
       then `bg-verify`. `onboard-client.js:44` `VALID_PLANS` is a FOURTH hardcoded
@@ -259,84 +288,120 @@ Ordered. Top item costs money today.
       instead of rejecting: `VALID_PLANS.includes(plan) ? plan : 'essentials'`.
       `Onboard.tsx:242` offers the real ladder from `PLAN_ORDER`, so a client
       onboarded on Growth (€299) or Growth PRO (€449) is silently provisioned
-      with Essentials (€99) entitlements and no error is raised anywhere. This is
-      BROADER than the C1 defect recorded above, which covered only `growth_pro`
-      and only via `set-client-plan.js`. Found by the 2026-07-26 dashboard audit
-      and independently re-verified in source.
+      with Essentials (€99) entitlements and no error is raised anywhere. Broader
+      than the `_plans.js` C1 defect that `f6deb01` closed, which covered only
+      `growth_pro` and only via `set-client-plan.js`.
       **Detection caveat, load-bearing:** affected rows cannot be found in
       Supabase. A coerced row reads `essentials` and is identical to a genuine
       Essentials customer, and `onboard-client.js` writes no `client_events` row
-      (unlike `set-client-plan.js:166`). Finding victims requires cross-
+      (unlike `set-client-plan.js:166`). Finding victims requires cross
       referencing Stripe subscriptions against `clients.plan`. Constantin ran that
-      comparison 2026-07-26; **the result was never recorded** — record it in
+      comparison 2026-07-26; **the result was never recorded.** Record it in
       packet `008` before closing it.
-- [ ] **Commit the still-untracked packets and artifacts.** `2e7f048` committed
-      packet `008` and the audit, but `003`, `004`, `005`, both `006`s, `007`,
-      `docs/qa/plans-divergence-b1.md`, `deploy-pipeline-netlify.md` and
-      `plans-drift-fix-006.md` remain untracked. A fresh session still cannot
-      cold-start from them per AGENT-OS §4.
+- [ ] Create the Stripe price and checkout link for Growth PRO. `f6deb01` made the
+      tier assignable by an admin, so this is the only remaining reason it cannot
+      be bought self-serve. External dependency; sequencing is `bg-strategy`'s per
+      `activation-path.md` §5.5.
+- [ ] Wire promotions to Stripe coupons and redemption at checkout. Table and
+      admin CRUD exist as of `3dadd8b` and the migration is applied; nothing
+      prices or discounts anything yet, by design
+      (`PRICING-STRATEGY-2026-07.md` §8).
+
+#### Review debt on work already shipped
+
+- [ ] **Retroactive `bg-verify` on `b6d4038` (view as current user).** It shipped
+      without the independent review its own backlog entry required, and it is
+      auth adjacent. Check the stated invariant holds everywhere: presentation
+      only, `isRealAdmin` never weakened, no token minted or swapped, no
+      server-side check softened, impersonated state continuously visible.
+- [ ] **Retroactive `bg-verify` scoped to `3dadd8b` (promotions).**
+      `promotions-admin.js` holds the service key behind
+      `requireAuth({ adminOnly: true })` and that gate has never been tested with
+      a real viewer token; the live 401 only proves it rejects a MISSING token,
+      the weaker test. Also covers the three applied RLS policies and an
+      independent close on `SECURITY-AUDIT.md` F1's `role` provisioning path.
+      `34e41bb` does NOT need this: B1 treated `planConfig.ts` as its subject and
+      confirmed `_cost.js` matches it, so ordering was violated but coverage was
+      not.
+- [ ] **Close the A branch gap**: `bg-copy` over what is already live on the
+      homepage, then `bg-verify` (A4). `bg-web` shipped `801732c` plus four
+      follow-ups with no copy stage and no verification stage, so this is a copy
+      and verification pass over live pages, not a build.
+
+#### Deploy pipeline hardening
+
+- [ ] **Deploy success is unobservable from outside the cPanel server**
+      (`deploy-pipeline-cpanel.md` F2, High, owner `bg-backend`). GitHub returns
+      202 whether or not the copy worked, so the webhook delivery list proves
+      nothing. F4 is the same gap one level down: nothing records which
+      acknowledgement branch fired.
+- [ ] **Pushes over 20 commits silently under-deploy** (`deploy-pipeline-cpanel.md`
+      F5). GitHub caps the webhook payload's `commits[]`, so files changed in the
+      overflow never reach the docroot and nothing reports it. F6, self-overwrite
+      with no guard, is recorded alongside it.
+- [ ] **All 23 `_` prefixed helpers are deployed as public function endpoints**
+      (`deploy-pipeline-netlify.md` F2). Low severity, confirmed here: `_auth.js`,
+      `_cost.js` and `_plans.js` export no handler, so the endpoints do nothing.
+      But **`CLAUDE.md` §4.6 states the `_` prefix stops Netlify exposing them,
+      and that is false.** Correct the guardrail text so nobody relies on it.
+- [ ] **Three functions call external APIs on the inherited 10s timeout**
+      (`deploy-pipeline-netlify.md` F3), while comparable functions in
+      `netlify.toml` were deliberately given 26s. Owner `bg-backend`.
+- [ ] **Two packets share id `006`**: `006-bg-backend-to-bg-verify-plans-drift.md`
+      and `006-bg-orchestrator-to-bg-verify-deploy-cpanel.md`. Exactly the
+      collision the numbering rule exists to prevent. Renumber one and record the
+      rule: ids are allocated when a packet is written, never reserved inside an
+      artifact.
+
+#### Product quality
+
 - [ ] **`bg-design` spec for contrast and first-run**, then `bg-app` builds it.
-      Both from the 2026-07-26 audit, both measured: side panel vs canvas
-      **1.07:1** (border 1.31:1), active nav tab differs from inactive by
+      Both from the 2026-07-26 dashboard audit, both measured: side panel vs
+      canvas **1.07:1** (border 1.31:1), active nav tab differs from inactive by
       **1.24:1** text and 1.17:1 background with the whole active state resting on
       one 3px rail, and the time-filter bar is worse at **1.39:1** with no rail.
       WCAG 1.4.11 wants 3:1. First-run: a zero-data tenant sees "0% AI VISIBILITY
       SCORE" across all six dimensions and AI Visibility calls an unmeasured brand
-      "Needs Work" — the product issues a verdict before it has data. `/sentiment`
-      at zero data renders 0 buttons and 0 links, an absolute dead end. Census:
-      52% reachable, 24% dead ends, five of six hit on day one.
+      "Needs Work", so the product issues a verdict before it has data.
+      `/sentiment` at zero data renders 0 buttons and 0 links, an absolute dead
+      end. Census: 52% reachable, 24% dead ends, five of six hit on day one.
 - [ ] **Engine palette is broken twice over** (audit §Amendment 4, validated with
       `dataviz`'s validator, not by eye). Claude `#f97316` vs Meta `#f59e0b` is
-      ΔE **9.6** normal vision against a floor of 15, and 3.4 for tritanopia —
+      ΔE **9.6** normal vision against a floor of 15, and 3.4 for tritanopia, and
       they co-render on the `/sentiment` and `/mentions` filter chip rows. Grok
       `#94a3b8` fails the chroma floor and reads as a disabled series. Deeper
       problem underneath: `#10b981` means ChatGPT AND Positive, `#ef4444` means
       Google AI Mode AND Negative AND a categorical series. One hue, three
-      meanings — a token-semantics fix, not a recolor. `Competitors.tsx:258`
-      carries a fourth independent palette assigned by array index.
-- [ ] **Spec'd, not built: "View as current user"** (audit `FIX F-VIEWAS`).
-      Admin-only presentation toggle, invariant `effectiveIsAdmin = isAdmin &&
-      !viewingAsUser`. Must never mint or swap a token, never grant data access,
-      never weaken a server-side check; impersonated state must be continuously
-      visible. Touches auth, so it needs independent `bg-verify` before shipping.
-      Its absence is why the audit could only assess the viewer experience from
-      source.
-- [ ] **Write a migration file for `clients.plan`** in `db/`. The column was
-      created ad hoc and is the only column on `clients` with no migration on
-      disk, which is what made V1 unverifiable from source in the first place.
-      No CHECK constraint exists on it (confirmed 2026-07-26), so this is
-      hygiene, not a live defect.
+      meanings, so this is a token-semantics fix, not a recolor.
+      `Competitors.tsx:258` carries a fourth independent palette assigned by
+      array index.
+- [ ] **Light mode is UNAUDITED** (~60 `!important` overrides in `index.css`).
+      The dashboard audit could not exercise it because doing so mutates a
+      persisted preference.
+
+#### Decisions owed
+
+- [ ] Decide whether `PLAN_PROMPTS` is enforced server-side or stays display-only
+      (`activation-path.md` §5.4).
+- [ ] Decide whether `free` clients get a non-manual `refresh_cadence`, a spend
+      decision against a €0.30 monthly budget (`activation-path.md` §5.3).
+      Blocked in practice until the scheduled-function exposure above is settled,
+      since that is the same code path.
+
+#### Hygiene
+
 - [ ] **Confirm the Promotions panel renders for an admin** on the live Account
       page: the amber "backend isn't deployed yet" banner should be gone and
       replaced by "No promotions yet." plus a New promotion button. Everything
       either side of that call is verified; this last hop needs an admin login,
       which no agent has.
-- [ ] **Commit the untracked packets and artifacts** (`003`, `004`, `005`,
-      `006`, `docs/qa/plans-divergence-b1.md`,
-      `docs/qa/plans-drift-fix-006.md`, and the amended
-      `docs/arch/activation-path.md`). Until this lands, committed state lies
-      about where the initiative is.
-- [ ] **Retroactive `bg-verify` scoped to `3dadd8b`.** `promotions-admin.js`
-      holds the service key behind `requireAuth({ adminOnly: true })` and that
-      gate has never been tested with a real viewer token; the live 401 only
-      proves it rejects a MISSING token, which is the weaker test. Also covers
-      the three applied RLS policies and an independent close on
-      `SECURITY-AUDIT.md` F1's `role` provisioning path, which still rests on
-      `bg-architect`'s reading. `34e41bb` does NOT need this: B1 subsequently
-      treated `planConfig.ts` as its subject and confirmed `_cost.js` matches it,
-      so ordering was violated but coverage was not.
-- [ ] **Close the A branch gap**: `bg-copy` over what is already live on the
-      homepage, then `bg-verify` (A4). `bg-web` already shipped, so this is a
-      copy and verification pass over live pages, not a build.
-- [ ] Wire promotions to Stripe coupons and redemption at checkout. Table and
-      admin CRUD exist as of `3dadd8b`; nothing prices or discounts anything yet,
-      by design (`PRICING-STRATEGY-2026-07.md` §8).
-- [ ] Create the Stripe price and checkout link for Growth PRO (external
-      dependency; sequencing is `bg-strategy`'s per `activation-path.md` §5.5).
-- [ ] Decide whether `PLAN_PROMPTS` is enforced server-side or stays display-only
-      (`activation-path.md` §5.4).
-- [ ] Decide whether `free` clients get a non-manual `refresh_cadence`, a spend
-      decision against a €0.30 monthly budget (`activation-path.md` §5.3).
+- [ ] Write a migration file for `clients.plan` in `db/`. The column was created
+      ad hoc and is the only column on `clients` with no migration on disk, which
+      is what made V1 unverifiable from source. No CHECK constraint exists on it
+      (confirmed 2026-07-26), so this is hygiene, not a live defect.
+- [ ] Commit or discard the last untracked items: `docs/audit/`,
+      `docs/linkedin-posts-2026-07-24.md`, and the modified
+      `.claude/agents/README.md`. Everything else is now committed.
 - [ ] Refresh `docs/STATE-OF-PRODUCT.md` §4.1, stale on collection architecture.
 - [ ] Reconcile §5's task list (#1 to #97) and §7 against reality; much of it
       predates the 2026-07 work.
@@ -344,29 +409,34 @@ Ordered. Top item costs money today.
 - [ ] Shared authentication / SSO with TalentWeLove and RecruiterAI portals.
 
 Closed 2026-07-26:
-- ~~Dashboard plan ladder vs marketing site pricing mismatch.~~ `34e41bb` shipped
-  and is live; the served bundle no longer contains €900.
-- ~~Promotions panel had no backend.~~ `3dadd8b` shipped `promotions-admin.js`
-  and the migration is applied and verified.
+- ~~Growth PRO unassignable (`_plans.js` C1 to C4).~~ `f6deb01` shipped and is
+  pushed. `growth_pro` is assignable in production. Reviewed in
+  `docs/qa/plans-drift-fix-006.md`, verdict PASS WITH FINDINGS, all seven of
+  packet `005`'s acceptance criteria met and B1's harness reproduced independently.
+- ~~The cPanel 10 second webhook ceiling.~~ **CONTRADICTED by measurement** up to
+  20 files per push (`deploy-pipeline-cpanel.md` F7): 59 pages deployed in
+  batches of 2, 5, 12, 20 and 20, all verified live byte for byte. The batch that
+  previously returned 504 and copied nothing now completes in about a second. The
+  real limit is the 20-commit payload cap, filed as F5 above.
+- ~~"View as current user" spec'd but not built.~~ `b6d4038`. Needs the
+  retroactive review filed above.
+- ~~Untracked packets and QA artifacts.~~ `695d3f7` committed the outstanding
+  packets, QA artifacts and the `dashboard-auditor` agent.
+- ~~Dashboard plan ladder vs marketing site pricing mismatch.~~ `34e41bb`, live;
+  the served bundle no longer contains €900.
+- ~~Promotions panel had no backend.~~ `3dadd8b`; migration applied and verified.
 - ~~Confirm cPanel re-upload of `index.html` + `site.js` (CSP fix landing).~~
   Verified live, see Deploy pipelines above.
-- ~~Scheduled background triggers for engine evaluation runs.~~ Already built:
-  `schedule-collections` runs hourly, inert by default. Only the cadence decision
-  remains.
-- ~~Push `f6deb01` (`_plans.js` / `set-client-plan.js` drift fix).~~ Pushed
-  2026-07-26 with `2e7f048`; `main` is in sync with `origin/main`. `growth_pro` is
-  now assignable in production.
-- ~~Logo is not clickable / no way home.~~ `2e7f048`, verified live on the
-  deployed bundle `index-DFdb-swz.js`: the login wordmark is an `<a>` to
-  `https://getbrandgeo.com` (NOT `/`, which is gated and would bounce back), and
-  the sidebar and mobile wordmarks link to Overview.
-- ~~Scroll position carried across route changes.~~ `2e7f048`. Reproduced before
-  and after: `/mentions` at 900px → `/competitors` landed at 516px, now lands at
-  0. Note for whoever touches this next: react-router's `<ScrollRestoration>` is
-  NOT usable here — it requires a data router and this app mounts
-  `BrowserRouter` — and the scroll container is `<main>`, not the window.
-- ~~A viewer reaching `/usage` by URL got a blank screen.~~ `2e7f048`;
-  `Usage.tsx` now matches `Onboard.tsx:88`'s message-plus-link pattern.
+- ~~Scheduled background triggers for engine evaluation runs.~~ Built, but see the
+  exposure and the unproven cron registration at the top of this list before
+  treating them as working.
+- ~~Logo is not clickable, scroll carried across routes, viewer blank on
+  `/usage`.~~ All `2e7f048`, verified on the deployed bundle. Note for whoever
+  touches scroll next: react-router's `<ScrollRestoration>` is NOT usable here,
+  it requires a data router and this app mounts `BrowserRouter`, and the scroll
+  container is `<main>`, not the window.
+- ~~Em and en dashes across the marketing site.~~ Removed in `c9a2451`, `3a8e3d5`,
+  `cc45220`, `bf009ea`, `a896349`.
 
 ### Four §7.1 claims REFUTED by measurement 2026-07-26 — do not re-file
 
