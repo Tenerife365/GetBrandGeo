@@ -136,38 +136,72 @@ spend are NOT affected. `_plans.js` is the lone drifted mirror:
   upgrading to Growth is emailed a written promise of "Google AI Mode", an engine
   the product will never collect for them, at the moment they pay more.
 
-Fix direction is specified in `activation-path.md` §3.4. `bg-backend` work, after
-`bg-verify`.
+- **C3, found by B1 and worse than C1/C2.** `planUnlocks` (`_plans.js:58`) opens
+  with `const key = isValidPlan(plan) ? plan : 'free'`, so an unknown plan does
+  not throw or render blank, it silently becomes Free. `planRank` degrades the
+  same way, returning 0. If `growth_pro` reaches `buildNotice()`, a €449 upgrade
+  is announced to the buyer as "1 AI engine monitored: ChatGPT", with the Free
+  plan's blurb, in a DOWNGRADE-toned email, because `planRank('growth_pro')` is 0
+  against `planRank('growth')` of 2. `activation-path.md` §3.3 originally
+  recorded this as an empty section; running the code proved otherwise.
+- **C4, latent.** `managed`, `pro` and `enterprise` each sit one rank lower in
+  `_plans.js` than in `planConfig.ts`. Harmless today because every comparison
+  happens within one file, and fixed for free by the same edit.
+
+Fix direction is `activation-path.md` §3.4, adjudicated by
+`docs/qa/plans-divergence-b1.md` §5, which also ships a runnable harness in §4 so
+the fix has a pass or fail condition rather than a judgement call. `bg-backend`,
+Opus not Sonnet: it rewrites the copy a paying customer is emailed on upgrade,
+which is billing under AGENT-OS §2. Packet `005` is written and ready.
 
 ### Conversion initiative: where the waterfall stands
 
 | Stage | Agent | Artifact | State |
 |---|---|---|---|
-| S0 | bg-strategy | `docs/strategy/hook-thesis-web.md`, `docs/strategy/activation-thesis-app.md` | DONE |
-| A1 | bg-design | `docs/design/homepage-hook.md` | DONE |
-| A2 | bg-copy | `docs/copy/homepage-hook.md` | NOT STARTED, `docs/copy/` empty |
-| A3 | bg-web | `brandgeo/web/index.html`, `site.js` | NOT STARTED |
-| A4 | bg-verify | `docs/qa/web-hook-verification.md` | NOT STARTED |
-| B1 | bg-verify | `docs/qa/product-funnel-gating-truth.md` | **NOT RUN, `docs/qa/` empty** |
-| (unplanned) | bg-architect | `docs/arch/activation-path.md` | DONE, ran in B1's slot |
-| B2 to B5 | design, copy, app, verify | | BLOCKED on B1 |
+| S0 | bg-strategy | `docs/strategy/hook-thesis-web.md`, `activation-thesis-app.md` | COMPLETE |
+| A1 | bg-design | `docs/design/homepage-hook.md` | COMPLETE |
+| A2 | bg-copy | `docs/copy/` | **BYPASSED, never ran** |
+| A3 | bg-web | `brandgeo/web/index.html`, `site.js` | **SHIPPED LIVE, UNREVIEWED** (`801732c` plus 4 follow-ups) |
+| A4 | bg-verify (web) | `docs/qa/web-hook-verification.md` | NOT RUN |
+| B1 | bg-verify | `docs/qa/plans-divergence-b1.md` | **COMPLETE** |
+| (B1 slot) | bg-architect | `docs/arch/activation-path.md` | COMPLETE, then amended by B1 |
+| B2 | bg-design | `docs/design/activation-path.md` | READY, packet `004` on disk, not started |
+| B3 to B5 | copy, app, backend, verify | | BLOCKED on B2 and on the `_plans.js` fix |
+| (none) | bg-app, bg-backend | `34e41bb`, `3dadd8b` | SHIPPED OUTSIDE THE WATERFALL |
 
-Protocol breaks to fix before continuing:
+Packets `001` to `005` all exist in `.claude/handoffs/`. `005` is `bg-verify` to
+`bg-backend`, the `_plans.js` drift fix, and is the next thing to run.
 
-1. **B1 was skipped.** `bg-architect` ran where `bg-verify` was scheduled. B1 was
-   mandatory-before-build because the surface touches billing and plan gating.
-   `activation-path.md:498` writes B1's acceptance criteria, assuming it runs.
-2. **The packet trail is missing.** `.claude/handoffs/` holds only `001`.
-   `homepage-hook.md:3` cites packet `002` and `activation-path.md:3` cites `003`;
-   neither exists, so nothing downstream can cold-start per AGENT-OS §4.
-3. **Packet number collision.** `bg-architect` ran as `003`, while
-   `homepage-hook.md` §13 drafts its `bg-copy` packet as `003` and `bg-web` as
-   `004`. Renumber before materialising any of them.
-4. **Filename drift.** The plan named `docs/design/web-hook-and-conversion.md`;
-   the artifact is `docs/design/homepage-hook.md`.
+State of the protocol, corrected 2026-07-26 20:45:
+
+1. **B1 ran and is complete.** An earlier pass in this file claimed it was skipped
+   and `docs/qa/` was empty. That was wrong: the observation was made before
+   15:22 and not rechecked. B1 loaded `_plans.js` and `_cost.js` in Node and
+   called them, with the harness reproduced in its §4. It confirmed four findings
+   and corrected `activation-path.md` §3.3 where reading the code had suggested a
+   milder fault than running it does.
+2. **The A branch is the real gap, not the B branch.** `bg-web` shipped the
+   public homepage with no `bg-copy` stage and no `bg-verify` stage, then patched
+   the same surface four more times (`82f0474`, `68afbaa`, `662ea8e`, `4ed6a94`).
+   This is the largest unreviewed surface in the initiative and it is live to
+   every visitor.
+3. **Packet ids are allocated when a packet is written, never reserved in advance
+   inside an artifact.** `homepage-hook.md` §13 drafts a `bg-copy` packet as `003`
+   and a `bg-web` packet as `004`; both numbers are consumed by other packets and
+   those drafts are dead. An artifact refers to a downstream packet by
+   from/to/slug, never by number. `bg-orchestrator` assigns the number on write.
+4. **Not a defect:** the design artifact is `homepage-hook.md`, not the plan's
+   `web-hook-and-conversion.md`. Packet `002`'s `scope_write` names
+   `homepage-hook.md`. The packet superseded the plan's stale filename.
 5. `bg-architect` read the WORKING TREE, not `HEAD`. Its `Account.tsx:41`
-   citation pointed at then-uncommitted work. C1's load-bearing claim
+   citation pointed at then-uncommitted work. The load-bearing claim
    (`set-client-plan.js:116`) is committed code and stands regardless.
+6. **Untracked, and this is load-bearing.** Packets `003`, `004`, `005` and
+   `docs/qa/plans-divergence-b1.md` are untracked, and
+   `docs/arch/activation-path.md` has B1's uncommitted amendment. Until they are
+   committed, a fresh session cannot cold-start from them per AGENT-OS §4, and
+   committed state misrepresents the initiative. That is exactly what produced
+   the false claim in item 1.
 
 ### Priority backlog
 
@@ -181,13 +215,22 @@ Ordered. Top item costs money today.
       replaced by "No promotions yet." plus a New promotion button. Everything
       either side of that call is verified; this last hop needs an admin login,
       which no agent has.
-- [ ] **Run B1 (`bg-verify`) before any product build**, mandate widened to
-      adjudicate C1/C2 and to independently confirm the `role` provisioning path.
-      `provision-account.js:57` writes `role: 'viewer'` and `signup-client.js:21`
-      states it writes no role, so `SECURITY-AUDIT.md` F1 looks closed, but that
-      reading came from `bg-architect`, not an independent review.
-- [ ] **Continue Waterfall A**: `bg-copy` against `docs/design/homepage-hook.md`
-      §13.1, then `bg-web`, then `bg-verify`.
+- [ ] **Commit the untracked packets and artifacts** (`003`, `004`, `005`,
+      `docs/qa/plans-divergence-b1.md`, and the amended
+      `docs/arch/activation-path.md`). Until this lands, committed state lies
+      about where the initiative is.
+- [ ] **Retroactive `bg-verify` scoped to `3dadd8b`.** `promotions-admin.js`
+      holds the service key behind `requireAuth({ adminOnly: true })` and that
+      gate has never been tested with a real viewer token; the live 401 only
+      proves it rejects a MISSING token, which is the weaker test. Also covers
+      the three applied RLS policies and an independent close on
+      `SECURITY-AUDIT.md` F1's `role` provisioning path, which still rests on
+      `bg-architect`'s reading. `34e41bb` does NOT need this: B1 subsequently
+      treated `planConfig.ts` as its subject and confirmed `_cost.js` matches it,
+      so ordering was violated but coverage was not.
+- [ ] **Close the A branch gap**: `bg-copy` over what is already live on the
+      homepage, then `bg-verify` (A4). `bg-web` already shipped, so this is a
+      copy and verification pass over live pages, not a build.
 - [ ] Wire promotions to Stripe coupons and redemption at checkout. Table and
       admin CRUD exist as of `3dadd8b`; nothing prices or discounts anything yet,
       by design (`PRICING-STRATEGY-2026-07.md` §8).
