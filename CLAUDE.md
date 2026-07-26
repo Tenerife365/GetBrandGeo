@@ -154,6 +154,18 @@ the fix has a pass or fail condition rather than a judgement call. `bg-backend`,
 Opus not Sonnet: it rewrites the copy a paying customer is emailed on upgrade,
 which is billing under AGENT-OS §2. Packet `005` is written and ready.
 
+**UPDATE 2026-07-26, `bg-backend` ran packet `005`.** `_plans.js` and
+`set-client-plan.js` are edited on the working tree, per the "Do" list in
+`005`. C1 through C4 are all addressed: `growth_pro` is now `isValidPlan`,
+`PLAN_ENGINES` is deleted (`planUnlocks` now derives from `_cost.js`'s
+`activeEnginesFor()`), `PLAN_BLURB.growth` no longer claims a fifth engine, and
+`planRank` matches `planConfig.ts` for all seven plans. The §4 harness printed
+`PASS`. **These changes are UNCOMMITTED — no git command has been run**, per
+`005`'s "Do not" list and AGENT-OS's builder/reviewer separation. Packet `006`
+(`bg-backend` → `bg-verify`) is written and READY; it is the next thing to run,
+before anything is committed. Full detail, the harness output, and the exact
+commit command bg-backend drafted: `.claude/handoffs/006-bg-backend-to-bg-verify-plans-drift.md`.
+
 ### Conversion initiative: where the waterfall stands
 
 | Stage | Agent | Artifact | State |
@@ -166,11 +178,45 @@ which is billing under AGENT-OS §2. Packet `005` is written and ready.
 | B1 | bg-verify | `docs/qa/plans-divergence-b1.md` | **COMPLETE** |
 | (B1 slot) | bg-architect | `docs/arch/activation-path.md` | COMPLETE, then amended by B1 |
 | B2 | bg-design | `docs/design/activation-path.md` | READY, packet `004` on disk, not started |
-| B3 to B5 | copy, app, backend, verify | | BLOCKED on B2 and on the `_plans.js` fix |
+| (`_plans.js` fix) | bg-backend | `_plans.js`, `set-client-plan.js` | **COMMITTED `f6deb01`, not yet pushed** |
+| (`_plans.js` review) | bg-verify | `docs/qa/plans-drift-fix-006.md` | **COMPLETE 2026-07-26, verdict PASS WITH FINDINGS** |
+| B3 to B5 | copy, app, backend, verify | | BLOCKED on B2 |
 | (none) | bg-app, bg-backend | `34e41bb`, `3dadd8b` | SHIPPED OUTSIDE THE WATERFALL |
 
-Packets `001` to `005` all exist in `.claude/handoffs/`. `005` is `bg-verify` to
-`bg-backend`, the `_plans.js` drift fix, and is the next thing to run.
+Packets `001` to `006` all exist in `.claude/handoffs/`. `005` (`bg-verify` to
+`bg-backend`, the `_plans.js` drift fix) has been run — see the UPDATE note
+above. `006` (`bg-backend` to `bg-verify`, reviewing that fix) **has now been
+run**: verdict `PASS WITH FINDINGS`, report `docs/qa/plans-drift-fix-006.md`.
+`bg-verify` reproduced the §4 harness independently (`PASS`, exit 0), confirmed
+all four B1 findings closed and all seven of packet `005`'s acceptance criteria
+met, and traced the `growth_pro` assignment path across 14 hops without finding
+any remaining consumer of the old `PLAN_ORDER` / `PLAN_ENGINES` shape. It wrote
+the commit command itself rather than verifying a drafted one, because
+**packet `006` contains no commit command** — an earlier claim in this file that
+it did was wrong, corrected below.
+
+Findings from the review, none of which block the commit:
+
+- **V1, MEDIUM, CLOSED 2026-07-26 by query.** `clients.plan` has no `CREATE` or
+  `ALTER` anywhere in `db/` (the column was made ad hoc, see #94), so `bg-verify`
+  could not close the Supabase write from source and flagged the risk that an
+  ad-hoc CHECK constraint over the old six-plan ladder would keep Growth PRO
+  unassignable, turning a fixed 400 into a 500. **Checked against production:**
+  `pg_constraint` returns exactly two CHECK constraints on `public.clients`,
+  `clients_category_check` (on `category`) and `clients_type_check` (on `type`).
+  Neither touches `plan`. There is no constraint blocking `growth_pro`, so the
+  fix reaches production intact. The underlying gap stands and is worth closing
+  on its own: `clients.plan` still has no migration file in `db/` while every
+  other column on that table does.
+- **V2, LOW, pre-existing.** `_cost.js:135` falls back to `essentials` for an
+  unknown plan while `planConfig.ts:329` falls back to `free`. Unreachable via
+  `planUnlocks`, reachable via the collection queue with a corrupt `clients.plan`.
+- **V3, LOW, pre-existing.** `_prospect_engines.js:384`'s comment still claims
+  Growth has five live engines. Comment only.
+
+`npm run build` was deliberately not run: `tsconfig.json` has
+`"include": ["src"]`, so neither changed file is compiled or even read by it,
+and a green build would be evidence about a different part of the repo.
 
 State of the protocol, corrected 2026-07-26 20:45:
 
@@ -207,16 +253,67 @@ State of the protocol, corrected 2026-07-26 20:45:
 
 Ordered. Top item costs money today.
 
-- [ ] **Fix `_plans.js` drift (C1 and C2).** A paying Growth customer is promised
-      an engine they do not receive, and the €449 tier cannot be sold or
-      assigned. `bg-verify` first, then `bg-backend`.
+- [ ] **Run packet `008`: the onboarding plan coercion.** `bg-backend` on Opus,
+      then `bg-verify`. `onboard-client.js:44` `VALID_PLANS` is a FOURTH hardcoded
+      copy of the ladder, missing `growth` and `growth_pro`, and line 67 coerces
+      instead of rejecting: `VALID_PLANS.includes(plan) ? plan : 'essentials'`.
+      `Onboard.tsx:242` offers the real ladder from `PLAN_ORDER`, so a client
+      onboarded on Growth (€299) or Growth PRO (€449) is silently provisioned
+      with Essentials (€99) entitlements and no error is raised anywhere. This is
+      BROADER than the C1 defect recorded above, which covered only `growth_pro`
+      and only via `set-client-plan.js`. Found by the 2026-07-26 dashboard audit
+      and independently re-verified in source.
+      **Detection caveat, load-bearing:** affected rows cannot be found in
+      Supabase. A coerced row reads `essentials` and is identical to a genuine
+      Essentials customer, and `onboard-client.js` writes no `client_events` row
+      (unlike `set-client-plan.js:166`). Finding victims requires cross-
+      referencing Stripe subscriptions against `clients.plan`. Constantin ran that
+      comparison 2026-07-26; **the result was never recorded** — record it in
+      packet `008` before closing it.
+- [ ] **Commit the still-untracked packets and artifacts.** `2e7f048` committed
+      packet `008` and the audit, but `003`, `004`, `005`, both `006`s, `007`,
+      `docs/qa/plans-divergence-b1.md`, `deploy-pipeline-netlify.md` and
+      `plans-drift-fix-006.md` remain untracked. A fresh session still cannot
+      cold-start from them per AGENT-OS §4.
+- [ ] **`bg-design` spec for contrast and first-run**, then `bg-app` builds it.
+      Both from the 2026-07-26 audit, both measured: side panel vs canvas
+      **1.07:1** (border 1.31:1), active nav tab differs from inactive by
+      **1.24:1** text and 1.17:1 background with the whole active state resting on
+      one 3px rail, and the time-filter bar is worse at **1.39:1** with no rail.
+      WCAG 1.4.11 wants 3:1. First-run: a zero-data tenant sees "0% AI VISIBILITY
+      SCORE" across all six dimensions and AI Visibility calls an unmeasured brand
+      "Needs Work" — the product issues a verdict before it has data. `/sentiment`
+      at zero data renders 0 buttons and 0 links, an absolute dead end. Census:
+      52% reachable, 24% dead ends, five of six hit on day one.
+- [ ] **Engine palette is broken twice over** (audit §Amendment 4, validated with
+      `dataviz`'s validator, not by eye). Claude `#f97316` vs Meta `#f59e0b` is
+      ΔE **9.6** normal vision against a floor of 15, and 3.4 for tritanopia —
+      they co-render on the `/sentiment` and `/mentions` filter chip rows. Grok
+      `#94a3b8` fails the chroma floor and reads as a disabled series. Deeper
+      problem underneath: `#10b981` means ChatGPT AND Positive, `#ef4444` means
+      Google AI Mode AND Negative AND a categorical series. One hue, three
+      meanings — a token-semantics fix, not a recolor. `Competitors.tsx:258`
+      carries a fourth independent palette assigned by array index.
+- [ ] **Spec'd, not built: "View as current user"** (audit `FIX F-VIEWAS`).
+      Admin-only presentation toggle, invariant `effectiveIsAdmin = isAdmin &&
+      !viewingAsUser`. Must never mint or swap a token, never grant data access,
+      never weaken a server-side check; impersonated state must be continuously
+      visible. Touches auth, so it needs independent `bg-verify` before shipping.
+      Its absence is why the audit could only assess the viewer experience from
+      source.
+- [ ] **Write a migration file for `clients.plan`** in `db/`. The column was
+      created ad hoc and is the only column on `clients` with no migration on
+      disk, which is what made V1 unverifiable from source in the first place.
+      No CHECK constraint exists on it (confirmed 2026-07-26), so this is
+      hygiene, not a live defect.
 - [ ] **Confirm the Promotions panel renders for an admin** on the live Account
       page: the amber "backend isn't deployed yet" banner should be gone and
       replaced by "No promotions yet." plus a New promotion button. Everything
       either side of that call is verified; this last hop needs an admin login,
       which no agent has.
 - [ ] **Commit the untracked packets and artifacts** (`003`, `004`, `005`,
-      `docs/qa/plans-divergence-b1.md`, and the amended
+      `006`, `docs/qa/plans-divergence-b1.md`,
+      `docs/qa/plans-drift-fix-006.md`, and the amended
       `docs/arch/activation-path.md`). Until this lands, committed state lies
       about where the initiative is.
 - [ ] **Retroactive `bg-verify` scoped to `3dadd8b`.** `promotions-admin.js`
@@ -256,6 +353,49 @@ Closed 2026-07-26:
 - ~~Scheduled background triggers for engine evaluation runs.~~ Already built:
   `schedule-collections` runs hourly, inert by default. Only the cadence decision
   remains.
+- ~~Push `f6deb01` (`_plans.js` / `set-client-plan.js` drift fix).~~ Pushed
+  2026-07-26 with `2e7f048`; `main` is in sync with `origin/main`. `growth_pro` is
+  now assignable in production.
+- ~~Logo is not clickable / no way home.~~ `2e7f048`, verified live on the
+  deployed bundle `index-DFdb-swz.js`: the login wordmark is an `<a>` to
+  `https://getbrandgeo.com` (NOT `/`, which is gated and would bounce back), and
+  the sidebar and mobile wordmarks link to Overview.
+- ~~Scroll position carried across route changes.~~ `2e7f048`. Reproduced before
+  and after: `/mentions` at 900px → `/competitors` landed at 516px, now lands at
+  0. Note for whoever touches this next: react-router's `<ScrollRestoration>` is
+  NOT usable here — it requires a data router and this app mounts
+  `BrowserRouter` — and the scroll container is `<main>`, not the window.
+- ~~A viewer reaching `/usage` by URL got a blank screen.~~ `2e7f048`;
+  `Usage.tsx` now matches `Onboard.tsx:88`'s message-plus-link pattern.
+
+### Four §7.1 claims REFUTED by measurement 2026-07-26 — do not re-file
+
+The dashboard audit (`docs/qa/dashboard-audit-2026-07-26.md`) measured these and
+found nothing to fix. §7.1 below is stale on all four; re-filing any of them burns
+a build cycle.
+
+1. **"Overview renders light-themed."** False. `documentElement.className` is `""`
+   and body measures `rgb(10,15,30)` on all 12 routes.
+2. **"Overview chart overflows its container."** False. A real horizontal scroll
+   was attempted; `scrollX` never moved, and `docScrollW === innerWidth` at both
+   1280 and 375. `scrollWidth` alone is not evidence — ancestor-clipped decorative
+   elements are intentional.
+3. **"Cards are flat with no elevation."** False. 163 of 164 cards carry a
+   computed box-shadow (`index.css:269` to `:286`).
+4. **"Teal used for active states."** False. Zero `teal-` occurrences in
+   `AIVisibility.tsx` or `Prompts.tsx`.
+
+Also corrected: the scrollbar IS styled and passes contrast at 4.01:1, and
+`motion` v12 is Framer Motion under its current package name with
+`MotionConfig reducedMotion="user"` already wired at `App.tsx:88`.
+
+Role gating came out better than expected: all twelve privileged Netlify functions
+enforce `requireAuth({ adminOnly: true })` server-side against `user_profiles.role`
+— no surface hides a link and relies on that hiding for protection.
+
+Largest thing the audit could NOT reach: **light mode** (~60 `!important`
+overrides in `index.css`), untouched because exercising it mutates a persisted
+preference. Treat light mode as UNAUDITED.
 
 ### Note on this file's history
 
@@ -1308,6 +1448,13 @@ ongoing/occasional-update area, not a single scoped task), not be folded into
 unrelated task chats.
 
 ### 7.1 Audit findings (design-critique pass, 2026-07-08, live site + dashboard)
+
+> ⚠️ **STALE as of 2026-07-26. Four of this section's findings were REFUTED by
+> measurement** — the light-theme Overview, the chart overflow, the flat cards,
+> and the teal active states. See "Four §7.1 claims REFUTED by measurement" in
+> CURRENT STATE above before acting on anything below. The real defects on these
+> surfaces are contrast (side panel 1.07:1, active tab 1.24:1) and the first-run
+> experience, neither of which this section names.
 
 Checked live via browser: `getbrandgeo.com` (hero + "what you get" section)
 and `app.getbrandgeo.com` (Overview page), plus source-code check of
