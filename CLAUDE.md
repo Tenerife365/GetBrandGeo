@@ -323,10 +323,15 @@ top two are live and reachable by anyone on the internet right now.
       `34e41bb` does NOT need this: B1 treated `planConfig.ts` as its subject and
       confirmed `_cost.js` matches it, so ordering was violated but coverage was
       not.
-- [ ] **Close the A branch gap**: `bg-copy` over what is already live on the
-      homepage, then `bg-verify` (A4). `bg-web` shipped `801732c` plus four
-      follow-ups with no copy stage and no verification stage, so this is a copy
-      and verification pass over live pages, not a build.
+- [ ] **Close the A branch gap.** `bg-web` shipped `801732c` plus four follow-ups
+      with no copy stage and no verification stage, so this is a review and copy
+      pass over live pages, not a build. Sequence: run `landing-page-optimizer`
+      against the live homepage first, since it produces the evidence the other
+      two stages need, then `bg-copy` against its ledger, then `bg-verify` (A4).
+      Note `docs/design/homepage-hook.md` §2 already measured the page as FAILING
+      the three-second test at 1280x800, and §12 recorded seven defects of which
+      F6 and F7 were never assigned. The optimizer should try to REFUTE those
+      rather than inherit them; two audits today earned their keep that way.
 
 #### Deploy pipeline hardening
 
