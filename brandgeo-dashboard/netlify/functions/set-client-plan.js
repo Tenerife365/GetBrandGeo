@@ -22,7 +22,7 @@
 // ============================================================================
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('./_auth');
-const { isValidPlan, planRank, planUnlocks, PLAN_LABELS } = require('./_plans');
+const { isValidPlan, planRank, planUnlocks, PLAN_LABELS, PLAN_ORDER } = require('./_plans');
 const { sendBrandedEmail, APP_URL } = require('./_email');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -113,7 +113,9 @@ exports.handler = async (event) => {
   const notify = body.notify !== false;
 
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
-  if (!isValidPlan(plan)) return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid plan. One of: free, essentials, growth, managed, pro, enterprise` }) };
+  // Enumerate from PLAN_ORDER, never by hand: a prose copy of the ladder is a
+  // third mirror and drifts on its own (docs/qa/plans-divergence-b1.md §5).
+  if (!isValidPlan(plan)) return { statusCode: 400, headers, body: JSON.stringify({ error: `Invalid plan. One of: ${PLAN_ORDER.join(', ')}` }) };
   if (!GRANT_TYPES.has(grant_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'grant_type must be manual, trial or comp' }) };
 
   // Resolve the grant end date for trial/comp.
