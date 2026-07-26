@@ -53,9 +53,9 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
-      {"@type":"Question","name":"Does an AI engine always favor English over the local language, or vice versa?","acceptedAnswer":{"@type":"Answer","text":"No — Madrid's data shows it can go either way, unpredictably, even within the same engine. For the airport-hotel question, Gemini returned nothing in Spanish but a full answer in English. Meta did the exact opposite on the identical question — a real answer in Spanish, nothing in English. There's no simple rule that one language always wins."},"description":""},
+      {"@type":"Question","name":"Does an AI engine always favor English over the local language, or vice versa?","acceptedAnswer":{"@type":"Answer","text":"No, Madrid's data shows it can go either way, unpredictably, even within the same engine. For the airport-hotel question, Gemini returned nothing in Spanish but a full answer in English. Meta did the exact opposite on the identical question: a real answer in Spanish, nothing in English. There's no simple rule that one language always wins."},"description":""},
       {"@type":"Question","name":"Which category showed the strongest AI consensus in Madrid?","acceptedAnswer":{"@type":"Answer","text":"Hotels near Madrid-Barajas airport, by a wide margin. Hilton Madrid Airport was named by every engine that returned a usable result, in both Spanish and English. That's the pattern seen elsewhere in this research program too: well-documented, internationally recognizable brands (airport hotel chains, major software products) converge across engines, while smaller, independent, locally-known businesses fragment."}},
-      {"@type":"Question","name":"Why is ChatGPT missing from this data?","acceptedAnswer":{"@type":"Answer","text":"ChatGPT's collection failed on every Madrid prompt this run — a technical error, not evidence ChatGPT has zero visibility for Madrid brands. This page reflects the 4 engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds."}}
+      {"@type":"Question","name":"Why is ChatGPT missing from this data?","acceptedAnswer":{"@type":"Answer","text":"ChatGPT's collection failed on every Madrid prompt this run, a technical error, not evidence ChatGPT has zero visibility for Madrid brands. This page reflects the 4 engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds."}}
     ]
   }
   </script>
@@ -216,8 +216,8 @@
 <div class="page-hero">
   <div class="hero-badge">City Research &middot; Madrid</div>
   <h1>AI Visibility in Madrid: Why the Same Engine Can Answer <em>Differently in Spanish vs. English</em></h1>
-  <p>Like Berlin, Madrid was tested bilingually — 4 categories, each asked once in Spanish and once in English, across four AI engines. But Madrid's language pattern turned out to be a different, arguably harder problem: it isn't one language consistently winning. It's engines flipping in opposite directions on the exact same question.</p>
-  <p>For one prompt, Gemini returned nothing in Spanish and a full answer in English. Meta did the reverse on that same question — a real answer in Spanish, nothing in English. Meanwhile, a completely different category (hotels near Madrid's airport) produced the most unanimous result of any city tested so far.</p>
+  <p>Like Berlin, Madrid was tested bilingually: 4 categories, each asked once in Spanish and once in English, across four AI engines. But Madrid's language pattern turned out to be a different, arguably harder problem: it isn't one language consistently winning. It's engines flipping in opposite directions on the exact same question.</p>
+  <p>For one prompt, Gemini returned nothing in Spanish and a full answer in English. Meta did the reverse on that same question, a real answer in Spanish, nothing in English. Meanwhile, a completely different category (hotels near Madrid's airport) produced the most unanimous result of any city tested so far.</p>
   <div class="updated-note">Original research &middot; data collected 2026-07-10 &middot; BrandGEO's own AI Visibility pipeline</div>
 </div>
 
@@ -228,7 +228,7 @@
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">4/4</div>
-        <div class="finding-desc">Engines named the same hotel for the airport-hotel prompt &mdash; the strongest consensus of any category, any city, in this program so far</div>
+        <div class="finding-desc">Engines named the same hotel for the airport-hotel prompt: the strongest consensus of any category, any city, in this program so far</div>
       </div>
       <div class="finding">
         <div class="finding-number">2</div>
@@ -240,17 +240,17 @@
       </div>
       <div class="finding">
         <div class="finding-number">0</div>
-        <div class="finding-desc">ChatGPT results this run &mdash; a collection error, not evidence of zero visibility, see below</div>
+        <div class="finding-desc">ChatGPT results this run: a collection error, not evidence of zero visibility, see below</div>
       </div>
     </div>
   </div>
 
   <h2>What we actually asked, in both languages</h2>
-  <p class="lede">Each category below was asked twice — once in Spanish, once in English — specifically to see whether coverage held steady or shifted depending on the language of the question.</p>
+  <p class="lede">Each category below was asked twice, once in Spanish, once in English, specifically to see whether coverage held steady or shifted depending on the language of the question.</p>
   <div class="prompt-grid">
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"¿Qué hotel recomiendan cerca del aeropuerto de Madrid-Barajas?" / "Which hotel is recommended near Madrid-Barajas airport?"<span>Unanimous &mdash; every responding engine, both languages</span></div>
+      <div class="prompt-text">"¿Qué hotel recomiendan cerca del aeropuerto de Madrid-Barajas?" / "Which hotel is recommended near Madrid-Barajas airport?"<span>Unanimous: every responding engine, both languages</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
@@ -276,21 +276,21 @@
       <tr><td class="vertical">Airport hotel</td><td class="leader"><strong>Hilton Madrid Airport</strong></td><td class="score">Every responding engine</td></tr>
       <tr><td class="vertical">Real estate agencies</td><td class="leader"><strong>Engel &amp; Völkers</strong></td><td class="score">2 engines, both languages</td></tr>
       <tr><td class="vertical">Boutique hotels</td><td class="leader">Hotel Urso, The Principal Madrid</td><td class="score">Loose, 2 engines each</td></tr>
-      <tr><td class="vertical">Business dinner restaurants</td><td class="leader frag">No cross-engine leader</td><td class="score frag">&mdash;</td></tr>
+      <tr><td class="vertical">Business dinner restaurants</td><td class="leader frag">No cross-engine leader</td><td class="score frag">N/A</td></tr>
     </tbody>
   </table>
 
   <div class="callout teal">
     <div class="callout-label">The language flip, in practice</div>
-    <p>For the airport-hotel question, Gemini returned nothing usable in Spanish but gave a full, real answer in English. Meta did the exact opposite on that same prompt — a real answer in Spanish, nothing in English. Both happened on the identical question, in opposite directions, for two different engines. There's no simple "AI favors English" or "AI favors the local language" rule here — coverage is genuinely inconsistent, and it's specific to the engine and the exact query, not a fixed bias you can plan around with one assumption.</p>
+    <p>For the airport-hotel question, Gemini returned nothing usable in Spanish but gave a full, real answer in English. Meta did the exact opposite on that same prompt: a real answer in Spanish, nothing in English. Both happened on the identical question, in opposite directions, for two different engines. There's no simple "AI favors English" or "AI favors the local language" rule here. Coverage is genuinely inconsistent, and it's specific to the engine and the exact query, not a fixed bias you can plan around with one assumption.</p>
   </div>
 
   <h2>One engine held steady across languages. Two didn't.</h2>
-  <p class="lede">The business-dinner restaurant prompt surfaced a different kind of language pattern: not silence in one language, but a completely different set of recommendations depending on which language was asked. Meta named nearly the same shortlist of restaurants (DiverXo, Kabuki, El Prior, La Tasquita de Enfrente) in both Spanish and English. Claude and Perplexity gave two almost entirely different lists — the Spanish and English answers from the same engine barely overlapped at all. Worth noting: Meta wasn't consistently the "stable" engine across every category in this dataset — this behavior was specific to this one prompt, not a fixed trait to rely on.</p>
+  <p class="lede">The business-dinner restaurant prompt surfaced a different kind of language pattern: not silence in one language, but a completely different set of recommendations depending on which language was asked. Meta named nearly the same shortlist of restaurants (DiverXo, Kabuki, El Prior, La Tasquita de Enfrente) in both Spanish and English. Claude and Perplexity gave two almost entirely different lists. The Spanish and English answers from the same engine barely overlapped at all. Worth noting: Meta wasn't consistently the "stable" engine across every category in this dataset. This behavior was specific to this one prompt, not a fixed trait to rely on.</p>
 
   <div class="callout">
     <div class="callout-label">A data-quality note, not a finding</div>
-    <p>ChatGPT's collection failed on every Madrid prompt this run (a technical error, `status: error`) — it isn't included in the tables above. That's not evidence ChatGPT has zero visibility for Madrid brands; it's a gap in this specific data pull that a future re-run will close.</p>
+    <p>ChatGPT's collection failed on every Madrid prompt this run (a technical error, `status: error`). It isn't included in the tables above. That's not evidence ChatGPT has zero visibility for Madrid brands; it's a gap in this specific data pull that a future re-run will close.</p>
   </div>
 
   <h2>What this means if your business is in Madrid</h2>
@@ -298,7 +298,7 @@
     <li>
       <div class="check-num">1</div>
       <div class="check-body">
-        <h4>Check both languages — don't assume one predicts the other</h4>
+        <h4>Check both languages, don't assume one predicts the other</h4>
         <p>This data shows an engine can go silent in one language and answer fully in the other, in either direction. If you serve both Spanish-speaking locals and English-speaking visitors or expats, your visibility in one language tells you very little about the other.</p>
       </div>
     </li>
@@ -320,7 +320,7 @@
       <div class="check-num">4</div>
       <div class="check-body">
         <h4>Re-run this regularly, not once</h4>
-        <p>These answers reflect what the engines say today, in each language, this week. As this page shows, an engine's language coverage can flip between runs — a check from months ago won't tell you what's true now.</p>
+        <p>These answers reflect what the engines say today, in each language, this week. As this page shows, an engine's language coverage can flip between runs. A check from months ago won't tell you what's true now.</p>
       </div>
     </li>
   </ol>
@@ -329,7 +329,7 @@
   <div class="mini-faq">
     <div class="mini-faq-item">
       <h4>Does an AI engine always favor English over the local language, or vice versa?</h4>
-      <p>No — Madrid's data shows it can go either way, unpredictably, even within the same engine. For the airport-hotel question, Gemini returned nothing in Spanish but a full answer in English. Meta did the exact opposite on the identical question — a real answer in Spanish, nothing in English. There's no simple rule that one language always wins.</p>
+      <p>No, Madrid's data shows it can go either way, unpredictably, even within the same engine. For the airport-hotel question, Gemini returned nothing in Spanish but a full answer in English. Meta did the exact opposite on the identical question: a real answer in Spanish, nothing in English. There's no simple rule that one language always wins.</p>
     </div>
     <div class="mini-faq-item">
       <h4>Which category showed the strongest AI consensus in Madrid?</h4>
@@ -337,7 +337,7 @@
     </div>
     <div class="mini-faq-item">
       <h4>Why is ChatGPT missing from this data?</h4>
-      <p>ChatGPT's collection failed on every Madrid prompt this run — a technical error, not evidence ChatGPT has zero visibility for Madrid brands. This page reflects the 4 engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds.</p>
+      <p>ChatGPT's collection failed on every Madrid prompt this run, a technical error, not evidence ChatGPT has zero visibility for Madrid brands. This page reflects the 4 engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds.</p>
     </div>
   </div>
 
@@ -362,7 +362,7 @@
 
   <div class="cta-box">
     <h3>See how your Madrid business actually shows up in AI search</h3>
-    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; in the languages your customers actually search in. No signup, no credit card, no tool to configure.</p>
+    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, in the languages your customers actually search in. No signup, no credit card, no tool to configure.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">Want the research on why language matters for AI Visibility? Read <a href="/bg-014.html" style="color:var(--ac2)">BG-014</a>.</p>
   </div>
