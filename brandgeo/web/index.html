@@ -2263,7 +2263,10 @@
   </div>
 </footer>
 
-<script src="site.js"></script>
+<!-- Versioned on purpose: the server sends no Cache-Control for .js, so a
+     returning visitor would keep running the previously cached site.js. Bump
+     this whenever site.js changes in a way visitors must pick up. -->
+<script src="site.js?v=2026-07-26b"></script>
 <!-- ── AI KNOWLEDGE GRAPH (hero showpiece) ──────────────────────────────────
      Vanilla 2D canvas. No libraries, no build step, ~5KB. Visualises the 5 AI
      engines routing citation pulses into your brand node. Cursor-reactive
