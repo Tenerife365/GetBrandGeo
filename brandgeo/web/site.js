@@ -17,53 +17,49 @@
 
   // ── Homepage instant-score widget (index.html only) ──────────────────
   //
-  // SALES-ENGINE.md Component D: visitor enters a domain -> we call
-  // Component A's public audit endpoint -> show a live teaser score ->
-  // email-gate the full report. Component A (the backend that actually
-  // runs the audit) is owned by a different session (Master-DashboardDesign)
-  // and, as of this writing, has NOT been built yet -- there is no
-  // brandgeo-dashboard/**/*audit* file and nothing documented in CLAUDE.md
-  // beyond SALES-ENGINE.md's prose description. So this widget is built
-  // against the STUB CONTRACT below and fails open: any non-200 response,
-  // network error, malformed JSON, or timeout is treated as "Component A
-  // isn't live yet" and silently falls back to the pre-existing, already-
-  // working flow (redirect to signup with the domain pre-filled) --
-  // zero regression today, and the richer experience turns on by itself
-  // the moment Component A ships a matching endpoint. No code change is
-  // needed here when that happens, only these two URLs below (and possibly
-  // the response-field names, if A ships something different).
+  // SALES-ENGINE.md Component D: visitor enters a domain -> we call the audit
+  // endpoint -> show a live teaser score -> email-gate the full report.
   //
-  // STUB CONTRACT (Master-DashboardDesign should confirm/adjust, not the
-  // other way around -- this file assumes, doesn't dictate):
+  // 2026-07-26: this block used to point at `public-audit` and
+  // `public-audit-unlock`, names invented by the stub contract it was written
+  // against before Component A existed. Component A did ship, under different
+  // names, and nobody came back and changed these two URLs. Both returned 404
+  // in production, so every visitor who typed a domain fell into the catch
+  // below and was redirected to signup. The instant audit had never once
+  // resolved in place. The names below are read from the deployed functions.
   //
-  //   POST https://app.getbrandgeo.com/.netlify/functions/public-audit
-  //   Body:    { "domain": "example.com" }
-  //   200 OK:  { "score": 34, "topGap": "ChatGPT has never mentioned your
-  //              brand.", "token": "aud_9f3e2b1c" }
-  //   Anything else (4xx/5xx/network error/timeout/malformed JSON) is
-  //   treated as "not available" by this widget.
+  // REAL CONTRACT (brandgeo-dashboard/netlify/functions/audit-domain.js and
+  // get-audit-report.js and unlock-audit-report.js):
   //
-  //   POST https://app.getbrandgeo.com/.netlify/functions/public-audit-unlock
-  //   Body:    { "token": "aud_9f3e2b1c", "email": "visitor@company.com",
-  //              "domain": "example.com" }
-  //   200 OK:  { "ok": true }  -- server emails the full report and
-  //             captures the lead (HubSpot, per SALES-ENGINE.md). This
-  //             widget just shows a thank-you state on 200.
+  //   POST /.netlify/functions/audit-domain
+  //   Body:    { "domain": "example.com", "honeypot": "" }
+  //   Public callers are always forced to 'screening' depth (audit-domain.js:74),
+  //   which runs to completion synchronously, so this stays a single call:
+  //   200 OK:  { "token": "...", "status": "ready",
+  //              "teaser": { "domain": ..., "ai_score": 41, "category": ... } }
+  //   400/429: { "error": "<message meant for the visitor>" } -- shown as-is,
+  //            not treated as "endpoint down". A paused-for-the-month 429 must
+  //            not dump someone into signup.
   //
-  //   CORS NOTE for whoever builds Component A: this widget runs on
-  //   https://getbrandgeo.com and calls app.getbrandgeo.com cross-origin.
-  //   The existing authenticated dashboard functions' origin whitelist
-  //   (_auth.js) does NOT include getbrandgeo.com -- this is a separate,
-  //   intentionally-unauthenticated public endpoint, so it needs its own
-  //   CORS allow-list entry for https://getbrandgeo.com (and
-  //   https://www.getbrandgeo.com if that's ever used), not a loosening
-  //   of the authenticated functions' existing lock.
+  //   GET  /.netlify/functions/get-audit-report?token=...
+  //   200 OK:  { "status": "ready", "unlocked": false, "domain", "category",
+  //              "ai_score", "low_confidence", "gap_count" }
+  //   Called once after the score lands, only to build the gap sentence. Its
+  //   failure is non-fatal: the score still renders without it.
+  //
+  //   POST /.netlify/functions/unlock-audit-report
+  //   Body:    { "token": ..., "email": ..., "honeypot": "" }
+  //   200 OK:  server emails the full report and captures the lead.
+  //
+  //   CORS: _prospect_guard.js:19 allowlists https://getbrandgeo.com,
+  //   https://www.getbrandgeo.com and https://app.getbrandgeo.com. The
+  //   marketing site's own CSP must also list app.getbrandgeo.com in
+  //   connect-src -- it did not until 2026-07-26, see brandgeo/web/.htaccess.
   //
   //   RATE LIMITING: this file only does a soft, client-side,
   //   localStorage-based limit (bot/UX deterrent, trivially bypassed by
-  //   clearing storage or using another browser). Real enforcement must
-  //   live server-side in Component A, per SALES-ENGINE.md's guardrail
-  //   against auditing the whole internet.
+  //   clearing storage or using another browser). Real enforcement lives
+  //   server-side in _prospect_guard.js (per-IP plus a monthly spend cap).
   var brandInput = document.getElementById('brandInput');
   var auditBtn = document.getElementById('auditBtn');
   var auditHp = document.getElementById('auditHp');
@@ -75,10 +71,17 @@
   var auditSkeleton = document.getElementById('auditSkeleton');
 
   if (brandInput && auditBtn && auditResult) {
-    var AUDIT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/public-audit';
-    var AUDIT_UNLOCK_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/public-audit-unlock';
-    var AUDIT_TIMEOUT_MS = 12000;
+    var AUDIT_BASE = 'https://app.getbrandgeo.com/.netlify/functions/';
+    var AUDIT_ENDPOINT = AUDIT_BASE + 'audit-domain';
+    var AUDIT_REPORT_ENDPOINT = AUDIT_BASE + 'get-audit-report';
+    var AUDIT_UNLOCK_ENDPOINT = AUDIT_BASE + 'unlock-audit-report';
+    // A real screening audit measured 26.9s end to end on 2026-07-26. The old
+    // 12s ceiling aborted every one of them, so even once the URLs were right
+    // the widget would still have redirected to signup. Netlify's synchronous
+    // limit is 26s of function time, so this sits just past it.
+    var AUDIT_TIMEOUT_MS = 32000;
     var AUDIT_UNLOCK_TIMEOUT_MS = 10000;
+    var AUDIT_REPORT_TIMEOUT_MS = 8000;
     var AUDIT_RATE_KEY = 'bgAuditAttempts';
     var AUDIT_RATE_MAX = 3;
     var AUDIT_RATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
@@ -144,7 +147,26 @@
       auditResult.hidden = (which !== 'result');
     }
 
+    // The audit runs for the better part of half a minute. One static line for
+    // that long reads as a hang, so the label reports where it has got to. Job:
+    // mask latency, per docs/design/homepage-hook.md §7. Times are wall clock,
+    // not progress, and the copy is careful not to claim otherwise.
+    var skTimers = [];
+    function startSkeletonProgress() {
+      stopSkeletonProgress();
+      var el = document.getElementById('skLabel');
+      if (!el) return;
+      el.textContent = 'Asking the engines about your brand';
+      skTimers.push(setTimeout(function() { el.textContent = 'Reading what each engine came back with'; }, 7000));
+      skTimers.push(setTimeout(function() { el.textContent = 'Scoring the answers, nearly there'; }, 16000));
+    }
+    function stopSkeletonProgress() {
+      for (var i = 0; i < skTimers.length; i++) { clearTimeout(skTimers[i]); }
+      skTimers = [];
+    }
+
     function setButtonScanning(on) {
+      if (!on) stopSkeletonProgress();
       if (on) {
         auditBtn.disabled = true;
         brandInput.disabled = true;
@@ -186,7 +208,23 @@
       requestAnimationFrame(step);
     }
 
-    function renderAuditResult(domain, score, topGap, token) {
+    // Replaces the gap sentence once the locked report lands. Only three fields
+    // are readable before the email step: ai_score, category and gap_count.
+    function setAuditGap(rep) {
+      var el = document.getElementById('auditGap');
+      if (!el) return;
+      var n = typeof rep.gap_count === 'number' ? rep.gap_count : null;
+      var where = rep.category ? ' in ' + rep.category : '';
+      var msg;
+      if (n === null)   msg = 'Scored across the engines your customers ask' + where + '.';
+      else if (n === 0) msg = 'No blocking gaps found' + where + '. The full report shows what is holding the score back.';
+      else if (n === 1) msg = 'One gap is holding this score down' + where + '. The full report names it.';
+      else              msg = n + ' gaps are holding this score down' + where + '. The full report names them.';
+      if (rep.low_confidence) msg += ' Confidence is low on this one, the engines returned little to read.';
+      el.textContent = msg;
+    }
+
+    function renderAuditResult(domain, score, token, category) {
       score = Math.max(0, Math.min(100, Math.round(score)));
       showSlot('result');
       // The email row inside the result is now the next step, so the hero
@@ -211,7 +249,13 @@
             '<div class="audit-domain">' + escapeHtml(domain) + '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="audit-gap">' + escapeHtml(topGap) + '</div>' +
+        // Filled in by setAuditGap() once get-audit-report answers. Starts with
+        // the category the audit classified the domain into, which is already
+        // known and is better than an empty box.
+        '<div class="audit-gap" id="auditGap">' +
+          (category ? 'Scored against the brands AI names in ' + escapeHtml(category) + '.'
+                    : 'Scored across the engines your customers ask.') +
+        '</div>' +
         '<form class="audit-email-row" id="auditEmailForm" novalidate>' +
           '<input type="email" id="auditEmail" placeholder="you@company.com" aria-label="Your email" required>' +
           '<button type="submit" class="audit-email-btn">Email me the full breakdown &rarr;</button>' +
@@ -245,7 +289,7 @@
         fetchWithTimeout(AUDIT_UNLOCK_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: token, email: email, domain: domain })
+          body: JSON.stringify({ token: token, email: email, honeypot: '' })
         }, AUDIT_UNLOCK_TIMEOUT_MS).then(function(res) {
           if (!res.ok) throw new Error('unlock failed');
           return res.json();
@@ -280,23 +324,54 @@
       auditResult.innerHTML = '';
       auditBtn.classList.remove('is-secondary');
       showSlot('skeleton');
+      startSkeletonProgress();
       setButtonScanning(true);
       recordAuditAttempt();
 
       fetchWithTimeout(AUDIT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: val })
+        body: JSON.stringify({ domain: val, honeypot: '' })
       }, AUDIT_TIMEOUT_MS).then(function(res) {
-        if (!res.ok) throw new Error('audit endpoint not ready');
+        // 400 and 429 carry a message written for the visitor (a bad domain, a
+        // per-IP limit, the monthly cap). Those are answers, not outages, so
+        // they are shown rather than treated as "endpoint down".
+        if (res.status === 400 || res.status === 429) {
+          return res.json().catch(function() { return {}; }).then(function(d) {
+            var e = new Error('handled'); e.handled = true;
+            e.userMessage = (d && d.error) || 'That domain could not be checked. Try another.';
+            throw e;
+          });
+        }
+        if (!res.ok) throw new Error('audit endpoint not reachable');
         return res.json();
       }).then(function(data) {
-        if (!data || typeof data.score !== 'number' || !data.topGap) {
+        var teaser = data && data.teaser;
+        var score = teaser && teaser.ai_score;
+        if (typeof score !== 'number') {
+          // 'collecting' should not reach a public caller, which is forced to
+          // screening depth, but if it ever does this widget cannot wait for it.
           throw new Error('unexpected audit response shape');
         }
         setButtonScanning(false);
-        renderAuditResult(val, data.score, data.topGap, data.token);
-      }).catch(function() {
+        renderAuditResult(val, score, data.token, teaser.category);
+        // Second, non-fatal call: the gap sentence. The score is already on
+        // screen, so a failure here changes nothing the visitor can see.
+        fetchWithTimeout(AUDIT_REPORT_ENDPOINT + '?token=' + encodeURIComponent(data.token || ''), {
+          method: 'GET'
+        }, AUDIT_REPORT_TIMEOUT_MS).then(function(r) {
+          return r.ok ? r.json() : null;
+        }).then(function(rep) {
+          if (rep && rep.status === 'ready') setAuditGap(rep);
+        }).catch(function() { /* score stands on its own */ });
+      }).catch(function(err) {
+        if (err && err.handled) {
+          setButtonScanning(false);
+          showSlot('card');
+          setAuditStatus(err.userMessage, true);
+          brandInput.focus();
+          return;
+        }
         // The audit endpoint errored, timed out, or answered in a shape this
         // widget does not recognise. Fall back to the pre-existing flow rather
         // than leaving the visitor stuck on a dead button.
