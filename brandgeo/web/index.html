@@ -11,10 +11,10 @@
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
   <title>BrandGEO | AI Visibility Intelligence</title>
-  <meta name="description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Meta AI. BrandGEO monitors, scores, and tracks your AI presence.">
+  <meta name="description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode. BrandGEO monitors, scores, and tracks your AI presence.">
   <link rel="canonical" href="https://getbrandgeo.com/">
   <meta property="og:title" content="BrandGEO: Be the brand AI recommends">
-  <meta property="og:description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Meta AI. BrandGEO monitors, scores, and tracks your AI presence.">
+  <meta property="og:description" content="See how visible your brand is across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode. BrandGEO monitors, scores, and tracks your AI presence.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://getbrandgeo.com/">
   <meta property="og:image" content="https://getbrandgeo.com/images/og-home.png">
@@ -33,7 +33,7 @@
         "legalName": "Constantin Daniel",
         "url": "https://getbrandgeo.com/",
         "logo": "https://getbrandgeo.com/logo.png",
-        "description": "BrandGEO is an AI Visibility Intelligence platform that monitors and scores how brands are mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Meta AI.",
+        "description": "BrandGEO is an AI Visibility Intelligence platform that monitors and scores how brands are mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode.",
         "disambiguatingDescription": "BrandGEO (getbrandgeo.com) is an independent, Spain-based company. It is unrelated to and shares no ownership, product, or affiliation with any similarly-named domain, including brandgeo.co or brangeo.app, which are separate, unaffiliated products.",
         "foundingDate": "2026",
         "founder": {
@@ -66,7 +66,7 @@
         "@id": "https://getbrandgeo.com/#website",
         "url": "https://getbrandgeo.com/",
         "name": "BrandGEO",
-        "description": "AI Visibility Intelligence that monitors and improves how your brand is mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Meta AI.",
+        "description": "AI Visibility Intelligence that monitors and improves how your brand is mentioned, recommended, and cited across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode.",
         "publisher": {"@id": "https://getbrandgeo.com/#organization"},
         "inLanguage": "en"
       },
@@ -76,7 +76,7 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
         "url": "https://getbrandgeo.com/",
-        "description": "AI Visibility Intelligence platform: a weighted 0-100 score across six dimensions, per-engine breakdowns for ChatGPT, Gemini, Claude, Perplexity and Meta AI, competitor tracking, and a prioritised Fix This action hub.",
+        "description": "AI Visibility Intelligence platform: a weighted 0-100 score across six dimensions, per-engine breakdowns for ChatGPT, Gemini, Claude, Perplexity and Google AI Mode, competitor tracking, and a prioritised Fix This action hub.",
         "offers": [
           {"@type": "Offer", "name": "BrandGEO Free", "price": "0", "priceCurrency": "EUR"},
           {"@type": "Offer", "name": "BrandGEO Essentials", "price": "99", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "99", "priceCurrency": "EUR", "unitText": "MONTH"}},
@@ -139,6 +139,28 @@
       transition: background .3s, color .3s;
     }
 
+    /* ── FOCUS RING ──
+       One pattern for every interactive control, matching the .engine-chip ring
+       that was already in this file. docs/design/homepage-hook.md §9.2: the
+       primary CTA shipped with `outline:none` and nothing replacing it. */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--ac);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+    /* The domain field's input is borderless inside a gradient wrapper, so the
+       ring belongs on the wrapper, not on the input itself. */
+    .search-wrap:focus-within {
+      outline: 2px solid var(--ac);
+      outline-offset: 3px;
+    }
+    .search-inner input:focus-visible { outline: none; }
+
     /* ── SCROLL REVEAL + LIVE-FEEL MOTION ── */
     .reveal {
       opacity: 0;
@@ -171,7 +193,9 @@
       -webkit-backdrop-filter: blur(16px);
       z-index: 100;
     }
-    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    /* Padding brings the nav controls to the same 44px hit-target floor as
+       every other control on the page. */
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; padding: 6px 0; }
     .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
     .logo-text .geo {
       background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
@@ -179,25 +203,29 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
+    nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; padding: 11px 0; transition: color .15s; }
     nav a:hover { color: var(--t); }
+    /* Outline, not solid. homepage-hook.md §3.2: exactly one solid --ac-strong
+       fill above the fold, and it belongs to the hero domain field. */
     .nav-cta {
-      background: var(--ac-strong) !important;
-      color: #fff !important;
-      padding: 8px 18px;
+      background: transparent !important;
+      color: var(--t) !important;
+      border: 1px solid var(--bd2);
+      padding: 11px 18px;
       border-radius: 8px;
       font-weight: 700;
       margin-left: 16px !important;
-      transition: opacity .15s !important;
+      transition: border-color .15s, color .15s !important;
     }
-    .nav-cta:hover { opacity: .9; }
+    .nav-cta:hover { border-color: var(--ac); color: var(--t) !important; }
     .theme-toggle {
       background: none;
       border: 1px solid var(--bd2);
       color: var(--t2);
       cursor: pointer;
-      width: 34px;
-      height: 34px;
+      /* 44px minimum hit target, same floor as every other control. */
+      width: 44px;
+      height: 44px;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -216,6 +244,23 @@
       max-width: 1160px;
       margin: 0 auto;
       position: relative;
+    }
+    /* The hero fills the first screen, so the fold lands on its bottom edge and
+       the first proof block always needs a deliberate scroll. Without this the
+       engines strip rendered at y=675 at 1280x800, above the fold, where it
+       duplicated the engine names the evidence card already shows and made the
+       proof order in homepage-hook.md §5 a pile rather than an order.
+       Height-capped so a short window never stretches the hero past usefulness. */
+    @media (min-width: 901px) {
+      .hero {
+        min-height: calc(100vh - 76px);
+        max-height: 900px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-bottom: 40px;
+      }
+      .hero-split { width: 100%; }
     }
     /* Full-bleed wrapper: breaks out of .hero's 680px content column so the
        background spans the whole viewport width, not just a narrow center
@@ -317,7 +362,9 @@
       color: var(--badge-text);
       padding: 6px 14px;
       border-radius: 30px;
-      font-size: 0.72rem;
+      /* 14px floor: below it, the three-second test in hook-thesis-web.md §4
+         excludes this element from scoring and it carries P2. */
+      font-size: 0.875rem;
       font-weight: 700;
       letter-spacing: .5px;
       text-transform: uppercase;
@@ -334,10 +381,13 @@
     }
     .hero h1 {
       /* Larger, tighter anchor so the eye lands on the promise in the first
-         second (audit weakness #2 — flat first-screen hierarchy). */
-      font-size: clamp(2.85rem, 6.4vw, 4.2rem);
+         second (audit weakness #2, flat first-screen hierarchy).
+         Floor lowered from 2.85rem: measured at 375x812 the old floor took
+         three lines and 142px and pushed the score evidence below the fold
+         (homepage-hook.md §2.2). Two lines at both widths is the constraint. */
+      font-size: clamp(2.2rem, 6.4vw, 3.5rem);
       font-weight: 900;
-      line-height: 1.04;
+      line-height: 1.06;
       letter-spacing: -.055em;
       margin-bottom: 22px;
       color: var(--t);
@@ -352,41 +402,47 @@
     .hero p { font-size: 1.05rem; color: var(--t2); max-width: 500px; margin: 0 auto 36px; line-height: 1.7; }
 
     /* ── SPLIT HERO (product above the fold) ── */
-    .hero-split { display: grid; grid-template-columns: 1.03fr .97fr; gap: 56px; align-items: center; }
+    /* The evidence card lost two of its four groups (homepage-hook.md §3.5), so
+       the copy column takes the width back. */
+    .hero-split { display: grid; grid-template-columns: 1.08fr .92fr; gap: 56px; align-items: center; }
     .hero-copy { min-width: 0; }
-    .hero-copy .hero-badge { margin-bottom: 22px; }
-    .hero-copy h1 { margin: 0 0 20px; }
-    .hero-copy p { margin: 0 0 28px; max-width: 40ch; }
-    .hero-copy .search-wrap { margin: 0; max-width: 470px; }
+    .hero-copy .hero-badge { margin-bottom: 16px; }
+    .hero-copy h1 { margin: 0 0 16px; }
+    .hero-copy p { margin: 0 0 20px; max-width: 40ch; }
+    .hero-copy .search-wrap { margin: 0; max-width: 520px; }
     .hero-copy .audit-status, .hero-copy .audit-result { text-align: left; }
-    .hero-trust { margin-top: 20px; display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: .85rem; color: var(--t3); align-items: center; }
-    .hero-trust b { color: var(--t2); font-weight: 700; }
+    /* 14px and --t2, not 13.6px and --t3: --t3 measures 3.05:1 on --bg in dark
+       and 2.32:1 in light, which fails AA (homepage-hook.md §9.1). */
+    .hero-trust { margin-top: 14px; display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: .875rem; color: var(--t2); align-items: center; }
+    .hero-trust b { color: var(--t); font-weight: 700; }
     .hero-trust .sep { color: var(--bd2); }
     .hero-visual { position: relative; min-width: 0; }
     .hero-visual .preview-wrap { margin: 0; }
     @media (max-width: 900px) {
-      .hero-split { grid-template-columns: 1fr; gap: 40px; }
+      .hero-split { grid-template-columns: 1fr; gap: 22px; }
       .hero-visual { max-width: 470px; margin: 0 auto; width: 100%; }
-      .hero-copy p { max-width: none; }
+      .hero-copy p { max-width: none; line-height: 1.55; }
       .hero-copy .search-wrap { max-width: none; }
     }
 
     /* ── ENGINES-WE-MONITOR STRIP ── */
     .engines-strip { max-width: 1060px; margin: 40px auto 0; border-top: 1px solid var(--bd); border-bottom: 1px solid var(--bd); padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 12px 28px; flex-wrap: wrap; }
-    .engines-strip .es-label { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); font-weight: 700; }
+    .engines-strip .es-label { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--t2); font-weight: 700; }
     .engines-strip .es-item { display: inline-flex; align-items: center; gap: 8px; color: var(--t2); font-weight: 600; font-size: .92rem; }
     .engines-strip .es-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
     /* ── RESEARCH CREDIBILITY BAND ── */
     .research-band { max-width: 1060px; margin: 32px auto 0; display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding: 22px 26px; background: linear-gradient(120deg, rgba(139,92,246,.07), rgba(0,212,170,.05)); border: 1px solid var(--bd); border-radius: 16px; }
     .research-band .rb-badge { width: 50px; height: 50px; border-radius: 12px; background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.3); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
-    .research-band h3 { font-size: 1rem; font-weight: 800; margin-bottom: 4px; color: var(--t); }
+    .research-band h2 { font-size: 1rem; font-weight: 800; margin-bottom: 4px; color: var(--t); }
     .research-band p { font-size: .88rem; color: var(--t2); margin: 0; max-width: 64ch; line-height: 1.6; }
     .research-band .rb-links { display: flex; gap: 10px; flex-shrink: 0; }
-    .research-band .rb-links a { white-space: nowrap; font-size: .85rem; font-weight: 700; text-decoration: none; padding: 9px 15px; border-radius: 9px; border: 1px solid var(--bd2); color: var(--t); transition: border-color .15s, opacity .15s; }
+    .research-band .rb-links a { white-space: nowrap; font-size: .85rem; font-weight: 700; text-decoration: none; padding: 11px 16px; border-radius: 9px; border: 1px solid var(--bd2); color: var(--t); transition: border-color .15s, opacity .15s; }
     .research-band .rb-links a:hover { border-color: var(--ac); }
-    .research-band .rb-links a.rb-pri { background: var(--ac-strong); border-color: var(--ac-strong); color: #fff; }
-    .research-band .rb-links a.rb-pri:hover { opacity: .9; }
+    /* Outline, not a solid fill: proof is not a call to action, and only the
+       hero domain field carries the solid --ac-strong (homepage-hook.md §3.2). */
+    .research-band .rb-links a.rb-pri { border-color: var(--bd2); color: var(--t); }
+    .research-band .rb-links a.rb-pri:hover { border-color: var(--ac); }
     @media (max-width: 760px) {
       .research-band { grid-template-columns: 1fr; text-align: center; justify-items: center; }
       .research-band .rb-links { flex-wrap: wrap; justify-content: center; }
@@ -418,14 +474,16 @@
       font-family: 'Inter', system-ui, sans-serif;
       padding: 10px 0;
     }
-    .search-inner input::placeholder { color: var(--t3); }
+    .search-inner input::placeholder { color: var(--t2); }
     .search-btn {
       background: var(--ac-strong);
       color: #fff;
       border: none;
       border-radius: 10px;
-      padding: 12px 20px;
-      font-size: 0.88rem;
+      /* 44px minimum hit target. It shipped at 43px (homepage-hook.md §9.3). */
+      padding: 14px 22px;
+      min-height: 44px;
+      font-size: 0.94rem;
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
@@ -436,6 +494,22 @@
     }
     .search-btn:hover { opacity: .9; transform: scale(.98); }
     .search-btn:disabled { opacity: .75; cursor: default; transform: none; }
+    /* Once a result is on screen the next step is the email row inside it, so
+       this control steps down to "check another domain" and gives up the solid
+       fill. Exactly one solid --ac-strong above the fold at any one moment. */
+    .search-btn.is-secondary {
+      background: transparent;
+      color: var(--t);
+      border: 1px solid var(--bd2);
+    }
+    .search-btn.is-secondary:hover { border-color: var(--ac); opacity: 1; }
+    /* Below 560px a single row leaves roughly 110px of input beside a 200px
+       button, so the visitor cannot read back the domain they typed. */
+    @media (max-width: 560px) {
+      .search-inner { flex-direction: column; align-items: stretch; padding: 6px; gap: 6px; }
+      .search-inner input { padding: 12px 12px; min-height: 48px; }
+      .search-btn { width: 100%; min-height: 48px; }
+    }
 
     /* ── AUDIT WIDGET (instant teaser score + email capture) ── */
     .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
@@ -443,8 +517,8 @@
       max-width: 560px;
       margin: 10px auto 0;
       min-height: 16px;
-      font-size: 0.78rem;
-      color: var(--t3);
+      font-size: 0.875rem;
+      color: var(--t2);
     }
     .audit-status.is-error { color: #f87171; }
     .search-btn .spinner {
@@ -460,30 +534,51 @@
     }
     @keyframes bgSpin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .search-btn .spinner { animation: none; } }
-    .audit-result {
-      max-width: 560px;
-      margin: 16px auto 0;
-      background: var(--s2);
+    /* The result takes the evidence card's position and size, because the card
+       is a preview of this exact layout. Rendering it under the field instead
+       pushed the trust row down at the moment the visitor was reading a number,
+       and on mobile it moved content under the thumb. homepage-hook.md §8. */
+    .audit-result, .audit-skeleton {
+      background: var(--s);
       border: 1px solid var(--bd2);
       border-radius: 16px;
       padding: 22px 24px;
       text-align: left;
-      animation: bgFadeUp .35s ease;
+      box-shadow: 0 30px 60px -20px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
     }
-    @keyframes bgFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .audit-result { animation: bgFadeUp .22s ease; }
+    @keyframes bgFadeUp { from { opacity: 0; } to { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { .audit-result { animation: none; } }
     .audit-result-top { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
-    .audit-ring-wrap { position: relative; width: 60px; height: 60px; flex-shrink: 0; }
-    .audit-ring-wrap svg { width: 60px; height: 60px; }
+    .audit-ring-wrap { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+    .audit-ring-wrap svg { width: 88px; height: 88px; }
     .audit-ring-num {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 0.95rem; color: var(--t);
+      font-weight: 900; font-size: 2.1rem; color: var(--t);
+      letter-spacing: -.04em; font-variant-numeric: tabular-nums;
     }
-    .audit-headline { font-size: 0.95rem; font-weight: 700; color: var(--t); margin-bottom: 3px; text-align: left; }
-    .audit-domain { font-size: 0.78rem; color: var(--t3); text-align: left; }
+
+    /* Scanning state: a skeleton that matches the result layout, never a
+       spinner that reflows. Its job is to mask up to 12s of latency while
+       holding the layout the answer will land in. */
+    .audit-skeleton { animation: bgFadeUp .22s ease; }
+    .sk-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .sk-ring { width: 88px; height: 88px; border-radius: 50%; border: 6px solid var(--bd2); flex-shrink: 0; }
+    .sk-lines { flex: 1; min-width: 0; }
+    .sk-bar { height: 12px; border-radius: 6px; background: var(--bd2); margin-bottom: 9px; }
+    .sk-bar.w70 { width: 70%; }
+    .sk-bar.w45 { width: 45%; }
+    .sk-bar.w90 { width: 90%; }
+    .sk-bar.w60 { width: 60%; }
+    .audit-skeleton .sk-pulse { animation: skPulse 1.4s ease-in-out infinite; }
+    @keyframes skPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+    @media (prefers-reduced-motion: reduce) { .audit-skeleton .sk-pulse { animation: none; } }
+    .sk-label { font-size: 0.875rem; color: var(--t2); margin-top: 4px; }
+    .audit-headline { font-size: 1rem; font-weight: 700; color: var(--t); margin-bottom: 3px; text-align: left; }
+    .audit-domain { font-size: 0.875rem; color: var(--t2); text-align: left; }
     .audit-gap {
-      font-size: 0.85rem;
+      font-size: 0.94rem;
       color: var(--t2);
       line-height: 1.55;
       background: var(--s);
@@ -506,14 +601,17 @@
       outline: none;
     }
     .audit-email-row input:focus { border-color: var(--ac); }
-    .audit-email-row input::placeholder { color: var(--t3); }
+    .audit-email-row input::placeholder { color: var(--t2); }
     .audit-email-btn {
-      background: var(--ac);
+      /* --ac with white text is 4.23:1 and fails AA. --ac-strong is 5.40:1 and
+         the token comment already names it the AA-safe fill for white text. */
+      background: var(--ac-strong);
       color: #fff;
       border: none;
       border-radius: 10px;
-      padding: 11px 18px;
-      font-size: 0.85rem;
+      padding: 12px 18px;
+      min-height: 44px;
+      font-size: 0.9rem;
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
@@ -522,7 +620,7 @@
     }
     .audit-email-btn:hover { opacity: .9; transform: scale(.98); }
     .audit-email-btn:disabled { opacity: .75; cursor: default; transform: none; }
-    .audit-fine-print { font-size: 0.68rem; color: var(--t3); margin-top: 8px; }
+    .audit-fine-print { font-size: 0.875rem; color: var(--t2); margin-top: 8px; }
     .audit-success { font-size: 0.9rem; color: var(--t); padding: 4px 2px; line-height: 1.6; }
     .audit-success strong { color: var(--ac2); }
 
@@ -718,78 +816,148 @@
       .live-ticker { display: none; }
     }
 
-    /* preview inner layout */
-    .preview-top { display: grid; grid-template-columns: auto 1fr; gap: 14px; margin-bottom: 14px; }
+    /* ── EVIDENCE CARD (E6) ──
+       Two groups only: the score and the engine split. The six dimension bars
+       moved to proof block 2 and the fix rows to proof block 4, per
+       homepage-hook.md §3.5. Nothing here renders below 14px: the shipped card
+       put 18 of its leaves under the three-second test's exclusion threshold. */
+    .preview-card-head { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .preview-sample {
+      font-size: 0.875rem;
+      color: var(--t2);
+      border: 1px solid var(--bd);
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
     .preview-score-box {
       background: var(--s2);
       border: 1px solid var(--bd);
       border-radius: 10px;
-      padding: 14px 18px;
+      padding: 16px 18px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      flex-shrink: 0;
+      gap: 18px;
+      margin-bottom: 16px;
     }
-    .preview-ring-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+    .preview-ring-wrap { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
     .preview-ring-num {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
     }
-    .preview-ring-num .num { font-size: 1.35rem; font-weight: 900; color: var(--t); line-height: 1; letter-spacing: -.04em; }
-    .preview-ring-num .denom { font-size: 0.65rem; color: var(--t3); }
-    .preview-score-meta { font-size: 0.7rem; color: var(--t3); }
-    .preview-score-meta .improving { color: var(--ac2); font-weight: 600; font-size: 0.78rem; display: block; margin: 2px 0; }
+    .preview-ring-num .num { font-size: 2.1rem; font-weight: 900; color: var(--t); line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .preview-ring-num .denom { font-size: 0.875rem; color: var(--t2); }
+    .preview-score-meta { font-size: 0.875rem; color: var(--t2); min-width: 0; }
+    .preview-score-meta .psm-label { display: block; color: var(--t); font-weight: 700; margin-bottom: 2px; }
+    .preview-score-meta .improving { color: var(--ac2); font-weight: 600; display: block; }
 
+    /* Dimension bars: no longer in the hero card, reused by proof block 2. */
     .preview-dims-box {
       background: var(--s2);
       border: 1px solid var(--bd);
       border-radius: 10px;
-      padding: 12px 14px;
+      padding: 18px 20px;
     }
-    .preview-dims-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 8px; }
-    .preview-dims-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 20px; }
-    .dim-row .dim-top { display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 3px; }
-    .dim-row .dim-name { color: var(--t2); }
-    .dim-row .dim-val { font-weight: 600; }
-    .dim-bar { height: 3px; background: var(--bd); border-radius: 2px; overflow: hidden; }
-    .dim-fill { height: 100%; border-radius: 2px; }
+    .preview-dims-label { font-size: 0.875rem; color: var(--t2); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 14px; }
+    .preview-dims-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+    .dim-row .dim-top { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; }
+    .dim-row .dim-name { color: var(--t); }
+    .dim-row .dim-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .dim-bar { height: 5px; background: var(--bd); border-radius: 3px; overflow: hidden; }
+    .dim-fill { height: 100%; border-radius: 3px; }
+    @media (max-width: 560px) { .preview-dims-grid { grid-template-columns: 1fr; gap: 12px; } }
 
-    .preview-engines-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 7px; }
-    .preview-engines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+    .preview-engines-label { font-size: 0.875rem; color: var(--t2); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 10px; }
+    .preview-engines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
     .pe-card {
       background: var(--s2);
       border: 1px solid var(--bd);
       border-radius: 8px;
-      padding: 10px 4px;
+      padding: 12px 6px;
       text-align: center;
     }
     .pe-card.know { border-color: rgba(139,92,246,.3); background: rgba(139,92,246,.04); }
     .pe-card.partial { border-color: rgba(251,146,60,.3); background: rgba(251,146,60,.04); }
-    .pe-card.missing { border-color: rgba(248,113,113,.25); background: rgba(248,113,113,.03); opacity: .75; }
-    .pe-name { font-size: 0.62rem; color: var(--t3); margin-bottom: 4px; font-weight: 500; }
-    .pe-pos { font-size: 1.1rem; font-weight: 900; line-height: 1; margin-bottom: 3px; letter-spacing: -.03em; }
-    .pe-status { font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; }
+    .pe-card.missing { border-color: rgba(248,113,113,.25); background: rgba(248,113,113,.03); }
+    /* The engine name was 10.4px and the rank 17.6px, so the largest thing in
+       the cell was the number a visitor cannot interpret and the smallest was
+       the word that gives it meaning. */
+    .pe-name { font-size: 0.875rem; color: var(--t); margin-bottom: 5px; font-weight: 600; }
+    .pe-pos { font-size: 1.1rem; font-weight: 900; line-height: 1; margin-bottom: 5px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .pe-status { font-size: 0.875rem; font-weight: 600; padding: 1px 6px; border-radius: 3px; }
     .pe-status.know { color: #c4b5fd; background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3); }
     .pe-status.partial { color: #fb923c; background: rgba(251,146,60,.12); border: 1px solid rgba(251,146,60,.2); }
     .pe-status.missing { color: #f87171; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.18); }
 
-    .preview-fix-label { font-size: 0.65rem; color: var(--t3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 7px; }
+    /* Fix rows: no longer in the hero card, reused by proof block 4 step one. */
+    .preview-fix-label { font-size: 0.875rem; color: var(--t2); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 10px; }
     .fix-row {
       display: flex;
       align-items: flex-start;
-      gap: 10px;
-      padding: 9px 12px;
+      gap: 12px;
+      padding: 12px 14px;
       border-radius: 8px;
-      margin-bottom: 5px;
+      margin-bottom: 8px;
     }
     .fix-row.p0 { background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.12); }
     .fix-row.p1 { background: rgba(251,146,60,.04); border: 1px solid rgba(251,146,60,.11); }
-    .fix-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; margin-top: 1px; }
+    .fix-row.p2 { background: rgba(139,92,246,.04); border: 1px solid rgba(139,92,246,.14); }
+    .fix-badge { font-size: 0.8rem; font-weight: 700; padding: 2px 8px; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
     .fix-badge.p0 { background: rgba(248,113,113,.12); color: #f87171; }
     .fix-badge.p1 { background: rgba(251,146,60,.12); color: #fb923c; }
-    .fix-title { font-size: 0.8rem; font-weight: 600; color: var(--t); margin-bottom: 2px; }
-    .fix-desc { font-size: 0.72rem; color: var(--t2); line-height: 1.5; }
+    .fix-badge.p2 { background: rgba(139,92,246,.14); color: #c4b5fd; }
+    .fix-title { font-size: 0.94rem; font-weight: 700; color: var(--t); margin-bottom: 3px; }
+    .fix-desc { font-size: 0.875rem; color: var(--t2); line-height: 1.55; }
+
+    /* ── PROOF BLOCK 4: THE CHAIN ──
+       homepage-hook.md §4. One connected track, not three product cards. AI SEO
+       and AI Social appeared exactly once on this page before now, inside the
+       Growth PRO pricing card. Shared shell plus one connector is the one-stop
+       claim rendered visually; size encodes subordination. */
+    .chain { display: grid; grid-template-columns: 1.4fr auto 1fr auto 1fr; align-items: stretch; gap: 0; margin-top: 40px; }
+    .chain-step {
+      background: var(--s);
+      border: 1px solid var(--bd);
+      border-radius: var(--r);
+      padding: 22px;
+      min-width: 0;
+    }
+    .chain-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      color: var(--t2);
+      font-size: 1.1rem;
+      position: relative;
+    }
+    .chain-link::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; top: 50%;
+      height: 1px;
+      background: var(--bd2);
+    }
+    .chain-link span { position: relative; background: var(--bg); padding: 0 6px; line-height: 1; }
+    .chain-pillar { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ac); margin-bottom: 10px; }
+    .chain-step h3 { font-size: 1rem; font-weight: 700; color: var(--t); margin-bottom: 8px; }
+    .chain-step > p { font-size: 0.875rem; color: var(--t2); line-height: 1.6; margin: 0; }
+    .chain-plan {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--t2);
+      border: 1px solid var(--bd);
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+    @media (max-width: 900px) {
+      .chain { grid-template-columns: 1fr; }
+      .chain-link { width: auto; height: 34px; }
+      .chain-link::before { left: 50%; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
+      .chain-link span { background: var(--bg); padding: 6px 0; }
+    }
 
     /* ── DIVIDER ── */
     .section-divider { border: none; border-top: 1px solid var(--bd); }
@@ -1343,24 +1511,28 @@
     <!-- LEFT: copy + audit -->
     <div class="hero-copy">
       <div class="hero-badge">AI Visibility Platform</div>
-      <h1>Be the brand<br><em>AI recommends.</em></h1>
-      <p>Every day your customers ask ChatGPT, Gemini, Claude, Perplexity and Meta AI for recommendations. See exactly where you stand, then fix it.</p>
+      <h1>Does AI recommend<br><em>your brand?</em></h1>
+      <p>Check your domain. See what five AI engines say when your customers ask.</p>
       <div class="search-wrap">
         <div class="search-inner">
-          <input type="text" id="brandInput" placeholder="yourcompany.com or brand name" aria-label="Enter your brand or domain">
+          <input type="text" id="brandInput" placeholder="yourcompany.com" aria-label="Enter your brand or domain">
           <!-- Honeypot: invisible to real visitors. Bots that fill it are dropped
                client-side before the audit endpoint is called. Real gating is
                server-side (SALES-ENGINE.md Component A) -- this is a cheap first filter. -->
           <input type="text" id="auditHp" name="company_website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
-          <button class="search-btn" id="auditBtn">Check My AI Visibility &rarr;</button>
+          <button class="search-btn" id="auditBtn">Check my visibility &rarr;</button>
         </div>
       </div>
       <div class="audit-status" id="auditStatus" aria-live="polite"></div>
-      <div class="audit-result" id="auditResult" hidden></div>
+      <!-- Trust row carries none of the three scoring parts in the
+           three-second test. Its job is to remove cost from the field above it,
+           so it is capped at three items. "Results in 48h" was removed: that is
+           the done-for-you motion and it contradicted the instant audit
+           promised by the field directly above it (hook-thesis-web.md §8).
+           "50+ brands audited" was removed as untraceable (§5). -->
       <div class="hero-trust">
         <span><b>5</b> AI engines</span><span class="sep">&middot;</span>
-        <span><b>50+</b> brands audited</span><span class="sep">&middot;</span>
-        <span>Results in <b>48h</b></span><span class="sep">&middot;</span>
+        <span>Result in seconds</span><span class="sep">&middot;</span>
         <span>No credit card</span>
       </div>
     </div>
@@ -1368,75 +1540,64 @@
     <div class="hero-visual">
       <div class="preview-wrap">
         <div class="preview-glow"></div>
-        <div class="live-ticker" aria-hidden="true">
-          <span class="ticker-dot"></span>
-          <span id="tickerText">ChatGPT mentioned your brand, 2 min ago</span>
-        </div>
-        <div class="preview-card">
-          <!-- Score + Dimensions -->
-          <div class="preview-top">
-            <div class="preview-score-box">
-              <div class="preview-ring-wrap">
-                <svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg);" aria-hidden="true">
-                  <circle cx="36" cy="36" r="28" fill="none" stroke="var(--bd2)" stroke-width="5.5"/>
-                  <circle id="scoreRingProgress" cx="36" cy="36" r="28" fill="none" stroke="url(#scoreGrad)" stroke-width="5.5"
-                    stroke-dasharray="175.93" stroke-dashoffset="175.93" data-target-offset="63" stroke-linecap="round"/>
-                  <defs>
-                    <linearGradient id="scoreGrad" x1="0%" y1="0%">
-                      <stop offset="0%" stop-color="#c4b5fd"/>
-                      <stop offset="100%" stop-color="#6d28d9"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div class="preview-ring-num">
-                  <div class="num" id="scoreNum" data-target="64">0</div>
-                  <div class="denom">/100</div>
-                </div>
-              </div>
-              <div class="preview-score-meta">
-                <span style="display:block;margin-bottom:2px;">AI Visibility Score</span>
-                <span class="improving">Improving &uarr;</span>
-                <span>+8 pts vs last audit</span>
+        <!-- E6, the evidence object. Two groups: the score, and the engine
+             split. The six dimension bars moved to proof block 2 and the fix
+             rows to proof block 4, where hook-thesis-web.md §5 wants them. That
+             removed 18 leaves rendering below the three-second test's 14px
+             threshold and bought the type size the rest of the card now uses.
+             The "live" activity ticker was cut: it announced an event that did
+             not happen to this visitor. -->
+        <div class="preview-card" id="previewCard">
+          <div class="preview-card-head">
+            <span class="preview-sample">Sample report</span>
+          </div>
+          <div class="preview-score-box">
+            <div class="preview-ring-wrap">
+              <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg);" aria-hidden="true">
+                <circle cx="44" cy="44" r="34" fill="none" stroke="var(--bd2)" stroke-width="6"/>
+                <circle id="scoreRingProgress" cx="44" cy="44" r="34" fill="none" stroke="url(#scoreGrad)" stroke-width="6"
+                  stroke-dasharray="213.63" stroke-dashoffset="213.63" data-target-offset="77" stroke-linecap="round"/>
+                <defs>
+                  <linearGradient id="scoreGrad" x1="0%" y1="0%">
+                    <stop offset="0%" stop-color="#c4b5fd"/>
+                    <stop offset="100%" stop-color="#6d28d9"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="preview-ring-num">
+                <div class="num" id="scoreNum" data-target="64">0</div>
+                <div class="denom">/100</div>
               </div>
             </div>
-            <div class="preview-dims-box">
-              <div class="preview-dims-label">6 dimensions</div>
-              <div class="preview-dims-grid">
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Recognition</span><span class="dim-val" style="color:#34d399">72%</span></div><div class="dim-bar"><div class="dim-fill" data-w="72" style="width:0%;background:#34d399"></div></div></div>
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Knowledge</span><span class="dim-val" style="color:#fb923c">60%</span></div><div class="dim-bar"><div class="dim-fill" data-w="60" style="width:0%;background:#fb923c"></div></div></div>
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Sentiment</span><span class="dim-val" style="color:#34d399">68%</span></div><div class="dim-bar"><div class="dim-fill" data-w="68" style="width:0%;background:#34d399"></div></div></div>
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Accuracy</span><span class="dim-val" style="color:#f87171">55%</span></div><div class="dim-bar"><div class="dim-fill" data-w="55" style="width:0%;background:#f87171"></div></div></div>
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Reach</span><span class="dim-val" style="color:#34d399">78%</span></div><div class="dim-bar"><div class="dim-fill" data-w="78" style="width:0%;background:#34d399"></div></div></div>
-                <div class="dim-row"><div class="dim-top"><span class="dim-name">Consistency</span><span class="dim-val" style="color:#f87171">52%</span></div><div class="dim-bar"><div class="dim-fill" data-w="52" style="width:0%;background:#f87171"></div></div></div>
-              </div>
+            <div class="preview-score-meta">
+              <span class="psm-label">AI Visibility Score</span>
+              <span class="improving">Improving, +8 pts vs last audit</span>
             </div>
           </div>
-          <!-- Engine grid -->
           <div class="preview-engines-label">Engine split view</div>
           <div class="preview-engines-grid">
             <div class="pe-card know"><div class="pe-name">ChatGPT</div><div class="pe-pos" style="color:#34d399">#2</div><span class="pe-status know">KNOW</span></div>
             <div class="pe-card know"><div class="pe-name">Gemini</div><div class="pe-pos" style="color:#34d399">#1</div><span class="pe-status know">KNOW</span></div>
             <div class="pe-card partial"><div class="pe-name">Claude</div><div class="pe-pos" style="color:#fb923c">#4</div><span class="pe-status partial">PARTIAL</span></div>
-            <div class="pe-card missing"><div class="pe-name">Perplexity</div><div class="pe-pos" style="color:#f87171">&mdash;</div><span class="pe-status missing">MISSING</span></div>
-            <div class="pe-card missing"><div class="pe-name">Meta AI</div><div class="pe-pos" style="color:#f87171">&mdash;</div><span class="pe-status missing">MISSING</span></div>
-          </div>
-          <!-- Fix This -->
-          <div class="preview-fix-label">Fix This: prioritised actions</div>
-          <div class="fix-row p0">
-            <span class="fix-badge p0">P0</span>
-            <div>
-              <div class="fix-title">Add schema markup so Perplexity can find you</div>
-              <div class="fix-desc">Your site has 0 structured data. Perplexity relies on schema.org to surface local businesses in its web results.</div>
-            </div>
-          </div>
-          <div class="fix-row p1">
-            <span class="fix-badge p1">P1</span>
-            <div>
-              <div class="fix-title">Publish an authoritative entity page</div>
-              <div class="fix-desc">ChatGPT and Meta AI are guessing. An entity page or Wikipedia presence gives AI models a reliable training signal.</div>
-            </div>
+            <div class="pe-card missing"><div class="pe-name">Perplexity</div><div class="pe-pos" style="color:#f87171">n/a</div><span class="pe-status missing">MISSING</span></div>
+            <div class="pe-card missing"><div class="pe-name">Google AI</div><div class="pe-pos" style="color:#f87171">n/a</div><span class="pe-status missing">MISSING</span></div>
           </div>
         </div>
+        <!-- Scanning skeleton and the real result both land here, in the card's
+             position and at the card's size. -->
+        <div class="audit-skeleton" id="auditSkeleton" hidden aria-hidden="true">
+          <div class="sk-row">
+            <div class="sk-ring sk-pulse"></div>
+            <div class="sk-lines">
+              <div class="sk-bar w70 sk-pulse"></div>
+              <div class="sk-bar w45 sk-pulse"></div>
+            </div>
+          </div>
+          <div class="sk-bar w90 sk-pulse"></div>
+          <div class="sk-bar w60 sk-pulse"></div>
+          <div class="sk-label" id="skLabel">Querying the engines for your domain</div>
+        </div>
+        <div class="audit-result" id="auditResult" hidden></div>
       </div>
     </div>
   </div>
@@ -1448,73 +1609,59 @@
      above, which forces position:relative and breaks fixed positioning. -->
 <div class="engine-tooltip" id="engineTooltip" role="tooltip"></div>
 
-<!-- ENGINES WE MONITOR -->
+<!-- =============================================================
+     PROOF ORDER. The sequence below is hook-thesis-web.md §5, applied in
+     docs/design/homepage-hook.md §5.1. It changed on 2026-07-26:
+       1  what was measured        engines strip
+       2  what the number means    the score and its six dimensions
+       3  presence is not endorsement   sentiment, moved ahead of where the
+                                        six-card features grid used to sit
+       4  what you do about it     the fix list, then AI SEO, then AI Social
+       5  why to believe any of it the DOI study, moved down from position two
+      5.5 the done-for-you path    how it works
+       6  pricing                  unchanged
+       7  objections               FAQ
+       8  the sales-assisted path  contact
+       9  latest research and news moved to last: the only block whose links
+                                   leave the conversion path
+     The six-card features grid is gone. Each of its cards has a home in the
+     order above; see homepage-hook.md §5.2.
+     ============================================================= -->
+
+<!-- PROOF 1: WHAT WAS MEASURED -->
 <div class="engines-strip reveal">
   <span class="es-label">Monitoring</span>
   <span class="es-item"><span class="es-dot" style="background:#34d399"></span> ChatGPT</span>
   <span class="es-item"><span class="es-dot" style="background:#60a5fa"></span> Gemini</span>
   <span class="es-item"><span class="es-dot" style="background:#a78bfa"></span> Claude</span>
   <span class="es-item"><span class="es-dot" style="background:#22d3ee"></span> Perplexity</span>
-  <span class="es-item"><span class="es-dot" style="background:#fbbf24"></span> Meta AI</span>
-</div>
-
-<!-- RESEARCH CREDIBILITY -->
-<div class="research-band reveal">
-  <div class="rb-badge">&#x1F52C;</div>
-  <div>
-    <h3>Built on peer-reviewed research.</h3>
-    <p>Our cross-engine visibility methodology is published and citable (DOI), and we release the AI Visibility Index tracking how brands surface across engines, the kind of credibility most tools can&rsquo;t point to.</p>
-  </div>
-  <div class="rb-links">
-    <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener" class="rb-pri">Read the study &rarr;</a>
-    <a href="/ai-visibility-index-2026-07.html">See the Index</a>
-  </div>
+  <span class="es-item"><span class="es-dot" style="background:#ef4444"></span> Google AI Mode</span>
 </div>
 
 <hr class="section-divider">
 
-<!-- FEATURES -->
-<section class="section reveal" id="features">
-  <div class="section-label">Why BrandGEO</div>
-  <h2>GEO is the new SEO.</h2>
-  <p>AI search now answers your customers before they visit any website. BrandGEO is the first platform built to track, measure, and dominate that new layer. Read our research: <a href="/bg-001.html" style="color:var(--ac2)">The AI Visibility Gap</a>.</p>
-  <div class="features-grid">
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F4E1;</div>
-      <h3>5-engine coverage</h3>
-      <p>ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all queried with live web search enabled, every week, with the exact queries your customers use.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F4CA;</div>
-      <h3>100-point visibility score</h3>
-      <p>One clear number across 6 dimensions: recognition, knowledge, sentiment, accuracy, reach, and consistency. Track your trend week over week.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F3AF;</div>
-      <h3>Prioritised fix list</h3>
-      <p>P0/P1/P2 actions ranked by impact (schema markup, entity pages, FAQ content) with copy-paste implementations ready to go.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F514;</div>
-      <h3>Weekly intelligence report</h3>
-      <p>A clear, non-technical report every week: your GEO score, what AI says about you, what changed, and what your competitors are doing.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F3C6;</div>
-      <h3>Competitor tracking</h3>
-      <p>See how your AI visibility stacks up against your top competitors. Know when a rival gains ground before it affects your business.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">&#x1F6E0;</div>
-      <h3>Fully managed</h3>
-      <p>No tools to learn, no dashboards to maintain. We handle everything, so you get the insights and act on them.</p>
+<!-- PROOF 2: WHAT THE NUMBER MEANS -->
+<section class="section reveal" id="score">
+  <div class="section-label">The score</div>
+  <h2>One number, six dimensions.</h2>
+  <p>The score is a diagnostic, not a badge. Each dimension is measured on its own, so a weak total tells you which part is weak and what to work on first. Read our research: <a href="/bg-001.html" style="color:var(--ac2)">The AI Visibility Gap</a>.</p>
+  <div class="preview-dims-box" style="margin-top:36px;">
+    <div class="preview-dims-label">6 dimensions</div>
+    <div class="preview-dims-grid">
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Recognition</span><span class="dim-val" style="color:#34d399">72%</span></div><div class="dim-bar"><div class="dim-fill" data-w="72" style="width:0%;background:#34d399"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Knowledge</span><span class="dim-val" style="color:#fb923c">60%</span></div><div class="dim-bar"><div class="dim-fill" data-w="60" style="width:0%;background:#fb923c"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Sentiment</span><span class="dim-val" style="color:#34d399">68%</span></div><div class="dim-bar"><div class="dim-fill" data-w="68" style="width:0%;background:#34d399"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Accuracy</span><span class="dim-val" style="color:#f87171">55%</span></div><div class="dim-bar"><div class="dim-fill" data-w="55" style="width:0%;background:#f87171"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Reach</span><span class="dim-val" style="color:#34d399">78%</span></div><div class="dim-bar"><div class="dim-fill" data-w="78" style="width:0%;background:#34d399"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Consistency</span><span class="dim-val" style="color:#f87171">52%</span></div><div class="dim-bar"><div class="dim-fill" data-w="52" style="width:0%;background:#f87171"></div></div></div>
     </div>
   </div>
+  <p style="margin-top:22px;">Every dimension is tracked against the competitors you name, so you can tell whether a drop is yours or the whole category moving.</p>
 </section>
 
 <hr class="section-divider">
 
-<!-- BRAND SENTIMENT SPOTLIGHT -->
+<!-- PROOF 3: PRESENCE IS NOT ENDORSEMENT -->
 <section class="section reveal" id="sentiment">
   <div class="sentiment-grid">
     <div class="sentiment-copy">
@@ -1527,7 +1674,6 @@
         <li>Catch a negative shift in tone before it shows up in lost customers.</li>
         <li>Compare sentiment engine-by-engine, since ChatGPT and Perplexity don't always agree.</li>
       </ul>
-      <a href="https://app.getbrandgeo.com/sentiment" class="btn-plan" style="display:inline-block;width:auto;padding:12px 28px;">See Brand Sentiment live &rarr;</a>
     </div>
     <div class="sentiment-visual">
       <div class="sentiment-card">
@@ -1558,11 +1704,86 @@
 
 <hr class="section-divider">
 
-<!-- HOW IT WORKS -->
+<!-- PROOF 4: THE CHAIN. The one place the one-stop claim is made, and it is
+     made as a chain rather than as a list of four products. Before this block
+     existed, AI SEO and AI Social appeared exactly once on this page, inside
+     the Growth PRO pricing card. -->
+<section class="section reveal" id="chain">
+  <div class="section-label">What you do about it</div>
+  <h2>A gap becomes a brief. A brief gets published.</h2>
+  <p>One place instead of three tools. The fix list comes out of your own visibility data, the brief comes out of a gap in it, and the post comes out of the brief.</p>
+  <div class="chain">
+    <div class="chain-step">
+      <div class="chain-pillar">AI Visibility</div>
+      <h3>Your gaps, ranked by impact</h3>
+      <p>P0, P1 and P2 actions, ordered by what moves the score most, each with a copy-paste implementation.</p>
+      <div style="margin-top:16px;">
+        <div class="fix-row p0">
+          <span class="fix-badge p0">P0</span>
+          <div>
+            <div class="fix-title">Add schema markup so Perplexity can find you</div>
+            <div class="fix-desc">Your site has no structured data. Perplexity relies on schema.org to surface businesses in its web results.</div>
+          </div>
+        </div>
+        <div class="fix-row p1">
+          <span class="fix-badge p1">P1</span>
+          <div>
+            <div class="fix-title">Publish an authoritative entity page</div>
+            <div class="fix-desc">ChatGPT and Google AI are guessing. An entity page gives the models a reliable signal to read.</div>
+          </div>
+        </div>
+        <div class="fix-row p2">
+          <span class="fix-badge p2">P2</span>
+          <div>
+            <div class="fix-title">Answer the questions buyers actually ask</div>
+            <div class="fix-desc">Your pages do not use the phrasing customers use with AI assistants, and that phrasing is what gets quoted.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain-link" aria-hidden="true"><span>&rarr;</span></div>
+    <div class="chain-step">
+      <div class="chain-pillar">AI SEO</div>
+      <h3>The gap becomes a brief</h3>
+      <p>Each gap turns into a content brief, then into a full draft, scored before you publish it on whether an AI answer engine would cite it.</p>
+      <span class="chain-plan">Essentials and up</span>
+    </div>
+    <div class="chain-link" aria-hidden="true"><span>&rarr;</span></div>
+    <div class="chain-step">
+      <div class="chain-pillar">AI Social</div>
+      <h3>The brief gets published</h3>
+      <p>Write the post once, adapt it per network, then schedule or publish to your channels from the same place the brief came from.</p>
+      <span class="chain-plan">Growth and up</span>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- PROOF 5: WHY TO BELIEVE ANY OF IT. Moved down from position two: at
+     position two it answered a doubt the visitor did not have yet. -->
+<div class="research-band reveal">
+  <div class="rb-badge">&#x1F52C;</div>
+  <div>
+    <h2>Built on peer-reviewed research.</h2>
+    <p>Our cross-engine visibility methodology is published and citable (DOI), and we release the AI Visibility Index tracking how brands surface across engines, the kind of credibility most tools can&rsquo;t point to.</p>
+  </div>
+  <div class="rb-links">
+    <a href="https://doi.org/10.5281/zenodo.21395598" target="_blank" rel="noopener" class="rb-pri">Read the study &rarr;</a>
+    <a href="/ai-visibility-index-2026-07.html">See the Index</a>
+  </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- PROOF 5.5: THE DONE-FOR-YOU PATH. Not named in hook-thesis-web.md §5.
+     Placed after belief and before price because it describes what a buyer
+     receives. The 48 hour promise belongs to this motion, which is why it no
+     longer appears above the fold next to the instant audit. -->
 <section class="section reveal" id="how">
-  <div class="section-label">How it works</div>
-  <h2>From domain to full audit in 48 hours.</h2>
-  <p>We configure everything for you. No technical knowledge required. No setup headaches.</p>
+  <div class="section-label">The done-for-you path</div>
+  <h2>Or we run all of it for you, in 48 hours.</h2>
+  <p>No tools to learn and no dashboards to maintain. You get the insights and act on them, or we act on them with you.</p>
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
@@ -1572,12 +1793,12 @@
     <div class="step">
       <div class="step-num">2</div>
       <h3>We query 5 AI engines</h3>
-      <p>We run 20+ tailored queries across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all with live web search active.</p>
+      <p>We run 20+ tailored queries across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode, all with live web search active.</p>
     </div>
     <div class="step">
       <div class="step-num">3</div>
-      <h3>Score &amp; roadmap delivered</h3>
-      <p>You receive your AI Visibility Score, per-engine breakdown, and a P0/P1/P2 action plan to climb the AI rankings, every week.</p>
+      <h3>Score and roadmap delivered</h3>
+      <p>You receive your AI Visibility Score, per-engine breakdown, and a P0/P1/P2 action plan to climb the AI rankings.</p>
     </div>
   </div>
 </section>
@@ -1799,59 +2020,6 @@
 
 <hr class="section-divider">
 
-<!-- LATEST FROM BRANDGEO -->
-<section class="section reveal" id="latest">
-  <div class="section-label">Latest from BrandGEO</div>
-  <h2>Fresh off the research desk and newsroom.</h2>
-  <p>Our most recent announcements and AI Visibility research, newest first.</p>
-  <div class="latest-grid">
-    <a href="/news/real-time-ai-visibility-engine-launch/" class="latest-card">
-      <div class="latest-card-top">
-        <span class="latest-tag latest-tag-news">Press Release</span>
-        <span class="latest-date">Jul 10, 2026</span>
-      </div>
-      <h3>BrandGEO Launches High-Frequency Real-Time AI Visibility Monitoring Engine</h3>
-      <p>A new real-time monitoring engine tracks brand citations across major AI engines as they happen.</p>
-    </a>
-    <a href="/bg-015.html" class="latest-card">
-      <div class="latest-card-top">
-        <span class="latest-tag latest-tag-research">Research</span>
-        <span class="latest-date">Jul 9, 2026</span>
-      </div>
-      <h3>Beyond &ldquo;Are We Mentioned?&rdquo;: The AI Visibility KPIs That Actually Matter</h3>
-      <p>Mention rate alone hides more than it shows. Here's a practical framework for the KPIs that actually matter.</p>
-    </a>
-    <a href="/bg-014.html" class="latest-card">
-      <div class="latest-card-top">
-        <span class="latest-tag latest-tag-research">Research</span>
-        <span class="latest-date">Jul 9, 2026</span>
-      </div>
-      <h3>Why Your Brand Might Be Invisible to AI Outside English</h3>
-      <p>Most AI models are trained overwhelmingly in English, and here's what that means for global brand citations.</p>
-    </a>
-    <a href="/bg-013.html" class="latest-card">
-      <div class="latest-card-top">
-        <span class="latest-tag latest-tag-research">Research</span>
-        <span class="latest-date">Jul 9, 2026</span>
-      </div>
-      <h3>How Often You Need to Publish to Stay Cited by AI</h3>
-      <p>Content under 30 days old earns up to 3.2x more AI citations, which points to the real refresh cadence that keeps you cited.</p>
-    </a>
-    <a href="/bg-012.html" class="latest-card">
-      <div class="latest-card-top">
-        <span class="latest-tag latest-tag-research">Research</span>
-        <span class="latest-date">Jul 9, 2026</span>
-      </div>
-      <h3>AI Visibility vs. Brand Mentions: What&rsquo;s the Difference?</h3>
-      <p>A brand can be mentioned by ChatGPT and still be losing, because mentions and AI Visibility measure different things.</p>
-    </a>
-  </div>
-  <div class="latest-more">
-    <a href="/blog.html">See all research and news &rarr;</a>
-  </div>
-</section>
-
-<hr class="section-divider">
 
 <!-- FAQ -->
 <style>
@@ -1872,11 +2040,11 @@
   <div class="faq-list">
     <details class="faq-item">
       <summary>What is GEO (Generative Engine Optimization)?</summary>
-      <p>GEO is the practice of measuring and improving how your brand appears in answers from AI engines like ChatGPT, Gemini, Claude, Perplexity and Meta AI. It's the new layer where customers get recommendations before they ever reach a website. It&rsquo;s what SEO was for Google, applied to AI answers.</p>
+      <p>GEO is the practice of measuring and improving how your brand appears in answers from AI engines like ChatGPT, Gemini, Claude, Perplexity and Google AI Mode. It's the new layer where customers get recommendations before they ever reach a website. It&rsquo;s what SEO was for Google, applied to AI answers.</p>
     </details>
     <details class="faq-item">
       <summary>Which AI engines does BrandGEO monitor?</summary>
-      <p>Five: ChatGPT, Gemini, Claude, Perplexity and Meta AI, all queried with live web search enabled, every week, using the exact prompts your customers actually ask.</p>
+      <p>Five: ChatGPT, Gemini, Claude, Perplexity and Google AI Mode, all queried with live web search enabled, every week, using the exact prompts your customers actually ask.</p>
     </details>
     <details class="faq-item">
       <summary>How is the AI Visibility Score calculated?</summary>
@@ -1945,6 +2113,61 @@
     </form>
   </div>
 </section>
+
+<hr class="section-divider">
+
+<!-- LATEST FROM BRANDGEO -->
+<section class="section reveal" id="latest">
+  <div class="section-label">Latest from BrandGEO</div>
+  <h2>Fresh off the research desk and newsroom.</h2>
+  <p>Our most recent announcements and AI Visibility research, newest first.</p>
+  <div class="latest-grid">
+    <a href="/news/real-time-ai-visibility-engine-launch/" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-news">Press Release</span>
+        <span class="latest-date">Jul 10, 2026</span>
+      </div>
+      <h3>BrandGEO Launches High-Frequency Real-Time AI Visibility Monitoring Engine</h3>
+      <p>A new real-time monitoring engine tracks brand citations across major AI engines as they happen.</p>
+    </a>
+    <a href="/bg-015.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h3>Beyond &ldquo;Are We Mentioned?&rdquo;: The AI Visibility KPIs That Actually Matter</h3>
+      <p>Mention rate alone hides more than it shows. Here's a practical framework for the KPIs that actually matter.</p>
+    </a>
+    <a href="/bg-014.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h3>Why Your Brand Might Be Invisible to AI Outside English</h3>
+      <p>Most AI models are trained overwhelmingly in English, and here's what that means for global brand citations.</p>
+    </a>
+    <a href="/bg-013.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h3>How Often You Need to Publish to Stay Cited by AI</h3>
+      <p>Content under 30 days old earns up to 3.2x more AI citations, which points to the real refresh cadence that keeps you cited.</p>
+    </a>
+    <a href="/bg-012.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 9, 2026</span>
+      </div>
+      <h3>AI Visibility vs. Brand Mentions: What&rsquo;s the Difference?</h3>
+      <p>A brand can be mentioned by ChatGPT and still be losing, because mentions and AI Visibility measure different things.</p>
+    </a>
+  </div>
+  <div class="latest-more">
+    <a href="/blog.html">See all research and news &rarr;</a>
+  </div>
+</section>
+
 
 <!-- FOOTER -->
 <footer>
@@ -2064,7 +2287,7 @@
     { name: 'Gemini',     bx: 0.31, by: 0.66, phase: 1.7, sp: 0.42 },
     { name: 'Claude',     bx: 0.60, by: 0.15, phase: 2.9, sp: 0.60 },
     { name: 'Perplexity', bx: 0.73, by: 0.52, phase: 4.1, sp: 0.48 },
-    { name: 'Meta AI',    bx: 0.09, by: 0.47, phase: 5.3, sp: 0.51 }
+    { name: 'Google AI',  bx: 0.09, by: 0.47, phase: 5.3, sp: 0.51 }
   ];
   var pulses = [];   // {ei, t, speed}
   var particles = []; // ambient depth cloud

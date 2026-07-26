@@ -68,6 +68,10 @@
   var auditHp = document.getElementById('auditHp');
   var auditStatus = document.getElementById('auditStatus');
   var auditResult = document.getElementById('auditResult');
+  // The scanning skeleton and the result both live in the evidence card's
+  // position, and swap with it. docs/design/homepage-hook.md §8.
+  var previewCard = document.getElementById('previewCard');
+  var auditSkeleton = document.getElementById('auditSkeleton');
 
   if (brandInput && auditBtn && auditResult) {
     var AUDIT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/public-audit';
@@ -130,21 +134,30 @@
       auditStatus.classList.toggle('is-error', !!isError);
     }
 
+    // Shows the skeleton in the evidence card's slot. A skeleton that matches
+    // the result layout, not a spinner that reflows: its job is to hold the
+    // shape the answer will land in while up to 12s of latency passes.
+    function showSlot(which) {
+      if (previewCard) previewCard.hidden = (which !== 'card');
+      if (auditSkeleton) auditSkeleton.hidden = (which !== 'skeleton');
+      auditResult.hidden = (which !== 'result');
+    }
+
     function setButtonScanning(on) {
       if (on) {
         auditBtn.disabled = true;
         brandInput.disabled = true;
-        auditBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Scanning 5 AI engines&hellip;';
+        auditBtn.textContent = 'Scanning the engines…';
       } else {
         auditBtn.disabled = false;
         brandInput.disabled = false;
-        auditBtn.innerHTML = 'Check My AI Visibility &rarr;';
+        auditBtn.innerHTML = 'Check my visibility &rarr;';
       }
     }
 
     function animateAuditScore(score) {
       var ring = document.getElementById('auditRingProgress');
-      var circumference = 150.8; // 2 * PI * r(24), matches the SVG below
+      var circumference = 213.63; // 2 * PI * r(34), matches the SVG below
       var offset = circumference * (1 - score / 100);
       var numEl = document.getElementById('auditRingNum');
       var inlineEl = document.getElementById('auditScoreInline');
@@ -174,14 +187,18 @@
 
     function renderAuditResult(domain, score, topGap, token) {
       score = Math.max(0, Math.min(100, Math.round(score)));
-      auditResult.hidden = false;
+      showSlot('result');
+      // The email row inside the result is now the next step, so the hero
+      // button steps down to "check another domain".
+      auditBtn.classList.add('is-secondary');
+      auditBtn.innerHTML = 'Check another &rarr;';
       auditResult.innerHTML =
         '<div class="audit-result-top">' +
           '<div class="audit-ring-wrap">' +
-            '<svg viewBox="0 0 60 60" style="transform:rotate(-90deg)" aria-hidden="true">' +
-              '<circle cx="30" cy="30" r="24" fill="none" stroke="var(--bd2)" stroke-width="5"></circle>' +
-              '<circle id="auditRingProgress" cx="30" cy="30" r="24" fill="none" stroke="url(#auditScoreGrad)" stroke-width="5" ' +
-                'stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round"></circle>' +
+            '<svg viewBox="0 0 88 88" style="transform:rotate(-90deg)" aria-hidden="true">' +
+              '<circle cx="44" cy="44" r="34" fill="none" stroke="var(--bd2)" stroke-width="6"></circle>' +
+              '<circle id="auditRingProgress" cx="44" cy="44" r="34" fill="none" stroke="url(#auditScoreGrad)" stroke-width="6" ' +
+                'stroke-dasharray="213.63" stroke-dashoffset="213.63" stroke-linecap="round"></circle>' +
               '<defs><linearGradient id="auditScoreGrad" x1="0%" y1="0%">' +
                 '<stop offset="0%" stop-color="#c4b5fd"></stop><stop offset="100%" stop-color="#6d28d9"></stop>' +
               '</linearGradient></defs>' +
@@ -202,6 +219,12 @@
         '<div class="audit-status is-error" id="auditEmailError" hidden></div>';
 
       animateAuditScore(score);
+
+      // Below 900px the evidence card sits under the field, so bring the
+      // answer into view rather than leaving it just off screen.
+      if (window.innerWidth < 900 && auditResult.scrollIntoView) {
+        auditResult.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
 
       var form = document.getElementById('auditEmailForm');
       if (!form) return;
@@ -232,7 +255,7 @@
         }).catch(function() {
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Email me the full breakdown →'; }
           if (errEl) {
-            errEl.textContent = 'Something went wrong sending that — try again, or start your full audit instead.';
+            errEl.textContent = 'Something went wrong sending that. Try again, or start your full audit instead.';
             errEl.hidden = false;
           }
         });
@@ -243,16 +266,19 @@
       var val = brandInput.value.trim();
       if (auditHp && auditHp.value) return; // honeypot tripped -- silently drop
       if (val.length < 2) {
+        // Was a silent focus() with no message, which reads as a dead button.
+        setAuditStatus('Enter your domain, for example yourcompany.com', true);
         brandInput.focus();
         return;
       }
       if (getAuditAttempts().length >= AUDIT_RATE_MAX) {
-        setAuditStatus('You’ve checked a few brands already — try again in a few minutes, or start your full audit now.', true);
+        setAuditStatus('You’ve checked a few brands already. Try again in a few minutes, or start your full audit now.', true);
         return;
       }
       setAuditStatus('');
-      auditResult.hidden = true;
       auditResult.innerHTML = '';
+      auditBtn.classList.remove('is-secondary');
+      showSlot('skeleton');
       setButtonScanning(true);
       recordAuditAttempt();
 
@@ -270,11 +296,19 @@
         setButtonScanning(false);
         renderAuditResult(val, data.score, data.topGap, data.token);
       }).catch(function() {
-        // Component A isn't live yet (or errored/timed out) -- fall back
-        // to the pre-existing, already-working flow rather than leaving
-        // the visitor stuck on a dead button.
+        // The audit endpoint errored, timed out, or answered in a shape this
+        // widget does not recognise. Fall back to the pre-existing flow rather
+        // than leaving the visitor stuck on a dead button.
+        //
+        // This is a failure path INSIDE the primary CTA, not a second CTA, so
+        // it is never offered as a choice (hook-thesis-web.md §3). The skeleton
+        // holds and one line explains the handoff, so a full-page redirect does
+        // not arrive unannounced.
         setButtonScanning(false);
-        redirectToSignup(val);
+        var sk = document.getElementById('skLabel');
+        if (sk) sk.textContent = 'Taking you to the full audit for ' + val;
+        setAuditStatus('Taking you to the full audit…');
+        setTimeout(function() { redirectToSignup(val); }, 600);
       });
     }
 
@@ -303,8 +337,14 @@
     }
   }
 
-  // Animated score ring + counting number + dimension-bar fill-in (index.html "what you get" mockup).
-  // Runs once, the first time the preview card scrolls into view.
+  // Animated score ring + counting number on the hero evidence card.
+  //
+  // Delayed 900ms on purpose (docs/design/homepage-hook.md §7): its job is to
+  // move the eye to the evidence AFTER the headline and the domain field have
+  // landed, not to compete with them in the first second. The dimension bars
+  // are no longer in this card -- they live in proof block 2 and animate on
+  // their own observer below, when that block is actually reached.
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var previewWrap = document.querySelector('.preview-wrap');
   if (previewWrap) {
     var animatePreview = function() {
@@ -321,7 +361,7 @@
       if (numEl) {
         var target = parseInt(numEl.getAttribute('data-target'), 10) || 0;
         var start = null;
-        var duration = 1400;
+        var duration = 900;
         var step = function(ts) {
           if (!start) start = ts;
           var progress = Math.min((ts - start) / duration, 1);
@@ -330,26 +370,18 @@
         };
         requestAnimationFrame(step);
       }
-      document.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
-        var w = bar.getAttribute('data-w');
-        requestAnimationFrame(function() { bar.style.width = w + '%'; });
-      });
     };
-    var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducedMotion) {
       // Respect the user's preference: set final values instantly, no animation.
       var ring0 = document.getElementById('scoreRingProgress');
       if (ring0) ring0.style.strokeDashoffset = ring0.getAttribute('data-target-offset');
       var num0 = document.getElementById('scoreNum');
       if (num0) num0.textContent = num0.getAttribute('data-target');
-      document.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
-        bar.style.width = bar.getAttribute('data-w') + '%';
-      });
     } else if ('IntersectionObserver' in window) {
       var previewIO = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
           if (entry.isIntersecting) {
-            animatePreview();
+            setTimeout(animatePreview, 900);
             previewIO.unobserve(entry.target);
           }
         });
@@ -357,6 +389,29 @@
       previewIO.observe(previewWrap);
     } else {
       animatePreview();
+    }
+  }
+
+  // Proof block 2: the six dimension bars fill when that block is reached.
+  var dimsBox = document.querySelector('.preview-dims-box');
+  if (dimsBox) {
+    var fillDims = function() {
+      dimsBox.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
+        var w = bar.getAttribute('data-w');
+        requestAnimationFrame(function() { bar.style.width = w + '%'; });
+      });
+    };
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      dimsBox.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
+        bar.style.width = bar.getAttribute('data-w') + '%';
+      });
+    } else {
+      var dimsIO = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) { fillDims(); dimsIO.unobserve(entry.target); }
+        });
+      }, { threshold: 0.3 });
+      dimsIO.observe(dimsBox);
     }
   }
 
@@ -383,29 +438,10 @@
     });
   }
 
-  // "Live" activity ticker on the preview card — cross-fades through a
-  // handful of illustrative example signals every few seconds, reinforcing
-  // that this is a running system rather than a static screenshot. Content
-  // is representative example data, the same convention already used by
-  // the surrounding mockup's own scores/positions, not a real client feed.
-  var tickerEl = document.getElementById('tickerText');
-  if (tickerEl && !prefersReduced) {
-    var tickerItems = [
-      'ChatGPT mentioned your brand — 2 min ago',
-      'Sentiment shifted positive on Gemini — 14 min ago',
-      'New competitor spotted in Perplexity — 38 min ago',
-      'Position improved to #2 on ChatGPT — 1 hr ago'
-    ];
-    var tickerIndex = 0;
-    setInterval(function() {
-      tickerEl.style.opacity = 0;
-      setTimeout(function() {
-        tickerIndex = (tickerIndex + 1) % tickerItems.length;
-        tickerEl.textContent = tickerItems[tickerIndex];
-        tickerEl.style.opacity = 1;
-      }, 400);
-    }, 4200);
-  }
+  // The "live" activity ticker was removed from the hero on 2026-07-26. It
+  // announced events ("ChatGPT mentioned your brand, 2 min ago") that had not
+  // happened to the visitor reading them, and it was a tenth competing element
+  // in a three-second window. docs/design/homepage-hook.md §3.5.
 
   // Engine chip tooltips (hero, index.html only) — hover (desktop) or tap
   // (touch/keyboard) reveals a short, clearly-labelled illustrative example
@@ -494,12 +530,13 @@
   }
 
   // ── Self-serve Stripe checkout links (index.html pricing) ──────────────────
-  // PASTE YOUR 4 STRIPE PAYMENT LINK URLS BELOW.
-  // Create them in Stripe → Payment Links (Essentials & Growth, each monthly +
-  // annual), then replace the 4 placeholder strings with the real https://
-  // URLs. Until a real URL is pasted for a given button, that button safely
-  // falls back to the signup page (the href set in index.html), so it never
-  // dead-ends. Managed / Pro / Enterprise stay on #contact (sales-assisted).
+  // Create Stripe Payment Links (Essentials, Growth, Growth PRO — each monthly +
+  // annual) and paste the real https:// URLs below. Until a real URL is pasted
+  // for a given plan, that button safely falls back to the signup page (the href
+  // set in index.html), so it never dead-ends — this is why growth_pro works
+  // today even with no link yet. Add a `growth_pro:` block here (monthly/annual)
+  // once its Stripe links exist. Managed / Custom Enterprise stay on #contact
+  // (sales-assisted), no checkout link.
   var STRIPE_LINKS = {
     essentials: {
       monthly: 'https://buy.stripe.com/fZu4gAb1adKQ7EgdcCdZ600',
@@ -509,6 +546,7 @@
       monthly: 'https://buy.stripe.com/5kQ8wQd9i4ag6Ac4G6dZ602',
       annual:  'https://buy.stripe.com/fZu6oI4CM6iobUwdcCdZ603'
     }
+    // growth_pro: { monthly: '', annual: '' }  // paste €449 Stripe links here
   };
 
   function applyCheckoutLinks(yearly) {
@@ -557,8 +595,8 @@
   var modeCaption = document.getElementById('modeCaption');
   if (modeBtns.length && gridSelf && gridManaged) {
     var MODE_CAPTIONS = {
-      self: 'Run it yourself — subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.',
-      managed: 'Done for you — our team runs the strategy, research and reporting. You get the results, not the busywork.'
+      self: 'Run it yourself: subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.',
+      managed: 'Done for you: our team runs the strategy, research and reporting. You get the results, not the busywork.'
     };
     modeBtns.forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -683,7 +721,7 @@
   var TIMEOUT_MS = 22000;
   var SESSION_MSG_CAP = 30; // soft client-side cap; the server enforces the real one
 
-  var WELCOME = "Hi — I'm the BrandGEO assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
+  var WELCOME = "Hi, I'm Jamie, BrandGEO's assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
   var OPENING_CHIPS = [
     { label: '💶 See pricing',       send: 'What does BrandGEO cost?' },
     { label: '🔍 Run a free audit',  send: 'I want to run a free audit.' },
@@ -694,16 +732,33 @@
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var history = [];   // [{role,content}] sent to the assistant endpoint
   var sentCount = 0, busy = false, lastFocus = null;
+  // Once the assistant classifies the conversation "hot" (strong buying signal),
+  // we latch this and echo it back on every later request + on lead capture, so
+  // the server bumps to the senior model and the lead is flagged HOT for the team.
+  var hot = false;
   var launcher, panel, msgs, composer, ta, sendBtn, chipsRow, greeted = false;
 
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   function scrollDown(){ if (msgs) msgs.scrollTop = msgs.scrollHeight; }
 
+  // Strip the markdown the model can still emit (bold, inline code, headings,
+  // bullet markers) — the chat bubble renders plain text (white-space:pre-wrap),
+  // so raw ** / # / - would otherwise show as literal symbols. Line breaks are
+  // preserved; bullets collapse to a clean "• ".
+  function tidyMarkdown(text){
+    return String(text)
+      .replace(/\*\*(.+?)\*\*/g, '$1')     // **bold**
+      .replace(/__(.+?)__/g, '$1')         // __bold__
+      .replace(/`([^`]+)`/g, '$1')         // `code`
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')  // # headings
+      .replace(/^\s*[-*]\s+/gm, '• ');// "- item" / "* item" -> "• item"
+  }
+
   // Escape text and turn bare URLs into safe new-tab links.
   function fillText(node, text){
     var re = /(https?:\/\/[^\s<>()]+[^\s<>().,!?])/g, idx = 0, m;
-    text = String(text);
+    text = tidyMarkdown(text);
     while ((m = re.exec(text))) {
       if (m.index > idx) node.appendChild(document.createTextNode(text.slice(idx, m.index)));
       var a = el('a', 'bg-asst-link'); a.href = m[0]; a.textContent = m[0];
@@ -750,6 +805,24 @@
     scrollDown();
   }
 
+  function delay(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  // Ask the assistant, retrying ONCE on a failed / empty response before giving
+  // up. The common failure here is a cold start or a just-deployed function
+  // returning a transient non-JSON error; the retry hits a now-warm function and
+  // succeeds, so a real hiccup never surfaces the fallback on the first click.
+  function requestReply(attemptsLeft){
+    return fetchJson(ASSISTANT_ENDPOINT, { messages: history, hot: hot }).then(function(res){
+      var d = res.data || {};
+      if (typeof d.reply === 'string' && d.reply) return { res: res, d: d };
+      if (attemptsLeft > 0) return delay(1200).then(function(){ return requestReply(attemptsLeft - 1); });
+      return { res: res, d: {} };
+    }).catch(function(e){
+      if (attemptsLeft > 0) return delay(1200).then(function(){ return requestReply(attemptsLeft - 1); });
+      throw e;
+    });
+  }
+
   function fetchJson(url, payload){
     var ctrl = window.AbortController ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, TIMEOUT_MS) : null;
@@ -790,7 +863,7 @@
   // in the widget so they can still run the free audit, see pricing, or reach a
   // human without leaving the page.
   function fallbackHelp(){
-    addBubble('assistant', "I'm having a brief hiccup on my end — but I can still point you the right way:");
+    addBubble('assistant', "I'm having a brief hiccup on my end, but I can still point you the right way:");
     var wrap = el('div', 'bg-asst-msg bg-asst-assistant');
     var box = el('div', 'bg-asst-actions');
     var audit = el('a', 'bg-asst-btn', 'Run my free audit →');
@@ -799,7 +872,7 @@
     price.href = 'https://getbrandgeo.com/#pricing'; price.target = '_blank'; price.rel = 'noopener noreferrer';
     var human = el('button', 'bg-asst-btn bg-asst-btn-sec', 'Talk to a human'); human.type = 'button';
     human.addEventListener('click', function(){
-      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      addBubble('assistant', 'Happy to connect you. Leave your details and the team will reach out.');
       showLeadForm('sales', null);
     });
     box.appendChild(audit); box.appendChild(price); box.appendChild(human);
@@ -810,7 +883,7 @@
     text = String(text || '').trim();
     if (!text || busy) return;
     if (sentCount >= SESSION_MSG_CAP) {
-      addBubble('assistant', 'That’s a lot of questions — the best next step is to talk to the team at ' + SUPPORT_EMAIL + ', or tap “Talk to a human” below.');
+      addBubble('assistant', 'That’s a lot of questions. The best next step is to talk to the team at ' + SUPPORT_EMAIL + ', or tap “Talk to a human” below.');
       return;
     }
     if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
@@ -819,13 +892,14 @@
     sentCount++;
     busy = true; setBusy(true); showTyping();
 
-    fetchJson(ASSISTANT_ENDPOINT, { messages: history }).then(function(res){
+    requestReply(1).then(function(out){
       hideTyping();
-      var d = res.data || {};
+      var d = out.d || {};
       if (typeof d.reply === 'string' && d.reply) {
+        if (out.res.ok && d.intent === 'hot') hot = true;   // latch: senior model + HOT lead from here on
         addBubble('assistant', d.reply);
-        if (res.ok) history.push({ role: 'assistant', content: d.reply });
-        if (res.ok && d.action) renderAction(d.action);
+        if (out.res.ok) history.push({ role: 'assistant', content: d.reply });
+        if (out.res.ok && d.action) renderAction(d.action);
       } else {
         fallbackHelp();
       }
@@ -869,12 +943,12 @@
       submit.disabled = true; submit.textContent = 'Sending…';
       fetchJson(LEAD_ENDPOINT, {
         name: name.value.trim(), email: em, need: need.value.trim(),
-        reason: reason, domain: domain || '', honeypot: hp.value
+        reason: reason, domain: domain || '', honeypot: hp.value, hot: hot
       }).then(function(res){
         if (res.ok && res.data && res.data.ok) {
           row.removeChild(form);
           var ok = el('div', 'bg-asst-bubble');
-          fillText(ok, 'Thanks — I’ve passed your details to the team. Someone will be in touch by email shortly.');
+          fillText(ok, 'Thanks, I’ve passed your details to the team. Someone will be in touch by email shortly.');
           row.appendChild(ok); scrollDown();
         } else {
           err.textContent = (res.data && res.data.error) || 'Something went wrong. Please email ' + SUPPORT_EMAIL + '.';
@@ -928,25 +1002,44 @@
     launcher = el('button', 'bg-asst-launcher');
     launcher.id = 'bg-asst-launcher';
     launcher.type = 'button';
-    launcher.setAttribute('aria-label', 'Open the BrandGEO assistant chat');
+    launcher.setAttribute('aria-label', 'Chat with Jamie, the BrandGEO assistant');
     launcher.setAttribute('aria-expanded', 'false');
     launcher.innerHTML =
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' +
-      '<span class="bg-asst-launch-label">Ask us</span>';
-    if (!reduced) launcher.classList.add('bg-asst-pulse');
+      '<span class="bg-asst-launch-label">Ask Jamie</span>';
+    // The pulse waits until the hero has left the viewport. An animated control
+    // in the corner competes with the primary CTA during the three seconds the
+    // hero has to land (docs/design/homepage-hook.md §3.5). Pages with no hero
+    // pulse immediately, as before.
+    if (!reduced) {
+      var heroEl = document.querySelector('.hero');
+      if (!heroEl || !('IntersectionObserver' in window)) {
+        launcher.classList.add('bg-asst-pulse');
+      } else {
+        var pulseIO = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (!entry.isIntersecting) {
+              launcher.classList.add('bg-asst-pulse');
+              pulseIO.disconnect();
+            }
+          });
+        }, { threshold: 0 });
+        pulseIO.observe(heroEl);
+      }
+    }
     launcher.addEventListener('click', open);
 
     // Panel
     panel = el('div', 'bg-asst-panel');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-label', 'BrandGEO assistant');
+    panel.setAttribute('aria-label', 'Jamie, the BrandGEO assistant');
 
     var head = el('div', 'bg-asst-head');
     head.appendChild(el('span', 'bg-asst-dot'));
     var titleWrap = el('div', 'bg-asst-titlewrap');
-    titleWrap.appendChild(el('div', 'bg-asst-title', 'BrandGEO Assistant'));
-    titleWrap.appendChild(el('div', 'bg-asst-sub', 'Online · usually replies instantly'));
+    titleWrap.appendChild(el('div', 'bg-asst-title', 'Jamie'));
+    titleWrap.appendChild(el('div', 'bg-asst-sub', 'BrandGEO assistant · usually replies instantly'));
     head.appendChild(titleWrap);
     var closeBtn = el('button', 'bg-asst-close', '×');
     closeBtn.type = 'button'; closeBtn.setAttribute('aria-label', 'Close chat');
@@ -975,7 +1068,7 @@
     human.type = 'button';
     human.addEventListener('click', function(){
       if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
-      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      addBubble('assistant', 'Happy to connect you. Leave your details and the team will reach out.');
       showLeadForm('sales', null);
     });
     foot.appendChild(composer); foot.appendChild(human);
