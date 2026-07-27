@@ -1,21 +1,48 @@
 // ============================================================================
-// expire-plan-grants.js  --  scheduled (daily). Reverts any trial/comp grant
+// expire-plan-grants.js  --  daily cron job. Reverts any trial/comp grant
 // whose plan_grant_until has passed back to the Free plan, logs it, drops an
 // in-dashboard notice for the client, and emails the admin a summary.
 //
 // Only touches clients whose plan_source is 'trial'/'comp' with a past
 // plan_grant_until — paid ('stripe'/'manual') plans are never auto-changed.
-// Service key bypasses RLS (admin cleanup), same posture as purge-old-results.js.
-// Scheduled in netlify.toml.
+// Service key bypasses RLS (admin cleanup).
+//
+// Invoked by Supabase pg_cron over pg_net at 06:10 UTC
+// (db/supabase-scheduled-jobs-migration.sql), authenticated by the X-Cron-Key
+// shared secret. It used to be a Netlify-scheduled function with no auth at
+// all, which made it an unauthenticated plan-reversion and email amplifier —
+// docs/qa/deploy-pipeline-netlify.md F1, redesigned in
+// docs/arch/scheduled-function-auth.md.
 // ============================================================================
 const { createClient } = require('@supabase/supabase-js');
 const { PLAN_LABELS } = require('./_plans');
 const { sendBrandedEmail, APP_URL } = require('./_email');
 const { recordAdminEvent } = require('./_admin_notify');
+const { requireCronAuth } = require('./_cron_auth');
 
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'constantin@getbrandgeo.com';
 
-exports.handler = async () => {
+// One row per invocation, success or failure, so "did the job run and what did
+// it do" is answerable in SQL (arch doc §6.4). Never allowed to break the job:
+// an observability write that throws would turn a good run into a bad one.
+// Both failure shapes are handled on purpose: supabase-js RETURNS { error } for
+// a database-level failure (missing table, RLS denial) and only THROWS at the
+// network layer. Catching just the throw would silently swallow the likeliest
+// failure of all — this code deployed before the migration that creates the
+// table — and the job would look healthy while recording nothing.
+async function recordJobRun(supabase, ok, detail) {
+  try {
+    const { error } = await supabase.from('job_runs').insert({ job: 'expire-plan-grants', ok, detail });
+    if (error) console.error('[expire-plan-grants] job_runs write failed:', error.message);
+  } catch (err) {
+    console.error('[expire-plan-grants] job_runs write threw:', err.message);
+  }
+}
+
+exports.handler = async (event) => {
+  const gate = requireCronAuth(event);
+  if (gate) return gate.response;
+
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -29,10 +56,12 @@ exports.handler = async () => {
 
   if (error) {
     console.error('[expire-plan-grants] query failed:', error.message);
+    await recordJobRun(supabase, false, { error: error.message });
     return { statusCode: 500, body: error.message };
   }
   if (!due || !due.length) {
     console.log('[expire-plan-grants] nothing to expire');
+    await recordJobRun(supabase, true, { expired: 0, due: 0 });
     return { statusCode: 200, body: 'Nothing to expire' };
   }
 
@@ -80,5 +109,6 @@ exports.handler = async () => {
     });
   }
 
+  await recordJobRun(supabase, true, { expired: expired.length, due: due.length, clients: expired });
   return { statusCode: 200, body: `Expired ${expired.length} grant(s)` };
 };

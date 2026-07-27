@@ -56,9 +56,12 @@
 [functions."set-client-plan"]
   timeout = 26
 
-# Daily: revert expired trial/comp grants to Free, notify client + admin.
+# Daily cron job (pg_cron -> pg_net, 06:10 UTC): revert expired trial/comp grants
+# to Free, notify client + admin. Loops per expiring client with four sequential
+# DB writes plus a Resend email each, and was inheriting the 10s default because
+# it only declared a cron string. Same reasoning as set-client-plan above.
 [functions."expire-plan-grants"]
-  schedule = "0 6 * * *"
+  timeout = 26
 
 # Admin-only: resolve a client's login users (one auth.admin lookup per user).
 [functions."client-users"]
@@ -68,9 +71,6 @@
 # Loops auth.admin.deleteUser per user + several table deletes, so needs > 10s.
 [functions."delete-client"]
   timeout = 26
-
-[functions."purge-old-results"]
-  schedule = "0 3 * * *"
 
 [functions."signup-client"]
   timeout = 15
@@ -119,15 +119,20 @@
 # filename suffix triggers this automatically) — it gets up to 15 minutes and
 # doesn't take a `timeout` setting the way synchronous functions above do.
 
-[functions."purge-old-audits"]
-  schedule = "0 4 * * *"
+# Retention for prospect_audits / prospect_leads is now a direct pg_cron SQL job
+# (db/supabase-scheduled-jobs-migration.sql). It needed nothing from Node, so it
+# no longer exists as a public HTTP endpoint. Same for the ai_results retention
+# delete, which pg_cron jobid 1 had been doing in parallel all along.
 
 # ── Collection queue (SCALE-SPEC.md §3) ───────────────────────────────────────
-# Hourly scheduler: enqueues a fresh run for every client whose refresh_cadence
-# is due, then kicks the worker. Does nothing for refresh_cadence='manual' (the
-# default), so this is inert until cadences are set per client.
+# Hourly cron job (pg_cron -> pg_net, :10 past the hour): enqueues a fresh run
+# for every client whose refresh_cadence is due, then kicks the worker. Does
+# nothing for refresh_cadence='manual' (the default), so it is inert until
+# cadences are set per client. Loops per due client with a limits check, an
+# enqueue and an update each across 36 clients, and was inheriting the 10s
+# default because it only declared a cron string.
 [functions."schedule-collections"]
-  schedule = "0 * * * *"
+  timeout = 26
 
 # Manual "Run collection" / "Force Refresh" enqueue endpoint (browser-called).
 # Fast: writes the queue + one worker kick, no engine calls.
@@ -157,11 +162,11 @@
   timeout = 15
 
 # ── Auto-notify search engines of new/changed pages (ping-sitemap.js) ─────────
-# Daily: diff the live sitemap against the sitemap_pings table, ping new/changed
-# URLs to Google + IndexNow. Automatic replacement for firing force-index by hand.
+# Daily cron job (pg_cron -> pg_net, 05:10 UTC): diff the live sitemap against
+# the sitemap_pings table, ping new/changed URLs to Google + IndexNow. Automatic
+# replacement for firing force-index by hand.
 # 26s so a first-run batch (auth reused across URLs, capped at 25) fits comfortably.
 [functions."ping-sitemap"]
-  schedule = "0 5 * * *"
   timeout = 26
 
 # ── AI Social publishing (social-*.js) ────────────────────────────────────────
