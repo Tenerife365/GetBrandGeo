@@ -6,7 +6,9 @@
  *
  * POST body: {
  *   name, slug, brand_website, brand_aliases, known_competitors,
- *   plan?: 'free'|'essentials'|'managed'|'pro'|'enterprise',
+ *   plan?: one of Object.keys(PLAN_LIVE_ENGINES) in _cost.js. Omit it to get
+ *          the documented 'essentials' default; an unrecognised value is a
+ *          400, never a silent downgrade (see the 2026-07-27 note below),
  *   default_market_id?: string,   // e.g. 'RO', 'WW' — see marketContext.tsx MARKETS
  *   default_region_id?: string,   // e.g. 'B' (Bucharest) — must belong to default_market_id's regions
  *   contact_email,
@@ -36,12 +38,32 @@
  * failure modes — duplicate slug (Postgres unique violation) and an email
  * that's already registered (Supabase Auth) — since the raw driver error
  * messages were unreadable dead ends for the admin filling out the form.
+ *
+ * Update (2026-07-27, packet 008, plan coercion): `VALID_PLANS` used to be a
+ * hand-written array here, a FOURTH copy of the plan ladder, and it was missing
+ * both `growth` and `growth_pro`. Worse, the check coerced rather than rejected
+ * (`VALID_PLANS.includes(plan) ? plan : 'essentials'`), so a client onboarded on
+ * Growth (EUR 299) or Growth PRO (EUR 449), both offered by the wizard, which
+ * maps the real PLAN_ORDER, was silently provisioned with Essentials (EUR 99)
+ * entitlements, with no error surfaced to anyone. The list is now derived from
+ * _cost.js (the mirror that ENFORCES entitlement and budget), and an
+ * unrecognised plan is a 400. A `client_events` audit row is also written on
+ * success, so the plan a client was provisioned with is recoverable from the
+ * database. Previously provisioning left no trail at all, which is why the
+ * clients affected by this defect cannot be found retroactively in Supabase.
  */
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
+const { PLAN_LIVE_ENGINES } = require('./_cost')
 
-const VALID_PLANS = ['free', 'essentials', 'managed', 'pro', 'enterprise']
+// Derive the accepted ladder from _cost.js, never by hand. _cost.js is the
+// current server-side mirror of planConfig.ts and is the copy that enforces
+// entitlement and spend, so a plan this file accepts is exactly a plan the
+// product can actually serve. promotions-admin.js and _auth.js:28 derive their
+// plan lists the same way, and for the same reason.
+const VALID_PLANS = new Set(Object.keys(PLAN_LIVE_ENGINES))
+const DEFAULT_PLAN = 'essentials'
 const VALID_ROLES = ['admin', 'viewer']
 const APP_URL = 'https://app.getbrandgeo.com'
 
@@ -64,8 +86,26 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields: name, slug, contact_email' }) }
   }
 
-  const clientPlan = VALID_PLANS.includes(plan) ? plan : 'essentials'
-  const userRole   = VALID_ROLES.includes(role) ? role : 'viewer'
+  // A plan that was SUPPLIED must be one we actually sell. Reject it, never
+  // coerce. Coercion here is fail-open against revenue: it under-provisions a
+  // paying client and tells nobody. An omitted `plan` is a different case and
+  // keeps the documented default; it is an unset optional field, not a
+  // mis-typed tier.
+  const planProvided = plan !== undefined && plan !== null && plan !== ''
+  if (planProvided && !VALID_PLANS.has(plan)) {
+    return {
+      statusCode: 400,
+      headers: auth.headers,
+      body: JSON.stringify({
+        error: `Unknown plan "${plan}". Must be one of: ${[...VALID_PLANS].join(', ')}.`,
+      }),
+    }
+  }
+  const clientPlan = planProvided ? plan : DEFAULT_PLAN
+
+  // `role` deliberately keeps coercing: defaulting to 'viewer' is fail-SAFE
+  // (least privilege), the opposite of defaulting a plan down to Essentials.
+  const userRole = VALID_ROLES.includes(role) ? role : 'viewer'
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
@@ -150,6 +190,45 @@ exports.handler = async (event) => {
     promptsCreated = promptRows.length
   }
 
+  // 5. Append-only audit row recording the plan this client was PROVISIONED
+  // with. Same row shape as set-client-plan.js:166 and expire-plan-grants.js:47
+  // (`from_plan` is null, since a brand-new client has no prior plan).
+  //
+  // Deliberately LAST and deliberately non-fatal. Steps 1-4 are already
+  // committed and the client is fully usable by this point, so a failure here
+  // must not roll any of it back: an audit gap is a far smaller problem than
+  // deleting a client that was created correctly, and logging must never be the
+  // thing that breaks provisioning. It also cannot leave a half-created client,
+  // because it creates nothing the client depends on and runs after every step
+  // that can roll back. If a rollback above did fire, this line is never
+  // reached, so no orphan row is written (and client_events cascades on client
+  // delete anyway).
+  let auditLogged = false
+  try {
+    const { error: eventErr } = await supabase.from('client_events').insert({
+      client_id: client.id,
+      actor:     auth.user.id,
+      type:      'onboarded',
+      from_plan: null,
+      to_plan:   clientPlan,
+      meta: {
+        source:            'onboard-client',
+        slug:              client.slug ?? slug,
+        role:              userRole,
+        plan_provided:     planProvided,   // false = the DEFAULT_PLAN default was applied
+        prompts_created:   promptsCreated,
+        default_market_id: default_market_id || null,
+      },
+    })
+    if (eventErr) {
+      console.error(`[onboard-client] audit row failed for client ${client.id}: ${eventErr.message}`)
+    } else {
+      auditLogged = true
+    }
+  } catch (e) {
+    console.error(`[onboard-client] audit row threw for client ${client.id}: ${e.message}`)
+  }
+
   return {
     statusCode: 200,
     headers: auth.headers,
@@ -161,6 +240,7 @@ exports.handler = async (event) => {
       role:            userRole,
       engines_enabled: client.engines_enabled ?? null,
       prompts_created: promptsCreated,
+      audit_logged:    auditLogged,
     }),
   }
 }

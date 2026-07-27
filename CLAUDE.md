@@ -82,8 +82,22 @@ header includes `connect-src ... https://app.getbrandgeo.com`.
 
 ### Content pipeline
 BG-001 through BG-019 are live in `brandgeo/web/` (19 `bg-*.html` files,
-counted). Recent `ROADMAP-*.md` and `linkedin-posts-*.md` live in `docs/`, not
-the repo root, per reorg commit `5326a59`.
+counted; `bg-018.html` and its hero image are live but still untracked in git,
+`bg-019.html` is committed and pushed at `e6d9af4`). 27 city AI-visibility
+research pages are live (the original 7 plus 20 more US cities added
+2026-07-24/25), 10 industry pages, 10 comparison pages, 1 AI Visibility Index
+issue (#1, 2026-07-14), 2 press releases. Recent `ROADMAP-*.md` and
+`linkedin-posts-*.md` live in `docs/`, not the repo root, per reorg commit
+`5326a59`.
+
+**Weekly content roadmap, run 2026-07-27:** `docs/ROADMAP-2026-07-27.md`.
+Decided focus: BG-020, a cross-city consensus follow-up to BG-016 using the
+now-27-city dataset (needs no new collection). AI Visibility Index Issue #2
+confirmed not due, no client of any kind has more than one distinct collection
+day in `ai_results` yet, so there is no trend data to report regardless of the
+30-day day-count. Full detail, sources, and an important flag in that file:
+this scheduled task was briefed to read `CLAUDE.md` §9/§12/§13, which **do not
+exist** — see the note directly below.
 
 ### Dashboard: shipped and verified live 2026-07-26
 
@@ -270,13 +284,43 @@ top two are live and reachable by anyone on the internet right now.
       `purge-old-results` and `purge-old-audits` DELETE rows,
       `expire-plan-grants` reverts customer plans to Free and emails them,
       `schedule-collections` enqueues collection runs and spends LLM budget.
-      Fix needs an auth design decision (Netlify's own scheduled-invocation
-      signal, or a shared secret header) so it is `bg-architect` then
-      `bg-backend`, and it must not break the cron path. **Cron registration is
-      separately UNPROVEN** (`deploy-pipeline-netlify.md` §5.2): every probe
-      returned 200 with a real body, which is not what a registered scheduled
-      function does, so the schedules may not be running at all. Settle both in
-      one pass.
+      **DESIGNED 2026-07-27, NOT YET BUILT.**
+      `docs/arch/scheduled-function-auth.md` is the binding architecture and
+      packet `010` is READY for `bg-backend` on Opus. Ruling: Netlify's
+      scheduled-invocation signal is a `POST` body `{"next_run": "..."}` with no
+      signature and no secret, so it is **not a credential** and cannot be gated
+      on. The shared secret wins, which forces the caller to change, because
+      Netlify's scheduler cannot attach a custom header. **Supabase `pg_cron`
+      becomes the scheduler.** It was already installed (1.6.4) and
+      `cron.job_run_details` shows jobid 1 succeeding within 210ms of 03:00:00
+      UTC for 12 consecutive days, and unlike Netlify its history is queryable by
+      any agent. Two of the five are pure SQL and get **deleted, not gated**:
+      `purge-old-results.js` is fully redundant with that existing pg_cron job,
+      which has been running the identical 24-month `ai_results` delete on the
+      identical schedule, undetected. Surface drops five endpoints to three and
+      both service-key `DELETE` endpoints stop existing. **Do not migrate to the
+      `schedule()` wrapper**: same platform mechanism, no credential gained, and
+      it would force a CommonJS to ESM conversion on functions that delete rows
+      and email customers (arch §3.2).
+      **Prerequisites are DONE** (2026-07-27): `pg_net` 0.20.3 enabled with
+      `net.http_post` signature confirmed and its functions in schema `net`, not
+      `extensions`; `cron_secret` in Supabase Vault verified as 64 lowercase hex;
+      `CRON_SECRET` set in Netlify. Sequencing is load-bearing and is arch §8:
+      apply the migration while the functions are **still ungated**, verify in
+      SQL, and only then ship the gating deploy. A fail-closed gate deployed
+      ahead of the secret breaks every job at once.
+- [ ] **Correction to `deploy-pipeline-netlify.md` §5.2 and F1(b): the Netlify
+      schedules probably ARE firing.** That audit inferred non-registration from
+      five `200` responses. Checked 2026-07-27: `sitemap_pings` records a write at
+      **2026-07-19 05:07 UTC**, inside `ping-sitemap`'s `0 5 * * *` slot. The
+      silence since is not evidence of anything, because `ping-sitemap.js:79`
+      throws at `createGoogleIndexer()` and returns before any row is written
+      (`:82`), so nothing has been recorded since the Google credential broke.
+      Evidence for, not proof: the database records the effect, not the caller.
+      The consequence is that in this project a toml-declared scheduled function
+      appears to be **both scheduled and publicly HTTP-invokable**, contradicting
+      Netlify's own documentation, which is why the design deliberately does not
+      depend on the platform gate.
 - [ ] **Files never meant to be public are live in the cPanel docroot.**
       `docs/qa/deploy-pipeline-cpanel.md` F1, confirmed over HTTP, owner
       `bg-web`. F3 is adjacent and latent: `deploy-secret.php` sits inside the
@@ -482,6 +526,23 @@ On 2026-07-26 a session found `CLAUDE.md` replaced in the working tree by a
 was committed in `97b3723`, deleting §0 through §7. That was a mistake and this
 file restores them. **Do not truncate this file.** If a section is stale, mark it
 stale in place, as done for §2.8 above.
+
+**Confirmed 2026-07-27, this restore is incomplete in a way worth knowing.**
+This file used to have sections well past §7 (at least a §9 Content, SEO &
+Own-GEO Initiative, a §12 State of Product, a §13 Client Health, and more,
+`docs/ROADMAP-2026-07-20.md` cites reading §8, §9, §11, §12, §13, and §18.1
+directly). Checked via `git log -- CLAUDE.md`: the commit right before
+`97b3723` (`205fb30`, 2026-07-09) is already only 1,268 lines, §0-7, same as
+what `97b3723`'s parent shows. So those later sections were never committed at
+any point, they only ever existed in an uncommitted working tree between
+roughly 2026-07-09 and 2026-07-20, and are gone for good, not recoverable from
+git history. The restore in this file's own header only restored what git
+had, §0-7, which is genuinely all that git ever had. If those sections matter
+going forward, they need to be deliberately rebuilt from what still exists in
+`docs/` (`CONTENT-STRATEGY-OVERVIEW.md`, `STATE-OF-PRODUCT.md`,
+`CLIENT-HEALTH-BPR.md`, and others cover overlapping ground) as their own
+task, and then actually committed this time, not left to accumulate
+uncommitted again.
 
 ---
 
