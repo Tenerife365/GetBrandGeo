@@ -17,6 +17,13 @@ Ten agents, disjoint write scopes, one waterfall. Constitution:
 | `bg-backend` | Sonnet 5 to Opus 5 | Netlify functions, collection pipeline, Supabase, Stripe |
 | `bg-verify` | Opus 5 | Security, accessibility, regression, acceptance. Can block a release |
 | `bg-grunt` | Local Qwen 2.5 Coder | Renames, import rewrites, boilerplate, zero judgement |
+| `dashboard-auditor` | Opus 5 | Scored three-lens audit of any SaaS dashboard, plus a ranked fix plan. Portable across projects, writes `docs/audit/` |
+| `landing-page-optimizer` | Opus 5 | Scored four-lens audit of a marketing landing page (hook and comprehension, conversion path, credibility and craft, AI answer readiness), plus a ranked fix plan. Audits only, never edits the page. Portable, writes `docs/audit/` |
+
+The last two are portable read-only auditors, not waterfall stages. You invoke
+them directly; `bg-orchestrator` does not schedule them. See `docs/AGENT-OS.md`
+§1 for why they sit outside the roster's waterfall and how they avoid colliding
+in `docs/audit/`.
 
 ## Every agent, every session
 
