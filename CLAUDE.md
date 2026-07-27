@@ -29,7 +29,10 @@ it the same way. This section takes precedence over §0 through §7 below.
 ### Agent Operating System
 - Constitution: `docs/AGENT-OS.md` (roster, model routing, waterfall, handoff
   packet schema, command set, guardrails). Binding on every agent and session.
-- Agent prompts: `.claude/agents/*.md` (10 agents, disjoint write scopes).
+- Agent prompts: `.claude/agents/*.md` (12: ten `bg-` waterfall agents plus two
+  portable read-only auditors, `dashboard-auditor` and `landing-page-optimizer`,
+  which write one exact file each into `docs/audit/`). Roster and the reason the
+  auditors are separate: `docs/AGENT-OS.md` §1.
 - Handoff packets: `.claude/handoffs/` (the only state that crosses a session
   boundary). Template: `.claude/handoffs/_TEMPLATE.md`.
 - Artifacts: `docs/strategy/`, `docs/arch/`, `docs/design/`, `docs/copy/`,

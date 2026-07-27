@@ -29,10 +29,34 @@ Mission this OS exists to serve:
 | `bg-backend` | Sonnet 5, escalates Opus 5 | `brandgeo-dashboard/netlify/functions/`, `db/` | frontend |
 | `bg-verify` | Opus 5 | `docs/qa/` | anything it reviewed |
 | `bg-grunt` | Qwen 2.5 Coder (local) | mechanical edits inside a named file list | anything requiring judgement |
+| `dashboard-auditor` | Opus 5 | `docs/audit/<target>-<date>.md`, one exact file per run | anything it reviewed |
+| `landing-page-optimizer` | Opus 5 | `docs/audit/<target>-<date>.md`, one exact file per run | anything it reviewed |
+
+The last two are **portable auditors**. They differ from the `bg-` agents in three
+ways and the differences are deliberate:
+
+1. **They are self-contained.** Each carries its own calibration step that
+   discovers the stack, so either can be pasted into a fresh chat in another
+   project with no repo knowledge. Nothing in them depends on this file.
+2. **They are read-only by construction**, not by convention. They never edit the
+   surface they assess and never draft the fix, only record findings with
+   evidence and an owner. `bg-verify` reviews a change against a packet's
+   acceptance criteria; an auditor assesses a whole surface against a rubric and
+   scores it. Both exist because the failure they prevent, a builder reviewing
+   its own work, is what shipped the homepage unreviewed in `801732c`.
+3. **They are invoked directly by Constantin**, not scheduled by
+   `bg-orchestrator` into a waterfall stage. Their output feeds the waterfall as
+   evidence; it is not itself a stage.
 
 Write scopes are disjoint by construction. Two agents may run in parallel only
 when their write scopes do not intersect. This is the file-level half of
 `rules/parallel-task-scoping.md`.
+
+**A directory is never a write scope for parallel work; an exact filename is.**
+The two auditors both write into `docs/audit/`, and packets `006` and `007` both
+wrote into `docs/qa/`. Both pairs are legal only because each run declares one
+exact filename. A packet or agent that claims a directory blocks every other
+writer in it.
 
 Git is never partitioned. Only one agent or session runs a git command at a
 time, and per `rules/execution-delegation.md` the default is to hand Constantin
@@ -276,9 +300,15 @@ docs/arch/        bg-architect artifacts
 docs/design/      bg-design artifacts
 docs/copy/        bg-copy artifacts
 docs/qa/          bg-verify artifacts
+docs/audit/       portable auditor artifacts (dashboard-auditor, landing-page-optimizer)
 .claude/agents/   agent prompts (this OS's agents)
 .claude/handoffs/ handoff packets, numbered, append-only
 ```
+
+`docs/audit/` is separate from `docs/qa/` on purpose. `docs/qa/` holds a verdict
+on a specific change against a packet's acceptance criteria. `docs/audit/` holds a
+scored assessment of a whole surface against a rubric, taken at a point in time
+and expected to be repeated later so the scores can be compared.
 
 Nothing else is created at the repo root. `CLAUDE.md` stays at the root and is
 the only file every session updates.
