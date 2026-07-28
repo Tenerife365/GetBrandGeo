@@ -39,10 +39,23 @@ const PRICE_TO_PLAN = {
   price_1TrLSeKh2GaZE2B48iVobXF9: 'essentials', // Essentials €990/yr
   price_1TrLQhKh2GaZE2B4gLPWMger: 'growth',     // Growth €299/mo
   price_1TrLR6Kh2GaZE2B4mYqOHBhQ: 'growth',     // Growth €2,990/yr
+  // TODO add the two Growth PRO price IDs here once they exist in Stripe.
+  // Not a blocker: metadata.plan is the primary source and is checked first,
+  // so a Growth PRO price carrying metadata.plan=growth_pro provisions
+  // correctly even while this fallback map has no entry for it. Verified live
+  // 2026-07-28: no Growth PRO product or price exists in the account yet.
 }
 
 // Only these self-serve tiers are ever provisioned by this webhook.
-const SELF_SERVE_PLANS = ['essentials', 'growth']
+//
+// growth_pro added 2026-07-28, deliberately BEFORE its Stripe prices exist.
+// Ordering matters here and it is the safe direction: with growth_pro absent
+// from this list, a paid €449 checkout would reach handleCheckoutCompleted,
+// fail the membership test, log "unresolved/non-self-serve plan", return 200,
+// and provision nothing — money taken, no entitlement, no error raised
+// anywhere. Adding it first is inert until a matching price exists, so the
+// gap can never open. Do not create the Stripe prices without this line.
+const SELF_SERVE_PLANS = ['essentials', 'growth', 'growth_pro']
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
