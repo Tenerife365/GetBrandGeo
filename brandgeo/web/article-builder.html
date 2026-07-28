@@ -16,7 +16,7 @@
     .panel-sub { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
 
     .section { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
-    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 14px; }
+    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8b5cf6; margin-bottom: 14px; }
 
     .field { margin-bottom: 14px; }
     label { display: block; font-size: 0.75rem; font-weight: 600; color: #555; margin-bottom: 5px; }
@@ -25,20 +25,20 @@
       padding: 9px 12px; font-size: 0.88rem; font-family: inherit; color: #1a1a2e;
       outline: none; transition: border-color .2s; resize: vertical;
     }
-    input:focus, textarea:focus, select:focus { border-color: #6c63ff; }
+    input:focus, textarea:focus, select:focus { border-color: #8b5cf6; }
     textarea { min-height: 80px; }
 
     .field-hint { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
 
     .finding-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 10px; align-items: start; }
     .add-btn { background: none; border: 1.5px dashed #bbb; color: #888; border-radius: 7px; padding: 8px 12px; font-size: 0.8rem; cursor: pointer; width: 100%; margin-top: 4px; transition: border-color .2s, color .2s; }
-    .add-btn:hover { border-color: #6c63ff; color: #6c63ff; }
+    .add-btn:hover { border-color: #8b5cf6; color: #8b5cf6; }
     .remove-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 4px; transition: color .2s; }
     .remove-btn:hover { color: #e55; }
     .section-block { background: #f8f8fc; border: 1px solid #e8e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; position: relative; }
     .section-block .remove-btn { position: absolute; top: 10px; right: 10px; }
 
-    .gen-btn { background: #6c63ff; color: #fff; border: none; border-radius: 9px; padding: 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 24px; transition: opacity .15s; }
+    .gen-btn { background: #8b5cf6; color: #fff; border: none; border-radius: 9px; padding: 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 24px; transition: opacity .15s; }
     .gen-btn:hover { opacity: .88; }
 
     /* ── Right panel ── */
@@ -49,9 +49,9 @@
     /* Tabs */
     .tab-bar { display: flex; gap: 4px; flex: 1; }
     .tab { background: #f0f0f8; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #888; transition: all .15s; }
-    .tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+    .tab.active { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
 
-    .copy-btn { background: #6c63ff; color: #fff; border: none; border-radius: 7px; padding: 8px 18px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+    .copy-btn { background: #8b5cf6; color: #fff; border: none; border-radius: 7px; padding: 8px 18px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
     .copy-btn:hover { opacity: .88; }
     .copy-btn.copied { background: #00b894; }
 
@@ -67,14 +67,14 @@
 
     .blog-card-pane { flex: 1; padding: 20px; overflow-y: auto; background: #1e1e2e; display: flex; flex-direction: column; gap: 20px; }
     .blog-card-section { background: #13131f; border: 1px solid #2a2a40; border-radius: 8px; padding: 16px; }
-    .blog-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 10px; }
+    .blog-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8b5cf6; margin-bottom: 10px; }
     .blog-card-instructions { font-size: 0.78rem; color: #8888aa; line-height: 1.55; margin-bottom: 12px; }
     .blog-card-instructions strong { color: #00d4aa; }
     pre.blog-card-code { font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all; color: #cdd6f4; }
 
     /* ── Steps hint ── */
     .steps-hint { background: #f0f0ff; border: 1px solid #d8d8ff; border-radius: 8px; padding: 12px 14px; font-size: 0.76rem; color: #555; line-height: 1.6; margin-bottom: 20px; }
-    .steps-hint strong { color: #6c63ff; }
+    .steps-hint strong { color: #8b5cf6; }
     .steps-hint ol { padding-left: 16px; margin-top: 6px; }
 
     @media(max-width: 900px) { .app { grid-template-columns: 1fr; } .output-panel { min-height: 50vh; } }
@@ -421,9 +421,9 @@ function generate() {
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f; --surface: #13131a; --border: #22223a;
-      --accent: #6c63ff; --accent2: #00d4aa;
-      --text: #e8e8f0; --muted: #8888aa; --radius: 12px;
+      --bg: #0a0b0e; --surface: #101116; --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed; --accent2: #34d399;
+      --text: #e8e9ed; --muted: #9ba1ac; --radius: 12px;
     }
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,.92); backdrop-filter: blur(12px); z-index: 100; }

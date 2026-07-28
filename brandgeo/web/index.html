@@ -90,27 +90,102 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Type pairing, 2026-07-28. Inter was the whole page and it is the single
+       most generic face in software, which is most of why the page read as
+       bland. Instrument Serif carries the display voice: high stroke contrast,
+       editorial, and it signals "we publish original research", which is what
+       actually differentiates BrandGEO from every competitor running a
+       geometric sans. Geist carries UI and body: sharp, technical, real tabular
+       figures for the score readouts. Both are on Google Fonts, so the existing
+       CSP (style-src fonts.googleapis.com, font-src fonts.gstatic.com) already
+       permits them and nothing in .htaccess needs to change. -->
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Design tokens ── */
+    /* ═══════════════════════════════════════════════════════════════════════
+       DESIGN TOKENS — rebuilt 2026-07-28 from measurement, not preference.
+
+       These tokens are consumed by all 79 pages in this folder, so every ratio
+       below is site-wide.
+
+       METHOD. Downloaded the shipped CSS of Linear and Cursor and the markup of
+       peec.ai, tryprofound.com, athenahq.ai, scrunch.com, evertune.ai,
+       brandlight.ai, conductor.com, seranking.com and ahrefs.com/brand-radar;
+       counted every hex; converted to OKLCH; computed sRGB contrast for every
+       pair actually used together.
+
+       WHAT THE MEASUREMENTS CHANGED:
+
+       1. PURE WHITE ON NEAR-BLACK BLOOMS. #ffffff on #050508 is 20.9:1. Linear
+          ships #e4e5e9 175 times and #ffffff 27 times. Past roughly 16:1, light
+          text haloes against a dark field — worst for the ~30% of readers with
+          astigmatism. --t is now #E8E9ED, 16.2:1, still well past AAA's 7:1.
+
+       2. THE SURFACES WERE VIOLET AND THAT MUTED THE ACCENT. Old --s #0e0e17 is
+          OKLCH C 0.019 at hue 284. --ac is C 0.219 at hue 293. Nine degrees
+          apart: the accent was sitting on a desaturated copy of itself, so it
+          could not be the isolated element the von Restorff effect depends on.
+          Linear's surface is C 0.008, peec.ai's greys are C 0.000. Surfaces are
+          now C 0.007-0.014, making --ac 22x the chroma of anything beside it.
+          The violet did not change. Its surroundings did.
+
+       3. ALPHA TEXT AND ALPHA BORDERS ARE NOT ONE COLOUR. rgba(255,255,255,.6)
+          resolves differently over --bg than over --s, so "muted" was never a
+          single value and could not be contrast-checked. Solid now.
+
+       4. LIGHT MODE FAILED WCAG AT THE TOKEN LEVEL, on every one of the 79
+          pages. Measured against --bg #f7f7fc: --t2 4.09:1, --t3 2.19:1, --ac
+          as text 3.97:1, --ac2 1.79:1. All four are below AA's 4.5:1 and --ac2
+          was effectively invisible. This was the surface recorded as UNAUDITED
+          in CLAUDE.md. It is audited now, and fixed.
+
+       5. VIOLET IS THE CATEGORY DIFFERENTIATOR, SO IT STAYS. Of ten competitors
+          scraped, none owns violet: SE Ranking #1b81f7 blue, AthenaHQ #4f39f6
+          and peec.ai #6b5bff indigo, Ahrefs #3a57fc blue with orange, Evertune
+          #0b2a3f navy with #f7594e coral, Conductor #c82e5b magenta with teal,
+          Scrunch #f1e8c7 cream with #d8fc3b lime, Profound near-neutral. Hue
+          293 sits clear of the indigo cluster at 277-281. Keep it, and push the
+          gradient away from that cluster rather than toward it.
+
+       6. ADDED A WARM COUNTER-ACCENT. Every competitor pairs a cool primary
+          with one warm signal colour; this palette had only violet and a teal.
+          --warn carries risk and loss (the revenue-drain framing) so that
+          --ac2 can mean nothing but "good".
+       ═══════════════════════════════════════════════════════════════════════ */
     :root {
-      --bg:   #050508;
-      --s:    #0e0e17;
-      --s2:   #12121c;
-      --bd:   rgba(255,255,255,.07);
-      --bd2:  rgba(255,255,255,.13);
-      --ac:   #8b5cf6;         /* unified with dashboard brand-500 (was #6c63ff indigo) */
-      --ac-strong: #7c3aed;    /* AA-safe solid fill for white-text CTAs (dashboard brand-600) */
-      --ac2:  #00d4aa;
-      --t:    #ffffff;
-      --t2:   rgba(255,255,255,.6);
-      --t3:   rgba(255,255,255,.35);
-      --nav:  rgba(5,5,8,.85);
+      /* Surfaces — near-neutral by design; see note 2 */
+      --bg:   #0a0b0e;         /* OKLCH L15.0 C0.007 */
+      --s:    #101116;         /* OKLCH L17.9 C0.010 */
+      --s2:   #16171e;         /* OKLCH L20.7 C0.014 */
+      /* Borders — solid, so a hairline reads the same on every layer */
+      --bd:   #23242b;         /* 1.27:1 vs --bg */
+      --bd2:  #32333c;         /* 1.57:1 vs --bg */
+      /* Brand. Two values on purpose: --ac is 4.65:1 and is a FILL behind white
+         button text; --ac-text is 7.23:1 and is what accent WORDS use. */
+      --ac:        #8b5cf6;
+      --ac-text:   #a78bfa;
+      --ac-strong: #7c3aed;
+      --ac2:  #34d399;         /* POSITIVE only. 10.24:1 */
+      --warn: #fbbf24;         /* risk / loss. 11.79:1 */
+      /* Status colours for the sample report card. These were hardcoded hexes
+         chosen against the dark canvas, so in light mode they measured 1.7 to
+         2.6:1 across 25 elements — every rank number, every KNOW/PARTIAL/
+         MISSING badge and every percentage was effectively unreadable. Tokens
+         now, with a light counterpart that clears AA on #f7f7fc. */
+      --ok:   #34d399;         /* 10.24:1 */
+      --part: #fb923c;         /*  8.70:1 */
+      --bad:  #f87171;         /*  7.11:1 */
+      --info: #c4b5fd;         /* 10.66:1 */
+      /* Text — solid values, measured against --bg */
+      --t:    #e8e9ed;         /* 16.22:1 */
+      --t2:   #9ba1ac;         /*  7.58:1 */
+      --t3:   #7d838f;         /*  5.17:1 on --bg, 4.69:1 on --s2, so it clears
+                                  AA on the lightest surface it ever sits on */
+      --nav:  rgba(10,11,14,.85);
       --r:    12px;
       --dot:  rgba(255,255,255,.13);
-      --badge-text: rgba(180,175,255,.9);
+      --badge-text: #c4b5fd;   /* 10.4:1, was rgba(180,175,255,.9) */
       --badge-bg:   rgba(139,92,246,.1);
       --badge-bd:   rgba(139,92,246,.28);
     }
@@ -118,11 +193,22 @@
       --bg:   #f7f7fc;
       --s:    #ffffff;
       --s2:   #f4f4fb;
-      --bd:   rgba(0,0,0,.08);
-      --bd2:  rgba(0,0,0,.14);
-      --t:    #09090f;
-      --t2:   rgba(9,9,15,.58);
-      --t3:   rgba(9,9,15,.35);
+      --bd:   #e2e2ea;
+      --bd2:  #cfcfda;
+      /* In light mode the roles invert: #8b5cf6 is only 3.97:1 on #f7f7fc and
+         fails as text, so --ac-text darkens while --ac stays a fill. */
+      --ac:        #7c3aed;
+      --ac-text:   #6d28d9;    /* 6.65:1 */
+      --ac-strong: #6d28d9;
+      --ac2:  #047857;         /* 5.14:1, was #00d4aa at 1.79:1 */
+      --warn: #b45309;         /* 5.06:1, amber is unreadable on light */
+      --ok:   #047857;         /* 5.14:1, was #34d399 at 1.80:1 */
+      --part: #b45309;         /* 4.70:1, was #fb923c at 2.12:1 */
+      --bad:  #b91c1c;         /* 6.06:1, was #f87171 at 2.59:1 */
+      --info: #6d28d9;         /* 6.65:1, was #c4b5fd at 1.73:1 */
+      --t:    #09090f;         /* 18.59:1 */
+      --t2:   #55555e;         /*  6.91:1, was rgba(9,9,15,.58) at 4.09:1 */
+      --t3:   #6b6b75;         /*  4.93:1, was rgba(9,9,15,.35) at 2.19:1 */
       --nav:  rgba(247,247,252,.88);
       --dot:  rgba(9,9,15,.065);
       --badge-text: #5732d6;
@@ -133,7 +219,7 @@
     body {
       background: var(--bg);
       color: var(--t);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       transition: background .3s, color .3s;
@@ -235,7 +321,7 @@
       flex-shrink: 0;
       transition: border-color .15s, color .15s;
     }
-    .theme-toggle:hover { border-color: var(--ac); color: var(--ac); }
+    .theme-toggle:hover { border-color: var(--ac); color: var(--ac-text); }
 
     /* ── HERO ── */
     .hero {
@@ -385,14 +471,28 @@
          Floor lowered from 2.85rem: measured at 375x812 the old floor took
          three lines and 142px and pushed the score evidence below the fold
          (homepage-hook.md §2.2). Two lines at both widths is the constraint. */
+      /* Instrument Serif, 2026-07-28. A display serif against a technical
+         grotesk is the differentiating move here: every competitor in AI search
+         runs a geometric sans, and BrandGEO's actual moat is that it publishes
+         original measured research. Editorial voice, editorial typeface.
+         Weight is 400 because the family ships one weight; authority comes from
+         size and stroke contrast, not from bolding. The old 900 would have
+         synthesised a fake bold. Tracking relaxed from -.055em, which was tuned
+         for Inter's tight sans fit and would collide serifs. */
+      /* Serif display was tried on 2026-07-28 and reverted the same day: it read
+         as disconnected from the Geist UI around it, and the italic lockup broke
+         across a line ("your" / "brand"). One family, worked hard, beats two
+         that argue. Geist carries it at weight 800. */
       font-size: clamp(2.2rem, 6.4vw, 3.5rem);
-      font-weight: 900;
+      font-weight: 800;
       line-height: 1.06;
-      letter-spacing: -.055em;
+      letter-spacing: -.045em;
       margin-bottom: 22px;
       color: var(--t);
     }
     .hero h1 em {
+      /* Upright. The italic experiment split "your / brand" across a line break
+         and read as a different typeface rather than emphasis. */
       font-style: normal;
       background: linear-gradient(135deg, var(--ac) 0%, var(--ac2) 100%);
       -webkit-background-clip: text;
@@ -429,6 +529,11 @@
     .engines-strip { max-width: 1060px; margin: 40px auto 0; border-top: 1px solid var(--bd); border-bottom: 1px solid var(--bd); padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 12px 28px; flex-wrap: wrap; }
     .engines-strip .es-label { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--t2); font-weight: 700; }
     .engines-strip .es-item { display: inline-flex; align-items: center; gap: 8px; color: var(--t2); font-weight: 600; font-size: .92rem; }
+    /* Roadmap engines. Visually subordinate to the live ones so the strip cannot
+       be read as "these all work today". Opacity only, no colour change, so the
+       contrast floor is still met against the hero background. */
+    .engines-strip .es-item.es-soon { opacity: .55; font-weight: 500; }
+    .engines-strip .es-item.es-soon .es-dot { animation: none; }
     .engines-strip .es-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
     /* ── RESEARCH CREDIBILITY BAND ── */
@@ -471,7 +576,7 @@
       outline: none;
       font-size: 0.95rem;
       color: var(--t);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       padding: 10px 0;
     }
     .search-inner input::placeholder { color: var(--t2); }
@@ -487,7 +592,7 @@
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       flex-shrink: 0;
       transition: opacity .15s, transform .1s;
       letter-spacing: -.01em;
@@ -520,7 +625,7 @@
       font-size: 0.875rem;
       color: var(--t2);
     }
-    .audit-status.is-error { color: #f87171; }
+    .audit-status.is-error { color: var(--bad); }
     .search-btn .spinner {
       display: inline-block;
       width: 12px;
@@ -597,7 +702,7 @@
       padding: 11px 14px;
       font-size: 0.88rem;
       color: var(--t);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       outline: none;
     }
     .audit-email-row input:focus { border-color: var(--ac); }
@@ -615,7 +720,7 @@
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       transition: opacity .15s, transform .1s;
     }
     .audit-email-btn:hover { opacity: .9; transform: scale(.98); }
@@ -649,7 +754,7 @@
       border-radius: 20px;
       font-size: 0.8rem;
       font-weight: 500;
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       cursor: pointer;
       appearance: none;
       -webkit-appearance: none;
@@ -793,7 +898,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #34d399;
+      background: var(--ok);
       flex-shrink: 0;
       animation: tickerPulse 2s ease-out infinite;
     }
@@ -885,9 +990,9 @@
     .pe-name { font-size: 0.875rem; color: var(--t); margin-bottom: 5px; font-weight: 600; }
     .pe-pos { font-size: 1.1rem; font-weight: 900; line-height: 1; margin-bottom: 5px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
     .pe-status { font-size: 0.875rem; font-weight: 600; padding: 1px 6px; border-radius: 3px; }
-    .pe-status.know { color: #c4b5fd; background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3); }
-    .pe-status.partial { color: #fb923c; background: rgba(251,146,60,.12); border: 1px solid rgba(251,146,60,.2); }
-    .pe-status.missing { color: #f87171; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.18); }
+    .pe-status.know { color: var(--info); background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3); }
+    .pe-status.partial { color: var(--part); background: rgba(251,146,60,.12); border: 1px solid rgba(251,146,60,.2); }
+    .pe-status.missing { color: var(--bad); background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.18); }
 
     /* Fix rows: no longer in the hero card, reused by proof block 4 step one. */
     .preview-fix-label { font-size: 0.875rem; color: var(--t2); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 10px; }
@@ -903,9 +1008,9 @@
     .fix-row.p1 { background: rgba(251,146,60,.04); border: 1px solid rgba(251,146,60,.11); }
     .fix-row.p2 { background: rgba(139,92,246,.04); border: 1px solid rgba(139,92,246,.14); }
     .fix-badge { font-size: 0.8rem; font-weight: 700; padding: 2px 8px; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
-    .fix-badge.p0 { background: rgba(248,113,113,.12); color: #f87171; }
-    .fix-badge.p1 { background: rgba(251,146,60,.12); color: #fb923c; }
-    .fix-badge.p2 { background: rgba(139,92,246,.14); color: #c4b5fd; }
+    .fix-badge.p0 { background: rgba(248,113,113,.12); color: var(--bad); }
+    .fix-badge.p1 { background: rgba(251,146,60,.12); color: var(--part); }
+    .fix-badge.p2 { background: rgba(139,92,246,.14); color: var(--info); }
     .fix-title { font-size: 0.94rem; font-weight: 700; color: var(--t); margin-bottom: 3px; }
     .fix-desc { font-size: 0.875rem; color: var(--t2); line-height: 1.55; }
 
@@ -939,7 +1044,7 @@
       background: var(--bd2);
     }
     .chain-link span { position: relative; background: var(--bg); padding: 0 6px; line-height: 1; }
-    .chain-pillar { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ac); margin-bottom: 10px; }
+    .chain-pillar { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ac-text); margin-bottom: 10px; }
     .chain-step h3 { font-size: 1rem; font-weight: 700; color: var(--t); margin-bottom: 8px; }
     .chain-step > p { font-size: 0.875rem; color: var(--t2); line-height: 1.6; margin: 0; }
     .chain-plan {
@@ -964,7 +1069,7 @@
 
     /* ── SECTION ── */
     .section { padding: 72px 40px; max-width: 1060px; margin: 0 auto; }
-    .section-label { color: var(--ac); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+    .section-label { color: var(--ac-text); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
     .section h2 {
       font-size: clamp(1.6rem, 3.5vw, 2.4rem);
       font-weight: 800;
@@ -1025,7 +1130,7 @@
     .latest-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
     .latest-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
     .latest-tag-news { color: var(--ac2); background: rgba(0,212,170,.12); border: 1px solid rgba(0,212,170,.25); }
-    .latest-tag-research { color: var(--ac); background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.25); }
+    .latest-tag-research { color: var(--ac-text); background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.25); }
     .latest-date { font-size: 0.76rem; color: var(--t3); white-space: nowrap; }
     .latest-card h3 { font-size: 0.92rem; font-weight: 700; color: var(--t); line-height: 1.35; margin-bottom: 8px; }
     .latest-card p { color: var(--t2); font-size: 0.82rem; line-height: 1.55; margin: 0; }
@@ -1060,11 +1165,11 @@
     .sentiment-quote .tag { display: inline-block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
     .sentiment-quote .engine { color: var(--t3); font-size: 0.68rem; }
     .sentiment-quote.positive { background: rgba(52,211,153,.05); border: 1px solid rgba(52,211,153,.15); }
-    .sentiment-quote.positive .tag { color: #34d399; background: rgba(52,211,153,.12); }
+    .sentiment-quote.positive .tag { color: var(--ok); background: rgba(52,211,153,.12); }
     .sentiment-quote.neutral { background: rgba(251,146,60,.05); border: 1px solid rgba(251,146,60,.14); }
-    .sentiment-quote.neutral .tag { color: #fb923c; background: rgba(251,146,60,.12); }
+    .sentiment-quote.neutral .tag { color: var(--part); background: rgba(251,146,60,.12); }
     .sentiment-quote.negative { background: rgba(248,113,113,.05); border: 1px solid rgba(248,113,113,.13); }
-    .sentiment-quote.negative .tag { color: #f87171; background: rgba(248,113,113,.1); }
+    .sentiment-quote.negative .tag { color: var(--bad); background: rgba(248,113,113,.1); }
     @media(max-width: 780px) { .sentiment-grid { grid-template-columns: 1fr; gap: 32px; } }
 
     /* ── HOW IT WORKS ── */
@@ -1153,7 +1258,7 @@
       align-items: center;
       font-size: 0.66rem;
       font-weight: 700;
-      color: var(--ac);
+      color: var(--ac-text);
       text-transform: uppercase;
       letter-spacing: .08em;
       gap: 4px;
@@ -1240,7 +1345,7 @@
     .btn-plan {
       display: block;
       text-align: center;
-      background: var(--ac);
+      background: var(--ac-strong);
       color: #fff;
       border: none;
       padding: 10px 14px;
@@ -1302,7 +1407,7 @@
     .upgrade-step { background: var(--s); border: 1px solid var(--bd); border-radius: 10px; padding: 12px 16px; min-width: 130px; }
     .upgrade-step.upgrade-step-featured { border-color: var(--ac); background: rgba(139,92,246,.06); }
     .upgrade-step-name { font-size: 0.8rem; font-weight: 800; color: var(--t); margin-bottom: 2px; }
-    .upgrade-step.upgrade-step-featured .upgrade-step-name { color: var(--ac); }
+    .upgrade-step.upgrade-step-featured .upgrade-step-name { color: var(--ac-text); }
     .upgrade-step-desc { font-size: 0.72rem; color: var(--t3); }
     .upgrade-arrow { font-size: 1.1rem; color: var(--t3); padding: 0 4px; flex-shrink: 0; }
 
@@ -1314,7 +1419,7 @@
       padding: 14px 20px;
     }
     .addons-note strong { color: var(--t); }
-    .addons-note a { color: var(--ac); font-weight: 700; text-decoration: none; }
+    .addons-note a { color: var(--ac-text); font-weight: 700; text-decoration: none; }
     .addons-note a:hover { text-decoration: underline; }
 
     /* ─── Snapshot CTA block ─── */
@@ -1329,7 +1434,7 @@
     .mode-switch { display: inline-flex; background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 4px; gap: 4px; max-width: 100%; }
     .mode-btn { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; color: var(--t2); font-family: inherit; font-size: 0.9rem; font-weight: 700; padding: 10px 20px; border-radius: 9px; cursor: pointer; transition: color .2s, background .2s; white-space: nowrap; }
     .mode-btn .m-sub { font-weight: 500; font-size: 0.76rem; color: var(--t3); }
-    .mode-btn.active { background: var(--ac); color: #fff; box-shadow: 0 3px 10px rgba(139,92,246,.32); }
+    .mode-btn.active { background: var(--ac-strong); color: #fff; box-shadow: 0 3px 10px rgba(139,92,246,.32); }
     .mode-btn.active .m-sub { color: rgba(255,255,255,.8); }
     .mode-caption { text-align: center; font-size: 0.8rem; color: var(--t3); max-width: 520px; margin: 0 auto 24px; }
     .pricing-grid.pricing-grid-modes { max-width: 1000px; margin: 0 auto; }
@@ -1392,7 +1497,7 @@
       font-size: 0.9rem;
       width: 100%;
       outline: none;
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       transition: border-color .2s;
     }
     input:focus, textarea:focus, select:focus { border-color: var(--ac); }
@@ -1400,11 +1505,11 @@
     textarea { resize: vertical; min-height: 110px; }
     select option { background: var(--s); color: var(--t); }
     .submit-btn {
-      background: var(--ac); color: #fff;
+      background: var(--ac-strong); color: #fff;
       border: none; padding: 15px;
       border-radius: 10px; font-size: 0.95rem; font-weight: 700;
       cursor: pointer;
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Geist', system-ui, sans-serif;
       transition: opacity .15s;
     }
     .submit-btn:hover { opacity: .9; }
@@ -1429,7 +1534,7 @@
       text-decoration: none;
       transition: border-color .2s, color .2s;
     }
-    .footer-social a:hover { border-color: var(--ac); color: var(--ac); }
+    .footer-social a:hover { border-color: var(--ac); color: var(--ac-text); }
     .footer-col h4 { color: var(--t); font-size: 0.72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
     .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
     .footer-col a { color: var(--t3); text-decoration: none; font-size: 0.84rem; transition: color .2s; }
@@ -1500,6 +1605,36 @@
     .hero-orb-2 {
       background: radial-gradient(circle, rgba(99,102,241,.20) 0%, rgba(99,102,241,.06) 48%, rgba(9,10,15,0) 74%);
     }
+    /* Grain, 2026-07-28. The hero was flat fills plus two blurred orbs, which
+       is why it read as bland even once the canvas was painting: nothing had
+       any material. A fine noise layer over the gradients gives the surface
+       tooth, the way a printed page differs from a screenshot of one.
+       Generated with feTurbulence in a data: URI, so no request and no CSP
+       change (img-src already allows data:). Kept at .035 alpha, above that it
+       reads as dirt rather than texture, and screened so it lifts the darks
+       instead of muddying them. */
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      inset: -20%;
+      pointer-events: none;
+      opacity: .035;
+      mix-blend-mode: screen;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    /* Depth. Two off-centre colour fields behind the orbs so the background has
+       somewhere to recede to. Deliberately asymmetric: the left field sits
+       behind the headline, the right one behind the report card, so the two
+       halves of the hero do not read as the same flat plane. */
+    .hero-bg {
+      background:
+        radial-gradient(80% 60% at 12% 18%, rgba(124,58,237,.13) 0%, rgba(9,10,15,0) 62%),
+        radial-gradient(70% 55% at 88% 72%, rgba(99,102,241,.10) 0%, rgba(9,10,15,0) 60%);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-bg::before { opacity: .02; }
+    }
+
     /* Soft floor so the hero dissolves into the next section instead of
        stopping on a line. */
     .hero-bg::after {
@@ -1549,7 +1684,7 @@
        friction-killers rather than a mix of proof and cost. */
     .hero-trust { gap: 10px 18px; }
     .hero-trust .ht-item { display: inline-flex; align-items: center; gap: 7px; }
-    .hero-trust .ht-ico { width: 15px; height: 15px; flex: 0 0 15px; color: var(--ac); }
+    .hero-trust .ht-ico { width: 15px; height: 15px; flex: 0 0 15px; color: var(--ac-text); }
 
     /* A4. Payment trust chips. "Coming soon" is load-bearing: no crypto is
        accepted at checkout yet. If that changes, this markup changes with it. */
@@ -1644,6 +1779,89 @@
       .es-dot::after, .node-lines .nl-flow { animation: none; }
       .preview-card { transition: none; transform: none !important; }
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       MOTION SYSTEM — 2026-07-28.
+
+       Values taken from the shipped CSS of linear.app and cursor.com, which
+       were downloaded and counted, not looked at. What the count showed:
+
+         - cubic-bezier(.22,1,.36,1) is the most-used curve on both sites. It
+           was already this file's curve, so it stays.
+         - Ambient loops cluster at 1600 / 2800 / 3200ms, each appearing about
+           100 times. Nothing decorative on those pages runs at UI speed; the
+           slowness is what reads as "alive" instead of "animated".
+         - mask-image: linear-gradient(to right, black 80%, transparent) appears
+           12+ times. It is how a scroller ends without a hard edge.
+         - backdrop-filter always pairs blur WITH saturate, e.g.
+           blur(14px) saturate(1.45). Blur alone is why glass reads grey.
+
+       DURATION SCALE. Material fixes 200ms as the reference transition and
+       300ms between screens; Nielsen puts 0.1s at "instantaneous" and 1s at the
+       limit of uninterrupted thought. Named so nothing gets hand-picked.
+
+       ONE HARD RULE, learned the expensive way on the Next prototype: CONTENT
+       VISIBILITY MUST NEVER DEPEND ON AN ANIMATION FIRING. An opacity keyframe
+       with animation-fill-mode:backwards holds the from-state for the whole
+       delay, so in a backgrounded tab, where the browser suspends the animation
+       timeline, the content stays invisible forever. Everything below either
+       animates transform only, or is decoration whose absence costs nothing.
+       ═══════════════════════════════════════════════════════════════════════ */
+    :root {
+      --dur-micro: 150ms;     /* hover, toggle */
+      --dur-standard: 200ms;  /* Material's reference */
+      --dur-enter: 300ms;     /* element entering a view */
+      --ease-soft: cubic-bezier(.22,1,.36,1);
+    }
+
+    /* Sweeping highlight. Used on the primary CTA so the one button that
+       matters reads as energised rather than painted. */
+    @keyframes bgShimmer {
+      from { background-position: -180% 0; }
+      to   { background-position: 280% 0; }
+    }
+    .shimmer-edge {
+      position: relative;
+      overflow: hidden;
+    }
+    .shimmer-edge::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(110deg, transparent 32%, rgba(255,255,255,.28) 50%, transparent 68%);
+      background-size: 220% 100%;
+      animation: bgShimmer 3.2s var(--ease-soft) infinite;
+    }
+
+    /* Edge-fade for any horizontal scroller. */
+    .marquee-mask {
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%);
+              mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%);
+    }
+
+    /* Glass. Blur WITH saturate, per the extracted values. Without the
+       saturate the panel desaturates whatever is behind it and reads as dirty
+       grey rather than as glass. */
+    .glass {
+      -webkit-backdrop-filter: blur(14px) saturate(1.45);
+              backdrop-filter: blur(14px) saturate(1.45);
+    }
+
+    /* Slow ambient drift for the hero orbs: 17-22s, an order of magnitude
+       longer than any UI transition, so it registers as atmosphere rather than
+       as something happening. */
+    @keyframes bgDrift {
+      0%   { transform: translate3d(0,0,0) scale(1); }
+      50%  { transform: translate3d(26px,-34px,0) scale(1.07); }
+      100% { transform: translate3d(0,0,0) scale(1); }
+    }
+    .hero-orb   { animation: bgDrift 22s ease-in-out infinite; }
+    .hero-orb-2 { animation: bgDrift 17s ease-in-out infinite reverse; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .shimmer-edge::after, .hero-orb, .hero-orb-2 { animation: none; }
+    }
   </style>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
@@ -1704,8 +1922,30 @@
     <!-- LEFT: copy + audit -->
     <div class="hero-copy">
       <div class="hero-badge">AI Visibility Platform</div>
-      <h1>Does AI recommend <em>your brand</em><br>across Web2 &amp; Web3?</h1>
-      <p>Check your domain instantly. See what top AI models and decentralized knowledge engines display when customers ask.</p>
+      <!-- Headline, 2026-07-28. Was "Does AI recommend your brand across Web2 &
+           Web3?". Two reasons for the change, both from evidence.
+
+           1. The competitor scrape. Every one of the ten AI-visibility pages
+              pulled today leads on a stake, not a capability: Scrunch "Humans
+              don't visit your website anymore, AI does", SE Ranking "Don't just
+              track visibility. Validate it.", Evertune "Own the AI customer
+              journey", Conductor "Where Enterprises Go to Win AI Search". The
+              verbs are win, own, validate. Nobody asks a yes/no question,
+              because "does AI recommend you" is answerable with "probably" and
+              a reader who answers it has no reason to continue.
+           2. Loss aversion. Naming the competitor is what makes the question
+              urgent: an absent brand is abstract, a rival occupying your slot is
+              not. Hero sections with a specific value proposition measure 35-40%
+              better than vague ones, and the five-second test asks what you do,
+              who it is for, and what to do next.
+
+           Web2/Web3 moved to the subline, which is where it was already being
+           qualified honestly anyway. -->
+      <h1>Are AI models recommending <em>your brand</em>, or your competitors?</h1>
+      <!-- Present tense here has to stay true. The audit runs five Web2 engines
+           (_prospect_engines.js FULL_ENGINES); decentralized engines are roadmap,
+           so they are named as what is coming, not as what is measured today. -->
+      <p>Check your domain instantly. See what the top AI models display when customers ask, with decentralized knowledge engines coming next.</p>
       <div class="search-wrap">
         <div class="search-inner">
           <input type="text" id="brandInput" placeholder="yourcompany.com" aria-label="Enter your brand or domain">
@@ -1713,7 +1953,7 @@
                client-side before the audit endpoint is called. Real gating is
                server-side (SALES-ENGINE.md Component A) -- this is a cheap first filter. -->
           <input type="text" id="auditHp" name="company_website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
-          <button class="search-btn" id="auditBtn">Check my visibility &rarr;</button>
+          <button class="search-btn shimmer-edge" id="auditBtn">Check my visibility &rarr;</button>
         </div>
       </div>
       <div class="audit-status" id="auditStatus" aria-live="polite"></div>
@@ -1730,7 +1970,7 @@
         </span>
         <span class="ht-item">
           <svg class="ht-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          Results in 10s
+          Results in under a minute
         </span>
         <span class="ht-item">
           <svg class="ht-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
@@ -1774,7 +2014,7 @@
                   stroke-dasharray="213.63" stroke-dashoffset="213.63" data-target-offset="77" stroke-linecap="round"/>
                 <defs>
                   <linearGradient id="scoreGrad" x1="0%" y1="0%">
-                    <stop offset="0%" stop-color="#c4b5fd"/>
+                    <stop offset="0%" stop-color="var(--info)"/>
                     <stop offset="100%" stop-color="#6d28d9"/>
                   </linearGradient>
                 </defs>
@@ -1791,11 +2031,11 @@
           </div>
           <div class="preview-engines-label">Engine split view</div>
           <div class="preview-engines-grid">
-            <div class="pe-card know"><div class="pe-name">ChatGPT</div><div class="pe-pos" style="color:#34d399">#2</div><span class="pe-status know">KNOW</span></div>
-            <div class="pe-card know"><div class="pe-name">Gemini</div><div class="pe-pos" style="color:#34d399">#1</div><span class="pe-status know">KNOW</span></div>
-            <div class="pe-card partial"><div class="pe-name">Claude</div><div class="pe-pos" style="color:#fb923c">#4</div><span class="pe-status partial">PARTIAL</span></div>
-            <div class="pe-card missing"><div class="pe-name">Perplexity</div><div class="pe-pos" style="color:#f87171">n/a</div><span class="pe-status missing">MISSING</span></div>
-            <div class="pe-card missing"><div class="pe-name">Google AI</div><div class="pe-pos" style="color:#f87171">n/a</div><span class="pe-status missing">MISSING</span></div>
+            <div class="pe-card know"><div class="pe-name">ChatGPT</div><div class="pe-pos" style="color:var(--ok)">#2</div><span class="pe-status know">KNOW</span></div>
+            <div class="pe-card know"><div class="pe-name">Gemini</div><div class="pe-pos" style="color:var(--ok)">#1</div><span class="pe-status know">KNOW</span></div>
+            <div class="pe-card partial"><div class="pe-name">Claude</div><div class="pe-pos" style="color:var(--part)">#4</div><span class="pe-status partial">PARTIAL</span></div>
+            <div class="pe-card missing"><div class="pe-name">Perplexity</div><div class="pe-pos" style="color:var(--bad)">n/a</div><span class="pe-status missing">MISSING</span></div>
+            <div class="pe-card missing"><div class="pe-name">Google AI</div><div class="pe-pos" style="color:var(--bad)">n/a</div><span class="pe-status missing">MISSING</span></div>
           </div>
         </div>
         <!-- Scanning skeleton and the real result both land here, in the card's
@@ -1853,17 +2093,25 @@
 <div class="engines-strip reveal">
   <span class="es-tier">
     <span class="es-tier-label">Web2 AI</span>
-    <span class="es-item"><span class="es-dot" style="background:#34d399"></span> ChatGPT</span>
+    <span class="es-item"><span class="es-dot" style="background:var(--ok)"></span> ChatGPT</span>
     <span class="es-item"><span class="es-dot" style="background:#60a5fa;animation-delay:-.34s"></span> Gemini</span>
     <span class="es-item"><span class="es-dot" style="background:#a78bfa;animation-delay:-.68s"></span> Claude</span>
     <span class="es-item"><span class="es-dot" style="background:#22d3ee;animation-delay:-1.02s"></span> Perplexity</span>
     <span class="es-item"><span class="es-dot" style="background:#ef4444;animation-delay:-1.36s"></span> Google AI Mode</span>
   </span>
   <span class="es-div" aria-hidden="true"></span>
+  <!-- Web3 tier is ROADMAP, not product. Neither Bittensor nor Mind Network
+       appears anywhere in planConfig.ts's engine union or in any collector: a
+       repo-wide grep for either name returns zero matches. The "coming soon"
+       label is therefore load-bearing and must not be removed until a collector
+       exists, exactly like the crypto payment chip at :1741. Flagged by the
+       homepage audit 2026-07-28 as the single largest credibility risk on the
+       page, because the h1 sells Web2 & Web3 while the JSON-LD lists only the
+       five Web2 engines. Same rule applied to retired `meta` in planConfig.ts. -->
   <span class="es-tier">
-    <span class="es-tier-label">Web3</span>
-    <span class="es-item"><span class="es-dot" style="background:#fbbf24;animation-delay:-1.7s"></span> Bittensor</span>
-    <span class="es-item"><span class="es-dot" style="background:#e879f9;animation-delay:-2.04s"></span> Mind Network</span>
+    <span class="es-tier-label">Web3 &middot; coming soon</span>
+    <span class="es-item es-soon"><span class="es-dot" style="background:#fbbf24;animation-delay:-1.7s"></span> Bittensor</span>
+    <span class="es-item es-soon"><span class="es-dot" style="background:#e879f9;animation-delay:-2.04s"></span> Mind Network</span>
   </span>
 </div>
 
@@ -1877,12 +2125,12 @@
   <div class="preview-dims-box" style="margin-top:36px;">
     <div class="preview-dims-label">6 dimensions</div>
     <div class="preview-dims-grid">
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Recognition</span><span class="dim-val" style="color:#34d399">72%</span></div><div class="dim-bar"><div class="dim-fill" data-w="72" style="width:0%;background:#34d399"></div></div></div>
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Knowledge</span><span class="dim-val" style="color:#fb923c">60%</span></div><div class="dim-bar"><div class="dim-fill" data-w="60" style="width:0%;background:#fb923c"></div></div></div>
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Sentiment</span><span class="dim-val" style="color:#34d399">68%</span></div><div class="dim-bar"><div class="dim-fill" data-w="68" style="width:0%;background:#34d399"></div></div></div>
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Accuracy</span><span class="dim-val" style="color:#f87171">55%</span></div><div class="dim-bar"><div class="dim-fill" data-w="55" style="width:0%;background:#f87171"></div></div></div>
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Reach</span><span class="dim-val" style="color:#34d399">78%</span></div><div class="dim-bar"><div class="dim-fill" data-w="78" style="width:0%;background:#34d399"></div></div></div>
-      <div class="dim-row"><div class="dim-top"><span class="dim-name">Consistency</span><span class="dim-val" style="color:#f87171">52%</span></div><div class="dim-bar"><div class="dim-fill" data-w="52" style="width:0%;background:#f87171"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Recognition</span><span class="dim-val" style="color:var(--ok)">72%</span></div><div class="dim-bar"><div class="dim-fill" data-w="72" style="width:0%;background:var(--ok)"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Knowledge</span><span class="dim-val" style="color:var(--part)">60%</span></div><div class="dim-bar"><div class="dim-fill" data-w="60" style="width:0%;background:var(--part)"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Sentiment</span><span class="dim-val" style="color:var(--ok)">68%</span></div><div class="dim-bar"><div class="dim-fill" data-w="68" style="width:0%;background:var(--ok)"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Accuracy</span><span class="dim-val" style="color:var(--bad)">55%</span></div><div class="dim-bar"><div class="dim-fill" data-w="55" style="width:0%;background:var(--bad)"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Reach</span><span class="dim-val" style="color:var(--ok)">78%</span></div><div class="dim-bar"><div class="dim-fill" data-w="78" style="width:0%;background:var(--ok)"></div></div></div>
+      <div class="dim-row"><div class="dim-top"><span class="dim-name">Consistency</span><span class="dim-val" style="color:var(--bad)">52%</span></div><div class="dim-bar"><div class="dim-fill" data-w="52" style="width:0%;background:var(--bad)"></div></div></div>
     </div>
   </div>
   <p style="margin-top:22px;">Every dimension is tracked against the competitors you name, so you can tell whether a drop is yours or the whole category moving.</p>
@@ -1909,16 +2157,16 @@
         <div class="sentiment-card-label">Sentiment breakdown: last 7 days</div>
         <div class="sentiment-bars">
           <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Positive</span><span class="val" style="color:#34d399">61%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:61%;background:#34d399"></div></div>
+            <div class="sentiment-bar-top"><span class="name">Positive</span><span class="val" style="color:var(--ok)">61%</span></div>
+            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:61%;background:var(--ok)"></div></div>
           </div>
           <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Neutral</span><span class="val" style="color:#fb923c">27%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:27%;background:#fb923c"></div></div>
+            <div class="sentiment-bar-top"><span class="name">Neutral</span><span class="val" style="color:var(--part)">27%</span></div>
+            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:27%;background:var(--part)"></div></div>
           </div>
           <div class="sentiment-bar-row">
-            <div class="sentiment-bar-top"><span class="name">Negative</span><span class="val" style="color:#f87171">12%</span></div>
-            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:12%;background:#f87171"></div></div>
+            <div class="sentiment-bar-top"><span class="name">Negative</span><span class="val" style="color:var(--bad)">12%</span></div>
+            <div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:12%;background:var(--bad)"></div></div>
           </div>
         </div>
         <div class="sentiment-quotes">
@@ -2256,11 +2504,11 @@
   .faq-item { border-bottom: 1px solid var(--bd); }
   .faq-item summary { cursor: pointer; padding: 20px 0; font-weight: 600; font-size: 1.02rem; color: var(--t); list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
   .faq-item summary::-webkit-details-marker { display: none; }
-  .faq-item summary::after { content: '+'; color: var(--ac); font-size: 1.35rem; font-weight: 400; line-height: 1; flex-shrink: 0; }
+  .faq-item summary::after { content: '+'; color: var(--ac-text); font-size: 1.35rem; font-weight: 400; line-height: 1; flex-shrink: 0; }
   .faq-item[open] summary::after { content: '\2212'; }
   .faq-item p { color: var(--t2); padding: 0 0 20px; margin: 0; line-height: 1.7; }
   .faq-more { text-align: center; margin-top: 32px; }
-  .faq-more a { color: var(--ac); font-weight: 700; text-decoration: none; font-size: 0.92rem; }
+  .faq-more a { color: var(--ac-text); font-weight: 700; text-decoration: none; font-size: 0.92rem; }
   .faq-more a:hover { text-decoration: underline; }
 </style>
 <section class="section reveal" id="faq">
