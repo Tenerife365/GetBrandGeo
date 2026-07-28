@@ -7,6 +7,20 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "brandgeo-dashboard",
       "port": 5173
+    },
+    {
+      "name": "brandgeo-next",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "brandgeo-next",
+      "port": 3000
+    },
+    {
+      "name": "brandgeo-next-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve@14", "out", "-l", "4173"],
+      "cwd": "brandgeo-next",
+      "port": 4173
     }
   ]
 }

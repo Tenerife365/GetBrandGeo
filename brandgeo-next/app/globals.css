@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BrandGEO design tokens — Tailwind v4 CSS-first config.
+
+   Ported from brandgeo/web/index.html's :root block so the Next.js site is
+   colour-identical to the live static site, with three deliberate changes from
+   the hero revamp directive:
+
+     1. Canvas is #090A0F (was #050508). The directive names this value; the
+        glow falloff below is tuned against it.
+     2. --ac2 was #00d4aa, a teal that fought the violet. Replaced by the
+        dual-tone ramp --grad-a #7C3AED -> --grad-b #6366F1.
+     3. --ac stays #8b5cf6. It already matches the dashboard's brand-500 and the
+        logo mark, so the "align the logo purple with the headline highlight and
+        the CTA" requirement is a consumption change, not a token change.
+
+   Engine brand colours are NOT accents and are not unified — they are identity.
+   They live in lib/engines.ts, not here.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #090a0f;
+  --color-surface: #0e0e17;
+  --color-surface-2: #12121c;
+
+  /* Borders */
+  --color-hairline: rgb(255 255 255 / 0.07);
+  --color-hairline-strong: rgb(255 255 255 / 0.13);
+
+  /* Brand */
+  --color-brand: #8b5cf6;
+  --color-brand-strong: #7c3aed;
+  --color-grad-a: #7c3aed;
+  --color-grad-b: #6366f1;
+
+  /* Text */
+  --color-ink: #ffffff;
+  --color-ink-2: rgb(255 255 255 / 0.6);
+  --color-ink-3: rgb(255 255 255 / 0.35);
+
+  /* Type — matches the live static site's 'Inter', system-ui, sans-serif */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+
+  /* Radius */
+  --radius-card: 12px;
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* The hero's glows are large and soft. Without this the page gains a horizontal
+   scrollbar on narrow viewports from the orb bleed alone. */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────── */
+
+@keyframes bg-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes bg-pulse-ring {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes bg-dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.bg-dot-core {
+  animation: bg-pulse-dot 2.4s var(--ease-out-soft) infinite;
+}
+
+.bg-dot-ring {
+  animation: bg-pulse-ring 2.4s var(--ease-out-soft) infinite;
+}
+
+.bg-flow {
+  animation: bg-dash-flow 1.1s linear infinite;
+}
+
+/* Honour the OS setting everywhere at once. The R3F canvas checks this too and
+   stops its render loop rather than just hiding motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
