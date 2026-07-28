@@ -272,6 +272,57 @@ Rewritten 2026-07-26 23:10 against the full commit history of the day and every
 artifact on disk. Ordered by exposure, then revenue, then everything else. The
 top two are live and reachable by anyone on the internet right now.
 
+> **UPDATE 2026-07-28: the first Live exposure item below is CLOSED and the
+> entry is stale.** `6accc67` shipped the gate; the migration was applied
+> 2026-07-27 and the whole chain is verified end to end. Anonymous `POST` to
+> `schedule-collections`, `expire-plan-grants` and `ping-sitemap` returns `401`;
+> the two deleted functions answer identically to a name that never existed
+> (Netlify returns `400 Bad request, missing form`, not `404` — the criterion's
+> expected code was wrong, the outcome was not). `cron.job` holds five active
+> jobs, `public.job_runs` is filling (`schedule-collections` 17 consecutive
+> `ok = true`), and all 17 runs land at minute `:10`, none at `:00`, so Netlify's
+> old schedule is confirmed not double-firing. Review:
+> `docs/qa/scheduled-function-auth-012-review.md`, verdict PASS WITH FINDINGS.
+
+| (scheduled-function auth) | bg-verify | `docs/qa/scheduled-function-auth-012-review.md` | **COMPLETE 2026-07-27, verdict PASS WITH FINDINGS** |
+
+#### Decision 2026-07-28: Google Indexing API dropped, indexing goes manual
+
+`GOOGLE_JSON_KEY` is **not being restored.** A service account was re-created and
+Search Console re-authorised on 2026-07-28, but the Netlify deploy hit the same
+4KB Lambda env-var ceiling that caused the original deletion. Constantin's call:
+drop it, submit URLs by hand via Search Console's URL Inspection tool instead.
+
+The reasoning that made this cheap, from `_indexing.js:11-14`, which is honest
+about it: Google documents the Indexing API as supported **only** for JobPosting
+and BroadcastEvent pages. Every BrandGEO page is blog, comparison, industry or
+city research, so Google returns a real `200` with no documented crawl benefit.
+The service-account JSON costs ~2.3KB of a 4KB budget for that.
+
+**Consequences, all live, none yet fixed in code:**
+
+1. `ping-sitemap` fails every day at 05:10 UTC with
+   `{"stage":"google_auth","error":"NO_CREDENTIALS"}`. Permanent `ok = false`
+   noise in `job_runs`, which erodes the exact observability packet `012` just
+   built. Cheapest stopgap is one line, and it is reversible:
+   `SELECT cron.unschedule('ping-sitemap');`
+2. **IndexNow is dark as collateral damage and should not be.**
+   `ping-sitemap.js:120-126` returns `500` at `createGoogleIndexer()` before
+   IndexNow is ever called, and the loop at `:131-133` awaits `indexer.publish()`
+   first. IndexNow needs no Google credential, acts on arbitrary URLs, reaches
+   Bing/Yandex/Seznam/Naver, costs ~32 bytes of env, and its verification file is
+   live (`getbrandgeo.com/b857aee5749c1fb84e8cf6b220793454.txt`, `200`, 32 bytes).
+   It has been down since 2026-07-19 for no reason of its own.
+3. `force-index.js` reads the same variable, so the in-product manual tool is
+   dead too. "Manual" now means Search Console by hand, not that endpoint.
+4. 22 sitemap URLs are unsubmitted (`sitemap_pings` last wrote 2026-07-19
+   05:07 UTC, 57 rows). These are the 20 US city pages plus two.
+
+**Open, owner `bg-backend`:** make Google optional rather than a hard dependency
+so IndexNow runs standalone. Three touch points, all above. Worth bundling with
+R1 (`collection-worker-background.js:35-43` fail-open, latent not live —
+Constantin confirmed `INTERNAL_AUDIT_KEY` IS set in Netlify 2026-07-28).
+
 #### Live exposure
 
 - [ ] **All five scheduled Netlify functions accept an unauthenticated public

@@ -45,9 +45,15 @@ state. Nothing here has been executed. Use it to seed the specialized chats.
 - [ ] `AYRSHARE_DOMAIN` (`id-5d2IR`) + `AYRSHARE_PRIVATE_KEY` — needed for self-service
   SSO; verified live on 2 clients 2026-07-21, so set. Re-confirm after any env change
   (env changes need a REDEPLOY).
-- [ ] **Restore `GOOGLE_JSON_KEY`** — deleted to fit the 4KB env limit; only the manual
-  SEO indexing tools (`force-index.js`) use it. Restore via **Function-scoped** env on
-  the Pro plan.
+- [x] ~~**Restore `GOOGLE_JSON_KEY`**~~ — **DROPPED 2026-07-28, will not be restored.**
+  Retried with a fresh service account and Search Console re-authorised; the deploy hit
+  the same 4KB Lambda env ceiling. Google's Indexing API is documented as supported only
+  for JobPosting/BroadcastEvent pages (`_indexing.js:11-14`), so ~2.3KB of a 4KB budget
+  bought nothing measurable. Indexing is manual via Search Console URL Inspection now.
+  Note the line above was already wrong: `ping-sitemap.js` uses it too, via `_indexing.js`,
+  so this is a daily cron dependency and not just a manual tool. See CLAUDE.md
+  "Decision 2026-07-28" for the two live consequences (daily `ok = false` in `job_runs`,
+  and IndexNow dark as collateral damage).
 - [ ] Confirm these BUILT-but-not-deployed items actually deploy (push to main auto-deploys):
   Admin Pass 1, Admin Pass 2, delete-account, social cancel/edit, AI SEO Phase 1
   (confirm live), signup redesign Phase 1.
