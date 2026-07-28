@@ -2494,7 +2494,12 @@
 <!-- Versioned on purpose: the server sends no Cache-Control for .js, so a
      returning visitor would keep running the previously cached site.js. Bump
      this whenever site.js changes in a way visitors must pick up. -->
-<script src="site.js?v=2026-07-26b"></script>
+<!-- Bump this whenever site.js changes. It is the only cache-buster on the
+     file, and site.js carries the Stripe checkout URLs: a stale copy sends
+     returning visitors to retired payment links and drops Growth PRO back to
+     the signup fallback. Missing this bump on 2026-07-28 shipped exactly that
+     for anyone with the previous version cached. -->
+<script src="site.js?v=2026-07-28a"></script>
 <!-- ── AI KNOWLEDGE GRAPH (hero showpiece) ──────────────────────────────────
      Vanilla 2D canvas. No libraries, no build step, ~5KB. Visualises the 5 AI
      engines routing citation pulses into your brand node. Cursor-reactive
