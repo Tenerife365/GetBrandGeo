@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-018: We Fixed 5 Rounds of False Positives in Our AI Visibility Scoring | BrandGEO Research™</title>
+  <meta name="description" content="Five distinct false positive bugs surfaced in BrandGEO's own AI response analysis pipeline over six weeks. Here is what each one looked like, and why the real fix was a judgment call, not a sixth rule.">
+  <meta property="og:title" content="We Fixed 5 Rounds of False Positives in Our AI Visibility Scoring: BrandGEO Research™">
+  <meta property="og:description" content="Bold section headings, colon-terminated field labels, an emoji that silently changed a heading's rank depth, language-specific residue. Five real bugs in our own measurement pipeline, and why we stopped patching and added a semantic judgment call instead.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-018-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-018.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-018.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-018-hero.png">
+  <meta property="article:published_time" content="2026-07-22">
+  <meta name="keywords" content="AI visibility measurement accuracy, competitor extraction false positives, GEO measurement methodology, AI response analysis pipeline, brand mention detection accuracy, semantic classifier AI visibility">
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "We Fixed 5 Rounds of False Positives in Our AI Visibility Scoring",
+    "description": "How BrandGEO found and fixed five distinct false positive bugs in its own AI response analysis pipeline, and why the last fix was a semantic judgment call layered on top of the structural rules, not another rule.",
+    "image": "https://getbrandgeo.com/images/bg-018-hero.png",
+    "datePublished": "2026-07-22",
+    "author": {"@type": "Organization", "name": "BrandGEO Research"},
+    "publisher": {"@type": "Organization", "name": "BrandGEO", "url": "https://getbrandgeo.com"},
+    "about": ["AI Visibility Measurement", "Generative Engine Optimization", "Competitor Extraction", "Measurement Accuracy", "Software Engineering"],
+    "mentions": [
+      {"@type": "SoftwareApplication", "name": "ChatGPT", "creator": {"@type": "Organization", "name": "OpenAI"}},
+      {"@type": "SoftwareApplication", "name": "Gemini", "creator": {"@type": "Organization", "name": "Google"}},
+      {"@type": "SoftwareApplication", "name": "Claude", "creator": {"@type": "Organization", "name": "Anthropic"}},
+      {"@type": "SoftwareApplication", "name": "Perplexity", "creator": {"@type": "Organization", "name": "Perplexity AI"}}
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p:last-child { margin: 0; }
+    .callout a { color: var(--accent2); }
+
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
+  <script src="ga4-init.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-018</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-018</span>
+    <span class="badge-tag">Methodology</span>
+    <span class="badge-tag">Measurement Accuracy</span>
+  </div>
+  <h1>We Kept Finding New Ways Our Own <em>Score Could Lie</em></h1>
+  <p class="article-subtitle">Five separate false positive bugs surfaced in our AI response analysis pipeline over six weeks, each one a different shape. Here is what each looked like, and why the real fix was a judgment call layered on top of the rules, not a sixth rule.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 22, 2026</span>
+    <span class="meta-item">7 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-018</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-018-hero.png" alt="An illustration of BrandGEO's five rounds of competitor extraction false positive fixes and the shift to a semantic classifier, with stat cards on regression assertions and the classifier's fail open design." loading="eager">
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Findings: BG-018</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">5</div>
+        <div class="finding-desc">Distinct false positive bugs found and fixed in our competitor extraction logic since July 9</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">156</div>
+        <div class="finding-desc">Hand written regression assertions that must still pass before any extraction change ships</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">0</div>
+        <div class="finding-desc">New names our semantic classifier is allowed to add. It can only remove, never invent</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">8s</div>
+        <div class="finding-desc">Timeout before the classifier fails open to the structural rules, never blocks a result</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+
+  <h2 id="the-question">Is your visibility score actually counting what it claims to count</h2>
+  <p>That is the question every one of these bugs raised, and it is the question worth asking about any AI visibility tool, including our own. A score built on top of a measurement pipeline is only as trustworthy as the code doing the counting underneath it. Over six weeks of running BrandGEO's own <a href="/glossary.html#term-ai-visibility-score">AI Visibility Score</a> against real client data, we found five separate, structurally different ways our own competitor extraction logic could quietly miscount, each one caught by looking closely at real production responses rather than by assuming the first fix had closed the door.</p>
+  <p>We are publishing the specifics because the alternative, treating this as an embarrassing detail to smooth over, would be exactly the kind of unearned confidence this whole measurement category needs less of. This is the same standard we already hold our <a href="/bg-017.html">published research</a> to: a real, checkable claim, or a disclosed limitation, never a quiet gap.</p>
+
+  <h2 id="round-one">Round one: a heading that looked like a company</h2>
+  <p>The first shape was the most obvious in hindsight. AI engines answering a "best providers" style question do not just list companies, they narrate around the list. Our extraction logic, tuned against catering-industry test data, had never been checked against the generic "how to measure or improve X" prompts that make up a large share of real commercial buyer questions. When we ran it against those, section headings from the AI's own answer, phrases like "AI Visibility Score," "Establish a Fixed Prompt Panel," and "Structure Content for AI Extraction," were extracted and reported as competitor brand names.</p>
+  <p>The fix was structural, not a denylist entry for those five exact phrases. We added rules that reject any candidate over a certain length, any candidate ending in a generic metric noun like "score" or "summary," and any candidate opening with an imperative verb attached to a clause word like "the" or "for." Real brand names that happen to start with a verb, "Focus Features" or "Boost Mobile," were deliberately spared by requiring the clause shape alongside the verb, not the verb alone.</p>
+
+  <h2 id="round-two">Round two: field labels wearing bold text</h2>
+  <p>A second bug looked nothing like the first. Engines answering "how do I choose a provider" questions often bold their own evaluation criteria: <strong>Best for:</strong>, <strong>Pricing:</strong>, <strong>Research:</strong>. Our bold text extractor, added specifically to catch competitors named only in prose rather than a numbered list, could not tell a bolded criterion label from a bolded company name. Both are Title Cased, both sit at the start of a line.</p>
+  <p>The distinguishing signal turned out to be the colon. A real company name essentially never carries a colon inside its own bold span, a field label almost always does. We added a check that rejects any bold candidate ending in a colon, in both the numbered list extractor and the bold and bullet extractor, and it closed this shape without touching a single real brand name in our test data.</p>
+
+  <h2 id="round-three">Round three: the same recommendation, scored two different ways</h2>
+  <p>The third bug was the one that mattered most, because it did not just add noise, it silently changed a real client's score depending on formatting details that had nothing to do with the substance of the answer. One of our own clients, Bucate pe Roate, received an AI answer that opened with a medal emoji and a heading naming them the top recommendation. Our position detection counted the character budget between the line start and the rank digit to decide whether a line was a ranked list item, and a medal emoji encoded as two UTF-16 units happened to sit exactly on that budget's edge. Under one heading depth the same answer scored a real rank of 1. Under a heading one level deeper, the identical recommendation scored no rank at all.</p>
+  <p>It got worse before it got better. Our sentiment logic scoped itself to the sentence or line naming the brand, which is normally the right call, but a ranked heading and the enthusiastic sentence underneath it were being split apart by sentence boundary detection, so the same praise scored positive in one formatting variant and neutral in another, purely because of where a period happened to fall. Genuinely identical praise, two different sentiment labels, depending on markdown choices an AI engine made for readability, not for meaning.</p>
+
+  <div class="callout">
+    <div class="callout-label">The concrete example</div>
+    <p>Two AI answers, functionally identical: a brand named the clear top recommendation, praised in the line right below the heading. One used a level 2 heading with the medal emoji directly in front of the rank number, the other used a level 3 heading. Before this fix, the first scored rank 1 and positive sentiment. The second scored no rank at all and neutral sentiment. Same brand, same praise, same answer in every way that matters to a reader. Different score, because of heading depth.</p>
+  </div>
+
+  <h2 id="round-four-five">Rounds four and five: the fixes that were fine in English and broken elsewhere</h2>
+  <p>The fourth and fifth bugs both had the same root cause: a rule tuned on English or Romanian test data that did not generalize to the other language BrandGEO actually operates in for a given client. A Romanian heading like "Recomandări Top de Catering" (Top Catering Recommendations) passed every structural filter, because every word was properly capitalized and looked exactly like a real multi-word brand name would. The fix there was lexical, not structural, adding the Romanian stem for "recommend" to the rejection list, since no real company name legitimately contains it.</p>
+  <p>The fifth bug showed up during a London legal-services research run: single bare words like "Referințe" (References) in Romanian and "Employment," "Fees" in English, each one a checklist criterion heading rather than a firm name, slipped through every rule built for multi-word phrases because a single Title Cased word has no phrase shape to catch. We added a small, single-word-exact list of these criterion nouns per language, deliberately narrow so it could never touch a real multi-word name like "Forrester Research" or "First Sentinel Wealth."</p>
+
+  <h2 id="why-a-judgment-call">Why we stopped patching and added a judgment call instead</h2>
+  <p>Five rounds in, the honest read of our own pattern was that a sixth rule would fix the next language or the next formatting quirk we happened to see, and a seventh bug would show up in whichever language or format we had not tested yet. Structural rules and denylists scale by language and by how much test data you have already seen. A worldwide product cannot out-write every language's field labels and section headings one denylist entry at a time.</p>
+  <p>So we added a semantic classifier as a final pass, not a replacement for the structural rules. The structural filters still run first, for free, and still catch the obvious cases before anything reaches a model call. Only the short list of candidates that survive the structural pass, the ones that made it past every rule above, get sent to a small language model with the brand name and a short excerpt of the surrounding answer, and it is asked one question: which of these are actually company or brand names.</p>
+  <p>Three design choices made this safe to ship rather than a new source of a different kind of error. The classifier can only remove names from the list, never add one, so a <a href="/glossary.html#term-hallucination">hallucinated</a> or invented brand name cannot leak into a score no matter what the model returns. It fails open on any error, a missing key, a timeout, an unparseable response, returning the original structural list unchanged rather than blocking or corrupting the result. And it is bounded: an 8 second timeout, at most 15 candidates per call, so a slow or degraded model call cannot hold up a collection run.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">The regression suite this all runs against</div>
+    <p>Every one of these five fixes, plus the sentiment and position corrections that came alongside them, is locked in by a hand written test file with 156 individual assertions, each one a real example pulled from production data, not a synthetic case invented to make a fix look good. A change to this pipeline does not ship until every one of those 156 checks still passes, including the ones written to catch bugs from six weeks ago.</p>
+  </div>
+
+  <h2 id="what-to-ask">What this means if you are evaluating any AI visibility tool</h2>
+  <p>Not just ours. Every tool in this category runs some version of the same extraction problem: read an AI engine's free-form answer and decide, automatically, which words in it are a real competitor name, a real mention, a real sentiment. That is a harder problem than it looks from the outside, and the honest answer is that it is never fully solved, only continuously found and fixed. Three questions are worth asking any vendor in this space, including us:</p>
+  <ul>
+    <li><strong>Do they test against real production responses, not just synthetic examples?</strong> A rule that only ever sees the bugs its author imagined will miss the ones a real AI engine actually produces.</li>
+    <li><strong>Do they disclose what they have found and fixed, or only what already works?</strong> A tool that has never found a false positive has probably not looked hard enough, not achieved something the rest of the category has not.</li>
+    <li><strong>Is there a regression suite standing behind the score, or just the current behavior of the current code?</strong> Without one, a fix for next month's bug can quietly reintroduce this month's.</li>
+  </ul>
+
+  <div class="section-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:48px 0 16px;">● Related Research</div>
+  <div class="related-grid">
+    <a href="/bg-016.html" class="related-card">
+      <div class="related-id">BG-016</div>
+      <div class="related-title">Cross-Engine Consensus: When AI Engines Agree, and When They Don't</div>
+      <div class="related-hook">The same production data these extraction fixes were caught against, read the other way, for what engines agree on rather than how we count it.</div>
+    </a>
+    <a href="/bg-017.html" class="related-card">
+      <div class="related-id">BG-017</div>
+      <div class="related-title">Our AI Visibility Research Is Now a Published Academic Paper</div>
+      <div class="related-hook">The same discipline of disclosing limits rather than smoothing them over, applied to a formal published dataset instead of our own pipeline.</div>
+    </a>
+    <a href="/bg-005.html" class="related-card">
+      <div class="related-id">BG-005</div>
+      <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
+      <div class="related-hook">Why measuring AI visibility is a different discipline from measuring search rank, and why the tooling underneath it has to be built differently too.</div>
+    </a>
+    <a href="/ai-visibility-index-2026-07.html" class="related-card">
+      <div class="related-id">Monthly Report</div>
+      <div class="related-title">AI Visibility Index, Issue #1</div>
+      <div class="related-hook">The trend data this same measurement pipeline produces once it is running clean, issue by issue.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>See a score built on a pipeline that shows its work</h3>
+    <p>We'll run your real buyer questions across five AI engines and show you exactly how each mention, rank, and sentiment reading was reached.</p>
+    <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
+    <a href="/faq.html" class="btn-secondary">Read the FAQ</a>
+    <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/blog.html" style="color:inherit;text-decoration:none;">Browse all BrandGEO Research</a></div>
+  </div>
+  <a href="/blog.html" class="next-link">View all research</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-018</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
