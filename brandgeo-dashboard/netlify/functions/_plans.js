@@ -42,8 +42,8 @@ const ENGINE_LABELS = {
 const PLAN_BLURB = {
   free:       'A single AI engine (ChatGPT) so you can see where your brand stands.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
-  growth:     'Four AI engines, more prompts, and AI Social, for brands scaling their AI presence.',
-  growth_pro: 'All five live AI engines, including Google AI Mode, with more prompts, pages and social channels than Growth.',
+  growth:     'All five live AI engines, including Google AI Mode, with AI Social, for brands scaling their AI presence.',
+  growth_pro: 'Everything in Growth at higher volume: more prompts, a faster refresh cycle, and more SEO pages and social channels.',
   managed:    'A done-for-you service across all five live AI engines, with our team running your visibility and acting on the findings.',
   pro:        'Everything in Managed at higher volume, more markets, and priority support, with the next wave of engines unlocking automatically.',
   enterprise: 'Custom scale, dedicated support, and bespoke reporting for large brands and agencies.',

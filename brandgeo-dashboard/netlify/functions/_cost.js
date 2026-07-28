@@ -104,12 +104,20 @@ function costForRow(llm, errorCode) {
  */
 // Google AI Mode (google_ai, via SerpApi) replaced Meta AI as the 5th live
 // engine 2026-07-16. Keep in sync with planConfig.ts's PLAN_ENGINES.
-// PRICING-STRATEGY-2026-07 §3: Growth = 4 engines (NO google_ai); Google AI Mode
-// (SerpApi, expensive) is Growth PRO and up only. Keep in sync with planConfig.ts.
+// SUPERSEDED 2026-07-28: Growth gets google_ai too, so Growth = 5 engines. The
+// old "Growth PRO and up" rule meant the FREE public audit (_prospect_engines.js
+// FULL_ENGINES) showed a prospect Google AI Mode results that they then lost by
+// paying EUR 299. Owner's call. Keep in sync with planConfig.ts PLAN_ENGINES.
+//
+// Spend note: this raises Growth's collection cost by google_ai's EUR 0.015 per
+// search. At Growth's 150-prompt ceiling that is EUR 2.25 per full run, against
+// a PLAN_MONTHLY_API_BUDGET_EUR of EUR 35.88 (12% of EUR 299), so the budget
+// still holds. PLAN_LIVE_ENGINE_COUNT below derives from this map, so _auth.js's
+// hourly ceiling for Growth widens from 4 to 5 engines automatically.
 const PLAN_LIVE_ENGINES = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],

@@ -40,22 +40,31 @@ export type EngineState = 'active' | 'coming_soon' | 'locked'
 // (2026-07-16). Meta (Llama, training-data only, no web search) was low-signal;
 // Google AI Mode is what real Google users now see. `meta` is retired from every
 // plan set (kept in ENGINE_META below only so historical meta rows still render).
-// PRICING-STRATEGY-2026-07.md §3: Growth = 4 engines (NO Google AI Mode);
-// Google AI Mode (SerpApi, the expensive engine) is Growth PRO and up only, to
-// protect SerpApi spend. Essentials = 3.
+// SUPERSEDED 2026-07-28: Growth now gets Google AI Mode too, so Growth = 5.
+// The old rule (Growth PRO and up, to protect SerpApi spend) produced an
+// incoherent ladder: _prospect_engines.js FULL_ENGINES runs google_ai for the
+// FREE public audit, so a prospect saw Google AI Mode results and then lost
+// them by paying EUR 299. Owner's call, 2026-07-28. Essentials = 3.
 export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
-  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity'],
+  growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
   enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
 }
 
-// ── Engines not yet built/collecting — always "coming soon" ──────────────────
-// google_ai went LIVE 2026-07-16 (Google AI Mode via SerpApi), so it's no longer here.
-export const COMING_SOON_ENGINES = new Set<EngineId>(['copilot', 'deepseek', 'grok'])
+// ── Engines not built, not collecting — always "coming soon" ─────────────────
+// google_ai went LIVE 2026-07-16 (Google AI Mode via SerpApi), so it's not here.
+//
+// `meta` joined this set on 2026-07-28. It is retired from every plan set, but
+// it was in NO set at all before, which meant getEngineStates() fell through to
+// 'locked' — telling the customer "upgrade to unlock" an engine that no plan
+// sells and no worker collects. Presenting it as coming soon, alongside the
+// other three that have never collected, is the honest state. There is no
+// current intention to reinstate it.
+export const COMING_SOON_ENGINES = new Set<EngineId>(['meta', 'copilot', 'deepseek', 'grok'])
 
 // ── All engines in display order ──────────────────────────────────────────────
 // Order is a design artefact, not just a list (dashboard-visual-system.md §8.2,
