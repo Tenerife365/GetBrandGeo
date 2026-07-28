@@ -116,38 +116,67 @@ exports.handler = async (event) => {
 
   const toPing = changed.slice(0, MAX_PINGS_PER_RUN)
 
-  // 4. One Google auth for the whole batch (token reused across publishes).
-  let indexer
+  // 4. Google is OPTIONAL. IndexNow is not, and must never depend on it.
+  //
+  // This used to `return 500` the moment createGoogleIndexer() threw, before a
+  // single IndexNow submission was attempted. When GOOGLE_JSON_KEY was dropped
+  // on 2026-07-19 (4KB Lambda env ceiling, see docs), that took IndexNow down as
+  // collateral damage for nine days: 22 sitemap URLs went unsubmitted and the
+  // job wrote ok=false into job_runs every morning at 05:10.
+  //
+  // IndexNow needs no Google credential, costs ~32 bytes of env, and reaches
+  // Bing, Yandex, Seznam and Naver. Google's Indexing API is in any case
+  // documented as supported only for JobPosting and BroadcastEvent pages, which
+  // BrandGEO has none of, so it is the *less* valuable of the two here.
+  let indexer = null
+  let googleSkipped = null
   try {
     indexer = await createGoogleIndexer()
   } catch (err) {
-    console.error('[ping-sitemap] Google credentials unavailable:', err.code || err.message)
-    await recordJobRun(supabase, false, { stage: 'google_auth', changed: changed.length, error: err.code || err.message })
-    return { statusCode: 500, body: 'google credentials unavailable' }
+    googleSkipped = err.code || err.message
+    console.warn('[ping-sitemap] Google unavailable, continuing with IndexNow only:', googleSkipped)
   }
 
-  let pinged = 0
+  let pinged = 0, googleOk = 0, indexnowOk = 0
   const nowIso = new Date().toISOString()
   for (const e of toPing) {
-    try {
-      await indexer.publish(e.url, 'URL_UPDATED')          // throws on Google failure
-      const bing = await submitToIndexNow(e.url)            // best-effort, never throws
-      // Record only after Google accepted, so a transient failure retries next run
-      // instead of being silently marked done.
+    let gOk = false, gErr = null
+    if (indexer) {
+      try { await indexer.publish(e.url, 'URL_UPDATED'); gOk = true; googleOk++ }
+      catch (err) { gErr = err.message }
+    }
+    const bing = await submitToIndexNow(e.url)   // best-effort, never throws
+    if (bing.ok) indexnowOk++
+
+    // Record once ANY endpoint accepted the URL. This was previously gated on
+    // Google alone, which is the second half of the same bug: even if IndexNow
+    // had been reached, nothing would have been written to sitemap_pings and
+    // every URL would have been re-submitted on every run forever.
+    if (gOk || bing.ok) {
       const { error: upErr } = await supabase
         .from('sitemap_pings')
         .upsert({ url: e.url, lastmod: e.lastmod, last_pinged_at: nowIso }, { onConflict: 'url' })
       if (upErr) console.error('[ping-sitemap] upsert failed for', e.url, upErr.message)
       pinged++
-      console.log(`[ping-sitemap] pinged ${e.url} | google:ok | indexnow:${bing.ok ? 'ok' : (bing.skipped ? 'skipped' : 'failed')}`)
-    } catch (err) {
-      console.error(`[ping-sitemap] ping failed for ${e.url}:`, err.message)
-      // Left unrecorded on purpose → retried on the next scheduled run.
     }
+    console.log(`[ping-sitemap] ${e.url}` +
+      ` | google:${!indexer ? 'unconfigured' : gOk ? 'ok' : 'failed:' + gErr}` +
+      ` | indexnow:${bing.ok ? 'ok' : bing.skipped ? 'unconfigured' : 'failed'}`)
   }
 
+  // Only a total loss is a failed run. Google being absent is a deliberate
+  // configuration choice as of 2026-07-28 and must not colour the job red,
+  // otherwise the observability that packet 012 built is worthless noise.
   const deferred = changed.length - toPing.length
-  console.log(`[ping-sitemap] done | pinged:${pinged}/${changed.length} changed${deferred > 0 ? ` (${deferred} deferred to next run)` : ''}`)
-  await recordJobRun(supabase, true, { pinged, changed: changed.length, deferred })
-  return { statusCode: 200, body: JSON.stringify({ pinged, changed: changed.length, deferred }) }
+  const nothingConfigured = !indexer && !process.env.INDEXNOW_KEY
+  console.log(`[ping-sitemap] done | recorded:${pinged}/${changed.length} | google:${googleOk} | indexnow:${indexnowOk}${deferred > 0 ? ` (${deferred} deferred)` : ''}`)
+  await recordJobRun(supabase, !nothingConfigured, {
+    pinged, changed: changed.length, deferred, googleOk, indexnowOk,
+    ...(googleSkipped ? { google_skipped: googleSkipped } : {}),
+    ...(nothingConfigured ? { error: 'neither GOOGLE_JSON_KEY nor INDEXNOW_KEY is configured' } : {}),
+  })
+  return {
+    statusCode: nothingConfigured ? 500 : 200,
+    body: JSON.stringify({ pinged, changed: changed.length, deferred, googleOk, indexnowOk }),
+  }
 }

@@ -107,27 +107,40 @@ exports.handler = async (event) => {
   }
 
   // Delegate the actual Google + IndexNow notification to the shared _indexing
-  // helper (also used by the scheduled ping-sitemap.js). pingUrl publishes to
-  // Google (throws on credential/API failure) then submits to IndexNow (never
-  // throws). The error-to-HTTP-status mapping below preserves this endpoint's
-  // original contract exactly (500 for missing/bad creds, 502 for API failure).
+  // helper (also used by the scheduled ping-sitemap.js).
+  //
+  // CONTRACT CHANGE, 2026-07-28, deliberate. This endpoint used to return 500
+  // whenever the Google credential was missing, because pingUrl threw before
+  // IndexNow was ever attempted. GOOGLE_JSON_KEY is now permanently absent by
+  // decision (4KB Lambda env ceiling), so under the old contract this tool was
+  // dead on every single call while the half of the work that still functions,
+  // IndexNow to Bing/Yandex/Seznam/Naver, was never reached.
+  //
+  // The rule is now "success if either endpoint accepted the URL". A missing
+  // Google credential is reported in the body as googleError, not as a 5xx,
+  // because it is expected configuration rather than a fault.
   try {
-    const { google: googleData, bing } = await pingUrl(parsed.toString(), type);
-    console.log(`[force-index] ok | google | ${type} | ${parsed.toString()} | indexnow:${bing.ok ? 'ok' : (bing.skipped ? 'skipped' : 'failed')}`);
+    const { google: googleData, googleError, bing } = await pingUrl(parsed.toString(), type);
+
+    if (!googleData && !bing.ok) {
+      const detail = googleError || 'google unavailable';
+      const bingDetail = bing.skipped ? 'INDEXNOW_KEY not set' : (bing.error || `status ${bing.status}`);
+      console.error(`[force-index] both endpoints failed | google:${detail} | indexnow:${bingDetail}`);
+      return {
+        statusCode: 502,
+        body: JSON.stringify({ error: 'no indexing endpoint accepted the URL', google: detail, indexnow: bingDetail }),
+      };
+    }
+
+    console.log(`[force-index] ok | ${type} | ${parsed.toString()}` +
+      ` | google:${googleData ? 'ok' : 'skipped:' + googleError}` +
+      ` | indexnow:${bing.ok ? 'ok' : (bing.skipped ? 'unconfigured' : 'failed')}`);
     return {
       statusCode: 200,
-      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: googleData, bing }),
+      body: JSON.stringify({ ok: true, url: parsed.toString(), type, google: googleData, googleError, bing }),
     };
   } catch (err) {
-    if (err.code === 'NO_CREDENTIALS') {
-      console.error('[force-index] GOOGLE_JSON_KEY is not set');
-      return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials not configured' }) };
-    }
-    if (err.code === 'BAD_CREDENTIALS') {
-      console.error('[force-index] GOOGLE_JSON_KEY did not parse as JSON:', err.message);
-      return { statusCode: 500, body: JSON.stringify({ error: 'Google credentials malformed' }) };
-    }
-    console.error('[force-index] Google Indexing API call failed:', err.message);
-    return { statusCode: 502, body: JSON.stringify({ error: 'Google Indexing API call failed', detail: err.message }) };
+    console.error('[force-index] unexpected failure:', err.message);
+    return { statusCode: 502, body: JSON.stringify({ error: 'indexing call failed', detail: err.message }) };
   }
 };
