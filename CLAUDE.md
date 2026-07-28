@@ -26,6 +26,74 @@ Every claim in this section was checked against the live sites, the running
 bundle, or the working tree. Not remembered. If you change something here, check
 it the same way. This section takes precedence over §0 through §7 below.
 
+### 2026-07-28: colour system, engine lineup and plan limits (all LIVE)
+
+Four commits, all pushed and verified over HTTP against getbrandgeo.com.
+`7da5a67` `9b6bbe3` `49c5c72` `0acd83b` `68b8e1d`.
+
+**The palette is now derived from measurement and is documented in place** in
+`index.html`'s `:root` block. Full teardown, sources and method:
+`docs/research/competitive-and-conversion-2026-07-28.md`. Headlines:
+
+- `--t` moved off `#ffffff` (20.9:1, halation range) to `#E8E9ED` (16.2:1).
+- Surfaces were OKLCH C 0.019 at hue 284 while `--ac` is C 0.219 at hue 293, so
+  the accent sat on a desaturated copy of itself. Surfaces are near-neutral now.
+  **The violet did not change and should not.** Of ten competitors scraped none
+  owns it; peec.ai `#6b5bff` and AthenaHQ `#4f39f6` sit at hue 277-281 and
+  BrandGEO's `#8b5cf6` is 293, clear of that cluster.
+- Alpha text/border tokens are solid hexes now, so they can be contrast-checked.
+- **Light mode is no longer UNAUDITED.** It failed at the token level on every
+  page (`--t2` 4.09:1, `--t3` 2.19:1, `--ac2` 1.79:1) and 76 of 79 pages never
+  overrode the accent tokens in their light block at all. Fixed everywhere.
+- `--ac` `#8b5cf6` is a FILL only in dark; white on it is 4.23:1. `--ac-strong`
+  `#7c3aed` (5.7:1) is the button fill, `--ac-text` `#a78bfa` (7.23:1) is accent
+  text. New `--ok/--part/--bad/--info` and `--warn` carry status and risk.
+- Verified in-browser at 1280px: 292 text nodes, **0 contrast failures in dark,
+  0 real failures in light**, no horizontal overflow.
+
+**Engine lineup is corrected in every product claim.** Growth gained `google_ai`
+(`9b6bbe3`), so Growth and Growth PRO now have identical 5-engine coverage. All
+ten `brandgeo-vs-*.html` pages had advertised "ChatGPT, Gemini, Claude,
+Perplexity, and Meta AI" — a retired engine — and `brandgeo-vs-profound.html`
+additionally conceded Google AI Mode to Profound twice. `faq.html` answered
+"Which AI engines does BrandGEO monitor?" with Meta AI in the visible copy AND
+the JSON-LD. 22 claims corrected. **Historical research pages were deliberately
+left alone**; when a city study reports what Meta AI answered in a given run,
+that is a measured result and rewriting it would falsify the record.
+
+**Published plan limits now match `planConfig.ts`.** The page had promised
+Essentials 30 prompts (enforced 20) and Growth 150 (enforced **75**), plus
+"4 AI engines" for Growth (now 5) and "Daily/weekly refresh" against a 48h
+cooldown. Corrected downward to reality, because the code has enforced the lower
+numbers all along so no customer ever received the published figure.
+
+**Three FAQPage schemas were invalid and silently dropped** on Baltimore,
+Charlotte and Detroit: the last FAQ entry closed with `"}]` instead of `"}}]`,
+leaving `acceptedAnswer` unclosed. Pre-existing, confirmed identical at
+`0c6e740`. Site-wide JSON-LD now validates **110/111**; the one failure is
+`article-builder.html`, an internal tool excluded from the cPanel upload.
+**Add a JSON-LD validation step to any content workflow** — this went unnoticed
+on a product whose whole thesis is being parsed correctly by AI engines.
+
+**Open decisions this created, none of which a copy edit can settle:**
+1. **Growth PRO's ladder is thin.** EUR 449 vs EUR 299 now buys +25 prompts and
+   a 12h faster refresh, with identical engines. Direct consequence of giving
+   Growth `google_ai`.
+2. Whether to raise `PLAN_PROMPTS` to the previously published numbers instead
+   of having lowered the page. That roughly doubles Growth's collection spend.
+3. The two uncited hero stats (73%, 4.2x) still need a source or removal.
+4. Otterly's pricing in the research doc is secondary-sourced (they 403 a plain
+   client) and needs a first-party check before it appears in public copy.
+
+**Measurement traps that produced two false findings in that session, worth
+knowing before trusting any browser audit:** a hidden/throttled tab does not
+advance CSS transitions, so `getComputedStyle` returns the pre-transition value
+indefinitely (this made light mode look completely broken, 107 phantom
+failures). Kill transitions at *matching specificity* — a `*` rule loses to a
+class rule carrying its own `!important` transition — then force a reflow. And a
+zero-width viewport reports every element as overflowing; assert
+`document.documentElement.clientWidth` before trusting any layout number.
+
 ### Agent Operating System
 - Constitution: `docs/AGENT-OS.md` (roster, model routing, waterfall, handoff
   packet schema, command set, guardrails). Binding on every agent and session.
