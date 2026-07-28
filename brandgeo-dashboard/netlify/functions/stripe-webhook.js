@@ -35,15 +35,24 @@ const APP_URL = 'https://app.getbrandgeo.com'
 // this fallback covers a price whose metadata ever goes missing. Plan slugs must
 // match planConfig.ts's Plan union exactly.
 const PRICE_TO_PLAN = {
-  price_1TrLPgKh2GaZE2B4kqgmQsiO: 'essentials', // Essentials €99/mo
-  price_1TrLSeKh2GaZE2B48iVobXF9: 'essentials', // Essentials €990/yr
-  price_1TrLQhKh2GaZE2B4gLPWMger: 'growth',     // Growth €299/mo
-  price_1TrLR6Kh2GaZE2B4mYqOHBhQ: 'growth',     // Growth €2,990/yr
-  // TODO add the two Growth PRO price IDs here once they exist in Stripe.
-  // Not a blocker: metadata.plan is the primary source and is checked first,
-  // so a Growth PRO price carrying metadata.plan=growth_pro provisions
-  // correctly even while this fallback map has no entry for it. Verified live
-  // 2026-07-28: no Growth PRO product or price exists in the account yet.
+  // Current catalogue, created 2026-07-28 by scripts/stripe-create-catalogue.js.
+  // Each of these six carries metadata.plan, which is what actually resolves the
+  // tier; this map is only the fallback for a price whose metadata goes missing.
+  price_1Ty5ZyKh2GaZE2B4UBLxnzdc: 'essentials', // Essentials €99/mo
+  price_1Ty5a0Kh2GaZE2B4cRsrKalr: 'essentials', // Essentials €990/yr
+  price_1Ty5a3Kh2GaZE2B4WSWURHv8: 'growth',     // Growth €299/mo
+  price_1Ty5a5Kh2GaZE2B4NivZ8zmd: 'growth',     // Growth €2,990/yr
+  price_1Ty5a7Kh2GaZE2B4vQhoTktV: 'growth_pro', // Growth PRO €449/mo
+  price_1Ty5a9Kh2GaZE2B4ibycxUST: 'growth_pro', // Growth PRO €4,490/yr
+
+  // Superseded catalogue. Their payment links are still active so the live site
+  // keeps working until the new site.js reaches cPanel, and a subscription
+  // bought in that window must still resolve. Delete these four only after the
+  // old links are deactivated in Stripe, not before.
+  price_1TrLPgKh2GaZE2B4kqgmQsiO: 'essentials', // old Essentials €99/mo
+  price_1TrLSeKh2GaZE2B48iVobXF9: 'essentials', // old Essentials €990/yr
+  price_1TrLQhKh2GaZE2B4gLPWMger: 'growth',     // old Growth €299/mo
+  price_1TrLR6Kh2GaZE2B4mYqOHBhQ: 'growth',     // old Growth €2,990/yr
 }
 
 // Only these self-serve tiers are ever provisioned by this webhook.
