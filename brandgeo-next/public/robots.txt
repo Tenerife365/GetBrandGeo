@@ -1,0 +1,5 @@
+# PREVIEW BUILD — not the production site.
+# Blocks crawlers from indexing the *.netlify.app preview so it cannot compete
+# with or duplicate getbrandgeo.com. Remove this file on the cutover deploy.
+User-agent: *
+Disallow: /
