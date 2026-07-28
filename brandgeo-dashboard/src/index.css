@@ -22,6 +22,41 @@
   --motion-base: 260ms;
   --motion-slow: 500ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --------------------------------------------------------------------------
+     Shell tokens (docs/design/dashboard-visual-system.md §3, amendments A1-A7).
+     The nav rail is now its own named surface instead of borrowing --dark-800,
+     so it can be given a measurable, solid divider and an active state that
+     doesn't collapse to 1.1-1.2:1 against its own background. See the spec for
+     the full contrast ledger — every value below is cited there. */
+  --surface-nav:        19 21 43;      /* #13152b — A1 */
+  --border-nav:         100 116 139;   /* #64748b — A2, same value as the scrollbar thumb, must stay SOLID */
+  --surface-nav-active: 58 47 113;     /* #3a2f71 — A3, must stay SOLID (no alpha wash) */
+  --text-nav-active:    255 255 255;   /* #ffffff — A4 */
+  --text-nav-idle:      203 213 225;   /* #cbd5e1 — A5, unchanged from slate-300's dark value */
+  --rail-active:        167 139 250;   /* #a78bfa (brand-400) — A6 */
+  --surface-bar:        13 20 37;      /* #0d1425 — A7, the time-filter strip */
+
+  /* Chart chrome (§3 A9). Recharts cannot resolve these directly (see
+     src/lib/chartTheme.ts) — declared here too so index.css stays the single
+     source of every token value, per the spec's own rule. */
+  --grid-line: 36 48 68;      /* #243044 */
+  --axis-ink:  148 163 184;   /* #94a3b8 */
+
+  /* Card system (§3 A8). Two radii, three paddings — replaces four radii and
+     eleven ad-hoc padding values (F-20). Same in both themes. */
+  --card-radius:    12px;
+  --control-radius: 8px;
+  --card-pad-compact:  16px;
+  --card-pad-standard: 20px;
+  --card-pad-feature:  24px;
+
+  /* Sentiment ramp (§8.5). Disjoint from every engine hue family on purpose —
+     see planConfig.ts ENGINE_META for the engine ramp, which never forks by
+     theme; this one does. */
+  --sentiment-positive: 132 204 22;   /* #84cc16 lime */
+  --sentiment-neutral:  148 163 184;  /* #94a3b8 */
+  --sentiment-negative: 251 113 133;  /* #fb7185 rose */
 }
 
 html.light {
@@ -37,6 +72,30 @@ html.light {
   --text-base:    15 23 42;
   --text-secondary: 71 85 105;
   --text-muted:   100 116 139;
+
+  /* Shell tokens, light mode (§3 A1-A7). Light mode gets its own rail-accent
+     step and its own active-surface treatment — see §4.2 for why each theme
+     carries the active nav state on a different cue. */
+  --surface-nav:        236 234 246;   /* #eceaf6 — unchanged from the pre-existing html.light aside rule */
+  --border-nav:         100 116 139;   /* #64748b — same value both themes */
+  --surface-nav-active: 255 255 255;   /* #ffffff — deliberate: a white chip on a violet-tinted rail reads as raised */
+  --text-nav-active:    15 23 42;      /* #0f172a */
+  --text-nav-idle:      71 85 105;     /* #475569 */
+  --rail-active:        124 58 237;    /* #7c3aed (brand-600) — its own step, not brand-400 remapped */
+  --surface-bar:        242 241 248;   /* #f2f1f8 */
+
+  --grid-line: 234 234 242;   /* #eaeaf2 */
+  --axis-ink:  100 116 139;   /* #64748b */
+
+  --card-radius:    12px;
+  --control-radius: 8px;
+  --card-pad-compact:  16px;
+  --card-pad-standard: 20px;
+  --card-pad-feature:  24px;
+
+  --sentiment-positive: 77 124 15;    /* #4d7c0f */
+  --sentiment-neutral:  100 116 139;  /* #64748b */
+  --sentiment-negative: 159 18 57;    /* #9f1239 */
 }
 
 @layer base {
@@ -193,18 +252,13 @@ html.light .text-red-400\/70     { color: #dc2626 !important; }
 html.light .text-amber-400\/80   { color: #b45309 !important; }
 html.light .text-emerald-500\/70 { color: #047857 !important; }
 
-/* Engine label colors (ENGINE_META) — keep legible on white. Several -400 hues
-   (blue = Gemini, orange = Claude, sky = Copilot, indigo = DeepSeek) were pale
-   on white; darken to ~-600. */
-html.light .text-blue-400    { color: #2563eb !important; }
-html.light .text-orange-400  { color: #ea580c !important; }
-html.light .text-purple-400  { color: #7c3aed !important; }
-html.light .text-sky-400     { color: #0284c7 !important; }
-html.light .text-indigo-400  { color: #4f46e5 !important; }
-
-/* Orange (Claude) soft tint fills */
-html.light .bg-orange-400\/10 { background-color: #fff7ed !important; }
-html.light .bg-orange-500\/15 { background-color: #ffedd5 !important; }
+/* Engine label colors (ENGINE_META) — DELETED (dashboard-visual-system.md A11).
+   ENGINE_META's colour and bg fields no longer exist: engine chips carry identity via
+   an 8px swatch in ENGINE_META[id].chartColor, plain text-token text, per §8.4.
+   Coloured engine text is how orange-400 and amber-400 ended up indistinguishable
+   in the first place — the chip hues were hand-picked separately from the chart
+   hues, so they drifted. Deleting the mechanism (rather than re-tuning these five
+   overrides) is the actual fix. */
 
 /* Neutral "slate" chips/pills — the market/location badges plus the UNAVAILABLE
    and Coming-Soon pills hardcode slate-700/800 fills that don't remap, so they
@@ -233,10 +287,14 @@ html.light .border-slate-700\/30 { border-color: rgb(203 213 225) !important; }
   scrollbar-color: rgb(100 116 139) transparent;
 }
 
-/* Safari has no scrollbar-color support at all; WebKit pseudo-elements cover it. */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Safari-only: it has no scrollbar-color support, so these WebKit pseudo-
+   elements are the only thing that colours its scrollbar thumb. Measured
+   (dashboard-visual-system.md A11 / audit F-23): Chrome ignores this block
+   entirely and honours scrollbar-width/scrollbar-color above, so `width` and
+   `border-radius` here never take effect there — dropped rather than left as
+   dead declarations that read as though they did something. */
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgb(100 116 139); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgb(100 116 139); }
 ::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
 
 @layer utilities {
@@ -371,4 +429,234 @@ html.light .card-hover-lift:hover {
     animation: none;
     opacity: 0.6;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Shell (dashboard-visual-system.md §4). The sidebar becomes its own surface
+   (A1), gets a solid measurable divider (A2), and the active nav item moves
+   off a bare 3px rail onto a raised solid fill (A3/A4) plus the rail (A6).
+   Every value below is a lookup on the tokens declared in :root / html.light
+   above — nothing here is a new colour. */
+
+@layer utilities {
+  .bg-surface-nav        { background-color: rgb(var(--surface-nav)); }
+  .border-nav            { border-color: rgb(var(--border-nav)); }
+  /* Decorative-only variant (§4.4): the time-filter bar's bottom border is not
+     the boundary WCAG 1.4.11's 3:1 applies to — that's the sidebar divider
+     above. Custom class rather than Tailwind's `/40` opacity modifier because
+     `border-nav` isn't a Tailwind-registered colour, so that modifier syntax
+     would silently no-op. */
+  .border-nav-40         { border-color: rgb(var(--border-nav) / 0.4); }
+  .bg-surface-nav-active { background-color: rgb(var(--surface-nav-active)); }
+  .text-nav-active       { color: rgb(var(--text-nav-active)); }
+  .text-nav-idle         { color: rgb(var(--text-nav-idle)); }
+  .text-rail-active      { color: rgb(var(--rail-active)); }
+  .bg-rail-active        { background-color: rgb(var(--rail-active)); }
+  .border-rail-active    { border-color: rgb(var(--rail-active)); }
+  .bg-surface-bar        { background-color: rgb(var(--surface-bar)); }
+  .bg-surface-nav-95     { background-color: rgb(var(--surface-nav) / 0.95); }
+
+  .rounded-card          { border-radius: var(--card-radius); }
+  .rounded-control       { border-radius: var(--control-radius); }
+  .p-card-compact        { padding: var(--card-pad-compact); }
+  .p-card-standard       { padding: var(--card-pad-standard); }
+  .p-card-feature        { padding: var(--card-pad-feature); }
+
+  .text-sentiment-positive   { color: rgb(var(--sentiment-positive)); }
+  .text-sentiment-neutral    { color: rgb(var(--sentiment-neutral)); }
+  .text-sentiment-negative   { color: rgb(var(--sentiment-negative)); }
+  .bg-sentiment-positive     { background-color: rgb(var(--sentiment-positive)); }
+  .bg-sentiment-neutral      { background-color: rgb(var(--sentiment-neutral)); }
+  .bg-sentiment-negative     { background-color: rgb(var(--sentiment-negative)); }
+  .border-sentiment-positive { border-color: rgb(var(--sentiment-positive)); }
+  .border-sentiment-neutral  { border-color: rgb(var(--sentiment-neutral)); }
+  .border-sentiment-negative { border-color: rgb(var(--sentiment-negative)); }
+
+  /* Fixed-opacity variants. Tailwind's `/NN` opacity-modifier syntax only
+     applies to utilities Tailwind itself generates from a theme colour — it
+     silently no-ops on a hand-written class like the ones above, so soft
+     tints/borders get their own named class instead of `bg-sentiment-positive/15`. */
+  .bg-sentiment-positive-15     { background-color: rgb(var(--sentiment-positive) / 0.15); }
+  .border-sentiment-positive-20 { border-color: rgb(var(--sentiment-positive) / 0.2); }
+  .border-sentiment-positive-30 { border-color: rgb(var(--sentiment-positive) / 0.3); }
+  .hover\:border-sentiment-positive-40:hover { border-color: rgb(var(--sentiment-positive) / 0.4); }
+  .bg-sentiment-negative-15     { background-color: rgb(var(--sentiment-negative) / 0.15); }
+  .border-sentiment-negative-20 { border-color: rgb(var(--sentiment-negative) / 0.2); }
+  .border-sentiment-negative-30 { border-color: rgb(var(--sentiment-negative) / 0.3); }
+  .hover\:border-sentiment-negative-40:hover { border-color: rgb(var(--sentiment-negative) / 0.4); }
+}
+
+/* Depth bleed (§4.1) — painted on the CANVAS side of the divider, never on the
+   sidebar itself, so the divider alone carries the measured 3:1 and the bleed
+   contributes nothing to any ratio. Its job is purely that the canvas reads as
+   sitting behind the rail. Decays to nothing by 24px; never extend it and never
+   add a shadow to <aside> (it is a fixed overlay below 768px and a shadow would
+   double up with the mobile backdrop). */
+.canvas-bleed {
+  background-image: linear-gradient(to right, rgba(2, 4, 10, 0.55), transparent 24px);
+}
+html.light .canvas-bleed {
+  background-image: linear-gradient(to right, rgba(15, 23, 42, 0.06), transparent 24px);
+}
+
+/* Nav item, three states (§4.2). isActive is applied as the `is-active`
+   modifier class from Layout.tsx's navItemClass. Hand-authored (not composed
+   from Tailwind utilities) because the active state needs two independently
+   measurable cues plus a rail, and that composition doesn't survive being
+   spread across utility classes — see the spec's rail-hidden test in §4.2 for
+   why background AND text both matter here, on different themes.
+
+   Inactive items are NOT dimmed — Layout.tsx's own comment on navItemClass
+   records that they were deliberately brightened to stay distinct from the
+   group headers, and this spec doesn't reopen that; the active state moved
+   instead (§4.2, judgement call J6). */
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: var(--control-radius);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgb(var(--text-nav-idle));
+  transition: background-color var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out);
+}
+.nav-item:hover {
+  color: rgb(var(--text-base));
+  background-color: rgb(var(--dark-700) / 0.55);
+}
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  border-radius: var(--control-radius);
+  background-color: transparent;
+  transition: height var(--motion-fast) var(--ease-out),
+              background-color var(--motion-fast) var(--ease-out);
+}
+.nav-item.is-active {
+  background-color: rgb(var(--surface-nav-active));
+  color: rgb(var(--text-nav-active));
+  font-weight: 600;
+}
+.nav-item.is-active::before {
+  height: 20px;
+  background-color: rgb(var(--rail-active));
+}
+.nav-item svg { color: inherit; }
+.nav-item.is-active svg { color: rgb(var(--rail-active)); }
+@media (max-width: 767px) {
+  .nav-item { min-height: 44px; }
+}
+
+/* Time-filter bar, pressed pill (§4.4). The criterion is that the pressed
+   pill is at least as strong as the nav's active item — measured stronger on
+   both cues, both themes (see §4.4's table). The pill carries a border the
+   nav item does not need, because the nav item has the rail and the pill has
+   nowhere to put one. */
+.time-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: var(--control-radius);
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgb(var(--text-secondary));
+  background-color: transparent;
+  transition: background-color var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out);
+}
+.time-pill:hover {
+  color: rgb(var(--text-base));
+  background-color: rgb(var(--dark-700) / 0.5);
+}
+.time-pill.is-pressed {
+  background-color: rgb(var(--surface-nav-active));
+  color: rgb(var(--text-nav-active));
+  font-weight: 600;
+  border-color: rgb(var(--rail-active));
+}
+@media (max-width: 767px) {
+  .time-pill { min-height: 36px; }
+  /* 44px tap area (WCAG 2.5.8) below 768px without growing the visible pill. */
+  .time-pill::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+}
+
+/* Engine identity chip (§8.4, §13.4). 28px tall at 1280 (the floor is 24px,
+   which it already clears). Below 768px it grows to 32px visible plus a 44px
+   tap area via a transparent inset pseudo-element — the chip itself doesn't
+   grow past 32px, only its hit area does. */
+.engine-chip {
+  position: relative;
+  min-height: 28px;
+  padding: 4px 10px;
+}
+@media (max-width: 767px) {
+  .engine-chip { min-height: 32px; }
+  .engine-chip::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+}
+
+/* Mobile bottom nav item (§4.5). The rail moves from the left edge (desktop
+   sidebar) to the TOP edge here, because the item is a vertical icon+label
+   stack — a left rail on a 60px-wide item reads as a divider between items,
+   not a selection. */
+.mobile-nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  color: rgb(var(--text-secondary));
+  transition: color var(--motion-fast) var(--ease-out);
+}
+.mobile-nav-item.is-active {
+  color: rgb(var(--text-nav-active));
+}
+.mobile-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 0;
+  border-radius: 0 0 var(--control-radius) var(--control-radius);
+  background-color: transparent;
+}
+.mobile-nav-item.is-active::before {
+  height: 3px;
+  background-color: rgb(var(--rail-active));
+}
+.mobile-nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -4,6 +4,11 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import EngineChip from '../components/EngineChip'
+import SharedEmptyState from '../components/EmptyState'
+import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { formatDate } from '../lib/format'
 import type { LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { promptCategoryLabel } from '../lib/promptCategories'
@@ -35,13 +40,11 @@ interface RawMentionRow {
   prompts?: { text: string; category: string; position: number } | null
 }
 
-const LLM_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-  chatgpt:    { label: 'ChatGPT',    color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25', dot: 'bg-emerald-400' },
-  gemini:     { label: 'Gemini',     color: 'text-blue-400',    bg: 'bg-blue-500/15 border-blue-500/25',       dot: 'bg-blue-400'    },
-  claude:     { label: 'Claude',     color: 'text-orange-400',  bg: 'bg-orange-500/15 border-orange-500/25',   dot: 'bg-orange-400'  },
-  perplexity: { label: 'Perplexity', color: 'text-cyan-400',    bg: 'bg-cyan-500/15 border-cyan-500/25',       dot: 'bg-cyan-400'    },
-  meta:       { label: 'Meta AI',    color: 'text-amber-400',   bg: 'bg-amber-500/15 border-amber-500/25',     dot: 'bg-amber-400'   },
-}
+// Engine identity is now ENGINE_META + EngineChip (dashboard-visual-system.md
+// §8.4) — this file used to carry its OWN independent copy of engine label +
+// colour (a fourth such copy in the app, alongside Competitors.tsx and
+// AIVisibility.tsx), hand-picked separately from the chart palette and cited
+// by the audit (F-14/F-15) as one of the two places Claude/Meta AI collide.
 
 const CATEGORY_LABEL: Record<string, string> = {
   mid:            'Mid (100-200)',
@@ -144,7 +147,7 @@ export default function Mentions() {
     : 0
   const positiveSentiment = mentions.filter(m => m.sentiment === 'positive').length
 
-  const engineCounts = Object.keys(LLM_META).map(llm => ({
+  const engineCounts = (Object.keys(ENGINE_META) as EngineId[]).map(llm => ({
     llm: llm as LLMName,
     count: mentions.filter(m => m.llm === llm).length,
   })).sort((a, b) => b.count - a.count)
@@ -154,12 +157,13 @@ export default function Mentions() {
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">{t.men_title}</h1>
+        <PageTitle>{t.men_title}</PageTitle>
         <p className="text-sm text-slate-400 mt-0.5">
           {fmt(t.men_subtitle, { brandName })}
         </p>
       </div>
 
+      <SectionHeading className="sr-only">Mention summary</SectionHeading>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <TrendingUp size={20} className="text-emerald-400 shrink-0" />
@@ -178,12 +182,13 @@ export default function Mentions() {
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <Bot size={20} className="text-blue-400 shrink-0" />
           <div>
-            <div className="text-2xl font-bold text-emerald-400 tabular-nums">{positiveSentiment}</div>
+            <div className="text-2xl font-bold text-sentiment-positive tabular-nums">{positiveSentiment}</div>
             <div className="text-xs text-slate-500 mt-0.5">{t.men_positiveSentiment}</div>
           </div>
         </div>
       </div>
 
+      <SectionHeading className="sr-only">Filter mentions</SectionHeading>
       <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setFilterLLM('all')}
           aria-pressed={filterLLM === 'all'}
@@ -195,17 +200,16 @@ export default function Mentions() {
           {fmt(t.men_allEngines, { n: totalMentions })}
         </button>
         {engineCounts.map(({ llm, count }) => {
-          const meta = LLM_META[llm]
-          if (!meta || count === 0) return null
+          if (count === 0) return null
           return (
-            <button key={llm} onClick={() => setFilterLLM(llm === filterLLM ? 'all' : llm)}
-              aria-pressed={filterLLM === llm}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                filterLLM === llm ? `${meta.bg} ${meta.color}` : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
-              }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-              {meta.label} ({count})
-            </button>
+            <EngineChip
+              key={llm}
+              id={llm as EngineId}
+              selected={filterLLM === llm}
+              onClick={() => setFilterLLM(llm === filterLLM ? 'all' : llm)}
+            >
+              {' '}({count})
+            </EngineChip>
           )
         })}
       </div>
@@ -226,7 +230,7 @@ export default function Mentions() {
 
       <div className="space-y-2">
         {filtered.map(m => {
-          const llmMeta = LLM_META[m.llm] ?? LLM_META['chatgpt']
+          const engineId = (ENGINE_META[m.llm as EngineId] ? m.llm : 'chatgpt') as EngineId
           const isOpen = expanded === m.id
           return (
             <div key={m.id} className="bg-dark-800 rounded-xl overflow-hidden">
@@ -237,7 +241,7 @@ export default function Mentions() {
                   <div className="shrink-0 w-10 text-center mt-0.5">
                     {m.brand_position ? (
                       <>
-                        <div className="text-lg font-bold text-emerald-400 tabular-nums">#{m.brand_position}</div>
+                        <div className="text-lg font-bold text-sentiment-positive tabular-nums">#{m.brand_position}</div>
                         <div className="text-[10px] text-slate-600">pos</div>
                       </>
                     ) : (
@@ -246,9 +250,7 @@ export default function Mentions() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${llmMeta.bg} ${llmMeta.color}`}>
-                        <Bot size={10} />{llmMeta.label}
-                      </span>
+                      <EngineChip id={engineId} interactive={false} />
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCatColor(m.category)}`}>
                         {getCatLabel(m.category)}
                       </span>
@@ -265,11 +267,13 @@ export default function Mentions() {
               {isOpen && m.response_snippet && (
                 <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
                   <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">{t.men_responseSnippet}</div>
-                  <blockquote className="text-sm text-slate-300 italic leading-relaxed border-l-2 border-emerald-500/40 pl-3">
+                  <blockquote className={`text-sm text-slate-300 italic leading-relaxed border-l-2 pl-3 ${
+                    m.sentiment === 'positive' ? 'border-sentiment-positive' : m.sentiment === 'negative' ? 'border-sentiment-negative' : 'border-sentiment-neutral'
+                  }`}>
                     "{m.response_snippet}"
                   </blockquote>
                   <div className="mt-3 text-xs text-slate-600">
-                    {t.men_checked} {new Date(m.checked_at).toLocaleDateString()}
+                    {t.men_checked} {formatDate(m.checked_at)}
                   </div>
                 </div>
               )}
@@ -284,11 +288,18 @@ export default function Mentions() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-16 text-slate-500">
-          {totalMentions === 0
-            ? t.men_noMentions
-            : t.men_noFilter}
-        </div>
+        totalMentions === 0 ? (
+          <SharedEmptyState
+            icon={Bot}
+            title="Not measured yet"
+            body={t.men_noMentions}
+            actionLabel="Run a collection"
+            actionTo="/ai-visibility"
+            minHeight={220}
+          />
+        ) : (
+          <div className="text-center py-16 text-slate-500">{t.men_noFilter}</div>
+        )
       )}
     </div>
   )

@@ -18,6 +18,10 @@ import { useClient } from '../lib/clientContext'
 import { ENGINE_META } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
+import ChartTooltip from '../components/ChartTooltip'
+import ChartLegend from '../components/ChartLegend'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import SharedEmptyState from '../components/EmptyState'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
@@ -142,17 +146,22 @@ function computeTrend(
 
 const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
 
+/**
+ * Competitor rows are not engines (dashboard-visual-system.md §9.5). Colour is
+ * resolved at RENDER time from the current chart theme, not baked in here:
+ * the tenant's own brand renders in --rail-active and every competitor
+ * renders in one flat --sentiment-neutral — identity here is "you vs. the
+ * field", not nine distinguishable hues. Rank is already carried by bar
+ * length and sort order, which is the whole reason the old index-keyed
+ * per-position colour arrays existed here and drifted (F-22).
+ */
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
-    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#8b5cf6', isYou: true },
+    { name: short(brandName), fullName: brandName, mentions: brandMentions, isYou: true },
     ...topCompetitors.map(c => ({
       name: short(c.name),
       fullName: c.name,
       mentions: c.totalMentions,
-      // Competitors share one quiet hue — the brand's violet bar is the focal
-      // point (you vs them), and the x-axis label already identifies each
-      // competitor, so 5 different bar colors was decorative rainbow, not meaning.
-      fill: '#64748b',
       isYou: false,
     })),
   ]
@@ -255,10 +264,11 @@ export default function Competitors() {
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
   const barData         = buildBarData(brandName, brandMentions, topCompetitors)
   const engineGroupData = buildEngineGroupData(brandName, engineStats, topCompetitors, activeEngines as LLMName[])
-  const groupColors     = ['#8b5cf6', '#ef4444', '#f59e0b', '#3b82f6']
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendData       = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
-  const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
+  // "You vs. the field" (§9.5) — resolved from the live chart theme, never a
+  // hand-picked hex, and never an array index (that's what F-22 was).
+  const colorForKey = (key: string) => key === brandName ? chart.railActive : chart.sentimentNeutral
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
@@ -267,7 +277,7 @@ export default function Competitors() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
-            <h1 className="text-2xl font-bold text-white">Competitors</h1>
+            <PageTitle>Competitors</PageTitle>
             {primaryMarket && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
                 {primaryMarket.flag} {primaryMarket.id} results
@@ -312,7 +322,7 @@ export default function Competitors() {
         <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">AI responses analysed</div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{totalResponses}</div>
-          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engines</div>
+          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engine{activeEngines.length === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -359,18 +369,19 @@ export default function Competitors() {
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={barData} margin={{ left: -20, bottom: 10, right: 8 }}>
-                <XAxis dataKey="name" tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false}
+                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false}
                   interval={0} />
-                <YAxis tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} width={40} tickCount={4} />
                 <Tooltip
-                  contentStyle={chart.tooltipContent}
-                  labelStyle={chart.tooltipLabel}
-                  itemStyle={chart.tooltipItem}
-                  labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName ?? ''}
-                  formatter={(v: any) => [v, 'AI mentions']}
+                  content={<ChartTooltip
+                    formatValue={item => `${item.value} AI mentions`}
+                    formatLabel={(_l, payload) => String(payload?.[0]?.payload?.fullName ?? '')}
+                  />}
+                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                 />
-                <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]}>
-                  {barData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                  {barData.map(entry => <Cell key={entry.fullName} fill={entry.isYou ? chart.railActive : chart.sentimentNeutral} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -384,18 +395,16 @@ export default function Competitors() {
             <p className="text-[11px] text-slate-600 mb-3">% of prompts where each brand appears, per AI engine</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={engineGroupData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="engine" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                <XAxis dataKey="engine" tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} width={40} tickCount={4} />
                 <Tooltip
-                  contentStyle={chart.tooltipContent}
-                  labelStyle={chart.tooltipLabel}
-                  itemStyle={chart.tooltipItem}
-                  formatter={(v: any) => [`${v}%`]}
+                  content={<ChartTooltip formatValue={item => `${item.value}%`} />}
+                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                 />
-                <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 6 }} />
-                {groupKeys.map((key, i) => (
-                  <Bar key={key} dataKey={key} fill={groupColors[i]} radius={[3, 3, 0, 0]} maxBarSize={28} />
+                <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                {groupKeys.map(key => (
+                  <Bar key={key} dataKey={key} fill={colorForKey(key)} radius={[3, 3, 0, 0]} maxBarSize={28} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -434,11 +443,13 @@ export default function Competitors() {
         </div>
 
         {topCompetitors.length === 0 ? (
-          <div className="py-16 text-center">
-            <Tag size={28} className="text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm mb-1">No competitors found in AI responses yet</p>
-            <p className="text-xs text-slate-600">Run a collection from the AI Visibility tab — competitors mentioned by AI will appear here automatically.</p>
-          </div>
+          <SharedEmptyState
+            icon={Tag}
+            title="Not measured yet"
+            body="Competitors mentioned by AI will appear here automatically once a collection runs — or add one manually below."
+            actionLabel="Run a collection"
+            actionTo="/ai-visibility"
+          />
         ) : (
           topCompetitors.map((c, idx) => {
             const engineDots = activeEngines.filter(e => (c.byEngine[e] ?? 0) > 0)
@@ -545,42 +556,47 @@ export default function Competitors() {
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
+              <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
               <XAxis
                 dataKey="period"
-                tick={{ fill: chart.axisTick, fontSize: 10 }}
+                tick={{ fill: chart.axisInk, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
+                minTickGap={24}
               />
               <YAxis
-                tick={{ fill: chart.axisTick, fontSize: 10 }}
+                tick={{ fill: chart.axisInk, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
+                width={40}
+                tickCount={4}
               />
               <Tooltip
-                contentStyle={chart.tooltipContent}
-                labelStyle={chart.tooltipLabel}
-                itemStyle={chart.tooltipItem}
+                content={<ChartTooltip />}
+                cursor={{ stroke: chart.gridLine, strokeWidth: 1 }}
               />
-              <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 8 }} />
+              <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+              {/* "You vs. the field" (§9.5) — same colorForKey as the grouped bar
+                  chart above, so brand vs. competitor reads identically in both
+                  charts on this page. All series share one strokeWidth. */}
               <Line
                 type="monotone"
                 dataKey={brandName}
-                stroke="#8b5cf6"
-                strokeWidth={2.5}
+                stroke={colorForKey(brandName)}
+                strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4 }}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }}
               />
-              {topCompetitors.slice(0, 4).map((c, i) => (
+              {topCompetitors.slice(0, 4).map(c => (
                 <Line
                   key={c.name}
                   type="monotone"
                   dataKey={c.name}
-                  stroke={trendColors[i]}
-                  strokeWidth={1.5}
+                  stroke={colorForKey(c.name)}
+                  strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 3 }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }}
                 />
               ))}
             </LineChart>

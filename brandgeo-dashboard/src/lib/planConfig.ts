@@ -58,9 +58,16 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
 export const COMING_SOON_ENGINES = new Set<EngineId>(['copilot', 'deepseek', 'grok'])
 
 // ── All engines in display order ──────────────────────────────────────────────
+// Order is a design artefact, not just a list (dashboard-visual-system.md §8.2,
+// judgement call J5): the categorical adjacent-pair colour-vision check is
+// computed on THIS order, so re-ordering it for a future product reason means
+// re-running the palette validator (spec §17 V1/V2) before shipping. The order
+// is also better product ordering than before: the five collecting engines
+// first, then retired `meta`, then the three that have never collected — the
+// old order had retired `meta` ahead of live `google_ai`.
 export const ALL_ENGINES: EngineId[] = [
-  'chatgpt', 'gemini', 'claude', 'perplexity', 'meta',
-  'google_ai', 'copilot', 'deepseek', 'grok',
+  'chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai',
+  'meta', 'deepseek', 'grok', 'copilot',
 ]
 
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
@@ -81,22 +88,41 @@ export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
 }
 
 // ── Engine UI metadata ────────────────────────────────────────────────────────
+// Nine hexes, one per engine, used in BOTH themes (dashboard-visual-system.md
+// §8.2, judgement call J1) — an engine's identity should not change when the
+// user flips the theme, and every value already clears 3:1 against all three
+// real surfaces the app paints on (#0a0f1e page, #0f172a dark card, #ffffff
+// light card), which is what makes one value per engine possible.
+//
+// `color` and `bg` (Tailwind text/bg class strings) are DELETED (§8.4/A10).
+// Coloured engine text is how Claude (orange-400) and Meta (amber-400) ended
+// up only 9.6 delta-E apart in the first place — those chip hues were
+// hand-picked separately from `chartColor` and drifted. Every call site now
+// renders identity as an 8px swatch in `chartColor` plus plain text-token
+// text (see components/EngineChip.tsx), so chip colour equals chart colour by
+// construction and cannot drift again.
+//
+// What changed and why, per engine (full derivation + validator output in the
+// spec): chatgpt/claude/perplexity keep their brand hue per the owner's
+// ruling (green/orange/cyan), stepped one notch for separation. google_ai
+// moves OFF red (reserved for the sentiment negative pole) onto pink. meta
+// moves off the amber/orange band entirely onto fuchsia (retired, renders
+// only on historical rows, so it's the cheapest slot to move). grok gets a
+// chromatic slot (ochre) instead of a desaturated grey that read as disabled.
 export const ENGINE_META: Record<EngineId, {
   label:      string
-  color:      string   // Tailwind text class
-  bg:         string   // Tailwind bg class
   logoUrl:    string
-  chartColor: string   // hex for recharts
+  chartColor: string   // hex, used for both chart fills AND the identity chip swatch
 }> = {
-  chatgpt:    { label: 'ChatGPT',   color: 'text-emerald-400', bg: 'bg-emerald-400/10', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com',              chartColor: '#10b981' },
-  gemini:     { label: 'Gemini',    color: 'text-blue-400',    bg: 'bg-blue-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com',       chartColor: '#3b82f6' },
-  claude:     { label: 'Claude',    color: 'text-orange-400',  bg: 'bg-orange-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#f97316' },
-  perplexity: { label: 'Perplexity',color: 'text-cyan-400',    bg: 'bg-cyan-400/10',    logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#06b6d4' },
-  meta:       { label: 'Meta AI',   color: 'text-amber-400',   bg: 'bg-amber-400/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#f59e0b' },
-  google_ai:  { label: 'Google AI Mode', color: 'text-red-400', bg: 'bg-red-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#ef4444' },
-  copilot:    { label: 'Copilot',   color: 'text-sky-400',     bg: 'bg-sky-400/10',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://copilot.microsoft.com', chartColor: '#38bdf8' },
-  deepseek:   { label: 'DeepSeek',  color: 'text-indigo-400',  bg: 'bg-indigo-400/10',  logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://deepseek.com',          chartColor: '#818cf8' },
-  grok:       { label: 'Grok',      color: 'text-slate-300',   bg: 'bg-slate-300/10',   logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#94a3b8' },
+  chatgpt:    { label: 'ChatGPT',        logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://openai.com',              chartColor: '#16a34a' },
+  gemini:     { label: 'Gemini',         logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://gemini.google.com',       chartColor: '#2563eb' },
+  claude:     { label: 'Claude',         logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#ea580c' },
+  perplexity: { label: 'Perplexity',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#0891b2' },
+  google_ai:  { label: 'Google AI Mode', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#db2777' },
+  meta:       { label: 'Meta AI',        logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#c026d3' },
+  deepseek:   { label: 'DeepSeek',       logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://deepseek.com',          chartColor: '#6366f1' },
+  grok:       { label: 'Grok',           logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#a16207' },
+  copilot:    { label: 'Copilot',        logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://copilot.microsoft.com', chartColor: '#0284c7' },
 }
 
 // ── Per-call engine API cost (EUR) ───────────────────────────────────────────

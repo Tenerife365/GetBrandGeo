@@ -8,6 +8,7 @@ import {
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { hasFeature, getPlanLimits, channelBaseAvailable, channelTier } from '../lib/planConfig'
+import { PageTitle } from '../components/Typography'
 import FeatureLocked from '../components/FeatureLocked'
 import AllowanceMeter from '../components/AllowanceMeter'
 import type {
@@ -804,7 +805,7 @@ export default function Social() {
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-5xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">AI Social</h1>
+        <PageTitle>AI Social</PageTitle>
         <p className="text-sm text-slate-400 mt-1">
           Write once, adapt per platform, publish or schedule for {activeClient?.name ?? 'this workspace'}.
         </p>
@@ -1112,7 +1113,7 @@ export default function Social() {
           </div>
 
           {accountsNote && (
-            <p className="text-xs text-slate-400 bg-dark-800 border border-dark-700 rounded-lg p-3">{accountsNote}</p>
+            <p className="text-xs text-slate-400 bg-dark-800 border border-dark-700 rounded-lg p-card-compact">{accountsNote}</p>
           )}
 
           {/* One card per CONNECTED ACCOUNT, not per network: a client may run

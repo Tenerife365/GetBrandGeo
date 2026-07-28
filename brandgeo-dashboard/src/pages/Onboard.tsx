@@ -6,6 +6,7 @@ import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, type Plan } from '../lib/pla
 import { MARKETS } from '../lib/marketContext'
 import { supabase } from '../lib/supabase'
 import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus } from 'lucide-react'
+import { PageTitle } from '../components/Typography'
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -180,7 +181,7 @@ export default function Onboard() {
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Onboard New Client</h1>
+        <PageTitle className="mb-1">Onboard New Client</PageTitle>
         <p className="text-sm text-slate-400">Set up a new client account with AI monitoring in minutes.</p>
       </div>
 
@@ -205,7 +206,10 @@ export default function Onboard() {
         })}
       </div>
 
-      <div className="bg-dark-800 border border-dark-700 rounded-2xl p-6">
+      {/* rounded-xl (12px), not rounded-2xl (16px) — the only 16px radius left in
+          the app (dashboard-visual-system.md A8/F-20); every other card uses the
+          same --card-radius value. */}
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
 
         {/* ── Step 1: Company info ── */}
         {step === 1 && (

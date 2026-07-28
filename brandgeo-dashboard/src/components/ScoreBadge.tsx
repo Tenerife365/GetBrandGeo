@@ -17,15 +17,19 @@ export function ClassificationBadge({ value }: { value: Classification }) {
   )
 }
 
+// Sentiment tokens (dashboard-visual-system.md §8.5), not emerald/slate/red —
+// those hues double as engine identity (ChatGPT/Grok-adjacent slate/negative
+// red-family), which is exactly the "one hue, three meanings" collision the
+// audit's F-14 named. Disjoint hue families now: lime / neutral-slate / rose.
 export function SentimentDot({ value }: { value: string }) {
   const colors: Record<string, string> = {
-    positive: 'bg-emerald-400',
-    neutral:  'bg-slate-400',
-    negative: 'bg-red-400',
+    positive: 'bg-sentiment-positive',
+    neutral:  'bg-sentiment-neutral',
+    negative: 'bg-sentiment-negative',
     none:     'bg-dark-600',
   }
   return (
-    <span className={`inline-block w-2 h-2 rounded-full ${colors[value] ?? 'bg-slate-600'}`} />
+    <span className={`inline-block w-2 h-2 rounded-full ${colors[value] ?? 'bg-sentiment-neutral'}`} />
   )
 }
 

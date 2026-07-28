@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { ENGINE_META, ENGINE_COST_EUR, type EngineId } from '../lib/planConfig'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import { useChartTheme } from '../lib/chartTheme'
 
 /**
  * EUR cost per response, per engine — sourced from planConfig.ts's
@@ -39,12 +41,17 @@ const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, nu
 // that was in dispute. ENGINE_COST is now only the fallback for legacy rows whose
 // cost_eur is NULL (collected before metering landed).
 
-// Sourced from ENGINE_META (planConfig.ts) instead of a hardcoded local map — same
-// duplication-drift risk DESIGN-SYSTEM.md §1/§5 flagged for Dashboard.tsx/Competitors.tsx.
-// Keyed off ENGINE_COST's own keys since those are the only engines this page ever renders.
-const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
-  Object.keys(ENGINE_COST).map(id => [id, ENGINE_META[id as EngineId]?.color ?? 'text-slate-400'])
-)
+// ENGINE_META's colour / bg fields no longer exist (dashboard-visual-system.md §8.4 —
+// engine identity is a swatch in ENGINE_META[id].chartColor, never coloured
+// text). This table cell/legend below reads chartColor directly per row via
+// `engineSwatch()` instead of keeping a second colour lookup. The fallback (an
+// id ENGINE_META doesn't recognise, defensive only — every real id here comes
+// from ENGINE_COST's own keys) resolves from the live chart theme rather than
+// a hand-typed hex, so no engine/sentiment hex sits outside planConfig.ts or
+// the chart-theme module (§17 V5).
+function engineSwatch(id: string, fallback: string): string {
+  return ENGINE_META[id as EngineId]?.chartColor ?? fallback
+}
 
 interface ClientUsage {
   clientId: number
@@ -58,6 +65,7 @@ interface ClientUsage {
 export default function Usage() {
   const { isAdmin, clients } = useClient()
   const { getStartDate, timeRange } = useTimeFilter()
+  const chart = useChartTheme()
   const [rows, setRows] = useState<ClientUsage[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -129,7 +137,7 @@ export default function Usage() {
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Usage &amp; Costs</h1>
+        <PageTitle>Usage &amp; Costs</PageTitle>
         <p className="text-sm text-slate-400 mt-0.5">
           Metered API spend per client (real per-row <code className="text-slate-300">cost_eur</code>),
           with a flat estimate for pre-metering rows
@@ -137,6 +145,7 @@ export default function Usage() {
       </div>
 
       {/* Summary cards */}
+      <SectionHeading className="sr-only">Spend summary</SectionHeading>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -190,7 +199,12 @@ export default function Usage() {
                   <th className="px-4 py-3 text-left text-xs text-slate-500 font-medium">Client</th>
                   <th className="px-3 py-3 text-center text-xs text-slate-500 font-medium">Responses</th>
                   {Object.keys(ENGINE_COST).map(e => (
-                    <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">{e}</th>
+                    <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />
+                        {e}
+                      </span>
+                    </th>
                   ))}
                   <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Est. Cost</th>
                 </tr>
@@ -201,7 +215,7 @@ export default function Usage() {
                     <td className="px-4 py-3 font-medium text-slate-200">{r.clientName}</td>
                     <td className="px-3 py-3 text-center text-slate-400 tabular-nums">{r.totalResponses}</td>
                     {Object.keys(ENGINE_COST).map(e => (
-                      <td key={e} className={`px-3 py-3 text-center tabular-nums ${ENGINE_COLOR[e] ?? 'text-slate-400'}`}>
+                      <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
                         {r.byEngine[e] ?? 0}
                       </td>
                     ))}
@@ -234,7 +248,8 @@ export default function Usage() {
         <div className="flex flex-wrap gap-3">
           {Object.entries(ENGINE_COST).map(([engine, cost]) => (
             <div key={engine} className="flex items-center gap-1.5">
-              <span className={`text-xs font-medium capitalize ${ENGINE_COLOR[engine] ?? 'text-slate-400'}`}>{engine}</span>
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(engine, chart.sentimentNeutral) }} />
+              <span className="text-xs font-medium capitalize text-slate-300">{engine}</span>
               <span className="text-xs text-slate-600">€{(cost ?? 0).toFixed(3)}</span>
             </div>
           ))}

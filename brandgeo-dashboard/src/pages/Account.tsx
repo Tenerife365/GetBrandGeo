@@ -12,6 +12,7 @@ import {
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS, PLAN_ORDER, type Plan } from '../lib/planConfig'
+import { PageTitle } from '../components/Typography'
 import BrandLogo from '../components/BrandLogo'
 import PromotionsPanel from '../components/PromotionsPanel'
 
@@ -383,7 +384,7 @@ export default function Account() {
       <div className="flex items-center gap-4 mb-8">
         <BrandLogo name={brandName} website={website} sizeClass="w-14 h-14" roundedClass="rounded-2xl" textClass="text-lg" />
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-white tracking-tight truncate">{brandName}</h1>
+          <PageTitle className="truncate">{brandName}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5 truncate flex items-center gap-2 flex-wrap">
             {domain && (
               <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer"

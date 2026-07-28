@@ -28,6 +28,9 @@ import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { useChartTheme } from '../lib/chartTheme'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import SharedEmptyState from '../components/EmptyState'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,16 +110,20 @@ const LLM_LABEL: Record<string, string> = {
   google_ai: 'Google AI', copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
 }
 
-const LLM_COLOR: Record<string, string> = {
-  chatgpt:    'bg-emerald-500/15 text-emerald-400',
-  gemini:     'bg-blue-500/15 text-blue-400',
-  claude:     'bg-violet-500/15 text-violet-400',
-  perplexity: 'bg-cyan-500/15 text-cyan-400',
-  meta:       'bg-amber-500/15 text-amber-400',
-  google_ai:  'bg-red-500/15 text-red-400',
-  copilot:    'bg-sky-500/15 text-sky-400',
-  deepseek:   'bg-indigo-500/15 text-indigo-400',
-  grok:       'bg-slate-500/15 text-slate-400',
+// LLM_COLOR (a fifth independent hand-picked engine-colour map, on top of the
+// four the audit already named) is DELETED — dashboard-visual-system.md §8.4:
+// one source (ENGINE_META[id].chartColor), never a second hand-picked map.
+// EngineTag below is the same swatch-plus-text-token treatment as EngineChip,
+// sized for this dense inline list instead of a filter row.
+function EngineTag({ id, fallbackLabel }: { id: string; fallbackLabel: string }) {
+  const meta = ENGINE_META[id as EngineId]
+  const chart = useChartTheme()
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-medium bg-dark-700 text-slate-300">
+      <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta?.chartColor ?? chart.sentimentNeutral }} />
+      {meta?.label ?? fallbackLabel}
+    </span>
+  )
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -447,9 +454,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
           <div className="font-semibold text-slate-100 text-sm leading-snug">{rec.title}</div>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {rec.fixes.map(f => (
-              <span key={f} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${LLM_COLOR[f]}`}>
-                {LLM_LABEL[f]}
-              </span>
+              <EngineTag key={f} id={f} fallbackLabel={LLM_LABEL[f] ?? f} />
             ))}
           </div>
         </div>
@@ -507,9 +512,7 @@ function StoredRecCard({
           <Lightbulb size={9} className="inline mr-0.5" />AI insight
         </span>
         {(rec.engines ?? []).map(e => (
-          <span key={e} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${LLM_COLOR[e] ?? 'bg-slate-500/15 text-slate-400'}`}>
-            {LLM_LABEL[e] ?? e}
-          </span>
+          <EngineTag key={e} id={e} fallbackLabel={LLM_LABEL[e] ?? e} />
         ))}
       </div>
 
@@ -775,7 +778,7 @@ export default function Recommendations() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-white">Recommendations</h1>
+            <PageTitle>Recommendations</PageTitle>
             {recs.length > 0 && (
               <span className="text-xs bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-medium">
                 {recs.length} action{recs.length !== 1 ? 's' : ''}
@@ -815,28 +818,37 @@ export default function Recommendations() {
       )}
 
       {(stats?.totalChecks ?? 0) === 0 ? (
-        <div className="text-center py-16 text-slate-500">
-          <Target size={40} className="mx-auto mb-3 opacity-20" />
-          <div className="text-sm font-medium mb-1">No AI results yet</div>
-          <div className="text-xs">Run a collection from the AI Visibility tab to generate recommendations.</div>
-        </div>
+        <SharedEmptyState
+          icon={Target}
+          title="Not measured yet"
+          body="Recommendations are generated from AI check results — run a collection to get your first set."
+          actionLabel="Run a collection"
+          actionTo="/ai-visibility"
+          minHeight={220}
+        />
       ) : (
         <>
           {/* Per-engine visibility — horizontal engine cards matching the AI
               Visibility page (logo tile left, name + status pill, % + avg position
               right, subtle status-coloured border). */}
           {stats && (
+            <>
+            <SectionHeading className="sr-only">Visibility by engine</SectionHeading>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
               {stats.llmStats.map(s => {
                 const meta = ENGINE_META[s.llm as EngineId]
                 const pct  = Math.round(s.rate * 100)
+                // Strong/Partial/Low is a status verdict, not an engine identity — the
+                // sentiment tokens (dashboard-visual-system.md §8.5) carry the two
+                // unambiguous ends so this never re-collides with an engine hue; amber
+                // stays for the middle tier (no token defines a fourth status colour).
                 const tone = s.rate >= 0.85
-                  ? { label: 'Strong',  badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30', dot: 'bg-emerald-400', card: 'border-emerald-500/20 hover:border-emerald-500/40' }
+                  ? { label: 'Strong',  badge: 'bg-sentiment-positive-15 text-sentiment-positive border border-sentiment-positive-30', dot: 'bg-sentiment-positive', card: 'border-sentiment-positive-20 hover:border-sentiment-positive-40' }
                   : s.rate >= 0.5
                   ? { label: 'Partial', badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',       dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' }
-                  : { label: 'Low',     badge: 'bg-red-500/15 text-red-300 border border-red-500/30',             dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40' }
+                  : { label: 'Low',     badge: 'bg-sentiment-negative-15 text-sentiment-negative border border-sentiment-negative-30',   dot: 'bg-sentiment-negative', card: 'border-sentiment-negative-20 hover:border-sentiment-negative-40' }
                 return (
-                  <div key={s.llm} className={`bg-dark-800 border rounded-xl p-3 flex items-center gap-3 transition-colors ${tone.card}`}>
+                  <div key={s.llm} className={`bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${tone.card}`}>
                     <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60">
                       <img src={meta?.logoUrl} alt={meta?.label ?? LLM_LABEL[s.llm]} className="w-7 h-7 object-contain" />
                     </div>
@@ -848,7 +860,7 @@ export default function Recommendations() {
                         </span>
                       </div>
                       <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className={`text-lg font-bold tabular-nums leading-none ${s.rate >= 0.85 ? 'text-emerald-400' : 'text-slate-200'}`}>{pct}%</span>
+                        <span className={`text-lg font-bold tabular-nums leading-none ${s.rate >= 0.85 ? 'text-sentiment-positive' : 'text-slate-200'}`}>{pct}%</span>
                         {s.avgPos !== null && <span className="text-[11px] text-slate-500">avg #{s.avgPos}</span>}
                       </div>
                     </div>
@@ -856,6 +868,7 @@ export default function Recommendations() {
                 )
               })}
             </div>
+            </>
           )}
 
           {/* Competitor context */}

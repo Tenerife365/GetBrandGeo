@@ -189,28 +189,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     },
   ]
 
-  // Stronger active-state indicator: left accent rail + bg tint, not just a bg tint (§7.4 Phase 2)
+  // Active nav state (dashboard-visual-system.md §4.2, replacing the old
+  // bg-brand-500/15 + before:bg-brand-400 rail-only treatment measured at
+  // 1.17:1 background / 1.24:1 text — both effectively invisible with the
+  // rail hidden). `.nav-item`/`.is-active` (index.css) carry the whole state:
+  // a solid raised fill (--surface-nav-active), white/ink semibold text
+  // (--text-nav-active), and the rail (--rail-active) — three cues, of which
+  // two clear the 1.5:1 rail-hidden floor independently (§4.2's table; dark
+  // clears it on background, light on text — that split is forced, see §4.2).
   //
-  // The rail is a centered pseudo-element pill, NOT a border-l: a 2px left
-  // border on an element with rounded-lg gets clipped by the corner radius into
-  // a short curved smear rather than reading as a rail.
-  //
-  // Inactive items sit at slate-300, not slate-400. The dark-mode contrast fix
-  // in index.css remaps text-slate-600 (the nav group headers) onto
-  // text-slate-400's value, so slate-400 nav items had become the exact same
-  // colour as the "INSIGHTS"/"STRATEGY" headers above them and the hierarchy
-  // went flat. Brightening the items — rather than re-dimming the headers,
-  // which would fail AA again — restores the ordering: active accent >
-  // item (slate-300, ~11.4:1) > group header (slate-400, 6.96:1).
+  // Inactive items are NOT dimmed. They stay at --text-nav-idle, unchanged in
+  // value from the slate-300 this app already used — the comment this
+  // replaces recorded that they were deliberately brightened to stay distinct
+  // from the group headers, and this spec doesn't reopen that; the active
+  // state moved instead (judgement call J6).
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
-    [
-      'relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors',
-      'before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2',
-      'before:w-[3px] before:rounded-full before:transition-all',
-      isActive
-        ? 'bg-brand-500/15 text-brand-300 font-medium hover:bg-brand-500/25 before:h-5 before:bg-brand-400'
-        : 'text-slate-300 hover:text-white hover:bg-dark-700 before:h-0 before:bg-transparent',
-    ].join(' ')
+    `nav-item${isActive ? ' is-active' : ''}`
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -277,9 +271,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — its own named surface (--surface-nav), not the card surface
+          (--dark-800). border-nav is a SOLID token (dashboard-visual-system.md
+          A1/A2): it must clear 3:1 against both the canvas and this surface, and
+          an alpha border cannot be measured without knowing what's behind it —
+          that's exactly how the previous 1.31:1/1.07:1 readings went unnoticed. */}
       <aside className={[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700/60 flex flex-col',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-surface-nav border-r border-nav flex flex-col',
         'transition-transform duration-200 ease-in-out',
         'md:relative md:w-64 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
@@ -704,8 +702,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* Main. canvas-bleed (index.css) is the depth cue from §4.1: a 24px
+          gradient painted on the CANVAS side of the divider, decaying to
+          nothing, so the canvas reads as sitting behind the rail rather than
+          beside it. It contributes nothing to any measured ratio — the
+          border-nav divider on <aside> alone carries the 3:1. */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden canvas-bleed">
 
         {/* View-as-user banner. Sits outside the scroll container on purpose, so
             it cannot be scrolled out of sight — an admin must never mistake an
@@ -741,19 +743,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        {/* Global time filter bar — hidden on the profile page (no historical data there) */}
+        {/* Global time filter bar — hidden on the profile page (no historical data
+            there). Solid --surface-bar (A7), not a translucent bg-dark-800/60 —
+            a translucent chrome surface can't be verified against 3:1 without
+            knowing what's scrolling under it. #0d1425 is the exact value the old
+            60% composite already produced over the dark canvas, so dark mode
+            doesn't change visually, it only becomes measurable. The border is
+            decorative here (40% alpha is fine): the 3:1 divider requirement is
+            the sidebar's, not this strip's (§4.4). */}
         {!hideTimeFilter && (
-        <div className="flex-shrink-0 border-b border-dark-700/40 bg-dark-800/60 backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
+        <div className="flex-shrink-0 border-b border-nav-40 bg-surface-bar backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
           {((['7d', '30d', '90d', 'all'] as const)).map(r => (
             <button
               key={r}
               onClick={() => setTimeRange(r)}
               aria-pressed={timeRange === r}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                timeRange === r
-                  ? 'bg-brand-500/20 text-brand-300'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-dark-700/50'
-              }`}
+              className={`time-pill${timeRange === r ? ' is-pressed' : ''}`}
             >
               {TIME_LABELS[r]}
             </button>
@@ -767,22 +772,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Mobile bottom nav bar */}
-      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-dark-800/95 backdrop-blur-md border-t border-dark-700 flex items-stretch justify-around safe-area-pb">
+      {/* Mobile bottom nav bar (§4.5) — --surface-nav at 95%, same rail token as
+          the desktop sidebar, moved to the item's TOP edge since these are a
+          vertical icon+label stack (a left rail would read as a divider
+          between items, not a selection). */}
+      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb">
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             onClick={closeSidebar}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-0.5 px-2 py-2 flex-1 transition-colors min-w-0 ${
-                isActive ? 'text-brand-300' : 'text-slate-500 active:text-slate-300'
-              }`
-            }
+            className={({ isActive }) => `mobile-nav-item${isActive ? ' is-active' : ''}`}
           >
             <Icon size={19} />
-            <span className="text-[9px] font-medium leading-none truncate max-w-full">
+            <span className="mobile-nav-label">
               {label.split(' ')[0]}
             </span>
           </NavLink>

@@ -22,7 +22,11 @@ import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
+import { PageTitle, SectionHeading } from '../components/Typography'
 import { promptCategoryLabel } from '../lib/promptCategories'
+import { useChartTheme } from '../lib/chartTheme'
+import SharedEmptyState from '../components/EmptyState'
+import { formatDate } from '../lib/format'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -95,7 +99,7 @@ function EngineToggleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
           <div>
@@ -125,7 +129,10 @@ function EngineToggleModal({
               <div key={engine} className="flex items-center gap-3 px-5 py-3.5">
                 <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 rounded-lg object-contain shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-medium ${meta.color}`}>{meta.label}</div>
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-white">
+                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.chartColor }} />
+                    {meta.label}
+                  </div>
                   {!isBuilt && (
                     <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon — not yet collecting data</div>
                   )}
@@ -174,6 +181,7 @@ export default function AIVisibility() {
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
   const { theme } = useTheme()
+  const chart = useChartTheme()
 
   const [prompts, setPrompts]           = useState<Prompt[]>([])
   const [results, setResults]           = useState<ResultMap>(new Map())
@@ -488,7 +496,6 @@ export default function AIVisibility() {
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.aiv_loading}</div>
 
-  const scoreColor      = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
   const circumference   = 2 * Math.PI * 54
   const dashOffset      = circumference - (aiScore / 100) * circumference
   const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
@@ -531,7 +538,7 @@ export default function AIVisibility() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <h1 className="text-2xl font-bold text-white">{t.aiv_title}</h1>
+            <PageTitle>{t.aiv_title}</PageTitle>
             {selections.map(sel => (
               <span
                 key={sel.market.id}
@@ -550,7 +557,7 @@ export default function AIVisibility() {
             {t.aiv_subtitle}
             {lastChecked && (
               <span className="ml-2 text-slate-600">
-                - {fmt(t.aiv_lastChecked, { date: new Date(lastChecked).toLocaleDateString() })}
+                - {fmt(t.aiv_lastChecked, { date: formatDate(lastChecked) })}
               </span>
             )}
           </p>
@@ -633,11 +640,15 @@ export default function AIVisibility() {
       )}
 
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
+      <SectionHeading className="sr-only">AI Visibility Score</SectionHeading>
       <motion.div
         className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center"
         variants={heroReveal} initial="hidden" animate="show"
       >
         <div className="flex flex-col items-center gap-3">
+          {/* Empty state (§11): ring at --grid-line, centre reads "Not measured
+              yet", no percentage, no band label — never a 0% ring, which reads
+              as a verdict rather than an absence of measurement (F-03). */}
           <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
               <linearGradient id="scoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
@@ -650,18 +661,33 @@ export default function AIVisibility() {
               </filter>
             </defs>
             <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-              filter="url(#scoreGlow)" opacity="0.3"
-              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-              transition={{ duration: 1.4, ease: EASE_OUT }} />
-            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-              transition={{ duration: 1.4, ease: EASE_OUT }} />
+            {totalChecked === 0 ? (
+              <circle cx="60" cy="60" r="54" fill="none" stroke={chart.gridLine} strokeWidth="6" />
+            ) : (
+              <>
+                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+                  filter="url(#scoreGlow)" opacity="0.3"
+                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+                  transition={{ duration: 1.4, ease: EASE_OUT }} />
+                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
+                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+                  transition={{ duration: 1.4, ease: EASE_OUT }} />
+              </>
+            )}
             <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
-              <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
+              {totalChecked === 0 ? (
+                <tspan fontSize="15" fontWeight="600" fill={chart.axisInk} textAnchor="middle">
+                  <tspan x="60" dy="-6">Not</tspan>
+                  <tspan x="60" dy="18">measured</tspan>
+                </tspan>
+              ) : (
+                <>
+                  <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
+                  <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
+                </>
+              )}
             </text>
           </svg>
           <div className="text-center -mt-1">
@@ -680,14 +706,24 @@ export default function AIVisibility() {
                 </span>
               </span>
             </div>
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
-              aiScore >= 60 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              : 'bg-red-500/10 text-red-400 border-red-500/20'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-emerald-400' : aiScore >= 35 ? 'bg-amber-400' : 'bg-red-400'}`} />
-              {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
-            </div>
+            {/* Never issue a verdict before there is data (§11 rule 1 / F-03): a
+                brand with zero checks previously read "Needs Work" — a judgement,
+                not an absence of measurement. */}
+            {totalChecked === 0 ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border bg-dark-700/60 text-slate-400 border-dark-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                Not measured yet
+              </div>
+            ) : (
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                aiScore >= 60 ? 'bg-sentiment-positive-15 text-sentiment-positive border-sentiment-positive-30'
+                : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-sentiment-negative-15 text-sentiment-negative border-sentiment-negative-30'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-sentiment-positive' : aiScore >= 35 ? 'bg-amber-400' : 'bg-sentiment-negative'}`} />
+                {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -731,7 +767,7 @@ export default function AIVisibility() {
             UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
           }[e.status]
           return (
-            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-3 flex items-center gap-3 transition-colors ${statusStyles.card}`}>
+            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${statusStyles.card}`}>
               {isAdmin && (
                 <button
                   onClick={() => handleRefreshEngine(e.id)}
@@ -795,7 +831,7 @@ export default function AIVisibility() {
         {comingSoonEngines.map(id => {
           const meta = ENGINE_META[id]
           return (
-            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-3 flex items-center gap-3 opacity-70">
+            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-card-compact flex items-center gap-3 opacity-70">
               <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/40">
                 <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 object-contain grayscale" />
               </div>
@@ -982,7 +1018,7 @@ export default function AIVisibility() {
           {activeLLMs.map(llm => (
             <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
               <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-              <span className={`text-[11px] font-semibold ${llm.color}`}>{llm.label}</span>
+              <span className="text-[11px] font-semibold text-slate-300">{llm.label}</span>
             </div>
           ))}
         </div>
@@ -1122,8 +1158,8 @@ export default function AIVisibility() {
                       ].sort((a, b) => a.pos - b.pos)
 
                       return (
-                        <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-emerald-500/5 border-emerald-500/20' : r ? 'bg-red-500/5 border-red-500/20' : 'bg-dark-800 border-dark-700'}`}>
-                          <div className={`text-xs font-semibold ${llm.color} mb-2 flex items-center gap-1.5`}>
+                        <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-sentiment-positive-15 border-sentiment-positive-20' : r ? 'bg-sentiment-negative-15 border-sentiment-negative-20' : 'bg-dark-800 border-dark-700'}`}>
+                          <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
                             <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                             {llm.label}
                             {isAdmin && (
@@ -1162,7 +1198,7 @@ export default function AIVisibility() {
                               )}
                               {r.checked_at && (
                                 <div className="text-[10px] text-slate-600 font-mono">
-                                  {new Date(r.checked_at).toLocaleDateString()}
+                                  {formatDate(r.checked_at)}
                                 </div>
                               )}
                               {r.response_snippet && (
@@ -1202,7 +1238,17 @@ export default function AIVisibility() {
         </AnimatePresence>
 
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
+          prompts.length === 0 ? (
+            <SharedEmptyState
+              icon={Target}
+              title="No prompts yet"
+              body={t.aiv_noPrompts}
+              actionLabel="Add prompts"
+              actionTo="/prompts"
+            />
+          ) : (
+            <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
+          )
         )}
         </div>
         </div>

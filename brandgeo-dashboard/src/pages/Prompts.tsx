@@ -6,6 +6,7 @@ import { mockPrompts } from '../lib/mockData'
 import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
+import { PageTitle, SectionHeading } from '../components/Typography'
 
 // Category is a grouping, not an alert — one quiet neutral chip everywhere, and
 // the label comes from the shared general taxonomy (lib/promptCategories.ts).
@@ -289,7 +290,7 @@ export default function Prompts() {
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t.pr_title}</h1>
+          <PageTitle>{t.pr_title}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
         </div>
         {/* Prompt management is available to any signed-in user for THEIR OWN
@@ -466,6 +467,7 @@ export default function Prompts() {
         </div>
       )}
 
+      <SectionHeading className="sr-only">Prompts</SectionHeading>
       <div className="space-y-1.5">
         {filtered.map((p, i) => {
           const isEditing = editId === p.id
