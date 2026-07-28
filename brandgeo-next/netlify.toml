@@ -1,0 +1,41 @@
+# Netlify config for the Next.js marketing site rebuild.
+#
+# This is a SEPARATE Netlify site from brandgeo-dashboard. Connect it to the
+# repo with "Base directory" = brandgeo-next and Netlify reads this file.
+#
+# next.config.ts sets output: 'export', so the build produces a plain static
+# folder. No Next runtime, no @netlify/plugin-nextjs, no serverless functions.
+
+[build]
+  base    = "brandgeo-next"
+  command = "npm run build"
+  publish = "out"
+
+  # Same convention as brandgeo-dashboard/netlify.toml: Netlify's `ignore`
+  # INVERTS the usual meaning — exit 0 cancels the build. `git diff --quiet`
+  # exits 0 when nothing changed, so any push that does not touch this
+  # directory is cancelled deliberately and shows as "Canceled", not "Skipped".
+  # $CACHED_COMMIT_REF tracks the last commit actually built, so the diff is
+  # cumulative and no change is lost across a run of cancellations.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# Belt and braces alongside public/robots.txt and the noindex in metadata.
+# Every preview deploy of this site must stay out of the index until it
+# actually replaces getbrandgeo.com — a second crawlable copy of the homepage
+# would compete with the real site in exactly the surfaces BrandGEO sells
+# visibility in. Delete this header block on cutover, with the other two.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Hashed build assets are immutable; everything else revalidates.
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
