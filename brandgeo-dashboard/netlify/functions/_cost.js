@@ -455,11 +455,10 @@ const PLAN_COLLECTION_COOLDOWN_HOURS = {
   managed: 168, pro: 168, enterprise: 0,
 }
 
-// Engines capped at 1 run per (client, prompt) per WEEKLY_CAP_DAYS — a hard
+// Engines capped at 1 run per (client, prompt) per MONTHLY_CAP_DAYS — a hard
 // throttle regardless of manual/force/scheduled, to protect a metered external
-// budget. google_ai (Google AI Mode via SerpApi) runs no_cache, so every call
-// consumes a SerpApi credit; capping it to once/week/prompt keeps a small
-// SerpApi plan (e.g. 250 searches/mo) from being burned by repeated refreshes.
+// budget. Both capped engines run no_cache, so every call consumes a SerpApi
+// credit against a 500-credit monthly pool shared by the whole platform.
 // ai_overview joined the cap 2026-07-29 for the same reason and more strongly:
 // it draws on the SAME SerpApi commitment as google_ai and consumes TWO credits
 // whenever Google defers the overview behind a page_token, so an uncapped
@@ -467,8 +466,34 @@ const PLAN_COLLECTION_COOLDOWN_HOURS = {
 // The cap is invisible to scheduled collection, which already runs weekly; it
 // only stops manual thrash. Removing it is a one-word edit if SerpApi headroom
 // later makes it unnecessary.
-const WEEKLY_CAPPED_ENGINES = ['google_ai', 'ai_overview']
-const WEEKLY_CAP_DAYS = 7
+/**
+ * Engines whose collection frequency is capped INDEPENDENTLY of the plan's
+ * normal cadence, and the window they are capped to.
+ *
+ * MOVED FROM WEEKLY TO MONTHLY 2026-07-29, owner's decision, and the rename is
+ * not cosmetic: the constant was called WEEKLY_CAP_DAYS and is now 30.
+ *
+ * WHY. Both capped engines are SerpApi, and SerpApi is a 500-credit monthly
+ * pool shared by the ENTIRE platform, not a per-client budget. At weekly cadence
+ * the sold prompt counts do not fit inside it: one Growth PRO client would draw
+ * 812 credits a month, 162% of the whole pool, and one Managed client 2,708,
+ * or 542%. The book only fit because no customer used their allowance.
+ *
+ * At monthly cadence the same allowances draw 187 and 625, and Growth drops
+ * from 217 to 50. The pool now supports a real book rather than one customer.
+ *
+ * The signal cost is small, which is what makes this the right lever rather
+ * than cutting prompts. Google's AI surfaces are assembled from its search
+ * index and move on the timescale of indexing and content changes, not on the
+ * timescale of a chat model's sampling. The five token-based engines stay
+ * weekly, so week-over-week trend is unaffected for the majority of the data.
+ *
+ * Enforced on BOTH paths, which is the reason this works at all: _enqueue.js
+ * for scheduled collection and collect-prompt.js for the manual refresh button.
+ * A cap that only covered manual refresh would not have touched the 812.
+ */
+const MONTHLY_CAPPED_ENGINES = ['google_ai', 'ai_overview']
+const MONTHLY_CAP_DAYS = 30
 
 module.exports = {
   ENGINE_COST_EUR,
@@ -488,6 +513,6 @@ module.exports = {
   activeEnginesFor,
   PLAN_MONTHLY_API_BUDGET_EUR,
   PLAN_COLLECTION_COOLDOWN_HOURS,
-  WEEKLY_CAPPED_ENGINES,
-  WEEKLY_CAP_DAYS,
+  MONTHLY_CAPPED_ENGINES,
+  MONTHLY_CAP_DAYS,
 }

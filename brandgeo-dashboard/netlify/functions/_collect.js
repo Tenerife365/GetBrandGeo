@@ -719,19 +719,31 @@ async function callGoogleAiOverview(prompt, _ctx, opts) {
 
     const text = flattenAiOverviewBlocks(ao.text_blocks).join('\n').trim()
 
-    // CITATIONS ARE CAPTURED BUT NOT PERSISTED, and that is a schema limit, not
-    // an oversight. ai_results has no column for them, and the only free-text
-    // column (response_text) is the exact same string analyseResponse() parses,
-    // so appending "Sources: ..." would feed citation titles and domains into
-    // competitor extraction. Logged here so the data is visible while the
-    // decision on a references column sits with the owner.
-    const refs = Array.isArray(ao.references) ? ao.references : []
+    // CITATIONS ARE PERSISTED as of 2026-07-29, to ai_results.citations (see
+    // db/supabase-citations-migration.sql). They go in their OWN column and never
+    // into response_text: that field is the exact string analyseResponse()
+    // parses, so appending "Sources: ..." would feed citation titles and domains
+    // into competitor extraction and a cited publisher would start showing up in
+    // the customer's competitor list.
+    //
+    // Normalised to a stable shape here rather than stored raw, so a change in
+    // SerpApi's response shape does not silently change what is in the column.
+    // Capped at 20 to bound the row.
+    const refs = (Array.isArray(ao.references) ? ao.references : [])
+      .slice(0, 20)
+      .map((r, i) => ({
+        title:  typeof r?.title  === 'string' ? r.title.slice(0, 300) : null,
+        link:   typeof r?.link   === 'string' ? r.link.slice(0, 1000) : null,
+        source: typeof r?.source === 'string' ? r.source.slice(0, 200) : null,
+        index:  typeof r?.index  === 'number' ? r.index : i,
+      }))
+      .filter(r => r.link || r.source || r.title)
 
     if (text) {
       console.log('[AIOverview] ok | len:', text.length, '| searches:', searches,
         '| refs:', refs.length, refs.slice(0, 5).map(x => x?.source || x?.link).filter(Boolean).join(', '),
         '| preview:', text.slice(0, 200))
-      return { text, usage: usage(), errorCode: null, detail: null }
+      return { text, usage: usage(), citations: refs, errorCode: null, detail: null }
     }
 
     // An ai_overview object with no readable text_blocks is the same outcome as
@@ -826,7 +838,7 @@ const CLAUDE_BUDGET_WORKER_MS = 55000
 // and the three HTTP endpoints agree byte-for-byte. run_id is set only when the
 // caller passes one (the queue worker does; the manual endpoints leave it null,
 // keeping their rows out of the uq_ai_results_run_prompt_llm partial index).
-function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, errorCode, detail, client_config }) {
+function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config }) {
   const base = { prompt_id, llm: engine, client_id, checked_at: new Date().toISOString() }
   if (run_id != null) base.run_id = run_id
 
@@ -878,6 +890,10 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usa
     competitors_mentioned: analysis.competitors_mentioned,
     response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
     cost_eur:              costForRow(engine, null, usage),
+    // NULL when the engine returned no citation data at all (six of seven
+    // today), [] when it ran and cited nothing. Those are different findings and
+    // must not collapse into each other.
+    citations:             Array.isArray(citations) ? citations : null,
   }
 }
 
@@ -929,8 +945,8 @@ async function collectEngines(engines, {
       continue
     }
 
-    const { text, errorCode, detail, usage } = s.value ?? { text: null, errorCode: null }
-    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, errorCode, detail, client_config })
+    const { text, errorCode, detail, usage, citations } = s.value ?? { text: null, errorCode: null }
+    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config })
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }
