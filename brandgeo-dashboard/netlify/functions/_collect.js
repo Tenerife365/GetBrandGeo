@@ -236,8 +236,22 @@ async function callOpenRouter(model, prompt, ctx, opts = {}) {
   //
   // BrandGEO measures what an engine ANSWERS, not how well it deliberates, so
   // extended reasoning buys nothing here and costs on both axes.
+  // HOW it is turned down matters. `{ enabled: false }` is the obvious spelling
+  // and it is the one that broke grok: 03df188 shipped it at 14:28 on 2026-07-29
+  // and every grok call after that returned api_error, where calls before it
+  // either succeeded or timed out. It is never quota (402/429/"credit" are
+  // classified separately above), and OpenRouter lists x-ai/grok-4.5 as
+  // supporting a `reasoning` parameter, so the field itself is understood. A
+  // reasoning-native model refusing to have reasoning switched off entirely is
+  // the reading that fits every observation.
+  //
+  // `{ effort: 'low' }` is the spelling that is already proven in this codebase:
+  // it is exactly what capped gpt-5.5 (see callChatGPT below, which carries a
+  // do-not-touch note about it). It keeps the model within its supported range
+  // instead of asking it to stop thinking, and still collapses the ~30,000
+  // output tokens that made grok cost EUR 0.165 a call.
   if (opts.noReasoning) {
-    body.reasoning = { enabled: false }
+    body.reasoning = { effort: 'low' }
   }
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
