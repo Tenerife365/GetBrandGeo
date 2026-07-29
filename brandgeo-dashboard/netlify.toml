@@ -28,7 +28,27 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai"
+    # askmywebsiteai (in-dashboard support assistant, added 2026-07-29). The
+    # snippet alone would have done NOTHING: script-src was 'self' only, so the
+    # SDK was blocked before it ran, and the failure is a console line nobody
+    # reads. default-src 'self' also covers frame-src by fallback, so any widget
+    # iframe was blocked too, and connect-src blocked its API calls.
+    #
+    # Scoped to the vendor's own origins, never a wildcard: this CSP is the last
+    # thing standing between a third-party script and a page showing signed-in
+    # customer data. If the widget still fails, read the console for the exact
+    # blocked origin and add THAT, rather than loosening a directive.
+# frame-src is now explicit because relying on the default-src fallback
+    # would silently re-block the widget the next time default-src changes.
+    #
+    # Scope verified by reading the 414KB bundle on 2026-07-29, not assumed:
+    # it resolves its API base as new URL(script.src).origin, which is
+    # app.askmywebsiteai.com, and it creates no iframe, no WebSocket and no
+    # EventSource. So no wss: entry is needed. The apex askmywebsiteai.com
+    # appears only as a target=_blank footer link, which is navigation and
+    # needs no CSP allowance. Note a CSP wildcard does NOT match the apex, so
+    # if the vendor ever moves the API there it must be listed explicitly.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com"
 
 [[redirects]]
   from = "/*"

@@ -34,5 +34,28 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- askmywebsiteai — in-dashboard support assistant, added 2026-07-29.
+         Placed before </body> rather than in <head>, and marked async, so a slow
+         or unreachable vendor cannot delay first paint of the app itself. The
+         keys are publishable by design (app id + pk_live), meant to sit in
+         client code, so they are not a secret and this repo being public does
+         not change that.
+
+         REQUIRES the CSP allowances in netlify.toml. Without them the browser
+         blocks this file before a line of it executes and the only symptom is a
+         console message. If this widget ever stops appearing, check the CSP
+         first, not the vendor.
+
+         It loads on EVERY route including the login screen, so it is present
+         for signed-out visitors and for admins as well as customers. That is
+         the vendor's supported install and the simplest thing that works; gate
+         it behind auth from React if that turns out to matter. -->
+    <script
+      async
+      src="https://app.askmywebsiteai.com/sdk.js"
+      data-app-id="app_a16a65082c9e13c7"
+      data-public-key="pk_live_352f98333e403138c8f2a64432ffe776">
+    </script>
   </body>
 </html>
