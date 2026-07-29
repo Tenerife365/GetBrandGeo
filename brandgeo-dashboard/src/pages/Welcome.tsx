@@ -1,20 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Building2, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useTheme } from '../lib/themeContext'
+import BrandGeoMark from '../components/BrandGeoLogo'
 
 function BrandGeoLogo() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  return (
-    <div className="flex items-center gap-2.5">
-      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '40px', width: 'auto', display: 'block' }} />
-      <span className="text-2xl font-bold tracking-tight">
-        <span className={isDark ? 'text-white' : 'text-slate-900'}>Brand</span>
-        <span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-      </span>
-    </div>
-  )
+  return <BrandGeoMark size="xl" />
 }
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'

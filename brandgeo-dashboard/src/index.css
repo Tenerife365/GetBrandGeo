@@ -11,7 +11,14 @@
 
   --text-base:    241 245 249;
   --text-secondary: 148 163 184;
-  --text-muted:   100 116 139;
+  /* --text-muted DELETED 2026-07-29. It was declared in both themes and read by
+     nothing (zero references anywhere in src/, tailwind.config.js, tests/ or
+     netlify/), and its value rgb(100 116 139) is 4.01:1 on --dark-900, which is
+     the exact value the .text-slate-500 rule further down exists to remap AWAY
+     from for failing AA. A dead token that encodes a known-failing value is a
+     trap: the next person who wants a third text tier reaches for the token
+     with the right name and ships 4.01:1. If a third tier is ever needed,
+     declare it with a measured value rather than resurrecting this one. */
 
   /* Motion timing tokens (DASHBOARD-UX-2026.md §3 Phase A). Mirrored as plain
      numbers in src/lib/motion.ts for the JS-driven (Motion library) side —
@@ -71,7 +78,7 @@ html.light {
 
   --text-base:    15 23 42;
   --text-secondary: 71 85 105;
-  --text-muted:   100 116 139;
+  /* --text-muted deleted here too; see the note in :root. */
 
   /* Shell tokens, light mode (§3 A1-A7). Light mode gets its own rail-accent
      step and its own active-surface treatment — see §4.2 for why each theme
@@ -135,13 +142,28 @@ html.light .text-brand-100   { color: rgb(15 23 42)   !important; }
 html.light .text-brand-200   { color: rgb(15 23 42)   !important; }
 html.light .text-brand-300   { color: rgb(109 40 217) !important; }
 html.light .text-brand-400   { color: rgb(109 40 217) !important; }
-html.light .text-emerald-400 { color: rgb(5 150 105) !important; }
+/* CORRECTED 2026-07-29 (was rgb(5 150 105), emerald-600). That value measured
+   3.77:1 on white, 3.53:1 on the page and 3.58:1 on its own emerald tint, i.e.
+   it failed AA on every surface it could render on, across ~52 call sites in 17
+   files - the largest text-contrast failure in this file. emerald-700 #047857
+   is not a new colour decision: .text-emerald-300 and .text-emerald-500/70
+   below already resolve to it. Now 5.48 / 5.13 / 5.21.
+   Consequence for design: light mode's emerald 300/400/500 now all land on one
+   value, so any emphasis step encoded by picking -400 over -300 is flat in
+   light mode. That is a ladder question, not a contrast one - see the report. */
+html.light .text-emerald-400 { color: rgb(4 120 87) !important; }
 html.light .text-red-400     { color: rgb(220 38 38) !important; }
 html.light .text-amber-400   { color: rgb(180 83 9) !important; }
 html.light .text-amber-300   { color: rgb(180 83 9) !important; }
 html.light .text-blue-300    { color: rgb(29 78 216) !important; }
 html.light .text-purple-300  { color: rgb(109 40 217) !important; }
-html.light .text-cyan-400    { color: rgb(8 145 178) !important; }
+/* CORRECTED 2026-07-29 (was rgb(8 145 178), cyan-600): 3.68:1 on white, 3.45:1
+   on the page, 3.29:1 on the cyan tint. text-cyan-400 currently has ZERO call
+   sites (only text-cyan-300 is used), so this is a no-op visually and is being
+   fixed precisely because it is dead: a dead override holding a failing value
+   is a landmine for whoever adds the first text-cyan-400 next month. cyan-700
+   #0e7490 is the value .text-cyan-300 below already uses. Now 5.36 / 5.01. */
+html.light .text-cyan-400    { color: rgb(14 116 144) !important; }
 
 /* CTA contrast fix (both themes): bg-brand-500 (#8b5cf6) + white text = 4.23:1,
    fails 4.5:1 AA at button-label sizes (14px medium/semibold — not "bold large
@@ -161,15 +183,20 @@ html.light .text-cyan-400    { color: rgb(8 145 178) !important; }
 html.light .bg-brand-500.text-white,
 html.light .bg-brand-600.text-white { color: #ffffff !important; }
 
-html.light .border-dark-700  { border-color: rgb(234 233 242) !important; }
-html.light .border-dark-600  { border-color: rgb(216 214 230) !important; }
+/* These two only exist to raise priority with !important. The utilities
+   themselves are already `rgb(var(--dark-700) / <alpha-value>)` from
+   tailwind.config.js, so they track the token in both themes. Read the token
+   rather than restating its light value, otherwise a change to --dark-700
+   moves the utility and leaves these two behind. */
+html.light .border-dark-700  { border-color: rgb(var(--dark-700)) !important; }
+html.light .border-dark-600  { border-color: rgb(var(--dark-600)) !important; }
 
 html.light input,
 html.light textarea,
 html.light select {
-  background-color: rgb(247 247 251);
-  color: rgb(15 23 42);
-  border-color: rgb(216 214 230);
+  background-color: rgb(var(--dark-900));
+  color: rgb(var(--text-base));
+  border-color: rgb(var(--dark-600));
 }
 
 html.light input::placeholder,
@@ -180,9 +207,14 @@ html.light textarea::placeholder {
 /* Brand-tinted sidebar (light mode) — a faint violet wash instead of plain
    white, so the nav anchors the layout and keeps the brand present. Depth
    order reads sidebar (deepest) < page < white cards. Specificity of
-   `html.light aside` beats the `.bg-dark-800` utility, so no !important needed. */
+   `html.light aside` beats the `.bg-dark-800` utility, so no !important needed.
+
+   Reads --surface-nav rather than repeating its value. The token at the top of
+   this file was DERIVED from this rule (see its own comment, "unchanged from
+   the pre-existing html.light aside rule"), so the literal here was the second
+   copy of that number, not the source of it. */
 html.light aside {
-  background-color: rgb(236 234 246);
+  background-color: rgb(var(--surface-nav));
 }
 
 /* ---------------------------------------------------------------------------
@@ -252,6 +284,132 @@ html.light .text-red-400\/70     { color: #dc2626 !important; }
 html.light .text-amber-400\/80   { color: #b45309 !important; }
 html.light .text-emerald-500\/70 { color: #047857 !important; }
 
+/* ---------------------------------------------------------------------------
+   Light-mode accent text, second pass (2026-07-29).
+
+   The pass above covered the families that existed when it was written. Every
+   class below was measured as having NO html.light override at all, so it kept
+   its DARK value on a white card and failed AA badly. Each value here is a
+   computed choice, not an eyeball: sRGB relative-luminance contrast against the
+   ACTUAL composited surface each class renders on, floor 4.5:1 for text.
+
+   Two rules learned the hard way while measuring this, both of which contradict
+   the obvious move:
+
+   1. "One step darker, same shade offset as the red family" is NOT safe.
+      text-red-400 maps to red-600 #dc2626, so rose-400 -> rose-600 #e11d48
+      looks like the answer. It measures 4.70:1 on a white CARD but 4.40:1 on
+      the PAGE (--dark-900 is #f7f7fb, not white) and 4.13 / 3.85 / 3.37 on the
+      rose-500/10, /15 and /25 fills the class actually co-renders with. Four of
+      its five real surfaces fail. Always measure against the composited
+      surface, never against #ffffff as a stand-in for "light mode".
+   2. The rose fills have no light override, so bg-rose-500/NN alpha-composites
+      over white. That is fine and is left alone: /10 lands on rgb(254 236 239)
+      and /15 on rgb(253 226 231), which are within a point or two of rose-50
+      and rose-100, i.e. the same pastel the red family gets handed explicitly.
+      Nothing to gain by restating them. The text is what was broken. */
+
+/* Rose = error / urgent status. NOT sentiment.
+   Kept deliberately separate from the --sentiment-* ramp: that ramp is a
+   lime/slate/rose scale chosen in ScoreBadge.tsx to be disjoint from the
+   status colours, and binding these two systems together would mean a future
+   change to "how negative sentiment looks" silently repainting every error
+   message and urgent ticket. The literal below happens to equal
+   --sentiment-negative's light value; that is a coincidence of both wanting a
+   readable dark rose, and it must stay a literal. Do not tidy it into a var().
+
+   Two steps are preserved, matching the dark theme's own emphasis order
+   (lighter = louder in dark, darker = louder in light), because -400 and -300
+   co-render: Social.tsx:1518 badges a status in -300 while :1533 sets the error
+   text under it in -400.
+     text-rose-400  rose-700 #be123c   6.29 card / 5.88 page / 5.52 /10 / 5.15 /15 / 4.50 /25
+     text-rose-300  rose-800 #9f1239   8.02 card / 7.50 page / 7.05 /10 / 6.57 /15 / 5.74 /25 */
+html.light .text-rose-400 { color: #be123c !important; }
+html.light .text-rose-300 { color: #9f1239 !important; }
+/* Tailwind emits `hover:text-rose-300` as `.hover\:text-rose-300:hover`, a
+   different class from `text-rose-300`, so the rule above does not reach it.
+   Both call sites (SEO.tsx:173, Social.tsx:1683) are delete buttons whose
+   resting colour is text-slate-500, and that class carries an !important light
+   override, which beats Tailwind's non-important hover rule outright. So the
+   turn-red-on-hover cue on a destructive control has been silently dead in
+   light mode. This restores it at 8.02:1. Specificity (0,3,0) plus !important
+   clears the resting .text-slate-500 rule's (0,2,0).
+   NOTE: this is the ONLY hover colour in the app that survives light mode; the
+   other ~70 are inert for the same reason. Fixing them all is one deliberate
+   pass, not a side effect of this one. See the report. */
+html.light .hover\:text-rose-300:hover { color: #9f1239 !important; }
+
+/* Red, the classes the first pass missed. Values follow the established red
+   mapping exactly: -400-ish -> #dc2626, -300-and-lighter -> #b91c1c.
+     text-red-500, /70, /60  #dc2626  4.83 on card (all four call sites are on
+                                      plain cards, not on a red fill)
+     text-red-200, red-300/70 #b91c1c 5.91 on the #fef2f2 red fill they sit on */
+html.light .text-red-500,
+html.light .text-red-500\/70,
+html.light .text-red-500\/60  { color: #dc2626 !important; }
+html.light .text-red-200,
+html.light .text-red-300\/70  { color: #b91c1c !important; }
+
+/* Amber needs TWO steps, unlike the first pass's single #b45309.
+   The -400/-300/-500 tier sits on white or on the #fffbeb fill and amber-700
+   clears it comfortably. The -200/-100 tier sits on the view-as-user banner,
+   whose fill is #fef3c7 (bg-amber-500/15, already remapped above) with an Exit
+   button on bg-amber-500/25 that is NOT remapped and composites to
+   rgb(252 222 152). On that button amber-700 measures 3.84:1 and fails; on the
+   banner itself it measures 4.51:1, which clears by 0.01 and is not a margin
+   worth shipping. amber-800 #92400e clears both properly.
+     text-amber-600, -400/90, -300/80, -500/70   #b45309  5.02 card / 4.84 tint
+     text-amber-200, /70, /90, text-amber-100    #92400e  7.09 card / 6.84 #fffbeb
+                                                          6.37 banner / 5.42 Exit button */
+html.light .text-amber-600,
+html.light .text-amber-400\/90,
+html.light .text-amber-300\/80,
+html.light .text-amber-500\/70 { color: #b45309 !important; }
+html.light .text-amber-200,
+html.light .text-amber-200\/70,
+html.light .text-amber-200\/90,
+html.light .text-amber-100     { color: #92400e !important; }
+
+/* Orange: matches the existing .text-orange-300 mapping. Both call sites are
+   the same button (AIVisibility.tsx:699, resting + hover) on bg-dark-700/50,
+   which composites to rgb(241 240 247). 4.57:1 there, 5.18:1 on a plain card. */
+html.light .text-orange-300\/90,
+html.light .text-orange-200    { color: #c2410c !important; }
+
+/* Emerald: #047857, NOT the #059669 the .text-emerald-400 rule used to carry.
+   See the correction note on that rule above for why emerald-600 fails.
+     text-emerald-500, -400/90, -400/80   #047857   5.48 card / 5.21 emerald tint */
+html.light .text-emerald-500,
+html.light .text-emerald-400\/90,
+html.light .text-emerald-400\/80 { color: #047857 !important; }
+
+/* Blue: blue-700, matching .text-blue-300, rather than the blue-600 #2563eb
+   that the "one step darker" reflex suggests. blue-600 clears white at 5.17:1
+   but measures 4.24:1 on the #dbeafe badge fill and 4.35:1 on bg-blue-500/15,
+   and half of this class's six call sites are exactly those badges
+   (ScoreBadge.tsx:6, Recommendations.tsx:233).
+     text-blue-400  #1d4ed8   6.70 card / 5.49 #dbeafe / 5.64 blue-500/15 */
+html.light .text-blue-400  { color: #1d4ed8 !important; }
+
+/* Violet: the same #6d28d9 the .text-brand-400 rule already uses. This is not a
+   judgement call - tailwind.config.js defines brand-400 as #a78bfa, which IS
+   violet-400, so text-violet-400 and text-brand-400 are the identical colour
+   wearing two class names and had two different light-mode fates.
+     text-violet-400  #6d28d9   7.10 card / 6.29 on bg-violet-500/10 */
+html.light .text-violet-400 { color: #6d28d9 !important; }
+
+/* Sky: matches .text-sky-300. sky-600 #0284c7 would not clear its own badge.
+     text-sky-400  #0369a1   5.93 card / 5.12 on bg-sky-500/15 */
+html.light .text-sky-400 { color: #0369a1 !important; }
+
+/* Slate at fractional alpha. Written as a literal on purpose, exactly as
+   .text-slate-400 above is: the DARK side of every slate remap comes from
+   Tailwind's default palette and not from any token in this file, so binding
+   only the light side to a token name would let the two themes fork silently
+   the first time that token moved.
+     text-slate-400/80  rgb(71 85 105)   7.58 on card (was 2.08) */
+html.light .text-slate-400\/80 { color: rgb(71 85 105) !important; }
+
 /* Engine label colors (ENGINE_META) — DELETED (dashboard-visual-system.md A11).
    ENGINE_META's colour and bg fields no longer exist: engine chips carry identity via
    an 8px swatch in ENGINE_META[id].chartColor, plain text-token text, per §8.4.
@@ -280,11 +438,16 @@ html.light .border-slate-700\/30 { border-color: rgb(203 213 225) !important; }
    The thumb value is fixed rather than themed: --dark-600 was 1.7-1.8:1 (dark)
    / 1.4:1 (light) against its own track, failing the 3:1 non-text/UI-component
    minimum (WCAG 1.4.11) in BOTH themes. rgb(100 116 139) clears 3:1 against
-   every surface in both — 3.75:1 on dark-800, 4.01:1 on dark-900, 4.76:1 on
-   white — so no theme swap is needed. */
+   every surface in both (3.75:1 on dark-800, 4.01:1 on dark-900, 4.76:1 on
+   white), so no theme swap is needed.
+
+   That value is --border-nav, which is declared identically in :root and
+   html.light for exactly this reason and whose own comment already names the
+   scrollbar thumb as its twin. It was written out as a literal in three places
+   here; all three now read the token, so the two cannot drift apart. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(100 116 139) transparent;
+  scrollbar-color: rgb(var(--border-nav)) transparent;
 }
 
 /* Safari-only: it has no scrollbar-color support, so these WebKit pseudo-
@@ -294,7 +457,7 @@ html.light .border-slate-700\/30 { border-color: rgb(203 213 225) !important; }
    `border-radius` here never take effect there — dropped rather than left as
    dead declarations that read as though they did something. */
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgb(100 116 139); }
+::-webkit-scrollbar-thumb { background: rgb(var(--border-nav)); }
 ::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
 
 @layer utilities {
@@ -302,7 +465,7 @@ html.light .border-slate-700\/30 { border-color: rgb(203 213 225) !important; }
      produce the same result everywhere, so new code needn't reach for it. */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgb(100 116 139) transparent;
+    scrollbar-color: rgb(var(--border-nav)) transparent;
   }
 
   /* iOS safe-area padding for bottom nav */
@@ -358,14 +521,17 @@ html.light .bg-dark-800.rounded-card {
    default happened to be — inconsistent, and low-contrast on the dark theme.
    :focus-visible (not :focus) so mouse/touch clicks don't show a ring, only
    real keyboard/AT navigation does. Brand-400 for contrast against both
-   dark-900/dark-800 surfaces and light-mode surfaces. */
+   dark-900/dark-800 surfaces and light-mode surfaces.
+
+   The two literals this used to carry, rgb(167 139 250) dark and
+   rgb(124 58 237) light, were --rail-active's two values written out a second
+   time, so the ring and the active-nav rail could drift apart despite being
+   the same design decision. Reading the token collapses the theme fork: the
+   html.light override this rule needed is now redundant and is gone. */
 :focus-visible {
-  outline: 2px solid rgb(167 139 250);
+  outline: 2px solid rgb(var(--rail-active));
   outline-offset: 2px;
   border-radius: 2px;
-}
-html.light :focus-visible {
-  outline-color: rgb(124 58 237);
 }
 /* Rings on already-round elements (pills, avatars, toggle chips) look better
    following the shape than a boxy outline. */

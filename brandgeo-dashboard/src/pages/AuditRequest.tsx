@@ -13,6 +13,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Loader2 } from 'lucide-react'
+import BrandGeoMark from '../components/BrandGeoLogo'
 
 export default function AuditRequest() {
   const navigate = useNavigate()
@@ -51,12 +52,7 @@ export default function AuditRequest() {
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <img src="/logo.png" alt="BrandGEO" style={{ height: 36, width: 'auto' }} />
-            <span className="font-bold text-xl text-white">
-              Brand<span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-            </span>
-          </div>
+          <BrandGeoMark size="lg" className="mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Free Instant AI Visibility Audit</h1>
           <p className="text-sm text-slate-400">
             See whether ChatGPT, Gemini, and other AI assistants actually mention your business when people ask for recommendations — in about a minute.

@@ -13,6 +13,7 @@ import { hasFeature } from '../lib/planConfig'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
+import BrandGeoMark from './BrandGeoLogo'
 import ClientBanner from './ClientBanner'
 import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
@@ -23,24 +24,17 @@ import type { TimeRange } from '../lib/timeFilterContext'
 
 // The wordmark is a link to Overview in both shells (sidebar + mobile header).
 // It used to be an inert <div>, so the most-clicked "take me home" affordance on
-// the web did nothing here. img alt is empty on purpose: the wordmark text that
-// follows already names the brand, and the link carries its own aria-label.
+// the web did nothing here. The mark itself is aria-hidden inside BrandGeoLogo:
+// the wordmark text already names the brand, and the link carries its own label.
+// 'md' is the 32px website-parity size, matching brandgeo/web/index.html's .logo.
 function BrandGeoLogo({ onNavigate }: { onNavigate?: () => void }) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
   return (
-    <NavLink
+    <BrandGeoMark
+      size="md"
       to="/"
       onClick={onNavigate}
-      aria-label="BrandGEO — go to Overview"
-      className="flex items-center gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-    >
-      <img src="/logo.png" alt="" style={{ height: '32px', width: 'auto', display: 'block' }} />
-      <div className="leading-none">
-        <span className={`font-bold text-base tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Brand</span>
-        <span className="font-bold text-base tracking-tight" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-      </div>
-    </NavLink>
+      ariaLabel="BrandGEO: go to Overview"
+    />
   )
 }
 

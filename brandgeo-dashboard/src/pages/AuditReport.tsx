@@ -13,9 +13,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Loader2, AlertTriangle, TrendingUp, Mail } from 'lucide-react'
 import { SentimentDot } from '../components/ScoreBadge'
+import BrandGeoMark from '../components/BrandGeoLogo'
 
 type ReportStatus = 'pending' | 'generating_prompts' | 'collecting' | 'ready' | 'error'
 
@@ -126,12 +127,7 @@ export default function AuditReport() {
   return (
     <div className="min-h-screen bg-dark-900 px-4 py-10">
       <div className="max-w-2xl mx-auto">
-        <Link to="/audit" className="inline-flex items-center gap-2 mb-6">
-          <img src="/logo.png" alt="BrandGEO" style={{ height: 28, width: 'auto' }} />
-          <span className="font-bold text-base text-white">
-            Brand<span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-          </span>
-        </Link>
+        <BrandGeoMark size="sm" to="/audit" className="mb-6" />
 
         {loadError && (
           <div className="bg-dark-800 border border-red-500/20 rounded-xl p-6 text-sm text-red-400 flex items-center gap-2">
