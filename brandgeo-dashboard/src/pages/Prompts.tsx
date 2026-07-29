@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle, Lock } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
@@ -7,6 +7,7 @@ import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
 import { PageTitle, SectionHeading } from '../components/Typography'
+import { PLAN_PROMPTS, PLAN_LABELS, type Plan } from '../lib/planConfig'
 
 // Category is a grouping, not an alert — one quiet neutral chip everywhere, and
 // the label comes from the shared general taxonomy (lib/promptCategories.ts).
@@ -49,10 +50,16 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, isAdmin } = useClient()
   const brandName = activeClient?.name
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
+  // Cap is read from the DB (plan_prompt_caps) rather than from PLAN_PROMPTS,
+  // so the number shown here is the number the trigger actually enforces. The
+  // planConfig value is only a fallback for demo mode and for the moment before
+  // the fetch resolves. See db/supabase-prompt-cap-migration.sql.
+  const [cap, setCap] = useState<number | null>(null)
+  const [capError, setCapError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState<string>('all')
   const [editId, setEditId] = useState<number | null>(null)
@@ -159,6 +166,30 @@ export default function Prompts() {
   }
 
   useEffect(() => { load() }, [activeClientId])
+
+  // Plan prompt cap. Falls back to PLAN_PROMPTS if the table is not there yet
+  // (the migration is applied separately), so this page never breaks on a
+  // missing table — it just stops showing a cap.
+  useEffect(() => {
+    const plan = (activeClient?.plan ?? 'free') as Plan
+    if (isDemoMode) { setCap(PLAN_PROMPTS[plan] ?? null); return }
+    supabase
+      .from('plan_prompt_caps')
+      .select('prompt_cap')
+      .eq('plan', plan)
+      .maybeSingle()
+      .then(({ data }) => setCap(data?.prompt_cap ?? PLAN_PROMPTS[plan] ?? null))
+  }, [activeClient?.plan])
+
+  // Only ACTIVE prompts consume the allowance — same rule the DB trigger uses.
+  // `prompts` is already filtered to is_active in load().
+  const used = prompts.length
+  const atCap = cap !== null && used >= cap
+  // Admins may deliberately exceed a customer's cap (the trigger lets them
+  // through too). isAdmin is false while an admin is viewing-as-customer, which
+  // is correct: that mode exists to show what the customer sees.
+  const capBlocks = atCap && !isAdmin
+  const remaining = cap === null ? Infinity : Math.max(0, cap - used)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, suggestions])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
@@ -178,11 +209,19 @@ export default function Prompts() {
   const deletePrompt = async (id: number) => {
     if (!isDemoMode) await supabase.from('prompts').delete().eq('id', id)
     setPrompts(prev => prev.filter(p => p.id !== id))
+    setCapError(null)   // a deletion is what unblocks a capped client
   }
 
-  const addPrompt = async (text?: string) => {
+  const addPrompt = async (text?: string): Promise<boolean> => {
     const promptText = (text ?? newText).trim()
-    if (!promptText) return
+    if (!promptText) return false
+    // Client-side check is a courtesy, not the limit — the real one is the
+    // enforce_prompt_cap() trigger, which is why the insert error below is
+    // handled rather than assumed away.
+    if (capBlocks) {
+      setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`)
+      return false
+    }
     // Category is auto-assigned from the prompt text (general taxonomy), not
     // chosen by the user — clients are diverse, so the old per-client picker is
     // gone. See lib/promptCategories.ts.
@@ -190,28 +229,51 @@ export default function Prompts() {
     setSaving(true)
     const position = prompts.length + 1
     if (!isDemoMode) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('prompts')
         .insert({ text: promptText, category: cat, position, client_id: activeClientId })
         .select()
         .single()
+      if (error) {
+        // The trigger raises with this token when the plan cap is hit. Anything
+        // else is a real failure and is shown verbatim rather than swallowed —
+        // this insert used to discard its error entirely, so a rejected write
+        // just silently did nothing.
+        setCapError(
+          error.message.includes('prompt_cap_reached')
+            ? `Your plan allows ${cap ?? '—'} active prompts. Delete one to add another, or upgrade.`
+            : `Could not add prompt: ${error.message}`
+        )
+        setSaving(false)
+        return false
+      }
       if (data) setPrompts(prev => [...prev, data])
     } else {
       setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
+    setCapError(null)
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
+    return true
   }
 
   const addSuggestion = async (s: SuggestedPrompt, idx: number) => {
-    await addPrompt(s.text)
-    setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
+    const ok = await addPrompt(s.text)
+    if (ok) setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
   }
 
   const addAllSuggestions = async () => {
-    const toAdd = suggestions.filter(s => !s.added && !prompts.some(p => p.text === s.text))
-    for (const s of toAdd) await addPrompt(s.text)
-    setSuggestions(prev => prev.map(s => ({ ...s, added: true })))
+    const toAdd = suggestions
+      .filter(s => !s.added && !prompts.some(p => p.text === s.text))
+      // Take only what fits. Without this, "Add all" on a 12-prompt suggestion
+      // list for a Free tenant fires 12 inserts, 7 of which the trigger rejects,
+      // and the user gets seven identical error messages for one action.
+      .slice(0, isAdmin ? undefined : remaining)
+    const addedText = new Set<string>()
+    for (const s of toAdd) {
+      if (await addPrompt(s.text)) addedText.add(s.text)
+    }
+    setSuggestions(prev => prev.map(s => (addedText.has(s.text) ? { ...s, added: true } : s)))
   }
 
   const sendMessage = async () => {
@@ -291,7 +353,14 @@ export default function Prompts() {
       <div className="mb-8 flex items-start justify-between">
         <div>
           <PageTitle>{t.pr_title}</PageTitle>
-          <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {cap === null || cap >= 100000
+              ? fmt(t.pr_titleCount, { n: used })
+              : <>
+                  <span className={atCap ? 'text-amber-300 font-medium' : ''}>{used} of {cap}</span>
+                  <span> prompts used on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}</span>
+                </>}
+          </p>
         </div>
         {/* Prompt management is available to any signed-in user for THEIR OWN
             client — not admin-only. This used to be gated behind `isAdmin`,
@@ -315,14 +384,52 @@ export default function Prompts() {
             {t.pr_aiDiscover}
           </button>
           <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-dark-700 text-slate-300 hover:bg-dark-600 transition-colors border border-dark-600"
+            onClick={() => (capBlocks ? setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
+            aria-disabled={capBlocks}
+            title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors border ${
+              capBlocks
+                ? 'bg-dark-800 text-slate-500 border-dark-700 cursor-not-allowed'
+                : 'bg-dark-700 text-slate-300 hover:bg-dark-600 border-dark-600'
+            }`}
           >
-            <Plus size={14} />
+            {capBlocks ? <Lock size={14} /> : <Plus size={14} />}
             {t.pr_addPrompt}
           </button>
         </div>
       </div>
+
+      {/* Plan cap notice. Two distinct states: a customer who is blocked and
+          needs to know the way out (delete one), and an admin who is over a
+          customer's cap on purpose and needs to know they are. */}
+      {atCap && (
+        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+          capBlocks
+            ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+            : 'border-brand-500/30 bg-brand-500/10 text-brand-200'
+        }`}>
+          {capBlocks ? (
+            <>
+              <strong>You have used all {cap} prompts on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}.</strong>{' '}
+              Delete a prompt you no longer track to add a new one, or upgrade for more.
+            </>
+          ) : (
+            <>
+              <strong>This client is at its plan limit ({used} of {cap}).</strong>{' '}
+              You can add beyond it as an admin. The customer cannot.
+            </>
+          )}
+        </div>
+      )}
+
+      {capError && (
+        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
+          <span>{capError}</span>
+          <button onClick={() => setCapError(null)} aria-label="Dismiss" className="text-red-300/70 hover:text-red-200">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Dynamic category filter — shows only categories that exist in this client's prompts */}
       {usedCategories.length > 0 && (
