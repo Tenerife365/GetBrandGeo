@@ -98,16 +98,29 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Type pairing, 2026-07-28. Inter was the whole page and it is the single
-       most generic face in software, which is most of why the page read as
-       bland. Instrument Serif carries the display voice: high stroke contrast,
-       editorial, and it signals "we publish original research", which is what
-       actually differentiates BrandGEO from every competitor running a
-       geometric sans. Geist carries UI and body: sharp, technical, real tabular
-       figures for the score readouts. Both are on Google Fonts, so the existing
-       CSP (style-src fonts.googleapis.com, font-src fonts.gstatic.com) already
-       permits them and nothing in .htaccess needs to change. -->
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Type pairing, revised 2026-07-29.
+       Instrument Serif carries the display voice: high stroke contrast,
+       editorial, and it signals "we publish original measured research", which
+       is what differentiates BrandGEO from every competitor running a geometric
+       sans. Inter carries UI and body.
+
+       History, because this exact pairing was rejected once. On 2026-07-28 the
+       serif display was tried against GEIST and reverted the same day for two
+       reasons: it read as disconnected from the Geist UI around it, and the
+       italic lockup broke across a line. Both are now void. The italic was
+       already replaced with an upright gradient em (see .hero h1 em), and the
+       UI face is no longer Geist.
+
+       Why Inter and not Geist for UI: measured 2026-07-29, this page was the
+       ONLY one of 82 loading Geist. 56 loaded Inter and 25 loaded no webfont at
+       all, declaring Segoe UI, so every research article rendered differently
+       per OS. Moving this page to Inter and fixing those 25 puts all 82 on one
+       body face. Owner's call, same day.
+
+       Both families are on Google Fonts, so the existing CSP (style-src
+       fonts.googleapis.com, font-src fonts.gstatic.com) already permits them
+       and nothing in .htaccess changes. -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Serif&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -227,7 +240,7 @@
     body {
       background: var(--bg);
       color: var(--t);
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       transition: background .3s, color .3s;
@@ -479,22 +492,35 @@
          Floor lowered from 2.85rem: measured at 375x812 the old floor took
          three lines and 142px and pushed the score evidence below the fold
          (homepage-hook.md §2.2). Two lines at both widths is the constraint. */
-      /* Instrument Serif, 2026-07-28. A display serif against a technical
-         grotesk is the differentiating move here: every competitor in AI search
-         runs a geometric sans, and BrandGEO's actual moat is that it publishes
-         original measured research. Editorial voice, editorial typeface.
-         Weight is 400 because the family ships one weight; authority comes from
-         size and stroke contrast, not from bolding. The old 900 would have
-         synthesised a fake bold. Tracking relaxed from -.055em, which was tuned
-         for Inter's tight sans fit and would collide serifs. */
-      /* Serif display was tried on 2026-07-28 and reverted the same day: it read
-         as disconnected from the Geist UI around it, and the italic lockup broke
-         across a line ("your" / "brand"). One family, worked hard, beats two
-         that argue. Geist carries it at weight 800. */
-      font-size: clamp(2.2rem, 6.4vw, 3.5rem);
-      font-weight: 800;
-      line-height: 1.06;
-      letter-spacing: -.045em;
+      /* Instrument Serif, RESTORED 2026-07-29. A display serif against a
+         technical grotesk is the differentiating move here: every competitor in
+         AI search runs a geometric sans, and BrandGEO's moat is that it
+         publishes original measured research. Editorial voice, editorial face.
+
+         This was tried on 2026-07-28 and reverted the same day, for two
+         reasons, BOTH of which are now void:
+           1. "read as disconnected from the Geist UI around it" — the UI face
+              is Inter now, and a display serif over Inter is a conventional,
+              well-tested pairing in a way it never was over Geist.
+           2. "the italic lockup broke across a line" — already fixed
+              independently; .hero h1 em is upright, see the rule below.
+         If it is reverted a second time, record the reason here and stop
+         re-litigating it.
+
+         Weight is 400 because the family ships ONE weight. Asking for 800 makes
+         the browser synthesise a fake bold, which smears the stroke contrast
+         that is the entire reason for using it. Authority comes from size.
+         Size floor raised 2.2 -> 2.5rem and the ceiling 3.5 -> 3.9rem because a
+         serif's smaller x-height reads optically smaller at the same px.
+         Tracking relaxed -.045em -> -.005em: the old value was tuned for
+         Inter's tight sans fit and collides serifs.
+         The two-lines-at-both-widths constraint from homepage-hook.md §2.2
+         still governs; re-measure at 375x812 before changing the clamp. */
+      font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+      font-size: clamp(2.5rem, 6.8vw, 3.9rem);
+      font-weight: 400;
+      line-height: 1.08;
+      letter-spacing: -.005em;
       margin-bottom: 22px;
       color: var(--t);
     }
@@ -584,7 +610,7 @@
       outline: none;
       font-size: 0.95rem;
       color: var(--t);
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       padding: 10px 0;
     }
     .search-inner input::placeholder { color: var(--t2); }
@@ -600,7 +626,7 @@
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       flex-shrink: 0;
       transition: opacity .15s, transform .1s;
       letter-spacing: -.01em;
@@ -710,7 +736,7 @@
       padding: 11px 14px;
       font-size: 0.88rem;
       color: var(--t);
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       outline: none;
     }
     .audit-email-row input:focus { border-color: var(--ac); }
@@ -728,7 +754,7 @@
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       transition: opacity .15s, transform .1s;
     }
     .audit-email-btn:hover { opacity: .9; transform: scale(.98); }
@@ -762,7 +788,7 @@
       border-radius: 20px;
       font-size: 0.8rem;
       font-weight: 500;
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       cursor: pointer;
       appearance: none;
       -webkit-appearance: none;
@@ -1509,7 +1535,7 @@
       font-size: 0.9rem;
       width: 100%;
       outline: none;
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       transition: border-color .2s;
     }
     input:focus, textarea:focus, select:focus { border-color: var(--ac); }
@@ -1521,7 +1547,7 @@
       border: none; padding: 15px;
       border-radius: 10px; font-size: 0.95rem; font-weight: 700;
       cursor: pointer;
-      font-family: 'Geist', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       transition: opacity .15s;
     }
     .submit-btn:hover { opacity: .9; }
