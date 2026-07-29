@@ -386,10 +386,42 @@ The service-account JSON costs ~2.3KB of a 4KB budget for that.
 4. 22 sitemap URLs are unsubmitted (`sitemap_pings` last wrote 2026-07-19
    05:07 UTC, 57 rows). These are the 20 US city pages plus two.
 
-**Open, owner `bg-backend`:** make Google optional rather than a hard dependency
-so IndexNow runs standalone. Three touch points, all above. Worth bundling with
-R1 (`collection-worker-background.js:35-43` fail-open, latent not live —
-Constantin confirmed `INTERNAL_AUDIT_KEY` IS set in Netlify 2026-07-28).
+> ✅ **CLOSED. Items 1 to 4 above are STALE and were already fixed by `933dd6a`
+> (2026-07-28), which this file never recorded.** Verified independently against
+> production on 2026-07-29, not taken from the commit message:
+>
+> - `job_runs` for `ping-sitemap`: **2026-07-28 05:10 `ok=false`**
+>   `{"error":"NO_CREDENTIALS","stage":"google_auth","changed":22}`, then
+>   **2026-07-29 05:10 `ok=true`**
+>   `{"pinged":22,"indexnowOk":22,"googleOk":0,"google_skipped":"NO_CREDENTIALS"}`.
+>   The last run under the old code failed, the first under the new code
+>   succeeded.
+> - `sitemap_pings` is at **79 rows** (was 57), `last_pinged_at` 2026-07-29
+>   05:10 UTC, and **22 rows written in the last two days** — exactly the 22
+>   stuck URLs.
+> - `cron.job` id 5 `ping-sitemap` `10 5 * * *` is `active = true`. It was never
+>   unscheduled, so the suggested `cron.unschedule` stopgap was never needed.
+>   To pause it in future use `cron.alter_job(job_id => 5, active => false)`,
+>   NOT `cron.unschedule`, which deletes the row.
+>
+> Google is now optional at all three touch points, IndexNow runs and is
+> reported independently, and a Google-absent run is a SUCCESS rather than a
+> logged failure.
+>
+> **A cycle was wasted on this**: an agent was dispatched on 2026-07-29 to build
+> a fix that already existed, because this backlog entry was believed over the
+> commit history. Check `git log -- <file>` before briefing any backlog item in
+> this file.
+>
+> **One real gap remains, worth a decision.** `job_runs.ok` is `true` whenever a
+> submitter was merely CONFIGURED, even if every submission failed. It does not
+> distinguish "pinged 22 URLs" from "pinged 0". `pinged` / `indexnowOk` in
+> `detail` carry that signal; `ok` does not. Only a both-credentials-absent run
+> returns 500. That undercuts the observability packet `012` was built for.
+
+**Still open, owner `bg-backend`:** R1, `collection-worker-background.js:35-43`
+fail-open, latent not live (Constantin confirmed `INTERNAL_AUDIT_KEY` IS set in
+Netlify 2026-07-28).
 
 #### Live exposure
 
@@ -894,6 +926,14 @@ Force Refresh deletes ALL rows (including error rows) before re-collecting.
 ## 2. Current Limitations
 
 ### 2.1 `analyseResponse` Duplication
+> ⚠️ **STALE, verified 2026-07-29. This limitation no longer exists.** The
+> extraction happened: `analyseResponse` is defined exactly once, in
+> `netlify/functions/_analysis.js:738` (exported at `:874`), and is required by
+> `_collect.js`, which the three HTTP collectors are now thin wrappers over.
+> `grep -c "^function analyseResponse"` returns 0 for `collect-prompt.js`,
+> `collect-claude.js` and `collect-chatgpt.js`, and 1 for `_analysis.js`. The
+> paragraph below describes the pre-`_collect.js` architecture.
+
 The full analysis function is **copy-pasted** into all three collect functions (`collect-chatgpt.js`, `collect-claude.js`, `collect-prompt.js`). Changes must be made in three places. **Fix:** extract to a shared `_analysis.js` helper (not yet done).
 
 ### 2.2 Netlify Hard Timeout (26s)
