@@ -193,9 +193,16 @@ async function callGemini(prompt, ctx, opts) {
   return { text: null, ...last }
 }
 
-// ─── OpenRouter — Perplexity (web search built-in) and Meta (training data) ────
-// (verbatim from collect-prompt.js)
-async function callOpenRouter(model, prompt, ctx) {
+// ─── OpenRouter — Perplexity (search built-in) and Grok (search via plugin) ────
+// (verbatim from collect-prompt.js, plus the web plugin + real-cost metering)
+//
+// opts.web — attach OpenRouter's `web` plugin. Perplexity/sonar does NOT need
+// it (Sonar bundles retrieval into its token price); Grok DOES, and without it
+// Grok answers from training data only, which is the exact low-signal shape
+// that got Meta AI retired on 2026-07-16. maxResults is billed per RESULT
+// ($4/1,000), so it is the main cost lever on this path — 2 results keeps a
+// Grok call near EUR 0.012 all-in.
+async function callOpenRouter(model, prompt, ctx, opts = {}) {
   if (!process.env.OPENROUTER_API_KEY) {
     console.error(`[OpenRouter:${model}] OPENROUTER_API_KEY not set — engine skipped`)
     return { text: null, errorCode: 'auth_error', detail: 'OPENROUTER_API_KEY not set' }
@@ -204,6 +211,19 @@ async function callOpenRouter(model, prompt, ctx) {
     { role: 'system', content: ctx },
     { role: 'user',   content: prompt },
   ]
+  const body = {
+    model,
+    messages,
+    max_tokens: 1000,
+    // Ask OpenRouter to return what it ACTUALLY billed. This is strictly better
+    // than modelling the price from tokens, because it already includes the web
+    // plugin's per-result fee, provider routing markups and any mid-flight price
+    // change. costForRow() prefers this over MODEL_PRICE_USD when present.
+    usage: { include: true },
+  }
+  if (opts.web) {
+    body.plugins = [{ id: 'web', max_results: opts.maxResults ?? 2 }]
+  }
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -212,7 +232,7 @@ async function callOpenRouter(model, prompt, ctx) {
       'HTTP-Referer': 'https://getbrandgeo.com',
       'X-Title':      'BrandGEO Monitor',
     },
-    body: JSON.stringify({ model, messages, max_tokens: 1000 }),
+    body: JSON.stringify(body),
   })
   const d = await r.json()
   if (d.error) {
@@ -224,8 +244,15 @@ async function callOpenRouter(model, prompt, ctx) {
   const text = d.choices?.[0]?.message?.content ?? null
   // Real token counts for metering. OpenRouter mirrors the OpenAI chat shape.
   // searches:0 — Sonar bundles search into its token price, no separate fee.
+  // costUsd is OpenRouter's own billed figure (credits charged for this call).
+  // When present it wins over token-modelled pricing in estimateCostEur().
   const usage = d.usage
-    ? { inputTokens: d.usage.prompt_tokens ?? 0, outputTokens: d.usage.completion_tokens ?? 0, searches: 0 }
+    ? {
+        inputTokens:  d.usage.prompt_tokens ?? 0,
+        outputTokens: d.usage.completion_tokens ?? 0,
+        searches:     0,
+        costUsd:      typeof d.usage.cost === 'number' ? d.usage.cost : undefined,
+      }
     : null
   if (text) {
     console.log(`[OpenRouter:${model}] ok | tokens:`, usage ? `${usage.inputTokens}in/${usage.outputTokens}out` : 'n/a', '| preview:', text.slice(0, 200))
@@ -528,6 +555,13 @@ const ENGINE_CALLERS = {
   perplexity: (p, ctx)    => callOpenRouter('perplexity/sonar', p, ctx),
   meta:       (p, ctx)    => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),
   google_ai:  (p, ctx, o) => callGoogleAiMode(p, ctx, o),
+  // Grok went live 2026-07-29 as the 6th engine, Growth PRO and up. Routed
+  // through OpenRouter rather than xAI directly for two reasons: the transport
+  // already exists and is proven, and xAI's own free-credit tier is paid for
+  // with a data-sharing opt-in that would put customer prompts into xAI's
+  // training set — not acceptable for a B2B product. web:true is load-bearing,
+  // see the note on callOpenRouter.
+  grok:       (p, ctx)    => callOpenRouter('x-ai/grok-4.5', p, ctx, { web: true }),
 }
 
 // Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
@@ -544,6 +578,7 @@ const ENGINE_TIMEOUT_MS = {
   claude:     24000,
   chatgpt:    40000,
   google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
+  grok:       22000,   // grok-4.5 + web plugin; slower than sonar, well under the wall
 }
 
 // WORKER path (collection-worker-background.js): the whole reason the queue
@@ -559,6 +594,7 @@ const ENGINE_TIMEOUT_MS_WORKER = {
   claude:     60000,
   chatgpt:    90000,
   google_ai:  45000,   // SerpApi AI Mode can be slow; generous in the 15-min worker
+  grok:       45000,
 }
 
 // Gemini's internal model-fallback budget is separate from the outer timeout

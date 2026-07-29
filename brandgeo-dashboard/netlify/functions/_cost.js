@@ -125,6 +125,7 @@ const MODEL_PRICE_USD = {
   claude:     { in: 3.00, out: 15.00 },  // claude-sonnet-4-6
   perplexity: { in: 1.00, out:  1.00 },  // perplexity/sonar via OpenRouter
   meta:       { in: 0.35, out:  0.40 },  // llama-3.1-70b, retired — historical rows only
+  grok:       { in: 2.00, out:  6.00 },  // x-ai/grok-4.5 via OpenRouter, live 2026-07-29
 }
 
 /** Flat per-call tool fees in USD (charged on top of tokens). */
@@ -148,6 +149,12 @@ const ENGINE_COST_EUR = {
   chatgpt:    0.056,   // was 0.060
   perplexity: 0.001,   // was 0.006
   meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); historical rows only
+  // grok-4.5 + OpenRouter web plugin at max_results:2. Tokens are ~EUR 0.0045
+  // ($2/$6 per 1M at the observed 500in/650out shape) and the two web results
+  // are $0.004 each. This is a FALLBACK only: every real grok row is metered
+  // from OpenRouter's own usage.cost, so this number exists for the budget gate
+  // before any data exists and should be trued up from ai_results after a week.
+  grok:       0.012,
   // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
   gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
   google_ai:  0.023,   // SerpApi mid-tier per-search; real cost is the monthly plan
@@ -193,6 +200,14 @@ const FREE_ERROR_CODES = new Set(['quota_exceeded', 'auth_error'])
  * pass it and this bills it exactly.
  */
 function estimateCostEur(llm, usage) {
+  // PROVIDER-REPORTED COST WINS. OpenRouter returns what it actually charged
+  // (usage.cost, requested via `usage: { include: true }`), which already
+  // includes the web plugin's per-result fee and any routing markup. Modelling
+  // that from tokens would be guessing at a number the provider already told
+  // us. Applies to perplexity and grok today.
+  if (usage && typeof usage.costUsd === 'number' && usage.costUsd > 0) {
+    return usage.costUsd * USD_TO_EUR
+  }
   const price = MODEL_PRICE_USD[llm]
   if (!price || !usage) return null
   const inTok  = Number(usage.inputTokens)  || 0
@@ -249,10 +264,15 @@ const PLAN_LIVE_ENGINES = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
+  // GROK IS THE 6TH ENGINE, GROWTH PRO AND UP (2026-07-29). Growth PRO vs
+  // Growth was +25 prompts and 3x AI SEO depth and nothing else once refresh
+  // frequency stopped being a differentiator; a 6th engine is the thing that
+  // makes the step legible. Grok is also the only engine with live X/Twitter
+  // retrieval, so it measures a surface none of the other five can see.
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
 }
 
 // Derived from PLAN_LIVE_ENGINES so there is ONE source of truth for the

@@ -49,10 +49,12 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   free:       ['chatgpt'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'copilot', 'deepseek', 'grok'],
+  // GROK LIVE 2026-07-29, Growth PRO and up — the 6th engine, and the step that
+  // makes Growth PRO legible. See the note in _cost.js PLAN_LIVE_ENGINES.
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'copilot', 'deepseek'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'copilot', 'deepseek'],
 }
 
 // ── Engines not built, not collecting — always "coming soon" ─────────────────
@@ -64,7 +66,12 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
 // sells and no worker collects. Presenting it as coming soon, alongside the
 // other three that have never collected, is the honest state. There is no
 // current intention to reinstate it.
-export const COMING_SOON_ENGINES = new Set<EngineId>(['meta', 'copilot', 'deepseek', 'grok'])
+// `grok` LEFT this set 2026-07-29 — it collects for real now (x-ai/grok-4.5 via
+// OpenRouter with the web plugin). `deepseek` deliberately stays: every DeepSeek
+// model on OpenRouter is retrieval-free, so it would answer from training data
+// only, which is the exact low-signal shape that got Meta AI retired. `copilot`
+// stays because Microsoft ships no public API for it at all.
+export const COMING_SOON_ENGINES = new Set<EngineId>(['meta', 'copilot', 'deepseek'])
 
 // ── All engines in display order ──────────────────────────────────────────────
 // Order is a design artefact, not just a list (dashboard-visual-system.md §8.2,
@@ -93,7 +100,7 @@ export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
   google_ai:  'growth_pro',  // AI Mode (SerpApi) is Growth PRO and up only (PRICING-STRATEGY-2026-07)
   copilot:    'pro',
   deepseek:   'pro',
-  grok:       'pro',
+  grok:       'growth_pro',  // LIVE 2026-07-29 — 6th engine, Growth PRO and up
 }
 
 // ── Engine UI metadata ────────────────────────────────────────────────────────
@@ -181,6 +188,7 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   chatgpt:    0.056,
   perplexity: 0.001,
   meta:       0.001,   // retired engine; kept for cost calc on historical rows
+  grok:       0.012,   // fallback only — real rows are metered from OpenRouter's usage.cost
   // Fixed-fee engines — accounting figures, not marginal cost. See above.
   gemini:     0.032,
   google_ai:  0.023,
@@ -289,10 +297,25 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
    already surfaces both the cooldown countdown and the budget message.
 
    free stays at 5 prompts and MONTHLY (not weekly): its EUR 0.30 budget buys
-   exactly one 1-engine run of 5 prompts. */
+   exactly one 1-engine run of 5 prompts.
+
+   REBALANCED 2026-07-29b for Grok. Growth PRO and Managed gained a 6th engine,
+   which raises their per-prompt cost from EUR 0.145 to EUR 0.157, so their
+   prompt caps come down to hold the same ~88% budget headroom as every other
+   tier: growth_pro 75 -> 70, managed/pro 250 -> 230. Deliberate trade — "6 AI
+   engines vs 5" is a stronger and more legible step up from Growth than "75
+   prompts vs 50" was, and 70 is still +40% on Growth.
+
+     plan          engines  prompts  EUR/run  weekly EUR/mo  budget   used
+     free                1      5      0.28          0.28*    0.30    93%
+     essentials          3     20      2.42         10.49    11.88    88%
+     growth              5     50      7.25         31.42    35.88    88%
+     growth_pro          6     70     10.99         47.62    53.88    88%
+     managed             6    230     36.11        156.48   180.00    87%
+   * free is monthly, not weekly. */
 export const PLAN_PROMPTS: Record<Plan, number> = {
-  free: 5, essentials: 20, growth: 50, growth_pro: 75,
-  managed: 250, pro: 250, enterprise: 100000,
+  free: 5, essentials: 20, growth: 50, growth_pro: 70,
+  managed: 230, pro: 230, enterprise: 100000,
 }
 
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
