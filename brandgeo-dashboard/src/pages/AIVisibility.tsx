@@ -215,6 +215,13 @@ export default function AIVisibility() {
   // from a dead button. lastAttempt* is the most recent attempt whatever its
   // outcome; lastOkAt is the most recent SUCCESS, which is what "checked" means
   // to a customer reading a number.
+  // `${prompt_id}:${llm}` cells where the engine ran fine but produced no answer
+  // to be present in. Only Google AI Overviews does this: Google renders an
+  // overview for some queries and not others. These are excluded from the score
+  // (see the load loop) but must NOT render as "Not checked", which is what they
+  // did when they were simply dropped, and which reads as our failure rather
+  // than as an absent Google feature.
+  const [noAnswerCells, setNoAnswerCells] = useState<Set<string>>(new Set())
   const [engineHealth, setEngineHealth] = useState<Map<LLMName, {
     lastAttemptAt: string | null
     lastAttemptFailed: boolean
@@ -304,6 +311,7 @@ export default function AIVisibility() {
     const map: ResultMap = new Map()
     const errEngines = new Set<LLMName>()
     const okEngines  = new Set<LLMName>()
+    const noAnswer   = new Set<string>()
     let latestChecked = lastChecked
     if (rData) {
       rData.forEach((r: AIResult) => {
@@ -321,7 +329,10 @@ export default function AIVisibility() {
         // explicitly (_collect.js writes the [no_ai_overview] prefix), so this
         // drops them from BOTH numerator and denominator rather than guessing.
         // Not an error: nothing failed, the question simply had no AI answer.
-        if (typeof r.response_snippet === 'string' && r.response_snippet.startsWith('[no_ai_overview]')) return
+        if (typeof r.response_snippet === 'string' && r.response_snippet.startsWith('[no_ai_overview]')) {
+          noAnswer.add(`${r.prompt_id}:${llm}`)
+          return
+        }
         if (!llmMap.has(llm)) {
           if (r.status === 'error') {
             // Track error but exclude from analysis — don't count as a real result
@@ -368,6 +379,7 @@ export default function AIVisibility() {
 
     if (pData) setPrompts(pData)
     setResults(map)
+    setNoAnswerCells(noAnswer)
     if (latestChecked) setLastChecked(latestChecked)
     setLoading(false)
     setRefreshed(true)
@@ -1208,7 +1220,15 @@ export default function AIVisibility() {
               >
                 <div className="px-2 py-3.5 self-center">
                   <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-md bg-dark-700 text-[11px] font-semibold text-slate-500 tabular-nums">
-                    {prompt.position || i + 1}
+                    {/* Sequential, never the stored `position`. That column is a
+                        sort key, not a label: it keeps the gaps left by prompts
+                        that were suggested and never kept, and by deactivated
+                        ones. BpR's six active prompts carried positions 2, 4, 5,
+                        6, 9 and 10 and the list read as though four were
+                        missing. It can also duplicate (two of BpR's sit at 3),
+                        so it is not even unique. The row index always reads
+                        1..n. */}
+                    {i + 1}
                   </span>
                 </div>
 
@@ -1245,13 +1265,32 @@ export default function AIVisibility() {
 
                 {activeLLMs.map(llm => {
                   const r = rowResults?.get(llm.id)
-                  if (!r) return (
-                    <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60" title="Not checked">
-                        <Minus size={13} />
-                      </span>
-                    </div>
-                  )
+                  if (!r) {
+                    // Ran fine, but the engine produced no answer for this query
+                    // at all, so there was nothing for the brand to appear in.
+                    // Distinct from "Not checked", which means we never asked.
+                    // Showing these identically was the bug: a client reads a
+                    // grey dash as our system failing, when it is Google simply
+                    // not rendering an AI Overview for that question.
+                    const noAnswer = noAnswerCells.has(`${prompt.id}:${llm.id}`)
+                    return (
+                      <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full ${noAnswer
+                            ? 'bg-dark-700/20 text-slate-700 ring-1 ring-dashed ring-dark-600/40'
+                            : 'bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60'}`}
+                          title={noAnswer
+                            ? `${llm.label} showed no answer for this query, so there was nothing to appear in. Not counted for or against you.`
+                            : 'Not checked'}
+                        >
+                          <Minus size={13} />
+                        </span>
+                        {noAnswer && (
+                          <span className="text-[9px] text-slate-700 leading-none">no answer</span>
+                        )}
+                      </div>
+                    )
+                  }
                   const competitors = parseCompetitors(r.competitors_mentioned)
                   const topComp = competitors[0] ?? null
                   return (
