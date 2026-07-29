@@ -110,9 +110,12 @@
       .page-hero, .news-list { padding-left: 20px; padding-right: 20px; }
     }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="/ga4-init.js"></script>
+  <!-- GA4 is loaded by ga4-init.js ONLY after the visitor consents. The raw
+       gtag tag that used to sit here loaded Google Analytics before any
+       consent was given, which is what 399723c removed from the other 79
+       pages on 2026-07-29. These three news pages were missed in that sweep
+       and were still tracking pre-consent until 2026-07-29. -->
+  <script src="/ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 

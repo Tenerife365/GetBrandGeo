@@ -110,24 +110,69 @@
   }
 
   var CSS =
+    // 2026-07-29 size pass. The notice measured 680x172 at 1905x911, about 19%
+    // of the viewport height. It is about 121px now, a 29% cut. Every pixel
+    // removed is chrome. Nothing about the choice itself moved, and the Reject
+    // boundary got STRONGER, see the note above the button rules.
+    //
+    // WIDTH IS DELIBERATELY UNCHANGED. The notice is 194 characters, roughly
+    // 1271px of advance at 13.6px, and it wraps to two lines at 638px of content
+    // box with about 5px to spare. Narrowing the card pushes it to three lines,
+    // so a 600px card is TALLER and larger in area than this one. Measured
+    // against the live element, not estimated.
+    //
+    // box-sizing is pinned because min-width and min-height below have to mean
+    // the same thing on all 78 pages. Most reset it to border-box, some do not,
+    // and a touch target that is 44px on one page and 66px on another is not a
+    // guarantee.
+    '.bg-cc,.bg-cc *{box-sizing:border-box;}' +
     '.bg-cc{position:fixed;left:16px;right:16px;bottom:16px;z-index:2147483000;' +
     'max-width:680px;margin:0 auto;background:var(--s,#101116);color:var(--t,#e8e9ed);' +
-    'border:1px solid var(--bd,#23242b);border-radius:14px;padding:18px 20px;' +
-    'box-shadow:0 18px 50px rgba(0,0,0,.45);font-size:.9rem;line-height:1.6;}' +
-    '.bg-cc h2{font-size:.95rem;font-weight:700;margin:0 0 6px;color:var(--t,#e8e9ed);}' +
-    '.bg-cc p{margin:0 0 14px;color:var(--t2,#9ba1ac);font-size:.85rem;}' +
+    'border:1px solid var(--bd,#23242b);border-radius:12px;padding:12px 16px;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,.32);font-size:.9rem;line-height:1.5;}' +
+    // The heading read "Cookies" and nothing else, which the first sentence of
+    // the notice already says with more information in it. It is hidden from
+    // sight and kept in the accessibility tree, so the dialog still exposes a
+    // heading to a screen reader and nothing a visitor needs in order to decide
+    // has been taken away. 30px of the 51px saved is this.
+    '.bg-cc h2{position:absolute;width:1px;height:1px;margin:-1px;padding:0;' +
+    'overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}' +
+    '.bg-cc p{margin:0 0 10px;color:var(--t2,#9ba1ac);font-size:.85rem;}' +
     '.bg-cc a{color:var(--ac-text,#a78bfa);text-decoration:underline;}' +
-    '.bg-cc-row{display:flex;gap:10px;flex-wrap:wrap;}' +
+    '.bg-cc-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}' +
     // Reject is the same size, weight and padding as Accept. Making refusal
     // harder than acceptance is the dark pattern the AEPD and CNIL enforce most
-    // often, so the two differ only in fill.
-    '.bg-cc button{flex:1 1 160px;padding:11px 18px;border-radius:9px;font:inherit;' +
-    'font-weight:600;font-size:.86rem;cursor:pointer;border:1px solid transparent;}' +
+    // often, so the two differ only in fill. min-width and min-height are set
+    // on .bg-cc button, which both buttons share, so neither can be shrunk
+    // without the other and neither can fall under the 44px touch floor. The
+    // buttons no longer stretch to fill the row: they are content sized and
+    // right aligned, which is most of the "discreet" in this change.
+    '.bg-cc button{flex:0 1 auto;min-width:124px;min-height:44px;padding:11px 18px;' +
+    'border-radius:9px;font:inherit;font-weight:600;font-size:.86rem;cursor:pointer;' +
+    'border:1px solid transparent;}' +
     '.bg-cc-accept{background:var(--ac-strong,#7c3aed);color:#fff;}' +
-    '.bg-cc-reject{background:transparent;color:var(--t,#e8e9ed);border-color:var(--bd2,#32333c);}' +
+    // Accept is a solid fill, Reject is an outline, so this border is the only
+    // thing that makes Reject look like a control at all. It was --bd2, which
+    // measures 1.50:1 against the card in dark and 2.47:1 in light, both under
+    // the 3:1 that WCAG 1.4.11 asks of a control boundary. A card that is 29%
+    // smaller cannot also have a Reject button you have to hunt for, so this
+    // moved to --t3: 4.95:1 dark, 5.27:1 light. cookies.html section 6 claims
+    // the two have equal prominence, and until now that was true of their
+    // geometry but not of their visibility.
+    // Selector is `.bg-cc button.bg-cc-reject`, not `.bg-cc-reject`, and that is
+    // load-bearing. `.bg-cc button` above is (0,1,1) and its `border` shorthand
+    // resets border-color to transparent; a bare `.bg-cc-reject` is (0,1,0) and
+    // loses, so the border painted nothing and Reject had no visible boundary at
+    // all, measured 1.11:1. The :hover rule below survived only because :hover
+    // lifts it to (0,2,0).
+    '.bg-cc button.bg-cc-reject{background:transparent;color:var(--t,#e8e9ed);border-color:var(--t3,#7d838f);}' +
     '.bg-cc-accept:hover{filter:brightness(1.08);}' +
-    '.bg-cc-reject:hover{border-color:var(--t2,#9ba1ac);}' +
-    '@media(max-width:520px){.bg-cc{left:10px;right:10px;bottom:10px;padding:16px;}}';
+    '.bg-cc-reject:hover{border-color:var(--t,#e8e9ed);}' +
+    // Under 520px the buttons go back to filling the row. A thumb target that
+    // spans half the width is easier to hit than a 124px one in the corner, and
+    // on a phone there is no room for the notice to look loud anyway.
+    '@media(max-width:520px){.bg-cc{left:10px;right:10px;bottom:10px;padding:12px 14px;}' +
+    '.bg-cc-row{justify-content:flex-start;}.bg-cc button{flex:1 1 0;min-width:0;}}';
 
   function injectCss() {
     if (document.getElementById('bg-cc-css')) return;
