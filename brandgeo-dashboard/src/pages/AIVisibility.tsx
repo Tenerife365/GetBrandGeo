@@ -312,6 +312,16 @@ export default function AIVisibility() {
         if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
         const llmMap = map.get(r.prompt_id)!
         const llm = r.llm as LLMName
+        // Google renders an AI Overview for some queries and not others. When it
+        // renders none there is no answer for a brand to appear in, so counting
+        // it as "not mentioned" scores the client down for something that was
+        // never winnable. Measured on BpR 2026-07-29: 3 of 6 checks were
+        // [no_ai_overview], which showed 33% on the card when the real rate over
+        // answerable queries was 67%. The collector already labels these
+        // explicitly (_collect.js writes the [no_ai_overview] prefix), so this
+        // drops them from BOTH numerator and denominator rather than guessing.
+        // Not an error: nothing failed, the question simply had no AI answer.
+        if (typeof r.response_snippet === 'string' && r.response_snippet.startsWith('[no_ai_overview]')) return
         if (!llmMap.has(llm)) {
           if (r.status === 'error') {
             // Track error but exclude from analysis — don't count as a real result
