@@ -15,9 +15,15 @@
  * call here can change what a customer is charged. Stripe wiring is separate
  * work with a real external dependency (PRICING-STRATEGY-2026-07.md §8).
  *
- * BEFORE THE MIGRATION IS APPLIED. db/supabase-promotions-migration.sql has not
- * been run yet. Until it is, every query fails with Postgres 42P01
- * (undefined_table) and this returns 404 -- which is exactly the signal
+ * THE MIGRATION IS APPLIED (2026-07-26, re-verified 2026-07-29). The paragraph
+ * below describes the pre-migration state and is kept because the 42P01 fallback
+ * is still live code. It is no longer the current situation: the table, its three
+ * admin-gated RLS policies and the deliberate absence of a delete policy are all
+ * confirmed in production.
+ *
+ * BEFORE THE MIGRATION WAS APPLIED. db/supabase-promotions-migration.sql had not
+ * been run. Until it was, every query failed with Postgres 42P01
+ * (undefined_table) and this returned 404 -- which is exactly the signal
  * PromotionsPanel.tsx keys its "backend isn't deployed yet" state off
  * (PromotionsPanel.tsx:77, :113, :124). So shipping this function ahead of the
  * migration is safe and visible rather than silently broken.

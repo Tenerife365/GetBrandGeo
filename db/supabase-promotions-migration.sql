@@ -2,11 +2,23 @@
 -- supabase-promotions-migration.sql
 -- Platform-wide promotion codes (PRICING-STRATEGY-2026-07.md §8, §12 T3).
 --
--- ⚠️ NOT YET APPLIED to the live project. Unlike most files in db/, this one is
--- the migration to run, not a record of one already run. Apply it before the
--- admin Promotions panel will do anything (until then promotions-admin.js
--- returns 404-equivalent errors and the panel shows its "not available yet"
--- state by design).
+-- ✅ APPLIED to the live project (duiyifepitvugyulobqm) on 2026-07-26 and
+-- re-verified 2026-07-29. Like the rest of db/, this is now a record of a
+-- migration already run, and it is safe to re-run. The header below used to say
+-- NOT YET APPLIED and was three days stale; a retroactive security review caught
+-- it, because a stale "not applied" note is what a cold-start session reads and
+-- believes.
+--
+-- Verified against pg_policies: exactly three policies on public.promotions,
+-- promotions_select (USING is_admin()), promotions_insert (WITH CHECK
+-- is_admin()) and promotions_update (both clauses is_admin()), all scoped TO
+-- authenticated. There is deliberately NO delete policy and promotions-admin.js
+-- exposes no delete action to match, so promotions deactivate and never
+-- disappear. Nothing compensates for the missing delete policy.
+--
+-- Still true, and the reason this changes no customer's bill: the table records
+-- which promotions exist and prices nothing. No Stripe coupon is created and
+-- nothing on the checkout path reads it.
 --
 -- DEPENDS ON public.is_admin() (supabase-multitenant-migration.sql). Already live.
 --
