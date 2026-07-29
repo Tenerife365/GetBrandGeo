@@ -60,22 +60,45 @@ const SIZES: Record<BrandGeoLogoSize, { tile: number; gap: number; font: number 
  * TOKEN GAP, deliberate and flagged: src/index.css declares no accent tokens.
  * It has --dark-900/800/700/600 and the shell tokens, but nothing equivalent to
  * the marketing site's --ac / --ac-text / --t, which is why these are literal
- * hexes here. They SHOULD become --ac, --ac-text and --t in :root and html.light,
- * matching brandgeo/web/index.html lines 192-193 (dark) and 226-227 (light).
- * That file is owned by another agent this session, so it was not touched.
+ * hexes here. They SHOULD become named tokens in :root and html.light. Note the
+ * dark ramp is no longer the site's verbatim pair, so whoever declares those
+ * tokens must carry the measured values below, not copy index.html again.
  *
- * The values below are the marketing site's, unmodified:
- *   dark   --ac #8B5CF6 -> --ac-text #A78BFA
- *   light  --ac #7C3AED -> --ac-text #6D28D9
- * The light ramp is darker on purpose: #A78BFA measures 2.8:1 on a white card and
- * would be unreadable, so --ac-text darkens while --ac stays a fill.
+ * DARK RAMP, measured and lifted 2026-07-29. It shipped as the marketing site's
+ * pair verbatim, #8B5CF6 -> #A78BFA. The dashboard's surfaces are darker than the
+ * site's #0a0b0e, and on them the opening stop fell under the 4.5:1 text floor:
+ * #8B5CF6 measures 4.24 on the nav rail #13152b, 4.22 on a card #0F172A and 4.51
+ * on the page #0A0F1E. The whole ramp therefore moves one step lighter, to
+ * #A78BFA -> #C4B5FD (violet-400 to violet-300), which puts the worst stop at
+ * 6.56 and every stop over 6.5 on all three surfaces.
+ *   Why shift the ramp rather than raise geoFrom to #A78BFA: that would collapse
+ *   both stops onto one colour and kill the gradient the mark is built on. The
+ *   shift keeps the ramp's perceptual span intact, 12.6 points of L* against the
+ *   old pair's 13.0, so the gradient reads the same, only lighter.
+ *   Why not a mid value like #9F7AEA for a wider ramp: it is off the Tailwind
+ *   violet scale, and an unnamed fifth violet is exactly the drift this file was
+ *   created to end. Both stops stay on-scale.
+ *   The wordmark renders at 16px in the rail, so it is body text under SC 1.4.3,
+ *   not large text, and 3:1 does not apply. A brand name is arguably exempt from
+ *   1.4.3 altogether, but this is live HTML text in Inter, not an image, and
+ *   4.22:1 is a legibility problem whether or not a standard excuses it.
+ *   The marketing site keeps #8B5CF6, which measures 4.65 on its own darker
+ *   #0a0b0e and passes there. The two properties now render the wordmark in
+ *   different violets. Raising the site to this same pair is recommended and is
+ *   tracked outside this file, which does not own it.
+ *
+ * LIGHT RAMP, unchanged and already correct: #7C3AED -> #6D28D9, measuring 4.79
+ * and 5.98 at worst (the light nav #ECEAF6), 5.70 and 7.10 on a white card.
+ * It is darker rather than a mirror of dark on purpose: #A78BFA measures 2.72:1
+ * on a white card and #C4B5FD 1.85:1, so neither is usable there. Do not
+ * symmetrise the two themes.
  *
  * "Brand" uses the dashboard's own ink (#0F172A, the value html.light maps
  * .text-white to) rather than the site's --t #09090F, so it sits identical to
  * every heading beside it. The two differ by under 2 points of contrast.
  */
 const INK = {
-  dark:  { brand: '#E8E9ED', geoFrom: '#8B5CF6', geoTo: '#A78BFA' },
+  dark:  { brand: '#E8E9ED', geoFrom: '#A78BFA', geoTo: '#C4B5FD' },
   light: { brand: '#0F172A', geoFrom: '#7C3AED', geoTo: '#6D28D9' },
 }
 
