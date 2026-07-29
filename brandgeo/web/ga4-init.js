@@ -49,13 +49,21 @@
   // treated as no answer, so the banner asks again rather than assuming consent
   // for something the visitor was never shown.
   var VERSION = 1;
+  // Consent is not open-ended. The published Cookie Policy states we ask again
+  // at least every 12 months, so the stored answer expires here to match. A
+  // policy that promises re-consent while the code never re-asks is a false
+  // statement in a legal document, which is worse than not promising it.
+  var MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
   function read() {
     try {
       var raw = window.localStorage.getItem(KEY);
       if (!raw) return null;
       var v = JSON.parse(raw);
-      return (v && v.version === VERSION) ? v : null;
+      if (!v || v.version !== VERSION) return null;
+      var at = Date.parse(v.at);
+      if (isFinite(at) && (Date.now() - at) > MAX_AGE_MS) return null;
+      return v;
     } catch (e) { return null; }   // Safari private mode throws on localStorage
   }
 
@@ -180,6 +188,26 @@
   // link is inserted next to the footer's existing cookie-policy link. Done from
   // here rather than in 79 HTML files, and it degrades to nothing if the footer
   // markup ever changes.
+  function reopen(ev) {
+    if (ev) ev.preventDefault();
+    try { window.localStorage.removeItem(KEY); } catch (e) {}
+    if (!document.querySelector('.bg-cc')) showBanner();
+  }
+
+  // Any element marked data-cookie-settings re-opens the banner. The Cookie
+  // Policy page uses this for its own button, because the footer-link injection
+  // below cannot fire there: that page's footer link points at the page you are
+  // already on, so the policy would otherwise be the one page with no way to
+  // change your mind.
+  function bindExplicitTriggers() {
+    var nodes = document.querySelectorAll('[data-cookie-settings]');
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-cc-bound')) continue;
+      nodes[i].setAttribute('data-cc-bound', '1');
+      nodes[i].addEventListener('click', reopen);
+    }
+  }
+
   function addFooterLink() {
     var target = document.querySelector('footer a[href$="/cookies.html"], footer a[href="cookies.html"]');
     if (!target || document.getElementById('bg-cc-reopen')) return;
@@ -187,11 +215,7 @@
     link.id = 'bg-cc-reopen';
     link.href = '#';
     link.textContent = 'Cookie settings';
-    link.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      try { window.localStorage.removeItem(KEY); } catch (e) {}
-      if (!document.querySelector('.bg-cc')) showBanner();
-    });
+    link.addEventListener('click', reopen);
     var host = target.parentNode;
     if (host && host.tagName === 'LI' && host.parentNode) {
       var li = document.createElement('li');
@@ -209,6 +233,7 @@
     else if (!choice) showBanner();
     // choice present and analytics false: nothing loads, nothing is re-asked.
     addFooterLink();
+    bindExplicitTriggers();
   }
 
   if (document.readyState === 'loading') {
