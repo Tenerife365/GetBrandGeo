@@ -6,7 +6,7 @@
   <title>BrandGEO: Article Builder</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
 
     .app { display: grid; grid-template-columns: 420px 1fr; min-height: 100vh; }
 
@@ -406,6 +406,9 @@ function generate() {
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
   <meta name="msapplication-TileColor" content="#8b5cf6">
   <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <title>${id}: ${titlePlain} | BrandGEO Research™</title>
   <meta name="description" content="${subtitle}">
   <meta property="og:title" content="${id}: ${titlePlain} | BrandGEO Research™">
@@ -431,7 +434,7 @@ function generate() {
       --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed; --accent2: #34d399;
       --text: #e8e9ed; --muted: #9ba1ac; --radius: 12px;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; }
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; text-decoration: none; }
     .logo span { color: var(--accent); }
