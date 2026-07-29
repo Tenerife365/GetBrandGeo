@@ -112,6 +112,19 @@ const PRIORITY_STYLE: Record<TicketPriority, string> = {
   urgent: 'text-rose-400',
 }
 
+// Triage is now automatic on tickets raised through the support widget
+// (support-request.js -> _triage.js), so priority is a signal that arrives
+// before any human has looked at the queue. low and normal stay as the plain
+// text label they were; high and urgent get the same bordered badge treatment
+// as StatusBadge so they are scannable down a long list. Same amber and rose
+// already in PRIORITY_STYLE, no new palette.
+const PRIORITY_BADGE: Record<TicketPriority, string | null> = {
+  low:    null,
+  normal: null,
+  high:   'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  urgent: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+}
+
 const card = 'bg-dark-800 rounded-xl p-6 mb-6'
 const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
 const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
@@ -127,6 +140,19 @@ function StatusBadge({ status }: { status: TicketStatus }) {
   return (
     <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md border ${STATUS_STYLE[status]}`}>
       {STATUS_LABEL[status]}
+    </span>
+  )
+}
+
+/** Badge for high/urgent, plain text for low/normal. See PRIORITY_BADGE. */
+function PriorityTag({ priority }: { priority: TicketPriority }) {
+  const badge = PRIORITY_BADGE[priority]
+  if (!badge) {
+    return <span className={PRIORITY_STYLE[priority]}>{PRIORITY_LABEL[priority]}</span>
+  }
+  return (
+    <span className={`inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded border ${badge}`}>
+      {PRIORITY_LABEL[priority]}
     </span>
   )
 }
@@ -265,33 +291,35 @@ function CustomerTickets() {
       return
     }
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    // status, priority and assignee are deliberately not sent. The column
-    // defaults produce the only shape the insert policy accepts, and sending
-    // anything else would be rejected rather than silently ignored.
-    const { data, error } = await supabase
-      .from('tickets')
-      .insert({
-        client_id: activeClientId,
-        created_by: user?.id ?? null,
-        source: 'customer',
-        subject: subject.trim().slice(0, 200),
-        body: body.trim(),
-        page: '/tickets',
-      })
-      .select('id, client_id, created_by, source, subject, body, status, priority, assignee, page, created_at, updated_at, resolved_at')
-      .single()
+    // Routed through support-request.js rather than inserted straight into
+    // PostgREST, even though RLS would happily accept the insert.
+    //
+    // A direct insert produces a bare row: no AI triage, so the priority stays
+    // at the RLS-pinned 'normal' however urgent the request is; no
+    // acknowledgement comment, so the customer sees silence; and no
+    // recordAdminEvent, so nothing reaches the admin bell. That is what this
+    // form used to do, which meant a ticket filed here and the identical ticket
+    // filed through the Support widget were treated completely differently.
+    // One code path in, one behaviour out.
+    const { status, data } = await authedPost<{ ticket_id?: number | null; error?: string }>(
+      'support-request',
+      { subject: subject.trim().slice(0, 200), message: body.trim(), page: '/tickets' }
+    )
     setSaving(false)
 
-    if (error) {
-      if (isMissingTable(error)) { setUnavailable(true); return }
-      console.error('[Tickets] create failed', error.message)
-      setMsg({ ok: false, text: `Could not send that: ${error.message}` })
+    if (status !== 200 || !data?.ticket_id) {
+      // 503 is the documented pre-migration branch: the table is not there, the
+      // function could not persist, and it falls back to email.
+      if (status === 503) { setUnavailable(true); return }
+      console.error('[Tickets] create failed', status, data?.error)
+      setMsg({ ok: false, text: `Could not send that: ${data?.error ?? `HTTP ${status}`}` })
       return
     }
-    setTickets(prev => [data as Ticket, ...prev])
+    // The function writes the row, the priority and both comments server side,
+    // so refetch rather than guessing the final shape from what we sent.
+    await load()
     setSubject(''); setBody(''); setShowForm(false)
-    setMsg({ ok: true, text: `Request #${(data as Ticket).id} sent. We will reply here and by email.` })
+    setMsg({ ok: true, text: `Request #${data.ticket_id} sent. We will reply here and by email.` })
   }
 
   const sendReply = async () => {
@@ -710,7 +738,7 @@ function AdminQueue() {
                             <span className="inline-flex items-center gap-1 truncate"><Building2 size={10} /> {t.client_name ?? `Client ${t.client_id}`}</span>
                           )}
                           <span className="text-slate-700">|</span>
-                          <span className={PRIORITY_STYLE[t.priority]}>{PRIORITY_LABEL[t.priority]}</span>
+                          <PriorityTag priority={t.priority} />
                           <span className="text-slate-700">|</span>
                           <span>{when(t.created_at)}</span>
                         </span>

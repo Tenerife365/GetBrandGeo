@@ -6,7 +6,13 @@
 // ============================================================================
 const { sendBrandedEmail, APP_URL } = require('./_email');
 
-const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'constantin@getbrandgeo.com';
+// support@ is the mailbox that actually exists and is monitored. The previous
+// default, constantin@getbrandgeo.com, was never provisioned, so every admin
+// alert this helper has ever sent (signup, Stripe, plan expiry, client
+// deletion, not just tickets) went to an address that does not receive mail.
+// NOTE the env var still wins: if ADMIN_ALERT_EMAIL is set in Netlify to the
+// old address, changing this default fixes nothing.
+const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'support@getbrandgeo.com';
 
 // supabase: a service-role client (bypasses RLS to insert the feed row).
 // email: also send the admin an email (default true) — use false for events that

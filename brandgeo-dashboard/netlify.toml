@@ -161,6 +161,17 @@
 [functions."assistant-lead"]
   timeout = 15
 
+# Dashboard support widget -> ticket. Was inheriting the 10s default, which no
+# longer fits: the request is now auth (2 Supabase round trips) + ticket insert
+# + a client lookup + one Haiku triage call (its own hard timeout is 6s) + a
+# priority update + 2 comment inserts + the admin-notify row/email + the Resend
+# notification. On a cold start that exceeds 10s, and a timeout there is worse
+# than it looks: the ticket INSERT has already committed, so the customer would
+# see a 502 for a request that actually succeeded and would file it again.
+# Same reasoning as assistant.js, which also wraps a Haiku call.
+[functions."support-request"]
+  timeout = 26
+
 # ── Auto-notify search engines of new/changed pages (ping-sitemap.js) ─────────
 # Daily cron job (pg_cron -> pg_net, 05:10 UTC): diff the live sitemap against
 # the sitemap_pings table, ping new/changed URLs to Google + IndexNow. Automatic

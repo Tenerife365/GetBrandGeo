@@ -49,14 +49,42 @@
  *   which is the correct reading of BrandGEO staff filing something from
  *   inside the product.
  *
+ * AI TRIAGE (added on top of the above, and deliberately subordinate to it)
+ *   Once the row exists, one cheap Haiku call (_triage.js) judges urgency and
+ *   drafts an acknowledgement. What that produces is written back as:
+ *     - tickets.priority, with the SERVICE ROLE client. This is the one
+ *       legitimate way the RLS-pinned 'normal' is raised. The pin is what makes
+ *       the raise safe: a customer cannot declare its own ticket urgent, so the
+ *       priority in the queue always came from BrandGEO, never from the filer.
+ *     - an INTERNAL comment (is_internal = true) carrying the reasoning. The
+ *       comments SELECT policy makes that unreadable to any customer, which is
+ *       why the reasoning needs no new column and no new migration.
+ *     - a PUBLIC comment (is_internal = false) carrying the acknowledgement, so
+ *       the customer sees a reply immediately.
+ *   Then recordAdminEvent fires with the resolved priority in the title, so an
+ *   urgent ticket is legible in the dashboard bell at a glance.
+ *
+ *   NONE OF THIS CAN COST THE CUSTOMER THEIR TICKET. triageTicket never throws
+ *   and is hard-timeout-bounded; every write below is individually try/caught
+ *   and only warns. A total triage failure leaves a normal-priority ticket for
+ *   a human to triage, which is exactly the pre-triage behaviour.
+ *
  * POST body:  { message, subject?, email?, brand?, page?, client_id? }
- * 200 ->      { ok: true, ticket_id: number|null, persisted: boolean, notified: boolean }
+ * 200 ->      { ok: true, ticket_id: number|null, persisted: boolean, notified: boolean,
+ *               priority: string|null, triaged: boolean }
  * 503 ->      { error } only when nothing was persisted AND email is unconfigured.
  */
 const { requireAuth } = require('./_auth')
+const { triageTicket } = require('./_triage')
+const { recordAdminEvent } = require('./_admin_notify')
 
 const MAX_SUBJECT = 200
 const MAX_BODY = 20000
+
+const APP_URL = 'https://app.getbrandgeo.com'
+
+/** Only these two are worth interrupting an admin over. */
+const NOTIFY_PRIORITIES = new Set(['high', 'urgent'])
 
 exports.handler = async (event) => {
   // requireAuth handles the OPTIONS preflight itself, so the method check has
@@ -139,7 +167,118 @@ exports.handler = async (event) => {
     )
   }
 
-  // ---- 2. Notify ------------------------------------------------------------
+  // ---- 2. Triage ------------------------------------------------------------
+  // Only runs when there is a row to attach the result to. Everything here is
+  // best-effort: the ticket is already safe at this point.
+  let priority = ticketId === null ? null : 'normal'
+  let triaged = false
+
+  if (ticketId !== null) {
+    // Plan and name are context for judging impact (a paying customer blocked
+    // is worse than a free one browsing). Failure here is not worth a retry;
+    // triage just runs with less context.
+    let plan = null
+    let clientName = null
+    if (clientId !== null) {
+      try {
+        const { data: client } = await auth.supabase
+          .from('clients').select('plan, name').eq('id', clientId).maybeSingle()
+        if (client) { plan = client.plan || null; clientName = client.name || null }
+      } catch (e) {
+        console.warn('[support-request] client lookup for triage failed:', String(e.message || e).slice(0, 200))
+      }
+    }
+
+    const result = await triageTicket({
+      subject,
+      body: message,
+      plan,
+      clientName,
+    })
+
+    triaged = result.ok
+    console.log(
+      `[support-request] triage ticket ${ticketId}`,
+      `ok=${result.ok}`,
+      `priority=${result.priority}`,
+      `failure=${result.failure || 'none'}`,
+      `safe_reply=${result.replyIsSafeFallback}`,
+    )
+
+    // 2a. Raise the priority. SERVICE ROLE, bypassing the RLS pin on purpose.
+    // Skipped when triage returned 'normal', because the row already is.
+    if (result.priority !== 'normal') {
+      try {
+        const { error } = await auth.supabase
+          .from('tickets').update({ priority: result.priority }).eq('id', ticketId)
+        if (error) {
+          console.error(
+            `[support-request] priority update failed for ticket ${ticketId}`,
+            `code=${error.code || 'none'}`,
+            String(error.message || error).slice(0, 300),
+          )
+        } else {
+          priority = result.priority
+        }
+      } catch (e) {
+        console.error(`[support-request] priority update threw for ticket ${ticketId}`, String(e.message || e).slice(0, 300))
+      }
+    }
+
+    // 2b. The reasoning, as an INTERNAL comment. A customer can never read this
+    // (ticket_comments_select excludes is_internal rows for a viewer), which is
+    // what lets the reasoning be stored without a schema change. author is NULL
+    // because no human wrote it; the body says so.
+    const internalLines = [
+      result.ok
+        ? `Automatic triage: ${result.priority.toUpperCase()}`
+        : 'Automatic triage did not run. Priority left at normal for manual triage.',
+    ]
+    if (result.summary) internalLines.push(`Summary: ${result.summary}`)
+    if (result.reason) internalLines.push(`Reason: ${result.reason}`)
+    if (result.failure) internalLines.push(`Note: ${result.failure}`)
+    if (result.replyIsSafeFallback) {
+      internalLines.push('The customer received the fixed acknowledgement, not generated text.')
+    }
+    internalLines.push('Written by the intake assistant. Not reviewed by a person.')
+
+    await addComment(auth.supabase, ticketId, internalLines.join('\n'), true)
+
+    // 2c. The acknowledgement, as a PUBLIC comment. Always safe to post: it is
+    // either guardrail-validated model text or the fixed fallback.
+    await addComment(auth.supabase, ticketId, result.reply, false)
+
+    // 2d. The dashboard bell. Priority leads the title so an urgent ticket is
+    // legible at a glance in the feed. The bell row is written for every
+    // ticket; the ADMIN_ALERT_EMAIL only fires for high and urgent, because
+    // support@ already receives an email for every ticket below and a second
+    // one per routine ticket is noise, not speed.
+    const label = (priority || 'normal').toUpperCase()
+    await recordAdminEvent(auth.supabase, {
+      type: 'support_ticket',
+      client_id: clientId,
+      title: `[${label}] Support ticket #${ticketId}: ${subject}`,
+      body: result.summary || message.slice(0, 300),
+      // ticket id in meta so the UI can deep-link straight to the queue.
+      meta: {
+        ticket_id: ticketId,
+        priority: priority || 'normal',
+        triaged: result.ok,
+        triage_failure: result.failure || null,
+        source,
+        page: page || null,
+        url: `${APP_URL}/tickets`,
+      },
+      // Owner's call 2026-07-29: email on EVERY ticket, not only high and
+      // urgent. Ticket volume is currently zero, so there is no noise to
+      // suppress, and missing the first real customer ticket costs more than
+      // a redundant email. Narrow this to NOTIFY_PRIORITIES once volume
+      // makes routine tickets noise rather than signal.
+      email: true,
+    })
+  }
+
+  // ---- 3. Notify ------------------------------------------------------------
   const RESEND_API_KEY = process.env.RESEND_API_KEY
 
   if (!RESEND_API_KEY) {
@@ -149,12 +288,14 @@ exports.handler = async (event) => {
       return json(503, { error: 'Support email not configured' })
     }
     console.warn(`[support-request] ticket ${ticketId} saved but RESEND_API_KEY is absent; no notification sent`)
-    return json(200, { ok: true, ticket_id: ticketId, persisted: true, notified: false })
+    return json(200, { ok: true, ticket_id: ticketId, persisted: true, notified: false, priority, triaged })
   }
 
   const ref = ticketId === null ? 'unsaved' : `#${ticketId}`
+  const prio = (priority || 'normal').toUpperCase()
   const html = `
     <h2 style="margin:0 0 12px">New dashboard support request ${esc(ref)}</h2>
+    <p style="margin:2px 0"><strong>Priority:</strong> ${esc(prio)}${triaged ? '' : ' (not triaged automatically)'}</p>
     <p style="margin:2px 0"><strong>From:</strong> ${esc(fromEmail) || 'unknown'}</p>
     <p style="margin:2px 0"><strong>Brand:</strong> ${esc(brand) || '-'}</p>
     <p style="margin:2px 0"><strong>Client id:</strong> ${esc(clientId === null ? 'internal (none)' : clientId)}</p>
@@ -179,7 +320,7 @@ exports.handler = async (event) => {
         from: 'BrandGEO Support <noreply@mail.getbrandgeo.com>',
         to: ['support@getbrandgeo.com'],
         reply_to: fromEmail || undefined,
-        subject: `[Dashboard] ${ref} ${subject}`,
+        subject: `[Dashboard][${prio}] ${ref} ${subject}`,
         html,
       }),
     })
@@ -196,7 +337,44 @@ exports.handler = async (event) => {
     if (ticketId === null) return json(500, { error: 'Send failed' })
   }
 
-  return json(200, { ok: true, ticket_id: ticketId, persisted: ticketId !== null, notified })
+  return json(200, { ok: true, ticket_id: ticketId, persisted: ticketId !== null, notified, priority, triaged })
+}
+
+/**
+ * Best-effort comment insert. Never throws and never fails the request: a
+ * ticket with no acknowledgement comment is worse UX, not a lost request.
+ * author is NULL because no human wrote it, and there is no service-role user
+ * id to attribute it to. tickets.created_by is ON DELETE SET NULL and
+ * ticket_comments.author is nullable, so a NULL author is an expected shape
+ * (tickets-admin.js already renders it as 'unknown').
+ */
+async function addComment(supabase, ticketId, body, isInternal) {
+  const text = String(body || '').trim()
+  // ticket_comments_body_check rejects an empty body; do not send one.
+  if (!text) return false
+  try {
+    const { error } = await supabase.from('ticket_comments').insert({
+      ticket_id: ticketId,
+      author: null,
+      body: text.slice(0, MAX_BODY),
+      is_internal: isInternal,
+    })
+    if (error) {
+      console.error(
+        `[support-request] ${isInternal ? 'internal' : 'public'} comment insert failed for ticket ${ticketId}`,
+        `code=${error.code || 'none'}`,
+        String(error.message || error).slice(0, 300),
+      )
+      return false
+    }
+    return true
+  } catch (e) {
+    console.error(
+      `[support-request] ${isInternal ? 'internal' : 'public'} comment insert threw for ticket ${ticketId}`,
+      String(e.message || e).slice(0, 300),
+    )
+    return false
+  }
 }
 
 function esc(s) {
