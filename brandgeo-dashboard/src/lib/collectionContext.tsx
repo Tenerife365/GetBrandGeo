@@ -17,6 +17,7 @@ import { createContext, useContext, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import type { MarketSelection } from './marketContext'
 import type { EngineId } from './planConfig'
+import { COLLECT_PROMPT_ENGINES, LIVE_ENGINES } from './planConfig'
 
 interface Progress {
   done: number
@@ -148,10 +149,15 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     markets?: MarketSelection[],
     activeEngines?: EngineId[],
   ) => {
-    const engines = activeEngines ?? ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'] as EngineId[]
+    // Both lists come from planConfig, never inlined here. The inlined version
+    // of promptEngines was missing grok and ai_overview, so Refresh silently did
+    // nothing for them: they were absent from active_engines, collect-prompt
+    // filtered them out, and no row of any kind was written. The fallback was
+    // stale in the same way and omitted both plus meta.
+    const engines = activeEngines ?? LIVE_ENGINES
     const runChatgpt    = engines.includes('chatgpt')
     const runClaude     = engines.includes('claude')
-    const promptEngines = engines.filter(e => ['gemini', 'perplexity', 'meta', 'google_ai'].includes(e))
+    const promptEngines = engines.filter(e => COLLECT_PROMPT_ENGINES.includes(e))
     const runPrompt     = promptEngines.length > 0
 
     const { data: clientRow } = await supabase

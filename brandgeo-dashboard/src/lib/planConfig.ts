@@ -117,6 +117,34 @@ export const ALL_ENGINES: EngineId[] = [
  */
 export const LIVE_ENGINES: EngineId[] = ALL_ENGINES.filter(e => !COMING_SOON_ENGINES.has(e))
 
+/**
+ * HTTP collection routing: which engines each manual endpoint serves.
+ *
+ * `collect-prompt` runs several engines in one call; `chatgpt` and `claude` have
+ * their own functions because they need their own timeouts and streaming.
+ *
+ * THIS EXISTS BECAUSE THE LIST WAS INLINED AND DRIFTED (2026-07-29). The
+ * per-prompt Refresh button filtered on a hardcoded
+ * `['gemini','perplexity','meta','google_ai']` while collect-prompt.js had
+ * grown to six engines. `grok` and `ai_overview` were therefore never sent, the
+ * server filtered them out of `active_engines`, and they silently never ran on
+ * that path — no row, no error, nothing. To the user the button simply did
+ * nothing, for the two engines that justify the top of the plan ladder.
+ *
+ * MUST stay equal to FAST_ENGINES in netlify/functions/collect-prompt.js, which
+ * cannot import this file (CJS at runtime vs the Vite bundle, the same split
+ * already accepted for _cost.js and _plans.js). tests/engine_routing.test.js
+ * parses both files and fails if they diverge, so this pair cannot rot again.
+ */
+export const COLLECT_PROMPT_ENGINES: EngineId[] =
+  ['gemini', 'perplexity', 'meta', 'google_ai', 'grok', 'ai_overview']
+
+/** Engines that have their own dedicated HTTP collection function. */
+export const DEDICATED_ENGINE_FUNCTIONS: Record<string, string> = {
+  chatgpt: 'collect-chatgpt',
+  claude:  'collect-claude',
+}
+
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
 // Kept in sync with PLAN_ENGINES above by hand — derive the "X+" label shown
 // on locked engine cards. perplexity/meta moved to 'growth' (was
