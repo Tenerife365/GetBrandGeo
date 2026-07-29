@@ -67,32 +67,102 @@ SURFACES = [
 # Internal tool, never uploaded to cPanel, contains JS template literals.
 EXCLUDE = {"article-builder.html"}
 
+# Every way a euro figure is written on these surfaces. `&euro;` was missing
+# until 2026-07-29 and that single gap hid a live EUR 900 Managed price on
+# brandgeo-vs-ahrefs-brand-radar.html for as long as the rule had existed: the
+# JSON-LD blocks use a literal €, the HTML bodies use &euro;, and the rule only
+# knew the first two. Add every new spelling here, never to one rule.
+EUR = r"(?:EUR|&#x20AC;|&euro;|€)"
+
 # A prompt count is only a PLAN claim when a plan name or a price sits near it.
 # Without this, "12 prompts across seven engines" in a sample report reads as a
 # violation, which it is not.
 PLAN_CONTEXT = re.compile(
-    r"free|essentials|growth|managed|enterprise|per month|/mo\b|EUR|&#x20AC;|€", re.I)
+    r"free|essentials|growth|managed|enterprise|per month|/mo\b|" + EUR, re.I)
 
-# Values that are wrong wherever they appear. Each carries why, so a future
-# reader can retire the rule when it stops being true rather than guessing.
+# Values that are wrong wherever they appear. Each carries a label (used by
+# EXEMPT below) and why, so a future reader can retire the rule when it stops
+# being true rather than guessing.
 FORBIDDEN = [
-    (r"\bMeta AI\b", "meta is RETIRED (2026-07-16), in no plan set. Historical "
-                     "research records are the ONE exception: if this hit is a "
-                     "record of what an engine answered on a date, keep it."),
-    (r"\bGPT-4o\b(?!-mini)", "no plan runs GPT-4o. _collect.js routes gpt-4o-mini "
-                             "on free/essentials and gpt-5.5 on growth and up."),
-    (r"1[,.]?250", "the EUR 1,250 setup fee is refuted by terms.html:317, which "
-                   "states Managed has no separate setup fee."),
-    (r"\bCSV\b", "no export feature exists. Zero matches for csv/download/toBlob/"
-                 "createObjectURL/xlsx across brandgeo-dashboard/src."),
-    (r"daily/weekly|daily or weekly", "cadence is not a tier differentiator. "
-                                      "PLAN_COLLECTION_COOLDOWN_HOURS is 168h flat "
-                                      "on every paid plan, 720h on free."),
-    (r"(?:EUR|&#x20AC;|€)\s?900\b", "Managed is EUR 1,500, not EUR 900."),
-    (r"(?:EUR|&#x20AC;|€)\s?9,000\b", "Managed annual is EUR 15,000."),
-    (r"(?:EUR|&#x20AC;|€)\s?10,000\b", "Enterprise publishes no figure. It is "
-                                            "scoped on a call."),
+    ("meta", r"\bMeta AI\b",
+     "meta is RETIRED (2026-07-16), in no plan set. Historical research records "
+     "are the ONE exception: if this hit is a record of what an engine answered "
+     "on a date, keep it."),
+    ("gpt4o", r"\bGPT-4o\b(?!-mini)",
+     "no plan runs GPT-4o. _collect.js routes gpt-4o-mini on free/essentials and "
+     "gpt-5.5 on growth and up."),
+    ("setup-fee", r"1[,.]?250",
+     "the EUR 1,250 setup fee is refuted by terms.html, which states Managed has "
+     "no separate setup fee."),
+    ("csv", r"\bCSV\b",
+     "no export feature exists. Zero matches for csv/download/toBlob/"
+     "createObjectURL/xlsx across brandgeo-dashboard/src."),
+    ("cadence", r"daily/weekly|daily or weekly",
+     "cadence is not a tier differentiator. PLAN_COLLECTION_COOLDOWN_HOURS is "
+     "168h flat on every paid plan, 720h on free."),
+    ("managed-900", EUR + r"\s?900\b", "Managed is EUR 1,500, not EUR 900."),
+    ("managed-9000", EUR + r"\s?9,000\b", "Managed annual is EUR 15,000."),
+    ("ent-10000", EUR + r"\s?10,000\b",
+     "Enterprise publishes no figure. It is scoped on a call."),
+    ("legacy-pro", r"\bPro from\s*" + EUR,
+     "the legacy `pro` tier is closed to new signups (planConfig.ts). The top "
+     "self-serve tier is Growth PRO at EUR 449; above it are Managed and Custom "
+     "Enterprise."),
 ]
+
+# ── Documented exceptions ────────────────────────────────────────────────────
+# A hit that is NOT a claim about BrandGEO's own product. Each entry names the
+# rule it exempts, the file, an exact context substring that must be present on
+# the line, and why. Anything that does not match all four still fails, so a new
+# occurrence somewhere else is caught rather than silently inherited.
+#
+# Deleting these strings would not fix drift, it would falsify the record: a
+# competitor really does track Meta AI, and AthenaHQ really does sell credits in
+# packs of 1,250.
+EXEMPT = [
+    ("meta", "brandgeo-vs-goodie.html", "Goodie tracks the broadest set publicly listed",
+     "Goodie AI's own published engine list, not BrandGEO's."),
+    ("meta", "brandgeo-vs-goodie.html", "Broader list publicly cited",
+     "Goodie AI's own published engine list, in the competitor column."),
+    ("meta", "brandgeo-vs-profound.html", "Profound tracks 10+ engines",
+     "Profound's own engine list, cited to argue they cover more than we do."),
+    ("meta", "brandgeo-vs-semrush.html", "custom-priced Enterprise",
+     "the engines Semrush gates behind its Enterprise tier, not ours."),
+    ("setup-fee", "brandgeo-vs-athenahq.html", "AthenaHQ bills by credits",
+     "AthenaHQ's credit-pack price (~$100 per 1,250 credits), in USD, theirs."),
+    ("meta", "llms-full.txt", "four AI engines (Google Gemini, Anthropic Claude, Perplexity, Meta AI",
+     "the engine set of a published, DOI-archived study (Zenodo 10.5281/"
+     "zenodo.21395598). A historical measurement record, the documented exception "
+     "in the `meta` rule above."),
+]
+
+# In a side-by-side comparison row the BrandGEO cell is the one marked
+# class="hl"; every other <td> describes a COMPETITOR's product, and its prices,
+# prompt counts and engine lists are theirs. Scanning the whole line made a
+# comparison table unwritable: Otterly's "100 prompts" sat within 120 characters
+# of BrandGEO's own price and read as a stale cap, and Semrush's Meta AI
+# coverage read as ours. Blank the competitor cells before scanning, preserving
+# length so reported column offsets stay true.
+_HL_ROW = re.compile(r'<td\b[^>]*\bclass="hl"')
+_CELL = re.compile(r"<td\b[^>]*>.*?</td>")
+
+
+def ours(line):
+    if not _HL_ROW.search(line):
+        return line          # not a comparison row: every word on it is ours
+    out, pos = [], 0
+    for m in _CELL.finditer(line):
+        out.append(line[pos:m.start()])
+        seg = m.group(0)
+        out.append(seg if 'class="hl"' in seg else " " * len(seg))
+        pos = m.end()
+    out.append(line[pos:])
+    return "".join(out)
+
+
+def exempt(label, rel, line):
+    return any(lab == label and rel.endswith(f) and ctx in line
+               for lab, f, ctx, _ in EXEMPT)
 
 
 def ground_truth():
@@ -152,10 +222,13 @@ def main():
         text = open(path, encoding="utf-8", errors="replace").read()
         lines = text.splitlines()
 
-        for i, line in enumerate(lines, 1):
-            for pat, why in FORBIDDEN:
+        for i, raw in enumerate(lines, 1):
+            line = ours(raw)
+            for label, pat, why in FORBIDDEN:
                 for m in re.finditer(pat, line, re.I):
-                    findings.append((rel, i, m.group(0), why, line.strip()[:90]))
+                    if exempt(label, rel, raw):
+                        continue
+                    findings.append((rel, i, m.group(0), why, raw.strip()[:90]))
             for m in re.finditer(r"\b(\d{1,4})\s+(?:commercial\s+|buyer\s+)?prompts\b", line, re.I):
                 # Only a plan claim if a plan name or price is nearby. A sample
                 # report saying "12 prompts across seven engines" is not a cap.
