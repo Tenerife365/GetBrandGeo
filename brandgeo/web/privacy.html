@@ -128,6 +128,7 @@
       <thead><tr><th>Processor</th><th>Purpose</th><th>Data shared</th><th>Location</th><th>Transfer basis</th></tr></thead>
       <tbody>
         <tr><td colspan="5"><strong>Infrastructure</strong></td></tr>
+        <tr><td>Cyberfolks (cyberfolks.ro)</td><td>Hosting for the public website getbrandgeo.com</td><td>Server access logs, including IP address</td><td>Romania (EU)</td><td>No transfer, data stays in the EU</td></tr>
         <tr><td>Supabase</td><td>Database, authentication and file storage for the dashboard</td><td>Account data, prompts, AI results, support tickets</td><td>Ireland (EU, AWS eu-west-1)</td><td>No transfer, data stays in the EU</td></tr>
         <tr><td>Netlify</td><td>Hosting and serverless functions for app.getbrandgeo.com</td><td>Request data in transit, IP address</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
         <tr><td colspan="5"><strong>AI engines</strong></td></tr>
@@ -140,7 +141,7 @@
         <tr><td>Stripe</td><td>Payment and subscription processing</td><td>Name, email, billing details. We never see or store full card numbers.</td><td>Ireland and United States</td><td>EU-US Data Privacy Framework</td></tr>
         <tr><td>Resend</td><td>Transactional email, including account and support notifications</td><td>Name, email address, message content</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
         <tr><td>FormSubmit.co</td><td>Delivery of the public contact and audit request form</td><td>Form fields you submit</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
-        <tr><td>HubSpot</td><td>Customer relationship management for enquiries. Used only when enabled.</td><td>Name, email, company name</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>HubSpot</td><td>Customer relationship management for enquiries. <strong>Not currently in use.</strong> The integration exists but is disabled, and no data is sent to HubSpot while it stays that way.</td><td>Name, email, company name</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
         <tr><td>Ayrshare</td><td>Social publishing for the AI Social feature. Not available to customers at present.</td><td>Post content and connected account tokens</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
         <tr><td colspan="5"><strong>Analytics</strong></td></tr>
         <tr><td>Plausible</td><td>Cookieless website analytics</td><td>Aggregate page views only, no identifier</td><td>European Union</td><td>No transfer</td></tr>
