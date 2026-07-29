@@ -157,7 +157,42 @@ const FIXED_FEE_ENGINES = new Set(['gemini', 'google_ai', 'ai_overview'])
  * would understate every deferred call and overstate every inline one, and the
  * split is not stable across markets or query types.
  */
-const SERPAPI_COST_PER_SEARCH_EUR = 0.023
+/**
+ * SerpApi cost per search, and the hard ceiling underneath it.
+ *
+ * REPRICED 2026-07-29d, owner's correction, and it doubles. The account is
+ * $25/month for 500 CREDITS, which is $0.05 per search, not the $0.025 that
+ * "$25 per 1,000" implied. Both SerpApi engines were priced at half their real
+ * cost.
+ *
+ *   $25 / 500 credits = $0.05 = EUR 0.046 per search
+ *
+ * THE EURO FIGURE IS NOT THE BINDING CONSTRAINT. The credit pool is. 500
+ * credits a month is a PLATFORM-WIDE ceiling shared by every client, unlike
+ * PLAN_MONTHLY_API_BUDGET_EUR which is per client, and unused credits expire at
+ * renewal. google_ai spends 1 credit per prompt-check; ai_overview spends 1, or
+ * 2 when Google defers the overview behind a page_token. So a single prompt on
+ * a 7-engine plan costs up to 3 credits.
+ *
+ * Owner's decision (2026-07-29): these stay in the budget gate and are NOT
+ * excluded as fixed-fee. A credit spent is a credit gone, and at 500 a month
+ * they are scarce rather than free. See SERPAPI_MONTHLY_CREDITS and
+ * serpApiCreditsPerMonth() below for the allowance model.
+ */
+const SERPAPI_COST_PER_SEARCH_EUR = 0.046
+const SERPAPI_MONTHLY_CREDITS = 500
+const SERPAPI_CREDITS_PER_CHECK = { google_ai: 1, ai_overview: 1.5 }   // ai_overview averages 1-2
+
+/**
+ * serpApiCreditsPerMonth(plan, prompts, runsPerMonth) -> number
+ * Credits ONE client on this plan consumes per month at the given prompt count
+ * and cadence. Sum across the book must stay under SERPAPI_MONTHLY_CREDITS.
+ */
+function serpApiCreditsPerMonth(plan, prompts, runsPerMonth = 4.333) {
+  const engines = PLAN_LIVE_ENGINES[plan] || PLAN_LIVE_ENGINES.essentials
+  const perCheck = engines.reduce((s, e) => s + (SERPAPI_CREDITS_PER_CHECK[e] || 0), 0)
+  return prompts * perCheck * runsPerMonth
+}
 
 const ENGINE_COST_EUR = {
   // Fallback estimates, used only when an engine returns no usage block.
@@ -174,14 +209,14 @@ const ENGINE_COST_EUR = {
   grok:       0.012,
   // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
   gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
-  google_ai:  0.023,   // SerpApi mid-tier per-search; real cost is the monthly plan
+  google_ai:  0.046,   // 1 SerpApi credit. $25/500 credits, owner-confirmed 2026-07-29
   // Google AI Overviews. FALLBACK ONLY — every real row is metered from
   // usage.serpSearches, so this is the blended figure used before any usage
   // exists (and by the budget projection): a mix of 1-search inline overviews
   // at EUR 0.023 and 2-search deferred ones at EUR 0.046. True it up from
   // ai_results.cost_eur once a week of real rows exists; the blend ratio is the
   // one number here that is genuinely unknown until measured.
-  ai_overview: 0.035,
+  ai_overview: 0.069,   // 1.5 SerpApi credits on average (2 when Google defers)
 }
 
 // Error codes where NO billable API call happened — the request was rejected
@@ -441,6 +476,9 @@ module.exports = {
   TOOL_FEE_USD,
   FIXED_FEE_ENGINES,
   SERPAPI_COST_PER_SEARCH_EUR,
+  SERPAPI_MONTHLY_CREDITS,
+  SERPAPI_CREDITS_PER_CHECK,
+  serpApiCreditsPerMonth,
   USD_TO_EUR,
   FREE_ERROR_CODES,
   costForRow,

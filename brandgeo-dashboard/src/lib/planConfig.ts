@@ -232,13 +232,13 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   grok:       0.012,   // fallback only — real rows are metered from OpenRouter's usage.cost
   // Fixed-fee engines — accounting figures, not marginal cost. See above.
   gemini:     0.032,
-  google_ai:  0.023,
+  google_ai:  0.046,   // 1 SerpApi credit at $25/500, owner-confirmed 2026-07-29
   // Google AI Overviews. Blended FALLBACK only: real rows are metered from the
   // SerpApi search count _collect.js returns, which is 1 for an inline overview
   // (EUR 0.023) and 2 when Google defers it behind a page_token (EUR 0.046).
   // Do not read 0.035 as the per-call price; it is the figure used before any
   // measured rows exist. Same SerpApi commitment as google_ai.
-  ai_overview: 0.035,
+  ai_overview: 0.069,  // 1.5 SerpApi credits on average (2 when Google defers)
 }
 
 /** Engines billed as a fixed periodic commitment rather than per call.
