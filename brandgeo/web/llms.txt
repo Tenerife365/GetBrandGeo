@@ -1,18 +1,19 @@
 # BrandGEO
 
 > BrandGEO is an AI Visibility Intelligence platform. It monitors, scores, and
-> tracks how brands are mentioned, ranked, and described across ChatGPT,
-> Gemini, Claude, Perplexity, and Meta AI, and reports a weighted 0-100 AI
-> Visibility Score across six dimensions: recognition, knowledge, sentiment,
-> accuracy, reach, and consistency.
+> tracks how brands are mentioned, ranked, and described across up to seven AI
+> engines - ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Grok, and
+> Google AI Overviews - and reports a weighted 0-100 AI Visibility Score across
+> six dimensions: recognition, knowledge, sentiment, accuracy, reach, and
+> consistency.
 
 BrandGEO is an independent, Spain-based company founded by Constantin Daniel
 in 2026, headquartered in Santa Cruz de Tenerife, Canary Islands. BrandGEO
 (getbrandgeo.com) is unrelated to and has no affiliation with any
 similarly-named domain, including brandgeo.co or brangeo.app, which are
 separate, unaffiliated products. Available as self-serve software (Free,
-Essentials, Growth) and as a fully managed, done-for-you service (Managed,
-Pro, Enterprise).
+Essentials, Growth, Growth PRO) and as a fully managed, done-for-you service
+(Managed, Custom Enterprise).
 
 ## Product
 

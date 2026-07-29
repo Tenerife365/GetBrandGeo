@@ -62,7 +62,7 @@
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid var(--bd); position: sticky; top: 0; background: var(--nav); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
+    .logo-text { font-size: 1.15rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; color: var(--t); }
     .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
     nav a:hover { color: var(--t); }
@@ -138,7 +138,12 @@
     }
     @media(max-width:640px) {
       nav { padding: 14px 20px; }
-      nav a:not(.nav-cta) { display: none; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
       .page-hero, .wrap { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 20px; }
       .compare-table { font-size: 0.8rem; }

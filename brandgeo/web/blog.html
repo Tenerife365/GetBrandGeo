@@ -55,7 +55,7 @@
     /* NAV */
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.9); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
     .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
@@ -131,7 +131,7 @@
     footer { border-top: 1px solid var(--border); padding: 56px 40px 32px; color: var(--muted); font-size: 0.88rem; }
     .footer-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1fr; gap: 28px; margin-bottom: 48px; }
     .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 800; line-height: 1; }
+    .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .footer-brand .footer-logo-text .brand { color: var(--text); }
     .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .footer-brand p { line-height: 1.6; margin-bottom: 16px; font-size: 0.85rem; }
@@ -153,6 +153,11 @@
     }
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .page-hero, .featured-wrap, .posts-wrap { padding-left: 20px; padding-right: 20px; }
       .footer-grid { grid-template-columns: 1fr; }

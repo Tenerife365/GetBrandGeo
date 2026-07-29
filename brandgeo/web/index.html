@@ -308,8 +308,26 @@
     /* Padding brings the nav controls to the same 44px hit-target floor as
        every other control on the page. */
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; padding: 6px 0; }
-    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
-    .logo-text .geo {
+    /* Wordmark, conformed to the signed-off lockup 2026-07-29.
+       Source of truth: docs/growth/brand-identity-2026-07-29/v3/logo-full.svg,
+       whose <text> is font-weight 700 and letter-spacing -3 at font-size 94,
+       i.e. -0.032em. This rule shipped at 800 / -.4px (-0.0217em), so the nav
+       rendered a heavier, looser wordmark than the approved artwork.
+       Family is NOT declared here on purpose: it inherits Inter from body,
+       which is exactly what the lockup's stack resolves to now that Geist was
+       dropped site-wide (see the type note above the font <link>). Declaring it
+       again would be a second place to forget to update.
+       Tracking is in em, not px, so the 1.15rem nav and the 1.1rem footer stay
+       optically identical instead of drifting apart as they did before. */
+    .logo-text { font-size: 1.15rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; color: var(--t); }
+    /* Both wordmarks, header and footer, share one declaration. The footer was
+       scoped out of this rule (`.logo-text .geo` against the footer's
+       `.footer-logo-text`) so its GEO rendered solid var(--t) while the nav's
+       ran the gradient: the same page shipped two different wordmarks. Adding
+       the selector here rather than writing a second rule next to
+       .footer-logo-text is deliberate, so the two can never drift again. */
+    .logo-text .geo,
+    .footer-logo-text .geo {
       /* Tokenised 2026-07-29. Was hardcoded #8B5CF6 to #6D28D9, which ended at
          2.77:1 on --bg while :root reserves --ac-text (7.23:1) for accent words,
          and had no light-mode override on any of the 76 pages carrying it. The
@@ -1712,7 +1730,10 @@
     }
     .footer-grid { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 44px; }
     .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .footer-logo-text { font-size: 1.1rem; font-weight: 800; line-height: 1; color: var(--t); }
+    /* Same wordmark as the nav, so the same two values. This rule carried no
+       letter-spacing at all, so the footer was rendering the wordmark at
+       default tracking while the nav ran -.4px: one page, two wordmarks. */
+    .footer-logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; color: var(--t); }
     .footer-brand p { line-height: 1.65; margin-bottom: 16px; font-size: 0.82rem; color: var(--t2); }
     .footer-social { display: flex; gap: 8px; }
     .footer-social a {
@@ -1760,7 +1781,18 @@
     /* ── RESPONSIVE ── */
     @media(max-width: 640px) {
       nav { padding: 14px 20px; }
-      nav a:not(.nav-cta) { display: none; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard.
+         The earlier belt-and-braces override here, `nav a.logo:not(.nav-cta)
+         { display: flex; }`, was removed on 2026-07-29 once site.js was
+         corrected: with neither copy of the rule matching .logo there is
+         nothing left to outrank, and one mechanism is easier to keep true
+         across 79 pages than two. The drawer is unaffected either way,
+         because .logo is never collected into it. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
       .hero, .product-preview, .section, #contact { padding-left: 20px; padding-right: 20px; }
       .pricing-box { padding: 22px 16px; }
       .preview-top { grid-template-columns: 1fr; }
@@ -3091,8 +3123,14 @@
      file, and site.js carries the Stripe checkout URLs: a stale copy sends
      returning visitors to retired payment links and drops Growth PRO back to
      the signup fallback. Missing this bump on 2026-07-28 shipped exactly that
-     for anyone with the previous version cached. -->
-<script src="site.js?v=2026-07-28a"></script>
+     for anyone with the previous version cached.
+     Bumped to 2026-07-29a: site.js now guards its injected
+     `nav a:not(.nav-cta)` rule with `:not(.logo)`. Without the bump a
+     returning visitor keeps the cached script, which re-hides the header
+     lockup below 640px on this page only, since this is the one page that
+     pins site.js to a version token. Caught by measuring at 375px: the page
+     CSS was correct and the logo was still display:none. -->
+<script src="site.js?v=2026-07-29a"></script>
 <!-- Hero canvas + card tilt. External on purpose: the CSP in .htaccess has no
      'unsafe-inline' in script-src, so an inline block here is silently refused
      and the hero renders motionless. See the header of hero.js. -->

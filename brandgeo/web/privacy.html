@@ -38,8 +38,18 @@
     }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.7; }
     nav { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-weight: 700; font-size: 1.1rem; text-decoration: none; color: var(--text); }
-    .logo span { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    /* Upgraded to the approved lockup 2026-07-29. This page was the last public
+       page still on the text-only wordmark: no tile mark at all, and the type
+       carried no tracking. Structure and values now match cookies.html, the
+       sibling utility page, so the header reads identically across the site.
+       Tracking is -.032em, from the signed-off lockup
+       docs/growth/brand-identity-2026-07-29/v3/logo-full.svg, whose <text> is
+       letter-spacing -3 at font-size 94. Gradient stops are carried over
+       unchanged from the rule this replaces. */
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .back { font-size: 0.88rem; color: var(--muted); text-decoration: none; }
     .back:hover { color: var(--text); }
     main { max-width: 760px; margin: 60px auto; padding: 0 24px 80px; }
@@ -97,7 +107,10 @@
 <body>
 
 <nav>
-  <a href="/" class="logo">Brand<span>GEO</span></a>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:30px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
   <a href="/" class="back">← Back to home</a>
 </nav>
 

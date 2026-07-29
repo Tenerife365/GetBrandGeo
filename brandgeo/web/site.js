@@ -741,7 +741,18 @@
       '.bg-nav-drawer{display:contents;}' +
       '.bg-nav-toggle{display:none;}' +
       '@media(max-width:640px){' +
-        'nav a:not(.nav-cta){display:none;}' +
+        // `:not(.logo)` added 2026-07-29, and it is load bearing. This rule
+        // collapses the nav text links so the drawer above can own them. But
+        // the header lockup is `<a class="logo">`, a direct child of <nav>,
+        // so it matched `nav a:not(.nav-cta)` too and was hidden below 640px
+        // on every page that loads this file: measured at 375px, .logo
+        // computed display:none with a 0x0 box, leaving the phone header with
+        // no mark and no wordmark. The drawer is unaffected, because .logo is
+        // never collected into it (the collector only walks `nav > div`).
+        // The static pages carry a byte-identical copy of this rule in their
+        // own <style>; both copies need the guard, since this sheet is
+        // appended later and would otherwise win the cascade tie on its own.
+        'nav a:not(.nav-cta):not(.logo){display:none;}' +
         '.bg-nav-toggle{display:flex;flex-direction:column;justify-content:center;gap:4px;width:36px;height:36px;margin-left:10px;padding:0 8px;background:none;border:1px solid var(--bd2);border-radius:8px;cursor:pointer;flex-shrink:0;}' +
         '.bg-nav-toggle span{display:block;height:2px;width:100%;background:var(--t2);border-radius:2px;transition:transform .2s ease,opacity .2s ease;}' +
         'nav.bg-menu-open .bg-nav-toggle span:nth-child(1){transform:translateY(6px) rotate(45deg);}' +
