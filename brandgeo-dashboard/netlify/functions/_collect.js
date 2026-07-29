@@ -224,6 +224,21 @@ async function callOpenRouter(model, prompt, ctx, opts = {}) {
   if (opts.web) {
     body.plugins = [{ id: 'web', max_results: opts.maxResults ?? 2 }]
   }
+  // REASONING OFF, and this is the third time this codebase has been bitten by
+  // the same thing. gpt-5.5 billed reasoning as uncapped output until effort was
+  // capped to 'low'. gemini-3.5-flash thought by default and timed out on 10 of
+  // 10 grounded calls, forcing a revert to 2.5-flash. grok-4.5 does it too.
+  //
+  // Measured on the first six production calls, 2026-07-29: EUR 0.165 per call
+  // against a budgeted 0.012, which back-solves to roughly 30,000 output tokens
+  // for an answer we truncate for analysis anyway. Four of those six also timed
+  // out. The cost and the timeouts were never two bugs; they were one.
+  //
+  // BrandGEO measures what an engine ANSWERS, not how well it deliberates, so
+  // extended reasoning buys nothing here and costs on both axes.
+  if (opts.noReasoning) {
+    body.reasoning = { enabled: false }
+  }
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -773,7 +788,7 @@ const ENGINE_CALLERS = {
   // with a data-sharing opt-in that would put customer prompts into xAI's
   // training set — not acceptable for a B2B product. web:true is load-bearing,
   // see the note on callOpenRouter.
-  grok:       (p, ctx)    => callOpenRouter('x-ai/grok-4.5', p, ctx, { web: true }),
+  grok:       (p, ctx)    => callOpenRouter('x-ai/grok-4.5', p, ctx, { web: true, noReasoning: true }),
   // Google AI Overviews went live as the 7th engine, Growth PRO and up. Same
   // SerpApi account as google_ai but a different Google surface: the AI summary
   // on an ordinary results page, not the AI Mode tab. Costs 1 SerpApi search,
@@ -795,7 +810,10 @@ const ENGINE_TIMEOUT_MS = {
   claude:     24000,
   chatgpt:    40000,
   google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
-  grok:       22000,   // grok-4.5 + web plugin; slower than sonar, well under the wall
+  grok:       26000,   // was 22000, which killed 4 of grok's first 6 calls. Sized off
+                       // perplexity/sonar, the wrong sibling: sonar does not reason.
+                       // With reasoning off this should be ample; if timeouts persist
+                       // the model is the problem, not the cap.
   // Up to TWO sequential SerpApi calls (the page_token branch), so it needs more
   // headroom than google_ai. Still under Netlify's 26s wall; if it does blow,
   // the row lands as a timeout, having consumed 1-2 SerpApi searches.
@@ -815,7 +833,7 @@ const ENGINE_TIMEOUT_MS_WORKER = {
   claude:     60000,
   chatgpt:    90000,
   google_ai:  45000,   // SerpApi AI Mode can be slow; generous in the 15-min worker
-  grok:       45000,
+  grok:       60000,   // worker path, matched to claude rather than sonar
   ai_overview: 60000,  // two sequential SerpApi calls; generous in the 15-min worker
 }
 

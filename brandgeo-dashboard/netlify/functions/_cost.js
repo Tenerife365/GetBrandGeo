@@ -198,15 +198,22 @@ const ENGINE_COST_EUR = {
   // Fallback estimates, used only when an engine returns no usage block.
   // Recomputed 2026-07-29 from the prices above at the observed call shape.
   claude:     0.033,   // was 0.010 — that figure predated web search being restored
-  chatgpt:    0.056,   // was 0.060
-  perplexity: 0.001,   // was 0.006
+  chatgpt:    0.108,   // MEASURED from metered rows 2026-07-29 (avg of 6, range
+                       // 0.078 to 0.174). Was 0.056, modelled. The gap is reasoning
+                       // tokens: 'low' effort still bills more than the flat
+                       // 500in/650out shape the old figure assumed.
+  perplexity: 0.005,   // MEASURED 2026-07-29 (avg of 6, tight range 0.0050-0.0052).
+                       // Was 0.001, modelled. Still the cheapest engine by far.
   meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); historical rows only
-  // grok-4.5 + OpenRouter web plugin at max_results:2. Tokens are ~EUR 0.0045
-  // ($2/$6 per 1M at the observed 500in/650out shape) and the two web results
-  // are $0.004 each. This is a FALLBACK only: every real grok row is metered
-  // from OpenRouter's own usage.cost, so this number exists for the budget gate
-  // before any data exists and should be trued up from ai_results after a week.
-  grok:       0.012,
+  // grok-4.5 + web plugin. The 0.012 here was modelled on a 500in/650out shape
+  // and the first six production rows METERED at EUR 0.165, fourteen times more,
+  // which back-solves to about 30,000 output tokens per call. grok-4.5 reasons by
+  // default. Reasoning is now disabled at the call site (_collect.js), so this
+  // returns to roughly the modelled figure, and 0.020 is deliberately a little
+  // above it rather than optimistic. TRUE THIS UP from metered rows once a
+  // collection has run with reasoning off, and if it does not fall, the engine
+  // is not viable at this price.
+  grok:       0.020,
   // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
   gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
   google_ai:  0.046,   // 1 SerpApi credit. $25/500 credits, owner-confirmed 2026-07-29

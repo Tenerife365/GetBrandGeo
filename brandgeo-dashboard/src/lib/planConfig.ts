@@ -226,10 +226,11 @@ export const ENGINE_META: Record<EngineId, {
 // the authoritative, server-enforced copy — update BOTH together.
 export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   claude:     0.033,
-  chatgpt:    0.056,
-  perplexity: 0.001,
+  chatgpt:    0.108,   // measured from metered rows 2026-07-29, was 0.056 modelled
+  perplexity: 0.005,   // measured 2026-07-29, was 0.001 modelled
   meta:       0.001,   // retired engine; kept for cost calc on historical rows
-  grok:       0.012,   // fallback only — real rows are metered from OpenRouter's usage.cost
+  grok:       0.020,   // was 0.012; first rows metered 0.165 because grok-4.5 reasons
+                       // by default. Reasoning is now disabled at the call site.
   // Fixed-fee engines — accounting figures, not marginal cost. See above.
   gemini:     0.032,
   google_ai:  0.046,   // 1 SerpApi credit at $25/500, owner-confirmed 2026-07-29
