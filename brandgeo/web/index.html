@@ -509,15 +509,31 @@
 
          Weight is 400 because the family ships ONE weight. Asking for 800 makes
          the browser synthesise a fake bold, which smears the stroke contrast
-         that is the entire reason for using it. Authority comes from size.
-         Size floor raised 2.2 -> 2.5rem and the ceiling 3.5 -> 3.9rem because a
-         serif's smaller x-height reads optically smaller at the same px.
+         that is the entire reason for using it.
          Tracking relaxed -.045em -> -.005em: the old value was tuned for
          Inter's tight sans fit and collides serifs.
-         The two-lines-at-both-widths constraint from homepage-hook.md §2.2
-         still governs; re-measure at 375x812 before changing the clamp. */
+
+         SIZE CLAMP IS THE ORIGINAL, and that is deliberate. It was briefly
+         raised to clamp(2.5rem, 6.8vw, 3.9rem) on the theory that a serif's
+         smaller x-height reads optically smaller. Measured live at both widths,
+         that theory cost a line and a lot of height for nothing:
+
+           variant                     1280px          375px
+           serif @ 3.9rem (reverted)   4 lines, 270px  4 lines, 173px
+           serif @ 3.5rem (this)       3 lines, 181px  3 lines, 114px
+           Inter 800 @ 3.5rem (old)    4 lines, 237px  4 lines, 149px
+
+         Instrument Serif at the SAME size is more compact than Inter at 800,
+         because the black weight is what was eating the horizontal room. So the
+         serif is a net win on hierarchy AND on height; the size bump was not.
+
+         Note homepage-hook.md §2.2 asks for TWO lines at both widths. That was
+         already unmet before the serif landed (Inter 800 measured 4). At 58
+         characters in a 553px split-hero column it is not reachable by type
+         alone. Shortening the headline is the only lever left, and that is a
+         copy decision, not a CSS one. Do not chase it by shrinking type. */
       font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
-      font-size: clamp(2.5rem, 6.8vw, 3.9rem);
+      font-size: clamp(2.2rem, 6.4vw, 3.5rem);
       font-weight: 400;
       line-height: 1.08;
       letter-spacing: -.005em;
