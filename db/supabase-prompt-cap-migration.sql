@@ -59,11 +59,11 @@ comment on table public.plan_prompt_caps is
 -- reverted. If you applied 29b, re-running this file corrects the rows.)
 insert into public.plan_prompt_caps (plan, prompt_cap) values
   ('free',         5),
-  ('essentials',  20),
-  ('growth',      50),
-  ('growth_pro',  75),
-  ('managed',    250),
-  ('pro',        250),
+  ('essentials',  15),
+  ('growth',      35),
+  ('growth_pro',  35),
+  ('managed',    120),
+  ('pro',        120),
   ('enterprise', 100000)
 on conflict (plan) do update
   set prompt_cap = excluded.prompt_cap,

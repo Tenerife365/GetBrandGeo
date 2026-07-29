@@ -554,7 +554,20 @@
     /* ── SPLIT HERO (product above the fold) ── */
     /* The evidence card lost two of its four groups (homepage-hook.md §3.5), so
        the copy column takes the width back. */
-    .hero-split { display: grid; grid-template-columns: 1.08fr .92fr; gap: 56px; align-items: center; }
+    /* align-items is START, not center, and that is the whole point of the
+       change. Measured at 1440 with center: the copy column began at y=227 and
+       the widget at y=311, an 85px offset, which is what read as misalignment.
+       center CANNOT align them because the columns are different heights
+       (522 vs 352). start is the only value that puts them on one baseline. */
+    .hero-split {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 56px;
+      align-items: start;
+      max-width: 1280px;
+      margin-inline: auto;
+      width: 100%;
+    }
     .hero-copy { min-width: 0; }
     .hero-copy .hero-badge { margin-bottom: 16px; }
     .hero-copy h1 { margin: 0 0 16px; }
@@ -563,7 +576,14 @@
     .hero-copy .audit-status, .hero-copy .audit-result { text-align: left; }
     /* 14px and --t2, not 13.6px and --t3: --t3 measures 3.05:1 on --bg in dark
        and 2.32:1 in light, which fails AA (homepage-hook.md §9.1). */
-    .hero-trust { margin-top: 14px; display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: .875rem; color: var(--t2); align-items: center; }
+        /* Trust row, 2026-07-29. Reverted from the A3 icon treatment to plain text
+       separated by middots, on the owner's call. Note the A3 comment argued the
+       opposite; if this is reverted again, record why rather than flip-flopping.
+       The dots are ::after so the markup carries no separator elements and the
+       last item cannot end on one. aria-hidden keeps them out of the a11y tree. */
+    .hero-trust { margin-top: 14px; display: flex; gap: 6px 10px; flex-wrap: wrap; font-size: .875rem; color: var(--t2); align-items: center; }
+    .hero-trust .ht-item { display: inline-flex; align-items: center; gap: 10px; }
+    .hero-trust .ht-item:not(:last-child)::after { content: '•'; color: var(--t3); }
     .hero-trust b { color: var(--t); font-weight: 700; }
     .hero-trust .sep { color: var(--bd2); }
     .hero-visual { position: relative; min-width: 0; }
@@ -1642,13 +1662,64 @@
        .hero-bg was clipped to the hero's padded box, so its glows ended on a
        visible rectangle. Make the background layer full-bleed and let every
        gradient terminate on a transparent stop against the page colour. */
-    .hero { position: relative; overflow: hidden; }
+    /* FULL-BLEED HERO, 2026-07-29.
+       The mesh used to be confined to the left half. Measured at 1440: the
+       background box ran x -727 to 713 while the report widget sat at 781 to
+       1253, so the right half of the hero had no mesh behind it at all.
+
+       Cause: .hero-bg was full-bleeding with `left:50%; width:100vw;
+       translateX(-50%)`, but `left:50%` resolves against .hero's own 1160px
+       padding box, not the viewport, and .hero's `overflow:hidden` then clipped
+       whatever escaped. The technique only works when the positioned ancestor
+       is already viewport-wide.
+
+       Fix: make the SECTION full-bleed and keep the content column inside it
+       with padding. Then .hero-bg is simply `inset:0` with no transform at all,
+       which cannot drift.
+
+       margin-inline rather than width:100vw on its own: 100vw includes the
+       scrollbar, so `width:100vw` alone introduces a horizontal scrollbar on
+       every desktop browser that shows one. */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      width: auto;
+      /* The section is a direct child of body, which is already viewport-wide,
+         so the usual `margin-inline: calc(50% - 50vw)` full-bleed trick does
+         nothing here: 50% resolves against body, so it computed to -7.5px, the
+         scrollbar width and nothing more. The REAL constraint was .hero's own
+         max-width:1160px set earlier in the sheet. Drop the cap, keep the
+         content column via padding, and the section is genuinely full width. */
+      max-width: none;
+      margin-inline: 0;
+      padding-inline: max(40px, calc((100% - 1160px) / 2));
+      /* svh, not vh: on mobile 100vh is the tallest the viewport ever gets, so
+         a vh-based hero is taller than the visible area while the browser
+         chrome is showing. Capped so the trust row stays above the fold on tall
+         monitors, which homepage-hook.md 2.2 cares about. */
+      min-height: min(100svh, 900px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
     .hero-bg {
       position: absolute;
       inset: 0;
-      left: 50%;
-      width: 100vw;
-      transform: translateX(-50%);
+      /* width and transform must be reset EXPLICITLY. An earlier .hero-bg rule
+         sets `width:100vw` and `translateX(-50%)`, and `inset:0` only writes
+         top/right/bottom/left, so the old width and transform survived and the
+         layer still measured 1440px wide sitting at x -720. Now the section is
+         full-bleed, the layer just fills it. */
+      width: auto;
+      height: auto;
+      transform: none;
+      /* margin:0 is load-bearing. The earlier rule also sets margin-left:-50vw,
+         and an absolutely positioned box with left:0, right:0 and a negative
+         margin STRETCHES rather than shifts: it measured 2145px wide starting
+         at x -720. That is not just wasted paint. The new top-centre glow is
+         positioned at 50%, which would have resolved against 2145px and landed
+         at x 352 instead of centre screen. */
+      margin: 0;
       overflow: hidden;
       pointer-events: none;
     }
@@ -1682,8 +1753,16 @@
        halves of the hero do not read as the same flat plane. */
     .hero-bg {
       background:
-        radial-gradient(80% 60% at 12% 18%, rgba(124,58,237,.13) 0%, rgba(9,10,15,0) 62%),
-        radial-gradient(70% 55% at 88% 72%, rgba(99,102,241,.10) 0%, rgba(9,10,15,0) 60%);
+        /* Top-centre key light. New 2026-07-29: with the section now full-bleed
+           there was a wide unlit band across the top, because both original
+           fields are off-centre by design. This ties the two halves together. */
+        radial-gradient(circle at 50% 18%, rgba(139,92,246,.15) 0%, rgba(10,11,14,0) 68%),
+        radial-gradient(80% 60% at 12% 18%, rgba(124,58,237,.13) 0%, rgba(10,11,14,0) 62%),
+        radial-gradient(70% 55% at 88% 72%, rgba(99,102,241,.10) 0%, rgba(10,11,14,0) 60%),
+        /* Base. Deliberately --bg (#0a0b0e) and NOT #07070a: the hero is now
+           full-bleed, so any other value puts a visible horizontal seam where
+           the section meets the rest of the page. The glows carry the depth. */
+        var(--bg);
     }
     @media (prefers-reduced-motion: reduce) {
       .hero-bg::before { opacity: .02; }
@@ -1801,6 +1880,26 @@
     @media(max-width: 900px) { .node-lines { display: none; } }
     @keyframes nodeFlow { to { stroke-dashoffset: -24; } }
     .node-lines .nl-flow { animation: nodeFlow 1.1s linear infinite; }
+
+    /* Connector weight, 2026-07-29. Measured before: a 0.5px gradient path under
+       a 1.1px path dashed `3 21`, so 3px of ink every 24px. At that ratio the
+       line is 12% ink and reads as dirt on the glass rather than a connection.
+       Now 1.5px on a 4/4 dash (50% ink) with a glow, which is what makes it
+       read as a signal path instead of a hairline. */
+    .node-lines path { stroke-width: 1.5; }
+    .node-lines .nl-flow {
+      stroke-dasharray: 4 4;
+      stroke-width: 1.5;
+      filter: drop-shadow(0 0 6px rgba(168,85,247,.6));
+      animation: nodeFlow 1.1s linear infinite, nodePulse 3s ease-in-out infinite;
+    }
+    @keyframes nodePulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+    /* Vestibular safety: the flow translation stops, the opacity breathe stays.
+       competitive-and-conversion-2026-07-28.md 4.2 is explicit that fades are
+       safe and translations are not. */
+    @media (prefers-reduced-motion: reduce) {
+      .node-lines .nl-flow { animation: nodePulse 3s ease-in-out infinite; }
+    }
 
     /* A8. Engine strip, now two tiers. The Web2/Web3 split is the headline's
        own framing, not a hedge about what is monitored. */
@@ -2016,18 +2115,9 @@
            promised by the field directly above it (hook-thesis-web.md §8).
            "50+ brands audited" was removed as untraceable (§5). -->
       <div class="hero-trust">
-        <span class="ht-item">
-          <svg class="ht-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          Free audit
-        </span>
-        <span class="ht-item">
-          <svg class="ht-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          Results in under a minute
-        </span>
-        <span class="ht-item">
-          <svg class="ht-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          No credit card required
-        </span>
+        <span class="ht-item">Free audit</span>
+        <span class="ht-item">Results in under a minute</span>
+        <span class="ht-item">No credit card required</span>
       </div>
       <!-- Payment trust chips. "Coming soon" is accurate and load-bearing: no
            Crypto.com merchant account exists and nothing on the checkout path
@@ -2428,7 +2518,7 @@
       <div class="plan-checkout-note">Secure Stripe checkout</div>
       <div class="plan-features-label">Everything in Free, plus</div>
       <ul class="pricing-features">
-        <li>20 commercial prompts</li>
+        <li>15 commercial prompts</li>
         <li>ChatGPT, Gemini &amp; Claude</li>
         <li>Weekly refresh + competitor tracking</li>
       </ul>
@@ -2450,7 +2540,7 @@
       <div class="plan-checkout-note">Secure Stripe checkout</div>
       <div class="plan-features-label">Everything in Essentials, plus</div>
       <ul class="pricing-features">
-        <li>50 commercial prompts</li>
+        <li>35 commercial prompts</li>
         <li><strong>5 AI engines</strong> &middot; + Perplexity &amp; Google AI Mode</li>
         <li>Weekly refresh &middot; every plan, same cadence</li>
         <li><strong>Site audit</strong> &middot; 10 pages, unlocks here</li>
@@ -2467,14 +2557,14 @@
         <div class="savings-tag billing-yearly" style="display:none;">Save &#x20AC;898</div>
       </div>
       <div class="plan-sub-row">
-        <div class="plan-sub">7 engines &middot; more prompts &middot; deeper site audit.</div>
+        <div class="plan-sub">7 engines &middot; deeper site audit.</div>
       </div>
       <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="growth_pro">Subscribe</a>
       <div class="plan-checkout-note">Secure Stripe checkout</div>
       <div class="plan-features-label">Everything in Growth, plus</div>
       <ul class="pricing-features">
         <li><strong>7 AI engines</strong> &middot; + Grok and Google AI Overviews</li>
-        <li><strong>75 commercial prompts</strong> &middot; vs 50</li>
+        <li>35 commercial prompts</li>
         <li>Weekly refresh &middot; priority queue</li>
         <li><strong>Site audit: 30 pages</strong> &middot; 3x Growth</li>
         <li>AI Social &middot; <span class="pc-muted">coming soon</span></li>

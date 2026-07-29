@@ -54,7 +54,7 @@ const PLAN_BLURB = {
   // true when every paid plan moved to the same weekly cadence. `managed` said
   // five engines when it now has seven.
   growth:     'All five live AI engines, including Google AI Mode, plus site audit, for brands scaling their AI presence.',
-  growth_pro: 'Two more AI engines than Growth, Grok and Google AI Overviews, plus more prompts, three times the SEO page depth, and more social channels.',
+  growth_pro: 'Two more AI engines than Growth, Grok and Google AI Overviews, at the same prompt allowance, plus three times the SEO page depth and more social channels.',
   managed:    'A done-for-you service across all seven live AI engines, with our team running your visibility and acting on the findings.',
   pro:        'Everything in Managed at higher volume, more markets, and priority support, with the next wave of engines unlocking automatically.',
   enterprise: 'Custom scale, dedicated support, and bespoke reporting for large brands and agencies.',

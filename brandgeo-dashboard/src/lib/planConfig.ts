@@ -378,8 +378,8 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
    because gemini (free under 1,500 requests/day) and google_ai (fixed SerpApi
    subscription) sit inside the modelled figure without being marginal spend. */
 export const PLAN_PROMPTS: Record<Plan, number> = {
-  free: 5, essentials: 20, growth: 50, growth_pro: 75,
-  managed: 250, pro: 250, enterprise: 100000,
+  free: 5, essentials: 15, growth: 35, growth_pro: 35,
+  managed: 120, pro: 120, enterprise: 100000,
 }
 
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
