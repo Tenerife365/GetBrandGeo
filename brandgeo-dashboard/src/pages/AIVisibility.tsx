@@ -1312,14 +1312,24 @@ export default function AIVisibility() {
                                 the queue with a 15 minute budget. Leaving it
                                 enabled is what produced a repeated cycle of
                                 pressing a button that could not work. */}
+                            {/* A queue-only engine still gets a PRESSABLE control
+                                here. The first version of this showed a dead
+                                clock and told the user to go find another button
+                                at the top of the page, which is a dead end
+                                wearing an explanation. Pressing it now starts
+                                the background run for that engine, the same
+                                thing the engine card does. The clock icon says
+                                it is slow, not that it is broken. */}
                             {isAdmin && (QUEUE_ONLY_ENGINES.includes(llm.id) ? (
-                              <span
-                                className="ml-auto p-1 text-slate-700 cursor-help"
-                                title={`${llm.label} takes longer than this button allows. Use the refresh icon on the ${llm.label} card at the top of the page, which runs it in the background.`}
-                                aria-label={`${llm.label} must be refreshed from its engine card`}
+                              <button
+                                onClick={(ev) => { ev.stopPropagation(); handleRefreshEngine(llm.id) }}
+                                disabled={collecting || refreshingEngine !== null}
+                                className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                                title={`${llm.label} is too slow for an instant re-run, so this starts it in the background across all prompts. It keeps running if you leave the page.`}
+                                aria-label={`Re-run ${llm.label} in the background`}
                               >
-                                <Clock size={11} />
-                              </span>
+                                <Clock size={11} className={refreshingEngine === llm.id ? 'animate-spin' : ''} />
+                              </button>
                             ) : (
                               <button
                                 onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
