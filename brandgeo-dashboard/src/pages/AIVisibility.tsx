@@ -183,6 +183,22 @@ export default function AIVisibility() {
   const { theme } = useTheme()
   const chart = useChartTheme()
 
+  // Customer-facing allowance, derived from the plan rather than from spend.
+  // Both come from getPlanLimits so this page cannot drift from what the
+  // pricing page publishes or the DB trigger enforces.
+  const planLimits    = getPlanLimits(activeClient?.plan ?? 'free')
+  const planPromptCap = planLimits.prompts
+  // Cooldown hours describe how often a run is allowed, which is what a
+  // customer means by "how often do you check". 0 means no cooldown at all.
+  const planCadence = (() => {
+    const h = planLimits.collectionCooldownH
+    if (h === 0)    return { label: 'On demand' }
+    if (h <= 24)    return { label: 'Daily' }
+    if (h <= 168)   return { label: 'Weekly, about 4 per month' }
+    if (h <= 336)   return { label: 'Every two weeks' }
+    return { label: 'Monthly' }
+  })()
+
   const [prompts, setPrompts]           = useState<Prompt[]>([])
   const [results, setResults]           = useState<ResultMap>(new Map())
   const [errorEngines, setErrorEngines] = useState<Set<LLMName>>(new Set())
@@ -622,20 +638,54 @@ export default function AIVisibility() {
         </div>
       </div>
 
-      {/* Collection allowance row (PRICING-STRATEGY-2026-07 §12 T2a) — cooldown
-          countdown (viewers only; admins bypass the cooldown server-side) +
-          monthly € budget meter (applies to everyone, admins included). */}
-      {!isDemoMode && (collectionAllowance.nextAvailableAt || collectionAllowance.budgetCapEur > 0) && (
+      {/* Collection allowance row.
+          SPLIT BY AUDIENCE 2026-07-29, owner's call. It used to show every user
+          a "Monthly API budget" meter in euros. That is OUR cost of goods, not
+          the customer's allowance: it answers "how much does BrandGEO spend on
+          you" when the customer is asking "how much can I still use". Worse, it
+          moves for reasons the customer cannot see or control, because a euro
+          of ChatGPT buys a different amount of work than a euro of SerpApi.
+
+          Customers now see what they bought: how often collection runs, and how
+          many of their prompts are in use. Admins keep the euro meter, because
+          for them it IS the operative number, and it is the one that actually
+          blocks a run in _auth.js. */}
+      {!isDemoMode && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {!isAdmin && collectionAllowance.nextAvailableAt && (
             <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
           )}
-          <AllowanceMeter
-            label="Monthly API budget"
-            used={collectionAllowance.budgetSpentEur}
-            cap={collectionAllowance.budgetCapEur}
-            format={n => `€${n.toFixed(2)}`}
-          />
+
+          {!isAdmin && (
+            <>
+              <div className="min-w-[140px]">
+                <div className="text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+                  Included runs
+                </div>
+                <div className="text-[11px] tabular-nums font-medium text-slate-400">
+                  {planCadence.label}
+                </div>
+              </div>
+              {/* Prompts is the allowance a customer can actually act on: it is
+                  the number they see on the pricing page, the number Prompts.tsx
+                  meters, and the number the DB trigger enforces. */}
+              <AllowanceMeter
+                label="Prompts in use"
+                used={prompts.length}
+                cap={planPromptCap}
+                hideWhenUnlimited={planPromptCap >= 100000}
+              />
+            </>
+          )}
+
+          {isAdmin && collectionAllowance.budgetCapEur > 0 && (
+            <AllowanceMeter
+              label="Monthly API budget"
+              used={collectionAllowance.budgetSpentEur}
+              cap={collectionAllowance.budgetCapEur}
+              format={n => `€${n.toFixed(2)}`}
+            />
+          )}
         </div>
       )}
 
