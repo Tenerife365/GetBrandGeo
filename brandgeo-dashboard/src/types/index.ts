@@ -11,9 +11,13 @@ export type PromptCategory =
   | 'mid' | 'large' | 'very_large' | 'general'
   | 'tool_discovery' | 'geo_category' | 'problem_based' | 'direct_brand'
 
+// Keep in sync with EngineId in src/lib/planConfig.ts, same set, and
+// ai_results.llm stores exactly these strings.
+// `ai_overview` (Google AI Overviews) is separate from `google_ai` (Google AI
+// Mode) on purpose: two different Google surfaces, measured independently.
 export type LLMName =
   | 'chatgpt' | 'gemini' | 'claude' | 'perplexity' | 'meta'
-  | 'google_ai' | 'copilot' | 'deepseek' | 'grok'
+  | 'google_ai' | 'ai_overview' | 'copilot' | 'deepseek' | 'grok'
 
 export interface SearchResult {
   id: number

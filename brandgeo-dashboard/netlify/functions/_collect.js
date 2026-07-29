@@ -474,7 +474,7 @@ function flattenAiModeBlocks(blocks) {
 async function callGoogleAiMode(prompt, _ctx, opts) {
   const key = process.env.SERPAPI_KEY
   if (!key) {
-    console.error('[GoogleAIMode] SERPAPI_KEY not set — engine skipped')
+    console.error('[GoogleAIMode] SERPAPI_KEY not set, engine skipped')
     return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
   }
   const params = new URLSearchParams({ engine: 'google_ai_mode', q: prompt, api_key: key })
@@ -545,6 +545,206 @@ async function callGoogleAiMode(prompt, _ctx, opts) {
   }
 }
 
+// ─── Google AI Overviews, via SerpApi ────────────────────────────────────────
+// A DIFFERENT SURFACE FROM google_ai, deliberately. `google_ai` is Google AI
+// Mode: the separate conversational tab a user has to switch to on purpose. AI
+// Overviews is the AI summary block that appears on an ORDINARY google.com
+// results page by default, which is a far higher-reach surface. A brand can be
+// present in one and absent from the other, so they are two engines, not two
+// names for the same measurement. Do not merge them.
+//
+// SERPAPI FLOW IS TWO-STEP AND BOTH BRANCHES ARE LIVE:
+//   1. engine=google with the prompt as `q`. If the response's `ai_overview`
+//      object carries `text_blocks`, the content arrived in ONE search.
+//   2. If it carries `page_token` instead, Google deferred rendering and the
+//      content needs a SECOND call to engine=google_ai_overview with that
+//      token. That second call BILLS AS A SECOND SERPAPI SEARCH. The token
+//      expires in roughly 4 minutes, so it is followed immediately in the same
+//      invocation and never queued.
+//   3. No `ai_overview` key at all, or an `ai_overview.error`, is a LEGITIMATE
+//      MEASUREMENT rather than a failure. See AI_OVERVIEW_NOT_SHOWN below.
+//
+// usage.serpSearches carries the real count (1 or 2) so _cost.js bills what was
+// actually consumed instead of a blended average.
+
+// WHY THIS IS A NORMAL 'ok' ROW AND NOT AN ERROR CODE.
+// "Google showed no AI Overview for this query" is the single most common
+// outcome on this surface and it is a real result: the brand was not surfaced,
+// because nothing was surfaced. Recording it as status='error' would be wrong
+// three times over. (a) The dashboard greys an engine card as "Temporarily
+// unavailable" when it sees error rows and no ok rows, so a correctly working
+// engine would read as broken. (b) Every ai_results query in the app filters
+// with .neq('status','error'), so the measurement would be silently dropped
+// from the score instead of counted as a miss. (c) It would still be charged
+// full cost, since the SerpApi search was consumed either way.
+//
+// buildResultRow() treats falsy text as error_code 'no_response', so the row
+// carries this sentinel string rather than an empty one. analyseResponse() on
+// it yields brand_mentioned=false, position null, sentiment neutral, no
+// competitors, which is exactly the intended record. The wording deliberately
+// avoids "Google" and any other plausible brand alias, because matchesAlias()
+// runs boundary-aware regexes over the whole response text and a customer
+// aliased to a word appearing here would register a false mention.
+const AI_OVERVIEW_NOT_SHOWN =
+  '[no_ai_overview] No AI Overview block was rendered for this query in this location.'
+
+// Flatten SerpApi's nested text_blocks into one plain-text string for
+// analyseResponse. Block shapes seen in the wild: `paragraph` ({snippet}),
+// `list` ({list:[{title?,snippet}]}) and `expandable` ({title, text_blocks}).
+//
+// List items are emitted as markdown BULLETS, never as a numbered list. That is
+// a correctness constraint, not a style choice: _analysis.js's
+// extractTopRankedResults() reads literal "1." lines as a ranking, and an AI
+// Overview bullet list is frequently unordered ("things to consider"), so
+// numbering it here would fabricate a brand_position. As bullets, a position is
+// only derived when detectBulletPosition() finds a lead-in that explicitly
+// declares an ordering, which is the existing never-fabricate-a-rank rule.
+function flattenAiOverviewBlocks(blocks, { asList = false, depth = 0 } = {}) {
+  const out = []
+  if (depth > 6) return out   // defensive: expandable blocks nest, but not deeply
+  for (const b of (Array.isArray(blocks) ? blocks : [])) {
+    if (!b || typeof b !== 'object') continue
+    const title = typeof b.title === 'string' ? b.title.trim() : ''
+    const snip  = typeof b.snippet === 'string' ? b.snippet.trim() : ''
+    const line  = [title, snip].filter(Boolean).join(': ')
+    if (line) out.push(asList ? `- ${line}` : line)
+    if (Array.isArray(b.list))        out.push(...flattenAiOverviewBlocks(b.list,        { asList: true,  depth: depth + 1 }))
+    if (Array.isArray(b.text_blocks)) out.push(...flattenAiOverviewBlocks(b.text_blocks, { asList: false, depth: depth + 1 }))
+  }
+  return out
+}
+
+// Shared SerpApi error classification for both AI surfaces.
+function classifySerpApiError(httpStatus, msg) {
+  const lower = String(msg || '').toLowerCase()
+  if (httpStatus === 401 || lower.includes('invalid api key') || lower.includes('unauthorized')) return 'auth_error'
+  if (httpStatus === 429 || lower.includes('run out of searches') || lower.includes('exceeded') || lower.includes('rate limit')) return 'quota_exceeded'
+  return 'api_error'
+}
+
+async function callGoogleAiOverview(prompt, _ctx, opts) {
+  const key = process.env.SERPAPI_KEY
+  if (!key) {
+    console.error('[AIOverview] SERPAPI_KEY not set, engine skipped')
+    return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
+  }
+
+  // Geo, derived exactly as callGoogleAiMode derives it, plus SerpApi's
+  // `location` for a named region. `location` only accepts SerpApi's own
+  // canonical location names and 400s on anything else, so a region that is not
+  // a real place name (or is spelled differently than SerpApi expects) would
+  // otherwise take the whole engine down for that client. One retry without it
+  // covers that. A 400 on an invalid parameter is not a completed search and is
+  // not billed by SerpApi, so the retry does not double-charge.
+  const marketId = opts?.marketId
+  const regionLabel = opts?.regionLabel
+  const hasSpecificRegion = regionLabel &&
+    !String(regionLabel).startsWith('All ') &&
+    regionLabel !== 'All regions' && regionLabel !== 'All states' &&
+    regionLabel !== 'All provinces' && regionLabel !== 'All emirates'
+
+  const buildParams = (withLocation) => {
+    const p = new URLSearchParams({ engine: 'google', q: prompt, api_key: key })
+    if (marketId && marketId !== 'WW') p.set('gl', String(marketId).toLowerCase())
+    if (withLocation && hasSpecificRegion) p.set('location', String(regionLabel))
+    return p
+  }
+
+  // searches counts SerpApi searches that actually returned a result payload.
+  // A rejected request (bad parameter, auth) is not counted, because SerpApi
+  // does not bill failed searches.
+  let searches = 0
+
+  try {
+    let r = await fetch(`https://serpapi.com/search?${buildParams(true).toString()}`)
+    let d
+    try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response` } }
+
+    // Retry once without `location` if that is what SerpApi rejected.
+    if (d.error && /location/i.test(String(d.error)) && hasSpecificRegion) {
+      console.warn('[AIOverview] SerpApi rejected location, retrying country-only:', String(d.error).slice(0, 160))
+      r = await fetch(`https://serpapi.com/search?${buildParams(false).toString()}`)
+      try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response (location retry)` } }
+    }
+
+    const idTag = d?.search_metadata?.id ? ` [serpapi:${d.search_metadata.id}]` : ''
+
+    if (d.error) {
+      const msg = String(d.error)
+      const errorCode = classifySerpApiError(r.status, msg)
+      console.error('[AIOverview] error:', msg)
+      return { text: null, errorCode, detail: `HTTP ${r.status} ${msg}${idTag}`.slice(0, 400) }
+    }
+    searches = 1
+
+    let ao = d.ai_overview
+    const usage = () => ({ serpSearches: searches })
+
+    // Branch 3, no AI Overview on this SERP. A real measurement, not a fault.
+    if (!ao || typeof ao !== 'object') {
+      console.log(`[AIOverview] no ai_overview block on the SERP${idTag} | searches:`, searches)
+      return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+    }
+
+    // Branch 2 — Google deferred the overview; follow the token immediately.
+    if (!Array.isArray(ao.text_blocks) && ao.page_token) {
+      const p2 = new URLSearchParams({ engine: 'google_ai_overview', page_token: ao.page_token, api_key: key })
+      const r2 = await fetch(`https://serpapi.com/search?${p2.toString()}`)
+      let d2
+      try { d2 = await r2.json() } catch { return { text: null, usage: usage(), errorCode: 'api_error', detail: `page_token follow-up: HTTP ${r2.status} non-JSON response${idTag}` } }
+      if (d2.error) {
+        const msg = String(d2.error)
+        // A token that has expired (roughly 4 minutes) or a deferred overview
+        // Google never rendered both land here. Neither is a broken engine.
+        const lower = msg.toLowerCase()
+        if (lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found') || lower.includes('expired')) {
+          searches = 2
+          console.warn(`[AIOverview] page_token follow-up returned nothing: ${msg}${idTag}`)
+          return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+        }
+        searches = 2
+        console.error('[AIOverview] page_token follow-up error:', msg)
+        return { text: null, usage: usage(), errorCode: classifySerpApiError(r2.status, msg), detail: `page_token follow-up: HTTP ${r2.status} ${msg}${idTag}`.slice(0, 400) }
+      }
+      searches = 2
+      ao = d2.ai_overview || {}
+    }
+
+    // SerpApi reports "Google hasn't returned any AI overview for this query"
+    // as an error nested INSIDE ai_overview rather than at the top level.
+    if (ao.error && !Array.isArray(ao.text_blocks)) {
+      console.log(`[AIOverview] not shown: ${String(ao.error).slice(0, 160)}${idTag} | searches:`, searches)
+      return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+    }
+
+    const text = flattenAiOverviewBlocks(ao.text_blocks).join('\n').trim()
+
+    // CITATIONS ARE CAPTURED BUT NOT PERSISTED, and that is a schema limit, not
+    // an oversight. ai_results has no column for them, and the only free-text
+    // column (response_text) is the exact same string analyseResponse() parses,
+    // so appending "Sources: ..." would feed citation titles and domains into
+    // competitor extraction. Logged here so the data is visible while the
+    // decision on a references column sits with the owner.
+    const refs = Array.isArray(ao.references) ? ao.references : []
+
+    if (text) {
+      console.log('[AIOverview] ok | len:', text.length, '| searches:', searches,
+        '| refs:', refs.length, refs.slice(0, 5).map(x => x?.source || x?.link).filter(Boolean).join(', '),
+        '| preview:', text.slice(0, 200))
+      return { text, usage: usage(), errorCode: null, detail: null }
+    }
+
+    // An ai_overview object with no readable text_blocks is the same outcome as
+    // no ai_overview at all: nothing was shown to a searcher.
+    console.log(`[AIOverview] ai_overview present but empty${idTag} | searches:`, searches)
+    return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+  } catch (e) {
+    if (e.name === 'AbortError') return { text: null, usage: searches ? { serpSearches: searches } : null, errorCode: 'timeout', detail: 'aborted' }
+    console.error('[AIOverview] threw:', e.message)
+    return { text: null, usage: searches ? { serpSearches: searches } : null, errorCode: 'api_error', detail: `threw ${e.message}` }
+  }
+}
+
 // ─── Engine registry ──────────────────────────────────────────────────────────
 // Normalized caller map: every engine is (promptText, ctx, opts) => { text, errorCode, detail }.
 // opts carries { marketId, regionLabel } (ChatGPT + Google AI Mode use them).
@@ -562,6 +762,11 @@ const ENGINE_CALLERS = {
   // training set — not acceptable for a B2B product. web:true is load-bearing,
   // see the note on callOpenRouter.
   grok:       (p, ctx)    => callOpenRouter('x-ai/grok-4.5', p, ctx, { web: true }),
+  // Google AI Overviews went live as the 7th engine, Growth PRO and up. Same
+  // SerpApi account as google_ai but a different Google surface: the AI summary
+  // on an ordinary results page, not the AI Mode tab. Costs 1 SerpApi search,
+  // or 2 when Google defers the overview behind a page_token.
+  ai_overview: (p, ctx, o) => callGoogleAiOverview(p, ctx, o),
 }
 
 // Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
@@ -579,6 +784,10 @@ const ENGINE_TIMEOUT_MS = {
   chatgpt:    40000,
   google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
   grok:       22000,   // grok-4.5 + web plugin; slower than sonar, well under the wall
+  // Up to TWO sequential SerpApi calls (the page_token branch), so it needs more
+  // headroom than google_ai. Still under Netlify's 26s wall; if it does blow,
+  // the row lands as a timeout, having consumed 1-2 SerpApi searches.
+  ai_overview: 24000,
 }
 
 // WORKER path (collection-worker-background.js): the whole reason the queue
@@ -595,6 +804,7 @@ const ENGINE_TIMEOUT_MS_WORKER = {
   chatgpt:    90000,
   google_ai:  45000,   // SerpApi AI Mode can be slow; generous in the 15-min worker
   grok:       45000,
+  ai_overview: 60000,  // two sequential SerpApi calls; generous in the 15-min worker
 }
 
 // Gemini's internal model-fallback budget is separate from the outer timeout
@@ -749,5 +959,6 @@ module.exports = {
   buildResultRow,
   collectEngines,
   // exported individually too, for any caller that wants one engine directly
-  callChatGPT, callClaude, callGemini, callOpenRouter,
+  callChatGPT, callClaude, callGemini, callOpenRouter, callGoogleAiOverview,
+  flattenAiOverviewBlocks, AI_OVERVIEW_NOT_SHOWN,
 }

@@ -30,7 +30,12 @@ const { WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS } = require('./_cost')
 // google_ai (Google AI Mode via SerpApi) is handled here too — it's a fast HTTP
 // call that fits the 26s window. `meta` is retired but kept in the list so an old
 // meta request wouldn't error (no plan includes it anymore, so it won't be sent).
-const FAST_ENGINES = ['gemini', 'perplexity', 'meta', 'google_ai', 'grok']
+// ai_overview (Google AI Overviews via SerpApi) is handled here too, for the
+// same reason google_ai is: it is an HTTP scrape that fits the 26s window. It
+// can make TWO sequential SerpApi calls when Google defers the overview behind
+// a page_token, which is why its ENGINE_TIMEOUT_MS in _collect.js is higher
+// than google_ai's.
+const FAST_ENGINES = ['gemini', 'perplexity', 'meta', 'google_ai', 'grok', 'ai_overview']
 
 exports.handler = async (event) => {
   // Auth: verify JWT + origin (client ownership checked after body parse)

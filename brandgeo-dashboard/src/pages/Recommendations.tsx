@@ -27,7 +27,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
-import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import SharedEmptyState from '../components/EmptyState'
@@ -104,11 +104,14 @@ interface EngineError {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LLM_LABEL: Record<string, string> = {
-  chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
-  perplexity: 'Perplexity', meta: 'Meta AI',
-  google_ai: 'Google AI', copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
-}
+// Derived from ENGINE_META, not hand-written. This map was a sixth independent
+// engine list and it drifted: several call sites below read LLM_LABEL[s.llm]
+// with NO fallback, so a newly shipped engine rendered the literal string
+// "undefined" into customer-facing recommendation copy. Deriving it means a new
+// engine is labelled correctly the moment it is added to ENGINE_META.
+const LLM_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(ENGINE_META).map(([id, m]) => [id, m.label])
+)
 
 // LLM_COLOR (a fifth independent hand-picked engine-colour map, on top of the
 // four the audit already named) is DELETED — dashboard-visual-system.md §8.4:
@@ -146,6 +149,7 @@ const LLM_SOURCE: Record<string, string> = {
   copilot:    'Copilot leverages Bing search index — ensuring your site is crawlable and listed on Bing-indexed directories boosts visibility.',
   deepseek:   'DeepSeek sources from high-quality web content — comprehensive, well-structured pages with clear brand information perform best.',
   grok:       'Grok uses real-time web data and X/Twitter — an active social presence combined with fresh indexed content helps visibility.',
+  ai_overview: 'Google AI Overviews summarise the ordinary Google results page, so the same signals that win classic rankings apply: being well indexed, having clear structured data, and earning citations from pages Google already trusts.',
 }
 
 /** Fastest fixes per LLM (generic enough for any client) */

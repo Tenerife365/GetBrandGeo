@@ -140,7 +140,24 @@ const TOOL_FEE_USD = {
  * still throttles them; it is not what the call marginally costs. Do not quote
  * these as marginal cost when deciding whether a run is "worth it".
  */
-const FIXED_FEE_ENGINES = new Set(['gemini', 'google_ai'])
+const FIXED_FEE_ENGINES = new Set(['gemini', 'google_ai', 'ai_overview'])
+
+/**
+ * SerpApi per-search accounting rate in EUR.
+ * Starter tier is $25 per 1,000 searches = $0.025 per search, which is
+ * EUR 0.023 at USD_TO_EUR. Both SerpApi engines (google_ai, ai_overview) draw
+ * on the SAME monthly commitment, so this is the shared unit.
+ *
+ * ai_overview is metered rather than estimated because its search count is not
+ * fixed: engine=google returns the overview inline for 1 search, but when
+ * Google defers it behind a page_token a second call to
+ * engine=google_ai_overview is required and that bills as a SECOND search.
+ * _collect.js returns the real count as usage.serpSearches, so a deferred
+ * overview is billed EUR 0.046 and an inline one EUR 0.023. Averaging the two
+ * would understate every deferred call and overstate every inline one, and the
+ * split is not stable across markets or query types.
+ */
+const SERPAPI_COST_PER_SEARCH_EUR = 0.023
 
 const ENGINE_COST_EUR = {
   // Fallback estimates, used only when an engine returns no usage block.
@@ -158,6 +175,13 @@ const ENGINE_COST_EUR = {
   // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
   gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
   google_ai:  0.023,   // SerpApi mid-tier per-search; real cost is the monthly plan
+  // Google AI Overviews. FALLBACK ONLY — every real row is metered from
+  // usage.serpSearches, so this is the blended figure used before any usage
+  // exists (and by the budget projection): a mix of 1-search inline overviews
+  // at EUR 0.023 and 2-search deferred ones at EUR 0.046. True it up from
+  // ai_results.cost_eur once a week of real rows exists; the blend ratio is the
+  // one number here that is genuinely unknown until measured.
+  ai_overview: 0.035,
 }
 
 // Error codes where NO billable API call happened — the request was rejected
@@ -207,6 +231,15 @@ function estimateCostEur(llm, usage) {
   // us. Applies to perplexity and grok today.
   if (usage && typeof usage.costUsd === 'number' && usage.costUsd > 0) {
     return usage.costUsd * USD_TO_EUR
+  }
+  // SERPAPI SEARCHES ARE METERED BY COUNT, NOT BY TOKENS. There are no tokens
+  // on this path — SerpApi bills per search — so the count the caller returned
+  // IS the cost basis. ai_overview consumes 1 search inline and 2 when Google
+  // defers the overview behind a page_token. google_ai returns no usage today
+  // and falls through to its flat estimate; if it is ever wired to report a
+  // count, it bills correctly here with no further change.
+  if (usage && typeof usage.serpSearches === 'number' && usage.serpSearches > 0) {
+    return usage.serpSearches * SERPAPI_COST_PER_SEARCH_EUR
   }
   const price = MODEL_PRICE_USD[llm]
   if (!price || !usage) return null
@@ -269,10 +302,17 @@ const PLAN_LIVE_ENGINES = {
   // frequency stopped being a differentiator; a 6th engine is the thing that
   // makes the step legible. Grok is also the only engine with live X/Twitter
   // retrieval, so it measures a surface none of the other five can see.
-  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
+  // AI OVERVIEWS IS THE 7TH ENGINE, GROWTH PRO AND UP (2026-07-29). It is ADDED
+  // alongside google_ai, not a replacement for it, because the two measure
+  // different Google products: google_ai is AI Mode, the conversational tab a
+  // user has to switch to deliberately; ai_overview is the AI summary block on
+  // an ordinary results page, shown by default and therefore reaching far more
+  // searchers. A brand can be cited in one and absent from the other, and only
+  // measuring them separately shows that. Growth and below are unchanged at 5.
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
 }
 
 // Derived from PLAN_LIVE_ENGINES so there is ONE source of truth for the
@@ -385,7 +425,14 @@ const PLAN_COLLECTION_COOLDOWN_HOURS = {
 // budget. google_ai (Google AI Mode via SerpApi) runs no_cache, so every call
 // consumes a SerpApi credit; capping it to once/week/prompt keeps a small
 // SerpApi plan (e.g. 250 searches/mo) from being burned by repeated refreshes.
-const WEEKLY_CAPPED_ENGINES = ['google_ai']
+// ai_overview joined the cap 2026-07-29 for the same reason and more strongly:
+// it draws on the SAME SerpApi commitment as google_ai and consumes TWO credits
+// whenever Google defers the overview behind a page_token, so an uncapped
+// manual refresh loop burns the plan roughly twice as fast as google_ai does.
+// The cap is invisible to scheduled collection, which already runs weekly; it
+// only stops manual thrash. Removing it is a one-word edit if SerpApi headroom
+// later makes it unnecessary.
+const WEEKLY_CAPPED_ENGINES = ['google_ai', 'ai_overview']
 const WEEKLY_CAP_DAYS = 7
 
 module.exports = {
@@ -393,6 +440,7 @@ module.exports = {
   MODEL_PRICE_USD,
   TOOL_FEE_USD,
   FIXED_FEE_ENGINES,
+  SERPAPI_COST_PER_SEARCH_EUR,
   USD_TO_EUR,
   FREE_ERROR_CODES,
   costForRow,

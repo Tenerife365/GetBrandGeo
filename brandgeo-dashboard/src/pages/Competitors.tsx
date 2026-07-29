@@ -15,7 +15,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
-import { ENGINE_META } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
 import ChartTooltip from '../components/ChartTooltip'
@@ -27,7 +27,9 @@ import type { LLMName } from '../types'
 // --- Types -------------------------------------------------------------------
 
 // ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
-const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
+// Derived, never hand-listed — see LIVE_ENGINES in planConfig.ts. The old
+// hardcoded five-engine array was already stale for grok and ai_overview.
+const ENGINES = LIVE_ENGINES as LLMName[]
 // Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
 // file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
 // ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.

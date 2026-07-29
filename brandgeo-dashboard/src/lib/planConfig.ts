@@ -15,6 +15,11 @@ export type EngineId =
   | 'perplexity'
   | 'meta'
   | 'google_ai'
+  // Google AI Overviews. NOT the same surface as google_ai (Google AI Mode):
+  // AI Mode is the conversational tab a user switches to on purpose, AI
+  // Overviews is the AI summary shown by default on an ordinary results page.
+  // Different reach, different answers, measured separately.
+  | 'ai_overview'
   | 'copilot'
   | 'deepseek'
   | 'grok'
@@ -51,10 +56,16 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   // GROK LIVE 2026-07-29, Growth PRO and up — the 6th engine, and the step that
   // makes Growth PRO legible. See the note in _cost.js PLAN_LIVE_ENGINES.
-  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
-  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok'],
-  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'copilot', 'deepseek'],
-  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'copilot', 'deepseek'],
+  // AI OVERVIEWS LIVE 2026-07-29, Growth PRO and up — the 7th engine, ADDED
+  // alongside google_ai rather than replacing it. AI Mode and AI Overviews are
+  // two different Google products: one is a tab the user opts into, the other
+  // is the summary block on a normal results page, which reaches far more
+  // people. Measuring only one of them would miss the surface most customers
+  // are actually seen (or not seen) on. Mirror in _cost.js PLAN_LIVE_ENGINES.
+  growth_pro: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
+  managed:    ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview'],
+  pro:        ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview', 'copilot', 'deepseek'],
+  enterprise: ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'grok', 'ai_overview', 'copilot', 'deepseek'],
 }
 
 // ── Engines not built, not collecting — always "coming soon" ─────────────────
@@ -81,10 +92,30 @@ export const COMING_SOON_ENGINES = new Set<EngineId>(['meta', 'copilot', 'deepse
 // is also better product ordering than before: the five collecting engines
 // first, then retired `meta`, then the three that have never collected — the
 // old order had retired `meta` ahead of live `google_ai`.
+// `ai_overview` is inserted directly after `google_ai` (both are Google
+// surfaces, and adjacency makes the AI Mode vs AI Overviews distinction
+// legible rather than looking like a duplicate entry elsewhere in the list).
+// Per J5 above, the adjacent-pair colour check was re-run for this order:
+// google_ai #db2777 vs ai_overview #0f766e is dE2000 51.6, and ai_overview vs
+// meta #c026d3 is 39.8, both far above the 15 floor.
 export const ALL_ENGINES: EngineId[] = [
-  'chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai',
+  'chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai', 'ai_overview',
   'meta', 'deepseek', 'grok', 'copilot',
 ]
+
+/**
+ * Engines that actually collect, in display order. ALL_ENGINES minus the ones
+ * that have never run.
+ *
+ * ADDED 2026-07-29 to kill a whole class of bug rather than one instance of it.
+ * Dashboard.tsx and Competitors.tsx each carried their own hand-written
+ * `['chatgpt','gemini','claude','perplexity','google_ai']`, so when grok shipped
+ * that morning and ai_overview shipped the same afternoon, both charts silently
+ * stopped plotting engines the product was collecting and billing for. Nothing
+ * failed and nothing warned; the data was simply absent from two pages. Any new
+ * consumer should import THIS rather than typing the list again.
+ */
+export const LIVE_ENGINES: EngineId[] = ALL_ENGINES.filter(e => !COMING_SOON_ENGINES.has(e))
 
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
 // Kept in sync with PLAN_ENGINES above by hand — derive the "X+" label shown
@@ -98,6 +129,7 @@ export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
   perplexity: 'growth',
   meta:       'growth',   // retired (no plan includes it) — kept for type completeness
   google_ai:  'growth_pro',  // AI Mode (SerpApi) is Growth PRO and up only (PRICING-STRATEGY-2026-07)
+  ai_overview: 'growth_pro', // LIVE 2026-07-29, 7th engine, Growth PRO and up
   copilot:    'pro',
   deepseek:   'pro',
   grok:       'growth_pro',  // LIVE 2026-07-29 — 6th engine, Growth PRO and up
@@ -135,6 +167,15 @@ export const ENGINE_META: Record<EngineId, {
   claude:     { label: 'Claude',         logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#ea580c' },
   perplexity: { label: 'Perplexity',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#0891b2' },
   google_ai:  { label: 'Google AI Mode', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#db2777' },
+  // Teal-700. Validated against the other nine with CIEDE2000 before being
+  // chosen, not picked by eye: worst normal-vision separation is 19.2 (vs
+  // perplexity #0891b2), above the 15 floor and comfortably better than the
+  // closest EXISTING pair in this table (gemini/deepseek at 6.9). Clears 3:1 on
+  // all three real surfaces (3.49 on #0a0f1e, 3.26 on #0f172a, 5.47 on white).
+  // Teal was the widest genuinely free slot: red is reserved for the sentiment
+  // negative pole, lime is the sentiment positive pole, and violet is the brand
+  // accent. If this order or set changes, re-run the validator (spec §17 V1/V2).
+  ai_overview: { label: 'Google AI Overviews', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',     chartColor: '#0f766e' },
   meta:       { label: 'Meta AI',        logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#c026d3' },
   deepseek:   { label: 'DeepSeek',       logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://deepseek.com',          chartColor: '#6366f1' },
   grok:       { label: 'Grok',           logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#a16207' },
@@ -192,12 +233,19 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   // Fixed-fee engines — accounting figures, not marginal cost. See above.
   gemini:     0.032,
   google_ai:  0.023,
+  // Google AI Overviews. Blended FALLBACK only: real rows are metered from the
+  // SerpApi search count _collect.js returns, which is 1 for an inline overview
+  // (EUR 0.023) and 2 when Google defers it behind a page_token (EUR 0.046).
+  // Do not read 0.035 as the per-call price; it is the figure used before any
+  // measured rows exist. Same SerpApi commitment as google_ai.
+  ai_overview: 0.035,
 }
 
 /** Engines billed as a fixed periodic commitment rather than per call.
- *  Mirrors FIXED_FEE_ENGINES in netlify/functions/_cost.js. */
+ *  Mirrors FIXED_FEE_ENGINES in netlify/functions/_cost.js.
+ *  google_ai and ai_overview both draw on the SAME SerpApi monthly plan. */
 export const FIXED_FEE_ENGINES: ReadonlySet<EngineId> =
-  new Set<EngineId>(['gemini', 'google_ai'])
+  new Set<EngineId>(['gemini', 'google_ai', 'ai_overview'])
 
 // ── Monthly per-client API spend cap (EUR) ───────────────────────────────────
 // SCALE-SPEC.md §2 — server-side enforcement lives in

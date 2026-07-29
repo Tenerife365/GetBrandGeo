@@ -29,10 +29,16 @@ const PLAN_LABELS = {
 
 // Engine id -> human label, for the congrats email + banner. Display only; the
 // per-plan engine SET comes from _cost.js, never from this file.
+// EVERY engine id that activeEnginesFor() can return MUST have a key here.
+// planUnlocks() does `ENGINE_LABELS[e] || e`, so a missing key does not throw,
+// it prints the raw id. `ai_overview` was missing for the few hours between the
+// engine shipping and this line, which would have emailed a customer the literal
+// string "ai_overview" in the list of what their EUR 449 just bought. This file
+// is the copy a paying customer reads at the moment they are charged.
 const ENGINE_LABELS = {
   chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', perplexity: 'Perplexity',
-  meta: 'Meta AI', google_ai: 'Google AI Mode', copilot: 'Copilot',
-  deepseek: 'DeepSeek', grok: 'Grok',
+  meta: 'Meta AI', google_ai: 'Google AI Mode', ai_overview: 'Google AI Overviews',
+  copilot: 'Copilot', deepseek: 'DeepSeek', grok: 'Grok',
 };
 
 // One human line per plan, for the congrats email + banner body. Every claim
@@ -42,9 +48,14 @@ const ENGINE_LABELS = {
 const PLAN_BLURB = {
   free:       'A single AI engine (ChatGPT) so you can see where your brand stands.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
-  growth:     'All five live AI engines, including Google AI Mode, with AI Social, for brands scaling their AI presence.',
-  growth_pro: 'Everything in Growth at higher volume: more prompts, a faster refresh cycle, and more SEO pages and social channels.',
-  managed:    'A done-for-you service across all five live AI engines, with our team running your visibility and acting on the findings.',
+  // CORRECTED 2026-07-29. Three claims here were false at the moment of charge.
+  // `growth` sold AI Social, which is admin-only and shows as coming soon to
+  // customers. `growth_pro` sold "a faster refresh cycle", which stopped being
+  // true when every paid plan moved to the same weekly cadence. `managed` said
+  // five engines when it now has seven.
+  growth:     'All five live AI engines, including Google AI Mode, plus site audit, for brands scaling their AI presence.',
+  growth_pro: 'Two more AI engines than Growth, Grok and Google AI Overviews, plus more prompts, three times the SEO page depth, and more social channels.',
+  managed:    'A done-for-you service across all seven live AI engines, with our team running your visibility and acting on the findings.',
   pro:        'Everything in Managed at higher volume, more markets, and priority support, with the next wave of engines unlocking automatically.',
   enterprise: 'Custom scale, dedicated support, and bespoke reporting for large brands and agencies.',
 };

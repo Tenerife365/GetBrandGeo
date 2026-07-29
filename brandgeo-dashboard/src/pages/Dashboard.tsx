@@ -11,7 +11,7 @@ import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { useTheme } from '../lib/themeContext'
-import { ENGINE_META } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import {
   computeAiVisibilityScore, buildScoreResultMap,
   type AiVisibilityDimensions, type ScoreInputRow,
@@ -29,7 +29,10 @@ import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
 // page's palette from drifting out of sync with AIVisibility.tsx (DESIGN-SYSTEM.md §1/§5).
-const LLM_IDS: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
+// Derived, never hand-listed. This array was hardcoded to five engines and was
+// already missing grok and ai_overview within hours of each shipping, so the
+// chart quietly under-reported what the product collects. See LIVE_ENGINES.
+const LLM_IDS = LIVE_ENGINES as LLMName[]
 const LLMS = LLM_IDS.map(id => ({
   id,
   label: ENGINE_META[id].label,
