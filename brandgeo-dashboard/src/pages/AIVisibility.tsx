@@ -14,7 +14,7 @@ import { useCollection } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
-  getPlanLimits,
+  getPlanLimits, QUEUE_ONLY_ENGINES,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
@@ -1303,17 +1303,34 @@ export default function AIVisibility() {
                           <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
                             <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                             {llm.label}
-                            {isAdmin && (
+                            {/* QUEUE_ONLY_ENGINES cannot finish inside the 26s
+                                Netlify wall this button posts to, so for them it
+                                could only ever spin and fail. Measured, not
+                                assumed: grok timed out at 21s on this exact path
+                                on 2026-07-29. It is disabled and says why, and
+                                points at the engine card refresh, which runs on
+                                the queue with a 15 minute budget. Leaving it
+                                enabled is what produced a repeated cycle of
+                                pressing a button that could not work. */}
+                            {isAdmin && (QUEUE_ONLY_ENGINES.includes(llm.id) ? (
+                              <span
+                                className="ml-auto p-1 text-slate-700 cursor-help"
+                                title={`${llm.label} takes longer than this button allows. Use the refresh icon on the ${llm.label} card at the top of the page, which runs it in the background.`}
+                                aria-label={`${llm.label} must be refreshed from its engine card`}
+                              >
+                                <Clock size={11} />
+                              </span>
+                            ) : (
                               <button
                                 onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
                                 disabled={refreshingCell !== null || collecting}
                                 className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
-                                title={`Re-run this prompt on ${llm.label} only — charges for one engine call`}
+                                title={`Re-run this prompt on ${llm.label} only. Charges for one engine call.`}
                                 aria-label={`Re-run this prompt on ${llm.label} only`}
                               >
                                 <RotateCcw size={11} className={refreshingCell === `${prompt.id}:${llm.id}` ? 'animate-spin' : ''} />
                               </button>
-                            )}
+                            ))}
                           </div>
                           {r ? (
                             <>

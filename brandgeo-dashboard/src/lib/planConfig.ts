@@ -145,6 +145,25 @@ export const DEDICATED_ENGINE_FUNCTIONS: Record<string, string> = {
   claude:  'collect-claude',
 }
 
+/**
+ * Engines that CANNOT complete inside the 26s Netlify wall and must run on the
+ * queue worker, which has 15 minutes.
+ *
+ * grok is here because it is measured, not assumed. On 2026-07-29 it failed the
+ * HTTP path repeatedly: first api_error (reasoning could not be disabled, fixed
+ * in cd4795d) and then, once the call was accepted, a clean timeout at 21s. The
+ * HTTP ceiling is ~24000ms because the row insert needs room before the platform
+ * kill, so there is no timeout value that makes grok fit. Raising it just moves
+ * the failure from a visible timeout back to a silent death.
+ *
+ * The per-(prompt, engine) refresh button uses the HTTP path, so for these
+ * engines it can only ever fail. AIVisibility disables it for them and points at
+ * the per-engine card refresh, which goes through the queue.
+ *
+ * Remove an engine from here only after seeing it succeed on the HTTP path.
+ */
+export const QUEUE_ONLY_ENGINES: EngineId[] = ['grok']
+
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
 // Kept in sync with PLAN_ENGINES above by hand — derive the "X+" label shown
 // on locked engine cards. perplexity/meta moved to 'growth' (was
