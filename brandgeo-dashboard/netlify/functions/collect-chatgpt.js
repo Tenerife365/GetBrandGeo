@@ -64,10 +64,19 @@ exports.handler = async (event) => {
     }
   }
 
+  // Plan selects the ChatGPT model (CHATGPT_MODEL_BY_PLAN in _collect.js: paid
+  // plans get gpt-5.5, free and essentials get gpt-4o-mini). Read from the
+  // database, NOT from client_config, which arrives in the request body: a
+  // viewer could otherwise claim 'managed' and spend the expensive model on our
+  // account. On a failed lookup `plan` stays null and the cheap model is used.
+  const { data: planRow } = await supabase
+    .from('clients').select('plan').eq('id', client_id).single()
+
   // For force: collect-prompt.js has already deleted all rows for this prompt.
   const T0 = Date.now()
   const { rows } = await collectEngines(['chatgpt'], {
     prompt_id, prompt_text, client_id, client_config, market_label, region_label, market_id,
+    plan: planRow?.plan ?? null,
   })
   const row = rows[0]
   console.log(`[ChatGPT/${invId}] call finished in ${Date.now() - T0}ms | status:${row.status}${row.status === 'error' ? ' ' + row.error_code : ''}`)

@@ -136,6 +136,16 @@ const MODEL_PRICE_USD = {
   grok:       { in: 2.00, out:  6.00 },  // x-ai/grok-4.5 via OpenRouter, live 2026-07-29
 }
 
+/**
+ * Prices keyed by MODEL ID, for engines that run more than one model. Used by
+ * estimateCostEur when the caller reports which model actually answered, which
+ * callChatGPT does. Keep in step with MODEL_PRICE_USD above.
+ */
+const MODEL_PRICE_BY_ID = {
+  'gpt-5.5':     { in: 5.00, out: 30.00 },
+  'gpt-4o-mini': { in: 0.15, out:  0.60 },
+}
+
 /** Flat per-call tool fees in USD (charged on top of tokens). */
 const TOOL_FEE_USD = {
   chatgpt: 0.010,   // web_search_preview, $10 per 1,000 calls
@@ -213,6 +223,15 @@ const ENGINE_COST_EUR = {
   // about a fifth of the cost and the flat search fee is the rest, which is a
   // different cost structure, so re-measure before quoting this anywhere.
   // Replace with a measured figure once real 4o-mini rows exist.
+  //
+  // DELIBERATELY THE CHEAP MODEL'S FIGURE, even though paid plans now run
+  // gpt-5.5 at roughly 0.084 for the same call shape. This value is only a
+  // FALLBACK for a row that reported no usage block; every real chatgpt row
+  // carries token counts and a model id and is priced exactly by
+  // estimateCostEur. Raising it to the gpt-5.5 figure to be "safe" would apply
+  // it to Free as well, whose whole monthly budget is a few tens of cents, and
+  // would gate that tier out of collecting at all. Under-budgeting a paid plan
+  // by a fraction of a cent on a rare usage-less row is the smaller error.
   chatgpt:    0.014,
   perplexity: 0.005,   // MEASURED 2026-07-29 (avg of 6, tight range 0.0050-0.0052).
                        // Was 0.001, modelled. Still the cheapest engine by far.
@@ -295,7 +314,15 @@ function estimateCostEur(llm, usage) {
   if (usage && typeof usage.serpSearches === 'number' && usage.serpSearches > 0) {
     return usage.serpSearches * SERPAPI_COST_PER_SEARCH_EUR
   }
-  const price = MODEL_PRICE_USD[llm]
+  // PER-MODEL PRICE WHEN THE CALLER KNOWS WHICH MODEL RAN. ChatGPT is no longer
+  // one model: paid plans run gpt-5.5 and free/essentials run gpt-4o-mini
+  // (CHATGPT_MODEL_BY_PLAN in _collect.js). Pricing every chatgpt row from a
+  // single MODEL_PRICE_USD entry would misprice one side of that split by more
+  // than thirty times, in whichever direction the entry was set, and these
+  // figures gate the monthly collection budget. So the model id wins when the
+  // caller reports it, and the per-engine entry stays as the fallback for rows
+  // that predate this or come from an engine with one model.
+  const price = (usage && usage.model && MODEL_PRICE_BY_ID[usage.model]) || MODEL_PRICE_USD[llm]
   if (!price || !usage) return null
   const inTok  = Number(usage.inputTokens)  || 0
   const outTok = Number(usage.outputTokens) || 0

@@ -93,6 +93,12 @@ async function enqueueClientCollection(supabase, {
     brand_aliases:     client.brand_aliases     ?? [],
     brand_website:     client.brand_website     ?? '',
     known_competitors: client.known_competitors ?? [],
+    // Selects the ChatGPT model on the worker path (CHATGPT_MODEL_BY_PLAN in
+    // _collect.js). Safe to carry here because this object is built server-side
+    // from the clients row, never from a request body. Snapshotted with the job,
+    // so a plan change mid-queue does not retroactively alter jobs already
+    // enqueued, which is the behaviour we want for a run the customer triggered.
+    plan:              client.plan ?? null,
   }
 
   // 4. Geo — explicit (manual) or resolved from the client default (scheduled)

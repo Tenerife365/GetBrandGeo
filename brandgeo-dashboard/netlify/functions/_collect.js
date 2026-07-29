@@ -294,7 +294,39 @@ async function callOpenRouter(model, prompt, ctx, opts = {}) {
 // ─── ChatGPT — OpenAI Responses API, gpt-5.5, web_search_preview + geo ─────────
 // (verbatim LIVE version from collect-chatgpt.js — reasoning:low cost cap; do NOT
 // add max_output_tokens (400s the request) or text.verbosity (truncates lists).)
-async function callChatGPT(prompt, ctx, marketId, regionLabel) {
+/**
+ * Which OpenAI model represents "ChatGPT" for a given plan.
+ *
+ * TIERED ON PURPOSE, 2026-07-29, owner's decision after seeing the cost of the
+ * flat switch to 4o-mini. That switch cut a Growth run 42% and immediately
+ * changed a measurement: Bucate pe Roate was mentioned on the certification
+ * prompt under gpt-5.5 at 13:05 and absent under gpt-4o-mini at 18:11, same
+ * prompt, same day. Nothing failed; the weaker model simply answered
+ * differently.
+ *
+ * That is the whole trade. A visibility score is only worth what the model
+ * behind it is worth, and a person asking ChatGPT today gets GPT-5.x. So paying
+ * plans, where the number is the product, keep the accurate model. Free and
+ * Essentials, where the job is to show the product works at a price that has to
+ * stay near zero marginal cost, get the cheap one.
+ *
+ * An unknown plan falls back to the CHEAP model deliberately. A corrupt or
+ * missing plan value should not be able to spend the expensive one.
+ */
+const CHATGPT_MODEL_BY_PLAN = {
+  free:       'gpt-4o-mini',
+  essentials: 'gpt-4o-mini',
+  growth:     'gpt-5.5',
+  growth_pro: 'gpt-5.5',
+  managed:    'gpt-5.5',
+  pro:        'gpt-5.5',
+  enterprise: 'gpt-5.5',
+}
+function chatgptModelForPlan(plan) {
+  return CHATGPT_MODEL_BY_PLAN[plan] || 'gpt-4o-mini'
+}
+
+async function callChatGPT(prompt, ctx, marketId, regionLabel, plan) {
   const isSpecificRegion = regionLabel &&
     !regionLabel.startsWith('All ') &&
     regionLabel !== 'All regions' &&
@@ -324,7 +356,7 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
   // comes back in well under a second, so the retry fits inside the budget. The
   // worst case is the old cost and a loud log line, never a dead engine.
   // Remove the fallback once metered rows prove the primary works.
-  const PRIMARY  = process.env.OPENAI_COLLECT_MODEL || 'gpt-4o-mini'
+  const PRIMARY  = process.env.OPENAI_COLLECT_MODEL || chatgptModelForPlan(plan)
   const FALLBACK = 'gpt-5.5'
   const isReasoningModel = (m) => /^(gpt-5|o[134])/.test(m)
 
@@ -368,7 +400,10 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
   // _cost.js from TOOL_FEE_USD; count the actual web_search calls made.
   const searches = (d.output || []).filter(o => o.type === 'web_search_call').length
   const usage = d.usage
-    ? { inputTokens: d.usage.input_tokens ?? 0, outputTokens: d.usage.output_tokens ?? 0, searches }
+    // `model` lets _cost.js price this row against the model that actually
+    // answered rather than a single per-engine figure. chatgpt now runs two
+    // models depending on plan, and they differ in price by more than 30x.
+    ? { inputTokens: d.usage.input_tokens ?? 0, outputTokens: d.usage.output_tokens ?? 0, searches, model: modelUsed }
     : null
   if (text) {
     console.log(`[ChatGPT:${modelUsed}] location used:`, userLocation || 'none (worldwide)',
@@ -824,7 +859,7 @@ async function callGoogleAiOverview(prompt, _ctx, opts) {
 // Normalized caller map: every engine is (promptText, ctx, opts) => { text, errorCode, detail }.
 // opts carries { marketId, regionLabel } (ChatGPT + Google AI Mode use them).
 const ENGINE_CALLERS = {
-  chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel),
+  chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel, o?.plan),
   gemini:     (p, ctx, o) => callGemini(p, ctx, o),
   claude:     (p, ctx, o) => callClaude(p, ctx, o),
   perplexity: (p, ctx)    => callOpenRouter('perplexity/sonar', p, ctx),
@@ -993,6 +1028,11 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usa
 async function collectEngines(engines, {
   prompt_id, prompt_text, client_id, client_config,
   market_label, region_label, market_id, run_id = null, worker = false,
+  // Selects the ChatGPT model (see CHATGPT_MODEL_BY_PLAN). MUST be resolved
+  // server-side from the clients table, never taken from the request body: the
+  // browser sends client_config, so a viewer claiming 'managed' would otherwise
+  // buy themselves the expensive model on our account. Absent means cheap.
+  plan = null,
 }) {
   const ctx  = buildSystemContext(client_config, market_label, region_label)
   // Context-aware timeouts (CLAUDE.md §12.6): the worker gets generous budgets
@@ -1002,6 +1042,7 @@ async function collectEngines(engines, {
   const opts = {
     marketId: market_id,
     regionLabel: region_label,
+    plan,
     ...(worker ? {
       geminiBudgetMs:  GEMINI_BUDGET_WORKER_MS,
       geminiAttemptMs: GEMINI_ATTEMPT_WORKER_MS,
