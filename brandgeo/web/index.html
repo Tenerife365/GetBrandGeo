@@ -1178,7 +1178,11 @@
     .step-num {
       width: 36px; height: 36px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--ac), var(--ac2));
+      /* Was --ac -> --ac2. White on #34d399 measures 1.92:1, the worst
+         contrast on the page, and --ac2 is the POSITIVE semantic token so a
+         decorative step counter had no business wearing it. Both stops now
+         carry white: 5.7:1 and 8.98:1 in dark, 7.1:1 and 8.98:1 in light. */
+      background: linear-gradient(135deg, var(--ac-strong), #5b21b6);
       color: #fff;
       font-weight: 800;
       font-size: 0.9rem;
@@ -2223,14 +2227,14 @@
       <div class="chain-pillar">AI SEO</div>
       <h3>The gap becomes a brief</h3>
       <p>Each gap turns into a content brief, then into a full draft, scored before you publish it on whether an AI answer engine would cite it.</p>
-      <span class="chain-plan">Essentials and up</span>
+      <span class="chain-plan">Growth and up</span>
     </div>
     <div class="chain-link" aria-hidden="true"><span>&rarr;</span></div>
     <div class="chain-step">
       <div class="chain-pillar">AI Social</div>
       <h3>The brief gets published</h3>
       <p>Write the post once, adapt it per network, then schedule or publish to your channels from the same place the brief came from.</p>
-      <span class="chain-plan">Growth and up</span>
+      <span class="chain-plan">Coming soon</span>
     </div>
   </div>
 </section>
