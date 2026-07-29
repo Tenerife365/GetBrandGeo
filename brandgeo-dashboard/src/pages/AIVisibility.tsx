@@ -27,7 +27,7 @@ import { aggregateCompetitors } from '../lib/competitorFilter'
 import { promptCategoryLabel } from '../lib/promptCategories'
 import { useChartTheme } from '../lib/chartTheme'
 import SharedEmptyState from '../components/EmptyState'
-import { formatDate } from '../lib/format'
+import { formatDate, formatRelativeOrDate } from '../lib/format'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -207,6 +207,20 @@ export default function AIVisibility() {
   // distinct from errorEngines (fully-failed only). Nielsen audit: the mixed case
   // silently showed a percentage with no hint that anything failed to sync.
   const [partialErrorEngines, setPartialErrorEngines] = useState<Set<LLMName>>(new Set())
+  // Per-engine health, added 2026-07-29 after a real report of "the refresh
+  // button does nothing". It DID run: it wrote an error row. But `isUnavailable`
+  // requires checked === 0, so an engine holding older successful rows kept
+  // rendering its old percentage and the failed attempt was invisible. The
+  // spinner stopped and the card did not change, which is indistinguishable
+  // from a dead button. lastAttempt* is the most recent attempt whatever its
+  // outcome; lastOkAt is the most recent SUCCESS, which is what "checked" means
+  // to a customer reading a number.
+  const [engineHealth, setEngineHealth] = useState<Map<LLMName, {
+    lastAttemptAt: string | null
+    lastAttemptFailed: boolean
+    lastErrorCode: string | null
+    lastOkAt: string | null
+  }>>(new Map())
   // Fix This hub: show top 3 by default, reveal the rest on demand (Nielsen audit
   // edge case: "add a Show all when there are more than 3 items").
   const [showAllFixes, setShowAllFixes] = useState(false)
@@ -314,6 +328,33 @@ export default function AIVisibility() {
     setErrorEngines(new Set([...errEngines].filter(e => !okEngines.has(e))))
     // Mixed/partial: engine had at least one failed check AND at least one OK result.
     setPartialErrorEngines(new Set([...errEngines].filter(e => okEngines.has(e))))
+
+    // Per-engine health. rData is ordered checked_at DESC, so the FIRST row seen
+    // for an engine is its most recent attempt. Deliberately walks every row
+    // rather than the per-prompt map above, because that map skips error rows
+    // entirely — which is exactly how a failed refresh became invisible.
+    const health = new Map<LLMName, {
+      lastAttemptAt: string | null
+      lastAttemptFailed: boolean
+      lastErrorCode: string | null
+      lastOkAt: string | null
+    }>()
+    rData?.forEach((r: AIResult) => {
+      const llm = r.llm as LLMName
+      if (!activeEngines.includes(llm as EngineId)) return
+      let h = health.get(llm)
+      if (!h) {
+        h = { lastAttemptAt: null, lastAttemptFailed: false, lastErrorCode: null, lastOkAt: null }
+        health.set(llm, h)
+      }
+      if (!h.lastAttemptAt) {
+        h.lastAttemptAt     = r.checked_at
+        h.lastAttemptFailed = r.status === 'error'
+        h.lastErrorCode     = r.error_code ?? null
+      }
+      if (!h.lastOkAt && r.status !== 'error') h.lastOkAt = r.checked_at
+    })
+    setEngineHealth(health)
 
     if (pData) setPrompts(pData)
     setResults(map)
@@ -451,7 +492,13 @@ export default function AIVisibility() {
         if (bestPos === null || r.brand_position < bestPos) bestPos = r.brand_position
       }
     })
-    return { ...s, status, bestPos, isUnavailable }
+    const health = engineHealth.get(s.id as LLMName)
+    return {
+      ...s, status, bestPos, isUnavailable,
+      lastOkAt:          health?.lastOkAt ?? null,
+      lastAttemptFailed: health?.lastAttemptFailed ?? false,
+      lastErrorCode:     health?.lastErrorCode ?? null,
+    }
   })
 
   // Coming-soon and locked engines for the status grid
@@ -825,17 +872,34 @@ export default function AIVisibility() {
           }[e.status]
           return (
             <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${statusStyles.card}`}>
-              {isAdmin && (
-                <button
-                  onClick={() => handleRefreshEngine(e.id)}
-                  disabled={collecting || refreshingEngine !== null}
-                  className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-dark-600 text-slate-500 hover:text-slate-200 transition-all disabled:opacity-30"
-                  title={`Force refresh ${e.label} only — re-runs all prompts on ${e.label} and charges for this engine alone`}
-                  aria-label={`Force refresh ${e.label} only`}
-                >
-                  <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
-                </button>
-              )}
+              {/* Top-right cluster: when this engine last returned data, and the
+                  control to re-run it. Previously the button was opacity-0 until
+                  hover, so on a trackpad or touch screen it was effectively
+                  undiscoverable, and there was no freshness signal anywhere on
+                  the card. The timestamp is always visible and quiet; the button
+                  sits at 60% and comes up on hover or keyboard focus, so it
+                  reads as available without competing with the score. */}
+              <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                {e.lastOkAt && !e.isUnavailable && (
+                  <span
+                    className="text-[9px] leading-none text-slate-500 tabular-nums"
+                    title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
+                  >
+                    {formatRelativeOrDate(e.lastOkAt)}
+                  </span>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => handleRefreshEngine(e.id)}
+                    disabled={collecting || refreshingEngine !== null}
+                    className="p-1 rounded-md opacity-60 hover:opacity-100 focus-visible:opacity-100 hover:bg-dark-600 text-slate-400 hover:text-slate-100 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+                    title={`Re-run every prompt on ${e.label} only. Charges for this engine alone.`}
+                    aria-label={`Re-run all prompts on ${e.label}`}
+                  >
+                    <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
+                  </button>
+                )}
+              </div>
 
               {/* Logo tile — left */}
               <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60 ${e.isUnavailable ? 'opacity-40' : ''}`}>
@@ -844,7 +908,10 @@ export default function AIVisibility() {
 
               {/* Details — right */}
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 pr-4">
+                {/* pr-16 clears the absolutely-positioned timestamp + refresh
+                    cluster above. pr-4 only cleared the icon and the label now
+                    runs under the timestamp. */}
+                <div className="flex items-center gap-1.5 pr-16">
                   <span className={`text-sm font-semibold truncate ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</span>
                   <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
                     {e.isUnavailable
@@ -867,11 +934,28 @@ export default function AIVisibility() {
                     </div>
                     {/* Mixed-case fetch failure (Nielsen audit): some checks errored while others
                         succeeded, so the % above is partial. Admins retry via the refresh icon (hover). */}
-                    {partialErrorEngines.has(e.id) && (
+                    {/* The MOST RECENT attempt failed, even though older rows
+                        succeeded and the % above is real. This is the state that
+                        used to be completely silent: you press refresh, the
+                        spinner stops, the card is unchanged, and nothing tells
+                        you the run failed. It outranks the partial notice below
+                        because it describes what just happened, not the history. */}
+                    {e.lastAttemptFailed && (
+                      <div
+                        className="flex items-center gap-1 text-[10px] text-red-400 mt-0.5"
+                        title={isAdmin
+                          ? `The last run of ${e.label} failed${e.lastErrorCode ? ` (${e.lastErrorCode})` : ''}. The figures above come from earlier successful checks. Use the refresh icon to try again.`
+                          : `The last check of ${e.label} did not complete. The figures above come from earlier successful checks.`}
+                      >
+                        <AlertTriangle size={9} />
+                        Last run failed{e.lastErrorCode ? ` · ${e.lastErrorCode.replace(/_/g, ' ')}` : ''}
+                      </div>
+                    )}
+                    {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
                       <div
                         className="flex items-center gap-1 text-[10px] text-amber-400/80 mt-0.5"
                         title={isAdmin
-                          ? 'Some checks failed to sync — this % is partial. Hover the card and use the refresh icon to retry this engine.'
+                          ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
                           : 'Some checks failed to sync, so this percentage is partial.'}
                       >
                         <AlertTriangle size={9} /> Some checks failed
