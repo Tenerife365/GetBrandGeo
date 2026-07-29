@@ -150,7 +150,7 @@ const ENGINE_COST_EUR = {
   meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); historical rows only
   // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
   gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
-  google_ai:  0.015,   // SerpApi mid-tier per-search; real cost is the monthly plan
+  google_ai:  0.023,   // SerpApi mid-tier per-search; real cost is the monthly plan
 }
 
 // Error codes where NO billable API call happened — the request was rejected
@@ -332,9 +332,15 @@ const PLAN_MONTHLY_API_BUDGET_EUR = {
 // checkCollectionCooldown (_enqueue.js). Separate from the € budget above: this
 // stops prompt-thrash (edit prompts, re-run repeatedly). free = monthly;
 // managed/pro/enterprise = 0 (on-demand). Keep in sync with planConfig.ts.
+// WEEKLY for every paid plan as of 2026-07-29. Refresh frequency is no longer a
+// tier differentiator, because it never actually was one: the EUR budget above
+// bound first on every plan, so the advertised 48h/36h split was unreachable.
+// Tiers differentiate on ENGINES, PROMPTS and AI SEO depth instead. 168h = one
+// manual refresh per week, matching the automatic cadence. free = monthly.
+// Keep in sync with planConfig.ts.
 const PLAN_COLLECTION_COOLDOWN_HOURS = {
-  free: 720, essentials: 72, growth: 48, growth_pro: 36,
-  managed: 0, pro: 0, enterprise: 0,
+  free: 720, essentials: 168, growth: 168, growth_pro: 168,
+  managed: 168, pro: 168, enterprise: 0,
 }
 
 // Engines capped at 1 run per (client, prompt) per WEEKLY_CAP_DAYS — a hard

@@ -183,7 +183,7 @@ export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
   meta:       0.001,   // retired engine; kept for cost calc on historical rows
   // Fixed-fee engines — accounting figures, not marginal cost. See above.
   gemini:     0.032,
-  google_ai:  0.015,
+  google_ai:  0.023,
 }
 
 /** Engines billed as a fixed periodic commitment rather than per call.
@@ -237,8 +237,14 @@ export type FeatureId = 'ai_social' | 'ai_seo'
 //   AI Social — from Growth (1 channel; 3 on Growth PRO). Per-tier depth is in
 //   the PLAN_* limit tables below, not here.
 export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
-  ai_social: 'growth',
-  ai_seo:    'essentials',
+  // ai_social is ADMIN-ONLY while the feature is finished (2026-07-29).
+  // Customers see it as coming soon; admins drive it for any account to test.
+  // The real gate is requireAuth({ adminOnly: true }) on the three social-*.js
+  // functions — this constant only controls customer-facing copy, and until
+  // 2026-07-29 there was NO server-side gate at all, so the UI lock was
+  // bypassable by a direct POST.
+  ai_social: 'enterprise',
+  ai_seo:    'growth',
 }
 
 // Copy for the locked/upgrade screen.
@@ -262,34 +268,64 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
 // self-serve caps.
 
 /** Buyer prompts included per plan. */
+/* RESIZED 2026-07-29. Prompt caps are now derived from what the monthly EUR
+   budget can actually sustain at a WEEKLY collection cadence, instead of being
+   picked and then silently blocked by the budget gate.
+
+   Per-prompt cost at the rebuilt prices (google_ai on SerpApi Starter):
+     3-engine (Essentials)  EUR 0.121
+     5-engine (Growth up)   EUR 0.145
+   Weekly = 4.33 runs/month. Budget = 12% of plan price.
+
+     plan         budget    max @ weekly   set to   budget used
+     essentials   11.88            22        20         88%
+     growth       35.88            57        50         88%
+     growth_pro   53.88            85        75         87%
+     managed     180.00           286       250         87%
+
+   ~12% headroom is left on every tier so an occasional MANUAL refresh does not
+   immediately trip the hard block in _auth.js. A client who refreshes manually
+   and often will still hit it — that is the budget doing its job, and the UI
+   already surfaces both the cooldown countdown and the budget message.
+
+   free stays at 5 prompts and MONTHLY (not weekly): its EUR 0.30 budget buys
+   exactly one 1-engine run of 5 prompts. */
 export const PLAN_PROMPTS: Record<Plan, number> = {
-  free: 5, essentials: 20, growth: 75, growth_pro: 100,
-  managed: 1000, pro: 1000, enterprise: 100000,
+  free: 5, essentials: 20, growth: 50, growth_pro: 75,
+  managed: 250, pro: 250, enterprise: 100000,
 }
 
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
  *  The button shows a live countdown until this elapses; the monthly € budget
  *  (PLAN_MONTHLY_API_BUDGET_EUR) is the separate hard cost cap. free = monthly. */
+// WEEKLY for every paid plan as of 2026-07-29. Refresh frequency is no longer a
+// tier differentiator, because it never actually was one: the EUR budget bound
+// first on every plan, so the advertised 48h/36h split was unreachable. Tiers
+// now differentiate on ENGINES, PROMPTS and AI SEO depth. 168h = one manual
+// refresh per week, matching the automatic cadence. free = monthly.
 export const PLAN_COLLECTION_COOLDOWN_HOURS: Record<Plan, number> = {
-  free: 720, essentials: 72, growth: 48, growth_pro: 36,
-  managed: 0, pro: 0, enterprise: 0,
+  free: 720, essentials: 168, growth: 168, growth_pro: 168,
+  managed: 168, pro: 168, enterprise: 0,
 }
 
 /** AI SEO — max pages that can be crawled/audited (0 = feature locked). */
+// MOVED TO GROWTH+ 2026-07-29 (was Essentials at 1 page). Site audit is now one
+// of the three things separating Essentials from Growth, alongside engines
+// (3 -> 5) and prompts (20 -> 50).
 export const PLAN_SEO_PAGE_CAP: Record<Plan, number> = {
-  free: 0, essentials: 1, growth: 10, growth_pro: 30,
+  free: 0, essentials: 0, growth: 10, growth_pro: 30,
   managed: 100, pro: 100, enterprise: 500,
 }
 
 /** AI SEO — max page audits per week. */
 export const PLAN_SEO_AUDITS_PER_WEEK: Record<Plan, number> = {
-  free: 0, essentials: 1, growth: 1, growth_pro: 1,
+  free: 0, essentials: 0, growth: 1, growth_pro: 1,
   managed: 3, pro: 3, enterprise: 7,
 }
 
 /** AI SEO — max content drafts generated per month. */
 export const PLAN_SEO_DRAFTS_PER_MONTH: Record<Plan, number> = {
-  free: 0, essentials: 2, growth: 10, growth_pro: 30,
+  free: 0, essentials: 0, growth: 10, growth_pro: 30,
   managed: 60, pro: 60, enterprise: 200,
 }
 
