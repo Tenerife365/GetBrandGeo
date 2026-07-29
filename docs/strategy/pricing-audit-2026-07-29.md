@@ -66,15 +66,22 @@ The published limit is prompts. The **enforced** limit is a monthly euro budget
 in `_auth.js:230`, which hard-blocks collection with "Monthly API budget
 exceeded for this plan. Contact support to raise this limit."
 
-Per-prompt cost across a full engine set is €0.125 for a 5-engine plan
-(chatgpt 0.060 + gemini 0.034 + claude 0.010 + perplexity 0.006 + google_ai 0.015).
+**Figures below restated 2026-07-29** after the cost model was rebuilt (§8). The
+per-prompt 5-engine cost is **€0.137**, not the €0.125 the old constants implied.
+Every conclusion in this section survives the correction; the margins are
+slightly tighter.
 
 | Plan | Full run | Monthly budget | Full runs affordable | Cadence advertised | Outcome |
 |---|---|---|---|---|---|
-| Essentials €99 | €2.08 | €11.88 | 5.7 | 72h (=10/mo) | blocked after 5.7 |
-| Growth €299 | €9.38 | €35.88 | 3.8 | 48h (=15/mo) | blocked after 3.8 |
-| Growth PRO €449 | €12.50 | €53.88 | 4.3 | 36h (=20/mo) | blocked after 4.3 |
-| Managed €1,500 | €125.00 | €180.00 | **1.4** | on demand | blocked after 1.4 |
+| Essentials €99 | €2.42 | €11.88 | 4.9 | 72h (=10/mo) | blocked after 4.9 |
+| Growth €299 | €10.28 | €35.88 | **3.5** | 48h (=15/mo) | blocked after 3.5 |
+| Growth PRO €449 | €13.70 | €53.88 | 3.9 | 36h (=20/mo) | blocked after 3.9 |
+| Managed €1,500 | €137.00 | €180.00 | **1.3** | on demand | blocked after 1.3 |
+
+Counting only genuinely marginal spend (excluding the two fixed-fee engines, §8),
+a Growth prompt costs €0.090 rather than €0.137, which would buy 5.3 full runs.
+That gap is itself an argument for separating fixed from variable cost in the
+budget gate rather than blocking collection over a subscription already paid for.
 
 Inverted, this is how many prompts each tier can actually sustain at the cadence
 it advertises, for a full month:
@@ -206,3 +213,116 @@ The prompt-count comparison is where BrandGEO looks weak (20 vs Otterly's 15 is
 fine; 75 vs Profound's 100 is not). §2 says the metric is meaningless in
 practice, which is an argument for competing on engines and freshness rather
 than matching them on a number nobody uses.
+
+
+---
+
+## 8. The cost model was rebuilt (2026-07-29)
+
+Everything in section 3 rests on per-engine costs, so the constants were checked
+before any pricing decision was taken. They did not survive the check.
+
+### 8.1 Nothing was ever metered
+
+`cost_eur` looked like measured spend and was not. `costForRow()` returned a flat
+per-engine constant and wrote it to the column, so every row for a given engine
+carried an identical value. Confirmed in production:
+
+```
+llm          rows  distinct cost_eur
+claude        235                  1
+chatgpt       226                  1
+gemini        202                  1
+perplexity    199                  1
+google_ai     141                  1
+meta           62                  1
+```
+
+Meanwhile the comment in `Usage.tsx` asserted the column "now meters this per row
+for real". It stored the estimate in the database; it measured nothing.
+
+The data needed for real metering was being **discarded at the point of
+collection**. Every `callX()` in `_collect.js` returned `{text, errorCode, detail}`
+and dropped the usage block that OpenAI, Anthropic, Gemini and OpenRouter all
+return for free on every response.
+
+### 8.2 The total was accidentally right; the attribution was not
+
+Modelled against list prices verified 2026-07-29:
+
+| engine | was | modelled | error |
+|---|---|---|---|
+| chatgpt | EUR 0.060 | EUR 0.056 | ok |
+| claude | EUR 0.010 | EUR 0.033 | **3.3x under** |
+| gemini | EUR 0.034 | EUR 0.032 | ok at list price |
+| perplexity | EUR 0.006 | EUR 0.001 | **5x over** |
+| google_ai | EUR 0.015 | fixed fee | not a marginal cost |
+
+A 5-engine run modelled at EUR 0.135 against the EUR 0.125 the constants implied,
+8% out in total, because the two large errors pointed in opposite directions and
+cancelled. Per-engine attribution is what `Usage.tsx` displays and what any
+"which engine do we cut" decision rests on, so being right in aggregate and wrong
+per engine is the worse failure. **Claude looked like the cheapest engine when it
+is the second most expensive.**
+
+### 8.3 Why Claude was 3.3x under, a known and flagged TODO
+
+EUR 0.010 is exactly the *no-web-search* cost: ~500 input + ~600 output on
+`claude-sonnet-4-6` is $0.0105, which is EUR 0.010 to three decimals.
+
+Task #63 removed web search from Claude and the constant was set for that shape.
+Then `8b7496c` was reverted and web search restored, because removing it had
+silently made the engine answer from training data only and stop seeing
+web-present businesses. The restore note in `_collect.js` is explicit about the
+consequence and ends with **"reconcile the cost math"**. That reconciliation had
+never happened. Web search adds a $10/1,000 tool fee *and* bills the retrieved
+results as input tokens.
+
+The header comment on that same function still read "NO web search", contradicting
+the restore note twenty lines below it. Corrected.
+
+### 8.4 Two of the five are not per-call costs at all
+
+- **gemini** grounding is $35/1,000 prompts, but the first **1,500 requests per
+  day** are free and retrieved context is not billed as tokens. BrandGEO has made
+  ~200 grounded calls in total, so the true marginal cost is **EUR 0**.
+- **google_ai** via SerpApi is a fixed monthly subscription and unused searches
+  expire at renewal. Marginal cost inside the plan is **EUR 0**; the real cost is
+  `plan_fee / searches_actually_used`, which at ~141 searches is far above any
+  per-search rate.
+
+Modelling these as marginal is a category error: the budget gate blocks
+collection over spend that is incurred whether or not you collect.
+
+### 8.5 What changed
+
+- Every collect function now captures the token usage its provider already
+  returned. ChatGPT and OpenRouter read it from the JSON response; Claude
+  accumulates it across `message_start`, `message_delta` and `server_tool_use`
+  SSE events, including on a time-budget cancel (those tokens were still
+  generated and still billed).
+- `estimateCostEur(llm, usage)` prices a call from real tokens plus per-call tool
+  fees. `costForRow()` takes an optional third argument and meters when usage is
+  present, falling back to the constant when it is not, so every existing
+  two-argument call site keeps working.
+- The constants were corrected and relabelled as fallbacks, with
+  `FIXED_FEE_ENGINES` marking the two that are not marginal.
+- `Usage.tsx`'s claim that metering was already real was corrected in place.
+
+Verified: `npx tsc --noEmit` clean, `npm run build` green, and a harness
+confirming metered matches modelled per engine, free error codes still cost zero,
+and legacy two-argument calls unchanged.
+
+### 8.6 Still open
+
+- **gpt-5.5 is legacy.** OpenAI doubled the GPT-5 line on 2026-04-23 ($2.50 to
+  $5.00 in, $15 to $30 out) and superseded it with GPT-5.6 in 2026-07. If the
+  model id in `_collect.js` is bumped, `MODEL_PRICE_USD` must move in the same
+  commit.
+- **The budget gate still charges fixed-fee engines per call.** Separating fixed
+  from variable would raise Growth from 3.5 to 5.3 affordable full runs per month
+  without spending a cent more.
+- **Prices are list, not invoice.** Confirm against actual OpenAI, Anthropic,
+  OpenRouter and SerpApi statements. The SerpApi tier in particular determines
+  whether EUR 0.015 per search is optimistic (Starter is $0.025) or pessimistic.
+- **`USD_TO_EUR` is hardcoded at 0.92.** Fine at this spend; revisit if it grows.

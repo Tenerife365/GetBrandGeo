@@ -222,12 +222,17 @@ async function callOpenRouter(model, prompt, ctx) {
     return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error', detail: `HTTP ${r.status} ${d.error.message || ''}`.trim() }
   }
   const text = d.choices?.[0]?.message?.content ?? null
+  // Real token counts for metering. OpenRouter mirrors the OpenAI chat shape.
+  // searches:0 — Sonar bundles search into its token price, no separate fee.
+  const usage = d.usage
+    ? { inputTokens: d.usage.prompt_tokens ?? 0, outputTokens: d.usage.completion_tokens ?? 0, searches: 0 }
+    : null
   if (text) {
-    console.log(`[OpenRouter:${model}] ok | preview:`, text.slice(0, 200))
+    console.log(`[OpenRouter:${model}] ok | tokens:`, usage ? `${usage.inputTokens}in/${usage.outputTokens}out` : 'n/a', '| preview:', text.slice(0, 200))
   } else {
     console.warn(`[OpenRouter:${model}] empty response:`, JSON.stringify(d).slice(0, 300))
   }
-  return { text, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
+  return { text, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
 }
 
 // ─── ChatGPT — OpenAI Responses API, gpt-5.5, web_search_preview + geo ─────────
@@ -267,17 +272,30 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
     .join('\n')
 
+  // Real token counts. The Responses API bills web-search results as input
+  // tokens, so d.usage.input_tokens already includes the retrieved content —
+  // no separate accounting needed for it. The $10/1k tool fee is added by
+  // _cost.js from TOOL_FEE_USD; count the actual web_search calls made.
+  const searches = (d.output || []).filter(o => o.type === 'web_search_call').length
+  const usage = d.usage
+    ? { inputTokens: d.usage.input_tokens ?? 0, outputTokens: d.usage.output_tokens ?? 0, searches }
+    : null
   if (text) {
-    console.log('[ChatGPT] location used:', userLocation || 'none (worldwide)', '| preview:', text.slice(0, 200))
+    console.log('[ChatGPT] location used:', userLocation || 'none (worldwide)',
+      '| tokens:', usage ? `${usage.inputTokens}in/${usage.outputTokens}out/${searches}search` : 'n/a',
+      '| preview:', text.slice(0, 200))
   } else {
     console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
   }
-  return { text: text || null, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
+  return { text: text || null, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
 }
 
-// ─── Claude — training-data mode, streaming with a wall-clock time budget ──────
-// (verbatim LIVE version from collect-claude.js — NO web search, time budget not
-// a char cap. See §8.4 finding 1.4 / §12.3 before touching this.)
+// ─── Claude — web search ON, streaming with a wall-clock time budget ──────────
+// (LIVE version from collect-claude.js. The "NO web search" that used to be on
+// this line was stale: 8b7496c removed web search and was reverted, and the
+// long note on the anthropic-beta header below is the authority. Web search is
+// ON and must stay on. Time budget is not a char cap. See §8.4 finding 1.4 /
+// §12.3 before touching this.)
 async function callClaude(prompt, ctx, opts) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error', detail: 'ANTHROPIC_API_KEY not set' } }
@@ -329,6 +347,13 @@ async function callClaude(prompt, ctx, opts) {
     let text       = ''
     let stopReason = null
     let timedOut   = false
+    // Usage arrives split across two SSE events: message_start carries
+    // input_tokens (which INCLUDE the web-search results Anthropic injects),
+    // message_delta carries the running output_tokens. server_tool_use counts
+    // the billable searches. Captured for real metering in _cost.js.
+    let inputTokens  = 0
+    let outputTokens = 0
+    let searches     = 0
 
     while (true) {
       const remaining = deadline - Date.now()
@@ -369,7 +394,15 @@ async function callClaude(prompt, ctx, opts) {
           if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
             text += ev.delta.text ?? ''
           }
-          if (ev.type === 'message_delta') stopReason = ev.delta?.stop_reason ?? stopReason
+          if (ev.type === 'message_start') {
+            inputTokens  = ev.message?.usage?.input_tokens  ?? inputTokens
+            outputTokens = ev.message?.usage?.output_tokens ?? outputTokens
+          }
+          if (ev.type === 'content_block_start' && ev.content_block?.type === 'server_tool_use') searches++
+          if (ev.type === 'message_delta') {
+            stopReason   = ev.delta?.stop_reason ?? stopReason
+            outputTokens = ev.usage?.output_tokens ?? outputTokens
+          }
           if (ev.type === 'error') console.error('[Claude] stream error:', JSON.stringify(ev.error))
         } catch { /* skip malformed SSE */ }
       }
@@ -377,8 +410,11 @@ async function callClaude(prompt, ctx, opts) {
 
     if (text) {
       console.log('[Claude] ok | stop:', timedOut ? 'time_budget' : stopReason,
+        '| tokens:', `${inputTokens}in/${outputTokens}out/${searches}search`,
         '| len:', text.length, '| preview:', text.slice(0, 200))
-      return { text, errorCode: null, detail: null }
+      // A time-budget cancel still incurred every token generated up to the
+      // cut, so meter what actually ran rather than dropping the row's cost.
+      return { text, usage: { inputTokens, outputTokens, searches }, errorCode: null, detail: null }
     }
     console.warn('[Claude] stream done but no text | stop_reason:', timedOut ? 'time_budget' : stopReason)
     return { text: null, errorCode: 'empty_response', detail: `no text (stop_reason=${timedOut ? 'time_budget' : stopReason})` }
@@ -544,7 +580,7 @@ const CLAUDE_BUDGET_WORKER_MS = 55000
 // and the three HTTP endpoints agree byte-for-byte. run_id is set only when the
 // caller passes one (the queue worker does; the manual endpoints leave it null,
 // keeping their rows out of the uq_ai_results_run_prompt_llm partial index).
-function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, errorCode, detail, client_config }) {
+function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, errorCode, detail, client_config }) {
   const base = { prompt_id, llm: engine, client_id, checked_at: new Date().toISOString() }
   if (run_id != null) base.run_id = run_id
 
@@ -555,7 +591,9 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: errorCode,
       brand_mentioned: false,
       response_text: detail ? String(detail).slice(0, 10000) : null,
-      cost_eur: costForRow(engine, errorCode),
+      // Metered from real tokens when the provider returned usage before the
+      // failure; falls back to the flat estimate otherwise.
+      cost_eur: costForRow(engine, errorCode, usage),
     }
   }
 
@@ -566,7 +604,7 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: 'no_response',
       brand_mentioned: false,
       response_text: 'engine returned no text and no error code',
-      cost_eur: costForRow(engine, 'no_response'),
+      cost_eur: costForRow(engine, 'no_response', usage),
     }
   }
 
@@ -580,7 +618,7 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: 'analysis_error',
       brand_mentioned: false,
       response_text: `${e.message}\n---\n${text}`.slice(0, 10000),
-      cost_eur: costForRow(engine, 'analysis_error'),
+      cost_eur: costForRow(engine, 'analysis_error', usage),
     }
   }
 
@@ -593,7 +631,7 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
     response_snippet:      analysis.response_snippet,
     competitors_mentioned: analysis.competitors_mentioned,
     response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
-    cost_eur:              costForRow(engine, null),
+    cost_eur:              costForRow(engine, null, usage),
   }
 }
 
@@ -645,8 +683,8 @@ async function collectEngines(engines, {
       continue
     }
 
-    const { text, errorCode, detail } = s.value ?? { text: null, errorCode: null }
-    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, errorCode, detail, client_config })
+    const { text, errorCode, detail, usage } = s.value ?? { text: null, errorCode: null }
+    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, errorCode, detail, client_config })
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }

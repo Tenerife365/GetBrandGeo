@@ -29,17 +29,34 @@ import { useChartTheme } from '../lib/chartTheme'
  * string comes back from Supabase — keeps working unchanged.
  */
 const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, number>
-// => 5-engine check ≈ €0.097. Batching (SCALE-SPEC §1.1b step 4) would take it
-//    to ≈€0.062, but that needs the §3 collection queue first — not built yet.
-//    The cost_eur column now meters this per row for real, so these estimates
-//    can be trued up from actual data instead of re-derived by hand.
+// => 5-engine check ≈ €0.137 at the rebuilt 2026-07-29 prices. Batching
+//    (SCALE-SPEC §1.1b step 4) would reduce it, but that needs the §3 collection
+//    queue first — not built yet.
 
-// The headline now shows real metered API spend (sum of cost_eur), NOT a
-// flat-estimate × row-count × overhead figure — that estimate was exactly why the
-// page read lower than the actual bill. Platform overhead (Supabase/Netlify/etc.) is
-// deliberately no longer folded in here: this card is API spend, which is the number
-// that was in dispute. ENGINE_COST is now only the fallback for legacy rows whose
-// cost_eur is NULL (collected before metering landed).
+// ⚠️ CORRECTION 2026-07-29. This comment block used to claim "the cost_eur
+// column now meters this per row for real". That was not true: costForRow()
+// returned a flat per-engine constant and wrote it to the column, so every row
+// for a given engine carried an identical value (verified in production —
+// count(distinct cost_eur) was 1 for all six engines). The database stored the
+// estimate; it did not measure anything.
+//
+// Metering is real as of 2026-07-29. Every collect function now captures the
+// token usage its provider already returned and was previously discarding, and
+// _cost.js prices it per call. Rows written from that point carry a measured
+// figure; rows written before it fall back to ENGINE_COST.
+//
+// TWO CAVEATS THE UI MUST KEEP HONEST:
+//  1. gemini and google_ai are FIXED-FEE (see FIXED_FEE_ENGINES). Gemini
+//     grounding is free under 1,500 requests/day and SerpApi is a monthly
+//     subscription whose unused searches expire, so neither has a meaningful
+//     per-call marginal cost. Their figures are accounting allocations.
+//  2. The old per-engine attribution was wrong in both directions — claude 3.3x
+//     under, perplexity 5x over — even though the total was within 8%. Any
+//     historical per-engine breakdown on this page that predates metering
+//     inherits that error. Read pre-metering rows as an order of magnitude.
+//
+// Platform overhead (Supabase/Netlify/etc.) is deliberately not folded in here:
+// this card is API spend, which is the number that was in dispute.
 
 // ENGINE_META's colour / bg fields no longer exist (dashboard-visual-system.md §8.4 —
 // engine identity is a swatch in ENGINE_META[id].chartColor, never coloured

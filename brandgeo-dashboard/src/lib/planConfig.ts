@@ -142,31 +142,54 @@ export const ENGINE_META: Record<EngineId, {
 // as a separate, hand-kept-in-sync CommonJS copy — same tradeoff already
 // accepted for _score.js <-> aiVisibilityScore.ts. Update BOTH files together.
 //
-// REPRICED 2026-07-10 (SCALE-SPEC.md §1.1, CLAUDE.md §12.3) after Claude's
-// web_search tool was removed and ChatGPT's reasoning effort was capped to
-// 'low'. See _cost.js for full per-engine confidence notes (gemini MEDIUM,
-// chatgpt MEDIUM, the rest HIGH) — these are derived from published rate
-// cards + measured response size, not an invoice, and are not exact. Only
-// the 5 currently-built engines have a real cost; the other 4
-// (google_ai/copilot/deepseek/grok) never collect.
+// ⚠️ THESE ARE FALLBACK ESTIMATES, NOT THE COST. As of 2026-07-29 the collect
+// functions capture real token usage from every provider and _cost.js meters
+// each row from it, so ai_results.cost_eur is a measured figure. The numbers
+// below are used only for rows written before metering existed (cost_eur NULL)
+// and for the two fixed-fee engines. Usage.tsx labels those separately.
 //
-// ⚠️ gemini CORRECTED 2026-07-13 (CLAUDE.md §12.3b), 0.020 → 0.034 — this
-// value had drifted out of sync with netlify/functions/_cost.js (the
-// authoritative, server-enforced copy). 0.020 was priced for
-// gemini-3.5-flash grounding; that model was reverted back to
-// gemini-2.5-flash after it timed out on 10/10 grounded calls in
-// production, and 2.5-flash bills a flat $35/1k grounded prompts ≈ €0.034,
-// not 3.5's per-search-query rate. This file is display-only (no server-side
-// enforcement reads it), but a stale value here still misleads anyone
-// reading Usage.tsx's cost estimator. Keep in sync with _cost.js by hand.
+// REBUILT 2026-07-29 against list prices verified that day. The previous set
+// was never metered — every row for a given engine carried an identical
+// constant — and while the 5-engine total happened to land within 8%, the
+// per-engine attribution was badly wrong in both directions:
+//
+//   engine      was      now     what was wrong
+//   claude      0.010    0.033   3.3x UNDER. 0.010 is exactly the no-web-search
+//                               cost (~500in/~600out on sonnet-4-6 = $0.0105).
+//                               Task #63 removed web search, this constant was
+//                               set for that shape, then 8b7496c was reverted
+//                               and search came back — adding a $10/1k tool fee
+//                               AND billing retrieved results as input tokens.
+//                               _collect.js's own note said "reconcile the cost
+//                               math"; this is that reconciliation.
+//   chatgpt     0.060    0.056   close enough; gpt-5.5 at $5/$30 per 1M.
+//   perplexity  0.006    0.001   5x OVER. sonar is $1/$1 per 1M with search
+//                               bundled into the token price.
+//   gemini      0.034    0.032   list price is right ($35/1k grounded), but the
+//                               first 1,500 requests/DAY are free and BrandGEO
+//                               has made ~200 grounded calls in total, so the
+//                               true marginal cost today is EUR 0.
+//   google_ai   0.015    0.015   not a marginal cost at all. SerpApi is a fixed
+//                               monthly subscription and unused searches expire
+//                               at renewal, so the real figure is
+//                               plan_fee / searches_actually_used.
+//
+// Full derivation, prices and sources: netlify/functions/_cost.js. That file is
+// the authoritative, server-enforced copy — update BOTH together.
 export const ENGINE_COST_EUR: Partial<Record<EngineId, number>> = {
-  claude:     0.010,
-  chatgpt:    0.060,
-  gemini:     0.034,
-  perplexity: 0.006,
+  claude:     0.033,
+  chatgpt:    0.056,
+  perplexity: 0.001,
   meta:       0.001,   // retired engine; kept for cost calc on historical rows
-  google_ai:  0.015,   // SerpApi Google AI Mode, per-search — PLACEHOLDER, true up to your SerpApi plan's per-search price
+  // Fixed-fee engines — accounting figures, not marginal cost. See above.
+  gemini:     0.032,
+  google_ai:  0.015,
 }
+
+/** Engines billed as a fixed periodic commitment rather than per call.
+ *  Mirrors FIXED_FEE_ENGINES in netlify/functions/_cost.js. */
+export const FIXED_FEE_ENGINES: ReadonlySet<EngineId> =
+  new Set<EngineId>(['gemini', 'google_ai'])
 
 // ── Monthly per-client API spend cap (EUR) ───────────────────────────────────
 // SCALE-SPEC.md §2 — server-side enforcement lives in

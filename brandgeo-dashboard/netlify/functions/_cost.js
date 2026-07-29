@@ -53,13 +53,104 @@
  * Keep in sync with src/lib/planConfig.ts's ENGINE_COST_EUR whenever either
  * changes.
  */
+/* ═══════════════════════════════════════════════════════════════════════════
+   COST MODEL — rebuilt 2026-07-29 against verified list prices.
+
+   WHAT WAS WRONG. cost_eur was never metered. costForRow() returned a flat
+   constant per engine, so every ai_results row for a given engine carried an
+   identical value (confirmed in production: `count(distinct cost_eur) = 1` for
+   all six engines). The comment in Usage.tsx claiming the column "now meters
+   this per row for real" was not true — it stored the same estimate in the
+   database instead of computing it in the UI.
+
+   The engines all return token usage and it was being discarded at the point
+   of collection: every callX() in _collect.js returned {text, errorCode,
+   detail} and dropped the usage block. Metering is now wired (see
+   estimateCostEur below and the `usage` returns in _collect.js).
+
+   THE TOTAL WAS ACCIDENTALLY CLOSE; THE ATTRIBUTION WAS NOT. Modelled against
+   list prices verified 2026-07-29, a 5-engine run costs about EUR 0.135 vs the
+   EUR 0.125 the constants implied — 8% out in total, because two large errors
+   pointed in opposite directions and cancelled:
+
+     engine      was      modelled   error
+     chatgpt     0.060    0.056      ok
+     claude      0.010    0.033      3.3x UNDER
+     gemini      0.034    0.032      ok at list (but see the free tier below)
+     perplexity  0.006    0.001      5x OVER
+     google_ai   0.015    fixed fee  not a marginal cost at all
+
+   Per-engine attribution is what Usage.tsx displays and what any "which engine
+   do we cut" decision would rest on, so being right in aggregate and wrong per
+   engine is the worse failure. Claude in particular looked like the cheapest
+   engine when it is the second most expensive.
+
+   WHY CLAUDE WAS 3.3x UNDER — the constant is exactly the no-web-search cost.
+   ~500 input + ~600 output on sonnet-4-6 is $0.0105, which is EUR 0.010 to
+   three decimals. Task #63 removed web search from Claude, the constant was set
+   for that shape, and then `8b7496c` was reverted and web search was restored
+   (see the long note in _collect.js callClaude, which explicitly says
+   "reconcile the cost math"). This closes that TODO. Web search adds a
+   $10/1,000 tool fee AND bills the retrieved results as input tokens.
+
+   TWO OF THE FIVE ARE NOT PER-CALL COSTS. Modelling them as marginal is a
+   category error that makes the budget gate block collection over spend that
+   is incurred whether or not you collect:
+     - gemini: grounding is $35/1,000 prompts BUT the first 1,500 requests per
+       DAY are free, and retrieved context is not billed as tokens. BrandGEO has
+       made ~200 grounded calls in total, so the true marginal cost is EUR 0.
+     - google_ai: SerpApi is a fixed monthly subscription and unused searches
+       expire at renewal. Marginal cost inside the plan is EUR 0; the real cost
+       is plan_fee / searches_actually_used, which at current volume is far
+       higher than any per-search figure.
+   Both are kept as non-zero here deliberately — see FIXED_FEE_ENGINES below.
+
+   PRICES (USD, verified 2026-07-29, converted at USD_TO_EUR):
+     gpt-5.5            $5.00 / $30.00 per 1M   + web_search $10/1k, results billed as input
+     claude-sonnet-4-6  $3.00 / $15.00 per 1M   + web_search $10/1k, results billed as input
+     perplexity/sonar   $1.00 /  $1.00 per 1M   search included, no separate fee
+     gemini-2.5-flash   $35 per 1k grounded prompts, 1,500/day free, context not billed
+     SerpApi            $10-25 per 1k depending on plan tier; fixed monthly commitment
+
+   NOTE gpt-5.5 is legacy as of the GPT-5.6 release (2026-07) and OpenAI doubled
+   the GPT-5 line on 2026-04-23 ($2.50->$5.00 in, $15->$30 out). If the model id
+   in _collect.js is ever bumped, revisit MODEL_PRICE_USD in the same commit.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const USD_TO_EUR = 0.92
+
+/** Per-1M-token list prices in USD, by engine. */
+const MODEL_PRICE_USD = {
+  chatgpt:    { in: 5.00, out: 30.00 },  // gpt-5.5
+  claude:     { in: 3.00, out: 15.00 },  // claude-sonnet-4-6
+  perplexity: { in: 1.00, out:  1.00 },  // perplexity/sonar via OpenRouter
+  meta:       { in: 0.35, out:  0.40 },  // llama-3.1-70b, retired — historical rows only
+}
+
+/** Flat per-call tool fees in USD (charged on top of tokens). */
+const TOOL_FEE_USD = {
+  chatgpt: 0.010,   // web_search_preview, $10 per 1,000 calls
+  claude:  0.010,   // web_search_20250305, $10 per 1,000 searches, max_uses:1
+}
+
+/**
+ * Engines whose cost is a fixed periodic commitment, not a per-call charge.
+ * The value below is a per-call ACCOUNTING figure so the monthly budget gate
+ * still throttles them; it is not what the call marginally costs. Do not quote
+ * these as marginal cost when deciding whether a run is "worth it".
+ */
+const FIXED_FEE_ENGINES = new Set(['gemini', 'google_ai'])
+
 const ENGINE_COST_EUR = {
-  claude:     0.010,
-  chatgpt:    0.060,
-  gemini:     0.034,   // 2.5-flash, flat $35/1k grounded prompts (see the note above)
-  perplexity: 0.006,
-  meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); kept for historical rows
-  google_ai:  0.015,   // Google AI Mode via SerpApi, per-search — PLACEHOLDER, true up to the SerpApi plan price
+  // Fallback estimates, used only when an engine returns no usage block.
+  // Recomputed 2026-07-29 from the prices above at the observed call shape.
+  claude:     0.033,   // was 0.010 — that figure predated web search being restored
+  chatgpt:    0.056,   // was 0.060
+  perplexity: 0.001,   // was 0.006
+  meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); historical rows only
+  // Fixed-fee engines: accounting figures, marginal cost is EUR 0 at current volume.
+  gemini:     0.032,   // $35/1k grounded LIST price; free under 1,500/day
+  google_ai:  0.015,   // SerpApi mid-tier per-search; real cost is the monthly plan
 }
 
 // Error codes where NO billable API call happened — the request was rejected
@@ -86,8 +177,48 @@ const FREE_ERROR_CODES = new Set(['quota_exceeded', 'auth_error'])
  * Unknown engine ids (e.g. the 4 not-yet-built ones) return 0 — they never
  * collect, so there's nothing to meter.
  */
-function costForRow(llm, errorCode) {
+/**
+ * estimateCostEur(llm, usage) -> number | null
+ *
+ * Real per-call cost from the token counts the provider returned. Returns null
+ * when the engine has no token-based price (the fixed-fee engines) or when the
+ * caller passed no usage — callers fall back to ENGINE_COST_EUR in that case.
+ *
+ * `usage` is the normalised shape produced by _collect.js:
+ *   { inputTokens: number, outputTokens: number, searches?: number }
+ *
+ * searches defaults to 1 for the two web-search engines because both are
+ * configured to search once per call (max_uses:1 on Claude, a single
+ * web_search_preview tool on ChatGPT). If a provider reports the real count,
+ * pass it and this bills it exactly.
+ */
+function estimateCostEur(llm, usage) {
+  const price = MODEL_PRICE_USD[llm]
+  if (!price || !usage) return null
+  const inTok  = Number(usage.inputTokens)  || 0
+  const outTok = Number(usage.outputTokens) || 0
+  if (inTok === 0 && outTok === 0) return null
+
+  const feePerSearch = TOOL_FEE_USD[llm] ?? 0
+  const searches = feePerSearch
+    ? (usage.searches === undefined ? 1 : Number(usage.searches) || 0)
+    : 0
+
+  const usd = (inTok * price.in / 1e6) + (outTok * price.out / 1e6) + (searches * feePerSearch)
+  return usd * USD_TO_EUR
+}
+
+/**
+ * costForRow(llm, errorCode, usage) -> number
+ *
+ * Metered when the provider returned usage, estimated otherwise. The third
+ * argument is optional so every existing 2-argument call site keeps working and
+ * silently falls back to the flat estimate.
+ */
+function costForRow(llm, errorCode, usage) {
   if (errorCode && FREE_ERROR_CODES.has(errorCode)) return 0
+  const metered = estimateCostEur(llm, usage)
+  if (metered !== null) return metered
   return ENGINE_COST_EUR[llm] ?? 0
 }
 
@@ -159,9 +290,18 @@ function activeEnginesFor(plan, enginesEnabled) {
  * CURRENT live ENGINE_COST_EUR values above, at 9% of monthly plan price
  * (SCALE-SPEC §1.2's own sizing rule — 9%, not 10%, so the reserved 1%
  * headroom absorbs Free-tier + prospecting spend):
- *   5-engine check (chatgpt+gemini+claude+perplexity+meta): EUR 0.111
- *   3-engine check (chatgpt+gemini+claude):                 EUR 0.104
- *   1-engine check (chatgpt):                                EUR 0.060
+ *
+ * RESTATED 2026-07-29 at the rebuilt prices (the figures below were computed
+ * against the old constants, where claude was 3.3x under and perplexity 5x
+ * over; the per-check totals move less than the per-engine numbers because
+ * those two errors partly cancelled):
+ *   5-engine check (chatgpt+gemini+claude+perplexity+google_ai): EUR 0.137  (was 0.111 w/ meta)
+ *   3-engine check (chatgpt+gemini+claude):                      EUR 0.121  (was 0.104)
+ *   1-engine check (chatgpt):                                    EUR 0.056  (was 0.060)
+ *
+ * Note the 5-engine figure now includes google_ai rather than the retired meta,
+ * and that gemini + google_ai inside it are FIXED_FEE_ENGINES — the true
+ * marginal cost of a 5-engine check at current volume is about EUR 0.090.
  * free:       fixed small allowance (5 checks), not price-derived (E0 revenue)
  * essentials: 9% of EUR 99   = 8.91
  * growth:     9% of EUR 299  = 26.91
@@ -207,8 +347,13 @@ const WEEKLY_CAP_DAYS = 7
 
 module.exports = {
   ENGINE_COST_EUR,
+  MODEL_PRICE_USD,
+  TOOL_FEE_USD,
+  FIXED_FEE_ENGINES,
+  USD_TO_EUR,
   FREE_ERROR_CODES,
   costForRow,
+  estimateCostEur,
   PLAN_LIVE_ENGINES,
   PLAN_LIVE_ENGINE_COUNT,
   activeEnginesFor,
