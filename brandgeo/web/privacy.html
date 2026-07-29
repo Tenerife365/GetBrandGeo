@@ -22,7 +22,6 @@
   <script src="plausible-init.js"></script>
   <title>Privacy Policy: BrandGEO</title>
   <meta name="description" content="BrandGEO's privacy policy: what data we collect, how it is used, and your rights as a user of our AI visibility platform." />
-  <meta name="robots" content="noindex" />
   <link rel="canonical" href="https://getbrandgeo.com/privacy.html" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -51,6 +50,12 @@
     a:hover { text-decoration: underline; }
     .gdpr-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 20px 24px; margin: 32px 0; }
     .gdpr-box p { margin: 0; }
+    .tablewrap { overflow-x: auto; margin: 16px 0 22px; border: 1px solid var(--border); border-radius: 10px; }
+    table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 0.84rem; }
+    th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--surface); font-weight: 700; white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    code { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.86em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     footer { text-align: center; padding: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
   </style>
   <script src="ga4-init.js?v=20260729b"></script>
@@ -64,7 +69,7 @@
 
 <main>
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: July 1, 2026 &nbsp;·&nbsp; BrandGEO / getbrandgeo.com</p>
+  <p class="meta">Last updated: 29 July 2026 &nbsp;·&nbsp; BrandGEO / getbrandgeo.com</p>
 
   <div class="gdpr-box">
     <p>&#x1F512; BrandGEO is based in the European Union (Santa Cruz de Tenerife, Canary Islands, Spain) and is fully committed to compliance with the General Data Protection Regulation (GDPR, EU 2016/679).</p>
@@ -75,15 +80,23 @@
   <p>Data protection contact: <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a> &nbsp;&middot;&nbsp; General contact: <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
 
   <h2>2. What Data We Collect</h2>
-  <p>We collect only the data you voluntarily provide through our contact/audit request form:</p>
+  <p><strong>From the public website</strong>, only what you voluntarily submit through our contact or audit request form:</p>
   <ul>
     <li>Full name</li>
     <li>Business email address</li>
     <li>Company or brand name</li>
     <li>Industry</li>
-    <li>Optional message / notes</li>
+    <li>Optional message or notes</li>
   </ul>
-  <p>We do not collect sensitive personal data, payment information, or data from minors.</p>
+  <p><strong>From the dashboard</strong>, if you hold an account, we additionally process:</p>
+  <ul>
+    <li>Account details: your email address, your role, and the client account you belong to</li>
+    <li>Brand configuration: brand name, aliases, website and named competitors</li>
+    <li>The monitoring prompts you create, and the responses AI engines return for them</li>
+    <li>Support tickets and any messages you send us through the dashboard</li>
+    <li>Billing status. Payment is handled by Stripe and we never see or store full card numbers.</li>
+  </ul>
+  <p>We do not collect special category data under Article 9 GDPR, and our services are not directed at children.</p>
 
   <h2>3. How We Use Your Data</h2>
   <p>Your data is used solely to:</p>
@@ -107,17 +120,42 @@
   </ul>
   <p>Retention is enforced automatically. You may request early deletion of your data at any time.</p>
 
-  <h2>6. Third-Party Services</h2>
-  <p>We use the following third-party services to operate our platform:</p>
-  <ul>
-    <li><strong>FormSubmit.co</strong>: processes contact form submissions (no data stored beyond email delivery)</li>
-    <li><strong>Supabase</strong>: database and authentication for the dashboard (EU-compatible, data stored in secure cloud infrastructure)</li>
-    <li><strong>Netlify</strong>: hosting for the dashboard (app.getbrandgeo.com)</li>
-  </ul>
+  <h2>6. Sub-processors</h2>
+  <p>To deliver the service we share data with the processors listed below. Each acts on our documented instructions under a data processing agreement, and none is permitted to use your data for its own purposes.</p>
+  <p><strong>What the AI engines receive.</strong> BrandGEO works by sending your monitoring prompts to AI engines and reading what they answer. Those prompts and the resulting responses are transmitted to the engine providers listed under "AI engines" below. Prompts are business queries you write, such as "best catering company in Madrid", and are not intended to contain personal data. Please do not put personal data into a prompt, because doing so sends it to those providers.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Processor</th><th>Purpose</th><th>Data shared</th><th>Location</th><th>Transfer basis</th></tr></thead>
+      <tbody>
+        <tr><td colspan="5"><strong>Infrastructure</strong></td></tr>
+        <tr><td>Supabase</td><td>Database, authentication and file storage for the dashboard</td><td>Account data, prompts, AI results, support tickets</td><td>Ireland (EU, AWS eu-west-1)</td><td>No transfer, data stays in the EU</td></tr>
+        <tr><td>Netlify</td><td>Hosting and serverless functions for app.getbrandgeo.com</td><td>Request data in transit, IP address</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>AI engines</strong></td></tr>
+        <tr><td>OpenAI</td><td>ChatGPT monitoring and prompt suggestions</td><td>Prompt text, brand and competitor names</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td>Anthropic</td><td>Claude monitoring, response analysis, recommendations, SEO drafting</td><td>Prompt text, engine response text, brand names</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td>Google</td><td>Gemini monitoring</td><td>Prompt text</td><td>United States and EU</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>OpenRouter</td><td>Routing layer for Perplexity and Grok monitoring</td><td>Prompt text</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>SerpApi</td><td>Google AI Mode and Google AI Overviews monitoring</td><td>Prompt text</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>Operations</strong></td></tr>
+        <tr><td>Stripe</td><td>Payment and subscription processing</td><td>Name, email, billing details. We never see or store full card numbers.</td><td>Ireland and United States</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>Resend</td><td>Transactional email, including account and support notifications</td><td>Name, email address, message content</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>FormSubmit.co</td><td>Delivery of the public contact and audit request form</td><td>Form fields you submit</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>HubSpot</td><td>Customer relationship management for enquiries. Used only when enabled.</td><td>Name, email, company name</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>Ayrshare</td><td>Social publishing for the AI Social feature. Not available to customers at present.</td><td>Post content and connected account tokens</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>Analytics</strong></td></tr>
+        <tr><td>Plausible</td><td>Cookieless website analytics</td><td>Aggregate page views only, no identifier</td><td>European Union</td><td>No transfer</td></tr>
+        <tr><td>Google Analytics</td><td>Website analytics. Loaded only with your consent.</td><td>Usage and device data, IP anonymised</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>We update this list when a processor is added or removed. If you need the current list in writing for your own records, or a copy of the relevant safeguards, contact <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a>.</p>
 
   <h2>7. Cookies &amp; Analytics</h2>
-  <p>The getbrandgeo.com website uses <strong>Plausible Analytics</strong>, a privacy-friendly analytics tool that does not use cookies, does not collect personal data, and does not track visitors across sites. Plausible processes aggregate traffic data (page views, referrer, country, device type) without storing any personally identifiable information. No cookie consent is required. You can review Plausible's data policy at <a href="https://plausible.io/data-policy" target="_blank" rel="noopener">plausible.io/data-policy</a>.</p>
-  <p>The dashboard (app.getbrandgeo.com) uses only essential session cookies required for authentication. No advertising or third-party tracking cookies are used on any BrandGEO property.</p>
+  <p>Full detail, including a cookie-by-cookie schedule and retention periods, is in our <a href="/cookies.html">Cookie Policy</a>. In summary:</p>
+  <p><strong>Google Analytics is loaded only if you consent.</strong> When you first visit getbrandgeo.com you are asked whether to allow it. Until you accept, no request is made to Google and no analytics cookies are set. If you accept, Google Analytics sets the <code>_ga</code> and <code>_ga_&lt;id&gt;</code> cookies. If you decline, they are never set and the Google script is never loaded at all. Accepting and declining are offered with equal prominence, nothing is pre-selected, and continuing to browse is not treated as consent. You can change your answer at any time using the <strong>Cookie settings</strong> link in the footer of any page, and we ask again at least every 12 months.</p>
+  <p><strong>Plausible Analytics runs for every visitor and requires no consent.</strong> It sets no cookies, stores no identifier on your device and collects no personal data, processing only aggregate traffic figures such as page views, referrer, country and device type. Because it neither stores nor accesses information on your device, the consent requirement in Article 5(3) of the ePrivacy Directive does not apply. See <a href="https://plausible.io/data-policy" target="_blank" rel="noopener">plausible.io/data-policy</a>.</p>
+  <p><strong>We use no advertising or cross-site tracking cookies.</strong> Google advertising signals are held at "denied" at all times, including for visitors who accept analytics, so no advertising profile is built and no audience pixel fires.</p>
+  <p>The dashboard (app.getbrandgeo.com) uses only strictly necessary authentication storage and your own interface preferences, such as theme and language. It carries no analytics and no advertising technology of any kind.</p>
 
   <h2>8. Your Rights Under GDPR</h2>
   <p>As a data subject in the EU, you have the right to:</p>
