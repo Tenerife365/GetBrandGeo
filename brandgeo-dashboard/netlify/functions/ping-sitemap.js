@@ -164,19 +164,47 @@ exports.handler = async (event) => {
       ` | indexnow:${bing.ok ? 'ok' : bing.skipped ? 'unconfigured' : 'failed'}`)
   }
 
-  // Only a total loss is a failed run. Google being absent is a deliberate
-  // configuration choice as of 2026-07-28 and must not colour the job red,
-  // otherwise the observability that packet 012 built is worthless noise.
+  // ── What `ok` means ────────────────────────────────────────────────────────
+  // STRICTER AS OF 2026-07-29, owner's call. `ok` used to mean "at least one
+  // submitter was CONFIGURED", which made it true even when every single
+  // submission failed. A run that pinged 22 URLs and a run that pinged 0 both
+  // wrote ok=true, so the field could not answer the only question anyone asks
+  // it. It now means "at least one URL was actually ACCEPTED by a submitter".
+  //
+  // A run with nothing to submit is still a success, and it is the common case:
+  // the sitemap only changes when content ships, so most mornings toPing is
+  // empty. Treating "no work" as a failure would make the job red almost every
+  // day and teach everyone to ignore it, which is the failure mode this change
+  // exists to prevent.
+  //
+  // Google being absent is a deliberate configuration choice as of 2026-07-28
+  // and must never colour the job red on its own.
   const deferred = changed.length - toPing.length
   const nothingConfigured = !indexer && !process.env.INDEXNOW_KEY
-  console.log(`[ping-sitemap] done | recorded:${pinged}/${changed.length} | google:${googleOk} | indexnow:${indexnowOk}${deferred > 0 ? ` (${deferred} deferred)` : ''}`)
-  await recordJobRun(supabase, !nothingConfigured, {
+  const nothingToSubmit   = toPing.length === 0
+  const allSubmissionsFailed = !nothingConfigured && !nothingToSubmit && pinged === 0
+  const ok = !nothingConfigured && !allSubmissionsFailed
+
+  const failure = nothingConfigured
+    ? 'neither GOOGLE_JSON_KEY nor INDEXNOW_KEY is configured'
+    : allSubmissionsFailed
+      ? `every submission failed: 0 of ${toPing.length} URLs were accepted by any submitter`
+      : null
+
+  console.log(`[ping-sitemap] done | recorded:${pinged}/${changed.length} | google:${googleOk} | indexnow:${indexnowOk}${deferred > 0 ? ` (${deferred} deferred)` : ''}${failure ? ` | FAILED: ${failure}` : ''}`)
+
+  await recordJobRun(supabase, ok, {
     pinged, changed: changed.length, deferred, googleOk, indexnowOk,
+    attempted: toPing.length,
     ...(googleSkipped ? { google_skipped: googleSkipped } : {}),
-    ...(nothingConfigured ? { error: 'neither GOOGLE_JSON_KEY nor INDEXNOW_KEY is configured' } : {}),
+    ...(failure ? { error: failure } : {}),
   })
+
   return {
-    statusCode: nothingConfigured ? 500 : 200,
-    body: JSON.stringify({ pinged, changed: changed.length, deferred, googleOk, indexnowOk }),
+    // 500 = misconfigured (nothing to submit WITH). 502 = configured, tried, and
+    // every upstream rejected us, which is a different problem with a different
+    // fix. Distinguishing them means the status code alone says which.
+    statusCode: nothingConfigured ? 500 : allSubmissionsFailed ? 502 : 200,
+    body: JSON.stringify({ ok, pinged, attempted: toPing.length, changed: changed.length, deferred, googleOk, indexnowOk, ...(failure ? { error: failure } : {}) }),
   }
 }
