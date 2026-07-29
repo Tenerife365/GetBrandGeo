@@ -56,3 +56,13 @@ integration-guides_*/
 # now-tracked files, the 3 differing spec variants, and local-only secrets.
 # Review and delete when confirmed unneeded. Never commit (contains secrets).
 /_reorg-stray/
+.aidesigner/*
+!.aidesigner/.gitkeep
+
+# Piper voice models: ~63MB each, re-downloadable in seconds with
+# `python -m piper.download_voices <name> --download-dir assets/voices`.
+# The .json configs and the licence README ARE tracked, so the licence
+# decision survives even though the weights do not.
+assets/voices/**/*.onnx
+assets/audio/*.wav
+assets/samples/*.wav
