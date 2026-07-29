@@ -1,4 +1,4 @@
-/* ga4-init.js — consent gate for Google Analytics. Rewritten 2026-07-29.
+/* ga4-init.js: consent gate for Google Analytics. Rewritten 2026-07-29.
  *
  * WHAT THIS FILE USED TO DO, and why it was a problem:
  *
