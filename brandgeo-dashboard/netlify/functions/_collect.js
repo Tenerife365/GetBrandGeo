@@ -305,20 +305,54 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     ? { type: 'approximate', country: marketId, ...(isSpecificRegion ? { city: regionLabel } : {}) }
     : null
 
-  const r = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model:        'gpt-5.5',
-      instructions: ctx,
-      tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
-      input:        prompt,
-      reasoning:    { effort: 'low' },
-    }),
-  })
-  const d = await r.json()
+  // MODEL SWITCH, 2026-07-29, owner's decision. gpt-5.5 measured EUR 0.108 a
+  // call and is 74% of all marginal collection spend. It is also legacy since
+  // the GPT-5.6 release, and OpenAI doubled the GPT-5 line on 2026-04-23, so we
+  // were paying twice the old price for a superseded model. gpt-4o-mini is
+  // $0.15/$0.60 per 1M against $5.00/$30.00.
+  //
+  // `reasoning` MUST NOT be sent to a non-reasoning model. It is a GPT-5-family
+  // parameter and 4o-mini rejects it. This is the exact shape that broke grok
+  // earlier today: one unsupported parameter, every call returning api_error,
+  // and nobody noticing for hours. Hence the family check rather than a
+  // hardcoded body.
+  //
+  // FALLBACK, and it is the reason this can ship the night before a customer
+  // walkthrough. ChatGPT runs on EVERY plan including Free, so a wrong guess
+  // here breaks collection for every client. If the primary model returns an
+  // API error that is not a quota problem, we retry once on gpt-5.5. A 4xx
+  // comes back in well under a second, so the retry fits inside the budget. The
+  // worst case is the old cost and a loud log line, never a dead engine.
+  // Remove the fallback once metered rows prove the primary works.
+  const PRIMARY  = process.env.OPENAI_COLLECT_MODEL || 'gpt-4o-mini'
+  const FALLBACK = 'gpt-5.5'
+  const isReasoningModel = (m) => /^(gpt-5|o[134])/.test(m)
+
+  const callOnce = async (model) => {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model,
+        instructions: ctx,
+        tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
+        input:        prompt,
+        ...(isReasoningModel(model) ? { reasoning: { effort: 'low' } } : {}),
+      }),
+    })
+    return { res, json: await res.json() }
+  }
+
+  let { res: r, json: d } = await callOnce(PRIMARY)
+  let modelUsed = PRIMARY
+  if (d.error && r.status !== 429 && r.status !== 402 && d.error.code !== 'insufficient_quota'
+      && PRIMARY !== FALLBACK) {
+    console.error(`[ChatGPT] ${PRIMARY} failed, falling back to ${FALLBACK}:`, JSON.stringify(d.error))
+    ;({ res: r, json: d } = await callOnce(FALLBACK))
+    modelUsed = FALLBACK
+  }
   if (d.error) {
-    console.error('[ChatGPT] API error:', JSON.stringify(d.error))
+    console.error(`[ChatGPT:${modelUsed}] API error:`, JSON.stringify(d.error))
     const isQuota = r.status === 429 || r.status === 402 || d.error.code === 'insufficient_quota'
     return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error', detail: `HTTP ${r.status} ${d.error.message || ''}`.trim() }
   }
@@ -337,7 +371,7 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     ? { inputTokens: d.usage.input_tokens ?? 0, outputTokens: d.usage.output_tokens ?? 0, searches }
     : null
   if (text) {
-    console.log('[ChatGPT] location used:', userLocation || 'none (worldwide)',
+    console.log(`[ChatGPT:${modelUsed}] location used:`, userLocation || 'none (worldwide)',
       '| tokens:', usage ? `${usage.inputTokens}in/${usage.outputTokens}out/${searches}search` : 'n/a',
       '| preview:', text.slice(0, 200))
   } else {

@@ -121,7 +121,15 @@ const USD_TO_EUR = 0.92
 
 /** Per-1M-token list prices in USD, by engine. */
 const MODEL_PRICE_USD = {
-  chatgpt:    { in: 5.00, out: 30.00 },  // gpt-5.5
+  // gpt-4o-mini as of 2026-07-29 (owner's switch off legacy gpt-5.5, which was
+  // $5.00/$30.00 and 74% of all marginal collection spend). Token prices are
+  // list. The web_search_preview fee in TOOL_FEE_USD below is NOT verified for
+  // this model and is the larger share of the cost now that tokens are cheap,
+  // so the first metered rows should be checked against the OpenAI dashboard
+  // and this table corrected. If the gpt-5.5 fallback in _collect.js fires, the
+  // row is priced with these numbers and will UNDERSTATE the real cost; a run
+  // of suspiciously cheap chatgpt rows means the fallback is firing.
+  chatgpt:    { in: 0.15, out: 0.60 },   // gpt-4o-mini
   claude:     { in: 3.00, out: 15.00 },  // claude-sonnet-4-6
   perplexity: { in: 1.00, out:  1.00 },  // perplexity/sonar via OpenRouter
   meta:       { in: 0.35, out:  0.40 },  // llama-3.1-70b, retired — historical rows only
@@ -198,10 +206,14 @@ const ENGINE_COST_EUR = {
   // Fallback estimates, used only when an engine returns no usage block.
   // Recomputed 2026-07-29 from the prices above at the observed call shape.
   claude:     0.033,   // was 0.010 — that figure predated web search being restored
-  chatgpt:    0.108,   // MEASURED from metered rows 2026-07-29 (avg of 6, range
-                       // 0.078 to 0.174). Was 0.056, modelled. The gap is reasoning
-                       // tokens: 'low' effort still bills more than the flat
-                       // 500in/650out shape the old figure assumed.
+  // 0.014, MODELLED for gpt-4o-mini, 2026-07-29. NOT measured yet, unlike the
+  // 0.108 it replaces, which WAS measured across 6 gpt-5.5 rows (range 0.078 to
+  // 0.174). Shape assumed: ~10k input (web results are billed as input) at
+  // $0.15/1M, ~1k output at $0.60/1M, plus one $0.010 search fee. Tokens are now
+  // about a fifth of the cost and the flat search fee is the rest, which is a
+  // different cost structure, so re-measure before quoting this anywhere.
+  // Replace with a measured figure once real 4o-mini rows exist.
+  chatgpt:    0.014,
   perplexity: 0.005,   // MEASURED 2026-07-29 (avg of 6, tight range 0.0050-0.0052).
                        // Was 0.001, modelled. Still the cheapest engine by far.
   meta:       0.001,   // retired 2026-07-16 (replaced by google_ai); historical rows only
