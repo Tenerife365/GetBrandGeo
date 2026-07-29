@@ -337,14 +337,31 @@ function activeEnginesFor(plan, enginesEnabled) {
 // giving ~88% gross margin at the §3 prompt counts + ~weekly collection. This is
 // the hard cost ceiling; PLAN_COLLECTION_COOLDOWN_HOURS below is the separate
 // frequency limiter. Keep in sync with planConfig.ts.
+// RAISED TO 15% OF PRICE, 2026-07-29c. Owner's instruction: API spend per client
+// is hard-capped at 15% of what that client pays, because BrandGEO carries other
+// costs on top of inference and has to clear a margin.
+//
+// THIS IS A CEILING, NOT THE EXPECTED SPEND, and the distinction is the whole
+// point of the change. Scheduled weekly collection costs about 10.5% of price on
+// every paid tier (see the table in planConfig.ts PLAN_PROMPTS). The old 12%
+// ceiling left only 1.5 points of slack, so a customer who pressed Run
+// Collection manually once or twice in a month could hit a hard block on spend
+// that was already budgeted for. 15% leaves real room for manual refreshes while
+// still stopping runaway use, and it is the number to enforce rather than drift
+// past.
+//
+// Reading these against revenue: the gate is 15% of price, scheduled use is
+// ~10.5%, and true cash out is 6.5-7.8% because gemini (free under 1,500
+// requests/day) and google_ai (fixed SerpApi subscription) are inside the
+// modelled figure but are not marginal spend.
 const PLAN_MONTHLY_API_BUDGET_EUR = {
-  free:       0.30,
-  essentials: 11.88,   // 12% of €99
-  growth:     35.88,   // 12% of €299
-  growth_pro: 53.88,   // 12% of €449
-  managed:    180.00,  // 12% of €1,500 floor
-  pro:        180.00,  // legacy (treated as Managed)
-  enterprise: 1200.00, // custom; generous default
+  free:       0.30,    // not price-derived: EUR 0 revenue, fixed small allowance
+  essentials:  14.85,  // 15% of €99
+  growth:      44.85,  // 15% of €299
+  growth_pro:  67.35,  // 15% of €449
+  managed:    225.00,  // 15% of €1,500 floor
+  pro:        225.00,  // legacy (treated as Managed)
+  enterprise: 1500.00, // 15% of the €10,000 pricing floor
 }
 
 // PRICING-STRATEGY-2026-07 §6 — minimum hours between MANUAL collection runs (the

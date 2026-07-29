@@ -53,16 +53,17 @@ create table if not exists public.plan_prompt_caps (
 comment on table public.plan_prompt_caps is
   'Max ACTIVE prompts per plan. Enforced by trigger enforce_prompt_cap() on public.prompts. Mirror of PLAN_PROMPTS in src/lib/planConfig.ts — this table is the enforced copy.';
 
--- Seeded from PLAN_PROMPTS as of 2026-07-29b (the Grok rebalance: growth_pro
--- 75 -> 70 and managed/pro 250 -> 230, because a 6th engine raised those tiers
--- from EUR 0.145 to EUR 0.157 per prompt).
+-- Seeded from PLAN_PROMPTS as of 2026-07-29c. (A brief 29b revision cut
+-- growth_pro to 70 and managed/pro to 230 to fit Grok under a 12%-of-price
+-- spend ceiling; the ceiling was raised to 15% the same day, so the cut was
+-- reverted. If you applied 29b, re-running this file corrects the rows.)
 insert into public.plan_prompt_caps (plan, prompt_cap) values
   ('free',         5),
   ('essentials',  20),
   ('growth',      50),
-  ('growth_pro',  70),
-  ('managed',    230),
-  ('pro',        230),
+  ('growth_pro',  75),
+  ('managed',    250),
+  ('pro',        250),
   ('enterprise', 100000)
 on conflict (plan) do update
   set prompt_cap = excluded.prompt_cap,

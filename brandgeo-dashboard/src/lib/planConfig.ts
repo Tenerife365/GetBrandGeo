@@ -212,14 +212,19 @@ export const FIXED_FEE_ENGINES: ReadonlySet<EngineId> =
 // (up from the old 9%), giving ~88% gross margin and ~weekly collection at the
 // §6 prompt counts. This is the hard cost ceiling; the cooldown (below) is the
 // frequency limiter. Keep in sync with _cost.js (the server-enforced copy).
+// 15% OF PRICE as of 2026-07-29c (was 12%). This is the hard CEILING on API
+// spend per client, not the expected spend: scheduled weekly collection runs at
+// about 10.5% of price, and the extra headroom exists so a customer who presses
+// Run Collection manually is not blocked on spend that was already budgeted.
+// Keep in sync with _cost.js, which is the copy that enforces it.
 export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
-  free:       0.30,
-  essentials: 11.88,    // 12% of €99
-  growth:     35.88,    // 12% of €299
-  growth_pro: 53.88,    // 12% of €449
-  managed:    180.00,   // 12% of €1,500 floor
-  pro:        180.00,   // legacy (treated as Managed)
-  enterprise: 1200.00,  // custom; generous default
+  free:       0.30,     // not price-derived (€0 revenue)
+  essentials:  14.85,   // 15% of €99
+  growth:      44.85,   // 15% of €299
+  growth_pro:  67.35,   // 15% of €449
+  managed:    225.00,   // 15% of €1,500 floor
+  pro:        225.00,   // legacy (treated as Managed)
+  enterprise: 1500.00,  // 15% of the €10,000 pricing floor
 }
 
 export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise']
@@ -299,23 +304,33 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
    free stays at 5 prompts and MONTHLY (not weekly): its EUR 0.30 budget buys
    exactly one 1-engine run of 5 prompts.
 
-   REBALANCED 2026-07-29b for Grok. Growth PRO and Managed gained a 6th engine,
-   which raises their per-prompt cost from EUR 0.145 to EUR 0.157, so their
-   prompt caps come down to hold the same ~88% budget headroom as every other
-   tier: growth_pro 75 -> 70, managed/pro 250 -> 230. Deliberate trade — "6 AI
-   engines vs 5" is a stronger and more legible step up from Growth than "75
-   prompts vs 50" was, and 70 is still +40% on Growth.
+   REBALANCED TWICE ON 2026-07-29, and the second pass undid the first.
+   29b cut growth_pro 75 -> 70 and managed 250 -> 230 to fit a 6th engine
+   (Grok, +EUR 0.012/prompt) under a 12%-of-price ceiling. 29c raised that
+   ceiling to 15% on the owner's instruction, which removed the reason for the
+   cut, so both are restored. Net effect of the day: an extra engine on Growth
+   PRO and up, and no allowance was reduced.
 
-     plan          engines  prompts  EUR/run  weekly EUR/mo  budget   used
-     free                1      5      0.28          0.28*    0.30    93%
-     essentials          3     20      2.42         10.49    11.88    88%
-     growth              5     50      7.25         31.42    35.88    88%
-     growth_pro          6     70     10.99         47.62    53.88    88%
-     managed             6    230     36.11        156.48   180.00    87%
-   * free is monthly, not weekly. */
+   READ THE LAST COLUMN AS A SHARE OF REVENUE, not of the budget. An earlier
+   version of this table showed "% of budget used" (~88%) with no label, which
+   read as if 88 cents of every euro went to inference. It does not.
+
+     plan          engines  prompts  EUR/run  weekly EUR/mo  price   % of price
+     free                1      5      0.28          0.28*      0        n/a
+     essentials          3     20      2.42         10.49       99      10.6%
+     growth              5     50      7.25         31.41      299      10.5%
+     growth_pro          6     75     11.78         51.02      449      11.4%
+     managed             6    250     39.25        170.07     1500      11.3%
+   * free is monthly, not weekly.
+
+   The hard ceiling is 15% of price (PLAN_MONTHLY_API_BUDGET_EUR), so scheduled
+   collection uses roughly two thirds of each client's allowance and the rest
+   absorbs manual refreshes. True cash out is lower again, 6.5-7.8% of price,
+   because gemini (free under 1,500 requests/day) and google_ai (fixed SerpApi
+   subscription) sit inside the modelled figure without being marginal spend. */
 export const PLAN_PROMPTS: Record<Plan, number> = {
-  free: 5, essentials: 20, growth: 50, growth_pro: 70,
-  managed: 230, pro: 230, enterprise: 100000,
+  free: 5, essentials: 20, growth: 50, growth_pro: 75,
+  managed: 250, pro: 250, enterprise: 100000,
 }
 
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
