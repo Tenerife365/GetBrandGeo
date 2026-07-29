@@ -6,12 +6,19 @@
 // ============================================================================
 const { sendBrandedEmail, APP_URL } = require('./_email');
 
-// support@ is the mailbox that actually exists and is monitored. The previous
-// default, constantin@getbrandgeo.com, was never provisioned, so every admin
-// alert this helper has ever sent (signup, Stripe, plan expiry, client
-// deletion, not just tickets) went to an address that does not receive mail.
-// NOTE the env var still wins: if ADMIN_ALERT_EMAIL is set in Netlify to the
-// old address, changing this default fixes nothing.
+// CORRECTION 2026-07-29: an earlier version of this comment claimed the old
+// default constantin@getbrandgeo.com was never provisioned and received no
+// mail. That was WRONG. getbrandgeo.com's MX is SMTP.GOOGLE.com and the address
+// is a verified Google Workspace send-as alias, so it has been receiving all
+// along. No admin alert was lost.
+//
+// support@ is still the right default, for the real reason: a shared, monitored
+// mailbox does not stop being read when one person is away, and admin alerts
+// (signup, Stripe, plan expiry, client deletion, tickets) are operational mail
+// rather than personal mail.
+//
+// NOTE the env var still wins. If ADMIN_ALERT_EMAIL is set in Netlify, changing
+// this default does nothing.
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'support@getbrandgeo.com';
 
 // supabase: a service-role client (bypasses RLS to insert the feed row).

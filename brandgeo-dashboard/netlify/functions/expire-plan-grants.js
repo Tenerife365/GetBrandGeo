@@ -20,7 +20,11 @@ const { sendBrandedEmail, APP_URL } = require('./_email');
 const { recordAdminEvent } = require('./_admin_notify');
 const { requireCronAuth } = require('./_cron_auth');
 
-const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'constantin@getbrandgeo.com';
+// Second copy of the default that lives in _admin_notify.js. Kept in sync by
+// hand, which is exactly how it drifted: the first copy moved to support@ and
+// this one did not, so plan-expiry alerts would have gone somewhere different
+// from every other admin alert.
+const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'support@getbrandgeo.com';
 
 // One row per invocation, success or failure, so "did the job run and what did
 // it do" is answerable in SQL (arch doc §6.4). Never allowed to break the job:
