@@ -44,6 +44,13 @@
   </url>
 
   <url>
+    <loc>https://getbrandgeo.com/news/grok-google-ai-overviews-launch/</loc>
+    <lastmod>2026-07-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
     <loc>https://getbrandgeo.com/ai-visibility-index-2026-07.html</loc>
     <lastmod>2026-07-14</lastmod>
     <changefreq>monthly</changefreq>
@@ -179,6 +186,13 @@
   <url>
     <loc>https://getbrandgeo.com/bg-019.html</loc>
     <lastmod>2026-07-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://getbrandgeo.com/bg-021-retrieval-not-engine-count.html</loc>
+    <lastmod>2026-07-29</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

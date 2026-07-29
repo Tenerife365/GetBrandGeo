@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BrandGEO">
+  <title>BrandGEO</title>
+  <desc>Favicon tile. Gradient ground, light glyph. This is the variant to ship
+  as the favicon: the dark-ground tile measures 1.01:1 against the site's own
+  canvas and disappears on dark browser chrome.</desc>
+  <defs>
+    <linearGradient id="tileGrad" gradientUnits="userSpaceOnUse"
+                    x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0"    stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1"    stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="url(#tileGrad)"/>
+
+  <g transform="translate(43.5 43.5) scale(0.83)" fill="#F5F3FF">
+    <g fill="none" stroke="#F5F3FF" stroke-width="56" stroke-linecap="round">
+      <path d="M156 116V388"/>
+      <circle cx="272" cy="304" r="84"/>
+    </g>
+    <circle cx="272" cy="304" r="28"/>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+{
+  "_source": "Supabase duiyifepitvugyulobqm. Read-only SELECT run 2026-07-29. Exact SQL in README.md section 'Template 3'.",
+  "_method": "20 US research tenants (clients.category='research', default_market_id='US', id>=28), collected 2026-07-24/25. Restricted to the FOUR prompt intents every one of the 20 shares, so cities are compared on identical questions: personal injury law, real estate agents, property management, immigration law. Brands are the distinct names parsed into ai_results.competitors_mentioned across those answers.",
+  "_excluded": "The 7 EU research tenants (London, Berlin, Madrid, New York is US, Paris, Rome, Dublin) run a DIFFERENT 8-prompt set covering law, SaaS, fintech and wealth management. Pooling them with the US 20 would compare different questions, so they are not in this file.",
+  "_metric": "distinct_brands = how many different companies the engines named in answer to the same 4 questions. named_once = how many of those were named in exactly one of the answers. answers = number of engine responses behind the count.",
+  "complete_coverage_definition": "4 of 4 intents present AND 5 of 5 engines answered AND 20 of 20 answers returned.",
+  "cities": [
+    { "city": "Washington DC",  "distinct_brands": 43, "brand_slots": 53, "named_once": 35, "top_brand": "Nest DC",                          "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Miami",          "distinct_brands": 44, "brand_slots": 57, "named_once": 33, "top_brand": "FirstService Residential",         "top_brand_appearances": 3, "answers": 15, "engines": 5, "intents": 3, "complete": false },
+    { "city": "Philadelphia",   "distinct_brands": 45, "brand_slots": 61, "named_once": 33, "top_brand": "Grow Property Management",         "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "San Francisco",  "distinct_brands": 45, "brand_slots": 51, "named_once": 40, "top_brand": "Azari Property Management",        "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Los Angeles",    "distinct_brands": 45, "brand_slots": 50, "named_once": 41, "top_brand": "Earnest Homes",                    "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Minneapolis",    "distinct_brands": 46, "brand_slots": 56, "named_once": 40, "top_brand": "Kleinman Property Management",     "top_brand_appearances": 4, "answers": 17, "engines": 5, "intents": 4, "complete": false },
+    { "city": "Tampa",          "distinct_brands": 47, "brand_slots": 53, "named_once": 41, "top_brand": "Eaton Realty",                     "top_brand_appearances": 2, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Houston",        "distinct_brands": 48, "brand_slots": 62, "named_once": 38, "top_brand": "Green Residential",                "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Denver",         "distinct_brands": 48, "brand_slots": 62, "named_once": 37, "top_brand": "Bachus & Schanker",                "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Chicago",        "distinct_brands": 52, "brand_slots": 74, "named_once": 38, "top_brand": "Landmark Property Management",     "top_brand_appearances": 4, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Baltimore",      "distinct_brands": 53, "brand_slots": 71, "named_once": 37, "top_brand": "Bay Property Management Group",    "top_brand_appearances": 4, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Detroit",        "distinct_brands": 53, "brand_slots": 62, "named_once": 46, "top_brand": "JMZ Management",                   "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Seattle",        "distinct_brands": 56, "brand_slots": 72, "named_once": 45, "top_brand": "Dubin Law Group",                  "top_brand_appearances": 4, "answers": 16, "engines": 4, "intents": 4, "complete": false },
+    { "city": "San Diego",      "distinct_brands": 60, "brand_slots": 71, "named_once": 52, "top_brand": "Good Life Property Management",    "top_brand_appearances": 4, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Boston",         "distinct_brands": 61, "brand_slots": 81, "named_once": 47, "top_brand": "Green Ocean Property Management",  "top_brand_appearances": 4, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Charlotte",      "distinct_brands": 62, "brand_slots": 82, "named_once": 48, "top_brand": "Henderson Properties",             "top_brand_appearances": 4, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Phoenix",        "distinct_brands": 63, "brand_slots": 81, "named_once": 48, "top_brand": "Lamber Goodnow Injury Lawyers",    "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "San Antonio",    "distinct_brands": 64, "brand_slots": 82, "named_once": 51, "top_brand": "Cloverleaf Property Management",   "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Dallas",         "distinct_brands": 71, "brand_slots": 82, "named_once": 61, "top_brand": "JOGIP Property Management",        "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true },
+    { "city": "Atlanta",        "distinct_brands": 75, "brand_slots": 92, "named_once": 62, "top_brand": "Evernest",                         "top_brand_appearances": 3, "answers": 20, "engines": 5, "intents": 4, "complete": true }
+  ]
+}

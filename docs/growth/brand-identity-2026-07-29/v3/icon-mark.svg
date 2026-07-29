@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BrandGEO">
+  <title>BrandGEO</title>
+  <desc>Lowercase b. The counter of the bowl holds a centred dot, the location
+  point. Stroke weight, dot diameter and the gap around the dot are all 56, 56
+  and 28 units, so the whole mark sits on one modular grid.</desc>
+  <defs>
+    <!-- userSpaceOnUse, not the default objectBoundingBox: the stem, the ring
+         and the dot are separate elements and must share one continuous ramp
+         rather than each restarting the gradient inside its own bounds. -->
+    <linearGradient id="bgGrad" gradientUnits="userSpaceOnUse"
+                    x1="128" y1="88" x2="384" y2="416">
+      <stop offset="0"    stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1"    stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke="url(#bgGrad)" stroke-width="56" stroke-linecap="round">
+    <path d="M156 116V388"/>
+    <circle cx="272" cy="304" r="84"/>
+  </g>
+
+  <circle cx="272" cy="304" r="28" fill="url(#bgGrad)"/>
+</svg>

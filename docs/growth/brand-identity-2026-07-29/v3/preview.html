@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BrandGEO mark v3</title>
+<link rel="icon" href="icon-tile.svg">
+<style>
+  :root { --bg:#0a0b0e; --s:#101116; --bd:#23242b; --t:#e8e9ed; --t2:#9ba1ac; --ac:#8b5cf6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t);
+         font-family:Geist,Inter,system-ui,sans-serif; padding:40px; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 4px; }
+  p.sub { color:var(--t2); font-size:13px; margin:0 0 32px; }
+  section { border:1px solid var(--bd); border-radius:14px; padding:24px;
+            margin-bottom:20px; background:var(--s); }
+  h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--t2); font-weight:600; margin:0 0 18px; }
+  .row { display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap; }
+  .light { background:#f7f7fc; border-radius:10px; padding:22px; }
+  .cap { font-size:11px; color:var(--t2); margin-top:8px; text-align:center; }
+  .cell { text-align:center; }
+  img, object { display:block; }
+</style>
+</head>
+<body>
+
+<h1>BrandGEO mark, v3</h1>
+<p class="sub">Lowercase b. The counter holds a centred dot, which is the GEO point.
+Stroke 56, dot diameter 56, gap 28. Every value is a multiple of 28.</p>
+
+<section>
+  <h2>Mark, on canvas</h2>
+  <div class="row">
+    <div class="cell"><object data="icon-mark.svg" width="180" height="180"></object>
+      <div class="cap">icon-mark.svg</div></div>
+    <div class="light"><object data="icon-mark.svg" width="180" height="180"></object>
+      <div class="cap" style="color:#4a4a55">on light</div></div>
+    <div class="cell"><object data="icon.svg" width="180" height="180"></object>
+      <div class="cap">icon.svg, dark tile</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="180" height="180"></object>
+      <div class="cap">icon-tile.svg, favicon</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Favicon tile, real sizes</h2>
+  <div class="row">
+    <div class="cell"><object data="icon-16.svg" width="16" height="16"></object><div class="cap">16</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="24" height="24"></object><div class="cap">24</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="32" height="32"></object><div class="cap">32</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="48" height="48"></object><div class="cap">48</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="64" height="64"></object><div class="cap">64</div></div>
+    <div class="cell"><object data="icon-tile.svg" width="128" height="128"></object><div class="cap">128</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Bare mark, small sizes</h2>
+  <div class="row">
+    <div class="cell"><object data="icon-mark.svg" width="24" height="24"></object><div class="cap">24</div></div>
+    <div class="cell"><object data="icon-mark.svg" width="32" height="32"></object><div class="cap">32</div></div>
+    <div class="cell"><object data="icon-mark.svg" width="48" height="48"></object><div class="cap">48</div></div>
+    <div class="cell"><object data="icon-mark.svg" width="64" height="64"></object><div class="cap">64</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Combination mark <span style="color:#fbbf24">wordmark is live text, not outlined</span></h2>
+  <div class="row">
+    <div class="cell"><object data="logo-full.svg" width="440" height="138"></object></div>
+    <div class="light"><object data="logo-full.svg" width="320" height="100"></object></div>
+  </div>
+</section>
+
+</body>
+</html>

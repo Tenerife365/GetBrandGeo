@@ -1,0 +1,48 @@
+{
+  "_source": "Supabase duiyifepitvugyulobqm, public.ai_results JOIN public.clients. Read-only SELECT run 2026-07-29. Exact SQL in README.md section 'Template 1'.",
+  "_note": "One entry per (client, collection day). A card is only honest for a SINGLE collection day, because BrandGEO's engine coverage changes between days and pooling days would mix engine mixes. See README 'What the data does not currently support'.",
+  "datasets": [
+    {
+      "key": "bpr-2026-07-21",
+      "client": "Bucate pe Roate",
+      "slug": "bpr",
+      "day": "2026-07-21",
+      "market": "Bucharest, Romania",
+      "engines": [
+        { "llm": "chatgpt",    "answers": 6, "mentions": 6, "prompts": 6 },
+        { "llm": "gemini",     "answers": 6, "mentions": 6, "prompts": 6 },
+        { "llm": "google_ai",  "answers": 3, "mentions": 3, "prompts": 3 },
+        { "llm": "claude",     "answers": 7, "mentions": 5, "prompts": 6 },
+        { "llm": "perplexity", "answers": 6, "mentions": 2, "prompts": 6 }
+      ]
+    },
+    {
+      "key": "brandgeo-2026-07-22",
+      "client": "BrandGEO",
+      "slug": "brandgeo",
+      "day": "2026-07-22",
+      "market": "Worldwide",
+      "engines": [
+        { "llm": "chatgpt",    "answers": 5, "mentions": 0, "prompts": 5 },
+        { "llm": "gemini",     "answers": 5, "mentions": 0, "prompts": 5 },
+        { "llm": "google_ai",  "answers": 4, "mentions": 0, "prompts": 4 },
+        { "llm": "claude",     "answers": 5, "mentions": 0, "prompts": 5 },
+        { "llm": "perplexity", "answers": 5, "mentions": 0, "prompts": 5 }
+      ]
+    },
+    {
+      "key": "edyta-2026-07-16",
+      "client": "Edyta Andrzejczak",
+      "slug": "edyta-andrzejczak",
+      "day": "2026-07-16",
+      "market": "Poland",
+      "engines": [
+        { "llm": "chatgpt",    "answers": 8, "mentions": 1, "prompts": 8 },
+        { "llm": "gemini",     "answers": 8, "mentions": 1, "prompts": 8 },
+        { "llm": "google_ai",  "answers": 3, "mentions": 1, "prompts": 3 },
+        { "llm": "claude",     "answers": 8, "mentions": 1, "prompts": 8 },
+        { "llm": "perplexity", "answers": 8, "mentions": 1, "prompts": 8 }
+      ]
+    }
+  ]
+}

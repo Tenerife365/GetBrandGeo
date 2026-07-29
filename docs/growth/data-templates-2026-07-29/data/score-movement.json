@@ -1,0 +1,36 @@
+{
+  "_source": "Supabase duiyifepitvugyulobqm. Read-only SELECT run 2026-07-29. Exact SQL in README.md section 'Template 2'.",
+  "_status": "AWAITING DATA. No client in the database has a plottable time series. This file records the audit that establishes that, so the finding can be re-checked rather than re-argued.",
+
+  "audit": {
+    "clients_with_any_ok_results": 35,
+    "clients_with_more_than_one_collection_day": 2,
+    "detail": "Every client except two has exactly ONE distinct collection day. The two exceptions are Bucate pe Roate (6 days, 2026-07-07 to 2026-07-21) and BrandGEO (3 days, 2026-07-06 to 2026-07-22).",
+
+    "why_the_two_exceptions_are_still_not_plottable": "A trend line requires the same question asked of the same engines on each date. Neither client has that. Engine coverage and prompt sets both change between days, so any movement in a pooled mention rate is a coverage artifact, not brand movement.",
+
+    "bucate_pe_roate_by_day": [
+      { "day": "2026-07-07", "answers": 2,  "mentions": 1,  "rate_pct": 50.0,  "engines": ["claude"] },
+      { "day": "2026-07-08", "answers": 3,  "mentions": 2,  "rate_pct": 66.7,  "engines": ["chatgpt", "claude"] },
+      { "day": "2026-07-09", "answers": 15, "mentions": 8,  "rate_pct": 53.3,  "engines": ["chatgpt", "claude", "meta", "perplexity"] },
+      { "day": "2026-07-16", "answers": 8,  "mentions": 2,  "rate_pct": 25.0,  "engines": ["google_ai", "meta"] },
+      { "day": "2026-07-17", "answers": 1,  "mentions": 1,  "rate_pct": 100.0, "engines": ["google_ai"] },
+      { "day": "2026-07-21", "answers": 28, "mentions": 22, "rate_pct": 78.6,  "engines": ["chatgpt", "claude", "gemini", "google_ai", "perplexity"] }
+    ],
+
+    "worked_example_of_the_artifact": "Read naively, Bucate pe Roate went 50.0 to 78.6 percent and that looks like a win. It is not a measurement of the brand. The 25.0 percent trough on 2026-07-16 is 6 of its 8 answers coming from Meta AI, which scored 0 of 6 and was retired on 2026-07-16. The 78.6 percent peak on 2026-07-21 is the first day Gemini and ChatGPT both ran a full 6-prompt set, and both returned 6 of 6. Different engines, different prompts, different answer counts (2 versus 28). Plotting those six points as a line would publish a chart of BrandGEO's own collection schedule and label it the client's visibility.",
+
+    "recurring_prompt_engine_pairs_in_entire_database": [
+      { "client": "Bucate pe Roate", "prompt_id": 172, "llm": "claude",  "days": 3, "day_list": ["2026-07-07", "2026-07-08", "2026-07-09"] },
+      { "client": "Bucate pe Roate", "prompt_id": 177, "llm": "claude",  "days": 3, "day_list": ["2026-07-07", "2026-07-08", "2026-07-09"] },
+      { "client": "Bucate pe Roate", "prompt_id": 172, "llm": "chatgpt", "days": 2, "day_list": ["2026-07-08", "2026-07-09"] }
+    ],
+    "recurring_pairs_note": "Three pairs, one client, all inside a single 3-day window in early July, maximum 3 points. That is the entire longitudinal content of the database. It is not enough to draw a trend and it is not enough to claim one.",
+
+    "root_cause": "clients.refresh_cadence defaults to 'manual', so the hourly schedule-collections cron is inert for every tenant. Collection only happens when someone presses the button. Until a cadence is set for at least one client, no time series can accumulate."
+  },
+
+  "unblock_condition": "Two or more collection days for one client where the set of (prompt_id, llm) pairs is identical across those days. The generator enforces exactly this and refuses to plot otherwise.",
+
+  "series": []
+}

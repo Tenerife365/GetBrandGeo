@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" role="img" aria-label="BrandGEO">
+  <title>BrandGEO</title>
+  <desc>Horizontal combination mark. Mark left, wordmark right, separated by one
+  stem-width of clear space.
+
+  NOT PRODUCTION READY: the wordmark below is live text, not outlined paths, so
+  it renders in a fallback face anywhere Geist is missing. Outlining needs a
+  Geist TTF or OTF, which is not in the repo and not installed. fontTools is
+  installed, so the font file is the only missing input.</desc>
+  <defs>
+    <linearGradient id="lockGrad" gradientUnits="userSpaceOnUse"
+                    x1="34" y1="22" x2="159" y2="182">
+      <stop offset="0"    stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1"    stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="geoGrad" gradientUnits="userSpaceOnUse"
+                    x1="430" y1="60" x2="600" y2="140">
+      <stop offset="0" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark, scaled to 160 units tall. Its own bounding box is x 128..384,
+       y 88..416, so the transform lands it at x=34, y=22. -->
+  <g transform="translate(-28.4 -20.9) scale(0.4878)">
+    <g fill="none" stroke="url(#lockGrad)" stroke-width="56" stroke-linecap="round">
+      <path d="M156 116V388"/>
+      <circle cx="272" cy="304" r="84"/>
+    </g>
+    <circle cx="272" cy="304" r="28" fill="url(#lockGrad)"/>
+  </g>
+
+  <text x="215" y="132" font-family="Geist, Inter, system-ui, -apple-system, sans-serif"
+        font-size="94" font-weight="700" letter-spacing="-3">
+    <tspan fill="#E8E9ED">Brand</tspan><tspan fill="url(#geoGrad)">GEO</tspan>
+  </text>
+</svg>

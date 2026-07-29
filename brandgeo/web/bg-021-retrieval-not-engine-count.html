@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>BG-021: We Shipped Two AI Engines Today. The More Useful Story Is the Two We Turned Down | BrandGEO Research™</title>
+  <meta name="description" content="Engine count is the easiest number in AI visibility tooling to raise and the least informative. What matters is whether retrieval was switched on. Why BrandGEO retired Meta AI, keeps DeepSeek out, and added Grok and Google AI Overviews with web search enabled.">
+  <meta property="og:title" content="We Shipped Two AI Engines Today. The More Useful Story Is the Two We Turned Down: BrandGEO Research™">
+  <meta property="og:description" content="A list of engines that only ever grows is a marketing artifact. The entry requirement at BrandGEO is retrieval: when the engine answered, did it go and look, or did it answer from memory. Four questions to ask your own vendor.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/bg-021-hero.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-021-retrieval-not-engine-count.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-021-retrieval-not-engine-count.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/bg-021-hero.png">
+  <meta property="article:published_time" content="2026-07-29">
+  <meta name="keywords" content="AI visibility, generative engine optimization, Grok, Google AI Overviews, Google AI Mode, retrieval, AI search monitoring, engine coverage">
+  <!-- Structured Data: BlogPosting -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "We shipped two AI engines today. The more useful story is the two we turned down.",
+    "description": "Engine count is the easiest number in AI visibility tooling to raise and the least informative. What matters is whether retrieval was enabled. Why BrandGEO retired Meta AI, keeps DeepSeek out, and added Grok and Google AI Overviews with search on.",
+    "image": "https://getbrandgeo.com/images/bg-021-hero.png",
+    "author": {
+      "@type": "Organization",
+      "name": "BrandGEO",
+      "url": "https://getbrandgeo.com"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "BrandGEO",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://getbrandgeo.com/logo.png"
+      }
+    },
+    "datePublished": "2026-07-29T09:00:00+00:00",
+    "dateModified": "2026-07-29T09:00:00+00:00",
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://getbrandgeo.com/bg-021-retrieval-not-engine-count.html"
+    },
+    "articleSection": "AI Visibility Research",
+    "keywords": "AI visibility, generative engine optimization, Grok, Google AI Overviews, retrieval, AI search monitoring"
+  }
+  </script>
+  <!-- Structured Data: FAQPage -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Which AI engines does BrandGEO monitor?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Seven. ChatGPT, Gemini, Claude, Perplexity and Google AI Mode are available from the Growth plan. Grok and Google AI Overviews are available on Growth PRO and above. All seven are queried with live web search enabled. Free includes ChatGPT; Essentials includes ChatGPT, Gemini and Claude."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between Google AI Mode and Google AI Overviews?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "They are two different Google products and BrandGEO measures them separately. AI Mode is a tab the searcher switches to on purpose. AI Overviews is the AI summary shown by default at the top of an ordinary Google results page, which reaches far more searchers. They frequently give different answers, so reporting only one of them under the label Google would hide the surface most people see."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why does BrandGEO not monitor Meta AI any more?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Meta AI was retired on 16 July 2026. The models reachable in that path answered from training data only, with no web search, so the results could not reflect current conditions."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why is DeepSeek not included?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Every DeepSeek model available through OpenRouter is retrieval-free and would answer from training data only. That is the same reason Meta AI was retired, so including it would contradict the standard applied to every other engine."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What does Grok add that the other engines do not?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Grok is xAI's model and has access to X in addition to the open web. The other engines see the open web only. A brand with a strong website and a thin social presence can look materially different to Grok than to ChatGPT."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How often does BrandGEO refresh its results?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Weekly on every paid plan."
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Structured Data: BreadcrumbList -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://getbrandgeo.com/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Research",
+        "item": "https://getbrandgeo.com/blog.html"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "We shipped two AI engines today",
+        "item": "https://getbrandgeo.com/bg-021-retrieval-not-engine-count.html"
+      }
+    ]
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
+      --radius: 12px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --surface: #ffffff;
+      --border: #dddde8;
+      --text: #0a0a1e;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
+    }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    .article-hero { max-width: 820px; margin: 0 auto; padding: 0 40px 48px; }
+    .article-hero img { width: 100%; height: auto; display: block; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(108,99,255,.18); }
+
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+    .article-body code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; font-family: 'Cascadia Code', Consolas, monospace; color: var(--accent2); }
+
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p:last-child { margin: 0; }
+    .callout a { color: var(--accent2); }
+
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+
+    .next-post { border-top: 1px solid var(--border); padding: 40px; max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .next-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .next-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .next-link { color: var(--accent); text-decoration: none; font-weight: 700; white-space: nowrap; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <script src="/ga4-init.js?v=20260729d"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/#contact" class="nav-cta">Get started</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-021</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research™</span>
+    <span class="badge-id">BG-021</span>
+    <span class="badge-tag">Methodology</span>
+    <span class="badge-tag">Engine Coverage</span>
+  </div>
+  <h1>We Shipped Two AI Engines Today. The More Useful Story Is the Two We <em>Turned Down</em>.</h1>
+  <p class="article-subtitle">Engine count is the easiest number in this category to raise and the least informative. The question that actually separates the tools is whether the engine went and looked, or answered from memory.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">July 29, 2026</span>
+    <span class="meta-item">7 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-021</strong></span>
+  </div>
+</div>
+
+<div class="article-hero">
+  <img src="/images/bg-021-hero.png" alt="An illustration contrasting AI engines that retrieve from the live web against engines that answer from training data, with Grok and Google AI Overviews shown joining BrandGEO's seven-engine ladder and Meta AI and DeepSeek shown outside it." loading="eager">
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">● Key Facts: BG-021</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">7</div>
+        <div class="finding-desc">Engines monitored on Growth PRO and above, every one of them queried with live web search enabled</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">2</div>
+        <div class="finding-desc">Engines added on 29 July 2026: Grok, and Google AI Overviews</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">2</div>
+        <div class="finding-desc">Separate Google surfaces measured independently, because AI Mode and AI Overviews are not the same product</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">1</div>
+        <div class="finding-desc">Engine retired for answering from training data only: Meta AI, on 16 July 2026</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+
+  <h2 id="the-hook">Every tool in this category advertises a number</h2>
+  <p>Five engines, seven, twelve. The number is easy to raise and it is almost never the thing that determines whether your measurement is any good.</p>
+  <p>Here is the question that separates them: when that engine answered, did it go and look, or did it answer from memory?</p>
+  <p>Those produce different answers to the same question, and only one of them tells you anything about today.</p>
+
+  <h2 id="no-retrieval">What an engine without retrieval is actually measuring</h2>
+  <p>A large language model with no retrieval answers from its training data. Ask it which companies do commercial catering in a given city and it will give you a confident, fluent, well-formatted list of what was true at some point before its training cutoff.</p>
+  <p>For brand visibility work that is close to useless, and worse, it is convincingly useless. A business that launched this year is invisible to it. A business that has been quietly winning for eighteen months is invisible to it. A competitor that shut down two years ago may still be ranked third. You get a clean number, a tidy chart, and a picture of the past.</p>
+  <p>The failure is silent. Nothing in the output says "this answer is from memory." It reads exactly like the engines that did go and look.</p>
+
+  <h2 id="meta-retired">We retired an engine over this</h2>
+  <p>BrandGEO monitored Meta AI until 16 July 2026. It is not in any plan now.</p>
+  <p>The reason was retrieval. The Llama models we could reach ran training-data only, with no web search available in that path. It kept producing answers that looked plausible and were structurally incapable of reflecting what had changed. For a product whose job is telling you what AI engines say about your brand right now, an engine that cannot see right now is not a feature. It is a number on a pricing page that makes the product worse.</p>
+  <p><strong>Removing it lowered our engine count. We did it anyway.</strong></p>
+
+  <h2 id="deepseek">The same reasoning keeps DeepSeek out</h2>
+  <p>DeepSeek comes up regularly. It is capable, it is cheap, and adding it would move our advertised number up by one.</p>
+  <p>Every DeepSeek model available to us through OpenRouter is retrieval-free. It would answer from training data only. That is the identical shape that got Meta AI retired, so adding it would mean reversing a decision we had just made, for the sole benefit of a larger number on a marketing page.</p>
+  <p>Copilot is out for a different reason. Microsoft ships no public API for it, so anyone claiming to monitor Copilot is either using an undocumented path or measuring something adjacent and calling it Copilot. We would rather say we do not cover it.</p>
+
+  <div class="callout">
+    <div class="callout-label">The standard, stated once</div>
+    <p>An engine earns a slot when we can query it with retrieval switched on, through a documented path, for every run that produces a customer's report. Capability is not enough. "The model supports web search" and "web search was enabled in our pipeline" are different claims, and only the second one is worth anything to you.</p>
+  </div>
+
+  <h2 id="grok">The first engine we added today: Grok</h2>
+  <p>Grok went live on 29 July 2026, on Growth PRO and above.</p>
+  <p>It passed the same test, but only just, and only because of a specific configuration choice. Grok on its own answers from training data. We run it with the web plugin enabled, which is what makes it a measurement instrument rather than a memory test. Had that not been available, Grok would have joined DeepSeek on the outside.</p>
+  <p>The second reason it earned a slot is that it reads something the others do not. Grok is xAI's model, and it has access to X. The rest see the open web: your site, your listings, publisher coverage, review sites. Grok also sees the conversation. Plenty of brands have a strong web footprint and a thin social one, or the reverse. Those brands look different to Grok, and until now that gap was not something you could measure.</p>
+
+  <h2 id="ai-overviews">The second one is the one most tools are missing</h2>
+  <p>We also added Google AI Overviews today, as a separate engine from Google AI Mode, which we have monitored since 16 July.</p>
+  <p>That distinction is the point, and it gets collapsed constantly. They are two different Google products.</p>
+
+  <table class="compare-table">
+    <thead><tr><th>Surface</th><th>How a searcher reaches it</th><th>Who sees it</th></tr></thead>
+    <tbody>
+      <tr><td>Google AI Mode</td><td>A tab. The searcher has to switch to it on purpose.</td><td>People who opted in</td></tr>
+      <tr><td>Google AI Overviews</td><td>The AI summary block at the top of an ordinary results page. Nobody opts in.</td><td>A very large share of ordinary searches</td></tr>
+    </tbody>
+  </table>
+
+  <p>Different reach, different answers. A tool that measures AI Mode and reports it as "Google" is describing the surface fewer people see, and calling it the whole picture. We measure both, separately, because they disagree often enough that averaging them would hide the thing you need to know.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">An absent AI Overview is a result, not an error</div>
+    <p>If Google renders no AI Overview at all for a query, we record that as a measurement rather than a failed collection. Whether an AI summary appears above the links for the questions your customers ask is itself a finding, and often a more actionable one than your position inside a summary that does appear.</p>
+  </div>
+
+  <h2 id="the-ladder">What the ladder looks like now</h2>
+  <ul>
+    <li><strong>Free:</strong> ChatGPT</li>
+    <li><strong>Essentials:</strong> ChatGPT, Gemini, Claude</li>
+    <li><strong>Growth:</strong> the above plus Perplexity and Google AI Mode</li>
+    <li><strong>Growth PRO and above:</strong> the above plus Grok and Google AI Overviews</li>
+  </ul>
+  <p>Seven engines at the top. Every one of them retrieves. That is not a coincidence of which models we happened to pick. It is the entry requirement, and it is why the list is seven and not twelve.</p>
+  <p>Every paid plan refreshes weekly.</p>
+
+  <h2 id="four-questions">Four questions worth asking your current vendor</h2>
+  <p>None of this is unique to us in principle. Any tool could adopt the same standard. Most do not publish enough for you to check, so ask directly.</p>
+
+  <h3>1. For each engine you list, was web search enabled when you queried it?</h3>
+  <p>Not "does the model support search." Was it on, in your pipeline, for the run that produced my report.</p>
+
+  <h3>2. When you say you monitor Google, which Google?</h3>
+  <p>AI Mode, AI Overviews, or one of them reported as though it were both. This is the question most likely to produce a pause.</p>
+
+  <h3>3. Which engines in your list have never returned a result for my account?</h3>
+  <p>An engine can sit on a pricing page for months without collecting anything. Coverage claimed and coverage delivered are different columns.</p>
+
+  <h3>4. What is your standard for removing an engine?</h3>
+  <p>Everyone has an add-an-engine story. Ask for the remove-an-engine story. If there is not one, the list only ever grows, and a list that only grows is a marketing artifact.</p>
+
+  <h2 id="uncomfortable">The uncomfortable version of this</h2>
+  <p>This argument stops favouring us the moment a competitor runs eight engines with retrieval on. That is fine. It is the correct standard even when it costs us the comparison, and it is one we have already applied against our own interest twice, by retiring an engine we had shipped and by declining a cheap one we could have added this month.</p>
+  <p>Engine count is the easiest number in this category to move and the least informative. <em>Ask what was switched on.</em></p>
+
+  <div class="section-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:48px 0 16px;">● Related Research</div>
+  <div class="related-grid">
+    <a href="/bg-019.html" class="related-card">
+      <div class="related-id">BG-019</div>
+      <div class="related-title">Why Our Scorer Returns Null Instead of a Rank It Can't Prove</div>
+      <div class="related-hook">The same refusal to publish a number we cannot stand behind, applied one layer down, to rank.</div>
+    </a>
+    <a href="/bg-018.html" class="related-card">
+      <div class="related-id">BG-018</div>
+      <div class="related-title">We Fixed 5 Rounds of False Positives in Our AI Visibility Scoring</div>
+      <div class="related-hook">What goes wrong inside the pipeline once an engine's answer is in hand, and how we disclose it.</div>
+    </a>
+    <a href="/bg-016.html" class="related-card">
+      <div class="related-id">BG-016</div>
+      <div class="related-title">Cross-Engine Consensus: When AI Engines Agree, and When They Don't</div>
+      <div class="related-hook">Why running more than one engine matters at all, read from real production data.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>See which engines mention your brand, and which do not</h3>
+    <p>Run the free audit on your own domain. We will show you what the engines actually return when your customers ask.</p>
+    <a href="/#contact" class="btn-primary">Start the free audit</a>
+    <a href="/faq.html" class="btn-secondary">Read the FAQ</a>
+    <p class="cta-note">No card required. No tools to install. Just clarity on where you stand.</p>
+  </div>
+
+</div>
+
+<div class="next-post">
+  <div>
+    <div class="next-label">More research →</div>
+    <div class="next-title"><a href="/blog.html" style="color:inherit;text-decoration:none;">Browse all BrandGEO Research</a></div>
+  </div>
+  <a href="/blog.html" class="next-link">View all research</a>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO Research™ &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Research ID: BG-021</span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">All Research</a>
+      <a href="/blog.html#compare">Compare</a>
+      <a href="/news/">Newsroom</a>
+      <a href="/support.html">Support</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/cookies.html">Cookies</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
