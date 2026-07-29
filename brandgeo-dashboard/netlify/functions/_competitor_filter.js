@@ -51,6 +51,16 @@ function firstBrandName(cfg) {
  * There is no industry field to hand it either: `clients.category` holds
  * 'active' / 'research' / 'free', an account status, not a business category.
  *
+ * THE SUPPLY TEST (owner's rule, 2026-07-29) is what actually separates these,
+ * and it is sharper than "is this its primary business". A venue that caters its
+ * own events cannot be hired by a buyer who already has a venue: it does not
+ * sell into the market at all, it consumes internally. It is not competing for
+ * the same contract, so it cannot cost the client the deal, so it does not
+ * belong on a board whose entire purpose is showing who takes their business.
+ * Generalised: if a company cannot be engaged as an external vendor by a
+ * customer it does not already host, it is not a competitor. That phrasing
+ * transfers to any industry without naming venues or hotels.
+ *
  * The prompt that produced the answer IS the missing signal, and it is exact.
  * Every one of BpR's active prompts says "firma de catering" (catering company),
  * so the category is stated outright in the question. Deriving from the question
@@ -105,11 +115,17 @@ function buildPrompt(brand, names, snippet, opts = {}) {
 `Veritas, Lloyd's Register), section labels and generic nouns ("References", ` +
 `"Presentation", "Logistics", "Pricing", "Budget"), events, awards, publications, ` +
 `institutions, and government agencies.\n` +
-`  - A company whose primary business is a DIFFERENT, adjacent category, even ` +
-`when it also offers the asked-for category as a side activity. If the question ` +
-`asks for catering companies, a hotel, restaurant, conference centre or event ` +
-`venue with an in-house kitchen does NOT qualify; its business is rooms, covers ` +
-`or hire, and catering is an add-on. Apply the same test in any industry.\n` +
+`  - A business that provides the asked-for service ONLY inside its own ` +
+`premises, to its own guests. THE TEST: could a buyer hire this company as an ` +
+`EXTERNAL supplier and have it deliver at a location the buyer chooses? A hotel, ` +
+`restaurant, conference centre or event venue that caters its own events fails ` +
+`that test. It does not sell catering into the market, it consumes it ` +
+`internally, and a buyer who already has a venue cannot hire it at all. It is ` +
+`not competing for the same contract. Apply this test in any industry: if the ` +
+`company cannot be engaged as a vendor by a customer it does not already host, ` +
+`it is not a competitor.\n` +
+`  - A company whose primary business is a DIFFERENT, adjacent category and ` +
+`that offers the asked-for category only as a side activity.\n` +
 `  - Things "${brand}" was merely associated with: its own clients, references, ` +
 `partners, suppliers, credentials or past events.\n` +
 `  - "${brand}" itself, under any spelling or alias.\n\n` +

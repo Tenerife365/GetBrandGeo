@@ -113,7 +113,12 @@ async function main() {
     })
     assert.ok(sent.includes(q239), 'the question must be in the prompt sent to the model')
     assert.ok(/STEP 1/.test(sent), 'the category-derivation step must be present')
-    assert.ok(/in-house kitchen does NOT qualify/.test(sent), 'the adjacent-business rule must be present')
+    // The supply test is the rule that actually excludes venues: a business that
+    // only caters its own guests cannot be hired by a buyer who has a venue, so
+    // it never competes for the contract. Asserted on its distinguishing clause
+    // rather than a stray word, so a reworded prompt that DROPS the rule fails.
+    assert.ok(/EXTERNAL supplier/.test(sent) && /cannot be engaged as a vendor/.test(sent),
+      'the supply test must be present')
     assert.deepStrictEqual(r.map(c => c.name), ['Elegant Catering', 'Royal Catering'])
     ok('question reaches the model; venues drop, caterers keep their pos')
   }
