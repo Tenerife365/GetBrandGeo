@@ -153,6 +153,17 @@ const LLM_SOURCE: Record<string, string> = {
 }
 
 /** Fastest fixes per LLM (generic enough for any client) */
+// Advice that holds for any engine, used when an engine has no tailored list.
+// EVERY engine in LIVE_ENGINES should really have its own entry; this exists so
+// that shipping an engine and forgetting its copy degrades to something true and
+// generic rather than crashing the page.
+const GENERIC_QUICK_WINS: string[] = [
+  'Publish a clear, factual page about what you do, who you serve and where, so an answer engine has something unambiguous to quote',
+  'Add Organization or LocalBusiness schema markup with your real details, so the facts are machine readable rather than inferred',
+  'Earn citations on sites the engine already trusts in your category, since answer engines lean on sources they have seen elsewhere',
+  'Keep your key pages current, because stale pages get quoted less often than recently updated ones',
+]
+
 const LLM_QUICK_WINS: Record<string, string[]> = {
   chatgpt: [
     'Get listed on 3+ authoritative directories in your industry (Tripadvisor, Trustpilot, G2, etc.) — ChatGPT reads these directly',
@@ -165,6 +176,12 @@ const LLM_QUICK_WINS: Record<string, string[]> = {
     'Add LocalBusiness or Organization schema markup to your homepage with complete details',
     'Build 5+ citations on Google-indexed directories — Yelp, Tripadvisor, or industry-specific platforms',
     'Verify your site in Google Search Console and confirm key pages are crawled and indexed without errors',
+  ],
+  ai_overview: [
+    'Google AI Overviews are assembled from the ordinary Google index, so the fastest lever is being indexed and crawlable for the queries you care about',
+    'Add FAQPage or Product schema to the pages that answer your buyers questions directly, since Overviews favour pages that already answer in a quotable form',
+    'Answer one question per page section, with the question as the heading, because an Overview quotes passages rather than whole pages',
+    'Earn citations from sites that already rank for your category, as Overviews draw on sources Google ranks rather than discovering new ones',
   ],
   claude: [
     'Create a detailed About page with verifiable credentials, history, and team information',
@@ -328,7 +345,12 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       effort: 'low',
       title: `${brandName} is invisible on ${LLM_LABEL[s.llm]} — 0% across ${s.total} prompts`,
       why: `Not a single one of your ${s.total} tracked prompts results in a mention on ${LLM_LABEL[s.llm]}. ${LLM_SOURCE[s.llm]}`,
-      how: LLM_QUICK_WINS[s.llm],
+      // ?? GENERIC_QUICK_WINS is load-bearing, not defensive habit. `how` is
+      // rendered with rec.how.map(), this card is `critical` so it sorts first
+      // and renders defaultOpen, and there is no ErrorBoundary anywhere in
+      // src/. A missing key here is not a blank section, it is a white screen
+      // on the page a customer opens to find out what to do next.
+      how: LLM_QUICK_WINS[s.llm] ?? GENERIC_QUICK_WINS,
       fixes: [s.llm],
       timeEst: '2–4h',
     })

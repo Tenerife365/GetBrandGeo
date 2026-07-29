@@ -23,6 +23,7 @@ import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
 import { PageTitle, SectionHeading } from '../components/Typography'
+import { aggregateCompetitors } from '../lib/competitorFilter'
 import { promptCategoryLabel } from '../lib/promptCategories'
 import { useChartTheme } from '../lib/chartTheme'
 import SharedEmptyState from '../components/EmptyState'
@@ -399,30 +400,30 @@ export default function AIVisibility() {
   // (Rules of Hooks).
   const displayedScore = useCountUp(aiScore, !loading)
 
-  const competitorFreq = (() => {
-    const freq: Record<string, { count: number; positions: number[] }> = {}
-    results.forEach(llmMap => {
-      llmMap.forEach(r => {
-        parseCompetitors(r.competitors_mentioned).forEach(c => {
-          const key = c.name.toLowerCase().trim()
-          if (!key || key.length < 2) return
-          if (!freq[key]) freq[key] = { count: 0, positions: [] }
-          freq[key].count++
-          freq[key].positions.push(c.pos)
-        })
-      })
-    })
-    return Object.entries(freq)
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
-      .map(([name, { count, positions }]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        count,
-        avgPos: positions.length > 0
-          ? Math.round(positions.reduce((s, p) => s + p, 0) / positions.length * 10) / 10
-          : null,
-      }))
-  })()
+  // Uses the SHARED aggregator now. This page carried its own copy that averaged
+  // the pos:99 prose sentinel into the displayed rank, which is not a rank at all
+  // but the marker _analysis.js writes for a name found in prose by
+  // scanForKnownCompetitors. Competitors.tsx and Recommendations.tsx were both
+  // migrated onto competitorFilter.ts on 2026-07-13 precisely to kill this; this
+  // page was missed and kept publishing the wrong number for two weeks.
+  //
+  // Measured on Bucate pe Roate the day this was fixed: "elegant catering" showed
+  // avg #61.3 against a true #2.1, "royal catering" #20.6 against #3.2. Those are
+  // not slightly-off numbers, they are arithmetic on a sentinel, and one of them
+  // was being printed into the headline Fix This card as the competitor beating
+  // the client.
+  const competitorFreq = aggregateCompetitors(
+    Array.from(results.values()).flatMap(llmMap => Array.from(llmMap.values())),
+    8,
+  ).map(c => ({
+    name: c.name,
+    count: c.totalMentions,
+    // Genuine ranks only. Null when an engine has never once ranked this name,
+    // which the UI must render as "no rank" rather than inventing one.
+    avgPos: c.avgPos,
+    rankedMentions: c.rankedMentions,
+    proseOnly: c.proseOnly,
+  }))
 
   const totalChecked = (() => {
     let n = 0
@@ -480,12 +481,18 @@ export default function AIVisibility() {
       })
     })
 
-    if (competitorFreq[0] && gapCount > 0) {
+    // "Outranked by" is a claim about RANK, so it now requires a rank on both
+    // sides. It used to fire on `competitorFreq[0] && gapCount > 0`, which never
+    // read a position at all: a name mentioned only in prose, carrying no rank
+    // whatsoever, was announced as outranking the client in the headline P1.
+    // Recommendations.tsx already gated this correctly; this page did not.
+    const topRanked = competitorFreq.find(c => !c.proseOnly && c.avgPos !== null)
+    if (topRanked && gapCount > 0) {
       items.push({
         priority: 'P1',
-        title: `Outranked by ${competitorFreq[0].name} (avg #${competitorFreq[0].avgPos ?? '?'})`,
-        description: `${competitorFreq[0].name} appears ${competitorFreq[0].count}x across AI results while ${brandName} is absent in ${gapCount} checks.`,
-        fix: `Publish a detailed comparison page: "${brandName} vs ${competitorFreq[0].name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
+        title: `Outranked by ${topRanked.name} (avg #${topRanked.avgPos})`,
+        description: `${topRanked.name} is ranked by an engine in ${topRanked.rankedMentions} of its ${topRanked.count} appearances, while ${brandName} is absent in ${gapCount} checks.`,
+        fix: `Publish a detailed comparison page: "${brandName} vs ${topRanked.name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
       })
     }
 
