@@ -978,7 +978,12 @@ async function collectEngines(engines, {
     if (row.status !== 'ok' || !row.competitors_mentioned) return
     let cands
     try { cands = JSON.parse(row.competitors_mentioned) } catch { return }
-    const kept = await classifyCompetitors(cands, { cfg: client_config, snippet: row.response_snippet })
+    // prompt_text is what tells the gate which product category the buyer is
+    // shopping for; without it the model guesses from the brand name alone and
+    // keeps adjacent businesses (venues for a caterer). See _competitor_filter.js.
+    const kept = await classifyCompetitors(cands, {
+      cfg: client_config, snippet: row.response_snippet, promptText: prompt_text,
+    })
     row.competitors_mentioned = kept.length ? JSON.stringify(kept) : null
   }))
 

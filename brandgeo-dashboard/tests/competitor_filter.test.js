@@ -87,6 +87,83 @@ async function main() {
   assert.strictEqual(parseKept('nope', ['A']), null); ok('parseKept null on garbage')
   assert.strictEqual(firstBrandName(cfg), 'Bucate pe Roate'); ok('firstBrandName from aliases')
 
+  // --- category-aware gate, added 2026-07-29 --------------------------------
+  // The gate used to receive a bare brand NAME, so it could not tell a catering
+  // supplier from a venue and BpR's board filled with hotels and event halls.
+  // The prompt is the category signal; these guard that it reaches the model.
+
+  // Verbatim prompt 239 and the venues that leaked onto BpR's real board.
+  const q239 = 'Care sunt cele mai bune firme de catering corporate din București?'
+  const venueRow = [
+    { pos: 1, name: 'JW Marriott Bucharest Grand Hotel' },
+    { pos: 2, name: 'Sheraton Bucharest Hotel' },
+    { pos: 3, name: 'Crowne Plaza Bucharest' },
+    { pos: 4, name: 'Elegant Catering' },
+    { pos: 5, name: 'Royal Catering' },
+  ]
+
+  {
+    let sent = ''
+    const spy = async (_u, init) => {
+      sent = JSON.parse(init.body).messages[0].content
+      return { ok: true, json: async () => anthropicText('<keep>["Elegant Catering","Royal Catering"]</keep>') }
+    }
+    const r = await classifyCompetitors(venueRow, {
+      cfg, apiKey: 'k', fetchImpl: spy, promptText: q239, snippet: '…',
+    })
+    assert.ok(sent.includes(q239), 'the question must be in the prompt sent to the model')
+    assert.ok(/STEP 1/.test(sent), 'the category-derivation step must be present')
+    assert.ok(/in-house kitchen does NOT qualify/.test(sent), 'the adjacent-business rule must be present')
+    assert.deepStrictEqual(r.map(c => c.name), ['Elegant Catering', 'Royal Catering'])
+    ok('question reaches the model; venues drop, caterers keep their pos')
+  }
+
+  {
+    // The client's own seeded rivals calibrate what a valid competitor looks like.
+    let sent = ''
+    const spy = async (_u, init) => {
+      sent = JSON.parse(init.body).messages[0].content
+      return { ok: true, json: async () => anthropicText('<keep>[]</keep>') }
+    }
+    await classifyCompetitors(venueRow, {
+      cfg: { ...cfg, known_competitors: ['Premier Catering & Events', 'Maia Catering'] },
+      apiKey: 'k', fetchImpl: spy, promptText: q239,
+    })
+    assert.ok(sent.includes('Premier Catering & Events'), 'seeded competitors are passed as calibration')
+    ok('known_competitors from client config reach the prompt')
+  }
+
+  {
+    // Tag parsing must survive the category line, including a bracket in it.
+    const reply = 'Category: catering company [corporate] in Bucharest\n<keep>["Elegant Catering"]</keep>'
+    const r = await classifyCompetitors(venueRow, {
+      cfg, apiKey: 'k', fetchImpl: mkFetch({ body: anthropicText(reply) }), promptText: q239,
+    })
+    assert.deepStrictEqual(r.map(c => c.name), ['Elegant Catering'])
+    ok('a bracket in the category line does not corrupt the parse')
+  }
+
+  {
+    // A bare array with no tags is still accepted, so an older-style reply works.
+    assert.deepStrictEqual(parseKept('["A"]', ['A', 'B']), ['A'])
+    // ...and a truncated reply still fails open rather than dropping everyone.
+    const r = await classifyCompetitors(venueRow, {
+      cfg, apiKey: 'k', promptText: q239,
+      fetchImpl: mkFetch({ body: anthropicText('Category: catering company') }),
+    })
+    assert.deepStrictEqual(r, venueRow)
+    ok('untagged replies still parse; a truncated reply fails open')
+  }
+
+  {
+    // No promptText (any caller that has not been wired) must still work.
+    const r = await classifyCompetitors(venueRow, {
+      cfg, apiKey: 'k', fetchImpl: mkFetch({ body: anthropicText('["Royal Catering"]') }),
+    })
+    assert.deepStrictEqual(r.map(c => c.name), ['Royal Catering'])
+    ok('omitting the question degrades gracefully instead of throwing')
+  }
+
   console.log(`\nAll ${passed} assertions passed.`)
 }
 main().catch(e => { console.error('FAILED:', e.message); process.exit(1) })

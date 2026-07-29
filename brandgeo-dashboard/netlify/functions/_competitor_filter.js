@@ -36,28 +36,104 @@ function firstBrandName(cfg) {
   return a || (cfg?.brand_website ? String(cfg.brand_website).replace(/^https?:\/\//, '').replace(/^www\./, '') : 'the brand')
 }
 
-function buildPrompt(brand, names, snippet) {
+/**
+ * Build the classification prompt.
+ *
+ * THE QUESTION IS THE CATEGORY (2026-07-29). The original prompt gave the model
+ * a bare brand NAME and nothing else, so it had to guess what business the brand
+ * was in. It guessed badly and in a specific, repeatable direction: it kept
+ * anything adjacent to the industry. Bucate pe Roate, a catering company, ended
+ * up with JW Marriott, Sheraton, Crowne Plaza, Hotel CARO, InterContinental,
+ * Palatul Bragadiru, Terra Events Hall, Le Chateau and Domeniile Saftica on its
+ * competitor board. Those are venues. A venue that has a kitchen is not a
+ * catering supplier, and no buyer choosing a caterer is choosing between them.
+ *
+ * There is no industry field to hand it either: `clients.category` holds
+ * 'active' / 'research' / 'free', an account status, not a business category.
+ *
+ * The prompt that produced the answer IS the missing signal, and it is exact.
+ * Every one of BpR's active prompts says "firma de catering" (catering company),
+ * so the category is stated outright in the question. Deriving from the question
+ * also self-corrects in the other direction: if a client asks "best event venues
+ * in Bucharest", venues become the correct answer and are kept. A hardcoded
+ * "exclude venues" rule could never do that.
+ *
+ * `industry` is accepted as an explicit override for the prospect-audit path,
+ * which really does have a generated category. `knownCompetitors` is passed as
+ * calibration: names the client themselves nominated show the model what the
+ * right KIND of company looks like in this market.
+ */
+function buildPrompt(brand, names, snippet, opts = {}) {
   const list = names.map((n, i) => `${i + 1}. ${n}`).join('\n')
-  const ctx = snippet ? `\n\nFor context, an excerpt of the answer:\n"""\n${String(snippet).slice(0, 700)}\n"""` : ''
+  const question = opts.promptText ? String(opts.promptText).trim().slice(0, 400) : ''
+
+  const askedBlock = question
+    ? `The question that was asked:\n"""\n${question}\n"""\n\n`
+    : ''
+  const industryBlock = opts.industry
+    ? `"${brand}" operates in this category: ${String(opts.industry).slice(0, 120)}.\n\n`
+    : ''
+  const knownBlock = Array.isArray(opts.knownCompetitors) && opts.knownCompetitors.length
+    ? `Known genuine competitors of "${brand}", as examples of the RIGHT kind of ` +
+      `company (they may or may not appear below): ` +
+      `${opts.knownCompetitors.slice(0, 8).map(n => `"${n}"`).join(', ')}.\n\n`
+    : ''
+  const ctx = snippet
+    ? `An excerpt of the answer, for context:\n"""\n${String(snippet).slice(0, 700)}\n"""\n\n`
+    : ''
+
+  // The category step only makes sense when we actually have the question.
+  const step1 = question
+    ? `STEP 1. From the question, identify the exact product or service category ` +
+      `the asker wants to BUY. Be specific: "catering company", not "food"; ` +
+      `"employment law firm", not "professional services".\n\n` +
+      `STEP 2. Keep a candidate ONLY if BOTH are true:\n` +
+      `  (a) it is a real, named company or product, AND\n` +
+      `  (b) supplying that exact category is its OWN primary business, so a buyer ` +
+      `reading this answer could pick it INSTEAD of "${brand}" for the same purchase.\n\n`
+    : `Keep a candidate ONLY if it is a real, named company or product whose primary ` +
+      `business directly competes with "${brand}" for the same purchase.\n\n`
+
   return (
-`An AI assistant answered a question about the market that "${brand}" competes in. ` +
-`From that answer we extracted the candidate names below. Some are real competing ` +
-`companies/products; others are NOT companies at all — certifications or standards ` +
-`(ISO 9001, FSSC 22000, HACCP), section labels or generic nouns ("References", ` +
-`"Presentation", "Logistics", "Pricing"), events, awards, publications, venues, ` +
-`institutions, or things the brand was merely associated with (its own clients, ` +
-`references, or credentials).\n\n` +
-`Candidates:\n${list}${ctx}\n\n` +
-`Return ONLY the names that are genuine companies or products COMPETING with ` +
-`"${brand}" in the same market. Exclude everything else. Do not invent, rename, ` +
-`translate, or reorder — copy kept names EXACTLY as written above. Reply with a JSON ` +
-`array of strings and nothing else, e.g. ["Acme Foods","Beta Co"]. If none qualify, reply [].`
+`${askedBlock}${industryBlock}${knownBlock}` +
+`An AI assistant answered that question. From its answer we extracted the ` +
+`candidate names below. Some are genuine competitors. Many are not.\n\n` +
+`Candidates:\n${list}\n\n${ctx}${step1}` +
+`REJECT, even when the answer lists them alongside real competitors:\n` +
+`  - Anything that is not a company: certifications and standards (ISO 9001, ` +
+`FSSC 22000, HACCP), the bodies that issue or audit them (TUV, SGS, Bureau ` +
+`Veritas, Lloyd's Register), section labels and generic nouns ("References", ` +
+`"Presentation", "Logistics", "Pricing", "Budget"), events, awards, publications, ` +
+`institutions, and government agencies.\n` +
+`  - A company whose primary business is a DIFFERENT, adjacent category, even ` +
+`when it also offers the asked-for category as a side activity. If the question ` +
+`asks for catering companies, a hotel, restaurant, conference centre or event ` +
+`venue with an in-house kitchen does NOT qualify; its business is rooms, covers ` +
+`or hire, and catering is an add-on. Apply the same test in any industry.\n` +
+`  - Things "${brand}" was merely associated with: its own clients, references, ` +
+`partners, suppliers, credentials or past events.\n` +
+`  - "${brand}" itself, under any spelling or alias.\n\n` +
+`KEEP a company in a category only because the QUESTION asked for that category. ` +
+`If the question had asked for event venues, venues would be the right answer.\n\n` +
+`Do not invent, rename, translate, or reorder. Copy kept names EXACTLY as ` +
+`written above.\n\n` +
+`Reply with one short line naming the category you identified, then the kept ` +
+`names as a JSON array of strings wrapped in <keep></keep> tags. If none ` +
+`qualify, reply <keep>[]</keep>. Example:\n` +
+`Category: catering company for corporate events\n` +
+`<keep>["Acme Foods","Beta Catering"]</keep>`
   )
 }
 
 function parseKept(rawText, names) {
   // Tolerate ```json fences / stray prose around the array.
   let s = String(rawText || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  // Preferred shape since 2026-07-29: a one-line category statement followed by
+  // <keep>[...]</keep>. Read inside the tags first, so a bracket appearing in
+  // the category line ("catering [corporate]") cannot corrupt the scan. The bare
+  // bracket scan below stays as the fallback for a model that ignores the tags.
+  const tagged = /<keep>([\s\S]*?)<\/keep>/i.exec(s)
+  if (tagged) s = tagged[1].trim()
   const start = s.indexOf('['), end = s.lastIndexOf(']')
   if (start === -1 || end === -1 || end < start) return null
   let arr
@@ -72,7 +148,11 @@ function parseKept(rawText, names) {
 /**
  * Filter a structural competitor list down to genuine competitors via one Haiku call.
  * @param {Array<{pos:number,name:string}>} candidates  parsed competitors_mentioned
- * @param {{cfg?:object, brand?:string, snippet?:string, fetchImpl?:function}} ctx
+ * @param {{cfg?:object, brand?:string, snippet?:string, promptText?:string,
+ *          industry?:string, knownCompetitors?:string[], fetchImpl?:function}} ctx
+ *   promptText — the prompt the engine answered. Strongly recommended: it is the
+ *   only reliable signal of which product category the buyer is shopping for.
+ *   See buildPrompt. Omitting it degrades to the pre-2026-07-29 behaviour.
  * @returns {Promise<Array<{pos:number,name:string}>>}  same shape; only removals
  */
 async function classifyCompetitors(candidates, ctx = {}) {
@@ -83,6 +163,12 @@ async function classifyCompetitors(candidates, ctx = {}) {
   const brand = ctx.brand || firstBrandName(ctx.cfg)
   const names = candidates.slice(0, MAX_CANDIDATES).map(c => c.name)
   const doFetch = ctx.fetchImpl || fetch
+  const opts = {
+    promptText: ctx.promptText,
+    industry:   ctx.industry,
+    knownCompetitors: ctx.knownCompetitors
+      ?? (Array.isArray(ctx.cfg?.known_competitors) ? ctx.cfg.known_competitors : undefined),
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ctx.timeoutMs ?? TIMEOUT_MS)
@@ -97,8 +183,11 @@ async function classifyCompetitors(candidates, ctx = {}) {
       },
       body: JSON.stringify({
         model:      MODEL,
-        max_tokens: 300,
-        messages:   [{ role: 'user', content: buildPrompt(brand, names, ctx.snippet) }],
+        // 300 -> 500: the reply now opens with a one-line category statement
+        // before the array. Truncating that line would cost the whole result,
+        // since an unparseable reply fails open and keeps every candidate.
+        max_tokens: 500,
+        messages:   [{ role: 'user', content: buildPrompt(brand, names, ctx.snippet, opts) }],
       }),
     })
     if (!r.ok) return candidates                         // fail-open: non-200 → unchanged

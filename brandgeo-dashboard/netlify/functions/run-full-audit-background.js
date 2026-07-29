@@ -147,7 +147,12 @@ exports.handler = async (event) => {
     await Promise.all(engineResults.map(async (er, i) => {
       if (!er.competitors_mentioned) return
       let cands; try { cands = JSON.parse(er.competitors_mentioned) } catch { return }
-      const kept = await classifyCompetitors(cands, { brand: brandForFilter, snippet: er.snippet })
+      const kept = await classifyCompetitors(cands, {
+        brand: brandForFilter,
+        snippet: er.snippet,
+        promptText: er.prompt,
+        industry: audit.category,   // persisted by audit-domain.js at generation time
+      })
       const val = kept.length ? JSON.stringify(kept) : null
       er.competitors_mentioned = val
       if (scoreRows[i]) scoreRows[i].competitors_mentioned = val
