@@ -808,12 +808,31 @@ const ENGINE_TIMEOUT_MS = {
   perplexity: 20000,
   meta:       20000,
   claude:     24000,
-  chatgpt:    40000,
+  // 24000, down from 40000, for the same reason as grok below. 40000 is well past
+  // this function's 26s Netlify wall, so it could never fire: any chatgpt call
+  // slower than the wall was killed by the platform with no row written. Nothing
+  // real is lost by capping it, because a call returning at 25s still cannot have
+  // its row inserted before the kill — that window was never actually succeeding,
+  // it was only failing invisibly. At 24000 it fails visibly instead. The worker
+  // path (ENGINE_TIMEOUT_MS_WORKER) keeps its long budget and is where slow
+  // chatgpt calls are supposed to run.
+  chatgpt:    24000,
   google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
-  grok:       26000,   // was 22000, which killed 4 of grok's first 6 calls. Sized off
-                       // perplexity/sonar, the wrong sibling: sonar does not reason.
-                       // With reasoning off this should be ample; if timeouts persist
-                       // the model is the problem, not the cap.
+  // 21000, down from 26000. 26000 was EXACTLY the Netlify wall for this function
+  // (netlify.toml sets collect-prompt to 26s), so there was no headroom at all:
+  // when grok ran long, the platform killed the process at the same instant the
+  // AbortController was due to fire. The abort never ran, the error row was never
+  // inserted, and the request simply died. That breaks the #109 guarantee of one
+  // row per engine, ok OR error, never silence — and to the user it looks like
+  // the refresh button does nothing at all, with no error anywhere to explain it.
+  // Reported live 2026-07-29: repeated refreshes produced a perplexity row and no
+  // grok row of any kind.
+  //
+  // 21000 leaves ~5s to build and insert the rows, so a slow grok now lands as a
+  // visible timeout instead of vanishing. With reasoning disabled (03df188) grok
+  // returns well inside this; if it does not, the model is the problem and the
+  // error row will say so. The worker path keeps 60000 and is unaffected.
+  grok:       21000,
   // Up to TWO sequential SerpApi calls (the page_token branch), so it needs more
   // headroom than google_ai. Still under Netlify's 26s wall; if it does blow,
   // the row lands as a timeout, having consumed 1-2 SerpApi searches.
