@@ -138,7 +138,15 @@ async function fetchAndExtract(url) {
     `# ${title || url}`,
     desc ? `\n${desc}` : '',
     `\n${body}`.slice(0, MAX_CONTENT_MD),
-    `\n\n---\nTechnical signals: JSON-LD schema: ${signals.jsonld ? 'yes' : 'no'}; `
+    // A BROKEN block is reported explicitly rather than collapsing into "no".
+    // "JSON-LD schema: no" and "you have 2 blocks and 1 does not parse" call for
+    // completely different advice, and the second is the more urgent because the
+    // author believes it is working.
+    `\n\n---\nTechnical signals: JSON-LD schema: ${signals.jsonld ? 'yes' : 'no'}`
+      + (signals.jsonldInvalid > 0
+          ? ` (WARNING: ${signals.jsonldInvalid} of ${signals.jsonldBlocks} JSON-LD block(s) fail to parse and are ignored by search and answer engines)`
+          : '')
+      + `; schema types found: ${signals.schemaTypes && signals.schemaTypes.length ? signals.schemaTypes.join(', ') : 'none'}; `
       + `FAQ schema: ${signals.faq ? 'yes' : 'no'}; tables: ${signals.table ? 'yes' : 'no'}; `
       + `lists: ${signals.list ? 'yes' : 'no'}; meta description: ${desc ? 'yes' : 'no'}; `
       + `H1 count: ${signals.h1}; word count: ${words}`,
@@ -162,13 +170,74 @@ function extractMetaDesc(html) {
   return m ? clean(m[1]) : '';
 }
 
+/**
+ * Walk a parsed JSON-LD value and collect every @type it declares. Schema.org
+ * nests: a WebPage can carry @graph, mainEntity, itemListElement and so on, and
+ * the FAQPage that matters is often several levels down rather than at the root.
+ */
+function collectTypes(node, out = new Set(), depth = 0) {
+  if (!node || depth > 8) return out;
+  if (Array.isArray(node)) {
+    for (const n of node) collectTypes(n, out, depth + 1);
+    return out;
+  }
+  if (typeof node !== 'object') return out;
+  const t = node['@type'];
+  if (typeof t === 'string') out.add(t.toLowerCase());
+  else if (Array.isArray(t)) t.forEach((x) => typeof x === 'string' && out.add(x.toLowerCase()));
+  for (const k of Object.keys(node)) {
+    if (k === '@type') continue;
+    collectTypes(node[k], out, depth + 1);
+  }
+  return out;
+}
+
+/**
+ * STRUCTURED DATA IS NOW PARSED, NOT PATTERN-MATCHED.
+ *
+ * This used to be `jsonldBlocks.some(b => /faqpage/i.test(b))`, a regex over the
+ * RAW STRING. Three ways that was wrong, all reproduced against the live
+ * function before this change:
+ *
+ *   1. A syntactically INVALID FAQPage passed. This repo shipped exactly that to
+ *      production on three city pages, `"}]` instead of `"}}]`, leaving
+ *      acceptedAnswer unclosed. Google drops such a block silently. The audit
+ *      called it present.
+ *   2. The literal prose {"note":"we plan to add FAQPage later"} passed, because
+ *      the string contains the word.
+ *   3. seo-audit-page.js then hands that boolean to Haiku and asks it to judge
+ *      "valid structured data (JSON-LD)". The model cannot see the page, so it
+ *      was certifying validity from a flag that never tested it.
+ *
+ * On a product whose entire thesis is being parsed correctly by answer engines,
+ * a structured-data check that does not parse is the one check that must not be
+ * faked. `jsonldValid` and `jsonldInvalid` are now reported separately so a
+ * BROKEN block is a finding in its own right rather than being indistinguishable
+ * from having none.
+ */
 function detectSignals(html) {
   const jsonldBlocks = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
     .map((m) => m[1]);
-  const faq = jsonldBlocks.some((b) => /faqpage/i.test(b));
+
+  let valid = 0;
+  let invalid = 0;
+  const types = new Set();
+  for (const block of jsonldBlocks) {
+    try {
+      collectTypes(JSON.parse(block), types);
+      valid++;
+    } catch {
+      invalid++;   // present but unparseable, which is worse than absent
+    }
+  }
+
   return {
-    jsonld: jsonldBlocks.length > 0,
-    faq,
+    jsonld: valid > 0,          // at least one block a machine can actually read
+    jsonldBlocks: jsonldBlocks.length,
+    jsonldValid: valid,
+    jsonldInvalid: invalid,
+    faq: types.has('faqpage'),
+    schemaTypes: Array.from(types).sort(),
     table: /<table[\s>]/i.test(html),
     list: /<(ul|ol)[\s>]/i.test(html),
     h1: (html.match(/<h1[\s>]/gi) || []).length,
