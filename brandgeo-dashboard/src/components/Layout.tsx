@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff,
+  Eye, EyeOff, LifeBuoy,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -183,6 +183,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // AI SEO — the content-action layer (Growth+; below that shown locked,
         // routing to the upgrade screen). Admins always have access.
         { to: '/seo', icon: FileSearch, label: 'AI SEO' },
+        // One route for everyone, two views (Tickets.tsx). An admin sees the
+        // triage queue, which also holds BrandGEO's own internal work, so the
+        // label differs; a customer sees only its own requests. Deliberately
+        // NOT added to the mobile bottom bar, which is a fixed 7-icon strip:
+        // this is reachable on mobile through the same sidebar, via the
+        // hamburger menu.
+        { to: '/tickets', icon: LifeBuoy, label: isAdmin ? 'Tickets' : 'Support' },
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],
