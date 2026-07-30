@@ -67,6 +67,128 @@ SURFACES = [
 # Internal tool, never uploaded to cPanel, contains JS template literals.
 EXCLUDE = {"article-builder.html"}
 
+# ── Cross-corpus superlatives ────────────────────────────────────────────────
+# A SECOND surface list, deliberately the near-inverse of SURFACES above.
+#
+# The pricing rules skip research pages because a research page reporting what
+# Meta AI answered in July is a record, not a product claim. But that exemption
+# hid a different defect living on exactly those pages, found 2026-07-30:
+#
+#   Madrid  "the most unanimous result of any city tested so far"
+#   Paris   "the cleanest, most unanimous consensus found anywhere in this
+#            research program"        <- same collection run as Madrid
+#   Chicago "the first fully unanimous result measured anywhere in this
+#            research program"        <- also in its FAQPage JSON-LD
+#   Boston  "the most 5/5-dense city measured in this research program"
+#
+# A superlative is a claim about every OTHER page in the corpus, so the page
+# making it is the one source that cannot check it. Several were mutually
+# exclusive, and two reached rendered marketing assets before anyone noticed.
+# Worse, Chicago's sat inside FAQPage JSON-LD, so an engine parsing the page
+# ingested it as a fact about the program, on a product sold on correct parsing.
+#
+# The pattern is structural, not careless: each page was written against its own
+# findings doc, and each findings doc compared itself only to the cities written
+# before it. That yields an escalating chain of "strongest yet" with nothing to
+# check it against.
+#
+# WHAT IS ALLOWED, and why the rule is shaped this way:
+#   - Page-scoped claims. "the densest result in the Baltimore dataset" names
+#     its denominator and cannot contradict another page.
+#   - Dated program-wide claims. "as of 2026-07-30" makes the claim checkable
+#     against the ledger and honest about ageing. This is the sanctioned form
+#     for a genuine program-wide count, e.g. Detroit's seven-firm convergence.
+#   - Counts, not orderings. Collection dates are day-granular and most cities
+#     share one, so "first"/"previous"/"the fourth city" assert an ordering the
+#     data does not have. A count ("11 of the 21 cities") survives; an ordinal
+#     does not.
+#
+# Ledger of what is currently true and sayable:
+#   docs/research/cross-city-consensus-inventory-2026-07-30.md
+SUPERLATIVE_SURFACES = [
+    "brandgeo/web/ai-visibility-for-*.html",
+    "brandgeo/web/bg-*.html",
+    "brandgeo/web/ai-visibility-index-*.html",
+    "brandgeo/web/blog.html",
+    "brandgeo/web/llms.txt",
+    "brandgeo/web/llms-full.txt",
+]
+
+# Ranking words. Only meaningful when they land near a corpus scope, below.
+_RANK = (r"\b(?:first|only|strongest|cleanest|densest|clearest|highest|lowest|"
+         r"most|widest|tightest|sharpest|biggest|largest|worst|best|"
+         r"unprecedented|unmatched)\b")
+
+# Phrases that scope a claim to the WHOLE corpus. These are the ones a single
+# page cannot verify about itself.
+_CORPUS = (r"(?:anywhere in (?:this|the)|in this (?:entire )?research program|"
+           r"in this program|in the (?:whole|entire) (?:program|dataset)|"
+           r"of any city|of any category|program-wide|"
+           r"any city (?:tested|measured|researched)|"
+           r"(?:we|we've|we have) (?:ever )?measured|measured anywhere|"
+           r"of (?:all|every) cit(?:y|ies))")
+
+# A dated claim is the sanctioned escape hatch: it is checkable and it admits
+# it will age. A page-scoped denominator is fine too.
+_DATED = re.compile(r"as of \d{4}-\d{2}-\d{2}", re.I)
+_PAGE_SCOPED = re.compile(r"in (?:the [A-Z][A-Za-z .'-]{2,30}|this) dataset", re.I)
+
+SUPERLATIVE_RULES = [
+    ("corpus-superlative",
+     re.compile(_RANK + r"[^.<>]{0,90}?" + _CORPUS, re.I),
+     "ranks this page against the whole corpus, which this page cannot verify. "
+     "Scope it to this page's own dataset, or state it as a dated count "
+     "('as of YYYY-MM-DD') after checking the ledger in "
+     "docs/research/cross-city-consensus-inventory-2026-07-30.md."),
+
+    ("city-ordinal",
+     re.compile(r"\bthe (?:second|third|fourth|fifth|sixth|seventh|eighth|"
+                r"ninth|tenth) (?:city|brand|team|firm)\b", re.I),
+     "asserts an ordering the data does not support. Collection dates are "
+     "day-granular and most cities share one, so no page is 'the fourth' "
+     "anything. Use a count or name the cities."),
+
+    ("ageing-superlative",
+     re.compile(_RANK + r"[^.<>]{0,60}?(?:so far|to date|yet measured|"
+                r"ever recorded)|(?:previous(?:ly)? (?:best|densest|city|record))",
+     re.I),
+     "'so far' dates a ranking to the moment it was written and never updates. "
+     "Drop the ranking or replace it with a dated count."),
+]
+
+# Documented exceptions, same four-part shape as EXEMPT above: rule, file,
+# an exact context substring, and why. Anything not matching all of it fails.
+SUPERLATIVE_EXEMPT = [
+    # BG-017 is a DOI-archived paper (Zenodo 10.5281/zenodo.21395598) whose
+    # corpus is enumerated on the page itself: London, Berlin, Madrid, New York,
+    # Paris, Rome, Dublin. A superlative over a named, fixed, seven-city set is
+    # verifiable and does not age. Rewriting it would also desynchronise the
+    # live page from the archived record, which is worse than the phrasing.
+    ("corpus-superlative", "bg-017.html", "highest overall consensus rate of any city",
+     "bounded to this paper's enumerated seven-city corpus; DOI-archived."),
+    ("corpus-superlative", "bg-017.html", "most noise-corrupted single response in the whole program",
+     "same paper, same enumerated corpus, and it is a self-reported data-quality "
+     "caveat rather than a boast. Editing the live page would also desynchronise "
+     "it from the Zenodo record."),
+    ("ageing-superlative", "bg-018.html", "had not tested yet",
+     "'not tested yet' describes a test plan, not a ranking."),
+    # Industry-level claims sourced to third-party benchmarks. The denominator
+    # is the cited study's, not this program's, so no city page can contradict
+    # them. Deleting them would falsify a correctly attributed citation.
+    ("corpus-superlative", "ai-visibility-for-healthcare.html", "BG-008",
+     "sourced to BG-008 / Siftly's 2026 AI Citation Rate Benchmarks."),
+    ("corpus-superlative", "ai-visibility-for-real-estate.html", "BG-008",
+     "sourced to BG-008's industry study, not this program's city corpus."),
+    ("corpus-superlative", "bg-008.html", "Siftly's 2026 AI Citation Rate Benchmarks",
+     "third-party benchmark, its own denominator."),
+    ("corpus-superlative", "bg-009.html", "Ahrefs' separate 17-million-citation",
+     "third-party benchmark, its own denominator."),
+    ("corpus-superlative", "bg-006.html", "the highest rate of any engine in the test",
+     "scoped to that article's own engine test, an enumerated set."),
+    ("corpus-superlative", "llms-full.txt", "the highest of any industry measured",
+     "industry-level, sourced to the law-firm guide's cited benchmark."),
+]
+
 # Every way a euro figure is written on these surfaces. `&euro;` was missing
 # until 2026-07-29 and that single gap hid a live EUR 900 Managed price on
 # brandgeo-vs-ahrefs-brand-radar.html for as long as the rule had existed: the
@@ -189,13 +311,41 @@ def ground_truth():
     return prompts, cooldown, engines
 
 
-def surface_files():
+def surface_files(patterns=None):
     out = []
-    for pat in SURFACES:
+    for pat in (patterns or SURFACES):
         for p in glob.glob(os.path.join(ROOT, pat), recursive=True):
             if os.path.basename(p) not in EXCLUDE:
                 out.append(p)
     return sorted(set(out))
+
+
+def superlative_exempt(label, rel, line):
+    return any(lab == label and rel.endswith(f) and ctx in line
+               for lab, f, ctx, _ in SUPERLATIVE_EXEMPT)
+
+
+def scan_superlatives():
+    """Cross-corpus ranking claims on research pages.
+
+    Separate from the pricing rules because it runs over the near-inverse
+    surface list. See the SUPERLATIVE_SURFACES comment for the incident.
+    """
+    findings = []
+    for path in surface_files(SUPERLATIVE_SURFACES):
+        rel = os.path.relpath(path, ROOT).replace("\\", "/")
+        for i, raw in enumerate(
+                open(path, encoding="utf-8", errors="replace").read().splitlines(), 1):
+            # A dated claim is checkable and admits it ages; a page-scoped one
+            # names its denominator. Both are the fix, not the defect.
+            if _DATED.search(raw) or _PAGE_SCOPED.search(raw):
+                continue
+            for label, pat, why in SUPERLATIVE_RULES:
+                m = pat.search(raw)
+                if m and not superlative_exempt(label, rel, raw):
+                    findings.append((rel, i, m.group(0)[:70], why, raw.strip()[:90]))
+                    break   # one finding per line is enough to send someone to it
+    return findings
 
 
 def main():
@@ -238,8 +388,13 @@ def main():
                                      f"not an enforced cap. PLAN_PROMPTS allows {sorted(valid, key=int)}",
                                      line.strip()[:90]))
 
+    sup = scan_superlatives()
+    findings.extend(sup)
+
     if not findings:
-        print(f"{len(surface_files())} surfaces checked, no contradictions found.")
+        print(f"{len(surface_files())} product surfaces and "
+              f"{len(surface_files(SUPERLATIVE_SURFACES))} research surfaces checked, "
+              "no contradictions found.")
         return 0
 
     print(f"{len(findings)} finding(s) across {len(set(f[0] for f in findings))} file(s):\n")
