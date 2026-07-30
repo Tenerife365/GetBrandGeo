@@ -46,24 +46,36 @@
          blocks this file before a line of it executes and the only symptom is a
          console message.
 
-         BUT a correct CSP is not sufficient, and on 2026-07-30 that was the
-         actual fault: the SDK loaded and ran, then its own config call was
-         refused by the vendor and it disabled itself silently apart from one
-         console line, "[ai-guidance] failed to load config, widget disabled".
-         Two separate server-side conditions have to hold, and both are set in
-         the askmywebsiteai dashboard, not here. Probe them directly rather
-         than guessing, because the browser reports both as "Failed to fetch":
+         BUT a correct CSP is not sufficient, and on 2026-07-30 that was not
+         the fault. The SDK loaded and ran, then its own config call was
+         refused by the vendor, so it disabled itself with no symptom beyond
+         one console line: "[ai-guidance] failed to load config, widget
+         disabled". Invisible widget, healthy-looking page.
+
+         THERE ARE TWO SEPARATE askmywebsiteai APPS, one per host, and each
+         one only accepts its own host as an origin. This file had been given
+         the LANDING SITE's app id and key, so the dashboard was asking a
+         vendor app that does not recognise app.getbrandgeo.com. Do not carry
+         an install snippet across from getbrandgeo.com to here; they are not
+         interchangeable and the failure is silent.
+
+           app_e9a0360bb6095088   app.getbrandgeo.com   (this file)
+           app_a16a65082c9e13c7   getbrandgeo.com       (marketing site)
+
+         Probe the endpoint directly rather than guessing, because the browser
+         collapses every one of these into "Failed to fetch":
 
            curl -s "https://app.askmywebsiteai.com/v1/apps/<app-id>/config" \
              -H "Origin: https://app.getbrandgeo.com" \
              -H "x-public-key: <pk_live...>"
 
-         {"error":"origin not allowed"}  -> app.getbrandgeo.com is missing from
-                                           the app's allowed origins. The apex
-                                           and www were allowed; the subdomain
-                                           the dashboard actually runs on was
-                                           not, and no wildcard covered it.
-         {"error":"app not live"}        -> the app is not published.
+         {"error":"origin not allowed"}  -> wrong app for this host, or the
+                                           host is missing from that app's
+                                           allowed origins. No wildcard covers
+                                           a subdomain; app.getbrandgeo.com is
+                                           its own entry, separate from the
+                                           apex and from www.
+         {"error":"app not live"}        -> right app, but not published yet.
          a JSON config object            -> vendor side is fine, look here.
 
          It loads on EVERY route including the login screen, so it is present
@@ -73,8 +85,8 @@
     <script
       async
       src="https://app.askmywebsiteai.com/sdk.js"
-      data-app-id="app_a16a65082c9e13c7"
-      data-public-key="pk_live_352f98333e403138c8f2a64432ffe776">
+      data-app-id="app_e9a0360bb6095088"
+      data-public-key="pk_live_727b3cd724ff6e10ee345d9cb240f6f6">
     </script>
   </body>
 </html>
