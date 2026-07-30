@@ -794,8 +794,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      {/* Floating support widget — present on every dashboard page. */}
-      <SupportWidget />
+      {/* Our own support widget is RETIRED from the UI as of 2026-07-29, in
+          favour of the askmywebsiteai assistant loaded in index.html, which
+          will feed tickets in from now on.
+
+          It is unmounted rather than deleted: SupportWidget.tsx, its
+          support-request function and the tickets pipeline behind it all still
+          work, so this is one line to reverse if the new assistant does not
+          work out.
+
+          It also had to go for the new one to be VISIBLE at all. Ours is
+          `fixed z-50 bottom-right`, which is exactly where a launcher of this
+          kind sits, so it was covering the askmywebsiteai launcher rather than
+          sitting beside it. Two floating buttons in one corner is not a layout
+          to fix, it is a decision to make, and the decision is that there is
+          one assistant. */}
+      {/* <SupportWidget /> */}
     </div>
   )
 }
