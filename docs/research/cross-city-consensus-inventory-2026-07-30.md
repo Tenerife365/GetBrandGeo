@@ -12,9 +12,11 @@ anywhere in this research program" in four places; Boston claimed to be "the mos
 Atlanta and six other cities were **all collected 2026-07-24**, so no ordering exists
 among them and "first" was not available to any of them.
 
-The root cause was structural, not careless: each city page was written against its own
-findings doc, and each findings doc compared itself only to the cities written before it.
-That produces an escalating chain of "strongest yet" claims with nothing to check them
+The root cause was structural, not careless, and it was not a data problem: each city
+page was written against its own findings doc, and each findings doc could only compare
+itself to the cities measured before it. Every one of those comparisons was true when
+written. Published copy is read in the present, though, so a run of locally-true "strongest
+yet" claims accumulates into a set that contradicts itself, with nothing to check it
 against. This file is that check. **Consult it before writing any cross-program
 superlative, and add to it when a new city lands.**
 
@@ -90,6 +92,11 @@ above share one collection date. Day-granularity dates are all the record has.
   ("the densest result measured in this program" / "the densest multi-firm consensus
   measured in this program"). This is a different metric from 5/5 consensus and was not
   in scope, but the two pages cannot both be right. **Unresolved, worth its own check.**
-- The per-city findings docs in `docs/` still contain the original escalating chain. They
-  are historical records and were not rewritten. Trust this file over their comparative
+- The per-city findings docs in `docs/` are staying exactly as written, by decision on
+  2026-07-30. **Their measurements are accurate for the date they were generated and were
+  verified against actual searches.** Nothing in them is being called into question here.
+  What they could not have was a view of cities measured after them, so their
+  *comparative* sentences ("the strongest measured so far") were true against a partial
+  picture and read as false now. Only the published pages were corrected. Trust this file
+  over their comparative
   claims.
