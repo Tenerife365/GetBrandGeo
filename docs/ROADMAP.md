@@ -22,16 +22,23 @@ Nothing here blocks the loop. It works around these.
 - **Refresh ChatGPT on prompt 6 for Bucate pe Roate.** ~EUR 0.11, the last stale
   row. Withheld from the loop because it spends money (AUTONOMY §2).
 
-- **Define BrandGEO's refund trigger.** The "shortlist by day 14" in the
-  original brief was TalentWeLove contamination. BrandGEO has no equivalent, so
-  the contract page in Stream C has nothing to promise. Needs a product answer:
-  what measurable outcome, by when, entitles a refund? Stream C is blocked at
-  the contract step without it.
+- **Swap the Stripe connector to BrandGEO's account.** The connected one is
+  TalentWeLove, `acct_1TxtkGQAKgm0Dugx`, confirmed 2026-07-30 when a lookup of
+  the live Growth PRO price `price_1Ty5a7Kh2GaZE2B4vQhoTktV` returned
+  "No such price". Any agent creating a price through it would put BrandGEO
+  billing objects in the wrong legal entity, and a customer would pay into the
+  wrong company. **Stream A is hard-blocked until this is swapped.**
+  `check: (the account id returned by get_stripe_account_info is NOT acct_1TxtkGQAKgm0Dugx, and GetPricesPrice for price_1Ty5a7Kh2GaZE2B4vQhoTktV succeeds)`
 
-- **Authorize connectors**, in an interactive terminal or claude.ai settings.
-  Ranked by value to the loop: Stripe (unblocks Stream A's price creation),
-  an error monitor such as Sentry (the loop currently has no way to discover
-  bugs it did not itself cause), GitHub, Netlify. Supabase already works.
+- **Authorize an error monitor** (Sentry or similar). The loop currently has no
+  way to discover a bug it did not itself cause. GitHub and Netlify connectors
+  are lower value but would replace polling. Supabase already works.
+
+> **There is NO 14-day refund policy and no shortlist guarantee.** Both came
+> from TalentWeLove text pasted here by accident on 2026-07-30 and were briefly,
+> wrongly, carried into this roadmap. BrandGEO promises no refund trigger.
+> Do not write one into any contract, terms page or piece of copy. If a refund
+> policy is ever wanted it will arrive as its own decision from Constantin.
 
 - **Confirm the UTC offset.** Every schedule assumes Europe/Bucharest, UTC+3.
 
@@ -111,10 +118,12 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
 
 - **C3. Payment gated behind the contract.** On the final step the Stripe
   payment must be unreachable until the visitor has either opened and accepted
-  the contract or ticked an explicit "I have read and accept" box. A terms link
-  sits on the same page covering refund conditions.
-  **Blocked on the refund trigger above** — do not write a guarantee nobody has
-  agreed to.
+  the contract or ticked an explicit "I have read and accept" box. A link to the
+  existing `terms.html` sits on the same page.
+  The gate must be enforced server-side too, not only by a disabled button, or
+  it is decorative.
+  **Invent no commercial terms here.** Link the terms page that exists; do not
+  author guarantees, refund windows or SLAs. See the note under NEEDS CONSTANTIN.
   `check: bash scripts/check-contract-gate.sh`
 
 ---
