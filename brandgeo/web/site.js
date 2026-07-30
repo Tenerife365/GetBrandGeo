@@ -803,12 +803,48 @@
   })();
 })();
 
-// ── BrandGEO site chat assistant (ASSISTANT-SPEC.md) ──────────────────────
+// ── askmywebsiteai support assistant ──────────────────────────────────────
+// Injected from here rather than pasted into all 76 html files, because every
+// public page already loads site.js and one copy cannot drift from another.
+// The vendor snippet reads its keys off document.currentScript.dataset, which
+// resolves to this element while it executes, so setting the attributes before
+// appending is equivalent to the static tag they document.
+//
+// This is the LANDING SITE's app. The dashboard runs a DIFFERENT one
+// (app_e9a0360bb6095088, in brandgeo-dashboard/index.html). One app per host,
+// each rejecting the other's origin, so never copy an id between the two.
+//
+// Requires the CSP allowances in .htaccess. Note the widget will not render
+// until the app's config is PUBLISHED vendor-side; an unpublished app fails
+// silently with one console line and no visible symptom.
+(function() {
+  if (document.querySelector('script[data-app-id]')) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://app.askmywebsiteai.com/sdk.js';
+  s.setAttribute('data-app-id', 'app_a16a65082c9e13c7');
+  s.setAttribute('data-public-key', 'pk_live_352f98333e403138c8f2a64432ffe776');
+  document.body.appendChild(s);
+})();
+
+// ── BrandGEO site chat assistant "Jamie" (ASSISTANT-SPEC.md) ──────────────
 // Self-contained: floating launcher + panel, injected on every page that loads
 // this script. Talks to two PUBLIC Netlify functions on app.getbrandgeo.com
 // (assistant / assistant-lead). Uses the site's own CSS custom properties so it
 // inherits dark/light theme automatically; no per-page HTML edits needed.
+//
+// RETIRING: Jamie is being handed over to the askmywebsiteai assistant above,
+// and will be recalibrated for outbound/inbound lead work instead. Flip
+// JAMIE_RETIRED to true to take it off the site. It is deliberately still
+// false: Jamie is the only lead capture on the public site (its "Talk to a
+// human" form posts to assistant-lead), and the askmywebsiteai app above is
+// not publishing its config yet, so retiring Jamie today would leave
+// getbrandgeo.com with no assistant and no lead capture at all. Flip this the
+// moment the vendor config goes live, not before.
+var JAMIE_RETIRED = false;
+
 (function() {
+  if (JAMIE_RETIRED) return;
   if (!window.fetch || document.getElementById('bg-asst-launcher')) return;
 
   var ASSISTANT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/assistant';
