@@ -44,8 +44,27 @@
 
          REQUIRES the CSP allowances in netlify.toml. Without them the browser
          blocks this file before a line of it executes and the only symptom is a
-         console message. If this widget ever stops appearing, check the CSP
-         first, not the vendor.
+         console message.
+
+         BUT a correct CSP is not sufficient, and on 2026-07-30 that was the
+         actual fault: the SDK loaded and ran, then its own config call was
+         refused by the vendor and it disabled itself silently apart from one
+         console line, "[ai-guidance] failed to load config, widget disabled".
+         Two separate server-side conditions have to hold, and both are set in
+         the askmywebsiteai dashboard, not here. Probe them directly rather
+         than guessing, because the browser reports both as "Failed to fetch":
+
+           curl -s "https://app.askmywebsiteai.com/v1/apps/<app-id>/config" \
+             -H "Origin: https://app.getbrandgeo.com" \
+             -H "x-public-key: <pk_live...>"
+
+         {"error":"origin not allowed"}  -> app.getbrandgeo.com is missing from
+                                           the app's allowed origins. The apex
+                                           and www were allowed; the subdomain
+                                           the dashboard actually runs on was
+                                           not, and no wildcard covered it.
+         {"error":"app not live"}        -> the app is not published.
+         a JSON config object            -> vendor side is fine, look here.
 
          It loads on EVERY route including the login screen, so it is present
          for signed-out visitors and for admins as well as customers. That is
