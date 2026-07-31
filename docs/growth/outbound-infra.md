@@ -128,24 +128,56 @@ the existing subscription puts the company's real mailbox one abuse report away
 from suspension. A separate subscription costs two more seats and isolates that
 risk completely.
 
-**Sending tool: Instantly.** Recommended over Smartlead for this sprint on two
-grounds: its warmup pool is the larger of the two, and its account setup path
-for Google Workspace is OAuth rather than app passwords, which is one fewer
-place to leak a credential.
+**Sending tool: Saleshandy Outreach Starter, not Instantly.** Changed
+2026-07-31 after checking real prices against a EUR 25 target Constantin set.
+Instantly Growth is **USD 47/month** billed monthly, USD 37.60 annual, which is
+above what my first estimate said and above what this sprint should spend.
+Saleshandy Outreach Starter is **USD 25/month**, the same rate monthly or
+annual, and it carries what actually matters here: **unlimited connected
+sending accounts**, built-in warmup with **3 warmup slots** (enough for three
+inboxes), 6,000 emails per month, and a **7 day free trial with no card**.
 
-### Cost
+6,000 emails per month covers the sprint's roughly 1,100 real sends with room
+to spare. The Starter plan's 3 warmup slots are the real ceiling: a fourth
+inbox would need the Pro tier, so plan around three.
 
-| Line | Monthly EUR | Note |
+### Cost, verified 2026-07-31
+
+Prices checked against the vendors' own pricing pages today, not estimated.
+They are quoted in USD and EUR as the vendor quotes them.
+
+| Line | First 3 months | After | Note |
+|---|---|---|---|
+| `trybrandgeo.com` registration | about EUR 1/mo | about EUR 1/mo | roughly EUR 12 for the year, paid once |
+| Google Workspace Business Starter | **EUR 3.40** per seat | EUR 6.80 per seat | 50 percent off for 3 months is live on the EU pricing page, and 3 months covers the whole sprint |
+| Saleshandy Outreach Starter | about EUR 23 | about EUR 23 | USD 25, unlimited accounts, 3 warmup slots |
+
+**One seat:** about **EUR 27/month** during the promo.
+**Two seats:** about **EUR 31/month** during the promo, EUR 38 after.
+
+**EUR 25 all-in is not reachable at list price** with Google Workspace plus any
+tool that does warmup, and warmup is the one line that cannot be cut on a brand
+new domain. The honest floor for a working two inbox setup is about EUR 31.
+Rather than pretend otherwise, see the trial sequencing below, which puts the
+**amount due today at EUR 12**.
+
+### Paying almost nothing in month one
+
+Both vendors have trials, and they line up with the sprint's shape because
+Days 1 to 5 are warmup only with zero real sends.
+
+| When | Action | Cash out |
 |---|---|---|
-| `trybrandgeo.com` registration | about 1 | roughly EUR 12 for the year |
-| Google Workspace Business Starter, 2 seats | about 14 to 17 | confirm the seat price at checkout |
-| Instantly, Growth plan | about 40 to 47 | monthly billing costs more than annual; for a 30 day sprint take monthly |
-| **Total** | **about 55 to 65** | ceiling is EUR 150, so a third and fourth inbox fit inside it |
+| Today | Register the domain | about EUR 12, once |
+| Today | Start the Google Workspace **14 day free trial** | EUR 0 |
+| Today | Start the Saleshandy **7 day free trial**, no card, warmup ON | EUR 0 |
+| Day 7 (08-07) | Saleshandy trial ends, subscribe as real sending begins | about EUR 23 |
+| Day 14 (08-14) | Workspace trial ends, promo rate starts | EUR 3.40 per seat |
 
-**I cannot verify vendor pricing from here and did not try.** The figures above
-are estimates for budgeting only. Confirm each at checkout before paying, and if
-any line is materially different, say so in the chat and the budget line gets
-rewritten rather than quietly exceeded.
+**Total cash in the sprint month: about EUR 35, of which only EUR 12 is due
+today.** The tool is not paid for until the day it starts doing real work, and
+the mailbox is not paid for until Day 14, by which point the plan's glidepath
+expects the first paying customers.
 
 ---
 
@@ -178,6 +210,35 @@ step 3, because every record in that step contains the domain name.
 A **new, separate** Google Workspace subscription for this domain. Not a
 secondary domain on the existing one, for the suspension reason above.
 
+> **An alias is not a second inbox, and this is the one thing to get right
+> here.** Asked 2026-07-31: can one seat plus an alias replace two seats? For
+> receiving and for DMARC reports, yes, and that is what the `dmarc@` alias in
+> point 3 below is for. For **sending**, no. An alias is the same mailbox, the
+> same account, the same sending quota and the **same reputation**. Sending
+> "as" an alias still routes every message through the one mailbox, so it adds
+> no independent reputation, no second warmup surface, and no extra safe
+> capacity. It is one inbox wearing two names.
+>
+> The practical ceiling is about **25 cold sends per day per mailbox**, so one
+> seat caps the channel at 25/day no matter how many aliases sit on it. Against
+> the plan's ramp that is enough through Day 6 only: Day 7 wants 30, Day 11
+> wants 40, Day 12 onward wants 50, and Days 25 to 28 want 55 to 70.
+>
+> **The seat is not the expensive line.** At the EUR 3.40 promo a second seat
+> costs EUR 3.40/month, and Saleshandy allows unlimited connected accounts, so
+> seat two adds nothing on the tool side. Saving EUR 3.40 by using an alias
+> instead costs roughly half the cold channel, which the sprint's own EV table
+> values at 30 to 40 paying subscribers. **Recommendation: two seats.**
+>
+> If one seat is genuinely the constraint, that is a legitimate call and the
+> plan already has the pre-agreed response, from `SPRINT-100-PLAN-30D.md`: cold
+> volume holds and **DM volume rises to compensate**, which costs founder time
+> and no cash. Expect that channel to land nearer 15 to 20 paying rather than
+> 30 to 40, and say so on the scoreboard rather than discovering it at Gate 2.
+> Seat two can also be added later and funded by the first customers, but it
+> needs 5 to 7 days of warmup, so it has to exist by **Day 5** to be useful on
+> Day 11.
+
 1. Go to `https://workspace.google.com/`, choose **Business Starter**, and start
    the signup with the domain `trybrandgeo.com` when it asks whether you have
    a domain (choose "Yes, I have one I can use").
@@ -206,7 +267,7 @@ secondary domain on the existing one, for the suspension reason above.
    An empty profile with no photo and no signature is one of the cheapest
    spam signals to fix, and warmup traffic starts flowing in step 5 today.
 5. In each mailbox: Settings, See all settings, Forwarding and POP/IMAP, and set
-   **IMAP access: Enable**. Instantly needs it even on the OAuth path.
+   **IMAP access: Enable**. Saleshandy needs it even on the OAuth path.
 
 **Report back:** both mailboxes created, and confirmation that you can send a
 normal email from each one.
@@ -313,16 +374,23 @@ with no deploy secret expectation.
 
 ---
 
-## STEP 5. Instantly: connect, warm up, cap
+## STEP 5. Saleshandy: connect, warm up, cap
 
-1. Sign up at `https://instantly.ai/` on the **Growth** plan, monthly billing.
-   Note the actual price you were charged and report it.
-2. **Accounts**, **Add new account**, **Google / Gmail**, and connect via OAuth.
-   Do this for **both** mailboxes. If OAuth is blocked by a Workspace policy,
-   the fix is in Admin console, Security, Access and data control, API controls,
-   Manage third party app access. Prefer fixing that over falling back to app
-   passwords.
-3. For **each** of the two accounts, set:
+> **The settings below are named by function, not by menu path.** I have not
+> used Saleshandy's console and will not invent its labels: guessing a vendor
+> UI is exactly the failure recorded in `AUTONOMY.md` §1. Every item here exists
+> in this class of tool; if a label reads differently, match on what it does and
+> tell me what it was actually called so this file can be corrected.
+
+1. Sign up at `https://www.saleshandy.com/` on **Outreach Starter**, and start
+   the **7 day free trial** (no card required). Do not pay yet, see the trial
+   sequencing in the cost section. Note the price you are quoted and report it.
+2. Connect each mailbox, preferring the **Google / Gmail OAuth** path over
+   SMTP and app passwords, since OAuth means no credential is stored anywhere
+   you have to handle. If OAuth is blocked by a Workspace policy, the fix is in
+   Admin console, Security, Access and data control, API controls, Manage third
+   party app access. Prefer fixing that over falling back to app passwords.
+3. For **each** connected account, set:
 
    | Setting | Value |
    |---|---|
@@ -345,7 +413,7 @@ with no deploy secret expectation.
 
 ### Daily send cap ramp, per the 30 day plan
 
-Caps are **per inbox**. Set them in Instantly on the morning of each date.
+Caps are **per inbox**. Set them in Saleshandy on the morning of each date.
 
 | Sprint day | Date | Per inbox | Total cold sends | Plan target |
 |---|---|---|---|---|
@@ -376,7 +444,7 @@ burned in week 4 of a 4 week sprint. Do not do that.
 
 Not legal advice. This is the shape the sending tool needs configured, and the
 copy itself belongs to S11, not here. Every cold email must contain the sender's
-real identity and a working one line opt out. Put this in the Instantly campaign
+real identity and a working one line opt out. Put this in the Saleshandy campaign
 signature block so it cannot be forgotten per template:
 
 ```
@@ -386,7 +454,7 @@ Constantin Goane, BrandGEO. If you would rather not hear from me, reply with
 
 A plain reply based opt out is honoured manually and beats an unsubscribe link,
 which on a cold domain adds a tracked redirect for no benefit. Honour every one
-the same day, and add the address to the Instantly blocklist.
+the same day, and add the address to the Saleshandy blocklist.
 
 ---
 
@@ -575,15 +643,15 @@ before any volume goes out. `SPRINT-100-PLAN-30D.md` already binds this: if
 deliverability is not proven by Day 6, cold volume waits and DM volume rises
 instead. Never burn the domain to keep a number.
 
-### 7.4 Instantly's own checker is green
+### 7.4 The sending tool's own checker is green
 
-Instantly, **Accounts**, click each connected inbox, and open its DNS or
+Saleshandy, **Accounts**, click each connected inbox, and open its DNS or
 deliverability panel. Pass condition: **SPF, DKIM and DMARC all showing pass or
 green on both accounts.** Screenshot both.
 
 ### 7.5 Warmup health, Day 5
 
-Instantly, Accounts, the warmup tab per inbox. Pass condition: warmup emails are
+Saleshandy, Accounts, the warmup tab per inbox. Pass condition: warmup emails are
 sending and landing in inbox rather than spam, with an inbox rate at or above 90
 percent. Screenshot. This is a health signal, not a gate: a low rate on Day 5
 means extend warmup, not cancel the sprint.
@@ -656,7 +724,7 @@ was checked precisely so this purchase could stay optional.
 ## Standing rules for this infrastructure
 
 1. **The primary domain never sends cold mail.** Not one message, not a test,
-   not a "just this one warm intro through Instantly".
+   not a "just this one warm intro through Saleshandy".
 2. **Volume never rises to hit a scoreboard number.** The cap table is a
    ceiling, not a target. A number missed is a number missed; a burned domain
    costs 7 days that a 30 day sprint does not have.
