@@ -57,6 +57,49 @@ bad list on the primary domain and password reset emails start landing in spam
 for paying customers. The secondary domain is a firebreak, and its whole job is
 to be the thing that burns instead.
 
+**And a subdomain is not that firebreak.** Asked and settled 2026-07-31:
+`try.getbrandgeo.com` would be cheaper and would need no second registration,
+but it is still `getbrandgeo.com` at the organisational level, which is the
+level that matters here.
+
+- Receiving systems score the organisational domain alongside the exact sending
+  domain. Subdomain reputation is partly separate, not separate.
+- Domain blocklists operate on domains. A listing that reaches the root takes
+  transactional mail down with it, and you cannot abandon a subdomain without
+  the root already carrying the damage. A separate domain you can genuinely
+  throw away.
+- DMARC couples the two. `getbrandgeo.com` publishes `p=none` with **no `sp=`
+  tag**, so under RFC 7489 every subdomain inherits `none`. The outreach
+  subdomain could not be moved to `p=quarantine` on Day 15 without either
+  moving the primary too or adding a subdomain-specific record. A separate
+  domain tunes independently, which is the whole point of a firebreak.
+- The From line is read by a human. `constantin@try.getbrandgeo.com` looks
+  machine generated to a small business owner. `constantin@trygetbrandgeo.com`
+  looks like a company.
+- The separate domain costs about EUR 12 for the year.
+
+**The honest argument for a subdomain, and why it loses here.** A subdomain
+inherits part of the parent's reputation, so it warms faster, roughly 3 to 5
+days against 5 to 7. Warmup is this sprint's hardest physical constraint, so
+that is a real advantage and not a small one. It loses anyway, because
+inheritance is worth exactly what the parent's reputation is worth, and
+`getbrandgeo.com` is a young, low volume sender: a small team's Google Workspace
+mail plus the app's transactional mail. There is no large established good
+reputation sitting there to borrow. The trade is the full downside, the primary
+domain permanently inside the blast radius, for an upside proportional to
+something the domain has not built yet.
+
+The subdomain advice is sound and widely repeated, but it comes from bulk
+marketing to opted-in lists, where consent exists, complaint rates sit near
+zero, and the parent has years of volume behind it. Cold outreach to people who
+never asked is a different risk profile and the advice does not carry over.
+
+**When a subdomain would be right, and it will be later.** For opted-in mail,
+a customer newsletter, product announcements, release notes, `mail.getbrandgeo.com`
+is the correct answer and is what to use when that day comes. Different job,
+different risk, and by then the reputation being inherited will be worth
+something.
+
 **Mailbox provider: a separate Google Workspace account for the new domain.**
 Not a secondary domain added to the existing `getbrandgeo.com` Workspace. Google
 suspends at the account level, not the domain level, so an alias domain sharing
