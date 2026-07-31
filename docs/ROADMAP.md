@@ -491,6 +491,27 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
   the gate. It never withholds provisioning, because the money is already
   captured and refusing a paying customer is the worse failure.
   Everything below is true and shipped; it is simply not the whole of C3.
+  **The detection has NEVER FIRED.** `terms_acceptances` is empty, no Stripe
+  event has arrived since it was built, and `checkout_without_acceptance` reads
+  like a working alarm without ever having been one. **After the first real
+  subscription, check exactly this:** one `terms_acceptances` row with
+  `matched_at`, `stripe_session_id` and `matched_email` set, and NO
+  `checkout_without_acceptance` beside it. That single observation validates four
+  hops that have so far only been reasoned about, including whether
+  `client_reference_id` survives a Payment Link on this account at all, which is
+  unverified. If it does not, every legitimate purchase raises the alert and the
+  alert becomes noise.
+  ```sql
+  select reference, plan, period, matched_at, stripe_session_id from terms_acceptances order by created_at desc limit 5;
+  select type, title, created_at from admin_notifications where type = 'checkout_without_acceptance' order by created_at desc;
+  ```
+  Two reviews: `docs/qa/s3-acquisition-funnel-contract-gate.md` (FAIL) and
+  `docs/qa/s3-acquisition-funnel-rereview.md` (PASS WITH FINDINGS).
+  **S3 should not close while the free tier cannot finish its own first
+  collection** (see NEEDS CONSTANTIN: 5 prompts at EUR 0.108 against a EUR 0.30
+  budget, blocked after prompt 3). C2 now sends people to free signup by design,
+  so that budget defect is this funnel's destination. It is S1/S2's decision to
+  make, not this stream's.
   The six Stripe payment links have been REMOVED from `brandgeo/web/site.js`,
   where a `STRIPE_LINKS` map had been writing them onto every Subscribe button
   on load. That is what makes this not decorative: while the destination was in
