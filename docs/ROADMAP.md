@@ -13,6 +13,20 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
+- **When you create the package price, the Payment Link MUST set
+  `customer_creation: 'always'`.** Stripe creates a Customer in `payment` mode
+  only with that flag (confirmed in the vendored SDK types). Without it
+  `session.customer` is null and the sale cannot be linked to anyone. Also set
+  `metadata.plan` and `metadata.months` on the price.
+  `scripts/stripe-create-catalogue.js` does NOT pass the flag and is the file
+  someone will copy from.
+
+- **A package sells a tier, not prompts.** `growth_pro` is **35** prompts,
+  identical to `growth` (`planConfig.ts:427`), and `prompt_limit_override` has
+  zero hits repo-wide. A "Growth PRO plus 200 prompts" offer would deliver 35.
+  Decide whether the founding-client offer includes extra prompts; if it does,
+  A2 §3.4 has to be built before it is sold.
+
 - **Publish the askmywebsiteai config for both apps.** Vendor said they would
   fix it 2026-07-31. Both apps are Live, scanned, domains verified, snippets
   installed and the Cortex interview is complete for all 13 pages; the console
@@ -42,7 +56,34 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
 `db/`, `src/lib/planConfig.ts`. Owner `bg-backend` on Opus, reviewed by
 `bg-verify`. **day-only** throughout: this is billing.
 
-- **A1. One-time and package payments are silently dropped.**
+- **A1-S1. HIGH, gated. An existing subscriber who buys a package gets reverted
+  while Stripe keeps charging them.** The mirror of the leak A1 closed:
+  `stripe-webhook.js:287` sets `plan_source='package'` while `:288` deliberately
+  preserves `stripe_subscription_id`, so `expire-plan-grants.js:69-72` later
+  drops a paying customer to Free and emails them a lapse notice. The code's own
+  comment reasons about "a client who holds both" and then leaves that case
+  unprotected in the job that reverts them.
+  **The gate: close this before the first package grant date, and before selling
+  a package to anyone who already has a subscription.** `MIN_PACKAGE_MONTHS = 1`
+  guarantees at least a month of runway from the first sale, which is why A1
+  shipped without it. Companion fix (null the sub id on `subscription.deleted`)
+  and the exact patch are in `docs/qa/package-provisioning-014.md`.
+  `check: (bg-verify's S1 assertion added to tests/package_provisioning.test.js passes)`
+
+- **A1-S6. The most contested line in A1 is pinned by nothing.** bg-verify ran
+  twelve mutations; eleven were killed. The survivor deletes
+  `plan_source`/`plan_grant_until` from `stripe-webhook.js:287` and all 43
+  checks stay green. That is precisely the deviation the review had to
+  adjudicate. Add the assertion.
+  `check: node brandgeo-dashboard/tests/package_provisioning.test.js`
+
+- **A1-S2/S3. MEDIUM.** Early renewal forfeits the unused remainder
+  (`grantUntil` always computed from today, `:221`, never reads the current
+  row). And line-item `quantity` is never read, so quantity 2 on a 6-month
+  package still provisions 6 months.
+
+- **A1. One-time and package payments are silently dropped. DONE 2026-07-31,
+  `19449ad`, see the Done section. Findings above carried forward.**
   `stripe-webhook.js:142` returns early on `session.mode !== 'subscription'`.
   A 12-months-for-the-price-of-10 package sold as a one-off means the customer
   pays and the product provisions nothing, with no error anywhere. This is the
