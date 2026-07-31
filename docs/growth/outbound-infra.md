@@ -632,17 +632,24 @@ This is the exact-match .com for the brand. `getbrandgeo.com` exists because it
 was the available alternative, and the `get` prefix is the reason every asset
 has to say "getbrandgeo" where a reader would type "brandgeo".
 
-**Recommendation: not now, and this is not the S8 chat's call.** EUR 9,200 in
-the week before a sprint whose entire purpose is the first 100 paying customers
-is the wrong use of cash, and nothing in the outbound plan needs it. Marketplace
-asking prices are also usually negotiable, so 9,995 is a ceiling rather than a
-number.
+**STATUS: OPEN, deferred on funds. Constantin's ruling 2026-07-31: "keep this
+open, no funds available for now."** Not closed, not dropped, and not to be
+re-argued from scratch by a future session. Nothing in the outbound plan or the
+sprint depends on it, so the deferral costs nothing operationally.
 
-What is worth doing now, because it costs nothing: note that the risk is
-one-directional. The domain does not get cheaper if BrandGEO succeeds, and a
-competitor in this category buying it would be genuinely awkward. Revisit at the
-Day 30 close-out with real revenue on the table, or sooner if Atom shows the
-listing moving. Recorded here so it is not rediscovered at a worse moment.
+Why it stays open rather than closing: the risk is one-directional. The domain
+does not get cheaper if BrandGEO succeeds, and a competitor in this category
+buying it would be genuinely awkward. Marketplace asking prices also negotiate,
+so USD 9,995 is a ceiling rather than a number.
+
+**Revisit triggers**, any one of them, not a calendar reminder:
+
+1. The Day 30 sprint close-out, with real revenue on the table.
+2. The Atom listing changing (price drop, or gone, which is its own signal).
+3. Any competitor in the GEO category being seen on it.
+
+`trybrandgeo.com` is unaffected by all of this and needs no decision here. It
+was checked precisely so this purchase could stay optional.
 
 ---
 

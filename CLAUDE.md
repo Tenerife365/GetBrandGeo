@@ -86,8 +86,10 @@ the right answer for opted-in mail later (`mail.getbrandgeo.com`). **The name is
 `brandgeo.com` is for sale at USD 9,995** on Atom.com (`ns1/ns2.atom.com`, 302s
 to `atom.com/name/BrandGEO`). It is parked marketplace inventory, not an
 operating competitor, which is what makes `trybrandgeo.com` safe to use.
-Recommendation is to defer past the sprint, cash goes to acquisition first, and
-marketplace asking prices negotiate. Revisit at Day 30 close-out.
+**Constantin's ruling 2026-07-31: keep it OPEN, no funds available for now.**
+Deferred, not closed and not to be re-argued from scratch. Revisit triggers are
+the Day 30 close-out, the Atom listing changing, or any GEO competitor being
+seen on it. Nothing in the sprint depends on it.
 
 ### 2026-07-31: the acquisition funnel has a forward step, and payment has a gate
 
