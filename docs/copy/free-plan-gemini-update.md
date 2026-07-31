@@ -5,6 +5,30 @@ withholds sending anything to a real customer from the loop, and that line has
 not been overridden in writing. Constantin sends this, or authorises it
 explicitly.
 
+> **HELD 2026-07-31 by Constantin's ruling, and the reason is good enough to
+> record.** Do not send this until the Radar tier is genuinely live: published
+> on the marketing site, present in `planConfig.ts`, visible in the dashboard,
+> and buyable through Stripe checkout. Then send it with a SECOND button beside
+> "View your results", offering the upgrade.
+>
+> This resolves the open question in §1 the right way round. The draft teased a
+> cheaper tier with no price and no date because naming EUR 29 before the tier
+> existed would have been a promise we could not keep. Constantin's answer is
+> not to soften the copy, it is to **make the claim true before making it**, so
+> the email stops being an announcement about the future and becomes a working
+> upgrade path. It also converts far better: a tease invites a reply, a live
+> button invites a purchase.
+>
+> **Consequence for this deck:** the tier paragraph gets rewritten once the
+> price is real, the second CTA gets added, and the send waits on sprint tasks
+> S2 and S16. Everything else here (the Gemini claims, the re-run, the
+> signature, the reply-to) is verified and final.
+>
+> **Second standing rule, from the same instruction:** when this is sent, the
+> same message must also appear as a shortened notification inside the
+> recipient's dashboard. That applies to every customer email from now on, not
+> just this one. Design in `docs/arch/client-notifications.md` (S17).
+
 Audience today: **one recipient**, Ai Fy, the only live free account. Written so
 the same body works as a template the moment there are more (see the merge
 fields at the bottom, and motion D-5 in the sprint pack for the machinery).
