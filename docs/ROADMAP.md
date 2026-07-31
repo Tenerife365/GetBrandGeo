@@ -21,24 +21,44 @@ Nothing here blocks the loop. It works around these.
   `scripts/stripe-create-catalogue.js` does NOT pass the flag and is the file
   someone will copy from.
 
-- **A package sells a tier, not prompts.** `growth_pro` is **35** prompts,
-  identical to `growth` (`planConfig.ts:427`), and `prompt_limit_override` has
-  zero hits repo-wide. A "Growth PRO plus 200 prompts" offer would deliver 35.
-  Decide whether the founding-client offer includes extra prompts; if it does,
-  A2 §3.4 has to be built before it is sold.
+- ~~**A package sells a tier, not prompts.**~~ **DECIDED 2026-07-31 by
+  Constantin: skip it. Packages sell the tier as it stands, with no extra
+  prompts.** So `growth_pro` delivering **35** prompts, identical to `growth`
+  (`planConfig.ts:428`, verified), is the intended behaviour and not a defect to
+  work around. Consequence worth stating plainly, because it will come up the
+  first time anyone drafts the offer: **A2 §3.4 is not needed to sell a package**,
+  and no package copy may promise a prompt count above the tier's own. The
+  Growth to Growth PRO boundary still adds zero prompts, so the upsell has to be
+  argued on engines, sites and AI SEO depth, never on volume.
 
-- **Publish the askmywebsiteai config for both apps.** Vendor said they would
-  fix it 2026-07-31. Both apps are Live, scanned, domains verified, snippets
-  installed and the Cortex interview is complete for all 13 pages; the console
-  exposes no publish control and support has been contacted.
+- **Publish the askmywebsiteai config for both apps.** **Constantin 2026-07-31:
+  parked, handle later.** Still failing as of 10:09 that day: the endpoint
+  returns `{"error":"no published config"}`, so the vendor missed the date they
+  gave. Keeps blocking the SupportWidget retirement and the `JAMIE_RETIRED` flip
+  in the Carried-over section.
   `check: curl -s "https://app.askmywebsiteai.com/v1/apps/app_e9a0360bb6095088/config" -H "Origin: https://app.getbrandgeo.com" -H "x-public-key: pk_live_727b3cd724ff6e10ee345d9cb240f6f6" | grep -qv "no published config"`
 
-- **Refresh ChatGPT on prompt 6 for Bucate pe Roate.** ~EUR 0.11, the last stale
-  row. Withheld from the loop because it spends money (AUTONOMY §2).
+- ~~**Refresh ChatGPT on prompt 6 for Bucate pe Roate.**~~ **CLOSED 2026-07-31,
+  no action and no spend needed. It was already fresh.** Measured against
+  production rather than assumed: all six ACTIVE BpR prompts carry a `chatgpt`
+  row from 2026-07-30 11:57 to 11:58, and position 10 from 2026-07-31 06:46. The
+  stale 2026-07-07/09 `chatgpt` rows that prompted this item belong to prompts
+  172 and 177, both `is_active = false`, so they are not collected and not
+  displayed. **The lesson is the roadmap's own: a staleness claim about
+  production has to be measured against production.** Query used:
+  ```sql
+  select p.id, p.position, p.is_active,
+         max(r.checked_at) filter (where r.llm='chatgpt') as chatgpt_last
+  from prompts p join clients c on c.id = p.client_id
+  left join ai_results r on r.prompt_id = p.id
+  where c.slug = 'bpr' and p.is_active group by 1,2,3 order by p.position;
+  ```
 
-- **Authorize an error monitor** (Sentry or similar). The loop currently has no
-  way to discover a bug it did not itself cause. GitHub and Netlify connectors
-  are lower value but would replace polling. Supabase already works.
+- **Error monitor: AUTHORIZED 2026-07-31 by Constantin.** No longer a decision,
+  it is an action. The loop still has no way to discover a bug it did not itself
+  cause. Blocked only on the one step no agent can take: creating the account.
+  See the Sentry item in Stream B. GitHub and Netlify connectors are lower value
+  but would replace polling. Supabase already works.
 
 > **There is NO 14-day refund policy and no shortlist guarantee.** Both came
 > from TalentWeLove text pasted here by accident on 2026-07-30 and were briefly,
@@ -46,7 +66,18 @@ Nothing here blocks the loop. It works around these.
 > Do not write one into any contract, terms page or piece of copy. If a refund
 > policy is ever wanted it will arrive as its own decision from Constantin.
 
-- **Confirm the UTC offset.** Every schedule assumes Europe/Bucharest, UTC+3.
+- ~~**Confirm the UTC offset.**~~ **ANSWERED 2026-07-31, and the assumption was
+  wrong by two hours.** The machine is `GMT Standard Time` at `+01:00`, not
+  Europe/Bucharest UTC+3. **The night window is 19:00-06:00 UTC.** `AUTONOMY.md`
+  §3 is corrected. **The remaining action is on the schedules**: every entry in
+  `.claude/` was written against +3 and must be re-derived before
+  `brandgeo-night-cycle` is re-enabled, or two hours of each night cycle run
+  while Constantin is still monitoring.
+  The earlier `date +"%z"` command failed for him because it is a Unix builtin;
+  neither PowerShell nor CMD has it. The Windows equivalents are
+  `Get-Date -Format "yyyy-MM-dd HH:mm zzz"` and `(Get-TimeZone).Id` in
+  PowerShell, or `tzutil /g` in CMD.
+  `check: powershell -NoProfile -Command "(Get-TimeZone).Id"`
 
 ---
 
@@ -56,8 +87,23 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
 `db/`, `src/lib/planConfig.ts`. Owner `bg-backend` on Opus, reviewed by
 `bg-verify`. **day-only** throughout: this is billing.
 
-- **A1-S1. HIGH, gated. An existing subscriber who buys a package gets reverted
-  while Stripe keeps charging them.** The mirror of the leak A1 closed:
+> **STALE-ENTRY CORRECTION, 2026-07-31.** The four items immediately below
+> (S1, S6, S2/S3) read as open and are **all closed in `HEAD` by `3c3f003`**,
+> which this section was never updated to reflect. Verified by reading the code,
+> not the commit message: the subscription-liveness guard is at
+> [expire-plan-grants.js:95](../brandgeo-dashboard/netlify/functions/expire-plan-grants.js),
+> keyed on `stripe_subscription_id` rather than on `plan_source`, and the
+> harness fixtures it in section 7. `node brandgeo-dashboard/tests/package_provisioning.test.js`
+> prints **63 checks passed, exit 0**.
+>
+> This is the exact shape of the wasted cycle on 2026-07-29: a prose backlog
+> entry believed over `git log`. Left in place rather than deleted, because the
+> reasoning is still the record of why the code looks the way it does. **Do not
+> rebuild any of them.** Only A1-S2-tier below is genuinely unbuilt.
+
+- **A1-S1. CLOSED by `3c3f003`.** ~~HIGH, gated. An existing subscriber who buys
+  a package gets reverted while Stripe keeps charging them.~~ The mirror of the
+  leak A1 closed:
   `stripe-webhook.js:287` sets `plan_source='package'` while `:288` deliberately
   preserves `stripe_subscription_id`, so `expire-plan-grants.js:69-72` later
   drops a paying customer to Free and emails them a lapse notice. The code's own
@@ -282,7 +328,11 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
 Scope: `brandgeo-dashboard/src/components/`, `brandgeo/web/*.html`,
 `brandgeo/web/site.js`. Owner `bg-app` + `bg-web`. Mostly **night-safe**.
 
-- **B1a. AuditReport's logo points at `/audit`**, not at either home. Every
+- **B1a. CLOSED by `14e0b26`, verified 2026-07-31.** `AuditReport.tsx:134` now
+  reads `href="https://getbrandgeo.com"`, which is the landing-page answer the
+  item asked for. The check passes. Listed as open here for a day longer than it
+  was true; same stale-entry problem as Stream A above.
+  ~~AuditReport's logo points at `/audit`~~, not at either home. Every
   other call site resolves to the dashboard root or to getbrandgeo.com. Decide
   which is correct: if a report is viewed by someone who has not entered the
   dashboard, the rule says landing page, but `/audit` may be the intended
@@ -294,6 +344,18 @@ Scope: `brandgeo-dashboard/src/components/`, `brandgeo/web/*.html`,
   marketing 404 or vice versa. Includes the footer, support, privacy and terms
   links that the retiring Jamie widget points at.
   `check: bash scripts/check-links.sh`
+
+- **B4. Error monitor. AUTHORIZED 2026-07-31.** Split so the loop does the part
+  it can and Constantin does only the part no agent can: wire `@sentry/react`
+  into the dashboard behind `VITE_SENTRY_DSN`, inert when the var is absent, so
+  the moment a DSN is pasted into Netlify it starts reporting and nothing
+  changes until then. Creating the account is the human step (AUTONOMY §2:
+  anything behind a login the agent does not hold). Do NOT commit a DSN; it goes
+  in Netlify env only.
+  Sample rate matters here: default to `tracesSampleRate: 0` and errors only, so
+  this is an error monitor and not a performance bill.
+  Scope: `brandgeo-dashboard/src/main.tsx`, `package.json`.
+  `check: grep -q "VITE_SENTRY_DSN" brandgeo-dashboard/src/main.tsx`
 
 - **B3. Verify the greeting clock.** The dashboard rendered "Good evening" at
   roughly 11:30 local on 2026-07-30. Either the greeting uses UTC while claiming
@@ -349,6 +411,26 @@ Full context for each is in `CLAUDE.md`. Listed here so the loop can see them.
 ## Done
 
 Items land here only with a passing check command and the date it passed.
+
+- **Dashboard UI/UX audit fixes shipped.** Passed 2026-07-31, `46b92fc`. Nine
+  source files had been sitting uncommitted on disk since 2026-07-30, so
+  production served none of them. **Third instance in three days of the same
+  failure: work that exists and never reaches production.** Found by running
+  `git status` while reporting queue state, not by any check, because no check
+  covered it.
+  What shipped: one value, slate-500 `rgb(100 116 139)`, was causing 55 of the
+  56 light-mode contrast failures across all 11 routes; light-mode hover was
+  dead by specificity on 131 measured elements including both destructive-delete
+  cues; touch targets raised to WCAG 2.2 SC 2.5.8 behind a coarse-pointer query
+  rather than a width breakpoint; and empty states now name what is absent
+  instead of rendering a bare em dash, one of which measured 1.72:1 and was the
+  last dark-mode contrast failure in the app.
+  ```
+  npx tsc --noEmit   exit 0
+  npm run build      exit 0, 2799 modules, built in 6.86s
+  ```
+  Evidence committed alongside: `docs/qa/dashboard-uiux-audit-2026-07-30.md`
+  and `docs/qa/dashboard-fix-brief-2026-07-30.md`.
 
 - **B1. Every logo returns to the right home.** Passed 2026-07-31, `b130bf6`.
   Four pre-login pages rendered `<BrandGeoMark>` with neither `to=` nor `href=`,

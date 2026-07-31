@@ -95,9 +95,24 @@ the item to the day queue and moves on. It never escalates its own permissions.
 schema, public copy, anything customer-facing, and anything the night cycle
 parked. Constantin is reachable, so an agent may ask.
 
-Cron is UTC. **Assumed offset: Europe/Bucharest, UTC+3 in summer** — so the
-night window is 17:00-04:00 UTC. Correct this if the offset is wrong; every
-schedule in `.claude/` depends on it.
+Cron is UTC. **CONFIRMED 2026-07-31, and the earlier assumption was wrong by two
+hours.** The machine reports `GMT Standard Time`, offset `+01:00` (BST), not
+Europe/Bucharest UTC+3:
+
+```
+Get-Date -Format "yyyy-MM-dd HH:mm zzz"   ->  2026-07-31 10:15 +01:00
+(Get-TimeZone).Id                         ->  GMT Standard Time
+```
+
+**So the night window is 19:00-06:00 UTC, not 17:00-04:00.** Every schedule in
+`.claude/` was written against the wrong offset and has to be re-derived before
+`brandgeo-night-cycle` is re-enabled, or the first two hours of each night cycle
+run while Constantin is still monitoring and the last two run past his morning.
+This is the same offset error that made cycle 1 believe 07:19 was evening.
+
+Note the offset is read from the machine, which is on London time. If Constantin
+is physically on a different clock, the machine is what cron follows regardless,
+so re-derive from the machine and not from where he happens to be.
 
 ---
 
