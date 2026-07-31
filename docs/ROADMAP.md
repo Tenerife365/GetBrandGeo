@@ -476,6 +476,18 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
   the visitor forward with their domain
   ```
 
+> **UPDATE, later on 2026-07-31: the links WERE rotated.** Constantin authorized
+> it. Six new payment links now exist against the same prices (no price, amount,
+> currency or metadata.plan changed), the new URLs are in `STRIPE_CHECKOUT_LINKS`
+> on Netlify, and `_terms_gate.js` reads them from there with no fallback.
+> **Two things are still owed and they are sequenced:** `ff7cae3` had not
+> deployed 15 minutes after the push (Netlify still on `31f8dc0`), so the live
+> gate still issues the OLD links, and **the old links must NOT be deactivated
+> until that deploy lands** or every buyer hits a dead page. Procedure, the
+> verification command, and the cleanup: `docs/qa/s3-e2e-payment-test-2026-07-31.md`.
+> Until the old links are deactivated the exposure is still open, because they
+> remain payable and are still in git history.
+
 - **C3. PARTLY DONE 2026-07-31, and the remaining half is Constantin's.**
   Read the caveat at the end of this item before recording it as closed.
   **The gate works on the ROUTE, not on the DESTINATION.** `bg-verify` found this
