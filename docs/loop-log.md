@@ -70,3 +70,50 @@ Carried forward, third instance in one day of the same failure shape:
 4. **The reviewer could not check its own scope.** `bg-verify` runs no git, so
    it could not confirm which files actually changed. The orchestrator must
    close that gap with `git status` every time, not assume the builder's list.
+
+---
+
+## 2026-07-31 10:0x-11:1x — cycle 3 (day window, attended)
+
+**Attempted:** prior-cycle re-checks, the uncommitted dashboard work, roadmap
+correction, C1.
+**Checks passed:** 6. **Checks failed:** 1 (askmywebsiteai, vendor side).
+**Commits:** `46b92fc`, `67a3cf4`, plus this one.
+
+Prior claims all still hold: `check-logo-links.sh` 0, the A1 webhook guard 0,
+the package harness 63 checks 0.
+
+**Nine dashboard files had been sitting uncommitted since 2026-07-30**, so
+production served none of the light-mode contrast work. Found by running
+`git status` while reporting queue state, not by any check, because no check
+covers it. Shipped as `46b92fc` and verified live by md5 against the served
+bundle, not by trusting Netlify.
+
+**Four roadmap entries claimed open work that was already done** (A1-S1/S6/S2/S3
+by `3c3f003`, B1a by `14e0b26`). That is the 2026-07-29 wasted-cycle shape,
+regrown in two streams inside four days. Corrected in place rather than deleted.
+
+**The UTC offset was wrong by two hours.** The machine is `+01:00` GMT Standard
+Time, not Europe/Bucharest `+03:00`. Night window is 19:00-06:00 UTC. Every
+schedule in `.claude/` needs re-deriving before the night cycle is re-enabled.
+
+**C1 found the acquisition funnel does not connect.** The full audit report is
+built, deployed, working and unreachable: no email is ever sent, and the widget
+does not link to the report it just unlocked. `redirectToSignup` is called only
+on the FAILURE path, so a failing audit converts better than a succeeding one.
+Zero real leads in 22 days; the only lead row is BrandGEO auditing itself.
+
+Carried forward:
+
+5. **A staleness claim about production must be measured against production.**
+   The BpR ChatGPT refresh was closed with no spend: every active prompt was
+   already fresh, and the stale rows belonged to two inactive prompts. Two
+   NEEDS CONSTANTIN items dissolved on measurement this cycle rather than being
+   worked.
+6. **Report what the code does, not what the item says it does.** C1's premise
+   named a "Book a call" CTA that does not exist anywhere in the repo. The
+   conclusion drawn from it was still correct, which is exactly why inheriting
+   the detail would have been easy and wrong.
+
+**NEEDS CONSTANTIN:** re-derive the `.claude/` schedules for +01:00; create the
+Sentry account so B4 can be wired; say whether the C1a handover fix ships today.

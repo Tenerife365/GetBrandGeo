@@ -370,11 +370,45 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
 `Onboard.tsx`. Owner `landing-page-optimizer` then `bg-copy` then `bg-app`.
 **day-only** from C2 onward: it is customer-facing copy and money.
 
-- **C1. Audit the funnel end to end and write it down.** Landing, audit run,
-  results, and what the visitor can actually do next. Constantin's finding: at
-  the results step the only call to action is Book a call. There is no way to
-  accept and proceed. Produce evidence, not impressions.
+- **C1. DONE 2026-07-31**, `docs/qa/acquisition-funnel-audit.md`, check passes.
+  Findings C1a to C1c below are what it produced and they outrank the rest of
+  this stream. Constantin's conclusion held; his label did not. The string "Book
+  a call" does not exist anywhere in the repo. The results step's CTA is an email
+  form. There is still no way to accept and proceed, and the real defect is worse
+  than a wrong CTA, see C1a.
   `check: test -f docs/qa/acquisition-funnel-audit.md`
+
+- **C1a. CRITICAL. The full report is built, deployed, working and unreachable,
+  and the visitor is told to check an inbox that never receives anything.**
+  Two defects, one fix ordering. `unlock-audit-report.js` sends no email: the
+  five files that touch a mailer and the eight that touch a prospect audit are
+  disjoint sets, verified. Meanwhile `site.js:298` promises "Check your inbox,
+  the full AI Visibility report is on its way." The report itself is fine and
+  live at `/audit/:token` (`App.tsx:106`), already unlocked at that moment, and
+  the token is already in the unlock response (`unlock-audit-report.js:63`).
+  **Fix the handover first, it is nearly one line, then decide about the email.**
+  Sending the visitor to their report also makes honest interim copy trivial.
+  Scope: `brandgeo/web/site.js`. **day-only**, customer-facing copy.
+  `check: grep -q "app.getbrandgeo.com/audit/" brandgeo/web/site.js`
+
+- **C1b. HIGH. The funnel is inverted: failing converts better than succeeding.**
+  `redirectToSignup()` (`site.js:95`) is called from exactly one place,
+  `site.js:387`, the **error** handler. A visitor whose audit fails is carried to
+  `signup?domain=` prefilled in one hop. A visitor whose audit succeeds gets an
+  email form and a dead end. Nobody chose this; it is what remains when the
+  success path was never finished. Folds naturally into C2.
+  Also `site.js:297` wipes the score card the visitor is looking at and replaces
+  it with one sentence, so paying with an email makes their screen emptier.
+
+- **C1c. MEDIUM. HubSpot has never received a lead, and records no reason.**
+  The only `prospect_leads` row has `hubspot_synced = false`, no contact id, and
+  no error text, which is indistinguishable from success at a glance. Same shape
+  as the `job_runs.ok` finding already carried below. Needs someone who can read
+  the Netlify env to say whether `HUBSPOT_API_KEY` is set at all; that is
+  withheld from the loop.
+  **Context for all three: zero real leads in 22 days.** 58 audits, 55 of them
+  BrandGEO's own internal prospecting. Three members of the public have ever run
+  one, and the single lead row is BrandGEO auditing its own domain.
 
 - **C2. Add "accept and continue" alongside Book a call**, leading to a company
   details step that collects what onboarding actually needs.
