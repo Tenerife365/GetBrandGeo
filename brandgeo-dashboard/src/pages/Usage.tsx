@@ -77,6 +77,62 @@ interface ClientUsage {
   totalResponses: number
   totalCost: number       // real metered spend: sum(cost_eur), flat estimate only for legacy rows
   estimatedResponses: number  // rows with a NULL cost_eur (pre-metering) — counted via flat estimate
+  internal?: boolean      // our own spend, not a customer's. See RESEARCH_ROW_ID.
+}
+
+/**
+ * Synthetic client id for the collapsed research row. Negative so it can never
+ * collide with a real clients.id (serial, always positive), which matters
+ * because it is used as a React key alongside real ids.
+ */
+const RESEARCH_ROW_ID = -1
+
+/**
+ * Collapse every `category = 'research'` client into one row.
+ *
+ * There are 27 of these, one per city study, and they drowned the eight real
+ * customers in the table. They are also not customers: we trigger every one of
+ * those runs ourselves, so per-city lines answer a question nobody asks, while
+ * the question that IS asked, "what does research cost us in total", could only
+ * be got by adding 27 numbers by hand.
+ *
+ * Done as a derivation over the already-fetched rows rather than inside the
+ * query, deliberately. The load effect does not depend on `clients` (it keys
+ * off isAdmin and timeRange), so a client list that arrives after the usage
+ * data would have produced a table with the grouping silently not applied.
+ * Deriving here means the grouping is always consistent with whatever client
+ * list is currently loaded, and no refetch is needed when it changes.
+ *
+ * Cost is untouched: the collapsed row sums its members exactly, so the table
+ * total is the same number before and after grouping.
+ */
+function collapseResearch(rows: ClientUsage[], clients: { id: number; category?: string | null }[]): ClientUsage[] {
+  const researchIds = new Set(clients.filter(c => c.category === 'research').map(c => c.id))
+  if (researchIds.size === 0) return rows
+
+  const research = rows.filter(r => researchIds.has(r.clientId))
+  if (research.length === 0) return rows
+
+  const merged: ClientUsage = {
+    clientId: RESEARCH_ROW_ID,
+    clientName: `Research (${research.length} ${research.length === 1 ? 'city' : 'cities'})`,
+    byEngine: {},
+    totalResponses: 0,
+    totalCost: 0,
+    estimatedResponses: 0,
+    internal: true,
+  }
+  for (const r of research) {
+    for (const [engine, n] of Object.entries(r.byEngine)) {
+      merged.byEngine[engine] = (merged.byEngine[engine] ?? 0) + n
+    }
+    merged.totalResponses += r.totalResponses
+    merged.totalCost += r.totalCost
+    merged.estimatedResponses += r.estimatedResponses
+  }
+
+  return [...rows.filter(r => !researchIds.has(r.clientId)), merged]
+    .sort((a, b) => b.totalCost - a.totalCost)
 }
 
 export default function Usage() {
@@ -146,9 +202,23 @@ export default function Usage() {
     </div>
   )
 
-  const grandTotal     = rows.reduce((s, r) => s + r.totalCost, 0)
-  const grandResponses = rows.reduce((s, r) => s + r.totalResponses, 0)
-  const grandEstimated = rows.reduce((s, r) => s + r.estimatedResponses, 0)
+  // What the table shows: research collapsed to one line. Totals are computed
+  // from THIS list, not from `rows`, so the footer always sums the rows above
+  // it. The two are equal by construction today; computing from what is
+  // rendered keeps that true if the grouping ever changes.
+  const displayRows = collapseResearch(rows, clients)
+
+  const grandTotal     = displayRows.reduce((s, r) => s + r.totalCost, 0)
+  const grandResponses = displayRows.reduce((s, r) => s + r.totalResponses, 0)
+  const grandEstimated = displayRows.reduce((s, r) => s + r.estimatedResponses, 0)
+
+  // The average card covers CUSTOMERS only. Including the collapsed research
+  // row would divide our own internal spend across a client count it is not
+  // part of, and the number would silently have changed meaning the moment the
+  // grouping landed. Research is reported as its own figure below instead.
+  const customerRows      = displayRows.filter(r => !r.internal)
+  const customerTotal     = customerRows.reduce((s, r) => s + r.totalCost, 0)
+  const researchTotal     = displayRows.filter(r => r.internal).reduce((s, r) => s + r.totalCost, 0)
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
@@ -191,10 +261,21 @@ export default function Usage() {
             <TrendingUp size={15} className="text-brand-400" />
             <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
           </div>
-          <div className="text-2xl font-bold text-white tabular-nums">
-            {rows.length > 0 ? `€${(grandTotal / rows.length).toFixed(2)}` : '—'}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">{rows.length} active client{rows.length !== 1 ? 's' : ''}</p>
+          {/* No clients is an absence, not a dash glyph. Kept in an h-8 box so
+              this card's baseline still lines up with the two beside it. */}
+          {customerRows.length > 0
+            ? <div className="text-2xl font-bold text-white tabular-nums">
+                €{(customerTotal / customerRows.length).toFixed(2)}
+              </div>
+            : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">
+                No clients yet
+              </div>}
+          <p className="text-xs text-slate-500 mt-1">
+            {customerRows.length} client{customerRows.length !== 1 ? 's' : ''}
+            {researchTotal > 0 && (
+              <>, plus €{researchTotal.toFixed(2)} research</>
+            )}
+          </p>
         </div>
       </div>
 
@@ -206,7 +287,7 @@ export default function Usage() {
 
         {loading ? (
           <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
-        ) : rows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
         ) : (
           <div className="overflow-x-auto">
@@ -227,9 +308,21 @@ export default function Usage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {displayRows.map(r => (
                   <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
-                    <td className="px-4 py-3 font-medium text-slate-200">{r.clientName}</td>
+                    <td className="px-4 py-3 font-medium text-slate-200">
+                      <span className="inline-flex items-center gap-2 flex-wrap">
+                        {r.clientName}
+                        {/* Says why this row is not a customer. Without it the
+                            collapsed line reads as one more account and quietly
+                            inflates the client count in the reader's head. */}
+                        {r.internal && (
+                          <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-dark-700 text-slate-400 border border-dark-600">
+                            Internal
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-3 py-3 text-center text-slate-400 tabular-nums">{r.totalResponses}</td>
                     {Object.keys(ENGINE_COST).map(e => (
                       <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
@@ -248,7 +341,7 @@ export default function Usage() {
                   <td className="px-3 py-3 text-center font-semibold text-slate-300 tabular-nums">{grandResponses}</td>
                   {Object.keys(ENGINE_COST).map(e => (
                     <td key={e} className="px-3 py-3 text-center text-slate-400 tabular-nums">
-                      {rows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
+                      {displayRows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</td>
@@ -273,7 +366,7 @@ export default function Usage() {
         </div>
         <p className="text-xs text-slate-600 mt-2">
           EUR, API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Estimates from
-          published rate cards, not invoices — Gemini is the least certain (billed per search query).
+          published rate cards, not invoices. Gemini is the least certain (billed per search query).
         </p>
       </div>
     </div>
