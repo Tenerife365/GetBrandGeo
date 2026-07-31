@@ -35,7 +35,7 @@
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const { createClient } = require('@supabase/supabase-js')
-const { recordAdminEvent } = require('./_admin_notify')
+const { recordAdminEvent, clientLabel } = require('./_admin_notify')
 const { PLAN_LABELS } = require('./_plans')
 const {
   SELF_SERVE_PLANS,
@@ -581,7 +581,10 @@ async function handleSubscriptionUpdated(sub, log) {
     .from('clients')
     .update({ plan, stripe_subscription_id: sub.id })
     .eq('stripe_customer_id', custId)
-    .select('id')
+    // `name` is selected ONLY so the admin notification can say which client
+    // this was. An admin reading "A client's subscription changed" has to go
+    // hunting; the whole point of the bell is to remove that step.
+    .select('id, name')
   if (error) throw new Error(`clients update failed: ${error.message}`)
 
   if (!data || data.length === 0) {
@@ -594,8 +597,9 @@ async function handleSubscriptionUpdated(sub, log) {
   for (const row of data) {
     await recordAdminEvent(supabase, {
       type: 'subscription_changed', client_id: row.id,
-      title: `Subscription changed to ${PLAN_LABELS[plan] || plan}`,
-      body: `A client's subscription changed to ${PLAN_LABELS[plan] || plan}.`, meta: { plan, cust: custId },
+      title: `Subscription changed to ${PLAN_LABELS[plan] || plan}: ${clientLabel(row)}`,
+      body: `${clientLabel(row)} changed to ${PLAN_LABELS[plan] || plan}.`,
+      meta: { plan, cust: custId, client_name: row.name || null },
     })
   }
 }
@@ -628,7 +632,9 @@ async function handleSubscriptionDeleted(sub, log) {
 
   const { data: rows, error: selErr } = await supabase
     .from('clients')
-    .select('id, plan, plan_source, plan_grant_until')
+    // `name`: see the note on the subscription.updated select above. Both
+    // cancellation notices below name the client.
+    .select('id, name, plan, plan_source, plan_grant_until')
     .eq('stripe_customer_id', custId)
   if (selErr) throw new Error(`clients lookup failed: ${selErr.message}`)
 
@@ -655,10 +661,11 @@ async function handleSubscriptionDeleted(sub, log) {
       log(`subscription.deleted: client ${row.id} keeps ${row.plan} — paid package runs to ${row.plan_grant_until}`)
       await recordAdminEvent(supabase, {
         type: 'subscription_canceled', client_id: row.id,
-        title: 'Subscription canceled, paid package kept',
-        body: `A client canceled their subscription but holds a paid package on ${PLAN_LABELS[row.plan] || row.plan} `
-            + `until ${row.plan_grant_until}. They were NOT downgraded to Free; the package expires on its own date.`,
-        meta: { cust: custId, plan: row.plan, plan_grant_until: row.plan_grant_until, downgraded: false },
+        title: `Subscription canceled, paid package kept: ${clientLabel(row)}`,
+        body: `${clientLabel(row)} canceled their subscription but holds a paid package on `
+            + `${PLAN_LABELS[row.plan] || row.plan} until ${row.plan_grant_until}. They were NOT downgraded to `
+            + `Free; the package expires on its own date.`,
+        meta: { cust: custId, plan: row.plan, plan_grant_until: row.plan_grant_until, downgraded: false, client_name: row.name || null },
       })
       continue
     }
@@ -666,8 +673,9 @@ async function handleSubscriptionDeleted(sub, log) {
     log(`subscription.deleted: client ${row.id} downgraded to free`)
     await recordAdminEvent(supabase, {
       type: 'subscription_canceled', client_id: row.id,
-      title: 'Subscription canceled', body: 'A client canceled and was downgraded to Free.',
-      meta: { cust: custId, downgraded: true },
+      title: `Subscription canceled: ${clientLabel(row)}`,
+      body: `${clientLabel(row)} canceled and was downgraded to Free.`,
+      meta: { cust: custId, downgraded: true, client_name: row.name || null },
     })
   }
 }

@@ -21,6 +21,21 @@ const { sendBrandedEmail, APP_URL } = require('./_email');
 // this default does nothing.
 const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'support@getbrandgeo.com';
 
+// How a client is named in an admin notification. One implementation, because
+// this was already open-coded as `c.name || \`client ${c.id}\`` in
+// expire-plan-grants.js while stripe-webhook.js said "A client" and named
+// nobody at all. An admin reading "A client canceled" has to go and find out
+// which one, which is exactly the work the bell exists to remove.
+//
+// Falls back to the id rather than to a friendly noun on purpose: "client 26"
+// is still actionable (it is the row id, and the notification links to it),
+// whereas "a client" is not. Pass any row that has id and, ideally, name.
+function clientLabel(row) {
+  if (!row) return 'A client'
+  const name = typeof row.name === 'string' ? row.name.trim() : ''
+  return name || `Client ${row.id}`
+}
+
 // supabase: a service-role client (bypasses RLS to insert the feed row).
 // email: also send the admin an email (default true) — use false for events that
 //        already send their own summary (e.g. the expiry job).
@@ -45,4 +60,4 @@ async function recordAdminEvent(supabase, { type, client_id = null, title, body 
   }
 }
 
-module.exports = { recordAdminEvent, ADMIN_ALERT_EMAIL };
+module.exports = { recordAdminEvent, clientLabel, ADMIN_ALERT_EMAIL };

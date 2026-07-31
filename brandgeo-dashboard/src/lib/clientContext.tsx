@@ -218,10 +218,30 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  /**
+   * Switch the active client.
+   *
+   * Refuses an id that is not in the loaded list instead of switching to it.
+   * The old behaviour was `clients.find(...) ?? null` followed by
+   * setActiveClient(found), so an unknown id set activeClient to NULL while
+   * leaving activeClientId pointing at it, and every consumer that reads
+   * activeClient (Account, the engine derivations above) rendered an empty
+   * shell. It also persisted the bad id to localStorage, so the next reload
+   * started from it too.
+   *
+   * Unknown ids are reachable: AdminBell links a notification to its client_id,
+   * and that client may since have been deleted. Callers should check
+   * membership themselves where they can show a better message; this is the
+   * backstop that keeps a bad id from emptying the whole app.
+   */
   const setActiveClientId = (id: number) => {
+    const found = clients.find(c => c.id === id)
+    if (!found) {
+      console.warn(`[ClientCtx] ignoring switch to unknown client ${id}`)
+      return
+    }
     localStorage.setItem('brandgeo_client', String(id))
     setActiveClientIdState(id)
-    const found = clients.find(c => c.id === id) ?? null
     setActiveClient(found)
   }
 

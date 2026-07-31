@@ -6,7 +6,7 @@
  * stripe-webhook.js and expire-plan-grants.js.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, Check, X, UserPlus, CreditCard, CalendarX, RefreshCw } from 'lucide-react'
+import { Bell, Check, X, UserPlus, CreditCard, CalendarX, RefreshCw, Building2, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -39,7 +39,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function AdminBell() {
-  const { isAdmin, setActiveClientId } = useClient()
+  const { isAdmin, clients, activeClientId, setActiveClientId } = useClient()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<AdminNotification[]>([])
@@ -88,13 +88,47 @@ export default function AdminBell() {
     await supabase.from('admin_notifications').update({ read_at: now }).is('read_at', null)
   }
 
+  /**
+   * The client a notification is about, resolved at RENDER time from the loaded
+   * client list rather than from the stored text.
+   *
+   * This is deliberately not "trust n.body". Three rows already in production
+   * say only "A client canceled and was downgraded to Free", because
+   * stripe-webhook.js never selected `name`. Those rows cannot be rewritten
+   * retroactively, and the next call site that forgets will produce more. The
+   * bell holds the client list already, so it can always answer "which client"
+   * from client_id, whatever the body says.
+   *
+   * Returns null for a notification with no client (nothing to name) and
+   * 'deleted' for one whose client no longer exists, which is a real case:
+   * delete-client.js writes a notification about the client it just deleted.
+   */
+  const clientFor = (n: AdminNotification): { name: string; gone: boolean } | null => {
+    if (!n.client_id) return null
+    const hit = clients.find(c => c.id === n.client_id)
+    if (hit) return { name: hit.name, gone: false }
+    const fromMeta = typeof n.meta?.client_name === 'string' ? n.meta.client_name : ''
+    return { name: fromMeta || `Client ${n.client_id}`, gone: true }
+  }
+
   const openItem = (n: AdminNotification) => {
     if (!n.read_at) {
       const now = new Date().toISOString()
       setItems(prev => prev.map(x => (x.id === n.id ? { ...x, read_at: now } : x)))
       supabase.from('admin_notifications').update({ read_at: now }).eq('id', n.id)
     }
-    if (n.client_id) { setActiveClientId(n.client_id); navigate('/account') }
+    // Only switch to a client that actually exists in the loaded list. Calling
+    // setActiveClientId with an unknown id sets activeClient to null (see
+    // clientContext), which renders /account as a blank shell and looks like
+    // the click silently failed.
+    const known = n.client_id != null && clients.some(c => c.id === n.client_id)
+    if (known) {
+      // Set the client first, then navigate. Both are React state updates in
+      // the same handler, so they batch and /account renders once, already on
+      // the right client.
+      if (n.client_id !== activeClientId) setActiveClientId(n.client_id as number)
+      navigate('/account')
+    }
     setOpen(false)
   }
 
@@ -141,11 +175,17 @@ export default function AdminBell() {
             )}
             {items.map(n => {
               const Icon = ICON[n.type] ?? Bell
+              const who = clientFor(n)
+              const canOpen = !!who && !who.gone
               return (
                 <button
                   key={n.id}
                   onClick={() => openItem(n)}
-                  className={`w-full text-left px-4 py-3 border-b border-dark-700/60 hover:bg-dark-700/50 transition-colors flex gap-3 ${n.read_at ? 'opacity-60' : ''}`}
+                  disabled={!canOpen}
+                  title={canOpen ? `Open ${who.name}` : undefined}
+                  className={`w-full text-left px-4 py-3 border-b border-dark-700/60 transition-colors flex gap-3 ${
+                    canOpen ? 'hover:bg-dark-700/50 cursor-pointer' : 'cursor-default'
+                  } ${n.read_at ? 'opacity-60' : ''}`}
                 >
                   <Icon size={16} className={`shrink-0 mt-0.5 ${n.read_at ? 'text-slate-500' : 'text-brand-300'}`} />
                   <span className="min-w-0 flex-1">
@@ -154,6 +194,21 @@ export default function AdminBell() {
                       {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />}
                     </span>
                     {n.body && <span className="block text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</span>}
+                    {/* Which client, always, resolved from client_id rather than
+                        from the body text. This is the line that makes a row
+                        actionable, so it sits above the timestamp and is not
+                        dimmed to slate-600 the way the timestamp is. */}
+                    {who && (
+                      <span className="flex items-center gap-1.5 mt-1.5 text-[11px] min-w-0">
+                        <Building2 size={11} className="shrink-0 text-slate-500" />
+                        <span className={`truncate font-medium ${who.gone ? 'text-slate-500 italic' : 'text-brand-300'}`}>
+                          {who.name}
+                        </span>
+                        {who.gone
+                          ? <span className="text-slate-500 shrink-0">(deleted)</span>
+                          : <ArrowRight size={11} className="shrink-0 text-slate-500" />}
+                      </span>
+                    )}
                     <span className="block text-[10px] text-slate-600 mt-1">{timeAgo(n.created_at)}</span>
                   </span>
                 </button>
