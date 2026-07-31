@@ -90,6 +90,27 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   single highest-risk item on the board and it is live today.
   `check: node -e "const s=require('fs').readFileSync('brandgeo-dashboard/netlify/functions/stripe-webhook.js','utf8'); process.exit(/mode !== 'subscription'/.test(s) && !/mode === 'payment'/.test(s) ? 1 : 0)"`
 
+- **A6. A client can always see their own plan limits and consumption.**
+  Constantin, 2026-07-31. Today they cannot see either: `/usage` is the admin
+  cost estimator and renders "Access restricted to admins." for a viewer
+  (`Usage.tsx:142`), and limits surface only incidentally on AIVisibility and
+  Prompts. There is no client-facing view of what they are entitled to or how
+  much of it they have used.
+  **The load-bearing constraint, and the reason this is not just "unhide
+  /usage": that page shows BrandGEO's API cost in euros.** Usage.tsx is a
+  margin instrument, with an `OVERHEAD_MULTIPLIER` in it. Showing a client that
+  their EUR 299 plan consumed EUR 4 of API spend hands them our gross margin
+  and reframes the product as a metered reseller. Consumption must be expressed
+  in units the client bought: prompts tracked against their allowance, engines
+  active on their plan, collection runs used and remaining, time until the next
+  refresh is available. Never in euros of cost, and never as a percentage of a
+  cost budget, which is the same disclosure wearing a hat.
+  This also raises the stakes on the open PLAN_PROMPTS decision below: a limit
+  shown to a customer had better be the limit actually applied.
+  Sequence: `bg-strategy` on what may be disclosed, then `bg-design`, then
+  `bg-app`. Not a lone build.
+  `check: test -f docs/design/client-plan-usage.md`
+
 - **A5. Admin can grant bonus prompts and bonus collection credits per account.**
   Constantin, 2026-07-31: the founding-client package does NOT bundle prompts,
   but an admin should be able to open any account and hand out extra prompts as
