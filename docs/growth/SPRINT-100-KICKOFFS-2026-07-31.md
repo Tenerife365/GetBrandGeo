@@ -54,7 +54,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 |---|---|---|---|---|
 | S1 | Ladder ruling: Radar tier, prompt rebalance, inversion | bg-strategy + Constantin | day | **IN PROGRESS** (chat `S1 · Ladder ruling`, 2026-07-31); decision 4 already DECIDED in 67a3cf4 |
 | S2 | Build the ruled ladder end to end | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 |
-| S3 | Funnel accept path (roadmap C1, C2, C3) | optimizer, bg-copy, bg-app, bg-verify | day | stage 1 DONE (eff8d9e); **C1a SHIPPED LIVE `ceb3596`, md5-verified on getbrandgeo.com**; C2, C3 OPEN |
+| S3 | Funnel accept path (roadmap C1, C2, C3) | optimizer, bg-copy, bg-app, bg-verify | day | **IN PROGRESS 2026-07-31**: C1 (eff8d9e), C1a (`ceb3596`, live), C1b, C1c and **C2 + C3 all built, both check scripts exit 0, migrations applied to production**. F1 is OPEN BY DECISION (on-screen delivery, no audit email this sprint). Remaining: deploy, then the one authorized live audit run |
 | S4 | First-run truth: zero-data states | bg-app | day | OPEN, narrowed; read 46b92fc first |
 | S5 | Research pages feed the audit funnel | bg-web | day | OPEN |
 | S6 | Evidence Machine | scripts, founder-run | day | OPEN |

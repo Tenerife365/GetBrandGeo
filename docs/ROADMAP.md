@@ -410,19 +410,64 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
   BrandGEO's own internal prospecting. Three members of the public have ever run
   one, and the single lead row is BrandGEO auditing its own domain.
 
-- **C2. Add "accept and continue" alongside Book a call**, leading to a company
-  details step that collects what onboarding actually needs.
-  `check: bash scripts/check-funnel-accept-path.sh`
+- **C1b. DONE 2026-07-31**, shipped with C2 below. The success path now offers
+  the forward step the error path always had. It sits on the RESULT card, beside
+  the report CTA, and not inside the unlock-success block, because that block
+  navigates to the report after 900ms and anything rendered next to it is gone
+  before it can be read.
 
-- **C3. Payment gated behind the contract.** On the final step the Stripe
-  payment must be unreachable until the visitor has either opened and accepted
-  the contract or ticked an explicit "I have read and accept" box. A link to the
-  existing `terms.html` sits on the same page.
-  The gate must be enforced server-side too, not only by a disabled button, or
-  it is decorative.
-  **Invent no commercial terms here.** Link the terms page that exists; do not
-  author guarantees, refund windows or SLAs. See the note under NEEDS CONSTANTIN.
-  `check: bash scripts/check-contract-gate.sh`
+- **C1c. DONE 2026-07-31**, in the half that was code. `HUBSPOT_API_KEY` is NOT
+  set on the dashboard site (Constantin confirmed, 2026-07-31), so the answer to
+  "unset key or failed push" is the first. A failed push now records its reason
+  on the `prospect_leads` row (`hubspot_error`), which is the part the audit
+  called "itself the defect": a silent `false` was indistinguishable from
+  success. `_hubspot.js` had always returned that reason and
+  `unlock-audit-report.js` discarded it.
+  **Still needs Constantin:** set `HUBSPOT_API_KEY` in Netlify. Until then every
+  new lead records `not_configured`, which is now visible instead of silent.
+
+- **C2. DONE 2026-07-31.** Accept-and-continue, and the domain survives the whole
+  way. `?domain=` was a URL site.js had been building since the error path was
+  written and that nothing read: `/signup` never looked at the query string, and
+  `/welcome` prefilled the company field from the user's EMAIL domain only, so a
+  gmail user who audited acme.com arrived at company setup with an empty field.
+  Four hops now carry it: widget result card, full report page, `/signup`
+  (which stores it through the email round trip), `/welcome` (which prefers it
+  over the email heuristic and clears it once used). The company-details step
+  itself already existed at `/welcome`; it was not reachable with any context.
+  `check: bash scripts/check-funnel-accept-path.sh` -> exit 0
+  ```
+  OK: the audit success path, the full report, /signup and /welcome all carry
+  the visitor forward with their domain
+  ```
+
+- **C3. DONE 2026-07-31. Payment gated behind the contract, server-side.**
+  The six Stripe payment links have been REMOVED from `brandgeo/web/site.js`,
+  where a `STRIPE_LINKS` map had been writing them onto every Subscribe button
+  on load. That is what makes this not decorative: while the destination was in
+  the page it was reachable from view-source, from a bookmark, and with
+  JavaScript off, so no client-side gate in front of it could have been more
+  than a suggestion.
+  The links now live in `netlify/functions/_terms_gate.js` and are issued one at
+  a time by `accept-terms.js`, which records a `terms_acceptances` row before it
+  answers and returns no URL if it cannot. The tick box is a courtesy; the gate
+  is that the browser does not know where Stripe is.
+  The acceptance `reference` rides to Stripe as `client_reference_id`, so the
+  contract and the money can be matched afterwards from either side.
+  Migration applied to production 2026-07-31 and verified, BEFORE the deploy, per
+  the sequencing lesson in `docs/arch/scheduled-function-auth.md` §8.
+  **No commercial terms were invented.** The gate links the existing
+  `terms.html` and records its effective date, `2026-07-13`, as the version.
+  `check: bash scripts/check-contract-gate.sh` -> exit 0
+  ```
+  OK: no checkout URL is served to the browser, and the server refuses to issue
+  one without a recorded acceptance of 2026-07-13
+  ```
+  **Deliberately NOT done, and worth a decision:** `stripe-webhook.js` does not
+  yet read `client_reference_id`, so provisioning does not verify an acceptance
+  exists. That was left alone on purpose: refusing to provision a customer whose
+  money has already been captured is a worse failure than the one it prevents,
+  and changing the provisioning path is its own reviewed change.
 
 ---
 

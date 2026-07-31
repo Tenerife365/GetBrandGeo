@@ -288,7 +288,7 @@ above are cheap enough to do first.
 ## 5. Check commands
 
 ```bash
-# F1: no mailer on any audit path (passes today, i.e. the defect is present)
+# F1: OPEN BY DECISION 2026-07-31. See the note below before running this.
 cd brandgeo-dashboard/netlify/functions && \
   grep -lq "_email\|resend\|sendgrid" unlock-audit-report.js && echo FIXED || echo "F1 OPEN"
 
@@ -297,7 +297,35 @@ grep -q "app.getbrandgeo.com/audit/" brandgeo/web/site.js && echo FIXED || echo 
 
 # F7: no em dash in site.js copy
 grep -q "&mdash;" brandgeo/web/site.js && echo "F7 OPEN" || echo FIXED
+
+# F3/F5 and roadmap C2: the success path carries the visitor forward
+bash scripts/check-funnel-accept-path.sh
+
+# Roadmap C3: payment is unreachable until the contract is accepted
+bash scripts/check-contract-gate.sh
 ```
+
+**F1 is OPEN BY DECISION as of 2026-07-31.** Constantin ruled that on-screen
+delivery is the sprint's answer and the audit email is not being built yet. That
+check will therefore print `F1 OPEN` and is expected to, which is why it is
+labelled rather than left to read as an outstanding failure.
+
+The reason this is a decision and not a deferral: the promise that made F1
+critical is gone. `ceb3596` replaced "check your inbox" with a link to the report
+and the button label with "Show me the full breakdown", so nothing in the funnel
+claims an email any more. The remaining gap is a missing convenience, not a
+broken promise, and it was ranked below the two dead ends fixed in this pass.
+
+Re-open it as a build the moment any copy anywhere promises delivery again. The
+two strings to watch are named in `site.js` beside `AUDIT_REPORT_URL`.
+
+**F6 is closed differently from how the audit framed it.** The audit could not
+distinguish an unset key from a failed push. It was the first: `HUBSPOT_API_KEY`
+is not set on the dashboard site (confirmed 2026-07-31). Setting it is
+Constantin's to do and is not code. What was fixed here is the half the audit
+called "itself the defect": a failed push now records its reason on the
+`prospect_leads` row (`hubspot_error`, migration in `db/`), so a silent `false`
+is no longer indistinguishable from success.
 
 Production counters, to re-measure rather than re-assume:
 

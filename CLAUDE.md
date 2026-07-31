@@ -41,6 +41,20 @@ capacity, so inboxes 3 and 4 must be created on Day 12; and the new domain's
 DMARC moves to `p=quarantine` on Day 15. S8 stays IN PROGRESS until mail-tester
 scores 9+ on both inboxes and the public GBP profile is re-checked.
 
+### 2026-07-31: the acquisition funnel has a forward step, and payment has a gate
+
+Sprint task S3, roadmap Stream C. The Stripe payment links are **no longer in
+`brandgeo/web/site.js`**: they moved to `netlify/functions/_terms_gate.js` and
+are issued one at a time by `accept-terms.js`, which records a
+`terms_acceptances` row first and returns nothing if it cannot. Never put a
+checkout URL back in a browser-served file. Also: the audit success path now
+offers signup with `?domain=` prefilled (it previously offered nothing, while
+the FAILURE path offered exactly that), the domain survives into `/welcome`, and
+a failed HubSpot push records why on `prospect_leads.hubspot_error` instead of a
+silent `false`. Two new checks: `scripts/check-funnel-accept-path.sh` and
+`scripts/check-contract-gate.sh`, both exit 0, both proven to fail on the commit
+before. Full detail in `docs/ROADMAP.md` Stream C.
+
 ### 2026-07-28: colour system, engine lineup and plan limits (all LIVE)
 
 Four commits, all pushed and verified over HTTP against getbrandgeo.com.
