@@ -133,7 +133,12 @@ const PERIODS = ['monthly', 'annual'];
 // from it would silently turn a real plan into "not a self-serve plan" and the
 // refusal would name the wrong cause. A missing LINK is a `no_link` outage; an
 // unknown PLAN is a bad request. Those need different answers.
-const SELF_SERVE_CHECKOUT_PLANS = ['essentials', 'growth', 'growth_pro'];
+// `radar` added 2026-07-31. Second half of bg-verify F1: without it the gate
+// refuses a Radar checkout with "not a self-serve plan" before Stripe is ever
+// reached. See the longer note on SELF_SERVE_PLANS in _package_checkout.js;
+// these two lists must move together or the tier is broken on one side or the
+// other.
+const SELF_SERVE_CHECKOUT_PLANS = ['essentials', 'growth', 'growth_pro', 'radar'];
 
 /**
  * Decide whether a checkout may proceed, and to where.

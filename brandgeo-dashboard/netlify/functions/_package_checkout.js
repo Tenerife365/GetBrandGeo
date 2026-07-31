@@ -60,7 +60,18 @@ const { isValidPlan } = require('./_plans');
 // by tests/package_provisioning.test.js rather than at module load, because a
 // throw here would take the whole webhook down and stop provisioning working
 // subscriptions too -- the failure mode this file exists to prevent.
-const SELF_SERVE_PLANS = ['essentials', 'growth', 'growth_pro'];
+// `radar` added 2026-07-31 IN THE SAME CHANGE that made the tier real, and
+// deliberately BEFORE any Radar price exists in Stripe. bg-verify F1: with the
+// tier live in planConfig but absent here, the first Radar payment would reach
+// stripe-webhook.js:242, log "non-self-serve plan", return 200 and provision
+// NOTHING. Money taken, no entitlement, and no error anywhere, because a 200 is
+// what tells Stripe to stop retrying.
+//
+// This is not hypothetical and it is not new: growth_pro closed this exact hole
+// on 2026-07-28. It is also primed rather than latent, because AUTONOMY.md §2
+// pre-authorises an agent to create Stripe prices without asking, so the next
+// agent to do so would open it.
+const SELF_SERVE_PLANS = ['essentials', 'growth', 'growth_pro', 'radar'];
 
 // 36 months is the ceiling from arch §3.1. It is not arbitrary: it bounds how
 // long a single card payment can hold an entitlement open, so a fat-fingered

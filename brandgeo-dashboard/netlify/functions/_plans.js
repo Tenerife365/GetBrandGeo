@@ -64,7 +64,18 @@ const PLAN_BLURB = {
   // weekly (PLAN_COLLECTION_COOLDOWN_HOURS.radar = 168), one website. It does
   // not mention ChatGPT, which Radar does not carry, and it does not promise a
   // prompt count above the tier's own (ruling decision 4).
-  radar:      'Two AI engines, Gemini and Claude, checked weekly across seven buyer prompts for one website.',
+  // "checked weekly" was a promise the product does not keep (bg-verify F2).
+  // NOTHING in this repo ever writes clients.refresh_cadence: there are readers
+  // and a column default, and no writer. All 36 production clients are
+  // 'manual', so schedule-collections stays inert and no automatic collection
+  // happens for anyone. What IS true is the cooldown: PLAN_COLLECTION_COOLDOWN
+  // _HOURS.radar is 168, so a customer may run a fresh check once a week.
+  //
+  // This string is read by a customer at the moment they are charged, which is
+  // the worst possible place to overstate. Reworded to the capability we
+  // actually ship. If automatic weekly collection is built later, change this
+  // back in the same commit.
+  radar:      'Two AI engines, Gemini and Claude, across seven buyer prompts for one website, with a fresh check available every week.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
   // CORRECTED 2026-07-29. Three claims here were false at the moment of charge.
   // `growth` sold AI Social, which is admin-only and shows as coming soon to
