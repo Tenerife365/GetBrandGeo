@@ -1369,3 +1369,96 @@ Two things for the council to decide, not the builder:
 Sequence once voted: `bg-strategy` on what may be disclosed, then `bg-design`,
 then `bg-app`. Not a lone build.
 `check: test -f docs/design/client-plan-usage.md`
+
+## D-5. MOTION. Segmented customer messaging, and the free-plan conversion play.
+
+Referred by Constantin 2026-07-31, explicitly to the council's growth seats for
+confirmation and logging.
+
+**Members owning this: CGO (the play), CMO (the copy and the list), CTO (the
+machinery), CFO on nothing until a price is named.**
+
+Two things arrived together and the council should keep them apart, because one
+is ready now and the other is a build.
+
+### D-5a. The immediate play, ready to send
+
+Copy deck: `docs/copy/free-plan-gemini-update.md`. **Drafted, verified against
+production, NOT SENT.** AUTONOMY §2 withholds customer sends from the loop.
+
+The play: the free plan moved from ChatGPT to Gemini (`6d2196c`), so we re-ran
+the free account's prompts on Gemini for free, and the email tells them the work
+is already done and waiting. Engine change is the reason, the free re-run is the
+gift, the gap in their results is the argument for paying.
+
+Every claim was checked before writing. Ai Fy has **2 active prompts**, both
+were collected on Gemini at 2026-07-31 14:41 for EUR 0.064, so "we re-ran all
+your prompts" is literally true rather than nearly true.
+
+**The council should note two deliberate omissions, and either ratify or
+overturn them:**
+
+1. **No price and no date for the smaller tier.** Radar is signed in
+   `sprint-ladder-ruling.md` and **is not in `planConfig.ts`**. Telling a
+   customer EUR 29 before the tier exists converts a live pricing decision into
+   a promise, and S1's own ruling still has an open sub-decision. The email
+   teases and asks them to reply if they want it, which returns a demand signal
+   and commits nothing. **CGO: if you want the price named, say so explicitly
+   and accept that it fixes the number.**
+2. **No refund, guarantee or SLA language**, per the standing rule.
+
+### D-5b. The build: segmented messaging, and what it actually is
+
+Constantin's framing: an admin panel that can send one branded message to a
+selected audience, with placeholders, so that at 200 free users it is one send
+rather than 200. Segments named: all plans, a single plan, subscribers, and
+**people who signed up but never created an account**.
+
+**What already exists, so the council prices this correctly.** More than it
+looks. `_email.js` already sends branded HTML from
+`BrandGEO <noreply@mail.getbrandgeo.com>` with verified DKIM, SPF and DMARC, and
+already supports `replyTo`, headings, paragraphs, bullets, a CTA and a footer
+note. The audience data exists too: `clients.plan`, `clients.category`,
+`user_profiles`, and `prospect_leads` for the never-signed-up segment, which is
+exactly the fourth audience Constantin named and it is already populated by the
+audit funnel.
+
+**What does not exist, which is the honest scope:**
+
+1. A composer and a send action behind `requireAuth({ adminOnly: true })`.
+2. Segment definitions, and a **preview of exactly who will receive it, with a
+   count, before anything sends**. A blind send to "all free plans" is an
+   unrecoverable action; the surrounding rules require confirmation before
+   exactly this class of thing.
+3. Merge-field resolution with a **hard fail when a field cannot resolve**.
+   `Hi ,` is worse than sending nothing, and at 200 recipients nobody proofreads
+   200 renders.
+4. A send log. Who was sent what, when, and whether the provider accepted it.
+   Without it the second campaign cannot avoid re-mailing the first campaign's
+   recipients, and a failed send is invisible. **This is the `job_runs.ok`
+   defect and the `hubspot_synced = false` defect for the third time: we keep
+   building senders that cannot report their own failure.**
+5. **Unsubscribe, and this is the one that is not optional.** The free-plan
+   email in D-5a is a product update to an existing user, which is defensible as
+   transactional. **A newsletter to a segment is marketing**, and marketing to
+   EU recipients needs a working opt-out and a record of consent. The
+   `prospect_leads` segment is the sharpest case: those addresses were given to
+   unlock an audit report, not to receive a newsletter. **CMO and CGO must rule
+   on whether that segment may be mailed at all**, because it is the difference
+   between a growth channel and a complaint.
+
+**Recommended shape, for the council to accept or reject:** build it as an
+admin-only page plus one function, reusing `_email.js` as it stands, with the
+send log and the recipient preview in the FIRST version rather than deferred.
+The composer without the log is the cheap half and it is the half that produces
+the incident.
+
+**Sequencing:** this is not blocked, but it is smaller value than S5 and S12
+until there is an audience. **Three public audit leads and one free account is
+not a list.** The machinery pays for itself at a volume the sprint has not
+reached yet, so the council should decide whether it is built now or the effort
+goes into filling the list first. **The CGO's own criterion applies: at today's
+numbers this is infrastructure for demand we do not yet have.**
+
+**Do not build this before the council votes.** Constantin asked for
+confirmation and logging, not for a build.
