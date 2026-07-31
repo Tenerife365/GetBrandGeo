@@ -23,6 +23,15 @@
  * plan_source here, add it to expire-plan-grants.js's filter in the same
  * change, or the grant never ends.
  *
+ * PLAN AUDIT, added 2026-07-31. EVERY branch below that writes clients.plan also
+ * appends a client_events row carrying from_plan, to_plan and the Stripe ids
+ * that caused it. There are five plan writes in this file — the existing-client
+ * checkout update, the two createClientRow inserts, subscription.updated, and
+ * the reverting half of subscription.deleted — and none of them recorded
+ * anything before. If you add a sixth, it appends an event in the SAME change:
+ * see recordPlanEvent below for why from_plan has to be read before the write
+ * and why the insert is best-effort.
+ *
  * AUTH MODEL — this function does NOT call requireAuth(event) (see spec §2).
  * Stripe calls it server-to-server with no JWT and not from the site's origin,
  * so _auth.js's JWT + origin whitelist would reject every call. Authentication
@@ -142,6 +151,80 @@ exports.handler = async (event) => {
     // Release the idempotency lock so Stripe's retry re-processes this event.
     await supabase.from('stripe_events').delete().eq('id', evtId)
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Append-only client_events row for EVERY clients.plan write this webhook makes.
+//
+// WHY IT EXISTS. On 2026-07-31 client 1's plan was changed three times in one
+// day — by an end-to-end payment test, by a manual restore, and by a correction
+// — and `select count(*) from client_events where client_id = 1` returned 0. The
+// question "what tier was this customer on an hour ago" had no answer, so the
+// tier was inferred from which engines had produced ai_results rows, and the
+// inference was WRONG: the client was restored to `pro` (9 engines, EUR 225
+// budget) when the true tier was `growth_pro` (7 engines, EUR 67.35). A paying
+// customer was briefly over-entitled because this function wrote plans and kept
+// no record. See docs/qa/s3-e2e-payment-test-2026-07-31.md.
+//
+// BEST-EFFORT, AND THIS ONE IS NOT THE USUAL "LOGGING IS OPTIONAL" HAND-WAVE.
+// Every call site below runs on the money path: by the time this is reached the
+// customer has already been charged and their entitlement has already been
+// written to clients. If this insert were allowed to throw, the catch in the
+// handler above would DELETE the idempotency row and return 500, and Stripe
+// would redeliver the same event — re-running provisioning because an AUDIT row
+// could not be written. A missing audit row is a gap in the record. A failed
+// provisioning is a customer who paid and got nothing. Same convention, and the
+// same reason, as _admin_notify.js's recordAdminEvent and onboard-client.js:206.
+//
+// FROM_PLAN IS THE WHOLE POINT and it is the easy thing to get wrong: you cannot
+// read what a client WAS after you have overwritten it. Every caller reads the
+// current plan before its update and passes it through. Never pass the plan you
+// are about to write.
+//
+// actor is null on purpose: the migration documents null as "system/auto", and
+// Stripe is not a human admin. The identifying cause lives in meta instead
+// (stripe customer id, checkout session id, subscription id, price, months).
+// The plan a client is on RIGHT NOW, for the from_plan of a write about to
+// happen. Returns null rather than throwing on any failure, for the same reason
+// recordPlanEvent swallows: this runs in front of an entitlement write on the
+// money path, and a customer must not go unprovisioned because the audit could
+// not read a column. A null from_plan is a weaker record than a real one; a 500
+// here is a Stripe redelivery loop around a paid checkout.
+async function readCurrentPlan(clientId, log) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('plan')
+      .eq('id', clientId)
+      .maybeSingle()
+    if (error) {
+      log('prior-plan lookup failed (continuing, from_plan will be null):', error.message)
+      return null
+    }
+    return data?.plan ?? null
+  } catch (e) {
+    log('prior-plan lookup threw (continuing, from_plan will be null):', e.message)
+    return null
+  }
+}
+
+async function recordPlanEvent({ client_id, type, from_plan, to_plan, meta }) {
+  try {
+    const { error } = await supabase.from('client_events').insert({
+      client_id,
+      actor: null,
+      type,
+      from_plan: from_plan ?? null,
+      to_plan: to_plan ?? null,
+      meta: { source: 'stripe-webhook', ...(meta || {}) },
+    })
+    if (error) console.error(`[stripe-webhook] client_events insert failed for client ${client_id}: ${error.message}`)
+  } catch (e) {
+    console.error(`[stripe-webhook] client_events insert threw for client ${client_id}: ${e.message}`)
   }
 }
 
@@ -283,6 +366,31 @@ async function handleCheckoutCompleted(session, log) {
     ? { email, plan, months, plan_source: planSource, plan_grant_until: grantUntil, price: priceId }
     : { email, plan })
 
+  // What caused the plan write, for the client_events audit row. Everything here
+  // identifies the CAUSE and nothing here is the plan itself — from_plan and
+  // to_plan are columns, not meta. A FUNCTION for the same reason eventMeta() is:
+  // grantUntil can still move in the existing-client branch (S2 stacking), and an
+  // object literal built here would freeze the pre-stack date into the audit
+  // trail, which is exactly the class of "the record disagrees with the row" bug
+  // this whole change exists to end.
+  //
+  // stripe_subscription_id is null for a package on purpose: the package path
+  // deliberately does not write one (see the update comment below), so recording
+  // the session's subId here would put an id in the audit trail that was never
+  // written to the client.
+  const auditMeta = () => ({
+    reason: isPackage ? 'package_purchase' : 'checkout_subscription',
+    mode,
+    email,
+    stripe_customer_id: custId,
+    stripe_subscription_id: isPackage ? null : (subId || null),
+    checkout_session: session.id,
+    price: priceId || null,
+    months: isPackage ? months : null,
+    plan_source: planSource,
+    plan_grant_until: grantUntil,
+  })
+
   log(`provisioning email=${email} plan=${plan} source=${planSource} grant_until=${grantUntil} (before stacking) cust=${custId} sub=${subId}`)
 
   // Find an existing auth user by email (returning subscriber, re-subscribe, or
@@ -300,6 +408,22 @@ async function handleCheckoutCompleted(session, log) {
     if (profErr) throw new Error(`user_profiles lookup failed: ${profErr.message}`)
 
     if (profile?.client_id) {
+      // The plan this client is on BEFORE the update below overwrites it — the
+      // value whose absence made the 2026-07-31 incident unanswerable. Read on
+      // BOTH paths: a subscription checkout changes a plan just as much as a
+      // package does.
+      //
+      // A SEPARATE read from the stacking read below, deliberately, and not
+      // merged into it even though the two hit the same row a moment apart.
+      // They have opposite failure policies, and merging them would force one
+      // policy on the other: the stacking read is load-bearing for a paying
+      // customer's months and MUST throw, while an audit read must never be
+      // able to fail a checkout. Audit machinery does not get to sit on the
+      // critical path, not even in its error handling.
+      const fromPlan = await readCurrentPlan(profile.client_id, log)
+      let priorSource = null
+      let priorGrantUntil = null
+
       // S2 (docs/qa/package-provisioning-014.md), ruled by Constantin
       // 2026-07-31: renewing a package early STACKS the unused remainder rather
       // than forfeiting it. This is the only branch where that can apply — the
@@ -321,6 +445,8 @@ async function handleCheckoutCompleted(session, log) {
           .eq('id', profile.client_id)
           .maybeSingle()
         if (curErr) throw new Error(`clients grant lookup failed: ${curErr.message}`)
+        priorSource = cur?.plan_source ?? null
+        priorGrantUntil = cur?.plan_grant_until ?? null
 
         const stacked = stackedGrantUntil(months, cur?.plan_grant_until)
         if (stacked !== grantUntil) {
@@ -366,6 +492,24 @@ async function handleCheckoutCompleted(session, log) {
         .eq('id', profile.client_id)
       if (updErr) throw new Error(`clients update failed: ${updErr.message}`)
       log(`existing user ${existingUser.id} → client ${profile.client_id} set to ${plan} (${planSource}${grantUntil ? `, until ${grantUntil}` : ''})`)
+      // Audit row for the plan write immediately above. Runs after the update,
+      // so it only ever claims a change that actually landed.
+      await recordPlanEvent({
+        client_id: profile.client_id,
+        type: 'stripe_change',
+        from_plan: fromPlan,
+        to_plan: plan,
+        meta: {
+          ...auditMeta(),
+          // What the row held before this checkout, so a reverted plan_source
+          // (trial → stripe, package → stripe) is reconstructable too — the
+          // plan is not the only thing this update overwrites. Only populated
+          // on the package path, which is the only one that reads them; null
+          // here means "not read", not "was null".
+          previous_plan_source: priorSource,
+          previous_grant_until: priorGrantUntil,
+        },
+      })
       await recordAdminEvent(supabase, {
         type: eventType, client_id: profile.client_id,
         title: isPackage ? `Package purchased: ${what}` : `Subscription: ${planLabel}`,
@@ -379,7 +523,9 @@ async function handleCheckoutCompleted(session, log) {
 
     // Auth user exists but has no client/profile (edge case). Create a client
     // and link it to them — no invite needed, they already have a login.
-    const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log })
+    // The audit row for this plan write is emitted inside createClientRow, at
+    // the INSERT that performs it; see the note there for why it lives there.
+    const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log, audit: auditMeta() })
     const { error: linkErr } = await supabase
       .from('user_profiles')
       .insert({ id: existingUser.id, client_id: client.id, role: 'viewer' })
@@ -401,7 +547,8 @@ async function handleCheckoutCompleted(session, log) {
 
   // No existing user → provision new, mirroring onboard-client.js's atomic
   // create-client → invite → user_profiles chain with rollback.
-  const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log })
+  // Audit row: emitted inside createClientRow, see the note there.
+  const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log, audit: auditMeta() })
 
   const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
     email,
@@ -577,6 +724,23 @@ async function handleSubscriptionUpdated(sub, log) {
     return
   }
 
+  // The plans these clients are on BEFORE the update. This read is the only
+  // moment they exist: `.update().select()` returns POST-update rows, so
+  // from_plan is unrecoverable after the fact — reusing `data` below would
+  // record from_plan === to_plan for every upgrade and downgrade, which is worse
+  // than recording nothing because it looks like an answer.
+  //
+  // Best-effort by design. This handler had no read before, and a subscription
+  // change must not start failing because an AUDIT read failed. On error the map
+  // stays empty and from_plan lands null.
+  const priorPlans = new Map()
+  const { data: before, error: beforeErr } = await supabase
+    .from('clients')
+    .select('id, plan')
+    .eq('stripe_customer_id', custId)
+  if (beforeErr) log('prior-plan lookup failed (continuing, from_plan will be null):', beforeErr.message)
+  else for (const r of before || []) priorPlans.set(r.id, r.plan ?? null)
+
   const { data, error } = await supabase
     .from('clients')
     .update({ plan, stripe_subscription_id: sub.id })
@@ -595,6 +759,19 @@ async function handleSubscriptionUpdated(sub, log) {
   }
   log(`subscription.updated: cust ${custId} → plan ${plan} (${data.length} client row(s))`)
   for (const row of data) {
+    await recordPlanEvent({
+      client_id: row.id,
+      type: 'stripe_change',
+      from_plan: priorPlans.get(row.id) ?? null,
+      to_plan: plan,
+      meta: {
+        reason: 'subscription_updated',
+        stripe_customer_id: custId,
+        stripe_subscription_id: sub.id,
+        price: price?.id || null,
+        client_name: row.name || null,
+      },
+    })
     await recordAdminEvent(supabase, {
       type: 'subscription_changed', client_id: row.id,
       title: `Subscription changed to ${PLAN_LABELS[plan] || plan}: ${clientLabel(row)}`,
@@ -650,6 +827,13 @@ async function handleSubscriptionDeleted(sub, log) {
       && !!row.plan_grant_until
       && !(row.plan_grant_until < today)
 
+    // Note which of these writes clients.plan, because only one does and only
+    // that one gets a plan audit row. The held-package branch writes
+    // stripe_subscription_id ONLY and leaves plan exactly as it was — there is
+    // no plan change to record, and inventing a client_events row saying
+    // growth_pro → growth_pro would put noise in the one log that is supposed
+    // to answer "what changed". That branch's admin_notifications row already
+    // records the cancellation.
     const update = holdsLivePackage
       ? { stripe_subscription_id: null }
       : { plan: 'free', stripe_subscription_id: null }
@@ -671,6 +855,24 @@ async function handleSubscriptionDeleted(sub, log) {
     }
 
     log(`subscription.deleted: client ${row.id} downgraded to free`)
+    // from_plan comes off the row selected BEFORE the update at the top of this
+    // handler, not from the update's result. A cancellation is the change most
+    // likely to be queried later ("what were they paying for before they left"),
+    // so losing it here would defeat the point.
+    await recordPlanEvent({
+      client_id: row.id,
+      type: 'stripe_change',
+      from_plan: row.plan ?? null,
+      to_plan: 'free',
+      meta: {
+        reason: 'subscription_deleted',
+        stripe_customer_id: custId,
+        stripe_subscription_id: sub.id,
+        previous_plan_source: row.plan_source ?? null,
+        previous_grant_until: row.plan_grant_until ?? null,
+        client_name: row.name || null,
+      },
+    })
     await recordAdminEvent(supabase, {
       type: 'subscription_canceled', client_id: row.id,
       title: `Subscription canceled: ${clientLabel(row)}`,
@@ -700,7 +902,13 @@ async function handleSubscriptionDeleted(sub, log) {
 //                                        nor 'stripe' is in the revert filter,
 //                                        so no expiry behaviour changes.
 //   package      → ('package', 'YYYY-MM-DD')
-async function createClientRow({ email, plan, custId, subId, planSource, grantUntil, log }) {
+//
+// `audit` is the cause metadata for the client_events row this writes. The audit
+// lives HERE rather than at the two call sites because the INSERT below IS the
+// plan write for a brand-new client — putting it next to the write is what makes
+// it impossible for a future third caller to create a client with a plan and no
+// record of it. Both current callers pass auditMeta().
+async function createClientRow({ email, plan, custId, subId, planSource, grantUntil, log, audit }) {
   if (!planSource) throw new Error('createClientRow: planSource is required')
   const domain = email.split('@')[1] || email
   const baseSlug = slugify(domain) || `client-${Date.now()}`
@@ -722,7 +930,26 @@ async function createClientRow({ email, plan, custId, subId, planSource, grantUn
       })
       .select()
       .single()
-    if (!error) return data
+    if (!error) {
+      // from_plan is null and that is correct, not a gap: this row did not
+      // exist a moment ago, so there is no prior plan to record. That is also
+      // the signal that distinguishes a CREATION from a CHANGE when reading the
+      // log back — a stripe_provision row always has a null from_plan.
+      //
+      // Written before the caller's invite / user_profiles steps, which can
+      // still roll back by deleting this client. That is safe and intentional:
+      // client_events.client_id is `on delete cascade`, so a rolled-back
+      // provisioning takes its own audit row with it and leaves no event
+      // pointing at a client that does not exist.
+      await recordPlanEvent({
+        client_id: data.id,
+        type: 'stripe_provision',
+        from_plan: null,
+        to_plan: plan,
+        meta: { ...(audit || {}), slug, name: data.name ?? null },
+      })
+      return data
+    }
     if (error.code === '23505' && attempt === 0) {
       log(`slug "${slug}" taken, retrying with suffix`)
       continue

@@ -223,7 +223,12 @@ section('4. subscription regression (arch §4.4)')
   // createClientRow's new parameters must be required, not defaulted: a default
   // would let a future caller provision a package as 'stripe' by omission, and
   // 'stripe' is not in the revert filter.
-  assert.match(src, /async function createClientRow\(\{ email, plan, custId, subId, planSource, grantUntil, log \}\)/)
+  // `audit` added 2026-07-31: createClientRow emits its own client_events row
+  // next to the INSERT rather than leaving it to each call site, so a future
+  // third caller cannot create a client with a plan and no audit record.
+  // This assertion pins the SIGNATURE, and its intent (see the comment above:
+  // the new parameters must be required, not defaulted) is unchanged.
+  assert.match(src, /async function createClientRow\(\{ email, plan, custId, subId, planSource, grantUntil, log, audit \}\)/)
   assert.match(src, /if \(!planSource\) throw new Error\('createClientRow: planSource is required'\)/)
   const callSites = src.match(/await createClientRow\(\{[^}]*\}\)/g) || []
   assert.strictEqual(callSites.length, 2, `expected 2 createClientRow call sites, found ${callSites.length}`)
