@@ -52,14 +52,14 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 
 | id | Task | Owner | Window | State |
 |---|---|---|---|---|
-| S1 | Ladder ruling: Radar tier, prompt rebalance, inversion | bg-strategy + Constantin | day | OPEN; decision 4 already DECIDED in 67a3cf4 |
+| S1 | Ladder ruling: Radar tier, prompt rebalance, inversion | bg-strategy + Constantin | day | **IN PROGRESS** (chat `S1 · Ladder ruling`, 2026-07-31); decision 4 already DECIDED in 67a3cf4 |
 | S2 | Build the ruled ladder end to end | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 |
 | S3 | Funnel accept path (roadmap C1, C2, C3) | optimizer, bg-copy, bg-app, bg-verify | day | stage 1 DONE (eff8d9e); **C1a SHIPPED LIVE `ceb3596`, md5-verified on getbrandgeo.com**; C2, C3 OPEN |
 | S4 | First-run truth: zero-data states | bg-app | day | OPEN, narrowed; read 46b92fc first |
 | S5 | Research pages feed the audit funnel | bg-web | day | OPEN |
 | S6 | Evidence Machine | scripts, founder-run | day | OPEN |
 | S7 | LAUNCH30 coupon live end to end (roadmap A4 slice) | bg-backend Opus, bg-verify | day | OPEN |
-| S8 | Outbound infra: domain, warmup, GBP | Constantin, chat instructs | day | OPEN |
+| S8 | Outbound infra: domain, warmup, GBP | Constantin, chat instructs | day | **IN PROGRESS** (chat `S8 · Outbound infra`, 2026-07-31); instructions written to `docs/growth/outbound-infra.md`, Constantin is on STEP 1 (register the domain). Stays IN PROGRESS until mail-tester 9+ and the GBP public check both pass |
 | S9 | Scoreboard and checkpoint gates | any session | night-safe | OPEN |
 | S10 | Close the A1-S1 revert gate | bg-backend Opus, bg-verify | day | **NARROWED: two thirds already shipped in `3c3f003`. Only A1-S2-tier remains.** See PART D-0 |
 | S11 | Outreach scripts and founder profile | bg-copy, bg-verify | day | OPEN, needs S3 stage 2 + S6 |

@@ -26,6 +26,21 @@ Every claim in this section was checked against the live sites, the running
 bundle, or the working tree. Not remembered. If you change something here, check
 it the same way. This section takes precedence over §0 through §7 below.
 
+### 2026-07-31: outbound sending infrastructure (S8), instructions written
+
+`docs/growth/outbound-infra.md` is the full build-out for the cold channel:
+secondary sending domain `trygetbrandgeo.com` (never send cold from
+`getbrandgeo.com`), two Google Workspace inboxes on a SEPARATE subscription so a
+suspension cannot reach company mail, exact SPF/DKIM/DMARC records, cPanel root
+redirect, Instantly warmup and the per-inbox cap ramp, plus the GBP description
+and services rewrite with the lineup read from `planConfig.ts`. Registrar and
+DNS host is **CyberFolks**, mail is **Google Workspace**, cPanel IP is
+**91.200.121.45**, all measured not remembered. Two open findings recorded
+there: the plan's Day 25 to 28 volumes (55 to 70/day) exceed two inboxes' safe
+capacity, so inboxes 3 and 4 must be created on Day 12; and the new domain's
+DMARC moves to `p=quarantine` on Day 15. S8 stays IN PROGRESS until mail-tester
+scores 9+ on both inboxes and the public GBP profile is re-checked.
+
 ### 2026-07-28: colour system, engine lineup and plan limits (all LIVE)
 
 Four commits, all pushed and verified over HTTP against getbrandgeo.com.
