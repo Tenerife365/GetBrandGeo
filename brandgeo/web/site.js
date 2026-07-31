@@ -702,7 +702,12 @@
 
   // Display names only. No prices: those live in the pricing cards and in
   // Stripe, and a third copy here would be a fourth place for them to drift.
-  var PLAN_LABELS = { essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO' };
+  // `radar` added 2026-07-31, once its Stripe price and payment link existed.
+  // This map is what decides whether the contract gate offers a plan at all: a
+  // key that is absent here makes the Subscribe button fall through to plain
+  // /signup, which is exactly how Radar's card shipped earlier today, on
+  // purpose, while there was nothing to sell.
+  var PLAN_LABELS = { radar: 'Radar', essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO' };
 
   // Hoisted out of the billing toggle below, where it used to be a local. The
   // gate has to know which period the visitor is looking at at the moment they

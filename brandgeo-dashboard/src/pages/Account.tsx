@@ -37,6 +37,13 @@ const GRANT_TYPE_LABELS: Record<string, string> = {
  *  else as an upgrade target. */
 const PLAN_TIERS: { id: string; label: string; price: string }[] = [
   { id: 'free',       label: 'Free',       price: '€0' },
+  // `radar` added 2026-07-31 (bg-verify F4). Without it `currentIdx` resolves to
+  // -1 for a Radar client, so they see no current plan and no upgrade CTA on
+  // their own account page. That was already reachable before the tier was
+  // buyable, because both admin plan pickers enumerate PLAN_ORDER rather than
+  // this list, so an admin could assign Radar to someone the page could not
+  // then describe.
+  { id: 'radar',      label: 'Radar',      price: '€29 / mo' },
   { id: 'essentials', label: 'Essentials', price: '€99 / mo' },
   { id: 'growth',     label: 'Growth',     price: '€299 / mo' },
   { id: 'growth_pro', label: 'Growth PRO', price: '€449 / mo' },
