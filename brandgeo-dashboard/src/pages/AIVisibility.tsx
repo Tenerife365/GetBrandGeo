@@ -102,15 +102,17 @@ function EngineToggleModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
-          <div>
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-dark-700">
+          {/* min-w-0 so a long client name truncates instead of widening the
+              modal past its max-w-md (same min-width:auto flex trap). */}
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-white">Engine Configuration</h2>
-            <p className="text-xs text-slate-500 mt-0.5">{clientName}</p>
+            <p className="text-xs text-slate-500 mt-0.5 truncate" title={clientName}>{clientName}</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close engine configuration"
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
           >
             <X size={16} />
           </button>
@@ -591,7 +593,15 @@ export default function AIVisibility() {
   const circumference   = 2 * Math.PI * 54
   const dashOffset      = circumference - (aiScore / 100) * circumference
   const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
-  const ringTextFillDim = theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'
+  // The score ring's "%" glyph. Solid hexes, not alpha, so the value can be
+  // contrast-checked at all: light was rgba(0,0,0,0.4), which composites to
+  // rgb(153,153,153) on the white card and measures 2.85:1 at 14px/500 against
+  // a 4.5 floor (discovery audit 2026-07-31, found while regression-sweeping
+  // Layout.tsx). #556479 is the same muted value --axis-ink uses, 6.03:1 on the
+  // card and 5.00:1 on the darkest light surface. Dark is unchanged in
+  // appearance: #93979f IS rgba(255,255,255,0.55) composited on --dark-800,
+  // and it already passed at 6.09:1.
+  const ringTextFillDim = theme === 'light' ? '#556479' : '#93979f'
 
   const dimConfig = [
     { key: 'recognition', label: 'Recognition', value: dimensions.recognition, desc: 'Prompt coverage' },
@@ -898,12 +908,18 @@ export default function AIVisibility() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
           {dimConfig.map(d => (
             <div key={d.key}>
-              <div className="flex justify-between items-center mb-1">
-                <div>
+              {/* min-w-0 on the label block and shrink-0 on the value is load-bearing,
+                  not tidying. A flex item defaults to `min-width: auto`, so the label
+                  block refuses to shrink below its own content, and the % value gets
+                  pushed past the right edge of <main>. Between 768 and ~810px the
+                  sidebar has appeared (md:) while this grid is already 2-up (sm:), so
+                  main is only ~502px wide and the row overflowed it by 19px. */}
+              <div className="flex justify-between items-center gap-2 mb-1">
+                <div className="min-w-0">
                   <span className="text-sm font-medium text-slate-300">{d.label}</span>
                   <span className="ml-2 text-xs text-slate-600">{d.desc}</span>
                 </div>
-                <span className={`text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                <span className={`shrink-0 text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
                   {d.value}%
                 </span>
               </div>
@@ -1086,11 +1102,13 @@ export default function AIVisibility() {
       {fixItems.length > 0 && (
         <div className="mb-4 bg-dark-800 rounded-xl overflow-hidden">
           <button
-            className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors"
+            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors"
             onClick={() => setShowFixHub(v => !v)}
             aria-expanded={showFixHub}
           >
-            <div className="flex items-center gap-2">
+            {/* min-w-0 + flex-wrap: this row carries four pieces of content and
+                sits at ~460px of usable width in the 768-810px band. */}
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               <Zap size={15} className="text-brand-400" />
               <span className="text-sm font-semibold text-white">Fix This</span>
               {/* The separator here used to be a leading em dash. The parent row is
@@ -1106,7 +1124,7 @@ export default function AIVisibility() {
                 })}
               </div>
             </div>
-            {showFixHub ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
+            {showFixHub ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
           </button>
 
           <Collapse open={showFixHub}>
@@ -1320,9 +1338,13 @@ export default function AIVisibility() {
                     const noAnswer = noAnswerCells.has(`${prompt.id}:${llm.id}`)
                     return (
                       <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                        {/* text-slate-700 has no dark-mode remap in index.css, so it
+                            rendered rgb(51,65,85) in BOTH themes: 1.72:1 on this card in
+                            dark, against a 3:1 floor for a non-text indicator. The dashed
+                            ring and the dimmer fill still separate this from Not checked. */}
                         <span
                           className={`inline-flex items-center justify-center w-7 h-7 rounded-full ${noAnswer
-                            ? 'bg-dark-700/20 text-slate-700 ring-1 ring-dashed ring-dark-600/40'
+                            ? 'bg-dark-700/20 text-slate-500 ring-1 ring-dashed ring-dark-600/40'
                             : 'bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60'}`}
                           title={noAnswer
                             ? `${llm.label} showed no answer for this query, so there was nothing to appear in. Not counted for or against you.`
@@ -1331,7 +1353,8 @@ export default function AIVisibility() {
                           <Minus size={13} />
                         </span>
                         {noAnswer && (
-                          <span className="text-[9px] text-slate-700 leading-none">no answer</span>
+                          // Real user-facing text, so the 4.5:1 floor applies, not 3:1.
+                          <span className="text-[9px] text-slate-500 leading-none">no answer</span>
                         )}
                       </div>
                     )
@@ -1526,11 +1549,11 @@ export default function AIVisibility() {
       {competitorFreq.length > 0 && (
         <div className="mt-6 mb-4 bg-dark-800 rounded-xl overflow-hidden">
           <button
-            className="w-full flex items-center justify-between px-5 py-3 text-left"
+            className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
             onClick={() => setShowInsights(v => !v)}
             aria-expanded={showInsights}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <AlertTriangle size={15} className="text-amber-400" />
               <span className="text-sm font-semibold text-amber-300">
                 Top competitors in AI recommendations
@@ -1541,7 +1564,7 @@ export default function AIVisibility() {
                 )}
               </span>
             </div>
-            {showInsights ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
+            {showInsights ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
           </button>
 
           <Collapse open={showInsights}>
@@ -1581,16 +1604,21 @@ export default function AIVisibility() {
 
         if (catStats.length > 0) return (
           <div className="mb-4 bg-dark-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
-              <span className="text-xs text-slate-600">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
+            {/* Same min-width:auto shape as the score breakdown above: neither flex
+                item could shrink, so the long right-hand caption pushed past the card.
+                min-w-0 lets the caption wrap instead. */}
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="shrink-0 text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
+              <span className="min-w-0 text-xs text-slate-600 text-right">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {catStats.map(({ cat, label, pct, checked, mentioned }) => (
                 <div key={cat} className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`}>{label}</span>
-                    <span className={`text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
+                  {/* Same shape again, and this grid is 2-up from the smallest
+                      viewport, so each cell is the narrowest box on the page. */}
+                  <div className="flex justify-between items-center gap-1.5">
+                    <span className={`min-w-0 truncate text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`} title={label}>{label}</span>
+                    <span className={`shrink-0 text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
                     <div className={`h-full rounded-full ${pct >= 50 ? 'bg-emerald-400' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />

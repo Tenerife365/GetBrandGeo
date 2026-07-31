@@ -113,6 +113,30 @@ item of the root `flex h-screen` container. `.skip-link:focus` never restates
 The link still *works*: activation moves focus to `<main id="main-content">`,
 verified. It is the presentation that is broken.
 
+> **FIXED 2026-07-31 in `index.css` only; `Layout.tsx` was not touched.**
+> `.skip-link:focus` now restates `position: fixed !important` (plus `width`
+> and `height: auto`). `!important` rather than source order, because Tailwind's
+> utility ordering is a build concern and this must not silently regress.
+>
+> **How it was verified, and why the obvious test was worthless.** Focusing the
+> link and re-reading the geometry returned byte-identical before and focused
+> snapshots, which looks like a pass and is not one: `document.hasFocus()` is
+> `false` in this hidden browser pane, so `link.matches(':focus')` is `false`
+> even while `document.activeElement === link`. Neither `.skip-link:focus` NOR
+> Tailwind's `.focus\:not-sr-only:focus` ever applied, so the test compared two
+> unfocused states and proved nothing. Recorded because it would pass review.
+>
+> Proven at the cascade level instead. CSSOM reports `.skip-link:focus` with
+> `position: fixed` at priority `important`, and `.focus\:not-sr-only:focus`
+> with `position: static` at no priority. A clone probe carrying both rule sets
+> computes `static` with Tailwind's declarations alone and `fixed` once the
+> important one is added. `!important` beats non-important regardless of
+> specificity, so the outcome does not depend on order.
+>
+> **Still unverified at runtime:** that the link becomes visible at `top:
+> 0.75rem` on a real Tab press. That needs a browser pane that composites
+> frames and holds document focus, which this environment does not provide.
+
 - Class list: `brandgeo-dashboard/src/components/Layout.tsx:266`
 - Rules: `brandgeo-dashboard/src/index.css:633-642`
 - Runtime-measured.
@@ -288,6 +312,22 @@ themes: `rgb(51,65,85)` in dark **and** light, identical.
 | `--dark-800` card, dark | **1.41:1** | 4.5 |
 | `--dark-900` page, dark | **1.72:1** | 4.5 |
 | `--dark-700`, light | 8.60:1 | pass |
+
+> **CORRECTION 2026-07-31: the two dark rows above are transposed, and 1.41 is
+> unexplained.** Disputed by the agent that fixed this, and adjudicated
+> independently by the coordinator against WCAG relative luminance. For
+> `rgb(51,65,85)`:
+>
+> | Surface | Correct ratio |
+> |---|---|
+> | `--dark-800` card `rgb(15,23,42)` | **1.72:1** |
+> | `--dark-900` page `rgb(10,15,30)` | **1.84:1** |
+> | `--dark-700` light `rgb(234,233,242)` | 8.60:1, as reported |
+>
+> `Competitors.tsx:153` independently records 1.72:1 for `--dark-800`, agreeing.
+> The light value matches exactly, so the instrument was sound and only the dark
+> rows are wrong. **The finding itself stands unchanged**: the class is far below
+> the 4.5 floor in dark on every surface, which is what mattered.
 
 That 1.72:1 is the exact value the 2026-07-30 audit recorded as F5 and closed by
 removing the class from `Competitors.tsx`. It survives in four live call sites:

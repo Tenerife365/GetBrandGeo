@@ -447,7 +447,13 @@ export default function Dashboard() {
                 <tspan fontSize="38" fontWeight="800" fill={theme === 'light' ? '#1e293b' : 'white'} letterSpacing="-1.5">
                   {displayedScore}
                 </tspan>
-                <tspan fontSize="14" fontWeight="500" fill={theme === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)'} dy="-13">%</tspan>
+                {/* Solid hexes, not alpha, so this can be contrast-checked.
+                    Light was rgba(0,0,0,0.4), composites to rgb(153,153,153)
+                    on the white card: 2.85:1 at 14px/500 against a 4.5 floor.
+                    #556479 measures 6.03:1. Dark is unchanged in appearance,
+                    #93979f is the old alpha composited on --dark-800, 6.09:1.
+                    Mirrors AIVisibility.tsx's ringTextFillDim. */}
+                <tspan fontSize="14" fontWeight="500" fill={theme === 'light' ? '#556479' : '#93979f'} dy="-13">%</tspan>
               </text>
             </svg>
             <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</div>

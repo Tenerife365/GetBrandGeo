@@ -22,6 +22,24 @@ import { useCollection } from '../lib/collectionContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import type { TimeRange } from '../lib/timeFilterContext'
 
+// React 18 does not know the `inert` attribute (native support lands in React
+// 19), and @types/react 18.3.31 has no declaration for it. A bare `inert={true}`
+// is silently DROPPED by React 18 with a non-boolean-attribute warning, which is
+// the exact trap here: the prop looks applied and the attribute never reaches the
+// DOM. The empty string renders as `inert=""`, which is what the HTML spec asks
+// for, so that is the only value this accepts. Verified present in the DOM by
+// reading `hasAttribute('inert')` off the running app, not assumed.
+declare module 'react' {
+  interface HTMLAttributes<T> {
+    inert?: '' | undefined
+  }
+}
+
+// Tailwind's `md:` prefix is min-width 768px, so "mobile" here is its exact
+// complement. Anything else and the off-canvas drawer and the `inert` flags
+// would disagree at the boundary.
+const MOBILE_QUERY = '(max-width: 767.98px)'
+
 // The wordmark is a link to Overview in both shells (sidebar + mobile header).
 // It used to be an inert <div>, so the most-clicked "take me home" affordance on
 // the web did nothing here. The mark itself is aria-hidden inside BrandGeoLogo:
@@ -96,6 +114,62 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const langMenuRef   = useRef<HTMLDivElement>(null)
   const internalMenuRef = useRef<HTMLDivElement>(null)
 
+  // The TRIGGER of each of those menus, plus the hamburger. Escape used to close
+  // the menu and leave document.activeElement on BODY (measured), losing the
+  // user's place entirely; closing the drawer with its X left focus on the X,
+  // which is then at left: -57, off-screen inside the closed drawer. Both are
+  // the same missing step: return focus to whatever opened the thing.
+  const clientBtnRef   = useRef<HTMLButtonElement>(null)
+  const marketBtnRef   = useRef<HTMLButtonElement>(null)
+  const langBtnRef     = useRef<HTMLButtonElement>(null)
+  const internalBtnRef = useRef<HTMLButtonElement>(null)
+  const hamburgerRef   = useRef<HTMLButtonElement>(null)
+
+  // Focus must move AFTER React commits, not during the event. While the drawer
+  // is open the whole main column is inert, so the hamburger cannot take focus
+  // until that attribute is gone; and a dropdown option is unmounted by the same
+  // state update that closes it. This effect has no dependency array on purpose:
+  // it drains one pending focus target after whichever commit follows.
+  const pendingFocusRef = useRef<HTMLElement | null>(null)
+  const focusAfterCommit = (el: HTMLElement | null) => { pendingFocusRef.current = el }
+  useEffect(() => {
+    const el = pendingFocusRef.current
+    if (!el) return
+    pendingFocusRef.current = null
+    el.focus()
+  })
+
+  // Below 768 the sidebar is an off-canvas drawer; at 768 and up it is the
+  // permanent shell. `inert` is driven off this, so it has to be real state and
+  // not a guess from `sidebarOpen`: with the drawer merely closed at 1440 the
+  // aside is fully visible and must NOT be inert.
+  //
+  // This listens to BOTH the MediaQueryList and window resize, and re-reads
+  // `mq.matches` rather than trusting the event payload. That is not belt and
+  // braces, it is a measured requirement: resizing 375 to 1440 in the audit
+  // environment moved `matchMedia().matches` to false while the `change` event
+  // never fired, which left a fully visible 1440px sidebar carrying `inert`.
+  // Missing this event fails DANGEROUSLY (a visible, unusable navigation), so it
+  // cannot depend on a single signal. React bails out when the value is
+  // unchanged, so the resize listener costs one boolean compare.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const sync = () => {
+      setIsMobile(mq.matches)
+      // Resizing past the breakpoint with the drawer still flagged open would
+      // leave the desktop main column inert. Close it on the way out.
+      if (!mq.matches) setSidebarOpen(false)
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
+
   // Close any open dropdown on outside click or Escape — none of the 3 dropdowns below
   // previously had this, so keyboard/screen-reader users had no way to dismiss one short
   // of re-clicking the trigger or picking an option.
@@ -107,13 +181,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (showLangs && langMenuRef.current && !langMenuRef.current.contains(target)) setShowLangs(false)
       if (showInternal && internalMenuRef.current && !internalMenuRef.current.contains(target)) setShowInternal(false)
     }
+    // Escape unwinds ONE layer at a time, innermost first: an open dropdown, else
+    // the mobile drawer. Each hands focus back to its own trigger. A pointer
+    // click-away deliberately does NOT move focus, because the user is already
+    // somewhere else and stealing focus back would be the worse behaviour.
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setShowClients(false)
-        setShowAddMarket(false)
-        setShowLangs(false)
-        setShowInternal(false)
-      }
+      if (e.key !== 'Escape') return
+      if (showClients)   { setShowClients(false);   focusAfterCommit(clientBtnRef.current);   return }
+      if (showAddMarket) { setShowAddMarket(false); focusAfterCommit(marketBtnRef.current);   return }
+      if (showLangs)     { setShowLangs(false);     focusAfterCommit(langBtnRef.current);     return }
+      if (showInternal)  { setShowInternal(false);  focusAfterCommit(internalBtnRef.current); return }
+      if (sidebarOpen)   { setSidebarOpen(false);   focusAfterCommit(hamburgerRef.current);   return }
     }
     document.addEventListener('mousedown', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
@@ -121,7 +199,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showClients, showAddMarket, showLangs, showInternal])
+  }, [showClients, showAddMarket, showLangs, showInternal, sidebarOpen])
 
   // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
   // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
@@ -240,6 +318,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const closeSidebar = () => setSidebarOpen(false)
+  // Closing the drawer with its own X button is the one path that strands focus:
+  // the X is inside the drawer, so once it is closed the focused control is at
+  // left: -57. Send focus back to the hamburger that opened it. Navigating out
+  // of the drawer via a nav link keeps using plain closeSidebar, because the
+  // route-change effect below owns focus in that case.
+  const closeSidebarAndRestore = () => {
+    setSidebarOpen(false)
+    focusAfterCommit(hamburgerRef.current)
+  }
   // The profile page has no historical data, so hide the global time-filter bar there.
   const { pathname } = useLocation()
   const hideTimeFilter = pathname === '/account'
@@ -249,8 +336,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // <ScrollRestoration> is not an option here — it requires a data router and
   // this app mounts <BrowserRouter>. Without this, arriving on a page mid-scroll
   // lands the reader below the H1 and the headline stats.
+  //
+  // The same effect also MOVES FOCUS to <main> on every route change after the
+  // first. Nothing else told a screen-reader user the page had changed: focus
+  // stayed on the activated nav link, document.title never moved, and there is
+  // no live region anywhere in the app. Focus is the primary mechanism here
+  // rather than an aria-live announcement, because it also fixes the sighted
+  // keyboard user's problem (the next Tab now continues into the new page's
+  // content instead of resuming inside the nav), and because running both would
+  // announce every navigation twice.
+  //
+  // Two things this must not do. It must not fire on first mount, which would be
+  // focus theft on load; and it must not scroll, which would undo the scrollTo
+  // above, hence preventScroll.
+  //
+  // The guard compares the PREVIOUS pathname rather than counting runs. A naive
+  // "first run" boolean is wrong here and was measured wrong: this app mounts
+  // inside React.StrictMode, which in development runs every effect, cleans up,
+  // and runs it again on the same instance with refs preserved. A run counter is
+  // already spent by the second invocation, so the page stole focus on load.
+  // Comparing pathnames is idempotent, so the StrictMode replay is a no-op and a
+  // real navigation still fires.
   const mainRef = useRef<HTMLElement>(null)
-  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [pathname])
+  const lastPathRef = useRef<string | null>(null)
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 })
+    const previous = lastPathRef.current
+    lastPathRef.current = pathname
+    if (previous === null || previous === pathname) return
+    mainRef.current?.focus({ preventScroll: true })
+  }, [pathname])
+
+  // Per-route document.title. Page names are read from the sidebar's own nav
+  // labels (already translated) so there is exactly ONE source of page names in
+  // the app, not a second list that can drift. /account is the one Layout route
+  // with no nav-group entry; its label is the one the sidebar's bottom actions
+  // already use. The separator is a middle dot, never a dash.
+  const navLabelByPath: Record<string, string> = { '/account': 'My Profile' }
+  navGroups.forEach(g => g.items.forEach(i => { navLabelByPath[i.to] = i.label }))
+  const pageLabel = navLabelByPath[pathname]
+  useEffect(() => {
+    document.title = pageLabel ? `${pageLabel} · BrandGEO` : 'BrandGEO Dashboard'
+  }, [pageLabel])
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
@@ -277,7 +404,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           A1/A2): it must clear 3:1 against both the canvas and this surface, and
           an alpha border cannot be measured without knowing what's behind it —
           that's exactly how the previous 1.31:1/1.07:1 readings went unnoticed. */}
-      <aside className={[
+      <aside
+        // Below 768 with the drawer closed the aside sits at left: -256, fully
+        // off-canvas, but it was still `visibility: visible` with no aria-hidden
+        // and no inert, so all 17 of its controls stayed in the tab order (17 of
+        // 35 tab stops at 375, while <main> held 4) and every nav destination was
+        // announced twice, once here and once in the mobile bottom bar. `inert`
+        // is the right tool because it removes the subtree from the tab order AND
+        // from the accessibility tree, so it closes both halves at once.
+        // At 768 and up this is undefined: the sidebar is the real shell there.
+        inert={isMobile && !sidebarOpen ? '' : undefined}
+        className={[
         'fixed inset-y-0 left-0 z-50 w-64 bg-surface-nav border-r border-nav flex flex-col',
         'transition-transform duration-200 ease-in-out',
         'md:relative md:w-64 md:flex-shrink-0',
@@ -310,7 +447,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 44x44 unconditionally rather than behind a query. The 18px glyph
                 is unchanged; only the box around it grew, and the header is
                 72px tall so nothing moves. */}
-            <button onClick={closeSidebar} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-slate-400 hover:text-white transition-colors" aria-label="Close menu">
+            <button onClick={closeSidebarAndRestore} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-slate-400 hover:text-white transition-colors" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
@@ -378,6 +515,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
+                ref={clientBtnRef}
                 onClick={() => {
                   setShowClients(v => {
                     const opening = !v
@@ -465,6 +603,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {internalCount > 0 && (
               <div className="relative mt-2" ref={internalMenuRef}>
                 <button
+                  ref={internalBtnRef}
                   onClick={() => { setShowInternal(v => !v); setShowClients(false) }}
                   className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[11px] text-slate-400 bg-dark-700/40 border border-dark-600/60 hover:text-slate-200 hover:border-dark-500 transition-colors"
                   aria-haspopup="listbox"
@@ -608,6 +747,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {availableMarkets.length > 0 && (
             <div className="relative" ref={marketMenuRef}>
               <button
+                ref={marketBtnRef}
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
                 className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
                 aria-haspopup="listbox"
@@ -665,6 +805,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5 pt-0.5">
             <div className="relative flex-1 min-w-0" ref={langMenuRef}>
               <button
+                ref={langBtnRef}
                 onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
                 className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
                 aria-haspopup="listbox"
@@ -721,7 +862,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           nothing, so the canvas reads as sitting behind the rail rather than
           beside it. It contributes nothing to any measured ratio — the
           border-nav divider on <aside> alone carries the 3:1. */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden canvas-bleed">
+      <div
+        // The open mobile drawer was not modal: all of <main>'s controls behind
+        // it stayed focusable. Making the background inert while the drawer is
+        // open is the trap, without a keydown cycler to maintain, and it is the
+        // exact mirror of the aside's own inert above, driven by the same
+        // boolean. Above 768 this is always undefined.
+        inert={isMobile && sidebarOpen ? '' : undefined}
+        className="flex-1 flex flex-col min-w-0 overflow-hidden canvas-bleed"
+      >
 
         {/* View-as-user banner. Sits outside the scroll container on purpose, so
             it cannot be scrolled out of sight — an admin must never mistake an
@@ -746,7 +895,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Mobile header */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
           {/* Mobile-only header, so 44x44 unconditionally. h-14 (56px) has room. */}
-          <button onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 text-slate-400 hover:text-white transition-colors" aria-label="Open menu">
+          <button ref={hamburgerRef} onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 text-slate-400 hover:text-white transition-colors" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
@@ -791,7 +940,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           the desktop sidebar, moved to the item's TOP edge since these are a
           vertical icon+label stack (a left rail would read as a divider
           between items, not a selection). */}
-      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb">
+      <nav
+        aria-label="Primary mobile"
+        // Sibling of the main column, so it needs the drawer's inert flag too or
+        // the "trap" would have a seven-link hole in it.
+        inert={isMobile && sidebarOpen ? '' : undefined}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb"
+      >
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

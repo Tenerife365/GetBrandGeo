@@ -15,7 +15,13 @@
     <meta name="msapplication-TileColor" content="#8b5cf6" />
     <meta name="msapplication-TileImage" content="/mstile-150x150.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BrandGEO — Dashboard</title>
+    <!-- No dash of any kind. This shipped with a real U+2014 em dash, which is
+         user-visible in the browser tab, the window title and every bookmark,
+         and the content programme's no-dash rule was never applied to the
+         product UI. Layout.tsx replaces this with a per-route title once the app
+         mounts; this is what a visitor sees before that, and on the routes with
+         no Layout (login, signup, audit). -->
+    <title>BrandGEO Dashboard</title>
 
     <!-- Deliberate typeface (DASHBOARD-UX-2026.md §8) — the app previously had
          zero font-family customization and rendered on whatever system-UI stack

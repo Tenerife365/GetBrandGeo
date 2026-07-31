@@ -737,9 +737,15 @@ function AdminQueue() {
                           ) : (
                             <span className="inline-flex items-center gap-1 truncate"><Building2 size={10} /> {t.client_name ?? `Client ${t.client_id}`}</span>
                           )}
-                          <span className="text-slate-700">|</span>
+                          {/* Purely decorative separators. text-slate-700 has no
+                              dark-mode remap in index.css, so these rendered at 1.72:1
+                              on this card and were effectively invisible in dark.
+                              text-slate-500 matches the line they sit in, and
+                              aria-hidden stops a screen reader announcing "vertical
+                              bar" twice on every ticket row. */}
+                          <span className="text-slate-500" aria-hidden="true">|</span>
                           <PriorityTag priority={t.priority} />
-                          <span className="text-slate-700">|</span>
+                          <span className="text-slate-500" aria-hidden="true">|</span>
                           <span>{when(t.created_at)}</span>
                         </span>
                       </span>

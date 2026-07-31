@@ -628,8 +628,22 @@ html.light .bg-dark-800.rounded-card {
 
 /* Skip-to-content link (WCAG 2.4.1) — visually hidden until keyboard-focused,
    then docked top-left above everything else. Pairs with the `sr-only
-   focus:not-sr-only` classes on the link itself in Layout.tsx; this just
-   handles the fixed positioning Tailwind's own not-sr-only doesn't cover. */
+   focus:not-sr-only` classes on the link itself in Layout.tsx.
+
+   The comment here used to say this "just handles the fixed positioning
+   Tailwind's own not-sr-only doesn't cover". That was wrong, and it was the
+   bug (discovery audit 2026-07-31, D1). Tailwind's `.focus\:not-sr-only:focus`
+   declares `position: static` at specificity (0,2,0), which BEATS `.skip-link`
+   at (0,1,0). So on focus the link left the fixed layer and became a flex item
+   of the root `flex h-screen` shell: measured 137x900 at 0,0, shoving the
+   sidebar from left 0 to 137 and shrinking <main> from 1184 to 1047. On the
+   first Tab of every route. It recovered on blur, so it read as a flicker
+   rather than a defect.
+
+   `.skip-link:focus` never restated `position`, so nothing defended it.
+   It does now. !important rather than relying on source order, because
+   Tailwind's utility ordering is a build concern and this must not silently
+   regress if that changes. */
 .skip-link {
   position: fixed;
   top: -100px;
@@ -638,6 +652,9 @@ html.light .bg-dark-800.rounded-card {
   transition: top 0.15s ease-out;
 }
 .skip-link:focus {
+  position: fixed !important;
+  width: auto;
+  height: auto;
   top: 0.75rem;
 }
 

@@ -185,8 +185,12 @@ export default function Onboard() {
         <p className="text-sm text-slate-400">Set up a new client account with AI monitoring in minutes.</p>
       </div>
 
-      {/* Step bar */}
-      <div className="flex items-center gap-2 mb-8">
+      {/* Step bar. flex-wrap is load-bearing: six pills plus five separators are
+          wider than <main> between 768 and about 810px, where the sidebar has
+          appeared but the viewport has not caught up, and the row overflowed the
+          scroll container by 197px. Nobody had seen it because this route is
+          admin-only and never renders under demo. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mb-8">
         {steps.map(({ n, label, icon: Icon }, idx) => {
           const done    = step > n
           const active  = step === n
@@ -200,7 +204,10 @@ export default function Onboard() {
                 {done ? <CheckCircle2 size={12} /> : <Icon size={12} />}
                 {label}
               </div>
-              {idx < steps.length - 1 && <ChevronRight size={12} className="text-slate-700 shrink-0" />}
+              {/* Decorative step separator. text-slate-700 has no dark-mode remap in
+                  index.css, so it rendered at 1.84:1 on the page in dark, against a
+                  3:1 floor for a non-text indicator. */}
+              {idx < steps.length - 1 && <ChevronRight size={12} className="text-slate-500 shrink-0" aria-hidden="true" />}
             </div>
           )
         })}
