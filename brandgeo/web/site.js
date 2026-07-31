@@ -724,7 +724,13 @@
     var continueEl = document.getElementById('termsGateContinue');
     var cancelEl   = document.getElementById('termsGateCancel');
     var errEl      = document.getElementById('termsGateError');
-    if (!planEl || !acceptEl || !continueEl || !cancelEl || !errEl) return;
+    // The redesigned notice (index.html, 2026-07-31) wraps setError's message
+    // in an icon + text row rather than one bare paragraph, so the message
+    // now targets this inner span. errEl.textContent would also erase the
+    // icon svg, since textContent replaces all children of the node it is
+    // set on.
+    var errTextEl  = document.getElementById('termsGateErrorText');
+    if (!planEl || !acceptEl || !continueEl || !cancelEl || !errEl || !errTextEl) return;
 
     var pendingPlan = null;
     var lastFocused = null;
@@ -753,7 +759,7 @@
     versionEl.textContent = 'Terms version ' + TERMS_VERSION + '. A copy is recorded with your subscription.';
 
     function setError(msg) {
-      errEl.textContent = msg || '';
+      errTextEl.textContent = msg || '';
       errEl.hidden = !msg;
     }
 

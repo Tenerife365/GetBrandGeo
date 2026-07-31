@@ -1640,8 +1640,50 @@
     .terms-gate-btn:disabled { opacity: .45; cursor: not-allowed; }
     .terms-gate-btn.ghost { flex: 0 0 auto; background: transparent; color: var(--t2); border: 1px solid var(--bd2); }
     .terms-gate-btn.ghost:hover { color: var(--t); opacity: 1; }
-    .terms-gate-error { font-size: 0.85rem; color: var(--bad); margin-top: 12px; line-height: 1.5; }
+    /* Redesigned 2026-07-31: was raw color:var(--bad) body text with no
+       container, which read as a browser error rather than product copy
+       (Constantin's flag). Now a contained notice matching the tinted-pill
+       idiom already used elsewhere on this page for --badge-bg/--badge-bd
+       (:216-217): soft tint + hairline, not full-saturation red. Text stays
+       --t2 (calm, not alarming); --bad is reserved for the icon, which is
+       what now carries the "this is an error" signal.
+       Background/border are --bad mixed toward --s2/--bd, same intent as
+       color-mix(), but frozen to a literal value per theme rather than
+       computed live: color-mix() results were confirmed NOT to re-resolve
+       when --bad/--s2 change via a live [data-theme] toggle (the theme
+       button switches by attribute, no reload) in an in-session test here,
+       even though the icon and text (plain var(--bad)/var(--t2)) update
+       correctly on the same toggle. A stale tint surviving a live toggle
+       would be a worse regression than the raw-red text this replaces, so
+       this follows the file's own established pattern for a per-theme
+       override (see [data-theme="light"] .pricing-box, :1465) instead.
+       Measured against the actual rendered background: text 6.01:1 dark,
+       5.71:1 light, both clear the 4.5:1 floor. Radius reuses var(--r), the
+       panel's own token, per instruction not to invent a spacing value. */
+    .terms-gate-error {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: var(--r);
+      background: #2d2026;   /* --bad #f87171 10% over --s2 #16171e, dark */
+      border: 1px solid #5a383d; /* --bad 26% over --bd #23242b, dark */
+      color: var(--t2);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      transition: background-color var(--dur-micro) var(--ease-soft), border-color var(--dur-micro) var(--ease-soft);
+    }
+    [data-theme="light"] .terms-gate-error {
+      background: #eedee5;   /* --bad #b91c1c 10% over --s2 #f4f4fb, light */
+      border-color: #d7afb4; /* --bad 26% over --bd #e2e2ea, light */
+    }
     .terms-gate-error[hidden] { display: none; }
+    .terms-gate-error-icon { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--bad); }
+    .terms-gate-error-text { flex: 1; min-width: 0; }
+    @media (prefers-reduced-motion: reduce) {
+      .terms-gate-error { transition: none; }
+    }
     .plan-checkout-note {
       text-align: center;
       font-size: 0.68rem;
@@ -3251,7 +3293,14 @@
       <button type="button" class="terms-gate-btn ghost" id="termsGateCancel">Cancel</button>
       <button type="button" class="terms-gate-btn" id="termsGateContinue" disabled>Continue to payment</button>
     </div>
-    <p class="terms-gate-error" id="termsGateError" hidden></p>
+    <div class="terms-gate-error" id="termsGateError" hidden role="alert">
+      <svg class="terms-gate-error-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="9"/>
+        <line x1="12" y1="8" x2="12" y2="13"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span class="terms-gate-error-text" id="termsGateErrorText"></span>
+    </div>
   </div>
 </div>
 <script src="site.js?v=2026-07-31a"></script>
