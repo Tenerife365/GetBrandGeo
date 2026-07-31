@@ -156,7 +156,12 @@ async function sendBrandedEmail({ to, bcc, subject, heading, paragraphs, bullets
       try { const j = await res.json(); msg = j.message || msg; } catch { /* keep status */ }
       return { ok: false, error: msg };
     }
-    return { ok: true };
+    // Return Resend's message id. It was being thrown away, which meant a send
+    // could not be traced afterwards: "did it go, and where did it land" had no
+    // answer. Callers that ignore the extra field are unaffected.
+    let id = null;
+    try { id = (await res.json()).id || null; } catch { /* id is a bonus, not a contract */ }
+    return { ok: true, id };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };
   }

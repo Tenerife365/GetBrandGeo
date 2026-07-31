@@ -73,18 +73,49 @@ const EMAIL = {
 
 async function main() {
   const mode = process.argv.includes('--send') ? 'send'
+             : process.argv.includes('--self-test') ? 'self'
              : process.argv.includes('--dry-run') ? 'dry'
+             : process.argv.includes('--status') ? 'status'
              : null;
 
   if (!mode) {
     console.error('Refusing to run without an explicit mode.\n'
-      + '  node scripts/send-free-plan-update.js --dry-run\n'
-      + '  node scripts/send-free-plan-update.js --send');
+      + '  --dry-run     write the HTML, send nothing, no key needed\n'
+      + '  --self-test   send the real email to Constantin ONLY, no customer involved\n'
+      + '  --send        send to the customer, BCC Constantin\n'
+      + '  --status <id> ask Resend what happened to a previous send');
     process.exit(2);
   }
 
+  // Ask Resend for the fate of a message id. This is the only way to tell
+  // "never sent" apart from "sent and filtered", which is the question a
+  // missing BCC always raises.
+  if (mode === 'status') {
+    const id = process.argv[process.argv.indexOf('--status') + 1];
+    if (!id || id.startsWith('--')) { console.error('--status needs a message id'); process.exit(2); }
+    if (!process.env.RESEND_API_KEY) { console.error('RESEND_API_KEY is not set.'); process.exit(1); }
+    const r = await fetch(`https://api.resend.com/emails/${id}`, {
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    });
+    const j = await r.json().catch(() => ({}));
+    console.log(`HTTP ${r.status}`);
+    console.log(JSON.stringify({ id: j.id, to: j.to, bcc: j.bcc, from: j.from, subject: j.subject, last_event: j.last_event, created_at: j.created_at }, null, 2));
+    return;
+  }
+
+  // SELF TEST. Same message, same sender, same shell, but Constantin is the TO
+  // and there is no BCC and no customer. It answers one question and only one:
+  // can this mailbox receive mail from Resend at all? If this lands, the send
+  // path works and a missing BCC is a filtering problem. If it does not land,
+  // the problem is the mailbox or the domain, and nothing about BCC.
+  if (mode === 'self') {
+    EMAIL.to = EMAIL.bcc;
+    delete EMAIL.bcc;
+    EMAIL.subject = `[self test] ${EMAIL.subject}`;
+  }
+
   console.log(`to:       ${EMAIL.to}`);
-  console.log(`bcc:      ${EMAIL.bcc}`);
+  console.log(`bcc:      ${EMAIL.bcc || '(none)'}`);
   console.log(`reply-to: ${EMAIL.replyTo}`);
   console.log(`subject:  ${EMAIL.subject}\n`);
 
@@ -103,7 +134,9 @@ async function main() {
 
   const res = await sendBrandedEmail(EMAIL);
   if (res.ok) {
-    console.log('SENT.');
+    console.log(`SENT. Resend id: ${res.id || '(none returned)'}`);
+    console.log('Keep that id. Trace it later with:');
+    console.log(`  node scripts/send-free-plan-update.js --status ${res.id || '<id>'}`);
   } else {
     console.error('NOT SENT:', res.error || 'unknown error', res.skipped ? '(skipped)' : '');
     process.exit(1);
