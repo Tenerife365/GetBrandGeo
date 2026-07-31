@@ -83,18 +83,46 @@ const TERMS_URL = 'https://getbrandgeo.com/terms.html';
  */
 const CHECKOUT_LINKS = (() => {
   const raw = process.env.STRIPE_CHECKOUT_LINKS;
+
+  // The first deploy of this loader returned no_link in production and there was
+  // no way to tell WHY from outside: an unset variable and a malformed one both
+  // fail closed and look identical to a caller. These logs exist so the next
+  // failure is diagnosable from the function log in one look. They deliberately
+  // never print the value, only its shape, because the value is six payable URLs.
   if (!raw) {
-    console.error('[TermsGate] STRIPE_CHECKOUT_LINKS is not set: no checkout can be issued');
+    console.error('[TermsGate] STRIPE_CHECKOUT_LINKS is NOT SET. No checkout can be issued. '
+      + 'If it is set in the Netlify UI, check it is scoped to Functions and that the site has been '
+      + 'REDEPLOYED since (functions read env at deploy time), and note that a variable marked SECRET '
+      + 'may not reach the function bundle.');
     return {};
   }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') throw new Error('not an object');
-    return parsed;
-  } catch (e) {
-    console.error('[TermsGate] STRIPE_CHECKOUT_LINKS is not valid JSON, no checkout can be issued:', e.message);
-    return {};
+
+  const shape = `len=${raw.length} starts=${JSON.stringify(raw.slice(0, 12))}`;
+
+  // Tolerate two manglings that are easy to introduce by hand or by an API
+  // client and impossible to spot in the Netlify UI, where the value is masked:
+  //   1. the whole JSON wrapped in an extra pair of quotes
+  //   2. every inner quote backslash-escaped, i.e. {\"essentials\":...}
+  // Both parse cleanly once undone, and neither can be confused with valid JSON.
+  const candidates = [raw, raw.trim()];
+  const trimmed = raw.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    candidates.push(trimmed.slice(1, -1));
   }
+  if (trimmed.includes('\\"')) candidates.push(trimmed.replace(/\\"/g, '"'));
+
+  for (const c of candidates) {
+    try {
+      const parsed = JSON.parse(c);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (c !== raw) console.warn(`[TermsGate] STRIPE_CHECKOUT_LINKS needed unwrapping before it parsed (${shape}). Re-save it as plain JSON.`);
+        return parsed;
+      }
+    } catch { /* try the next candidate */ }
+  }
+
+  console.error(`[TermsGate] STRIPE_CHECKOUT_LINKS is set but does not parse as a JSON object (${shape}). No checkout can be issued.`);
+  return {};
 })();
 
 const PERIODS = ['monthly', 'annual'];
