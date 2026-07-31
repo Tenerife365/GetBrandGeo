@@ -26,8 +26,10 @@ untrusted and re-derived.
 | Web server IP | `nslookup -type=A` | **91.200.121.45** (the cPanel box) |
 | Existing SPF | `nslookup -type=TXT` | `v=spf1 include:_spf.google.com +a +mx +ip4:89.36.131.31 +ip4:185.236.86.239 ~all` |
 | Existing DMARC | `nslookup -type=TXT _dmarc` | `v=DMARC1; p=none; rua=mailto:constantin@talentwelove.com` |
-| `trygetbrandgeo.com` | `nslookup -type=NS` | no delegation exists, so almost certainly unregistered |
+| `trybrandgeo.com` | `nslookup -type=NS` | no delegation exists, so almost certainly unregistered |
+| `trygetbrandgeo.com` | `nslookup -type=NS` | no delegation, also free, rejected on naming grounds below |
 | `getbrandgeo-outreach.com` | `nslookup -type=NS` | no delegation exists, so almost certainly unregistered |
+| `brandgeo.com` | `nslookup -type=NS`, then `curl -I` | **registered and parked**, `ns1/ns2.atom.com`, 302s to `atom.com/name/BrandGEO`, **listed for sale at USD 9,995** |
 | Engine lineup | `brandgeo-dashboard/src/lib/planConfig.ts` `PLAN_ENGINES` | see the table in step 6 |
 | Free public audit engines | `netlify/functions/_prospect_engines.js:396` `FULL_ENGINES` | 5 engines, not 7 |
 
@@ -44,10 +46,29 @@ Two things this table settles that are easy to get wrong:
 
 ## The two decisions, and why
 
-**Domain: `trygetbrandgeo.com`.** Recommended over `getbrandgeo-outreach.com`.
-The word "outreach" inside a sending domain is a filter tell, it labels the mail
-as bulk before a human reads it, and it is 9 characters longer in every From
-line. `try` reads as a product trial and matches the free audit CTA.
+**Domain: `trybrandgeo.com`.** Constantin's suggestion, taken over the original
+`trygetbrandgeo.com` on 2026-07-31, and over `getbrandgeo-outreach.com`.
+
+- `getbrandgeo-outreach.com` is out because the word "outreach" inside a sending
+  domain labels the mail as bulk before a human reads it, and it is 12
+  characters longer in every From line.
+- `trybrandgeo.com` beats `trygetbrandgeo.com` on reading. "try BrandGEO" is a
+  verb plus the brand. "try get BrandGEO" stacks two verbs and stutters at the
+  `try-get` seam. It is also 3 characters shorter, and it carries the brand name
+  exactly as the signature, the LinkedIn profile and the S6 one-pagers spell it.
+- The one thing `trygetbrandgeo.com` had going for it: it contains the full
+  primary domain as a substring, so a suspicious recipient can see the
+  relationship without a lookup. The root redirect in step 4 answers that
+  question better and answers it for both candidates, so it is not worth the
+  clumsier name.
+
+**Checked before recommending it: `brandgeo.com` is not an operating business.**
+It is parked marketplace inventory, `ns1/ns2.atom.com`, 302ing to
+`atom.com/name/BrandGEO` with a USD 9,995 asking price. So `trybrandgeo.com`
+sits next to a for-sale listing, not next to a live company that could be
+confused with us or object. That is what makes it safe. Residual risk, small and
+future: if someone buys `brandgeo.com` and operates in this category, the
+adjacency stops being free. Accepted, and noted below as a decision owed.
 
 **Never send cold from `getbrandgeo.com`.** That domain carries the company's
 Google Workspace mail and the app's transactional mail: password resets, plan
@@ -74,7 +95,7 @@ level that matters here.
   moving the primary too or adding a subdomain-specific record. A separate
   domain tunes independently, which is the whole point of a firebreak.
 - The From line is read by a human. `constantin@try.getbrandgeo.com` looks
-  machine generated to a small business owner. `constantin@trygetbrandgeo.com`
+  machine generated to a small business owner. `constantin@trybrandgeo.com`
   looks like a company.
 - The separate domain costs about EUR 12 for the year.
 
@@ -116,7 +137,7 @@ place to leak a credential.
 
 | Line | Monthly EUR | Note |
 |---|---|---|
-| `trygetbrandgeo.com` registration | about 1 | roughly EUR 12 for the year |
+| `trybrandgeo.com` registration | about 1 | roughly EUR 12 for the year |
 | Google Workspace Business Starter, 2 seats | about 14 to 17 | confirm the seat price at checkout |
 | Instantly, Growth plan | about 40 to 47 | monthly billing costs more than annual; for a 30 day sprint take monthly |
 | **Total** | **about 55 to 65** | ceiling is EUR 150, so a third and fourth inbox fit inside it |
@@ -134,7 +155,7 @@ At CyberFolks, the same place `getbrandgeo.com` already lives, so that DNS for
 both domains sits in one panel.
 
 1. Sign in at `https://www.cyberfolks.ro/`.
-2. Search the domain `trygetbrandgeo.com` and add it to the cart.
+2. Search the domain `trybrandgeo.com` and add it to the cart.
 3. At checkout, turn **WHOIS privacy ON** and **auto renew ON**.
 4. Leave the nameservers at the CyberFolks defaults (`ns1` to `ns4.cyberfolks.ro`),
    the same set `getbrandgeo.com` uses. Do not delegate this domain anywhere else.
@@ -142,10 +163,11 @@ both domains sits in one panel.
    Google Workspace, step 2, and buying a second mail service on the same domain
    creates a conflicting MX record that is tedious to find later.
 
-If `trygetbrandgeo.com` turns out to be taken at checkout, the fallback in order
-of preference is `getbrandgeo.io`, then `brandgeo-audit.com`, then
-`getbrandgeo-outreach.com`. Tell me which one you registered before doing step 3,
-because every record in that step contains the domain name.
+If `trybrandgeo.com` turns out to be taken at checkout, the fallback in order of
+preference is `trygetbrandgeo.com` (also confirmed free today), then
+`getbrandgeo.io`, then `brandgeo-audit.com`. Do not fall back to
+`getbrandgeo-outreach.com`. Tell me which one you registered before doing
+step 3, because every record in that step contains the domain name.
 
 **Report back:** the domain you registered.
 
@@ -157,7 +179,7 @@ A **new, separate** Google Workspace subscription for this domain. Not a
 secondary domain on the existing one, for the suspension reason above.
 
 1. Go to `https://workspace.google.com/`, choose **Business Starter**, and start
-   the signup with the domain `trygetbrandgeo.com` when it asks whether you have
+   the signup with the domain `trybrandgeo.com` when it asks whether you have
    a domain (choose "Yes, I have one I can use").
 2. Create these two users. Use your real name on both. Real human names only:
    `sales@`, `info@`, `hello@` and other role addresses are filtered harder on
@@ -165,11 +187,11 @@ secondary domain on the existing one, for the suspension reason above.
 
    | Mailbox | First name | Last name |
    |---|---|---|
-   | `constantin@trygetbrandgeo.com` | Constantin | Goane |
-   | `c.goane@trygetbrandgeo.com` | Constantin | Goane |
+   | `constantin@trybrandgeo.com` | Constantin | Goane |
+   | `c.goane@trybrandgeo.com` | Constantin | Goane |
 
 3. Create one alias for DMARC reports on the first user:
-   `dmarc@trygetbrandgeo.com`. Admin console, Directory, Users, click the first
+   `dmarc@trybrandgeo.com`. Admin console, Directory, Users, click the first
    user, User information, Alternate email addresses, add `dmarc`.
 4. For **each** of the two mailboxes, sign in once at `https://mail.google.com/`
    and set: a profile photo (the same one you use on LinkedIn), and a plain text
@@ -193,7 +215,7 @@ normal email from each one.
 
 ## STEP 3. DNS records
 
-All of these go in the CyberFolks DNS zone editor for `trygetbrandgeo.com` (the
+All of these go in the CyberFolks DNS zone editor for `trybrandgeo.com` (the
 domain's DNS management / zone editor section, not the one for
 `getbrandgeo.com`, check the domain name at the top of the page before you type
 anything).
@@ -207,15 +229,15 @@ what Google gives you.
 | 1 | MX | `@` | `1` | `smtp.google.com` | 3600 |
 | 2 | TXT | `@` | | `v=spf1 include:_spf.google.com ~all` | 3600 |
 | 3 | TXT | `google._domainkey` | | `v=DKIM1; k=rsa; p=` plus the key from step 3c | 3600 |
-| 4 | TXT | `_dmarc` | | `v=DMARC1; p=none; rua=mailto:dmarc@trygetbrandgeo.com; fo=1; adkim=r; aspf=r; pct=100` | 3600 |
+| 4 | TXT | `_dmarc` | | `v=DMARC1; p=none; rua=mailto:dmarc@trybrandgeo.com; fo=1; adkim=r; aspf=r; pct=100` | 3600 |
 | 5 | A | `@` | | `91.200.121.45` | 3600 |
-| 6 | CNAME | `www` | | `trygetbrandgeo.com.` | 3600 |
+| 6 | CNAME | `www` | | `trybrandgeo.com.` | 3600 |
 
 ### 3c. Generating the DKIM key
 
 1. Go to `https://admin.google.com/`.
 2. Apps, then Google Workspace, then Gmail, then **Authenticate email**.
-3. Select `trygetbrandgeo.com` in the domain dropdown.
+3. Select `trybrandgeo.com` in the domain dropdown.
 4. Set DKIM key bit length to **2048** and prefix selector to **google**, then
    **Generate new record**.
 5. Google shows a DNS host name (`google._domainkey`) and a long TXT value
@@ -234,7 +256,7 @@ catches it.
 
 **B. Host fields append the domain.** Most zone editors append the domain to
 whatever you type. If after saving you see
-`google._domainkey.trygetbrandgeo.com.trygetbrandgeo.com`, you typed the full
+`google._domainkey.trybrandgeo.com.trybrandgeo.com`, you typed the full
 name into a field that appends. Enter only `google._domainkey`, only `_dmarc`,
 only `www`, and `@` (or a blank field, depending on the panel) for the root.
 
@@ -247,9 +269,9 @@ it, split the value into quoted chunks on one line, which DNS concatenates:
 **D. `rua` stays on this domain on purpose.** DMARC reports sent to an address
 at a *different* domain require the receiving domain to publish an
 authorisation record, or most reporters silently send nothing. So `rua` points
-at `dmarc@trygetbrandgeo.com`, which needs no such record. If you ever want the
+at `dmarc@trybrandgeo.com`, which needs no such record. If you ever want the
 reports at `constantin@talentwelove.com` instead, `talentwelove.com` must first
-publish `trygetbrandgeo.com._report._dmarc.talentwelove.com` TXT `"v=DMARC1"`.
+publish `trybrandgeo.com._report._dmarc.talentwelove.com` TXT `"v=DMARC1"`.
 
 **E. `p=none` is the starting value, not the final one.** It means "monitor and
 report, enforce nothing", which is correct while records settle. On **Day 15
@@ -271,12 +293,12 @@ at the cPanel box, and this step makes it redirect.
 
 In cPanel at `https://getbrandgeo.com:2083` (or whichever cPanel URL you use):
 
-1. **Domains**, then **Create A New Domain**. Domain: `trygetbrandgeo.com`.
+1. **Domains**, then **Create A New Domain**. Domain: `trybrandgeo.com`.
    **Uncheck "Share document root"**. Let it create its own document root at
-   `/home/<your-cpanel-user>/trygetbrandgeo.com`.
+   `/home/<your-cpanel-user>/trybrandgeo.com`.
 2. **Redirects**. Set:
    - Type: **Permanent (301)**
-   - https?://(www.)? : select `trygetbrandgeo.com`
+   - https?://(www.)? : select `trybrandgeo.com`
    - Redirects to: `https://getbrandgeo.com`
    - **Redirect with or without www**: selected
    - Wild Card Redirect: leave **unchecked**
@@ -345,7 +367,7 @@ The fix is a **third and fourth mailbox created and warmed starting Day 12
 Four inboxes at 25 covers 100 per day with headroom. Cost is two more Workspace
 seats, about EUR 14 to 17, and the total stays around EUR 75 per month, still
 well inside the EUR 150 ceiling. Suggested addresses, same real-name rule:
-`constantin.g@trygetbrandgeo.com` and `cgoane@trygetbrandgeo.com`.
+`constantin.g@trybrandgeo.com` and `cgoane@trybrandgeo.com`.
 
 The alternative, pushing 35 per inbox on two mailboxes, is how a domain gets
 burned in week 4 of a 4 week sprint. Do not do that.
@@ -504,19 +526,19 @@ Nothing below is optional and nothing is a self report. S8 is not done until
 ### 7.1 DNS resolves (run after step 3, wait 15 minutes first)
 
 ```bash
-nslookup -type=MX trygetbrandgeo.com 8.8.8.8
+nslookup -type=MX trybrandgeo.com 8.8.8.8
 ```
 
 ```bash
-nslookup -type=TXT trygetbrandgeo.com 8.8.8.8
+nslookup -type=TXT trybrandgeo.com 8.8.8.8
 ```
 
 ```bash
-nslookup -type=TXT google._domainkey.trygetbrandgeo.com 8.8.8.8
+nslookup -type=TXT google._domainkey.trybrandgeo.com 8.8.8.8
 ```
 
 ```bash
-nslookup -type=TXT _dmarc.trygetbrandgeo.com 8.8.8.8
+nslookup -type=TXT _dmarc.trybrandgeo.com 8.8.8.8
 ```
 
 Pass condition: MX returns `smtp.google.com`; the second returns exactly one
@@ -526,7 +548,7 @@ returns the `v=DMARC1` line. Paste all four outputs into the chat.
 ### 7.2 The root redirect works
 
 ```bash
-curl -sSI https://trygetbrandgeo.com | head -5
+curl -sSI https://trybrandgeo.com | head -5
 ```
 
 Pass condition: `HTTP/... 301` and a `location:` header of
@@ -538,12 +560,12 @@ Do this on **Day 5 (2026-08-05)**, after four days of warmup, and before the
 first real send on Day 6.
 
 1. Open `https://www.mail-tester.com/` and copy the address it shows.
-2. From `constantin@trygetbrandgeo.com` in the Gmail web interface, send to that
+2. From `constantin@trybrandgeo.com` in the Gmail web interface, send to that
    address. **Use a realistic email**, roughly the length and shape of the real
    first touch, with a subject line and a signature. A message reading "test"
    scores badly for reasons that will not apply to real mail and wastes the run.
 3. Wait 60 seconds, click "Then check your score".
-4. Repeat the whole thing for `c.goane@trygetbrandgeo.com` on a **fresh**
+4. Repeat the whole thing for `c.goane@trybrandgeo.com` on a **fresh**
    mail-tester address. Each address is single use.
 
 Pass condition: **9.0 or higher out of 10 on both inboxes.** Paste the score and
@@ -575,7 +597,7 @@ the public URL.
 
 ### 7.7 Optional but free, and worth 10 minutes
 
-Add `trygetbrandgeo.com` to Google Postmaster Tools at
+Add `trybrandgeo.com` to Google Postmaster Tools at
 `https://postmaster.google.com/`. It needs one TXT verification record and then
 reports real Gmail-side domain reputation and spam rate, which is the only
 first-party view of how Gmail actually sees you. Do it once warmup is running.
@@ -597,6 +619,30 @@ first-party view of how Gmail actually sees you. Do it once warmup is running.
 | first real send | 7.3 passing | Day 6, 2026-08-06 |
 | inboxes 3 and 4 | nothing, but warmup takes 13 days | create Day 12, 2026-08-12 |
 | DMARC to `p=quarantine` | 14 days of clean reports | Day 15, 2026-08-15 |
+
+---
+
+## A decision owed, found while checking the name
+
+**`brandgeo.com` is for sale at USD 9,995** (about EUR 9,200) on Atom.com, the
+marketplace its nameservers point at. Found 2026-07-31 while confirming that
+`trybrandgeo.com` would not sit next to a live competitor.
+
+This is the exact-match .com for the brand. `getbrandgeo.com` exists because it
+was the available alternative, and the `get` prefix is the reason every asset
+has to say "getbrandgeo" where a reader would type "brandgeo".
+
+**Recommendation: not now, and this is not the S8 chat's call.** EUR 9,200 in
+the week before a sprint whose entire purpose is the first 100 paying customers
+is the wrong use of cash, and nothing in the outbound plan needs it. Marketplace
+asking prices are also usually negotiable, so 9,995 is a ceiling rather than a
+number.
+
+What is worth doing now, because it costs nothing: note that the risk is
+one-directional. The domain does not get cheaper if BrandGEO succeeds, and a
+competitor in this category buying it would be genuinely awkward. Revisit at the
+Day 30 close-out with real revenue on the table, or sooner if Atom shows the
+listing moving. Recorded here so it is not rediscovered at a worse moment.
 
 ---
 

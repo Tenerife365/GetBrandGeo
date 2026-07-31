@@ -43,7 +43,7 @@ and Managed breach their ceilings by EUR 8.61 and EUR 46.27.
 ### 2026-07-31: outbound sending infrastructure (S8), instructions written
 
 `docs/growth/outbound-infra.md` is the full build-out for the cold channel:
-secondary sending domain `trygetbrandgeo.com` (never send cold from
+secondary sending domain `trybrandgeo.com` (never send cold from
 `getbrandgeo.com`), two Google Workspace inboxes on a SEPARATE subscription so a
 suspension cannot reach company mail, exact SPF/DKIM/DMARC records, cPanel root
 redirect, Instantly warmup and the per-inbox cap ramp, plus the GBP description
@@ -54,6 +54,22 @@ there: the plan's Day 25 to 28 volumes (55 to 70/day) exceed two inboxes' safe
 capacity, so inboxes 3 and 4 must be created on Day 12; and the new domain's
 DMARC moves to `p=quarantine` on Day 15. S8 stays IN PROGRESS until mail-tester
 scores 9+ on both inboxes and the public GBP profile is re-checked.
+
+Two rulings recorded in that doc rather than left to be re-argued. **A subdomain
+was rejected**: `getbrandgeo.com` publishes `p=none` with no `sp=` tag, so under
+RFC 7489 a sending subdomain inherits `none` and could not move to
+`p=quarantine` independently, and organisational-domain scoring plus domain
+blocklists would put the primary inside the blast radius. A subdomain is still
+the right answer for opted-in mail later (`mail.getbrandgeo.com`). **The name is
+`trybrandgeo.com`**, Constantin's suggestion, over the original
+`trygetbrandgeo.com` which stutters at the `try-get` seam.
+
+**Found while checking that name, and it is a decision owed:
+`brandgeo.com` is for sale at USD 9,995** on Atom.com (`ns1/ns2.atom.com`, 302s
+to `atom.com/name/BrandGEO`). It is parked marketplace inventory, not an
+operating competitor, which is what makes `trybrandgeo.com` safe to use.
+Recommendation is to defer past the sprint, cash goes to acquisition first, and
+marketplace asking prices negotiate. Revisit at Day 30 close-out.
 
 ### 2026-07-31: the acquisition funnel has a forward step, and payment has a gate
 
