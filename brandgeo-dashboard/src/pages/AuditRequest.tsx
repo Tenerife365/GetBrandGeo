@@ -52,7 +52,7 @@ export default function AuditRequest() {
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <BrandGeoMark size="lg" className="mb-4" />
+          <BrandGeoMark size="lg" className="mb-4" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" />
           <h1 className="text-2xl font-bold text-white mb-2">Free Instant AI Visibility Audit</h1>
           <p className="text-sm text-slate-400">
             See whether ChatGPT, Gemini, and other AI assistants actually mention your business when people ask for recommendations — in about a minute.

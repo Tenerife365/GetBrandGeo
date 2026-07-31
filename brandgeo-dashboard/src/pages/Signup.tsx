@@ -4,8 +4,10 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
 
+// Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
+// bounce straight back to sign-in, so the wordmark links to the marketing site.
 function BrandGeoLogo() {
-  return <BrandGeoMark size="xl" />
+  return <BrandGeoMark size="xl" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" />
 }
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'

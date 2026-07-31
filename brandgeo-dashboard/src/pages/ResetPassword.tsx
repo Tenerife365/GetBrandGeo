@@ -4,8 +4,10 @@ import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
 
+// Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
+// bounce straight back to sign-in, so the wordmark links to the marketing site.
 function BrandGeoLogo() {
-  return <BrandGeoMark size="xl" />
+  return <BrandGeoMark size="xl" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" />
 }
 
 export default function ResetPassword() {

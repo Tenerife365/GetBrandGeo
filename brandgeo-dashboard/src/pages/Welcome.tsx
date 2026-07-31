@@ -3,8 +3,10 @@ import { Building2, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
 
+// Authenticated shell (wrapped in PrivateRoute in App.tsx), so unlike Login/
+// Signup/ResetPassword the wordmark can safely link to "/" — no bounce risk.
 function BrandGeoLogo() {
-  return <BrandGeoMark size="xl" />
+  return <BrandGeoMark size="xl" to="/" ariaLabel="BrandGEO: go to Overview" />
 }
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
