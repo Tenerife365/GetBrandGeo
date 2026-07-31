@@ -50,15 +50,26 @@ exports.handler = async (event) => {
     email, domain: audit.domain, auditToken: token, score: audit.ai_score, category: audit.category,
   })
 
+  // hubspot_error records WHY a push did not land (funnel audit F6). Before
+  // this, a failed push and a missing API key and a lead nobody had tried to
+  // push were all the same row: hubspot_synced = false with no other trace. The
+  // only lead this funnel has ever produced sat in that state for 22 days and
+  // was indistinguishable from success at a glance, which is the same defect
+  // shape as job_runs.ok on the roadmap.
+  //
+  // _hubspot.js has always returned a `reason` ('not_configured', 'api_error',
+  // 'exception', 'already_exists'); this function simply threw it away. Null on
+  // success, so the column reads as an exception log rather than a status.
   await supabase.from('prospect_leads').insert([{
     audit_id: audit.id, domain: audit.domain, email,
     source: 'instant_audit',
     hubspot_synced: hubspotResult.synced,
     hubspot_contact_id: hubspotResult.contactId,
+    hubspot_error: hubspotResult.synced ? null : (hubspotResult.reason || 'unknown'),
     created_at: nowIso,
   }])
 
-  console.log(`[Unlock] audit:${audit.id} email:${email} hubspot_synced:${hubspotResult.synced}`)
+  console.log(`[Unlock] audit:${audit.id} email:${email} hubspot_synced:${hubspotResult.synced}${hubspotResult.synced ? '' : ` reason:${hubspotResult.reason || 'unknown'}`}`)
 
   return { statusCode: 200, headers: corsHeaders(origin), body: JSON.stringify({ ok: true, token }) }
 }
