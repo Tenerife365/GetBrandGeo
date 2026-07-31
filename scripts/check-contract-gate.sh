@@ -62,7 +62,23 @@ fi
 [ -f "$GATE" ] || note "$GATE is missing (there is no server-side gate to enforce)"
 [ -f "$ENDPOINT" ] || note "$ENDPOINT is missing (nothing issues a checkout URL)"
 
+# The links must not be in the repo AT ALL, not merely out of the docroot. They
+# were rotated on 2026-07-31 and now live in the STRIPE_CHECKOUT_LINKS env var;
+# the whole point is that a public repository never carries a payable URL again.
+# Matched on the link SHAPE (a path of at least six chars) so the validation
+# regex inside _terms_gate.js, which necessarily mentions the host, does not
+# trip it.
+if grep -rIlE "buy\.stripe\.com/[A-Za-z0-9]{6,}" brandgeo-dashboard/netlify/functions/ >/dev/null 2>&1; then
+  echo "FAIL: a live Stripe checkout URL is hardcoded in a Netlify function. These are permanent bearer URLs and this repo is public; they belong in STRIPE_CHECKOUT_LINKS:"
+  grep -rIlnE "buy\.stripe\.com/[A-Za-z0-9]{6,}" brandgeo-dashboard/netlify/functions/ | sed 's/^/       /'
+  fail=1
+fi
+
 if [ -f "$GATE" ]; then
+  # A FAKE catalogue, injected for the harness only. The real one is an env var
+  # this script must never contain, and the logic under test is the same either
+  # way: what resolveCheckout does with a plan, a period and an acceptance.
+  export STRIPE_CHECKOUT_LINKS='{"essentials":{"monthly":"https://buy.stripe.com/TESTessMo","annual":"https://buy.stripe.com/TESTessYr"},"growth":{"monthly":"https://buy.stripe.com/TESTgroMo","annual":"https://buy.stripe.com/TESTgroYr"},"growth_pro":{"monthly":"https://buy.stripe.com/TESTproMo","annual":"https://buy.stripe.com/TESTproYr"}}'
   node -e '
     const path = require("path");
     const gate = require(path.resolve(process.argv[1]));
@@ -114,6 +130,23 @@ if [ -f "$GATE" ]; then
         }
       }
     }
+
+    // A MISSING CATALOGUE MUST NOT LOOK LIKE A BAD REQUEST. With
+    // STRIPE_CHECKOUT_LINKS unset, a real plan has to fail as `no_link`, an
+    // outage on our side, and never as `unknown_plan`, which would tell a
+    // would-be Growth customer that Growth is not a plan. This is why the
+    // self-serve plan list is static and not derived from the env var.
+    {
+      delete require.cache[require.resolve(path.resolve(process.argv[1]))];
+      const saved = process.env.STRIPE_CHECKOUT_LINKS;
+      delete process.env.STRIPE_CHECKOUT_LINKS;
+      const bare = require(path.resolve(process.argv[1]));
+      const r = bare.resolveCheckout({ plan: "growth", period: "monthly", accepted: true, acceptedVersion: bare.TERMS_VERSION });
+      if (r.ok) fail("resolveCheckout issued a checkout with STRIPE_CHECKOUT_LINKS unset");
+      if (r.reason !== "no_link") fail(`with no catalogue, a real plan failed as "${r.reason}"; it must be "no_link" (an outage), not a bad request`);
+      process.env.STRIPE_CHECKOUT_LINKS = saved;
+    }
+
     process.exit(bad);
   ' "$GATE" || fail=1
 fi

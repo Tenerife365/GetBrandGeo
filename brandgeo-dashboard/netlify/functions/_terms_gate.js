@@ -22,10 +22,24 @@
 // self-serve, asserting that no URL comes back in any of them. A UI-only gate
 // fails that script, which is the point of it.
 //
-// THE LINKS THEMSELVES were moved verbatim out of brandgeo/web/site.js, where
-// they had been since the 2026-07-28 catalogue rebuild. Every price carries
-// metadata.plan so stripe-webhook.js resolves the tier without a hardcoded id
-// map (scripts/stripe-create-catalogue.js generated them).
+// THE LINKS ARE NOT IN THIS FILE AND MUST NEVER BE PUT BACK. They live in the
+// STRIPE_CHECKOUT_LINKS env var on the Netlify project.
+//
+// The first version of this module DID hardcode them, having moved them out of
+// brandgeo/web/site.js, and review (docs/qa/s3-acquisition-funnel-contract-gate.md
+// S1) showed that changed nothing: a Stripe Payment Link is a permanent,
+// reusable bearer URL, and THIS REPOSITORY IS PUBLIC. Moving six live payment
+// URLs from one public file to another public file gated the route and not the
+// destination, and they were additionally in four committed docs and in git
+// history forever.
+//
+// Those six links were ROTATED on 2026-07-31: new links were created against the
+// same prices (no price, amount or currency changed), the new URLs went into the
+// env var, and the old ones were deactivated in Stripe. The URLs still sitting in
+// git history are now dead.
+//
+// Every price carries metadata.plan so stripe-webhook.js resolves the tier
+// without a hardcoded id map (scripts/stripe-create-catalogue.js generated them).
 //
 // NOT IN HERE, DELIBERATELY: managed and enterprise. Both are sales-assisted and
 // have no self-serve link by design, so asking this module for one is a refusal
@@ -45,22 +59,53 @@ const TERMS_VERSION = '2026-07-13';
 
 const TERMS_URL = 'https://getbrandgeo.com/terms.html';
 
-const CHECKOUT_LINKS = {
-  essentials: {
-    monthly: 'https://buy.stripe.com/5kQcN63yI6io6AcdcCdZ605',
-    annual:  'https://buy.stripe.com/bJe4gAb1a0Y47Eg7SidZ606',
-  },
-  growth: {
-    monthly: 'https://buy.stripe.com/7sY3cw9X6ayEf6IegGdZ607',
-    annual:  'https://buy.stripe.com/bJeaEY5GQ4agbUwegGdZ608',
-  },
-  growth_pro: {
-    monthly: 'https://buy.stripe.com/7sYaEY3yIcGMaQsa0qdZ609',
-    annual:  'https://buy.stripe.com/4gM28s1qA36c1fS3C2dZ60a',
-  },
-};
+/**
+ * The checkout catalogue, read from STRIPE_CHECKOUT_LINKS:
+ *
+ *   {"essentials":{"monthly":"https://buy.stripe.com/...","annual":"..."},
+ *    "growth":{...},"growth_pro":{...}}
+ *
+ * One variable rather than six, because this project has already lost an
+ * integration to Lambda's 4KB environment ceiling (GOOGLE_JSON_KEY, see
+ * CLAUDE.md), and one compact JSON costs ~350 bytes where six keys plus their
+ * names cost noticeably more.
+ *
+ * NO FALLBACK, deliberately. A hardcoded default here would defeat the entire
+ * point of the rotation, and a silent fallback to stale links would send buyers
+ * to deactivated URLs while every check still passed. If the variable is absent
+ * or malformed, resolveCheckout refuses every request with `no_link` and the
+ * page tells the visitor to contact us. That is a loud, visible outage rather
+ * than a quiet wrong answer on a money path.
+ *
+ * Parsed once at module load: it never changes within an invocation, and a
+ * throw here would take down every function that requires this module, so a bad
+ * value degrades to an empty catalogue instead.
+ */
+const CHECKOUT_LINKS = (() => {
+  const raw = process.env.STRIPE_CHECKOUT_LINKS;
+  if (!raw) {
+    console.error('[TermsGate] STRIPE_CHECKOUT_LINKS is not set: no checkout can be issued');
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') throw new Error('not an object');
+    return parsed;
+  } catch (e) {
+    console.error('[TermsGate] STRIPE_CHECKOUT_LINKS is not valid JSON, no checkout can be issued:', e.message);
+    return {};
+  }
+})();
 
 const PERIODS = ['monthly', 'annual'];
+
+// The tiers the gate is willing to sell, kept SEPARATE from the catalogue above.
+// Membership questions ("is growth_pro a thing you can buy?") must not depend on
+// an env var: if STRIPE_CHECKOUT_LINKS were missing or truncated, deriving this
+// from it would silently turn a real plan into "not a self-serve plan" and the
+// refusal would name the wrong cause. A missing LINK is a `no_link` outage; an
+// unknown PLAN is a bad request. Those need different answers.
+const SELF_SERVE_CHECKOUT_PLANS = ['essentials', 'growth', 'growth_pro'];
 
 /**
  * Decide whether a checkout may proceed, and to where.
@@ -104,10 +149,12 @@ function resolveCheckout({ plan, period, accepted, acceptedVersion } = {}) {
   }
 
   const planKey = String(plan == null ? '' : plan).trim();
-  if (!Object.prototype.hasOwnProperty.call(CHECKOUT_LINKS, planKey)) {
-    // Covers three cases with one message on purpose: a typo, a sales-assisted
-    // tier (managed, enterprise), and a prototype-pollution probe such as
-    // "constructor" or "__proto__", which hasOwnProperty is here to stop.
+  // Checked against the STATIC list, not against the env-var catalogue. A typo,
+  // a sales-assisted tier (managed, enterprise), and a prototype-pollution probe
+  // such as "constructor" or "__proto__" all land here and all mean "bad
+  // request". `includes` on a plain array also closes the pollution case that
+  // hasOwnProperty was guarding before.
+  if (!SELF_SERVE_CHECKOUT_PLANS.includes(planKey)) {
     return fail('unknown_plan', `"${planKey}" is not a self-serve plan`);
   }
 
@@ -116,12 +163,15 @@ function resolveCheckout({ plan, period, accepted, acceptedVersion } = {}) {
     return fail('unknown_period', `"${periodKey}" is not a billing period`);
   }
 
-  const url = CHECKOUT_LINKS[planKey][periodKey];
-  if (!url) {
-    // Unreachable while the catalogue above is complete. It is kept because the
-    // alternative is returning undefined as a URL and sending a paying customer
-    // to "undefined".
-    return fail('no_link', `no checkout link is configured for ${planKey}/${periodKey}`);
+  // A real plan and a real period that resolve to no URL means the catalogue is
+  // missing or malformed, which is an outage on our side and NOT a bad request.
+  // Distinguishing the two is why the plan list above is static: without it, an
+  // unset env var would tell a would-be Growth customer that Growth is not a
+  // plan.
+  const forPlan = CHECKOUT_LINKS[planKey];
+  const url = forPlan && typeof forPlan === 'object' ? forPlan[periodKey] : null;
+  if (!url || typeof url !== 'string' || !/^https:\/\/buy\.stripe\.com\//.test(url)) {
+    return fail('no_link', `no checkout link is configured for ${planKey}/${periodKey} (check STRIPE_CHECKOUT_LINKS)`);
   }
 
   return { ok: true, url, plan: planKey, period: periodKey, version: TERMS_VERSION };
@@ -146,7 +196,7 @@ module.exports = {
   TERMS_VERSION,
   TERMS_URL,
   PERIODS,
-  SELF_SERVE_CHECKOUT_PLANS: Object.keys(CHECKOUT_LINKS),
+  SELF_SERVE_CHECKOUT_PLANS,
   resolveCheckout,
   withReference,
 };
