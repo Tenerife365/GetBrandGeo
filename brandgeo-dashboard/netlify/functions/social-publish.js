@@ -73,7 +73,20 @@ async function enforceSocialLimits(supabase, clientId, targets) {
 }
 
 exports.handler = async (event) => {
-  const auth = await requireAuth(event);
+  // ADMIN-ONLY 2026-07-31. AI Social is unfinished and is presented to customers
+  // as coming soon; admins drive it for any account to test. This endpoint posts
+  // to LIVE external social channels, and until this line the only gate was a
+  // plan-rank check (enforceSocialLimits, below) plus the client-side plan check
+  // in Social.tsx. A plan-rank gate is the wrong gate under that decision: no
+  // customer plan should reach this code at all, so rank is not the question.
+  // The UI lock was never a security boundary.
+  //
+  // enforceSocialLimits is deliberately left in place below, unchanged. It is now
+  // unreachable (its call site is guarded by profile.role !== 'admin', which this
+  // gate has already excluded), but it is entitlement logic and removing it is a
+  // product decision, not an auth fix. It stands as a second line of defence if
+  // this gate is ever relaxed.
+  const auth = await requireAuth(event, { adminOnly: true });
   if (auth.response) return auth.response;
   const { headers, supabase, profile, user } = auth;
 

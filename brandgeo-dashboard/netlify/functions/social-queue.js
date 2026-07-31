@@ -20,7 +20,13 @@ const { getProvider } = require('./_publishing');
 const { ensureSocialProfile, requireBoundProfile } = require('./_social');
 
 exports.handler = async (event) => {
-  const auth = await requireAuth(event);
+  // ADMIN-ONLY 2026-07-31. AI Social is unfinished and is presented to customers
+  // as coming soon; admins drive it for any account to test. Until this line the
+  // only gate was the client-side plan check in Social.tsx, so a non-admin viewer
+  // could call this endpoint directly and read the provider-side scheduled queue
+  // of any client they could authenticate for, including posts BrandGEO never
+  // created. The UI lock was never a security boundary.
+  const auth = await requireAuth(event, { adminOnly: true });
   if (auth.response) return auth.response;
   const { headers, supabase, profile } = auth;
 
