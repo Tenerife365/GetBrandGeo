@@ -92,6 +92,7 @@
         "description": "AI Visibility Intelligence platform: a weighted 0-100 score across six dimensions, per-engine breakdowns for ChatGPT, Gemini, Claude, Perplexity and Google AI Mode, competitor tracking, and a prioritised Fix This action hub.",
         "offers": [
           {"@type": "Offer", "name": "BrandGEO Free", "price": "0", "priceCurrency": "EUR"},
+          {"@type": "Offer", "name": "BrandGEO Radar", "price": "29", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "29", "priceCurrency": "EUR", "unitText": "MONTH"}},
           {"@type": "Offer", "name": "BrandGEO Essentials", "price": "99", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "99", "priceCurrency": "EUR", "unitText": "MONTH"}},
           {"@type": "Offer", "name": "BrandGEO Growth", "price": "299", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "299", "priceCurrency": "EUR", "unitText": "MONTH"}},
           {"@type": "Offer", "name": "BrandGEO Growth PRO", "price": "449", "priceCurrency": "EUR", "priceSpecification": {"@type": "UnitPriceSpecification", "price": "449", "priceCurrency": "EUR", "unitText": "MONTH"}},
@@ -1705,6 +1706,13 @@
     .pricing-cta-block p { font-size: 1.05rem; font-weight: 700; color: var(--t); margin-bottom: 18px; }
 
     /* ─── Redesign 2026-07-17: hook header + path toggle + trust glue ─── */
+    /* #pricing override, added 2026-07-31 with the Radar card: the generic
+       .section rule caps every section at max-width:1060px, which left only
+       ~980px of content width, too narrow for 5 pricing cards without
+       cramming. ID specificity beats the .section class regardless of source
+       order, so this is the only rule needed; padding and everything else on
+       .section is untouched. */
+    #pricing { max-width: 1300px; }
     .pricing-head { text-align: center; max-width: 640px; margin: 0 auto; }
     #pricing h2 em { font-style: normal; background: linear-gradient(135deg, var(--ac), var(--ac2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .hook-sub { color: var(--t2); font-size: 0.95rem; max-width: 600px; margin: 12px auto 0; line-height: 1.65; }
@@ -1717,10 +1725,13 @@
     .mode-caption { text-align: center; font-size: 0.8rem; color: var(--t3); max-width: 520px; margin: 0 auto 24px; }
     .pricing-grid.pricing-grid-modes { max-width: 1000px; margin: 0 auto; }
     .pricing-grid[hidden] { display: none; }
-    /* Mode grids (2026-07 ladder): self-serve = 4 across (Free / Essentials /
-       Growth / Growth PRO); done-for-you = 2 across (Managed + Custom
-       Enterprise). #id specificity overrides the generic 3-col base. */
-    #grid-self    { grid-template-columns: repeat(4, 1fr); max-width: 1180px; }
+    /* Mode grids (2026-07 ladder, Radar added 2026-07-31): self-serve = 5
+       across (Free / Radar / Essentials / Growth / Growth PRO); done-for-you
+       = 2 across (Managed + Custom Enterprise). #id specificity overrides the
+       generic 3-col base. #pricing's own max-width override, just below the
+       generic .section 1060px cap, is what actually gives the 5th column
+       room: a child's max-width can never exceed its parent's content box. */
+    #grid-self    { grid-template-columns: repeat(5, 1fr); max-width: 1220px; }
     #grid-managed { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
     /* the generic `.featured { grid-column: span 2 }` further down is for the old
        3-up layout — neutralise it inside the mode grids so cards keep their column */
@@ -2795,8 +2806,29 @@
       <div class="plan-features-label">Includes</div>
       <ul class="pricing-features">
         <li>1 project &middot; 5 buyer prompts</li>
-        <li>ChatGPT visibility</li>
+        <li>Gemini visibility</li>
         <li>Monthly refresh + dashboard</li>
+      </ul>
+    </div>
+
+    <!-- Radar -->
+    <div class="pricing-box">
+      <div class="plan-eyebrow">Launch price</div>
+      <div class="plan-name">BrandGEO Radar</div>
+      <div class="plan-price-row">
+        <div class="plan-price">&#x20AC;29 <span>/mo</span></div>
+        <div class="savings-tag">List &#x20AC;39/mo after launch</div>
+      </div>
+      <div class="plan-sub-row">
+        <div class="plan-sub">For our first 100 customers. Then &#x20AC;39/mo list price.</div>
+      </div>
+      <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="radar">Subscribe</a>
+      <div class="plan-checkout-note">Secure Stripe checkout</div>
+      <div class="plan-features-label">Everything in Free, plus</div>
+      <ul class="pricing-features">
+        <li>1 project &middot; 7 buyer prompts</li>
+        <li>Gemini &amp; Claude</li>
+        <li>Weekly refresh + dashboard</li>
       </ul>
     </div>
 
@@ -2814,9 +2846,9 @@
       </div>
       <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="essentials">Subscribe</a>
       <div class="plan-checkout-note">Secure Stripe checkout</div>
-      <div class="plan-features-label">Everything in Free, plus</div>
+      <div class="plan-features-label">Everything in Radar, plus</div>
       <ul class="pricing-features">
-        <li>15 commercial prompts</li>
+        <li>18 commercial prompts</li>
         <li>ChatGPT, Gemini &amp; Claude</li>
         <li>Weekly refresh + competitor tracking</li>
       </ul>
@@ -2862,7 +2894,7 @@
       <div class="plan-features-label">Everything in Growth, plus</div>
       <ul class="pricing-features">
         <li><strong>7 AI engines</strong> &middot; + Grok and Google AI Overviews</li>
-        <li>35 commercial prompts</li>
+        <li>56 commercial prompts</li>
         <li>Weekly refresh &middot; priority queue</li>
         <li><strong>Site audit: 30 pages</strong> &middot; 3x Growth</li>
         <li>AI Social &middot; <span class="pc-muted">coming soon</span></li>
