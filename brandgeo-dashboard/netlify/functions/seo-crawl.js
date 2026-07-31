@@ -11,7 +11,7 @@
 // ============================================================================
 const { requireAuth } = require('./_auth');
 
-// Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Essentials+
+// Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Radar+
 // (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
 // SIXTH copy of the plan ladder. Source of truth is planConfig.ts
 // PLAN_SEO_PAGE_CAP; this exists because a Netlify function cannot import the
@@ -27,7 +27,14 @@ const { requireAuth } = require('./_auth');
 // There is no hasFeature() gate in this file. The `maxPages <= 0` test IS the
 // gate, which is why a wrong number here is an entitlement leak rather than a
 // display bug.
-const CRAWL_PAGE_CAP = { free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
+//
+// UPDATED 2026-07-31: radar and essentials go to 1, the landing page only.
+// Constantin's ruling. See planConfig.ts PLAN_SEO_PAGE_CAP for the full reason
+// essentials moved too (it is a ladder inversion otherwise: Radar is EUR 29 and
+// Essentials is EUR 99). The "landing page" part is delivered by _seo_crawl.js,
+// which now seeds the crawl queue with the homepage; a bare cap of 1 would
+// otherwise audit whatever the client's sitemap lists first.
+const CRAWL_PAGE_CAP = { free: 0, radar: 1, essentials: 1, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
 // One crawl/audit cycle per week per client (the "max 1 audit / week" cap).
 const CRAWL_COOLDOWN_DAYS = 7;
 
@@ -59,7 +66,7 @@ exports.handler = async (event) => {
     // granted it AI SEO silently. That is exactly how radar got one.
     const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 0;
     if (maxPages <= 0) {
-      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Essentials or higher to audit your pages.' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Radar or higher to audit your landing page.' }) };
     }
 
     // Don't start a second crawl while one is already running for this client.

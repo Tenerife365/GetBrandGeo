@@ -24,8 +24,14 @@ const TIMEOUT_MS = 22000;
 // across many clients. A client below the AI SEO min plan never reaches here
 // (the page + nav are feature-gated), so free/essentials are 0 for completeness.
 // PRICING-STRATEGY-2026-07 §3. Keep in sync with planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH.
+// CORRECTED 2026-07-31, and it was about to go live. essentials read 2 here
+// against planConfig's 0, which was harmless only while FEATURE_MIN_PLAN.ai_seo
+// was 'growth' and the whole surface was shut to Essentials. That gate is now
+// 'radar', so this line would have started handing every Essentials customer two
+// free LLM drafts a month that the plan does not sell. radar is spelled out for
+// the same reason rather than left to the `?? 0` fallback below.
 const DRAFT_MONTHLY_CAP = {
-  free: 0, essentials: 2, growth: 10, growth_pro: 30, managed: 60, pro: 60, enterprise: 200,
+  free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 60, pro: 60, enterprise: 200,
 };
 
 function monthStartIso() {

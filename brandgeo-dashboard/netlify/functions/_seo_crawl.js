@@ -38,6 +38,27 @@ async function sitemapCrawl(host, maxPages) {
   // Same host, allowed by robots, deduped, capped.
   const seen = new Set();
   const picked = [];
+
+  // THE HOMEPAGE GOES FIRST, ALWAYS. Two reasons, and the second is an
+  // entitlement rule rather than a preference.
+  //
+  //   1. A client sitemap that omits its own root is common with generated
+  //      sitemaps, and until now that meant we audited a site without ever
+  //      looking at its front door, at ANY page cap.
+  //   2. Radar and Essentials are sold a ONE PAGE audit, and what they are sold
+  //      is the landing page. maxPages = 1 used to mean "whatever the client's
+  //      sitemap happens to list first", which is not what they bought and is
+  //      not reproducible between runs either.
+  //
+  // Both spellings go into `seen` because sitemaps write the root as either
+  // https://host or https://host/ and stripHash does not reconcile the two, so
+  // without this the homepage could be picked twice and eat a one-page budget.
+  if (robots.allowed('/')) {
+    picked.push(base);
+    seen.add(stripHash(base));
+    seen.add(stripHash(`${base}/`));
+  }
+
   for (const u of urls) {
     const norm = stripHash(u);
     if (seen.has(norm)) continue;

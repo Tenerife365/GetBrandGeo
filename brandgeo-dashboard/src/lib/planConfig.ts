@@ -36,9 +36,13 @@ export type EngineId =
 //
 // ITS POSITION IN PLAN_ORDER IS LOAD BEARING, not cosmetic. planRank() and
 // hasFeature() both derive from the INDEX, so `radar` anywhere except directly
-// after `free` silently shifts every feature gate on the ladder. Sitting where it
-// does, FEATURE_MIN_PLAN.ai_seo = 'growth' keeps excluding it with no further
-// edit.
+// after `free` silently shifts every feature gate on the ladder.
+//
+// The worked example that used to sit here said Radar's position kept
+// FEATURE_MIN_PLAN.ai_seo = 'growth' excluding it "with no further edit". True
+// when written, stale since 2026-07-31: that gate is now 'radar' by ruling, so
+// AI SEO is the one feature Radar's index deliberately does NOT exclude. The
+// point about the index still stands for every other gate.
 export type Plan = 'free' | 'radar' | 'essentials' | 'growth' | 'growth_pro' | 'managed' | 'pro' | 'enterprise'
 
 export type EngineState = 'active' | 'coming_soon' | 'locked'
@@ -422,7 +426,8 @@ export type FeatureId = 'ai_social' | 'ai_seo'
 export const ADMIN_ONLY_FEATURES: ReadonlySet<FeatureId> = new Set<FeatureId>(['ai_social'])
 
 // Minimum plan that unlocks each feature (PRICING-STRATEGY-2026-07.md §3):
-//   AI SEO: from Growth (1 landing page; 10 on Growth, 30 on Growth PRO).
+//   AI SEO: from Radar (landing page only on Radar and Essentials; 10
+//   pages on Growth, 30 on Growth PRO).
 //   AI Social: none. It is admin-only and coming soon (see ADMIN_ONLY_FEATURES
 //   above). No plan grants it, so no per-tier depth applies yet. The value below
 //   is INERT: hasFeature() short-circuits on the admin-only set before reading
@@ -430,7 +435,13 @@ export const ADMIN_ONLY_FEATURES: ReadonlySet<FeatureId> = new Set<FeatureId>(['
 //   deleting the set alone does not ship the feature to self-serve customers.
 export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
   ai_social: 'enterprise',   // inert, see above. NOT a statement that Enterprise gets it.
-  ai_seo:    'growth',
+  // Lowered from 'growth' 2026-07-31 so Radar and Essentials can reach their
+  // one-page audit (PLAN_SEO_PAGE_CAP). This gate opens the whole AI SEO
+  // SURFACE, not the crawl alone, so depth is enforced by the per-plan caps
+  // underneath it and not by this line. Drafts in particular stay at 0 for both
+  // tiers in PLAN_SEO_DRAFTS_PER_MONTH, and in seo-draft.js's own copy, because
+  // a draft is an LLM generation and a crawl is a fetch.
+  ai_seo:    'radar',
 }
 
 // Copy for the locked / coming-soon screen. Admin-only features must NOT be
@@ -655,19 +666,39 @@ export function refreshCadenceFor(plan: string, category?: string | null): Refre
 }
 
 /** AI SEO — max pages that can be crawled/audited (0 = feature locked). */
-// MOVED TO GROWTH+ 2026-07-29 (was Essentials at 1 page). Site audit is now one
-// of the three things separating Essentials from Growth, alongside engines
-// (3 -> 5) and prompts (20 -> 50).
-// radar = 0. AI SEO is Growth and up (FEATURE_MIN_PLAN.ai_seo), and the ruling
-// grants Radar no SEO entitlement of any kind. Same for the four maps below it.
+// LANDING PAGE ONLY FROM RADAR, ruled by Constantin 2026-07-31: "I want Radar
+// to have the one page crawl, but only one page, the landing page, no other
+// page." One page is affordable at EUR 29 because a crawl is an HTTP fetch plus
+// one audit call, not a collection run.
+//
+// ESSENTIALS MOVES WITH IT, and that part was NOT asked for. Radar is EUR 29 and
+// Essentials is EUR 99, so radar: 1 with essentials: 0 would have sold a cheaper
+// plan an audit the dearer one does not get. That is a ladder inversion of
+// exactly the kind decision 2 of the sprint ladder ruling exists to close, and
+// it costs nothing to avoid: Essentials pays more for the same single page.
+//
+// This partially restores the 2026-07-29 state (Essentials was 1 page then, and
+// was zeroed to widen the Essentials/Growth gap). The other two levers from that
+// change are untouched and still carry the differentiation: engines 3 -> 5 and
+// prompts 7 -> 18 -> 35. Growth's advantage is now 10 pages against 1, which is
+// a depth difference rather than an on/off difference.
+//
+// The one-page grant is only truthful because _seo_crawl.js seeds the crawl
+// queue with the homepage. Before that, maxPages = 1 meant "the first URL in
+// the client's sitemap", which is not the landing page and is not stable
+// between runs. Do not raise or lower this without re-reading that seed.
 export const PLAN_SEO_PAGE_CAP: Record<Plan, number> = {
-  free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30,
+  free: 0, radar: 1, essentials: 1, growth: 10, growth_pro: 30,
   managed: 100, pro: 100, enterprise: 500,
 }
 
 /** AI SEO — max page audits per week. */
+// radar/essentials = 1: a page cap above zero is meaningless if the weekly
+// allowance is zero, so these two move together with PLAN_SEO_PAGE_CAP above or
+// the entitlement is decorative. seo-crawl.js enforces the weekly interval with
+// its own CRAWL_COOLDOWN_DAYS = 7, which agrees with 1 per week.
 export const PLAN_SEO_AUDITS_PER_WEEK: Record<Plan, number> = {
-  free: 0, radar: 0, essentials: 0, growth: 1, growth_pro: 1,
+  free: 0, radar: 1, essentials: 1, growth: 1, growth_pro: 1,
   managed: 3, pro: 3, enterprise: 7,
 }
 
