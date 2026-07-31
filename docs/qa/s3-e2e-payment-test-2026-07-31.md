@@ -33,7 +33,30 @@ back.
 Restored to `pro`, with the Stripe fields cleared and the subscription cancelled.
 `pro` and `managed` are **identical** in what they grant (7 engines, 120 prompts,
 EUR 225 budget), so entitlement is whole either way; only the label is uncertain.
-**Constantin should confirm whether BpR was `pro` or `managed`.**
+~~**Constantin should confirm whether BpR was `pro` or `managed`.**~~
+
+> **ANSWERED 2026-07-31 by Constantin: it was `growth_pro`, which was NEITHER of
+> the two options this section offered.** The row now reads `growth_pro`,
+> verified.
+>
+> **The inference method was wrong, and that is the part worth keeping.** The
+> tier was deduced from the presence of `grok` and `ai_overview` rows, on the
+> reasoning that those engines exist only above Growth. True, but not
+> discriminating: `growth_pro`, `managed` and `pro` ALL carry `grok` and
+> `ai_overview` (`planConfig.ts:93-96`). The evidence narrowed seven plans to
+> three and was then read as though it had picked one. It landed on `pro`, which
+> grants **9 engines and a EUR 225 budget** against Growth PRO's **7 and EUR
+> 67.35**, so a real customer sat over-entitled until it was corrected.
+>
+> Restated as a rule: evidence that excludes is not evidence that selects. When
+> a measurement narrows the field without closing it, say which candidates
+> remain rather than naming the most likely one.
+>
+> **`client_events` for client 1 held ZERO rows through all three plan changes**,
+> which is why none of this could be read back from the database. Constantin
+> approved the fix the same day: every path that writes `clients.plan` appends a
+> `client_events` row. `stripe-webhook.js` and `provision-account.js` had none at
+> all, and `stripe-webhook.js` is the path that handles real payments.
 
 **The lesson, and it generalises:** never run a payment test with an email that
 already belongs to a user, because provisioning resolves by email and will attach
