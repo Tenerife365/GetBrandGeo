@@ -1,5 +1,49 @@
 # End-to-end payment test, and the link rotation
 
+## RESULT: the test PASSED, and it caused one incident
+
+Paid 2026-07-31 14:01. **`client_reference_id` DOES survive a Stripe Payment
+Link on this account**, which was the single unverified assumption the whole S1
+remediation rested on:
+
+```
+matched_at        2026-07-31 14:01:32
+matched_email     constantin@talentwelove.com
+stripe_session_id cs_live_a1c7wUoZef1ulMHKHtn7d0rBK3jfkrtT5kKQXA0bU7vDJazIxdI9E6nfpb
+admin_notifications  subscription_new "Subscription: Essentials"
+                     NO checkout_without_acceptance  <- no false alarm
+```
+
+So the gate, the reference, the webhook match and the provisioning path all work
+end to end against real money.
+
+### INCIDENT: the test overwrote a real client's plan
+
+**The test email was `constantin@talentwelove.com`, which is the ADMIN user, and
+`user_profiles.client_id` for that user is 1, Bucate pe Roate.** The webhook does
+`findUserByEmail(email)`, followed it to client 1, and set a REAL client to
+`essentials` with `plan_source = 'stripe'` and the test subscription attached.
+
+BpR was NOT on essentials. Proven, not assumed: it has `grok` and `ai_overview`
+rows from 2026-07-29/30, and those engines exist only on `growth_pro`, `managed`
+and `pro`. Essentials has three engines and none of them are those. There is no
+`client_events` history for client 1, so the exact prior tier could not be read
+back.
+
+Restored to `pro`, with the Stripe fields cleared and the subscription cancelled.
+`pro` and `managed` are **identical** in what they grant (7 engines, 120 prompts,
+EUR 225 budget), so entitlement is whole either way; only the label is uncertain.
+**Constantin should confirm whether BpR was `pro` or `managed`.**
+
+**The lesson, and it generalises:** never run a payment test with an email that
+already belongs to a user, because provisioning resolves by email and will attach
+to whatever client that user points at. Use an address that is not any client's
+login. This is the same trap the roster memory already recorded for testing the
+`/welcome` flow.
+
+---
+
+
 Written 2026-07-31. Everything here is against the LIVE Stripe account
 (`acct_1LHjKrKh2GaZE2B4`, `livemode: true`). There is no test mode.
 
@@ -99,6 +143,24 @@ reason the rotation happened.
 
 The six OLD links (`plink_1Ty5ZzKh…` through `plink_1Ty5aAKh…`) are **still
 active on purpose**, see below.
+
+### LIVE OUTAGE, open at time of writing: checkout returns `no_link`
+
+The rotation deploy LANDED (the gate now answers `no_link`, a response only the
+new code can produce), but **`STRIPE_CHECKOUT_LINKS` is not reaching the
+function**, so every Subscribe button fails closed. Nobody can subscribe.
+
+Diagnosis: other env vars DO reach `accept-terms` (it writes to Supabase on every
+call, using `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`), so this is specific to
+this one variable. The only thing different about it is that it was created with
+**`is_secret: true`**. That is the prime suspect.
+
+Fix, in the Netlify UI (agent env-var writes are blocked by policy):
+Site configuration -> Environment variables -> `STRIPE_CHECKOUT_LINKS` ->
+recreate it **not** marked secret, scopes including **Functions**, context All,
+then **trigger a redeploy** (functions pick env up at deploy time).
+
+Verify with the command below; it must return the NEW growth-monthly link.
 
 ### SEQUENCING, and it is the whole risk
 
