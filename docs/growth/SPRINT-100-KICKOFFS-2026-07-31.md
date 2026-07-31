@@ -622,8 +622,13 @@ ACTION: create docs/growth/SPRINT-100-SCOREBOARD.md with:
    fallback from Path 1 cadence to Path 2 (documented in the registry, Part
    A); Day 22 at or above 55 plus a CFO check on churn and upgrades; Day 30
    close-out and the Day 31 memo.
-3. A five-minute end-of-day routine, written as a checklist: fill the row,
-   compare to glidepath, write the one-line note, nothing else.
+3. The capture rule, stated in the scoreboard header: rows are written by
+   council chats, never by hand. Constantin says "close the day" in
+   whatever chat is open; that chat pulls Stripe and Supabase numbers, asks
+   him one line for sends, DMs, replies and calls, fills the row, commits
+   and pushes. Full protocol: the day-side capture section of
+   SPRINT-100-DAILY-COUNCIL.md. Fridays add the CFO reconciliation line;
+   Mondays and Thursdays record the real-card rehearsal tick.
 
 VERIFY: check: test -f docs/growth/SPRINT-100-SCOREBOARD.md and the table has
 30 dated rows. Fill row zero (2026-07-31) with today's baseline: current

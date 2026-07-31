@@ -34,6 +34,26 @@ improved by editing this file, not the schedule.
 6. `docs/ROADMAP.md` NEEDS CONSTANTIN section (do not duplicate items into
    the brief that already live there; reference them)
 
+## How the scoreboard gets its data (the day side)
+
+Constantin never edits the scoreboard by hand. During the day he works inside
+council chats, and the chats are the instrument:
+
+1. Any BrandGEO session, when told **"close the day"** (or when a working
+   session notices the working day ending), runs the capture: pull paying
+   subscribers and MRR from the Stripe MCP (read-only, active subscriptions
+   plus live package grants), pull the day's audit runs and signups from
+   Supabase (read-only SQL on prospect_audits and clients), then ask
+   Constantin ONE line for the manual numbers: sends, DMs, replies, calls.
+   "0" and "skip" are valid answers.
+2. The session writes the row in `SPRINT-100-SCOREBOARD.md`, adds the
+   one-line note, commits docs-only and pushes.
+3. A day chat that learns a number mid-day (a new paying customer, a booked
+   call) may update the row incrementally; the close-the-day pass finalizes.
+4. Fridays the capture adds the CFO reconciliation line (Stripe subscriptions
+   vs clients.plan). Mondays and Thursdays it records whether the real-card
+   rehearsal ran.
+
 ## The cycle, in order
 
 1. **Re-verify before trusting.** For every S-task marked DONE in the
@@ -41,11 +61,15 @@ improved by editing this file, not the schedule.
    if it is runnable here (test -f, grep, node scripts with no credentials).
    A check that passed and now fails is the number one item in the brief.
    List unverifiable checks explicitly.
-2. **Measure yesterday.** Read yesterday's scoreboard row. Compare against
-   yesterday's plan row (sends, DMs, new paying) and the glidepath. Classify
-   the day: GREEN (on plan), YELLOW (one metric off), RED (glidepath breach
-   per the plan's rule, or the row is empty). An empty row means the cycle
-   is flying blind; say so at the top of the brief.
+2. **Measure yesterday.** Read yesterday's scoreboard row, written by the
+   day-side capture above. Compare against yesterday's plan row (sends, DMs,
+   new paying) and the glidepath. Classify the day: GREEN (on plan), YELLOW
+   (one metric off), RED (glidepath breach per the plan's rule). If the row
+   is missing, the capture did not run: derive what is derivable from the
+   repo itself (commits, registry state changes, briefs), mark acquisition
+   metrics UNVERIFIABLE HERE, hold cadence steady, and put "tell any council
+   chat to close the day" first in ACTIONS FOR CONSTANTIN. A missing row is
+   never treated as zero activity.
 3. **Apply the pre-agreed rules, do not re-debate them.** From registry Part
    A and Part C: reply rate below 5 percent for 5 sending days = segment
    change, never volume increase. Gate misses trigger the gate's written

@@ -25,8 +25,11 @@ against the scoreboard. Rules of adaptation:
 
 Morning: send block (cold email batch fires, DMs by hand). Midday: replies
 within 2 hours, calls. Afternoon: onboarding, agent supervision, one
-evidence post. Evening: 5-minute scoreboard row, done. Weekends: reduced
-sends (deliverability and reply rates drop), content and prep instead.
+evidence post. Evening: tell the open council chat to **close the day**; the
+chat pulls Stripe and Supabase numbers, asks one line for sends and replies,
+writes the scoreboard row and commits. Constantin edits no files. Weekends:
+reduced sends (deliverability and reply rates drop), content and prep
+instead.
 
 ## The 30 days
 
