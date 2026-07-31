@@ -469,7 +469,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[11px] text-slate-400 bg-dark-700/40 border border-dark-600/60 hover:text-slate-200 hover:border-dark-500 transition-colors"
                   aria-haspopup="listbox"
                   aria-expanded={showInternal}
-                  title="Internal research workspaces for content and other uses — not customer accounts"
+                  title="Internal research workspaces for content and other uses, not customer accounts"
                 >
                   <FlaskConical size={12} className="flex-shrink-0" />
                   <span className="flex-1 text-left">Internal / Research</span>

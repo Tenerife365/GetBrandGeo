@@ -94,7 +94,7 @@ export default function Prompts() {
         setClientConfig(data)
         // Auto-trigger prompt generation using the client website
         const autoMsg = data.brand_website
-          ? `Analyze this business and generate monitoring prompts: ${data.name} — website: ${data.brand_website}`
+          ? `Analyze this business and generate monitoring prompts: ${data.name}, website: ${data.brand_website}`
           : `Generate monitoring prompts for: ${data.name}`
         // Use a short delay so the panel renders first
         setTimeout(() => {
@@ -239,10 +239,15 @@ export default function Prompts() {
         // else is a real failure and is shown verbatim rather than swallowed —
         // this insert used to discard its error entirely, so a rejected write
         // just silently did nothing.
+        // When the cap itself is unknown, say so in words. The old fallback
+        // interpolated a bare dash glyph, producing the broken string
+        // "Your plan allows [dash] active prompts."
         setCapError(
-          error.message.includes('prompt_cap_reached')
-            ? `Your plan allows ${cap ?? '—'} active prompts. Delete one to add another, or upgrade.`
-            : `Could not add prompt: ${error.message}`
+          !error.message.includes('prompt_cap_reached')
+            ? `Could not add prompt: ${error.message}`
+            : cap != null
+              ? `Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`
+              : 'You have reached your plan\'s active prompt limit. Delete one to add another, or upgrade.'
         )
         setSaving(false)
         return false
@@ -350,8 +355,15 @@ export default function Prompts() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div>
+      {/* flex-wrap + min-w-0 are load-bearing at 320: without them the title
+          column cannot shrink below its content and the button group cannot drop
+          to a second line, so <main> overflowed (358 against a 320 clientWidth).
+          Pre-existing, found 2026-07-30 when 320 was first tested, and unchanged
+          by the touch-target work: forcing the old gaps back still measured 358.
+          The document itself never overflowed, so only a checker reading <main>
+          could see it. */}
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <PageTitle>{t.pr_title}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5">
             {cap === null || cap >= 100000
@@ -567,7 +579,7 @@ export default function Prompts() {
               aria-label="New prompt text"
               className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
             />
-            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text — no need to pick one.</p>
+            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
           </div>
           {/* 32x32 visible, 44x44 target below md, and the gap goes to 16px there
               so the two targets do not overlap (32 + 12 = 44, centres 48 apart). */}
@@ -582,8 +594,13 @@ export default function Prompts() {
       <div className="space-y-1.5">
         {filtered.map((p, i) => {
           const isEditing = editId === p.id
+          // gap-2 below sm: three of this row's four children are flex-shrink-0
+          // (index, category badge, actions), so at 320 the three 16px gaps were
+          // 48px of fixed cost the row could not give back, and it overflowed
+          // <main>. The text span also needs min-w-0 below, or `flex-1` still
+          // cannot shrink past its longest word.
           return (
-            <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-4 group hover:border-dark-600 transition-colors">
+            <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-2 sm:gap-4 group hover:border-dark-600 transition-colors">
               <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${CAT_BADGE}`}>{promptCategoryLabel(p.category)}</span>
               {isEditing ? (
@@ -608,7 +625,7 @@ export default function Prompts() {
                 </div>
               ) : (
                 <>
-                  <span className="flex-1 text-sm text-slate-300">{p.text}</span>
+                  <span className="flex-1 min-w-0 text-sm text-slate-300">{p.text}</span>
                   {/* Row actions. Three separate things are going on here, all of
                       them the same defect measured from different angles
                       (dashboard-uiux-audit-2026-07-30.md F3):

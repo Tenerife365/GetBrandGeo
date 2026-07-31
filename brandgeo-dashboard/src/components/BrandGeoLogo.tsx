@@ -184,7 +184,17 @@ export default function BrandGeoLogo({
           style={{
             // color is the fallback any engine without background-clip:text falls back to.
             color: ink.geoTo,
-            background: `linear-gradient(135deg, ${ink.geoFrom} 0%, ${ink.geoTo} 100%)`,
+            // backgroundImage, NOT the `background` shorthand. React 18 warns in dev
+            // ("Updating a style property during rerender (background) when a
+            // conflicting property is set (backgroundClip)") every time the theme
+            // toggle changes this value, because mixing a shorthand with one of its
+            // own longhands in the same style object leaves the update order
+            // undefined: React may write `background` after `backgroundClip` and
+            // reset the clip to its initial `border-box`, which would render the
+            // gradient as a solid block behind the letters instead of inside them.
+            // Measured 2 warnings per toggle, one per mounted logo, before this
+            // change and 0 after. Every property here is now a longhand.
+            backgroundImage: `linear-gradient(135deg, ${ink.geoFrom} 0%, ${ink.geoTo} 100%)`,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',

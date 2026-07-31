@@ -74,6 +74,25 @@ Traps already paid for here, do not rediscover them:
 - **Surface-pair delta is the wrong measure for a component boundary.** WCAG
   1.4.11 asks that the boundary be perceivable, which a border or rail satisfies
   while the two surfaces sit at 1.05:1.
+- **`<main>` is the scroll container, not the window.** It carries
+  `overflow-x: auto`. A checker reading `documentElement.scrollWidth >
+  clientWidth` is blind to overflow *inside* `main`, which is where content
+  actually overflows. The coordinator's own overflow numbers were wrong for this
+  reason and had to be withdrawn. Measure `main`, and inject your negative
+  control INSIDE `main`.
+- **A negative control only proves a checker catches the defect you thought to
+  inject.** The overflow checker above went red and green exactly on cue against
+  a 3000px child in `body`, while being structurally incapable of seeing the
+  real case. Ask what your control does NOT cover before trusting a green.
+- **`localStorage` is shared across every tab on `localhost:5173`.** Sibling
+  agents toggling the theme will silently change yours mid-session. Assert the
+  RESOLVED state (`documentElement.className`) inside the same evaluation as
+  every reading, never the stored key, and treat `brandgeo-theme` as unowned.
+- **Demo mode does not render every branch, and several pages have no
+  `isDemoMode` guard at all**, so they issue real HTTP at the placeholder host.
+  Three instances were found in one day (`Recommendations.tsx`, and two loaders
+  in `Social.tsx`). A string that never painted is not a string that passed:
+  say which of your fixes were runtime-verified and which are source-only.
 
 ## Contrast floors
 

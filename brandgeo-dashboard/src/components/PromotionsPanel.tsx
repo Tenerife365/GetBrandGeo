@@ -135,13 +135,13 @@ export default function PromotionsPanel() {
         <span className="text-[10px] font-normal uppercase tracking-wide text-slate-500 border border-dark-600 rounded px-1.5 py-0.5">Admin</span>
       </h2>
       <p className="text-xs text-slate-500 mb-4">
-        Platform-wide discount codes — apply to signups and renewals for the plans you pick. Propagates to the
+        Platform-wide discount codes. They apply to signups and renewals for the plans you pick, and propagate to the
         marketing site's pricing page automatically (PRICING-STRATEGY-2026-07.md §8).
       </p>
 
       {unavailable ? (
         <p className="text-xs text-amber-400/90 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
-          Promotions backend isn't deployed yet (T3 — the <code className="text-amber-300">promotions</code> table +
+          Promotions backend isn't deployed yet (T3: the <code className="text-amber-300">promotions</code> table +
           Stripe coupon wiring). This panel is ready; it'll start working the moment that ships.
         </p>
       ) : loading ? (

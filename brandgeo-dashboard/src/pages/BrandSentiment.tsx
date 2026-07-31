@@ -122,18 +122,23 @@ function computeTrend(events: SentimentEvent[], period: TrendPeriod) {
 
 /**
  * Same segmented-control hit-area treatment as Competitors.tsx, and the same
- * reasoning: these chips measured 24.5x20.5 (audit 2026-07-30, F3), the worst
- * targets on the page. The visual stays compact on a mouse at 32x32, past WCAG
- * 2.2 SC 2.5.8's 24x24 AA minimum, and grows to 44x44 only under a coarse
- * pointer, which is the input the 44px floor is actually about.
+ * reasoning, which is written out in full there. Short version: these chips
+ * measured 24.5x20.5 in the first audit and 32x33 after the earlier pass. The
+ * visual stays 32x32; a transparent `::after` at -6px on all four sides takes
+ * the TARGET to 44x44 at every width, replacing a coarse-pointer query that left
+ * a narrow desktop window (still `pointer: fine`) at 32x33.
+ *
+ * The group gap goes from 4px to 12px because that is the exact arithmetic floor
+ * for three non-overlapping 44px targets around 32px visuals. Do not lower it.
  *
  * Duplicated rather than shared because this fix is scoped to two page files
  * and a shared control would have to live in src/components/. Worth extracting
  * next time either page is opened; noted in the handoff.
  */
 const TREND_CHIP_TARGET =
-  'inline-flex items-center justify-center min-w-[32px] min-h-[32px] ' +
-  '[@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px]'
+  "relative inline-flex items-center justify-center min-w-[32px] min-h-[32px] " +
+  "after:content-[''] after:absolute after:-inset-1.5"
+const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
 
 function buildEngineSentimentData(
   byEngine: Partial<Record<LLMName, SentimentCounts & { total: number }>>,
@@ -390,7 +395,7 @@ export default function BrandSentiment() {
                 <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   Sentiment Over Time
                 </h2>
-                <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
+                <div className={TREND_GROUP}>
                   {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
                     <button key={p} onClick={() => setTrendPeriod(p)}
                       aria-pressed={trendPeriod === p}

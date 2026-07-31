@@ -170,16 +170,33 @@ function NoData({ children }: { children: ReactNode }) {
 
 /**
  * Segmented trend control. The hit area, not the label, is what was undersized:
- * these measured 29x24 (audit F3, floor 44x44 for touch). The visual stays
- * compact on a mouse at 32x32 — comfortably past WCAG 2.2 SC 2.5.8's 24x24 AA
- * minimum — and only grows to 44x44 where a finger is actually the input, via a
- * coarse-pointer query rather than a width breakpoint. A width breakpoint would
- * be the wrong test: a narrow window on a desktop is still a mouse, and a tablet
- * at 1024px is still a finger.
+ * these measured 29x24 in the first audit and 32x33 once the earlier pass landed
+ * a 32px floor. 32x33 passes WCAG 2.2 SC 2.5.8 (24x24 minimum) but sits under the
+ * 44x44 best practice, which the owner has decided to meet at every width, not
+ * only under a coarse pointer. The previous coarse-pointer clause is therefore
+ * gone: it delivered 44x44 only on touch hardware, and a desktop browser at
+ * 375px wide still reports `pointer: fine`, so the narrow case measured 32x33.
+ *
+ * The visual stays 32x32. The target is expanded by a transparent `::after` at a
+ * negative inset, the pattern index.css already ships for `.time-pill` and
+ * `.engine-chip`. -inset-1.5 is -6px on all four sides, so 32 + 6 + 6 = 44 in
+ * both axes. Expressed as a utility here rather than a rule because index.css is
+ * owned by the coordinator and off limits to this change.
+ *
+ * The gap-3 in TREND_GROUP is load-bearing and must not be reduced. Three 44px
+ * targets whose visuals are 32px wide need their centres at least 44px apart, so
+ * the gap floor is 44 - 32 = 12px exactly. This was verified on the running app
+ * rather than argued: with the ::after in place but the gap forced back to 4px,
+ * the three chips hit-test at 37x45, 36x45 and 44x45, because a later sibling's
+ * pseudo-element paints over an earlier one and the first two chips lose 8px of
+ * their own hit area to their right-hand neighbour. Raising the target without
+ * raising the gap would have made mis-taps worse, not better. At gap-3 all three
+ * measure 44 to 45 in both axes with zero overlap.
  */
 const TREND_CHIP_TARGET =
-  'inline-flex items-center justify-center min-w-[32px] min-h-[32px] ' +
-  '[@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px]'
+  "relative inline-flex items-center justify-center min-w-[32px] min-h-[32px] " +
+  "after:content-[''] after:absolute after:-inset-1.5"
+const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
 
 /**
  * Competitor rows are not engines (dashboard-visual-system.md §9.5). Colour is
@@ -308,10 +325,15 @@ export default function Competitors() {
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
 
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-0.5">
+      {/* Header. flex-wrap + min-w-0 are load-bearing at 320: without them the
+          title column cannot shrink below its content and the Add manually
+          button cannot drop to a second line, so <main> overflowed (338 against
+          a 320 clientWidth). Pre-existing, found 2026-07-30 when 320 was first
+          tested. The document itself never overflowed, so only a checker reading
+          <main> could see it. */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3 mb-0.5">
             <PageTitle>Competitors</PageTitle>
             {primaryMarket && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
@@ -569,7 +591,7 @@ export default function Competitors() {
               AI mention trends for {brandName} vs top competitors
             </p>
           </div>
-          <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
+          <div className={TREND_GROUP}>
             {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
               <button key={p} onClick={() => setTrendPeriod(p)}
                 aria-pressed={trendPeriod === p}

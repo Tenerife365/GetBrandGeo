@@ -135,10 +135,10 @@ function EngineToggleModal({
                     {meta.label}
                   </div>
                   {!isBuilt && (
-                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon — not yet collecting data</div>
+                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon, not yet collecting data</div>
                   )}
                   {isBuilt && !isEnabled && (
-                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled — shown as Coming Soon to client</div>
+                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled, shown as Coming Soon to client</div>
                   )}
                 </div>
 
@@ -236,6 +236,10 @@ export default function AIVisibility() {
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
   const [lastChecked, setLastChecked]   = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
+  // Click-toggle state for the score-weighting help popup. Hover and keyboard focus
+  // still reveal it via the CSS `group` pattern; this exists so touch users, who
+  // have no hover state, can reach the same content.
+  const [scoreInfoOpen, setScoreInfoOpen] = useState(false)
   const [showFixHub, setShowFixHub]     = useState(true)
   const [copiedFix, setCopiedFix]       = useState<number | null>(null)
   const [refreshed, setRefreshed]       = useState(false)
@@ -541,7 +545,7 @@ export default function AIVisibility() {
       items.push({
         priority: 'P1',
         title: `Low visibility in ${e.label} (${e.pct}%)`,
-        description: `Brand appears inconsistently — in ${e.mentioned} of ${e.checked} prompts checked.`,
+        description: `Brand appears inconsistently, in ${e.mentioned} of ${e.checked} prompts checked.`,
         fix: `Strengthen brand authority signals for ${e.label}: publish 3+ long-form pages that directly answer your tracked queries, build backlinks from industry media mentioning ${brandName} in context, and add FAQ schema markup to your site's key landing pages.`,
       })
     })
@@ -687,8 +691,8 @@ export default function AIVisibility() {
             <button
               onClick={forceCollection}
               disabled={collecting || loading}
-              title="Force Refresh — wipes existing results and re-runs all engines"
-              aria-label="Force refresh — wipes existing results and re-runs all engines"
+              title="Force Refresh: wipes existing results and re-runs all engines"
+              aria-label="Force refresh: wipes existing results and re-runs all engines"
               /* Grouped with the other secondary actions (same outlined base), but keeps a
                  muted orange label/border so it still reads as the destructive one — Error
                  Prevention cue preserved, per the Nielsen audit's own praise for it. */
@@ -815,12 +819,54 @@ export default function AIVisibility() {
           <div className="text-center -mt-1">
             {/* Score-weighting transparency (Nielsen audit): an info affordance explaining
                 how the headline number derives from the 6 sub-dimensions. Weights mirror
-                aiVisibilityScore.ts exactly. Reachable by keyboard (focus), not hover-only. */}
+                aiVisibilityScore.ts exactly.
+
+                2026-07-30 a11y pass. It used to be a bare `<span tabIndex={0}>` with an
+                aria-label and no role, so AT announced a label attached to nothing, and
+                it carried `cursor: auto`, so a mouse user got no signal at all. It is a
+                real <button> now, which supplies the role, the keyboard activation and
+                the global :focus-visible ring for free.
+                It is also a DISCLOSURE, not a pure tooltip: hover-only reveal is
+                unreachable on touch, where there is no hover state to enter, so click
+                toggles it open as well and aria-expanded reports which it is.
+                The `after:-inset-[7px]` grows an 11px control to a 25px hit target
+                without moving a pixel of the visible layout. Same transparent-::after
+                trick already shipped for .time-pill and .engine-chip in index.css;
+                written inline here because index.css is off limits this pass. */}
             <div className="flex items-center justify-center gap-1 mb-2">
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</span>
-              <span className="relative group inline-flex" tabIndex={0} aria-label="How the AI Visibility Score is calculated">
-                <Info size={11} className="text-slate-500 hover:text-slate-300 cursor-help" />
-                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block group-focus-within:block w-60 z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal">
+              <span className="relative group inline-flex">
+                <button
+                  type="button"
+                  onClick={() => setScoreInfoOpen(v => !v)}
+                  onKeyDown={e => { if (e.key === 'Escape') setScoreInfoOpen(false) }}
+                  onBlur={() => setScoreInfoOpen(false)}
+                  aria-expanded={scoreInfoOpen}
+                  aria-controls="score-weighting-help"
+                  aria-label="How the AI Visibility Score is calculated"
+                  className="relative inline-flex items-center justify-center rounded text-slate-500 hover:text-slate-300 cursor-help after:content-[''] after:absolute after:-inset-[7px]"
+                >
+                  <Info size={11} aria-hidden="true" />
+                </button>
+                <span
+                  id="score-weighting-help"
+                  /* The width cap is not decorative, and the constant is not arbitrary.
+                     This popup is centred on the TRIGGER, and the trigger sits at the
+                     right-hand end of a row that is itself centred in the viewport, so
+                     its centre is offset from the viewport centre by half the row width
+                     minus half the icon: measured at 66.34px. A centred box therefore
+                     clips once its width passes `100vw - 132.68px`. At 320 the fixed
+                     240px w-60 overran the right edge by 26.34px and pushed <main>
+                     (the real scroll container, overflow-x:auto) to scrollWidth 346.
+                     11rem = 176px leaves 43.32px of headroom over the geometric
+                     requirement, i.e. 21.66px of clearance each side, which also
+                     absorbs a classic 15px scrollbar gutter on platforms where 100vw
+                     exceeds clientWidth. It is inert at >=~1440 (cap 1264px vs 240px),
+                     so wide layouts are byte-identical.
+                     If the "AI Visibility Score" label above ever gets longer, the
+                     66.34px offset grows and this constant must grow with it. */
+                  className={`pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${scoreInfoOpen ? 'block' : 'hidden group-hover:block group-focus-within:block'} w-60 max-w-[calc(100vw-11rem)] z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal`}
+                >
                   <span className="block text-[11px] font-semibold text-slate-200 mb-1.5">How this score is calculated</span>
                   <span className="block text-[10px] text-slate-400 leading-relaxed">
                     A weighted average of six signals: Recognition 25%, Knowledge 20%, Sentiment 15%, Accuracy 15%, Reach 15%, Consistency 10%.
@@ -1025,7 +1071,7 @@ export default function AIVisibility() {
               <div
                 key={id}
                 className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40"
-                title={`${meta.label} — unlocks on the ${planLabel} plan`}
+                title={`${meta.label} is available on the ${planLabel} plan and above`}
               >
                 <img src={meta.logoUrl} alt={meta.label} className="w-4 h-4 object-contain grayscale opacity-70" />
                 <span className="text-xs font-medium text-slate-500">{meta.label}</span>
@@ -1047,7 +1093,10 @@ export default function AIVisibility() {
             <div className="flex items-center gap-2">
               <Zap size={15} className="text-brand-400" />
               <span className="text-sm font-semibold text-white">Fix This</span>
-              <span className="text-xs text-slate-500">— {fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
+              {/* The separator here used to be a leading em dash. The parent row is
+                  already `flex items-center gap-2`, so the 8px gap does the separating
+                  and the dash was carrying no information the layout did not. */}
+              <span className="text-xs text-slate-500">{fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
               <div className="flex items-center gap-1 ml-1">
                 {(['P0','P1','P2'] as const).map(p => {
                   const count = fixItems.filter(i => i.priority === p).length
@@ -1206,7 +1255,7 @@ export default function AIVisibility() {
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
-                aria-label={`${prompt.text} — expand for engine-by-engine detail`}
+                aria-label={`${prompt.text}. Expand for engine-by-engine detail.`}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -1498,7 +1547,7 @@ export default function AIVisibility() {
           <Collapse open={showInsights}>
             <div className="px-5 pb-4 border-t border-dark-700/50">
               <p className="text-xs text-slate-500 mt-3 mb-3">
-                Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
+                Companies that appear most often in AI top-5 rankings across all prompts. Real response data only.
               </p>
               <div className="flex flex-wrap gap-2">
                 {competitorFreq.map(({ name, count, avgPos }) => (

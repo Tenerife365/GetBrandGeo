@@ -69,5 +69,16 @@ export function formatOrdinal(n: number): string {
   }
 }
 
-/** Em dash for "no data", so callers don't each retype the character. Pair with text-secondary. */
-export const NO_DATA = '—'
+/*
+ * There is deliberately no shared "no data" glyph constant here.
+ *
+ * `NO_DATA = '<em dash>'` used to live at this spot with zero callers, and its
+ * docstring invited the next author to reuse the character (UI/UX audit
+ * 2026-07-30). Two rules make that the wrong abstraction: the content rules ban
+ * em and en dashes anywhere a user can read them, and a bare dash standing in
+ * for a missing value reads as a broken string rather than as an absence.
+ *
+ * Word each empty case where it renders, the way `Account.tsx`'s `Field` does:
+ * "Not set", "Not measured yet", "No prompts yet". See the empty-state rule in
+ * dashboard-visual-system.md §11.
+ */

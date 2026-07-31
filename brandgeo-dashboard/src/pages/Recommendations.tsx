@@ -854,7 +854,15 @@ export default function Recommendations() {
           not have yet, is swapped for a skeleton. Rendering "0 successful AI checks"
           mid-fetch would be a measurement the page has not made. */}
       <div className="mb-6 flex items-start justify-between">
-        <div>
+        {/* min-w-0 is load-bearing, not tidying. A flex item defaults to
+            `min-width: auto`, so this column refuses to shrink below its own
+            content and the skeleton's `max-w-full` then resolves against an
+            already-overwide parent. Without it, /recommendations overflowed
+            <main> at 375 (scrollWidth 531 vs clientWidth 375) for the whole
+            loading state: the 416px skeleton plus the 99px Refresh button.
+            The document itself did NOT overflow, which is why a checker reading
+            documentElement instead of <main> could never see it. */}
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-1">
             <PageTitle>Recommendations</PageTitle>
             {!loading && recs.length > 0 && (

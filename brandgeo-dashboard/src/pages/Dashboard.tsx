@@ -401,7 +401,7 @@ export default function Dashboard() {
             title="Not measured yet"
             body={
               stats.promptCount === 0
-                ? `BrandGEO measures how AI engines like ChatGPT and Gemini answer real buyer questions about ${brandName} — add a prompt to start.`
+                ? `BrandGEO measures how AI engines like ChatGPT and Gemini answer real buyer questions about ${brandName}. Add a prompt to start.`
                 : `BrandGEO is about to check how AI engines answer ${stats.promptCount} tracked prompt${stats.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
             }
             actionLabel={stats.promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
@@ -524,7 +524,7 @@ export default function Dashboard() {
             <Stat
               icon={<Target size={15} />}
               label={t.dash_statAvgPos}
-              value={stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
+              value={stats.avgPosition != null ? `#${stats.avgPosition}` : null}
               sub={t.dash_statAvgPosSub}
               tone={stats.avgPosition != null && stats.avgPosition > 6 ? 'warn' : 'neutral'}
               spark={avgPosSpark}
@@ -763,13 +763,14 @@ function Sparkline({ data, color, connectNulls = false }: {
 // Rendered inside ONE shared KPI card (Hick's Law — one island, not four). The
 // muted icon + one-line descriptor keep each number self-explanatory for a
 // first-time reader without adding color noise.
-function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }: {
-  icon: React.ReactNode; label: string; value: string; sub: string
+function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls, emptyLabel = 'Not measured yet' }: {
+  icon: React.ReactNode; label: string; value: string | null; sub: string
   tone?: 'neutral' | 'warn' | 'alert'; spark?: SparkPoint[]; connectNulls?: boolean
+  emptyLabel?: string
 }) {
   const valueColor = tone === 'alert' ? 'text-red-400' : tone === 'warn' ? 'text-amber-400' : 'text-white'
   // The sparkline stroke was hardcoded #94a3b8, which measures 2.56:1 against a
-  // white page — below the 3:1 graphical minimum in light mode.
+  // white page, below the 3:1 graphical minimum in light mode.
   const chart = useChartTheme()
   return (
     <div>
@@ -777,7 +778,15 @@ function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
+      {/* A null value is an ABSENCE, never a dash glyph. `value={'—'}` used to be
+          passed here for an unmeasured average position, which reads as a broken
+          string rather than "we have not measured this" (UI/UX audit 2026-07-30),
+          besides breaking the no-dash content rule. The empty label sits in a
+          fixed h-8 box so it occupies the same 32px line box as a real value and
+          the four KPI columns stay on the same baseline grid. */}
+      {value !== null
+        ? <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
+        : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">{emptyLabel}</div>}
       {spark && spark.length >= 2 && (
         <Sparkline data={spark} color={chart.axisInk} connectNulls={connectNulls} />
       )}

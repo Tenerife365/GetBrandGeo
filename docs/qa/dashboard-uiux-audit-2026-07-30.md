@@ -161,6 +161,31 @@ alongside this: `FEATURE_MIN_PLAN.ai_social` is `enterprise` while the
 it. The sidebar advertises it to every plan regardless. `/seo` is gated at
 Growth, which is reachable.
 
+> **RESOLVED 2026-07-30, and the framing above was wrong.** I later escalated
+> this to "four sources disagree on AI Social's tier". They do not. The owner
+> confirmed the intended rule, and `planConfig.ts:349-355` already states it,
+> dated 2026-07-29: **AI Social is admin-only while the feature is finished.
+> No customer on any plan gets it. An admin may drive it on any account,
+> because the owner is testing it on real accounts.** `ai_social: 'enterprise'`
+> is a SENTINEL meaning "nobody", not a tier claim, and `Social.tsx:793` and
+> `Layout.tsx:149` both already read `!isAdmin && !hasFeature(...)`. Nothing
+> about the gate needed a decision. I read a deliberate sentinel as a conflict.
+>
+> Two real defects survive underneath it, both narrower and one of them worse:
+>
+> 1. `planConfig.ts:344-347` still reads "AI Social — from Growth (1 channel;
+>    3 on Growth PRO)", eleven lines above the line that contradicts it, and
+>    `FEATURE_META.ai_social.blurb` pitches "publish to all your social
+>    channels" to a customer who can never buy it.
+> 2. **The comment claims "the real gate is `requireAuth({ adminOnly: true })`
+>    on the three `social-*.js` functions". Four are gated. Seven are not**:
+>    `social-accounts`, `social-delete`, `social-image`, `social-link`,
+>    `social-publish`, `social-queue`, `social-status`. `social-publish.js`
+>    enforces a plan rank rather than an admin check, so it is gated on a
+>    ladder position that the product decision says nobody occupies. That is a
+>    live server-side authorization gap on a function that posts to real
+>    external channels, not a copy problem.
+
 ### F8, LOW. /recommendations shows a bare loading string for over 8 seconds
 
 > **CORRECTION, 2026-07-30. The 8 seconds is a demo-fixture artefact and is not
@@ -263,10 +288,180 @@ bug, F7 the AI Social gate, F8 the loading state.
 4. **F4 and F5** together: replace the placeholder em dash with a real empty
    state token at a legible colour, and strip the four prose em dashes.
 5. **F6**, one string.
-6. **F7**, a product call, not a code fix: either hide AI Social from the nav
-   for plans that cannot reach it, or lower the gate so the tier that is
-   advertised can actually buy it.
+6. **F7**, NOT the product call I described. The gate is correct and
+   deliberate. Fix the stale prose and the blurb, and close the seven ungated
+   `social-*.js` endpoints, `social-publish` first.
 7. **F8**, add a skeleton.
+
+## Consolidated verification, 2026-07-30, after all four fix agents landed
+
+One measurement harness, injected once, run identically across 11 routes x 2
+themes x 2 widths. Every checker was negative-controlled in the same session
+before any number below was read: contrast (inject `#6b7280` on `#5b6472`,
+fails 0 to 1 to 0), touch targets (inject a 10x10 button, 20/2 to 21/3 to 20/2,
+**plus a true-negative: an injected 44x44 button is correctly not flagged**),
+dash census (0 to 1 to 0), overflow (false to true to false). 5 of 5 fire.
+
+### Closing state
+
+> **SUPERSEDED. The table immediately below was the first-pass result and two of
+> its rows were produced by broken checkers.** The authoritative numbers are in
+> "Final consolidated pass" at the end of this section. Kept here because the
+> corrections underneath it are the useful part.
+
+| Check | 1440 dark | 1440 light | 375 dark | 375 light |
+|---|---|---|---|---|
+| Text nodes measured | 1309 | 1311 | 1410 | 1410 |
+| Contrast failures | **0** | **0** | **0** | **0** |
+| Horizontal overflow | none | none | none | none |
+| Rendered dashes | 0 | 0 | 0 | 0 |
+
+`npx tsc --noEmit` exit 0. `npm run build` exit 0, 2799 modules, 7.10s.
+
+**F1, F2 CLOSED.** 56 light-mode failures to 0, 131 dead hovers to 0, and dark
+mode did not regress: it was 5 failures before (the placeholder em dashes) and
+is 0 now that those placeholders are gone.
+
+**F3 CLOSED.** Full-page target census, scrolling each control into view rather
+than only measuring above the fold. At 1440: 395 reachable controls. At 375: 317.
+Row Edit and Delete are 44x44 at both widths, gap 4px to 20px, and the target
+boxes went from a 14px overlap to 2px of clearance.
+
+**F4, F5, F6, F8 CLOSED** in the files the agents owned. `Account.tsx`,
+`Recommendations.tsx`, `Competitors.tsx`, `BrandSentiment.tsx` and
+`FeatureLocked.tsx` now contain zero user-visible dashes.
+
+**F7 did not need a decision and my framing of it was wrong.** See the resolution
+block under the finding. The gate is admin-only by design and already
+implemented; what remains is stale prose, a customer-facing blurb for a product
+nobody can buy, and seven ungated `social-*.js` endpoints including
+`social-publish`.
+
+### Two corrections to this audit, from the verification itself
+
+**1. The "over 8 seconds" in F8 is a demo-fixture artefact and was never a
+production number.** `Recommendations.tsx` has no `isDemoMode` branch, so under
+demo it issues real HTTP at the placeholder Supabase host: 132 requests, median
+**41ms**, max 124ms, all failing fast. The wall clock came from the page
+re-firing `load()` as `clientContext` re-resolved against the dead host. The
+skeleton was still the right fix, because it is what a genuinely slow real query
+would show, but nobody should quote 8 seconds as a latency figure.
+
+**2. The "Horizontal overflow: none" row above is measured on the wrong element
+and does not prove what it claims.** My checker read
+`documentElement.scrollWidth > clientWidth`. The scroll container in this app is
+`<main>`, which carries `overflow-x: auto` — a fact already recorded in
+`CLAUDE.md` from an earlier session, which I did not apply. Content overflowing
+*inside* `main` never reaches `documentElement`, so the check could only ever
+have caught overflow of the page body itself. My negative control injected a
+3000px child into `body`, which the checker did catch, so it went red and green
+on cue while still being blind to the case that matters. **A negative control
+only proves a checker detects the defect you thought to inject.** Overflow must
+be re-measured on `<main>` in the final pass; treat that row as unproven, not as
+a pass.
+
+**3. My rendered-DOM dash census undercounts, and the "0" row above must be read
+with that caveat.** It walks text nodes, so `title` and `aria-label` are never
+inspected, and demo fixtures do not render every branch (admin panels, the
+locked-engine chip strip, several empty states). A source-level census with
+comments stripped is the authoritative check. That census, negative-controlled
+5 of 5, finds **74 user-visible dash lines still in `src/`**, none of them in a
+file any agent owned:
+
+| File | Lines | Note |
+|---|---|---|
+| `lib/i18nContext.tsx` | 24 | 3 unique strings x 8 languages |
+| `pages/AIVisibility.tsx` | 9 | incl. 4 in `title` / `aria-label` |
+| `pages/Onboard.tsx` | 9 | |
+| `pages/AuditReport.tsx`, `pages/Social.tsx` | 6 each | |
+| `pages/Prompts.tsx` | 6 | 4 are LLM prompt text, not UI copy |
+| 9 further files | 1 to 2 each | |
+
+Split by kind: 51 string literals, 16 JSX text, 7 attributes.
+
+**The systemic one is `lib/format.ts:73`, `export const NO_DATA = '—'`.** It has
+**no callers**, so it is dead today, but its own docstring reads "so callers
+don't each retype the character" — it actively invites the next author to seed
+an em dash into the UI. Delete it or change the character.
+
+### Three target-size items nobody owned, reported without overclaiming
+
+- `AIVisibility.tsx`: the AI Visibility Score info trigger is an **11x11
+  `<span tabindex="0">` with an `aria-label` but no `role`, and `cursor: auto`**.
+  Smallest control in the product at both widths. Whether WCAG 2.2 SC 2.5.8
+  strictly applies is arguable, since a hover tooltip is not obviously an
+  "action" and the span sits inline beside heading text. The missing `role` and
+  the non-interactive cursor are the clearer problems.
+- Three trend-range buttons on `/sentiment` and three on `/competitors` are
+  32x32. Above SC 2.5.8's 24x24 AA minimum, below the 44px best practice.
+- The sidebar theme switch and sign out are 36x36 above 768px, 44x44 below it.
+  Deliberate, per Agent A: `matchMedia('(pointer: coarse)')` returns `false` in
+  this harness even at 375, so a coarse-pointer rule would have been
+  unverifiable, and `index.css` already keys its three existing tap-area blocks
+  to `max-width: 767px`. Consequence: a touch tablet at 768px or wider keeps the
+  desktop sizes.
+
+### Final consolidated pass, all nine agents landed
+
+Checkers rebuilt with the two defects above fixed: overflow measured on `<main>`,
+and `sr-only` text excluded from the contrast census. 11 routes x 2 themes x
+**3** widths, 320 added because an agent proved it is where narrow-width defects
+actually appear rather than merely approach.
+
+| Width | Theme | Text nodes | Contrast fails | Rendered dashes | `main` overflow | `documentElement` overflow |
+|---|---|---|---|---|---|---|
+| 1440 | dark | 1302 | **0** | **0** | **0 routes** | 0 |
+| 1440 | light | 1302 | **0** | **0** | **0 routes** | 0 |
+| 375 | dark | 1406 | **0** | **0** | **0 routes** | 0 |
+| 375 | light | 1401 | **0** | **0** | **0 routes** | 0 |
+| 320 | dark | 1401 | **0** | **0** | **2 routes** | 0 |
+| 320 | light | 1401 | **0** | **0** | **2 routes** | 0 |
+
+The dash census now reads `title`, `aria-label`, `placeholder` and `alt` as well
+as text nodes. Negative controls, 3 of 3, re-run against the final build: a real
+contrast failure is caught, an injected `sr-only` element is correctly ignored,
+an em dash in a text node and an en dash in a `title` are both caught, and a
+child injected **inside `main`** is caught while `documentElement` reports
+`false` throughout.
+
+`npx tsc --noEmit` exit 0. `npm run build` exit 0, 7.19s.
+
+**The two overflowing routes at 320 are PRE-EXISTING and were not caused by this
+work.** Proven by forcing the old gap values back on the running app:
+`/prompts` measures 358 either way, unchanged; `/competitors` measures 330 with
+the old gap and 338 with the new, so today's change added 8px to a page that
+already overflowed. The culprits are the `Add prompt` and `Add manually` header
+buttons in flex rows that do not wrap at 320. The wide table cells that also
+appear in the scan sit inside their own scroll container and contribute nothing.
+Nobody had tested 320 before; the earlier passes used 375 and 1440 only.
+
+**A fourth correction, and the third defect found in my own checkers today.**
+The contrast census initially reported a real-looking failure at 1.03:1 on
+`/recommendations` in light mode, "Loading recommendations" in `#f1f5f9` on
+`#f7f7fb`. It is `sr-only`: clipped to `rect(0,0,0,0)`, 1x1, `margin: -1px`,
+never painted. My visibility test rejected anything under 1px, and `1 < 1` is
+false, so screen-reader-only text passed straight through it. A contrast ratio
+for text that is never painted is meaningless. Fixed by walking the ancestor
+chain for the clip-and-shrink pattern, and re-controlled to prove it still
+catches a genuine failure.
+
+**A regression this session introduced, found and fixed.**
+`/recommendations` overflowed `<main>` at 375 for the entire loading state,
+`scrollWidth` 531 against `clientWidth` 375: the new 416px skeleton bar plus the
+99px Refresh button in a flex row whose column had no `min-w-0`, so it could not
+shrink below its content and the skeleton's own `max-w-full` resolved against an
+already-overwide parent. The document itself never overflowed, which is exactly
+why the original checker passed it. Fixed with `min-w-0`; re-measured across 54
+samples of the loading state at worst `scrollWidth` 375, and confirmed by
+reinstating `min-width: auto` to reproduce 531 on demand.
+
+### One false positive I raised and withdrew
+
+`/usage` "Back to Dashboard" first measured as a 1x1 target inside a 242x37 box.
+It is a two-line **inline** link: the union rect is meaningless, the real line
+boxes are 50x17 and 73x17, and both hit-test true at their own centres. The
+union centre simply lands in the whitespace past the end of line two. Inline
+links in a text block are exempt from SC 2.5.8 regardless. Not a defect.
 
 ## Not audited
 

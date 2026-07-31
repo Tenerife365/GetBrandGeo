@@ -43,7 +43,7 @@ export default function AuditRequest() {
       }
       navigate(`/audit/${data.token}`)
     } catch {
-      setError('Network error — please try again.')
+      setError('Network error. Please try again.')
       setLoading(false)
     }
   }
@@ -55,7 +55,7 @@ export default function AuditRequest() {
           <BrandGeoMark size="lg" className="mb-4" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" />
           <h1 className="text-2xl font-bold text-white mb-2">Free Instant AI Visibility Audit</h1>
           <p className="text-sm text-slate-400">
-            See whether ChatGPT, Gemini, and other AI assistants actually mention your business when people ask for recommendations — in about a minute.
+            See whether ChatGPT, Gemini, and other AI assistants actually mention your business when people ask for recommendations. Takes about a minute.
           </p>
         </div>
 

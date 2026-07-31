@@ -108,7 +108,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
 
       const runId = resp.run_id as number
       const total = (resp.total_jobs as number) ?? 0
-      console.log(`[Collection] run ${runId} enqueued — ${total} jobs. Worker is running server-side; you can close this tab.`)
+      console.log(`[Collection] run ${runId} enqueued, ${total} jobs. Worker is running server-side; you can close this tab.`)
       setProgress({ done: 0, total, clientId, clientName })
 
       // 2. Poll collection_jobs for this run until every job is done/failed.
