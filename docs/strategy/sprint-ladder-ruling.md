@@ -8,10 +8,18 @@ Blocks S2 (build the ladder) and S7 (launch coupon).
 
 ## The 30 second version
 
+> **ALL FOUR DECIDED 2026-07-31 by Constantin.** His `DECIDED` lines are at the
+> end of each decision. **He amended decision 1: Radar's engines are Gemini and
+> Claude, not ChatGPT and Gemini**, on cost. Every Radar figure below has been
+> recomputed against that amendment; where a superseded number is still visible
+> it is struck and labelled. One consequence of the amendment needs one more
+> line from him and is filed as **decision 1b**, unsigned.
+
 Four decisions. **Decision 1: yes, add Radar at EUR 39 list, EUR 29 launch price
-for the first 100, ChatGPT and Gemini only, 7 prompts, weekly, 1 website.** It
-clears the 15 percent ceiling at both prices and it consumes zero SerpApi
-credits, which is the only reason it can scale to 100 subscribers at all.
+for the first 100, ~~ChatGPT and Gemini~~ **Gemini and Claude** (amended by
+Constantin), 7 prompts, weekly, 1 website.** It clears the 15 percent ceiling at
+both prices and it consumes zero SerpApi credits, which is the only reason it can
+scale to 100 subscribers at all.
 **Decision 2: the authoritative ladder is 5, 7, 18, 35, 56, 200, 200, sentinel.**
 Both existing ladders are wrong: the shipped one inverts twice, and the
 documented `5, 20, 50, 75, 250` was costed when ChatGPT was EUR 0.056 a check
@@ -52,7 +60,7 @@ Per prompt, per month, at 4.333 weekly runs:
 | Plan | Weekly engines | Weekly EUR/check | SerpApi engines | SerpApi EUR/month | **EUR per prompt per month** |
 |---|---|---|---|---|---|
 | free | chatgpt | 0.108 | none | 0.000 | **0.1080** (monthly cadence, 1 run) |
-| radar | chatgpt, gemini | 0.140 | none | 0.000 | **0.6067** (0.140 x 4.333) |
+| radar | gemini, claude | 0.065 | none | 0.000 | **0.2817** (0.065 x 4.333) |
 | essentials | + claude | 0.173 | none | 0.000 | **0.7497** |
 | growth | + perplexity | 0.178 | google_ai | 0.046 | **0.8173** |
 | growth_pro | + grok | 0.198 | + ai_overview | 0.115 | **0.9730** |
@@ -192,6 +200,9 @@ EUR 29 price.
 | | Price | Sites | Prompts | **Prompts per site** | Budget | **Budget per site** |
 |---|---|---|---|---|---|---|
 | Radar | 29 | 1 | 7 | **7.00** | 4.35 | 4.35 |
+<!-- Radar's engine set changed on 2026-07-31 (Gemini + Claude). Prompts stayed
+     at 7, so this table is unaffected: only the cost of those 7 fell. -->
+
 | Essentials | 99 | 2 | **18** | **9.00** | 14.85 | 7.43 |
 
 **Yes, my proposed Essentials number is what makes this work, and it is carried
@@ -208,8 +219,8 @@ export type Plan = 'free' | 'radar' | 'essentials' | 'growth'
 
 PLAN_ORDER                    // ['free','radar','essentials','growth','growth_pro','managed','pro','enterprise']
 PLAN_LABELS.radar             = 'Radar'
-PLAN_ENGINES.radar            = ['chatgpt', 'gemini']
-PLAN_LIVE_ENGINES.radar       = ['chatgpt', 'gemini']    // _cost.js
+PLAN_ENGINES.radar            = ['gemini', 'claude']     // AMENDED 2026-07-31
+PLAN_LIVE_ENGINES.radar       = ['gemini', 'claude']     // _cost.js
 PLAN_PROMPTS.radar            = 7
 PLAN_MONTHLY_API_BUDGET_EUR.radar = 4.35   // 15% of the EUR 29 LAUNCH price
 PLAN_COLLECTION_COOLDOWN_HOURS.radar = 168 // weekly, same as every paid tier
@@ -246,7 +257,90 @@ where the ceiling is EUR 7.35 and buys 12 prompts. I did not recommend it becaus
 the council's judgement is that EUR 99 is already too high a cold entry, and EUR
 49 gives back half of that move. Constantin's call if the 7 reads as unsellable.
 
-**DECIDED <date>:**
+**DECIDED 2026-07-31 by Constantin. Yes to Radar, AMENDED: the engines are
+Gemini and Claude, not ChatGPT and Gemini.** His reason, in his words, is that
+ChatGPT is the most expensive engine and at 100 subscribers it is a large cost.
+Price, prompt count, cadence, website count and budget are accepted as briefed.
+
+### What the amendment changes, in euros
+
+He is right on the arithmetic, and by more than the brief assumed. ChatGPT is
+EUR 0.108 a check against Gemini's 0.032 and Claude's 0.033, so it was **77
+percent of Radar's modelled cost while being one engine of two.**
+
+| | Engines | EUR/check | EUR per prompt per month | 7 prompts EUR/month | Budget EUR 29 | Cost % of price | Gross margin |
+|---|---|---|---|---|---|---|---|
+| As briefed | chatgpt, gemini | 0.140 | 0.6067 | **4.247** | 4.35 | 14.6% | 85.4% |
+| **As ruled** | gemini, claude | 0.065 | 0.2817 | **1.972** | 4.35 | **6.8%** | **93.2%** |
+
+**At 100 Radar subscribers the amendment saves EUR 227.55 a month** (EUR 424.70
+against EUR 197.15) on EUR 2,900 of revenue. It also more than doubles the
+headroom under the ceiling, from EUR 0.10 to EUR 2.38 a client.
+
+**True cash out is lower again and worth stating separately**, because Gemini is
+a `FIXED_FEE_ENGINE` (free under 1,500 grounded requests a day). The only
+marginal cash in Radar is Claude: **EUR 1.00 per client per month, EUR 100 a
+month across 100 subscribers.** Gemini volume at that book is about 3,033
+requests a month, roughly 100 a day, against the 1,500 a day free allowance, so
+Radar does not threaten it. Every constraint the tier was designed around holds:
+still zero SerpApi credits, still 7.00 prompts per site against Essentials' 9.00,
+still no inversion anywhere.
+
+**7 prompts is now well inside the budget rather than at its edge.** The ceiling
+at EUR 29 would fund 15 prompts, and the binding constraint is no longer money
+but the Essentials per site floor, which caps Radar at **8**. 7 is what was
+signed and 7 is what ships. **8 is available for one word if the sales line
+reads thin** (open question 1a), and it costs EUR 0.28 a client a month.
+
+### Decision 1b. The amendment removes ChatGPT from a paying customer. UNSIGNED.
+
+**This is a consequence of the amendment, not a challenge to it.** Recording it
+because it reverses a rule Constantin himself set, and because it is invisible
+until a customer hits it.
+
+`PLAN_ENGINES.free` is `['chatgpt']` (`planConfig.ts:54`) and the public prospect
+audit runs `FULL_ENGINES = ['chatgpt', 'gemini', 'claude', 'perplexity',
+'google_ai']` (`_prospect_engines.js:396`). So under the amendment:
+
+- A **Free** client sees ChatGPT. They pay EUR 29 for Radar and **ChatGPT
+  disappears.** They have paid to lose an engine.
+- A visitor who runs the **free public audit** sees ChatGPT results, subscribes
+  to Radar, and the engine that produced the result that sold them is not in the
+  product.
+
+That is the exact failure recorded at `planConfig.ts:51`: "a prospect saw Google
+AI Mode results and then lost them by paying EUR 299. Owner's call, 2026-07-28.
+Essentials = 3." The amendment recreates it one rung lower.
+
+**RECOMMENDED FIX, one constant, and it is cheaper than what we have today:
+move Free from ChatGPT to Gemini.** `PLAN_ENGINES.free = ['gemini']`.
+
+| | Free engines | Free cost/month (5 prompts, monthly cadence) | Free budget | Radar a superset of Free? |
+|---|---|---|---|---|
+| Today | chatgpt | **EUR 0.540** | 0.30 | n/a |
+| Under the amendment, unfixed | chatgpt | EUR 0.540 | 0.30 | **No. Radar loses ChatGPT.** |
+| **With the fix** | gemini | **EUR 0.160** | 0.30 | **Yes. Gemini, plus Claude.** |
+
+The fix does three things at once: Radar becomes a strict superset of Free so
+nobody pays to lose anything, Free costs **EUR 0.38 less per client per month**,
+and **the free tier budget breach reported in decision 2 disappears without
+raising the budget at all** (EUR 0.160 against the existing EUR 0.30, with
+headroom). If this is taken, `PLAN_MONTHLY_API_BUDGET_EUR.free` stays at 0.30 and
+decision 2's raise to 0.60 is not needed.
+
+The cost of the fix is that the free tier stops showing ChatGPT, which is the
+engine most prospects mean when they say "AI". The counter is that they still see
+ChatGPT in the free public audit, which is the acquisition surface that actually
+does the selling, and the audit is unchanged either way.
+
+**The alternative, if Free must keep ChatGPT:** give Radar all three engines with
+ChatGPT on a monthly cadence rather than weekly. That is EUR 3.12 a month at 8
+prompts, still inside the EUR 4.35 ceiling, and it keeps the strongest engine in
+the entry tier. It costs a build: `MONTHLY_CAPPED_ENGINES` in `_cost.js` is
+global today and would have to become per plan. Not recommended inside a 30 day
+sprint, recorded so the option is not lost.
+
+**DECIDED 1b <date>:**
 
 ---
 
@@ -477,7 +571,26 @@ monotonicity trivially. Note that `enterprise: 100000` is a sentinel, not a
 promise: at EUR 0.9730 a prompt the EUR 1,500 budget stops collection at **1,541
 prompts**, so the real cap is 1,541 and the schema says 100,000.
 
-**DECIDED <date>:**
+**DECIDED 2026-07-31 by Constantin. Adopted in full, as briefed.**
+`PLAN_PROMPTS = 5, 7, 18, 35, 56, 200, 200, sentinel`. Lever A, the 15 percent
+ceiling held, per site monotonicity preserved, no allowance reduced against what
+any customer holds today. `pro` drops from 20 sites to 10. Essentials is **18**,
+not 20, so open question 2a is closed by taking the recommendation. Enterprise's
+site count stands at **25** provisionally (open question 2c), which is D-3c's to
+confirm and does not block S2.
+
+**One number in this decision is now conditional on decision 1b.** The raise of
+`PLAN_MONTHLY_API_BUDGET_EUR.free` from 0.30 to 0.60 exists only to cover 5
+ChatGPT checks at EUR 0.540. If 1b moves Free to Gemini, free costs EUR 0.160 and
+**the raise is not needed at all**. S2 must read 1b before shipping that
+constant, and must not ship 0.60 and a Gemini free tier together, which would
+leave a budget at four times the work it pays for.
+
+Radar's row is unchanged by the decision 1 amendment: still 7 prompts, still 1
+site, still 7.00 per site. Only its cost fell, from EUR 4.247 to EUR 1.972.
+
+**DECIDED 2b (SerpApi pool, open question 2b): NOT RULED, and it does not block.**
+It is a vendor purchase, not a pricing call. Carried to the roadmap.
 
 ---
 
@@ -564,7 +677,14 @@ going to surface per site consumption to the customer. If Constantin wants a
 guard now, the cheapest is a floor rather than a cap: reserve each site's own
 plan budget and pool only the remainder.
 
-**DECIDED <date>:**
+**DECIDED 2026-07-31 by Constantin. Adopted, as briefed. SUM the pools, MAX the
+site allowance.**
+
+The condition that makes it real rather than decorative, restated so S2 cannot
+miss it: **the budget must be summed and enforced at ACCOUNT level.**
+`PLAN_MONTHLY_API_BUDGET_EUR` is keyed per client in `_cost.js` today, so if D1
+ships with that code untouched the product delivers SUM by accident, and nobody
+will have chosen it. Enforcing the sum is part of D1's build, not this ruling.
 
 ---
 
