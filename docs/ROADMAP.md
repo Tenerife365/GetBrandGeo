@@ -90,6 +90,27 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   single highest-risk item on the board and it is live today.
   `check: node -e "const s=require('fs').readFileSync('brandgeo-dashboard/netlify/functions/stripe-webhook.js','utf8'); process.exit(/mode !== 'subscription'/.test(s) && !/mode === 'payment'/.test(s) ? 1 : 0)"`
 
+- **A5. Admin can grant bonus prompts and bonus collection credits per account.**
+  Constantin, 2026-07-31: the founding-client package does NOT bundle prompts,
+  but an admin should be able to open any account and hand out extra prompts as
+  a goodwill bonus, or extra credit to run collections. Two different changes
+  wearing one name, and the difference decides the work:
+  - **Bonus prompts** is nearly free today and nearly meaningless today, for
+    the same reason: `PLAN_PROMPTS` is **display-only**. It is read at
+    `planConfig.ts:516` for the plan card and enforced nowhere server-side. So
+    an override changes a number on a screen until the open decision "is
+    PLAN_PROMPTS enforced server-side" is settled. Settle that first or the
+    bonus is theatre.
+  - **Bonus credits is real money and really enforced.** `_cost.js`'s
+    `PLAN_MONTHLY_API_BUDGET_EUR` is the authoritative per-client cap and it
+    does gate collection. A top-up column read there genuinely buys the client
+    more runs, and genuinely spends BrandGEO's money, so it needs an audit row
+    (`client_events`) and an admin-only path like `set-client-plan.js` has.
+  Depends on A2 §3.4 for the override-column pattern. `bg-architect` first:
+  this is entitlement shape, and the repo already has four plan-ladder copies
+  that drifted.
+  `check: test -f docs/arch/admin-bonus-grants.md`
+
 - **A2. No custom-entitlement record exists.** `clients.plan` is a single enum
   string, so "these engines, this many prompts, this price, this term" cannot be
   expressed. `engines_enabled` already gives per-client engine mixing;
