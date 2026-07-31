@@ -22,14 +22,6 @@ Nothing here blocks the loop. It works around these.
 - **Refresh ChatGPT on prompt 6 for Bucate pe Roate.** ~EUR 0.11, the last stale
   row. Withheld from the loop because it spends money (AUTONOMY §2).
 
-- **Swap the Stripe connector to BrandGEO's account.** The connected one is
-  TalentWeLove, `acct_1TxtkGQAKgm0Dugx`, confirmed 2026-07-30 when a lookup of
-  the live Growth PRO price `price_1Ty5a7Kh2GaZE2B4vQhoTktV` returned
-  "No such price". Any agent creating a price through it would put BrandGEO
-  billing objects in the wrong legal entity, and a customer would pay into the
-  wrong company. **Stream A is hard-blocked until this is swapped.**
-  `check: (the account id returned by get_stripe_account_info is NOT acct_1TxtkGQAKgm0Dugx, and GetPricesPrice for price_1Ty5a7Kh2GaZE2B4vQhoTktV succeeds)`
-
 - **Authorize an error monitor** (Sentry or similar). The loop currently has no
   way to discover a bug it did not itself cause. GitHub and Netlify connectors
   are lower value but would replace polling. Supabase already works.
@@ -146,4 +138,19 @@ Full context for each is in `CLAUDE.md`. Listed here so the loop can see them.
 
 ## Done
 
-Empty. Items land here only with a passing check command and the date it passed.
+Items land here only with a passing check command and the date it passed.
+
+- **Stripe connector points at BrandGEO.** Passed 2026-07-30. It had been
+  authorized against TalentWeLove (`acct_1TxtkGQAKgm0Dugx`), so an agent
+  creating a price would have put BrandGEO billing objects in the wrong legal
+  entity and a customer would have paid the wrong company. Root cause: Stripe
+  OAuth grants whichever account is active in the dashboard switcher at the
+  moment of approval, so re-authorizing without switching first reproduces the
+  fault silently. Three consecutive checks caught it before anything was built.
+  ```
+  get_stripe_account_info      -> acct_1LHjKrKh2GaZE2B4  "BrandGEO"
+  GetPricesPrice price_1Ty5a7Kh2GaZE2B4vQhoTktV
+                               -> EUR 449.00/month, active, metadata.plan=growth_pro
+  ```
+  **The connection is `livemode: true`.** Every Stripe write from here is real
+  customer money in the live account. There is no test-mode safety net.
