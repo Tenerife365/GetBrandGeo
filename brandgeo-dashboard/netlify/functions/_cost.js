@@ -375,7 +375,37 @@ function costForRow(llm, errorCode, usage) {
 // still holds. PLAN_LIVE_ENGINE_COUNT below derives from this map, so _auth.js's
 // hourly ceiling for Growth widens from 4 to 5 engines automatically.
 const PLAN_LIVE_ENGINES = {
-  free:       ['chatgpt'],
+  // FREE IS GEMINI, NOT CHATGPT (decision 1b, Constantin, 2026-07-31). This was
+  // a LIVE DEFECT, not a preference: a free signup could not finish the very
+  // collection the product had just promised it, and met a raw budget error
+  // instead of a result.
+  //
+  // MEASURED against production rather than modelled, because the modelled
+  // figure was wrong and the roadmap's EUR 0.108 per chatgpt prompt is not what
+  // this account bills. 152 real chatgpt rows over 30 days: avg EUR 0.0615,
+  // range 0.0600 to 0.1234. So five prompts average EUR 0.307 against a EUR 0.30
+  // budget, and the free visitor was blocked on the LAST prompt at typical rates
+  // and around the third when rows ran expensive. Note how narrow that margin
+  // was: the tier was misconfigured by less than a cent, which is exactly why
+  // nobody caught it by inspection. (ENGINE_COST_EUR.chatgpt below is 0.014 and
+  // is a FALLBACK for usage-less rows only; do not size a tier with it.)
+  //
+  // Fixed by moving the engine, NOT by raising the budget. 146 real gemini rows:
+  // avg EUR 0.0339 in a tight 0.0320 to 0.0340 band, so five prompts cost EUR
+  // 0.170, 57% of the budget, with headroom for variance. Gemini is also
+  // genuinely EUR 0 under 1,500 grounded calls a day, so the accounting figure
+  // overstates real cash out. THE BUDGET STAYS AT 0.30; the raise to 0.60
+  // drafted in decision 2 is cancelled, and shipping both fixes would double
+  // free-tier spend to buy nothing.
+  //
+  // It also stops a Radar buyer LOSING an engine: Radar runs gemini and claude,
+  // so with free on chatgpt, paying EUR 29 took ChatGPT away. Free is now a
+  // strict subset of Radar.
+  //
+  // Consequence owned by S2, not fixed here: ChatGPT is now first sold at
+  // Essentials, so a generic "upgrade to unlock" next to ChatGPT on Free points
+  // at Radar, which does not carry it. That is a copy fix in getEngineStates().
+  free:       ['gemini'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   // GROK IS THE 6TH ENGINE, GROWTH PRO AND UP (2026-07-29). Growth PRO vs

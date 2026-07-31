@@ -51,7 +51,13 @@ export type EngineState = 'active' | 'coming_soon' | 'locked'
 // FREE public audit, so a prospect saw Google AI Mode results and then lost
 // them by paying EUR 299. Owner's call, 2026-07-28. Essentials = 3.
 export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
-  free:       ['chatgpt'],
+  // FREE IS GEMINI (decision 1b, 2026-07-31). Five chatgpt prompts bill about
+  // EUR 0.540 against a EUR 0.30 free budget, so a free signup was blocked
+  // partway through its own first collection and met a budget error instead of
+  // a result. Five gemini prompts cost EUR 0.160 and fit. The budget stays at
+  // 0.30. Full reasoning in _cost.js PLAN_LIVE_ENGINES, which is the copy that
+  // ENFORCES this; keep the two in sync.
+  free:       ['gemini'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   // GROK LIVE 2026-07-29, Growth PRO and up — the 6th engine, and the step that
@@ -341,30 +347,47 @@ export const PLAN_LABELS: Record<Plan, string> = {
 // <FeatureLocked feature=… /> for plans below it. All plan gating lives here.
 export type FeatureId = 'ai_social' | 'ai_seo'
 
+/**
+ * Features that NO plan grants, at any price. Only an admin can reach them, and
+ * an admin may drive them on any account. This is the explicit expression of
+ * "coming soon", and it is checked BEFORE the plan ladder in hasFeature(), so
+ * the answer does not depend on which plans happen to exist or be sold.
+ *
+ * AI Social is here while the feature is being finished (owner decision,
+ * confirmed 2026-07-30). Customers see a coming-soon screen with no purchase
+ * path, because there is nothing to buy. Remove a feature from this set ONLY
+ * when it is genuinely for sale, and update FEATURE_MIN_PLAN in the same edit.
+ *
+ * The real gate is requireAuth({ adminOnly: true }) on ALL ELEVEN social-*.js
+ * functions (2026-07-30; before that only four of the eleven were gated, and
+ * before 2026-07-29 none were, so the UI lock was bypassable by a direct POST).
+ * This module only controls what the customer is shown.
+ */
+export const ADMIN_ONLY_FEATURES: ReadonlySet<FeatureId> = new Set<FeatureId>(['ai_social'])
+
 // Minimum plan that unlocks each feature (PRICING-STRATEGY-2026-07.md §3):
-//   AI SEO   — from Essentials (1 landing page; 10 on Growth, 30 on Growth PRO).
-//   AI Social — from Growth (1 channel; 3 on Growth PRO). Per-tier depth is in
-//   the PLAN_* limit tables below, not here.
+//   AI SEO: from Growth (1 landing page; 10 on Growth, 30 on Growth PRO).
+//   AI Social: none. It is admin-only and coming soon (see ADMIN_ONLY_FEATURES
+//   above). No plan grants it, so no per-tier depth applies yet. The value below
+//   is INERT: hasFeature() short-circuits on the admin-only set before reading
+//   it. It is kept at the top of the ladder as a second line of defence so that
+//   deleting the set alone does not ship the feature to self-serve customers.
 export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
-  // ai_social is ADMIN-ONLY while the feature is finished (2026-07-29).
-  // Customers see it as coming soon; admins drive it for any account to test.
-  // The real gate is requireAuth({ adminOnly: true }) on the three social-*.js
-  // functions — this constant only controls customer-facing copy, and until
-  // 2026-07-29 there was NO server-side gate at all, so the UI lock was
-  // bypassable by a direct POST.
-  ai_social: 'enterprise',
+  ai_social: 'enterprise',   // inert, see above. NOT a statement that Enterprise gets it.
   ai_seo:    'growth',
 }
 
-// Copy for the locked/upgrade screen.
+// Copy for the locked / coming-soon screen. Admin-only features must NOT be
+// described as something the reader can buy or upgrade into: no plan grants
+// them, so any purchase language would be a path that leads nowhere.
 export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> = {
   ai_social: {
     label: 'AI Social',
-    blurb: 'Write a post once, adapt it for each network, and schedule or publish to all your social channels from one place, with AI drafting copy built to be quoted by AI answer engines.',
+    blurb: 'AI Social is still being built. When it is ready it will draft a post once, adapt it for each network, and publish or schedule it, with copy written to be quoted by AI answer engines.',
   },
   ai_seo: {
     label: 'AI SEO',
-    blurb: 'Turn your AI visibility gaps into ready-to-write content briefs, then generate full, GEO-scored drafts built to be cited by AI answer engines, and hand them straight to AI Social.',
+    blurb: 'Turn your AI visibility gaps into ready-to-write content briefs, then generate full, GEO-scored drafts built to be cited by AI answer engines.',
   },
 }
 
@@ -530,14 +553,29 @@ export function planRank(plan: string): number {
   return i < 0 ? 0 : i
 }
 
-/** True if `plan` includes `feature` (i.e. is at or above its minimum plan). */
+/** True if `feature` is admin-only (coming soon): no plan grants it, ever. */
+export function isAdminOnlyFeature(feature: FeatureId): boolean {
+  return ADMIN_ONLY_FEATURES.has(feature)
+}
+
+/**
+ * True if `plan` includes `feature` (i.e. is at or above its minimum plan).
+ * Admin-only features return false for EVERY plan, including any plan added
+ * later, so selling a new top tier can never ship an unfinished feature.
+ * Callers that let admins through keep doing so themselves (`isAdmin || ...`).
+ */
 export function hasFeature(plan: string, feature: FeatureId): boolean {
+  if (ADMIN_ONLY_FEATURES.has(feature)) return false
   return planRank(plan) >= planRank(FEATURE_MIN_PLAN[feature])
 }
 
-/** The minimum plan that unlocks a feature (for the "Upgrade to X" prompt). */
-export function featureUnlockPlan(feature: FeatureId): Plan {
-  return FEATURE_MIN_PLAN[feature]
+/**
+ * The plan that unlocks a feature, for the "included on the X plan" prompt.
+ * null for an admin-only feature: there is no such plan, and the caller must
+ * render a coming-soon state with no purchase call to action instead.
+ */
+export function featureUnlockPlan(feature: FeatureId): Plan | null {
+  return ADMIN_ONLY_FEATURES.has(feature) ? null : FEATURE_MIN_PLAN[feature]
 }
 
 // ── State derivation ──────────────────────────────────────────────────────────

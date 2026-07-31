@@ -39,7 +39,7 @@ const ASSISTANT_KB = `# BrandGEO grounded facts (authoritative; answer only from
 BrandGEO monitors how AI engines mention, rank, and describe a brand. It runs a client's real, commercial-buyer-style prompts against up to seven AI engines on a recurring basis: ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Grok, and Google AI Overviews. How many of those a brand is monitored on depends on its plan (see Plans below). Google AI Mode and Google AI Overviews are two different Google surfaces and are measured separately: AI Mode is the conversational tab a user switches to on purpose, AI Overviews is the AI summary shown by default on an ordinary results page. Microsoft Copilot and DeepSeek are not live and are not collected on any plan. BrandGEO also tracks named competitors per prompt, sentiment trends over time, and surfaces a prioritized "Fix This" action hub of specific recommendations.
 
 ## Plans (all prices EUR)
-- Free (€0/month): 1 project, 5 buyer prompts, ChatGPT only, monthly refresh, dashboard access, self-serve, no credit card.
+- Free (€0/month): 1 project, 5 buyer prompts, Gemini only, monthly refresh, dashboard access, self-serve, no credit card.
 - Essentials (€99/month or €990/year): 15 commercial prompts, 3 AI engines (ChatGPT, Gemini, Claude), weekly refresh, competitor tracking, self-serve, no setup fee.
 - Growth (€299/month or €2,990/year): 35 commercial prompts, 5 AI engines (adds Perplexity and Google AI Mode), weekly refresh, site audit up to 10 pages, 1 onboarding call, self-serve, no setup fee.
 - Growth PRO (€449/month or €4,490/year): 35 commercial prompts, 7 AI engines (adds Grok and Google AI Overviews), weekly refresh on a priority queue, site audit up to 30 pages, self-serve, no setup fee.

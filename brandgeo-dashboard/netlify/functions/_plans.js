@@ -46,7 +46,10 @@ const ENGINE_LABELS = {
 // at the moment they are charged. Engine counts must match _cost.js's
 // PLAN_LIVE_ENGINES; limits come from planConfig.ts's PLAN_* tables.
 const PLAN_BLURB = {
-  free:       'A single AI engine (ChatGPT) so you can see where your brand stands.',
+  // Named the engine, so it changed when the engine did (1b, 2026-07-31). This
+  // text is sent to a customer at the moment they are charged, and it would have
+  // promised ChatGPT to someone whose account collects Gemini.
+  free:       'A single AI engine (Gemini) so you can see where your brand stands.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
   // CORRECTED 2026-07-29. Three claims here were false at the moment of charge.
   // `growth` sold AI Social, which is admin-only and shows as coming soon to
