@@ -227,7 +227,46 @@ async function checkCollectionLimits(supabase, clientId) {
     .gte('checked_at', monthStart)
 
   const clientSpent = (clientRows || []).reduce((sum, r) => sum + (r.cost_eur || 0), 0)
-  const clientBudget = PLAN_MONTHLY_API_BUDGET_EUR[plan]
+  // FAIL CLOSED ON AN UNMAPPED PLAN. Without the fallback this lookup returns
+  // undefined, `clientSpent >= undefined` is false (the comparison coerces to
+  // NaN), and the plan collects with NO SPEND CAP AT ALL. The only remaining
+  // limit would be the hourly ceiling above, which bounds row count and not
+  // euros. It would also throw one line further down, where clientBudget.toFixed
+  // builds the customer-facing message.
+  //
+  // REACHABILITY, stated precisely so this is not mistaken for a data-integrity
+  // bug: `plan` is already coerced to 'essentials' at the top of this function
+  // for anything outside VALID_PLANS, and VALID_PLANS derives from _cost.js's
+  // PLAN_LIVE_ENGINES. So a corrupt or unknown clients.plan value CANNOT reach
+  // here unmapped. The one way in is a plan present in PLAN_LIVE_ENGINES but
+  // absent from PLAN_MONTHLY_API_BUDGET_EUR: two maps in the same file, keyed
+  // independently, with nothing coupling them. That is a developer adding a tier
+  // to one and not the other, which is exactly what shipping `radar` on
+  // 2026-07-31 could have done.
+  //
+  // THE FALLBACK IS `free`, NOT ZERO, DELIBERATELY. Zero would block collection
+  // outright for a plan whose only fault is a missing map entry, turning a
+  // config omission into a customer-visible outage on a paid tier. The free
+  // budget degrades the tier loudly (the customer hits a budget message quickly
+  // and support hears about it) without breaking it, and it is the most
+  // restrictive real budget on the ladder, so it cannot be more permissive than
+  // whatever the correct entry would have been.
+  // FAILS CLOSED for a plan this map does not know. Without the fallback the
+  // lookup returns undefined, `clientSpent >= undefined` is false, and the
+  // client has NO spend cap at all: the only remaining limit is the 150
+  // rows/hour rate ceiling, which is roughly EUR 7,900 a month.
+  //
+  // Reachable by omission, not by attack. PLAN_ENGINES and this map are keyed
+  // independently and nothing couples them, so adding a tier to one and
+  // forgetting the other uncaps it. That is not hypothetical: the radar tier
+  // was added to both on 2026-07-31 and would have shipped uncapped had the
+  // second edit been missed.
+  //
+  // The fallback is `free`, not 0, deliberately. Zero blocks collection
+  // outright for a plan that is merely missing from a map, turning a config
+  // omission into an outage for a paying customer. The free budget degrades
+  // the tier loudly without breaking it, and the warn below names the plan.
+  const clientBudget = PLAN_MONTHLY_API_BUDGET_EUR[plan] ?? PLAN_MONTHLY_API_BUDGET_EUR.free ?? PLAN_MONTHLY_API_BUDGET_EUR.free
 
   if (clientSpent >= clientBudget) {
     console.warn(`[Auth] Monthly budget hit: client ${clientId} (${plan}) spent EUR ${clientSpent.toFixed(4)} of EUR ${clientBudget}`)

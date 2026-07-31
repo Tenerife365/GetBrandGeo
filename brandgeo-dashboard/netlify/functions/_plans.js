@@ -18,13 +18,21 @@
 
 const { activeEnginesFor } = require('./_cost');
 
-// Mirror of planConfig.ts:159 (PLAN_ORDER). growth_pro is ladder position 3.
-const PLAN_ORDER = ['free', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise'];
+// Mirror of planConfig.ts PLAN_ORDER. MUST match it index for index, for all
+// eight plans. planRank() below reads the INDEX, and set-client-plan.js:47 uses
+// planRank to decide whether a plan change is announced to the customer as an
+// upgrade or a downgrade. When growth_pro was missing from this array it ranked
+// 0, so a EUR 449 upgrade was emailed to the buyer in downgrade tone with the
+// Free plan's blurb. A plan missing here does not throw; it silently becomes
+// Free (see planUnlocks below). That is the defect class this file has already
+// shipped once, so verify against planConfig.ts rather than assuming.
+// `radar` inserted at position 1, 2026-07-31 (ruling decision 1).
+const PLAN_ORDER = ['free', 'radar', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise'];
 
-// Mirror of planConfig.ts:161-:169 (PLAN_LABELS).
+// Mirror of planConfig.ts PLAN_LABELS.
 const PLAN_LABELS = {
-  free: 'Free', essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO',
-  managed: 'Managed', pro: 'Pro', enterprise: 'Enterprise',
+  free: 'Free', radar: 'Radar', essentials: 'Essentials', growth: 'Growth',
+  growth_pro: 'Growth PRO', managed: 'Managed', pro: 'Pro', enterprise: 'Enterprise',
 };
 
 // Engine id -> human label, for the congrats email + banner. Display only; the
@@ -50,6 +58,13 @@ const PLAN_BLURB = {
   // text is sent to a customer at the moment they are charged, and it would have
   // promised ChatGPT to someone whose account collects Gemini.
   free:       'A single AI engine (Gemini) so you can see where your brand stands.',
+  // Every claim here is checked against what the tier actually grants, because
+  // this string is sent to a customer at the moment they are charged: two
+  // engines (PLAN_LIVE_ENGINES.radar), seven prompts (PLAN_PROMPTS.radar),
+  // weekly (PLAN_COLLECTION_COOLDOWN_HOURS.radar = 168), one website. It does
+  // not mention ChatGPT, which Radar does not carry, and it does not promise a
+  // prompt count above the tier's own (ruling decision 4).
+  radar:      'Two AI engines, Gemini and Claude, checked weekly across seven buyer prompts for one website.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
   // CORRECTED 2026-07-29. Three claims here were false at the moment of charge.
   // `growth` sold AI Social, which is admin-only and shows as coming soon to

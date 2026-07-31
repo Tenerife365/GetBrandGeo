@@ -24,11 +24,22 @@ export type EngineId =
   | 'deepseek'
   | 'grok'
 
-// PRICING-STRATEGY-2026-07.md ladder: Free → Essentials → Growth → Growth PRO
-// (self-serve) → Managed → Enterprise (done-for-you). `pro` is LEGACY (old €1,500
-// tier merged into Managed) — kept only so existing pro clients don't fall back
-// until they migrate at renewal; no new signups use it.
-export type Plan = 'free' | 'essentials' | 'growth' | 'growth_pro' | 'managed' | 'pro' | 'enterprise'
+// PRICING-STRATEGY-2026-07.md ladder: Free → Radar → Essentials → Growth →
+// Growth PRO (self-serve) → Managed → Enterprise (done-for-you). `pro` is LEGACY
+// (old €1,500 tier merged into Managed) — kept only so existing pro clients don't
+// fall back until they migrate at renewal; no new signups use it.
+//
+// `radar` ADDED 2026-07-31 (docs/strategy/sprint-ladder-ruling.md decision 1,
+// signed by Constantin). EUR 39 list, EUR 29 for the first 100 customers. It
+// exists because 100 paying subscribers in 30 days is not reachable at a EUR 99
+// cold entry.
+//
+// ITS POSITION IN PLAN_ORDER IS LOAD BEARING, not cosmetic. planRank() and
+// hasFeature() both derive from the INDEX, so `radar` anywhere except directly
+// after `free` silently shifts every feature gate on the ladder. Sitting where it
+// does, FEATURE_MIN_PLAN.ai_seo = 'growth' keeps excluding it with no further
+// edit.
+export type Plan = 'free' | 'radar' | 'essentials' | 'growth' | 'growth_pro' | 'managed' | 'pro' | 'enterprise'
 
 export type EngineState = 'active' | 'coming_soon' | 'locked'
 
@@ -58,6 +69,17 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
   // 0.30. Full reasoning in _cost.js PLAN_LIVE_ENGINES, which is the copy that
   // ENFORCES this; keep the two in sync.
   free:       ['gemini'],
+  // RADAR IS GEMINI + CLAUDE, NOT CHATGPT + GEMINI (ruling decision 1, amended by
+  // Constantin 2026-07-31 on cost). ChatGPT was 77% of the tier's modelled cost
+  // while being one engine of two, so the amendment saves EUR 227.55 a month at
+  // 100 subscribers and more than doubles the headroom under the 15%-of-price
+  // ceiling. Radar is deliberately a strict SUPERSET of Free (which runs gemini),
+  // so nobody pays EUR 29 and loses an engine.
+  // NO SERPAPI ENGINE HERE, and that is the constraint the tier is built around,
+  // not a packaging preference: SerpApi is a 500-credit PLATFORM-WIDE pool, so
+  // 100 Radar clients on google_ai would draw 700 credits a month, 140% of the
+  // whole pool, consumed by the cheapest tier alone. Mirror in _cost.js.
+  radar:      ['gemini', 'claude'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   // GROK LIVE 2026-07-29, Growth PRO and up — the 6th engine, and the step that
@@ -171,17 +193,39 @@ export const DEDICATED_ENGINE_FUNCTIONS: Record<string, string> = {
 export const QUEUE_ONLY_ENGINES: EngineId[] = ['grok']
 
 // ── Minimum plan that unlocks each engine ────────────────────────────────────
-// Kept in sync with PLAN_ENGINES above by hand — derive the "X+" label shown
-// on locked engine cards. perplexity/meta moved to 'growth' (was
-// managed/pro) and google_ai moved to 'pro' (was managed) to match the
-// PLAN_ENGINES change above (2026-07-09).
+// Hand-kept against PLAN_ENGINES above — this derives the "X+" label shown on a
+// LOCKED engine card, so every value here is a sentence the product says to a
+// customer about what to buy next. A value that disagrees with PLAN_ENGINES
+// points a customer at the wrong plan.
+//
+// CORRECTED 2026-07-31 (ruling decision 1b and its named consequence). THREE of
+// these were false, and each one was false in the direction that costs the
+// customer money or the sale:
+//
+//   chatgpt   'free' -> 'essentials'. Free moved to Gemini in 6d2196c, so
+//             ChatGPT is not on Free any more. It is also NOT on Radar
+//             (gemini + claude), so the first tier that carries it is
+//             Essentials at EUR 99. The ruling flags this by name: a generic
+//             "upgrade to unlock" next to ChatGPT on Free must not point at the
+//             next rung, because the next rung does not have it.
+//   gemini    'essentials' -> 'free'. Free has run Gemini since 6d2196c.
+//   claude    'essentials' -> 'radar'. Radar carries Claude and is a rung below
+//             Essentials, so Essentials was overcharging for it by EUR 70.
+//
+//   google_ai 'growth_pro' -> 'growth'. PRE-EXISTING drift, not created by this
+//             change and not named in the ruling: PLAN_ENGINES.growth has
+//             carried google_ai since 2026-07-28, so this line has been telling
+//             Essentials customers to buy Growth PRO (EUR 449) for an engine
+//             Growth (EUR 299) already includes. Corrected here because leaving
+//             one knowingly-false upgrade label beside three freshly corrected
+//             ones is not a defensible state. Flagged for review.
 export const ENGINE_UNLOCK_PLAN: Record<EngineId, Plan> = {
-  chatgpt:    'free',
-  gemini:     'essentials',
-  claude:     'essentials',
+  chatgpt:    'essentials',
+  gemini:     'free',
+  claude:     'radar',
   perplexity: 'growth',
   meta:       'growth',   // retired (no plan includes it) — kept for type completeness
-  google_ai:  'growth_pro',  // AI Mode (SerpApi) is Growth PRO and up only (PRICING-STRATEGY-2026-07)
+  google_ai:  'growth',      // AI Mode (SerpApi). Growth and up since 2026-07-28.
   ai_overview: 'growth_pro', // LIVE 2026-07-29, 7th engine, Growth PRO and up
   copilot:    'pro',
   deepseek:   'pro',
@@ -321,6 +365,13 @@ export const FIXED_FEE_ENGINES: ReadonlySet<EngineId> =
 // Keep in sync with _cost.js, which is the copy that enforces it.
 export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
   free:       0.30,     // not price-derived (€0 revenue)
+  // 15% of the EUR 29 LAUNCH price, NOT of the EUR 39 list price. This map is
+  // keyed by plan and not by price, so it can hold only one number while two
+  // Radar prices are live, and the ruling picks the lower one deliberately:
+  // 5.85 while every customer actually pays 29 would make the real ceiling
+  // 5.85/29 = 20.2% of price, a 5-point margin giveaway nobody decided on.
+  // RAISE THIS TO 5.85 IN THE SAME COMMIT that deactivates the EUR 29 price.
+  radar:        4.35,
   essentials:  14.85,   // 15% of €99
   growth:      44.85,   // 15% of €299
   growth_pro:  67.35,   // 15% of €449
@@ -329,10 +380,15 @@ export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
   enterprise: 1500.00,  // 15% of the €10,000 pricing floor
 }
 
-export const PLAN_ORDER: Plan[] = ['free', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise']
+// ORDER IS THE LADDER. planRank() and hasFeature() read the INDEX, so this array
+// is the definition of "higher plan", not a display list. Mirror in _plans.js,
+// which is the copy that decides whether a plan change is announced to the
+// customer as an upgrade or a downgrade.
+export const PLAN_ORDER: Plan[] = ['free', 'radar', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise']
 
 export const PLAN_LABELS: Record<Plan, string> = {
   free:       'Free',
+  radar:      'Radar',
   essentials: 'Essentials',
   growth:     'Growth',
   growth_pro: 'Growth PRO',
@@ -399,57 +455,81 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
 // managed/pro/enterprise are done-for-you / custom — generous placeholders, not
 // self-serve caps.
 
-/** Buyer prompts included per plan. */
-/* RESIZED 2026-07-29. Prompt caps are now derived from what the monthly EUR
-   budget can actually sustain at a WEEKLY collection cadence, instead of being
-   picked and then silently blocked by the budget gate.
-
-   Per-prompt cost at the rebuilt prices (google_ai on SerpApi Starter):
-     3-engine (Essentials)  EUR 0.121
-     5-engine (Growth up)   EUR 0.145
-   Weekly = 4.33 runs/month. Budget = 12% of plan price.
-
-     plan         budget    max @ weekly   set to   budget used
-     essentials   11.88            22        20         88%
-     growth       35.88            57        50         88%
-     growth_pro   53.88            85        75         87%
-     managed     180.00           286       250         87%
-
-   ~12% headroom is left on every tier so an occasional MANUAL refresh does not
-   immediately trip the hard block in _auth.js. A client who refreshes manually
-   and often will still hit it — that is the budget doing its job, and the UI
-   already surfaces both the cooldown countdown and the budget message.
-
-   free stays at 5 prompts and MONTHLY (not weekly): its EUR 0.30 budget buys
-   exactly one 1-engine run of 5 prompts.
-
-   REBALANCED TWICE ON 2026-07-29, and the second pass undid the first.
-   29b cut growth_pro 75 -> 70 and managed 250 -> 230 to fit a 6th engine
-   (Grok, +EUR 0.012/prompt) under a 12%-of-price ceiling. 29c raised that
-   ceiling to 15% on the owner's instruction, which removed the reason for the
-   cut, so both are restored. Net effect of the day: an extra engine on Growth
-   PRO and up, and no allowance was reduced.
-
-   READ THE LAST COLUMN AS A SHARE OF REVENUE, not of the budget. An earlier
-   version of this table showed "% of budget used" (~88%) with no label, which
-   read as if 88 cents of every euro went to inference. It does not.
-
-     plan          engines  prompts  EUR/run  weekly EUR/mo  price   % of price
-     free                1      5      0.28          0.28*      0        n/a
-     essentials          3     20      2.42         10.49       99      10.6%
-     growth              5     50      7.25         31.41      299      10.5%
-     growth_pro          6     75     11.78         51.02      449      11.4%
-     managed             6    250     39.25        170.07     1500      11.3%
-   * free is monthly, not weekly.
-
-   The hard ceiling is 15% of price (PLAN_MONTHLY_API_BUDGET_EUR), so scheduled
-   collection uses roughly two thirds of each client's allowance and the rest
-   absorbs manual refreshes. True cash out is lower again, 6.5-7.8% of price,
-   because gemini (free under 1,500 requests/day) and google_ai (fixed SerpApi
-   subscription) sit inside the modelled figure without being marginal spend. */
+/** Buyer prompts included per plan.
+ *
+ *  THE NUMBERS DIRECTLY BELOW ARE THE LIVE ONES: 5, 7, 18, 35, 56, 200, 200,
+ *  sentinel. Ruled 2026-07-31 and signed by Constantin in
+ *  docs/strategy/sprint-ladder-ruling.md decision 2. Nothing else in this repo
+ *  overrides them, and there is no pending rebalance.
+ *
+ *  WHAT THIS COMMENT USED TO SAY, AND WHY IT WAS DELETED RATHER THAN AMENDED.
+ *  It described a ladder of 5, 20, 50, 75, 250 as though it were shipped. It
+ *  never was: the constant underneath it read 5, 15, 35, 35, 120 the whole time,
+ *  so the prose and the code disagreed by up to 130 prompts on a single tier, and
+ *  the prose was the more convincing of the two because it carried a costing
+ *  table. That table was also stale twice over. It priced a 3-engine check at
+ *  EUR 0.121 and a 5-engine one at EUR 0.145, against a 6-engine top tier, all
+ *  from before the 2026-07-29 reprice; the real figures are EUR 0.173, EUR 0.224
+ *  and a 7-engine top tier at EUR 0.313. Costed at today's prices that ladder
+ *  breaches the 15%-of-price ceiling by EUR 5.63 on Growth PRO and EUR 18.25 on
+ *  Managed, so it could not have been adopted even if it had been real.
+ *
+ *  A second correction worth keeping: the SerpApi engines (google_ai,
+ *  ai_overview) run MONTHLY, not weekly (MONTHLY_CAPPED_ENGINES in _cost.js), so
+ *  every earlier table in this repo multiplied all engines by 4.333 and
+ *  overstated the top tiers by roughly 40%.
+ *
+ *  THE LIVE LADDER, costed at verified 2026-07-29 prices. "Per site" is the
+ *  number the ladder is actually shaped by: it must rise at every boundary a
+ *  customer can cross, or a cheaper tier out-delivers a dearer one per website.
+ *
+ *    plan         price  engines  prompts  sites  per site  EUR/mo  budget  % price
+ *    free             0        1        5      1      5.00   0.160    0.30     n/a
+ *    radar           29        2        7      1      7.00   1.972    4.35    6.8%
+ *    essentials      99        3       18      2      9.00  13.494   14.85   13.6%
+ *    growth         299        5       35      2     17.50  28.607   44.85    9.6%
+ *    growth_pro     449        7       56      3     18.67  54.488   67.35   12.1%
+ *    managed       1500        7      200     10     20.00 194.600  225.00   13.0%
+ *    pro (legacy)  1500        7      200     10     20.00 194.600  225.00   13.0%
+ *    enterprise  custom        7  100000     25       n/a  budget-bound
+ *
+ *  Per site reads 5.00, 7.00, 9.00, 17.50, 18.67, 20.00: strictly increasing,
+ *  no inversion anywhere. Two inversions that WERE live are closed by this set.
+ *  Growth PRO used to sit at 11.67 per site, BELOW Growth's 17.50, so the more
+ *  expensive tier delivered less per website; it is raised 35 -> 56. Legacy `pro`
+ *  used to sit at 6.00 per site, below Essentials, on a paper allowance of 20
+ *  websites in a feature (D1) that has not shipped; it drops to 10 sites and
+ *  rises to 200 prompts, which costs no existing customer anything precisely
+ *  because no `pro` client has ever held more than one site.
+ *
+ *  NO ALLOWANCE IS REDUCED against what any customer holds today. Free holds at
+ *  5, Growth holds at 35, and Essentials (15 -> 18), Growth PRO (35 -> 56) and
+ *  Managed/Pro (120 -> 200) all rise. That is deliberate: a reduction would be a
+ *  customer-impacting migration under docs/AUTONOMY.md, and this ruling requires
+ *  none. Verified against production before shipping — the heaviest tenant in the
+ *  book had 8 active prompts against a cap of 15, so no client is put into
+ *  violation by any row of this table.
+ *
+ *  `enterprise: 100000` IS A SENTINEL, NOT A PROMISE. At EUR 0.9730 a prompt the
+ *  EUR 1,500 budget stops collection at about 1,541 prompts, so the real cap is
+ *  the budget and this number only means "not capped here".
+ *
+ *  Growth deliberately spends only 63.8% of its ceiling while Growth PRO spends
+ *  80.9% and Managed 86.5%. That is what makes per-site capacity rise across the
+ *  top of the ladder at all, and it is the honest cost of this ruling: a Growth
+ *  customer leaves EUR 16.24 a month of budgeted capacity unused.
+ *
+ *  FIVE COPIES OF THIS LADDER EXIST. This one, _cost.js, _plans.js,
+ *  onboard-client.js (derived, not hand-written) and public.plan_prompt_caps in
+ *  Postgres, which is the copy with teeth: trg_enforce_prompt_cap refuses the
+ *  INSERT at the database. The table and this constant must land in the SAME
+ *  deploy. The trigger falls back to the FREE cap for a plan it does not know, so
+ *  a live `radar` plan with no plan_prompt_caps row silently caps Radar customers
+ *  at 5 prompts instead of 7. Migration: db/supabase-plan-caps-2026-07-31-migration.sql.
+ */
 export const PLAN_PROMPTS: Record<Plan, number> = {
-  free: 5, essentials: 15, growth: 35, growth_pro: 35,
-  managed: 120, pro: 120, enterprise: 100000,
+  free: 5, radar: 7, essentials: 18, growth: 35, growth_pro: 56,
+  managed: 200, pro: 200, enterprise: 100000,
 }
 
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
@@ -460,8 +540,14 @@ export const PLAN_PROMPTS: Record<Plan, number> = {
 // first on every plan, so the advertised 48h/36h split was unreachable. Tiers
 // now differentiate on ENGINES, PROMPTS and AI SEO depth. 168h = one manual
 // refresh per week, matching the automatic cadence. free = monthly.
+// radar = 168 (weekly), the same as every other paid tier. This is forced by
+// arithmetic, not chosen: at a fortnightly cadence Radar's EUR 4.35 would buy
+// 14.34 prompts on its single website, against a hard ceiling of 9.90 prompts
+// per site on Essentials, so Radar would out-deliver the tier above it per site
+// by 45% permanently and no Essentials number could fix it. Weekly puts Radar at
+// 7.17 per site, safely under. Ruling decision 1.
 export const PLAN_COLLECTION_COOLDOWN_HOURS: Record<Plan, number> = {
-  free: 720, essentials: 168, growth: 168, growth_pro: 168,
+  free: 720, radar: 168, essentials: 168, growth: 168, growth_pro: 168,
   managed: 168, pro: 168, enterprise: 0,
 }
 
@@ -469,32 +555,34 @@ export const PLAN_COLLECTION_COOLDOWN_HOURS: Record<Plan, number> = {
 // MOVED TO GROWTH+ 2026-07-29 (was Essentials at 1 page). Site audit is now one
 // of the three things separating Essentials from Growth, alongside engines
 // (3 -> 5) and prompts (20 -> 50).
+// radar = 0. AI SEO is Growth and up (FEATURE_MIN_PLAN.ai_seo), and the ruling
+// grants Radar no SEO entitlement of any kind. Same for the four maps below it.
 export const PLAN_SEO_PAGE_CAP: Record<Plan, number> = {
-  free: 0, essentials: 0, growth: 10, growth_pro: 30,
+  free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30,
   managed: 100, pro: 100, enterprise: 500,
 }
 
 /** AI SEO — max page audits per week. */
 export const PLAN_SEO_AUDITS_PER_WEEK: Record<Plan, number> = {
-  free: 0, essentials: 0, growth: 1, growth_pro: 1,
+  free: 0, radar: 0, essentials: 0, growth: 1, growth_pro: 1,
   managed: 3, pro: 3, enterprise: 7,
 }
 
 /** AI SEO — max content drafts generated per month. */
 export const PLAN_SEO_DRAFTS_PER_MONTH: Record<Plan, number> = {
-  free: 0, essentials: 0, growth: 10, growth_pro: 30,
+  free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30,
   managed: 60, pro: 60, enterprise: 200,
 }
 
 /** AI Social — number of channels the client may connect/target (0 = locked). */
 export const PLAN_SOCIAL_CHANNEL_LIMIT: Record<Plan, number> = {
-  free: 0, essentials: 0, growth: 1, growth_pro: 3,
+  free: 0, radar: 0, essentials: 0, growth: 1, growth_pro: 3,
   managed: 13, pro: 13, enterprise: 13,
 }
 
 /** AI Social — max posts per channel per month (composer + scheduling). */
 export const PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH: Record<Plan, number> = {
-  free: 0, essentials: 0, growth: 12, growth_pro: 30,
+  free: 0, radar: 0, essentials: 0, growth: 12, growth_pro: 30,
   managed: 100, pro: 100, enterprise: 100,
 }
 

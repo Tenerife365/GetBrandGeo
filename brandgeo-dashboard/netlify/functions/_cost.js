@@ -406,6 +406,30 @@ const PLAN_LIVE_ENGINES = {
   // Essentials, so a generic "upgrade to unlock" next to ChatGPT on Free points
   // at Radar, which does not carry it. That is a copy fix in getEngineStates().
   free:       ['gemini'],
+  // RADAR, the EUR 39 list / EUR 29 launch entry tier (ruling decision 1, signed
+  // 2026-07-31). Gemini + Claude, AMENDED by Constantin from the briefed
+  // ChatGPT + Gemini on cost: ChatGPT is EUR 0.108 a check against Gemini's 0.032
+  // and Claude's 0.033, so it was 77% of the tier's modelled cost while being one
+  // engine of two. The amendment takes Radar from EUR 4.247 to EUR 1.972 per
+  // client per month, which at 100 subscribers is EUR 227.55 a month saved, and
+  // moves cost from 14.6% of price to 6.8%.
+  //
+  // TRUE CASH OUT IS LOWER AGAIN AND IS THE HONEST FIGURE FOR SCALING: gemini is
+  // a FIXED_FEE_ENGINE (free under 1,500 grounded requests a day), so the only
+  // marginal cash in Radar is Claude, about EUR 1.00 per client per month.
+  //
+  // NO SERPAPI ENGINE, DELIBERATELY, AND THIS IS THE TIER'S BINDING CONSTRAINT.
+  // SERPAPI_MONTHLY_CREDITS below is 500 a month PLATFORM-WIDE, not per client.
+  // 100 Radar clients on google_ai at the monthly cap would draw 700 credits,
+  // 140% of the entire pool, consumed by the cheapest tier and leaving nothing
+  // for Growth, Growth PRO or Managed. A cheap tier that draws on a scarce shared
+  // pool cannot scale to 100, which is the whole premise of the tier.
+  //
+  // WATCH THE GEMINI FREE TIER, NOT THE EUROS. 1,500 requests a day is the real
+  // ceiling: 100 Radar clients x 7 prompts landing on the same weekday is 700
+  // calls, 47% of it, and the ceiling is hit at 214 clients on one collection
+  // day. Spread the weekly schedule across weekdays rather than clustering it.
+  radar:      ['gemini', 'claude'],
   essentials: ['chatgpt', 'gemini', 'claude'],
   growth:     ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai'],
   // GROK IS THE 6TH ENGINE, GROWTH PRO AND UP (2026-07-29). Growth PRO vs
@@ -507,6 +531,15 @@ function activeEnginesFor(plan, enginesEnabled) {
 // modelled figure but are not marginal spend.
 const PLAN_MONTHLY_API_BUDGET_EUR = {
   free:       0.30,    // not price-derived: EUR 0 revenue, fixed small allowance
+  // 15% of the EUR 29 LAUNCH price, not of the EUR 39 list price. This map is
+  // keyed by PLAN and Radar has TWO live Stripe prices, so it can hold only one
+  // number. The ruling takes the lower one: 5.85 while every customer actually
+  // pays 29 would make the effective ceiling 20.2% of price, which is a 5-point
+  // margin giveaway that no decision authorised.
+  // RAISE TO 5.85 IN THE SAME COMMIT that deactivates the EUR 29 launch price.
+  // This is the copy _auth.js checkCollectionLimits() reads, so this number is
+  // the one that actually stops a collection run.
+  radar:        4.35,
   essentials:  14.85,  // 15% of €99
   growth:      44.85,  // 15% of €299
   growth_pro:  67.35,  // 15% of €449
@@ -526,8 +559,12 @@ const PLAN_MONTHLY_API_BUDGET_EUR = {
 // Tiers differentiate on ENGINES, PROMPTS and AI SEO depth instead. 168h = one
 // manual refresh per week, matching the automatic cadence. free = monthly.
 // Keep in sync with planConfig.ts.
+// radar = 168 (weekly), same as every paid tier. Forced by arithmetic, not
+// preference: at fortnightly cadence Radar's budget would buy 14.34 prompts on
+// its one website against Essentials' hard ceiling of 9.90 per site, so the
+// cheaper tier would out-deliver the dearer one per site permanently.
 const PLAN_COLLECTION_COOLDOWN_HOURS = {
-  free: 720, essentials: 168, growth: 168, growth_pro: 168,
+  free: 720, radar: 168, essentials: 168, growth: 168, growth_pro: 168,
   managed: 168, pro: 168, enterprise: 0,
 }
 
@@ -570,6 +607,35 @@ const PLAN_COLLECTION_COOLDOWN_HOURS = {
  */
 const MONTHLY_CAPPED_ENGINES = ['google_ai', 'ai_overview']
 const MONTHLY_CAP_DAYS = 30
+
+/**
+ * THE PROMPT LADDER DEPENDS ON THE LINE ABOVE AND SILENTLY BREACHES WITHOUT IT.
+ * Added 2026-07-31 per sprint-ladder-ruling.md decision 2, breach 2.
+ *
+ * PLAN_PROMPTS was costed with both SerpApi engines running MONTHLY. If either
+ * id is removed from MONTHLY_CAPPED_ENGINES they revert to the weekly cadence of
+ * the other five engines, and at that cadence Growth PRO costs EUR 75.955
+ * against a EUR 67.35 ceiling (breach EUR 8.61) and Managed EUR 271.267 against
+ * EUR 225.00 (breach EUR 46.27). Two tiers would be repriced past their margin
+ * by a one-word edit, with nothing failing and nothing warning.
+ *
+ * This throws at module load rather than warning, deliberately. It is a check on
+ * two constants in this file, so it either always throws or never does, and it
+ * cannot fire because of runtime data. Every collector requires this module, so
+ * the failure is loud and immediate instead of arriving as a margin surprise a
+ * month later. If SerpApi headroom ever makes the cap genuinely unnecessary,
+ * delete the cap AND this assertion AND re-cost PLAN_PROMPTS, in one change.
+ */
+for (const required of ['google_ai', 'ai_overview']) {
+  if (!MONTHLY_CAPPED_ENGINES.includes(required)) {
+    throw new Error(
+      `_cost.js: "${required}" must stay in MONTHLY_CAPPED_ENGINES. PLAN_PROMPTS is ` +
+      'costed against a monthly SerpApi cadence; at weekly cadence Growth PRO and ' +
+      'Managed breach their 15%-of-price budgets by EUR 8.61 and EUR 46.27. ' +
+      'See docs/strategy/sprint-ladder-ruling.md decision 2, breach 2.'
+    )
+  }
+}
 
 module.exports = {
   ENGINE_COST_EUR,
