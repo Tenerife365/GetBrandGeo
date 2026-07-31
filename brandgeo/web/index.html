@@ -838,6 +838,12 @@
     .audit-fine-print { font-size: 0.875rem; color: var(--t2); margin-top: 8px; }
     .audit-success { font-size: 0.9rem; color: var(--t); padding: 4px 2px; line-height: 1.6; }
     .audit-success strong { color: var(--ac2); }
+    /* The handover link to the unlocked report (site.js, F2 fix 2026-07-31).
+       Matches the accent-text token already used by .audit-success strong
+       rather than introducing a second accent, and stays underlined so it does
+       not depend on colour alone to read as a link. */
+    .audit-success-link { color: var(--ac2); font-weight: 600; text-decoration: underline; }
+    .audit-success-link:hover { color: var(--t); }
 
     /* ── ENGINE CHIPS ── */
     .engine-chips-hint {

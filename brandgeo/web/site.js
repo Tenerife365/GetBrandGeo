@@ -75,6 +75,14 @@
     var AUDIT_ENDPOINT = AUDIT_BASE + 'audit-domain';
     var AUDIT_REPORT_ENDPOINT = AUDIT_BASE + 'get-audit-report';
     var AUDIT_UNLOCK_ENDPOINT = AUDIT_BASE + 'unlock-audit-report';
+    // Where the unlocked report actually lives (App.tsx:106, /audit/:token).
+    // Added 2026-07-31 closing acquisition-funnel-audit.md F1/F2/F4: the report
+    // was built, deployed, working and unreachable, because nothing ever handed
+    // the visitor this URL. unlock-audit-report.js sends NO email (the files
+    // that touch a mailer and the files that touch a prospect audit are
+    // disjoint sets), so the old "check your inbox" copy promised a delivery
+    // that could not happen, to every person who converted.
+    var AUDIT_REPORT_URL = 'https://app.getbrandgeo.com/audit/';
     // A real screening audit measured 26.9s end to end on 2026-07-26. The old
     // 12s ceiling aborted every one of them, so even once the URLs were right
     // the widget would still have redirected to signup. Netlify's synchronous
@@ -258,9 +266,16 @@
         '</div>' +
         '<form class="audit-email-row" id="auditEmailForm" novalidate>' +
           '<input type="email" id="auditEmail" placeholder="you@company.com" aria-label="Your email" required>' +
-          '<button type="submit" class="audit-email-btn">Email me the full breakdown &rarr;</button>' +
+          // "Show me", not "Email me". No email is sent on unlock and none ever
+          // was; see the AUDIT_REPORT_URL note above. The label now describes
+          // what the button does. If the unlock email is ever built, this and
+          // the success copy below are the two strings to change back.
+          '<button type="submit" class="audit-email-btn">Show me the full breakdown &rarr;</button>' +
         '</form>' +
-        '<div class="audit-fine-print">One-time report. No spam, unsubscribe any time.</div>' +
+        // "One-time report" implied a delivery. The report opens in the browser
+        // instead, so say that. The no-spam line stays true: the address is
+        // kept as a lead (prospect_leads), it is simply not mailed a report.
+        '<div class="audit-fine-print">Opens in your browser. No spam, unsubscribe any time.</div>' +
         '<div class="audit-status is-error" id="auditEmailError" hidden></div>';
 
       animateAuditScore(score);
@@ -293,12 +308,29 @@
         }, AUDIT_UNLOCK_TIMEOUT_MS).then(function(res) {
           if (!res.ok) throw new Error('unlock failed');
           return res.json();
-        }).then(function() {
+        }).then(function(data) {
+          // Hand over the report the visitor just unlocked. Announce, then move,
+          // matching the pattern the failure path already uses at the bottom of
+          // this file so a full-page navigation never arrives unannounced.
+          //
+          // The link is rendered as well as followed, deliberately: it survives
+          // a blocked navigation, a slow connection, and a visitor who wants to
+          // open it in a new tab. Never replace it with the redirect alone.
+          //
+          // `token` is the one from the audit that is already in scope; the
+          // response echoes it back (unlock-audit-report.js:63) and is preferred
+          // only so a future server-side token rotation cannot break this.
+          var reportToken = (data && data.token) || token;
+          var reportUrl = AUDIT_REPORT_URL + encodeURIComponent(reportToken);
           auditResult.innerHTML =
-            '<div class="audit-success">Check your inbox &mdash; the full AI Visibility report for ' +
-            '<strong>' + escapeHtml(domain) + '</strong> is on its way.</div>';
+            '<div class="audit-success">Your full AI Visibility report for ' +
+            '<strong>' + escapeHtml(domain) + '</strong> is ready. ' +
+            '<a class="audit-success-link" href="' + reportUrl + '">Open it now &rarr;</a></div>';
+          setTimeout(function() { window.location.href = reportUrl; }, 900);
         }).catch(function() {
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Email me the full breakdown →'; }
+          // Must match the label rendered above, or a failed attempt silently
+          // rewrites the button to a promise the product does not keep.
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Show me the full breakdown →'; }
           if (errEl) {
             errEl.textContent = 'Something went wrong sending that. Try again, or start your full audit instead.';
             errEl.hidden = false;
