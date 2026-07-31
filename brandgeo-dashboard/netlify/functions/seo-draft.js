@@ -14,6 +14,7 @@
 // ANTHROPIC_API_KEY (already set for social-generate / assistant).
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-5';
@@ -21,13 +22,12 @@ const TIMEOUT_MS = 22000;
 
 // Per-plan monthly draft cap (cost control, mirrors the SerpApi weekly-cap idea
 // in AI-SEO-SPEC.md). Admins bypass it -- they run the managed/done-for-you work
-// across many clients. A client below the AI SEO min plan never reaches here
-// (the page + nav are feature-gated), so free/essentials are 0 for completeness.
-// PRICING-STRATEGY-2026-07 §3. Keep in sync with planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH.
-const DRAFT_MONTHLY_CAP = {
-  free: 0, essentials: 2, growth: 10, growth_pro: 30, managed: 60, pro: 60, enterprise: 200,
-};
-
+// across many clients. Read from _plans.js PLAN_LIMITS.seoDraftsPerMonth, the
+// single server-side mirror of planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH. The old
+// local copy here said `essentials: 2` for two days after AI SEO moved to
+// Growth+ on 2026-07-29, and never carried `radar`. Do not reintroduce a copy:
+// the "the page is feature-gated so this is only for completeness" reasoning is
+// what let it drift, and the UI gate is bypassable by a direct POST.
 function monthStartIso() {
   const d = new Date();
   d.setDate(1); d.setHours(0, 0, 0, 0);
@@ -168,7 +168,7 @@ exports.handler = async (event) => {
     // ── Per-plan monthly draft cap (cost control). Admins bypass it. ──
     if (profile.role !== 'admin') {
       const plan = client?.plan || 'free';
-      const cap = DRAFT_MONTHLY_CAP[plan] ?? 0;
+      const cap = planLimit('seoDraftsPerMonth', plan);
       const { count } = await supabase
         .from('seo_briefs')
         .select('*', { count: 'exact', head: true })

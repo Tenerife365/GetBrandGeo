@@ -10,10 +10,15 @@
 //   -> { crawl_id, status:'running', max_pages } | { error } (HTTP 200)
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 
-// Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Essentials+
-// (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
-const CRAWL_PAGE_CAP = { free: 0, essentials: 1, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
+// Pages per crawl comes from _plans.js PLAN_LIMITS.seoPages, the single
+// server-side mirror of planConfig.ts PLAN_SEO_PAGE_CAP. It used to be a local
+// map here and it drifted twice over: it still said `essentials: 1` after AI SEO
+// moved to Growth+ on 2026-07-29, and it never learned about `radar`, whose
+// missing row a `?? 1` fallback then turned into a free 1-page crawl. There is
+// no hasFeature() call in this file, so `maxPages <= 0` below IS the entitlement
+// gate and that fallback was the entire decision. Do not reintroduce a copy.
 // One crawl/audit cycle per week per client (the "max 1 audit / week" cap).
 const CRAWL_COOLDOWN_DAYS = 7;
 
@@ -40,9 +45,14 @@ exports.handler = async (event) => {
     if (!domain) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'This client has no website set, so there is nothing to crawl. Add a website to the client first.' }) };
     }
-    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 1;
+    // Fails closed on an unknown plan (planLimit returns 0), so a tier nobody has
+    // priced is denied rather than defaulted into an allowance.
+    const maxPages = planLimit('seoPages', client?.plan);
     if (maxPages <= 0) {
-      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Essentials or higher to audit your pages.' }) };
+      // Names Growth, not Essentials: FEATURE_MIN_PLAN.ai_seo is 'growth' and
+      // PLAN_SEO_PAGE_CAP.essentials is 0, so the old message sold EUR 99 for a
+      // feature the buyer still would not get.
+      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Growth or higher to audit your pages.' }) };
     }
 
     // Don't start a second crawl while one is already running for this client.

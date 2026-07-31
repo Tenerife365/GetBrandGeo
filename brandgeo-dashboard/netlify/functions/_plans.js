@@ -78,6 +78,70 @@ const PLAN_BLURB = {
   enterprise: 'Custom scale, dedicated support, and bespoke reporting for large brands and agencies.',
 };
 
+// ── Per-plan self-serve limits ───────────────────────────────────────────────
+// Mirror of planConfig.ts's five limit tables, in this order: PLAN_SEO_PAGE_CAP,
+// PLAN_SEO_AUDITS_PER_WEEK, PLAN_SEO_DRAFTS_PER_MONTH, PLAN_SOCIAL_CHANNEL_LIMIT
+// and PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH. UPDATE THEM TOGETHER.
+//
+// 0 MEANS LOCKED, and on these paths the number IS the gate. seo-crawl.js has no
+// hasFeature() call: it refuses the crawl on `maxPages <= 0` and nothing else.
+// social-publish.js gates on the rank plus these two caps. So a wrong or missing
+// value here is an entitlement decision, not a display detail.
+//
+// WHY THIS LIVES HERE INSTEAD OF IN EACH FUNCTION. Until 2026-07-31 seo-crawl.js,
+// seo-draft.js and social-publish.js each carried their own hand-written copy,
+// and all three had drifted from planConfig.ts:
+//   - seo-crawl.js had essentials: 1 and seo-draft.js essentials: 2, against 0 in
+//     planConfig.ts since 2026-07-29 when AI SEO moved to Growth+. Essentials
+//     customers kept a crawl and two drafts a month they were not entitled to.
+//   - none of the three knew about `radar`, added 2026-07-31. seo-crawl.js read
+//     its cap with `?? 1`, so the tier the ruling grants ZERO SEO was handed a
+//     1-page crawl by the FALLBACK.
+// That last one is the lesson: the missing row was survivable, the fallback was
+// not. A plan a table has never heard of has never been priced, so it must be
+// denied. planLimit() below is the only reader, and it fails closed.
+const PLAN_LIMITS = {
+  seoPages:              { free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 },
+  seoAuditsPerWeek:      { free: 0, radar: 0, essentials: 0, growth: 1,  growth_pro: 1,  managed: 3,   pro: 3,   enterprise: 7 },
+  seoDraftsPerMonth:     { free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 60,  pro: 60,  enterprise: 200 },
+  socialChannels:        { free: 0, radar: 0, essentials: 0, growth: 1,  growth_pro: 3,  managed: 13,  pro: 13,  enterprise: 13 },
+  socialPostsPerChannel: { free: 0, radar: 0, essentials: 0, growth: 12, growth_pro: 30, managed: 100, pro: 100, enterprise: 100 },
+};
+
+/**
+ * THIS IS THE PART THAT STOPS THE NEXT `radar`.
+ *
+ * Same idiom and same reasoning as _cost.js's MONTHLY_CAPPED_ENGINES assertion,
+ * which this module already sits downstream of (line 19): it reads two constants
+ * in this file, so it either always throws or never does, and it can never fire
+ * on tenant data. Adding a plan to PLAN_ORDER without pricing it in every table
+ * above now breaks every function that requires this module, instead of quietly
+ * handing the new tier whatever each calling function's fallback happened to be.
+ * That silence is the whole of how Radar was granted a crawl it does not pay for.
+ *
+ * WHERE IT ACTUALLY SURFACES, because this was stated wrongly once already:
+ * NOT at build time. Netlify does not execute functions during a build, so a bad
+ * constant here surfaces at the FIRST INVOCATION of any function on this chain,
+ * and for stripe-webhook.js that first invocation is a customer paying. Test the
+ * ladder locally (tests/plan_limits_drift.test.js) rather than relying on a
+ * deploy to catch it. _package_checkout.js:59-62 rules against throwing for
+ * exactly this reason; that tension is recorded as F3 in
+ * docs/qa/plan-limits-drift-fix.md and is Constantin's call, not this file's.
+ */
+for (const [limit, table] of Object.entries(PLAN_LIMITS)) {
+  for (const plan of PLAN_ORDER) {
+    if (typeof table[plan] !== 'number') {
+      throw new Error(
+        `_plans.js: PLAN_LIMITS.${limit} has no number for plan "${plan}". Every plan ` +
+        'in PLAN_ORDER must be priced in every limit table: these values ARE the ' +
+        'entitlement gate on the AI SEO and AI Social paths, so an unpriced plan is ' +
+        'a feature given away. See src/lib/planConfig.ts and ' +
+        'docs/strategy/sprint-ladder-ruling.md.'
+      );
+    }
+  }
+}
+
 function isValidPlan(p) {
   return typeof p === 'string' && PLAN_ORDER.includes(p);
 }
@@ -85,6 +149,27 @@ function isValidPlan(p) {
 function planRank(p) {
   const i = PLAN_ORDER.indexOf(p);
   return i < 0 ? 0 : i;
+}
+
+/**
+ * The `limit` allowance for `plan`, FAILING CLOSED.
+ *
+ * An unknown, legacy or corrupt plan gets 0, never a default allowance. Callers
+ * gate on the number itself (`cap <= 0` means not entitled), so any other answer
+ * for a plan we do not recognise hands a paid feature to an account nobody has
+ * priced. This is the exact line that was `?? 1` in seo-crawl.js.
+ *
+ * An unknown `limit` throws instead, because that is a typo in our own code
+ * rather than tenant data: returning 0 there would silently lock a paying
+ * customer out of something they bought, which fails closed in the wrong
+ * direction. Every valid plan is guaranteed a number by the assertion above.
+ */
+function planLimit(limit, plan) {
+  const table = PLAN_LIMITS[limit];
+  if (!table) {
+    throw new Error(`_plans.js: unknown limit "${limit}". One of: ${Object.keys(PLAN_LIMITS).join(', ')}`);
+  }
+  return isValidPlan(plan) ? table[plan] : 0;
 }
 
 // What a plan unlocks, in human terms, for notifications. engineLabels is
@@ -102,6 +187,6 @@ function planUnlocks(plan) {
 }
 
 module.exports = {
-  PLAN_ORDER, PLAN_LABELS, ENGINE_LABELS, PLAN_BLURB,
-  isValidPlan, planRank, planUnlocks,
+  PLAN_ORDER, PLAN_LABELS, ENGINE_LABELS, PLAN_BLURB, PLAN_LIMITS,
+  isValidPlan, planRank, planLimit, planUnlocks,
 };
