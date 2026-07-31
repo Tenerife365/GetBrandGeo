@@ -127,7 +127,11 @@ export default function AuditReport() {
   return (
     <div className="min-h-screen bg-dark-900 px-4 py-10">
       <div className="max-w-2xl mx-auto">
-        <BrandGeoMark size="sm" to="/audit" className="mb-6" />
+        {/* Goes to the marketing site, not to /audit. This route is
+            `/audit/:token`, public and usually reached from an emailed link by
+            someone who has never signed in, so "home" for them is
+            getbrandgeo.com. /audit is a sibling form, not a parent. */}
+        <BrandGeoMark size="sm" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" className="mb-6" />
 
         {loadError && (
           <div className="bg-dark-800 border border-red-500/20 rounded-xl p-6 text-sm text-red-400 flex items-center gap-2">

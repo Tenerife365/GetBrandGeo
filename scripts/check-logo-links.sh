@@ -19,11 +19,12 @@ cd "$(dirname "$0")/.."
 fail=0
 
 # --- 1. Marketing site ---------------------------------------------------
-# thanks.html is a standalone post-submit confirmation page with no header/nav
-# at all (by design — a distraction-free "we got it" screen). Its way home is
-# a text CTA ("Back to BrandGEO" -> href="/"), not a .logo mark, so it is
-# exempt rather than failing.
-MARKETING_EXCEPTIONS=("brandgeo/web/thanks.html")
+# No exceptions. thanks.html used to be exempt here, on the reasoning that a
+# headerless confirmation screen has no nav to hang a logo on. Constantin
+# overruled that on 2026-07-31: the logo goes on every page, full stop. The
+# exemption list is kept (empty) rather than deleted, so that the next person
+# tempted to add one has to add it deliberately and say why.
+MARKETING_EXCEPTIONS=()
 
 is_exception() {
   local f="$1"

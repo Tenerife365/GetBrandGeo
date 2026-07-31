@@ -30,6 +30,10 @@
     h1 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
     p { color: #9ba1ac; margin-bottom: 32px; }
     a { background: #8b5cf6; color: #fff; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: 700; }
+    /* The bare `a` rule above styles EVERY anchor as a violet CTA button, so
+       the logo lockup needs an explicit reset or it renders inside a purple
+       pill. Declared after it, same specificity, so it wins on order. */
+    a.logo { background: none; padding: 0; border-radius: 0; display: block; }
   
     /* Social row, added 2026-07-29. Fallback chains because the site runs two
        token families: --t3/--bd/--ac-text on most pages, --muted/--border/
@@ -70,6 +74,14 @@
 </head>
 <body>
   <div class="box">
+    <!-- Logo added 2026-07-31. This page used to be the one exception in the
+         whole site: a headerless confirmation screen whose only way back was
+         the text CTA below. Constantin's rule is that the logo is on every
+         page and always returns you home, no exceptions, so the mark is here
+         even though there is no nav to hang it on. -->
+    <a href="/" class="logo">
+      <img src="logo-nav.png" alt="BrandGEO" style="height:32px;width:auto;display:block;margin:0 auto 28px;">
+    </a>
     <div class="icon">✅</div>
     <h1>We got your request!</h1>
     <p>We'll review your brand and send your free AI visibility audit within 24 hours.</p>
