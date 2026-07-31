@@ -844,6 +844,18 @@
        not depend on colour alone to read as a link. */
     .audit-success-link { color: var(--ac2); font-weight: 600; text-decoration: underline; }
     .audit-success-link:hover { color: var(--t); }
+    /* The success path's forward step to signup (site.js, C1b fix 2026-07-31).
+       Secondary to the report CTA above it and styled to read that way: body
+       text in --t2, the same token .audit-fine-print already uses, with only
+       the link itself carrying an accent.
+
+       --ac-text (#a78bfa, 7.23:1), NOT the --ac2 that .audit-success-link above
+       uses. --ac2 is #34d399 and is documented in :root as POSITIVE only; it
+       reads as a status, and this is a navigation choice, not a good outcome.
+       Underlined so it does not depend on colour alone to read as a link. */
+    .audit-forward { font-size: 0.875rem; color: var(--t2); margin-top: 10px; line-height: 1.6; }
+    .audit-forward-link { color: var(--ac-text); font-weight: 600; text-decoration: underline; }
+    .audit-forward-link:hover { color: var(--t); }
 
     /* ── ENGINE CHIPS ── */
     .engine-chips-hint {
@@ -1577,6 +1589,58 @@
       box-shadow: 0 3px 10px rgba(139,92,246,.32);
     }
     .btn-plan:has(+ .plan-checkout-note) { margin-bottom: 8px; }
+
+    /* ── CONTRACT GATE (ROADMAP Stream C, C3) ──────────────────────────────
+       Stands between a Subscribe button and Stripe. The panel is only the
+       visible half: the checkout URL is not in this page at all any more, it is
+       issued by accept-terms.js in response to a request carrying an
+       acceptance, so nothing here can be clicked past. See _terms_gate.js.
+       Hidden with [hidden] rather than a class so it stays hidden even if
+       site.js never runs. */
+    .terms-gate[hidden] { display: none; }
+    .terms-gate {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      background: rgba(10, 11, 14, .78);
+    }
+    .terms-gate-panel {
+      background: var(--s); border: 1px solid var(--bd2); border-radius: var(--r);
+      max-width: 460px; width: 100%; padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+    }
+    .terms-gate-title { font-size: 1.05rem; font-weight: 700; color: var(--t); margin: 0 0 6px; }
+    .terms-gate-plan { font-size: 0.9rem; color: var(--t2); margin: 0 0 16px; line-height: 1.6; }
+    .terms-gate-plan strong { color: var(--t); }
+    /* The label is the hit target for the checkbox, so it is padded and sized
+       for a coarse pointer (WCAG 2.2 SC 2.5.8) rather than being a 13px tick. */
+    .terms-gate-accept {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 12px; margin-bottom: 4px; cursor: pointer;
+      background: var(--s2); border: 1px solid var(--bd); border-radius: 8px;
+      font-size: 0.9rem; color: var(--t); line-height: 1.5;
+    }
+    .terms-gate-accept:hover { border-color: var(--bd2); }
+    .terms-gate-accept input { margin-top: 2px; width: 18px; height: 18px; flex: none; accent-color: var(--ac); }
+    .terms-gate-accept a { color: var(--ac-text); text-decoration: underline; }
+    .terms-gate-version { font-size: 0.78rem; color: var(--t3); margin: 8px 2px 16px; }
+    .terms-gate-actions { display: flex; gap: 10px; }
+    .terms-gate-btn {
+      flex: 1; padding: 11px 16px; border-radius: 8px; border: none;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      /* --ac-strong (#7c3aed) is the button FILL token: 5.7:1 behind white.
+         --ac is 4.65:1 and is not used for text-bearing fills. */
+      background: var(--ac-strong); color: #fff;
+      transition: opacity var(--dur-micro) var(--ease-soft);
+    }
+    .terms-gate-btn:hover:not(:disabled) { opacity: .88; }
+    /* Disabled is a COURTESY here, never the gate. The server refuses an
+       unaccepted request regardless of what this button looks like. */
+    .terms-gate-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .terms-gate-btn.ghost { flex: 0 0 auto; background: transparent; color: var(--t2); border: 1px solid var(--bd2); }
+    .terms-gate-btn.ghost:hover { color: var(--t); opacity: 1; }
+    .terms-gate-error { font-size: 0.85rem; color: var(--bad); margin-top: 12px; line-height: 1.5; }
+    .terms-gate-error[hidden] { display: none; }
     .plan-checkout-note {
       text-align: center;
       font-size: 0.68rem;
@@ -3136,7 +3200,29 @@
      lockup below 640px on this page only, since this is the one page that
      pins site.js to a version token. Caught by measuring at 375px: the page
      CSS was correct and the logo was still display:none. -->
-<script src="site.js?v=2026-07-29a"></script>
+<!-- Contract gate (ROADMAP Stream C, C3). Sits between every Subscribe button
+     and Stripe. Markup only: site.js opens it, fills in the plan, and asks
+     accept-terms.js for a checkout URL once the box is ticked. The URL is not
+     in this page, which is what makes the gate more than a disabled button.
+     Starts [hidden] so it stays closed if site.js never loads. -->
+<div class="terms-gate" id="termsGate" hidden role="dialog" aria-modal="true" aria-labelledby="termsGateTitle">
+  <div class="terms-gate-panel">
+    <h2 class="terms-gate-title" id="termsGateTitle">Before you subscribe</h2>
+    <p class="terms-gate-plan" id="termsGatePlan"></p>
+    <label class="terms-gate-accept" for="termsGateAccept">
+      <input type="checkbox" id="termsGateAccept">
+      <span>I have read and accept the
+        <a href="/terms.html" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
+    </label>
+    <p class="terms-gate-version" id="termsGateVersion"></p>
+    <div class="terms-gate-actions">
+      <button type="button" class="terms-gate-btn ghost" id="termsGateCancel">Cancel</button>
+      <button type="button" class="terms-gate-btn" id="termsGateContinue" disabled>Continue to payment</button>
+    </div>
+    <p class="terms-gate-error" id="termsGateError" hidden></p>
+  </div>
+</div>
+<script src="site.js?v=2026-07-31a"></script>
 <!-- Hero canvas + card tilt. External on purpose: the CSP in .htaccess has no
      'unsafe-inline' in script-src, so an inline block here is silently refused
      and the hero renders motionless. See the header of hero.js. -->
