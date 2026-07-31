@@ -1,8 +1,15 @@
 /**
- * FeatureLocked.tsx — the locked / upgrade screen for a plan-gated feature.
+ * FeatureLocked.tsx: the locked / upgrade screen for a plan-gated feature.
  * Rendered by a page when the active client's plan is below the feature's
  * minimum plan (see planConfig FEATURE_MIN_PLAN / hasFeature). Reusable for any
- * future gated feature — pass its FeatureId.
+ * future gated feature: pass its FeatureId.
+ *
+ * COPY RULE, do not undo. No sentence here may put an indefinite article in
+ * front of an interpolated plan label. "a {PLAN_LABELS[plan]} feature" shipped
+ * as "AI Social is a Enterprise feature" (audit F6). The plan ladder has been
+ * rewritten twice this month, so a computed a/an would be one label away from
+ * breaking again. Both sentences below use the fixed determiner "the ... plan",
+ * which is correct for every current and future label.
  */
 import { Lock, Sparkles, ArrowRight, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -20,13 +27,13 @@ export default function FeatureLocked({ feature }: { feature: FeatureId }) {
           <Lock size={22} className="text-brand-300" />
         </div>
         <h1 className="text-xl font-semibold text-white">
-          {meta.label} is a {PLAN_LABELS[plan]} feature
+          {meta.label} is included on the {PLAN_LABELS[plan]} plan
         </h1>
         <p className="text-sm text-slate-400 mt-3 max-w-md mx-auto leading-relaxed">{meta.blurb}</p>
 
         <div className="mt-6 inline-flex items-center gap-2 text-sm text-slate-300 bg-dark-700/50 border border-dark-600 rounded-lg px-4 py-2">
           <Check size={15} className="text-brand-300" />
-          Unlocks on the <span className="text-brand-300 font-medium">{PLAN_LABELS[plan]}</span> plan and above
+          Available on the <span className="text-brand-300 font-medium">{PLAN_LABELS[plan]}</span> plan and above
         </div>
 
         <div className="mt-7">

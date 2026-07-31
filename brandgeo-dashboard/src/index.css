@@ -92,7 +92,15 @@ html.light {
   --surface-bar:        242 241 248;   /* #f2f1f8 */
 
   --grid-line: 234 234 242;   /* #eaeaf2 */
-  --axis-ink:  100 116 139;   /* #64748b */
+  /* CORRECTED 2026-07-30 (was 100 116 139, slate-500). chartTheme.ts:29 states
+     this is text and clears 4.5:1 in both themes. It measured 4.76 and only
+     because every chart happens to sit on a white --dark-800 card: on the page
+     background it is 4.45 and on --dark-700 it is 3.95, so the claim held by
+     luck of placement rather than by the value. Same slate-500 that caused 55
+     of the 56 light-mode failures fixed today. rgb(85 100 121) is now 6.03 on
+     the card and 5.00 on the darkest light surface, so the comment is true
+     wherever a chart is put. */
+  --axis-ink:  85 100 121;    /* #556479 */
 
   --card-radius:    12px;
   --control-radius: 8px;
@@ -100,7 +108,21 @@ html.light {
   --card-pad-standard: 20px;
   --card-pad-feature:  24px;
 
-  --sentiment-positive: 77 124 15;    /* #4d7c0f */
+  /* CORRECTED 2026-07-30 (was 77 124 15, lime-700). `.text-sentiment-positive`
+     is real text, TrendDelta.tsx:37, and the AI Visibility "Strong" chip draws
+     it on its own lime tint #e4ebdb, where lime-700 measured 4.09 against a 4.5
+     floor. It was the last light-mode text failure standing after the slate
+     fix. lime-800 #3f6212 measures 5.80 on that tint, 7.08 on the card, 6.62 on
+     the page, and stays clearly separable from neutral and negative below. */
+  --sentiment-positive: 63 98 18;     /* #3f6212 */
+  /* NOTE: this is the same value that failed as text elsewhere in light mode,
+     but `.text-sentiment-neutral` has ZERO call sites; the token is only used
+     as a 2x2 dot fill (ScoreBadge.tsx:27) where the floor is 3:1 non-text and
+     it measures 4.45 on the page. Left alone deliberately rather than changed
+     blind, because it is a ramp step and moving it affects chart legibility
+     that was not measured here. It is the same landmine shape as the dead
+     text-cyan-400 override noted below: correct today, wrong the moment
+     someone renders it as text. */
   --sentiment-neutral:  100 116 139;  /* #64748b */
   --sentiment-negative: 159 18 57;    /* #9f1239 */
 }
@@ -135,8 +157,26 @@ html.light .text-slate-100   { color: rgb(15 23 42) !important; }
 html.light .text-slate-200   { color: rgb(30 41 59) !important; }
 html.light .text-slate-300   { color: rgb(51 65 85) !important; }
 html.light .text-slate-400   { color: rgb(71 85 105) !important; }
-html.light .text-slate-500   { color: rgb(100 116 139) !important; }
-html.light .text-slate-600   { color: rgb(100 116 139) !important; }  /* was slate-400 (~2.9:1 on white — failed contrast) → slate-500, legible */
+/* CORRECTED 2026-07-30. Both classes previously resolved to slate-500
+   rgb(100 116 139), which measures 4.76 on the card, 4.45 on the page, 4.24 on
+   the bar, 4.00 on the nav and 3.95 on --dark-700: it failed the 4.5 normal-text
+   floor on FOUR of the five light surfaces it can render on. That single value
+   caused 55 of the 56 light-mode contrast failures measured across all 11
+   routes, the worst page being /ai-visibility with 29 (the rank badges).
+
+   The earlier note below was right that slate-400 at ~2.9:1 was worse, and the
+   raise was in the correct direction. It stopped just short of the floor and was
+   never re-measured on the darker surfaces.
+
+   The binding surface is --dark-700 rgb(234 233 242), NOT the white card. A
+   value chosen against white passes there and fails on the nav and on chips.
+
+   slate-500 keeps a genuinely lighter step than slate-600 so the muted level
+   still reads as muted. rgb(85 100 121) is the value that buys real margin
+   (5.00:1 worst) rather than the 4.51:1 the lightest passing value would give,
+   which is one rounding step from failing again. */
+html.light .text-slate-500   { color: rgb(85 100 121) !important; }   /* 5.00 worst / 6.03 best */
+html.light .text-slate-600   { color: rgb(71 85 105)  !important; }   /* 6.29 worst / 7.58 best */
 
 html.light .text-brand-100   { color: rgb(15 23 42)   !important; }
 html.light .text-brand-200   { color: rgb(15 23 42)   !important; }
@@ -152,7 +192,13 @@ html.light .text-brand-400   { color: rgb(109 40 217) !important; }
    value, so any emphasis step encoded by picking -400 over -300 is flat in
    light mode. That is a ladder question, not a contrast one - see the report. */
 html.light .text-emerald-400 { color: rgb(4 120 87) !important; }
-html.light .text-red-400     { color: rgb(220 38 38) !important; }
+/* CORRECTED 2026-07-30 (was rgb(220 38 38), red-600). That value measures 4.83
+   on the card but 4.01 on --dark-700 and 4.06 on the nav, so it failed AA on
+   three of the five light surfaces. It went unseen by the route sweep because
+   no red-400 text happened to render on any page under demo fixtures, which is
+   the same reason a dead override is worth fixing before it has call sites.
+   red-700 #b91c1c now measures 5.37 worst, 6.47 best. */
+html.light .text-red-400     { color: rgb(185 28 28) !important; }
 html.light .text-amber-400   { color: rgb(180 83 9) !important; }
 html.light .text-amber-300   { color: rgb(180 83 9) !important; }
 html.light .text-blue-300    { color: rgb(29 78 216) !important; }
@@ -334,10 +380,51 @@ html.light .text-rose-300 { color: #9f1239 !important; }
    turn-red-on-hover cue on a destructive control has been silently dead in
    light mode. This restores it at 8.02:1. Specificity (0,3,0) plus !important
    clears the resting .text-slate-500 rule's (0,2,0).
-   NOTE: this is the ONLY hover colour in the app that survives light mode; the
-   other ~70 are inert for the same reason. Fixing them all is one deliberate
-   pass, not a side effect of this one. See the report. */
+   NOTE, superseded 2026-07-30: the deliberate pass this defers is the block
+   directly below. The "~70" estimate was low. Counted on the live DOM across
+   all 11 routes, 131 elements carry a hover colour class alongside a resting
+   class with an !important light override. */
 html.light .hover\:text-rose-300:hover { color: #9f1239 !important; }
+
+/* ---------------------------------------------------------------------------
+   THE DELIBERATE PASS, 2026-07-30. Hover colours in light mode.
+
+   Mechanism, same as the rose rule above: 32 `html.light .text-*` rules carry
+   !important, and of the 15 Tailwind hover colour rules exactly one did. An
+   !important declaration beats a non-important one regardless of specificity,
+   so a resting colour with a light override permanently wins over its own hover
+   state. Measured on the live DOM: 131 dead instances across 11 routes, 7
+   distinct resting -> hover pairs, /prompts worst at 51.
+
+   Two of the seven are the destructive cue, `text-slate-400 -> hover:text-red-400`
+   (Sign out) and `text-slate-500 -> hover:text-red-400` (Delete prompt), so in
+   light mode a delete control gave no colour feedback on hover at all.
+
+   Specificity: these are (0,3,1) against the resting rules' (0,2,1). Both sides
+   are !important, so the higher specificity wins, which is what makes this work.
+
+   ON MEASUREMENT. Luminance ratio is the wrong instrument for "does this hover
+   read as a change", because it cannot see a hue shift: grey to red scores 1.07
+   and is obvious to the eye. Legibility below is CIE76 dE against the resting
+   colour, floor 15, the same floor this project uses for series colours.
+
+   ON THE FLATTENING. hover:text-white, -slate-200 and -slate-300 all resolve to
+   one value here. Mapping each to its symmetric inverse would give
+   slate-300 -> #334155 at dE 8.6 from its resting colour, a hover nobody can
+   see. Three distinct hover levels in dark collapse to one in light. That is a
+   ladder question, not a contrast one, and it is deliberate. Same trade the
+   emerald note above records. */
+html.light .hover\:text-white:hover,
+html.light .hover\:text-slate-200:hover,
+html.light .hover\:text-slate-300:hover { color: rgb(15 23 42) !important; }   /* 14.82 worst, dE 28.0 from slate-400 resting */
+
+html.light .hover\:text-red-400:hover   { color: rgb(185 28 28) !important; }  /* 5.37 worst, dE 81.4. The destructive cue. */
+
+/* text-brand-400 and text-brand-300 BOTH already map to #6d28d9 in light, so
+   `text-brand-400 hover:text-brand-300` is dead at dE 0.0 even after the
+   specificity fix: the hover resolves to the colour it started on. violet-900
+   is a real step away at dE 29.5 and 9.10 worst. */
+html.light .hover\:text-brand-300:hover { color: rgb(76 29 149) !important; }
 
 /* Red, the classes the first pass missed. Values follow the established red
    mapping exactly: -400-ish -> #dc2626, -300-and-lighter -> #b91c1c.

@@ -31,6 +31,7 @@ import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import SharedEmptyState from '../components/EmptyState'
+import Skeleton from '../components/Skeleton'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,15 +141,15 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 /** Per-LLM explanation of what drives its recommendations */
 const LLM_SOURCE: Record<string, string> = {
-  chatgpt:    'ChatGPT sources from web crawl data and Bing search — backlinks, directory listings, and well-indexed pages drive its recommendations.',
-  gemini:     "Gemini is deeply integrated with Google's ecosystem — Google Business Profile, Google Maps, and Google-indexed structured data are the fastest path to appearing here.",
-  claude:     'Claude sources from high-quality web content — authoritative pages, reputable citations, and clear brand descriptions help most.',
-  perplexity: 'Perplexity uses real-time web search — fresh, well-indexed content on platforms it actively crawls appears fastest.',
-  meta:       'Meta AI combines web search with social signals — LinkedIn company pages, Facebook presence, and web directory listings all contribute.',
-  google_ai:  'Google AI uses Google Search index data — being well-indexed and having structured data on your site helps most.',
-  copilot:    'Copilot leverages Bing search index — ensuring your site is crawlable and listed on Bing-indexed directories boosts visibility.',
-  deepseek:   'DeepSeek sources from high-quality web content — comprehensive, well-structured pages with clear brand information perform best.',
-  grok:       'Grok uses real-time web data and X/Twitter — an active social presence combined with fresh indexed content helps visibility.',
+  chatgpt:    'ChatGPT sources from web crawl data and Bing search, so backlinks, directory listings, and well-indexed pages drive its recommendations.',
+  gemini:     "Gemini is deeply integrated with Google's ecosystem, so Google Business Profile, Google Maps, and Google-indexed structured data are the fastest path to appearing here.",
+  claude:     'Claude sources from high-quality web content, so authoritative pages, reputable citations, and clear brand descriptions help most.',
+  perplexity: 'Perplexity uses real-time web search, so fresh, well-indexed content on platforms it actively crawls appears fastest.',
+  meta:       'Meta AI combines web search with social signals, so LinkedIn company pages, Facebook presence, and web directory listings all contribute.',
+  google_ai:  'Google AI uses Google Search index data, so being well-indexed and having structured data on your site helps most.',
+  copilot:    'Copilot reads the Bing search index, so making sure your site is crawlable and listed on Bing-indexed directories boosts visibility.',
+  deepseek:   'DeepSeek sources from high-quality web content, so comprehensive, well-structured pages with clear brand information perform best.',
+  grok:       'Grok uses real-time web data and X/Twitter, so an active social presence combined with fresh indexed content helps visibility.',
   ai_overview: 'Google AI Overviews summarise the ordinary Google results page, so the same signals that win classic rankings apply: being well indexed, having clear structured data, and earning citations from pages Google already trusts.',
 }
 
@@ -166,15 +167,15 @@ const GENERIC_QUICK_WINS: string[] = [
 
 const LLM_QUICK_WINS: Record<string, string[]> = {
   chatgpt: [
-    'Get listed on 3+ authoritative directories in your industry (Tripadvisor, Trustpilot, G2, etc.) — ChatGPT reads these directly',
-    'Publish 2+ pieces of content in the past 90 days — ChatGPT weights recently indexed pages',
+    'Get listed on 3+ authoritative directories in your industry (Tripadvisor, Trustpilot, G2, and the like), because ChatGPT reads these directly',
+    'Publish 2+ pieces of content in the past 90 days, since ChatGPT weights recently indexed pages',
     'Ensure your brand name appears in page titles, H1, and the opening paragraph of your key service pages',
-    'Earn 1–2 press mentions from established sites — third-party citations signal authority to ChatGPT',
+    'Earn one or two press mentions from established sites, because third-party citations signal authority to ChatGPT',
   ],
   gemini: [
     'Complete your Google Business Profile 100%: all service categories, photos, a description with specific capacity or scale data',
     'Add LocalBusiness or Organization schema markup to your homepage with complete details',
-    'Build 5+ citations on Google-indexed directories — Yelp, Tripadvisor, or industry-specific platforms',
+    'Build 5+ citations on Google-indexed directories such as Yelp, Tripadvisor, or industry-specific platforms',
     'Verify your site in Google Search Console and confirm key pages are crawled and indexed without errors',
   ],
   ai_overview: [
@@ -191,15 +192,15 @@ const LLM_QUICK_WINS: Record<string, string[]> = {
   ],
   perplexity: [
     'List on Perplexity-indexed platforms: Yelp, TripAdvisor, LinkedIn, industry-specific directories',
-    'Publish fresh content (blog posts, case studies, press releases) — Perplexity favors sources from the past 6 months',
-    'Ensure your site is fast, mobile-friendly, and fully crawlable — Perplexity scores page quality',
-    'Secure 2–3 mentions from news sites or industry blogs published recently',
+    'Publish fresh content (blog posts, case studies, press releases), because Perplexity favours sources from the past 6 months',
+    'Ensure your site is fast, mobile-friendly, and fully crawlable, since Perplexity scores page quality',
+    'Secure two or three mentions from news sites or industry blogs published recently',
   ],
   meta: [
-    'Complete your LinkedIn Company Page: description, services, specialties, and company size — Meta AI reads LinkedIn directly',
+    'Complete your LinkedIn Company Page with description, services, specialties, and company size, because Meta AI reads LinkedIn directly',
     'Ensure your Facebook Business Page is complete if relevant to your audience',
     'List on web directories Meta AI crawls: Trustpilot, Capterra, local and industry business directories',
-    'Publish LinkedIn content mentioning your key services — these surface in Meta AI responses',
+    'Publish LinkedIn content mentioning your key services, since these surface in Meta AI responses',
   ],
   google_ai: [
     'Ensure your site is fully indexed in Google Search Console with no crawl errors',
@@ -222,7 +223,7 @@ const LLM_QUICK_WINS: Record<string, string[]> = {
   grok: [
     'Maintain an active presence on X (Twitter) with regular updates about your brand',
     'Ensure your site is indexed and well-structured for web search',
-    'Publish timely content and news updates — Grok weights recency',
+    'Publish timely content and news updates, since Grok weights recency',
     'Earn mentions in recently published online articles and news sites',
   ],
 }
@@ -343,7 +344,7 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       id: `zero-${s.llm}`,
       impact: 'critical',
       effort: 'low',
-      title: `${brandName} is invisible on ${LLM_LABEL[s.llm]} — 0% across ${s.total} prompts`,
+      title: `${brandName} is invisible on ${LLM_LABEL[s.llm]}: 0% across ${s.total} prompts`,
       why: `Not a single one of your ${s.total} tracked prompts results in a mention on ${LLM_LABEL[s.llm]}. ${LLM_SOURCE[s.llm]}`,
       // ?? GENERIC_QUICK_WINS is load-bearing, not defensive habit. `how` is
       // rendered with rec.how.map(), this card is `critical` so it sorts first
@@ -352,7 +353,7 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       // on the page a customer opens to find out what to do next.
       how: LLM_QUICK_WINS[s.llm] ?? GENERIC_QUICK_WINS,
       fixes: [s.llm],
-      timeEst: '2–4h',
+      timeEst: '2 to 4h',
     })
   }
 
@@ -369,15 +370,15 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       title: `"${weakestCat.label}" category: ${Math.round(weakestCat.rate * 100)}% visibility (${weakestCat.mentioned}/${weakestCat.total} checks)`,
       why: `Your lowest-performing category by mention rate.${compHint} Every missed mention here is a potential client being sent to a competitor.`,
       how: [
-        `Read the prompts in the "${weakestCat.label}" category — these are the exact questions real clients type into AI about your services`,
+        `Read the prompts in the "${weakestCat.label}" category, because these are the exact questions real clients type into AI about your services`,
         `Create or expand content that directly answers each of those prompts: dedicated service pages, case studies, or FAQ entries`,
-        `Include specific, verifiable details in the content (capacity, pricing range, certifications, past event references) — AI engines prioritize specificity`,
+        `Include specific, verifiable details in the content (capacity, pricing range, certifications, past event references), because AI engines prioritise specificity`,
         weakCats.length > 1
-          ? `Also check "${weakCats[1].label}" (${Math.round(weakCats[1].rate * 100)}%) — your second weakest category`
+          ? `Also check "${weakCats[1].label}" at ${Math.round(weakCats[1].rate * 100)}%, your second weakest category`
           : `Once "${weakestCat.label}" is addressed, re-run collection to measure the improvement`,
       ],
       fixes: gapLLMs.map(s => s.llm),
-      timeEst: '4–8h',
+      timeEst: '4 to 8h',
     })
   }
 
@@ -395,7 +396,7 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       why: `${topComp.name} is the alternative AI engines rank most often across your tracked prompts.${secText} Closing this gap is the most direct path to recapturing those AI recommendations.`,
       how: [
         `Audit ${topComp.name}'s website: which pages do they have that you don't? (service pages, case studies, certifications, FAQ)`,
-        `Identify which of your prompts ${topComp.name} appears in — those topics are your highest-priority content gaps`,
+        `Identify which of your prompts ${topComp.name} appears in, because those topics are your highest-priority content gaps`,
         `Create content that directly targets the prompts where ${topComp.name} ranks and you don't`,
         `Build citations from the same directories and publications that mention ${topComp.name}`,
         secondComp
@@ -403,7 +404,7 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
           : `After closing the content gap, re-run collection to see if ${topComp.name}'s lead shrinks`,
       ],
       fixes: gapLLMs.length > 0 ? gapLLMs.map(s => s.llm) : llmStats.map(s => s.llm),
-      timeEst: '6–12h',
+      timeEst: '6 to 12h',
     })
   }
 
@@ -414,17 +415,17 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       id: 'position-improve',
       impact: 'high',
       effort: 'medium',
-      title: `Mentioned but ranked #${avgBrandPos} on average — push into top 2`,
-      why: `Being in the AI response is good — being first is significantly better. Clients and users act on the first 1–2 recommendations far more than position #3+. ${lowPosLLMs.length > 0 ? `${lowPosLLMs.map(s => LLM_LABEL[s.llm]).join(' and ')} rank you lowest.` : ''}`,
+      title: `Mentioned but ranked #${avgBrandPos} on average, so push into the top 2`,
+      why: `Being in the AI response is good. Being first is significantly better. Clients and users act on the first one or two recommendations far more than on position #3 and below. ${lowPosLLMs.length > 0 ? `${lowPosLLMs.map(s => LLM_LABEL[s.llm]).join(' and ')} rank you lowest.` : ''}`,
       how: [
-        `Review the response snippets in the AI Visibility tab for prompts where you appear at position #3 or lower — what brands are above you?`,
+        `Review the response snippets in the AI Visibility tab for prompts where you appear at position #3 or lower, and note what brands are above you`,
         `Add more verifiable, specific data to your content: exact numbers, awards, certifications, named client references`,
-        `Increase citation volume from authoritative sources — each new credible mention raises your authority score`,
+        `Increase citation volume from authoritative sources, since each new credible mention raises your authority score`,
         `Ensure your brand name and core value proposition appear in the first 100 words of your key landing pages`,
         `Add or improve structured schema markup so AI can parse your entity clearly alongside competitors`,
       ],
       fixes: lowPosLLMs.map(s => s.llm),
-      timeEst: '4–8h',
+      timeEst: '4 to 8h',
     })
   }
 
@@ -439,12 +440,12 @@ function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
       why: `You appear in some prompts on these engines but not others. This means your brand is recognized, but not authoritative enough across all query types. Targeted content in your weaker categories typically closes this gap.`,
       how: [
         `Filter AI Visibility by each underperforming category and note which engine misses you most`,
-        `Ensure your brand name, core services, and key differentiators appear in page titles and H1 headings — not just in body text`,
+        `Ensure your brand name, core services, and key differentiators appear in page titles and H1 headings, not just in body text`,
         `Add or expand schema markup (LocalBusiness, Organization, or SoftwareApplication) to help AI parse your entity clearly`,
-        `Ask satisfied clients to mention you by name in reviews on indexed platforms — brand name mentions from third parties are powerful`,
+        `Ask satisfied clients to mention you by name in reviews on indexed platforms, because brand name mentions from third parties carry a lot of weight`,
       ],
       fixes: partialLLMs.map(s => s.llm),
-      timeEst: '2–4h',
+      timeEst: '2 to 4h',
     })
   }
 
@@ -593,6 +594,54 @@ function StoredRecCard({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+/**
+ * Content-shaped loading state for the body of this page, replacing the bare
+ * "Loading recommendations…" string the 2026-07-30 UI/UX audit measured (F8):
+ * plain text, no structure, and ZERO interactive elements in <main> for the whole
+ * wait. The page header is deliberately NOT part of this component: it renders
+ * unchanged during the fetch, so the Refresh control stays reachable and the
+ * header's box never moves when data lands.
+ *
+ * Shape mirrors the resolved page's first two regions: the per-engine card grid
+ * (logo tile, name line, percentage line) and the first content card below it.
+ *
+ * Reduced motion: <Skeleton> uses Tailwind's `animate-pulse`, which is NOT
+ * governed by App.tsx's <MotionConfig reducedMotion="user"> (that only covers
+ * Motion's own animate/variants). index.css already freezes `.animate-pulse` to
+ * a static 0.6 opacity under `prefers-reduced-motion: reduce`; the explicit
+ * `motion-reduce:animate-none` here is a second, local guard so this state does
+ * not silently start pulsing if that global rule is ever refactored away.
+ */
+function RecommendationsSkeleton() {
+  const still = 'motion-reduce:animate-none'
+  return (
+    <div role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Loading recommendations</span>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6" aria-hidden="true">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-card-compact flex items-center gap-3">
+            <Skeleton className={`shrink-0 w-12 h-12 rounded-xl ${still}`} />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className={`h-4 w-24 ${still}`} />
+              <Skeleton className={`h-5 w-16 ${still}`} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-dark-800 rounded-xl p-5 space-y-3" aria-hidden="true">
+        <Skeleton className={`h-4 w-40 ${still}`} />
+        <Skeleton className={`h-3 w-full ${still}`} />
+        <Skeleton className={`h-3 w-5/6 ${still}`} />
+        <Skeleton className={`h-16 w-full rounded-lg ${still}`} />
+      </div>
     </div>
   )
 }
@@ -750,8 +799,8 @@ export default function Recommendations() {
         console.error('[GenRec] non-JSON response:', res.status, text.slice(0, 300))
         throw new Error(
           res.status === 524 || res.status === 502
-            ? 'The analysis timed out — try again in a moment'
-            : `Function error (HTTP ${res.status}) — check Netlify logs`
+            ? 'The analysis timed out. Try again in a moment.'
+            : `Function error (HTTP ${res.status}). Check the Netlify logs.`
         )
       }
 
@@ -791,8 +840,6 @@ export default function Recommendations() {
 
   useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading recommendations…</div>
-
   const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
   const visibleRuns = showAllRuns ? runs : runs.slice(0, 1)
@@ -800,34 +847,53 @@ export default function Recommendations() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
-      {/* Header */}
+      {/* Header. Rendered identically while loading: the title, the count chip slot
+          and the Refresh control do not depend on the fetch, so keeping them mounted
+          means the header's box is byte-identical before and after data lands and
+          nothing above the fold moves. Only the subtitle, which states a COUNT we do
+          not have yet, is swapped for a skeleton. Rendering "0 successful AI checks"
+          mid-fetch would be a measurement the page has not made. */}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <PageTitle>Recommendations</PageTitle>
-            {recs.length > 0 && (
+            {!loading && recs.length > 0 && (
               <span className="text-xs bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-medium">
                 {recs.length} action{recs.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-400">
-            Generated from {stats?.totalChecks ?? 0} successful AI checks — API failures excluded.
-          </p>
+          {loading ? (
+            <Skeleton className="h-5 w-[26rem] max-w-full motion-reduce:animate-none" />
+          ) : (
+            <p className="text-sm text-slate-400">
+              Generated from {stats?.totalChecks ?? 0} successful AI checks. API failures are excluded.
+            </p>
+          )}
         </div>
+        {/* aria-disabled, not disabled: a `disabled` button is removed from the tab
+            order, which is how this page came to have ZERO focusable controls in
+            <main> for the whole 8-second wait (audit F8). The click is guarded
+            instead, so the control stays reachable and announced.
+            No opacity dimming either. The old `disabled:opacity-50` measured the
+            label at 2.70:1 on --dark-900, and dimming the one focusable thing on
+            screen below legibility undoes the reason for keeping it focusable. The
+            busy state is carried by aria-disabled and the spinning icon. */}
         <button
-          onClick={load}
-          disabled={loading}
+          onClick={() => { if (!loading) load() }}
+          aria-disabled={loading}
           aria-label="Refresh recommendations"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-50"
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 text-slate-400 transition-colors ${loading ? 'cursor-default' : 'hover:text-slate-200 hover:bg-dark-700'}`}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Refresh
         </button>
       </div>
 
-      {/* API-failure notice — this is OUR outage, not the brand's invisibility. */}
-      {engineErrors.length > 0 && (
+      {loading && <RecommendationsSkeleton />}
+
+      {/* API-failure notice. This is OUR outage, not the brand's invisibility. */}
+      {!loading && engineErrors.length > 0 && (
         <div className="mb-6 p-4 bg-amber-500/8 border border-amber-500/20 rounded-xl flex gap-3">
           <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
@@ -837,17 +903,17 @@ export default function Recommendations() {
             <p className="text-xs text-slate-400 leading-relaxed">
               These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed calls),
               so they are excluded from every score and from the AI analysis below. This is a collection
-              failure, not a visibility failure — it does not mean these engines ignore your brand.
+              failure, not a visibility failure. It does not mean these engines ignore your brand.
             </p>
           </div>
         </div>
       )}
 
-      {(stats?.totalChecks ?? 0) === 0 ? (
+      {loading ? null : (stats?.totalChecks ?? 0) === 0 ? (
         <SharedEmptyState
           icon={Target}
           title="Not measured yet"
-          body="Recommendations are generated from AI check results — run a collection to get your first set."
+          body="Recommendations are generated from AI check results. Run a collection to get your first set."
           actionLabel="Run a collection"
           actionTo="/ai-visibility"
           minHeight={220}
@@ -911,7 +977,7 @@ export default function Recommendations() {
                         : 'bg-red-500/10 border-red-500/20'
                     }`}
                     title={c.proseOnly
-                      ? 'Named in prose, but never ranked in a list by any engine — usually because they are on your own competitor seed list'
+                      ? 'Named in prose, but never ranked in a list by any engine, usually because they are on your own competitor seed list'
                       : `Ranked ${c.rankedMentions}× by AI engines`}
                   >
                     <Target size={10} className={c.proseOnly ? 'text-slate-500 shrink-0' : 'text-red-400 shrink-0'} />
@@ -925,7 +991,7 @@ export default function Recommendations() {
               </div>
               {stats.competitors.some(c => c.proseOnly) && (
                 <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                  "Prose only" names were never ranked by any engine — they appear because they are on your
+                  "Prose only" names were never ranked by any engine. They appear because they are on your
                   own competitor list and an engine happened to mention them. They are not counted as losses.
                 </p>
               )}
@@ -946,10 +1012,10 @@ export default function Recommendations() {
               <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
               <div>
                 <div className="text-sm font-semibold text-red-300 mb-0.5">
-                  {gapLLMCount} engine{gapLLMCount !== 1 ? 's' : ''} below 50% — address these first
+                  {gapLLMCount} engine{gapLLMCount !== 1 ? 's' : ''} below 50%. Address these first.
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Overall visibility: {overallPct}%. The recommendations below are ordered by impact — fix critical gaps first.
+                  Overall visibility: {overallPct}%. The recommendations below are ordered by impact, so fix critical gaps first.
                 </p>
               </div>
             </div>
@@ -1014,7 +1080,7 @@ export default function Recommendations() {
 
             {!aiLoading && runs.length === 0 && unsavedRecs.length === 0 && !aiError && (
               <div className="bg-dark-800 border border-dark-700 border-dashed rounded-xl p-5 text-center text-sm text-slate-600">
-                Click "Generate insights" — Claude reads your actual response snippets and ranked competitors
+                Click "Generate insights". Claude reads your actual response snippets and ranked competitors
                 and produces specific, evidence-based advice. Every run is saved, so you keep a record of what
                 was advised and when.
               </div>
@@ -1073,7 +1139,7 @@ export default function Recommendations() {
           {recs.length === 0 ? (
             <div className="text-center py-12 text-slate-500 text-sm">
               <CheckCircle size={32} className="mx-auto mb-3 opacity-30" />
-              No priority actions right now — keep running monthly collections to track trends.
+              No priority actions right now. Keep running monthly collections to track trends.
             </div>
           ) : (
             <div className="space-y-3">

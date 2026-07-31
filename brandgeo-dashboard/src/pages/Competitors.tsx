@@ -5,7 +5,7 @@
  * Radar chart: 5 axes = 5 AI engines, showing visibility profile per entity.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
@@ -147,6 +147,39 @@ function computeTrend(
 // --- Charts ------------------------------------------------------------------
 
 const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
+
+/**
+ * Empty-cell placeholder. Replaces the bare em dash this page used to render in
+ * `text-slate-700`, which measured 1.72:1 on --dark-800 and was the last
+ * dark-mode contrast failure anywhere in the app (audit 2026-07-30, F5).
+ *
+ * Two faults were wearing one glyph. It was unreadable, and a lone dash does not
+ * say WHAT is missing on a product whose whole claim is honest measurement, so
+ * every call site below now passes the specific reason the cell is empty
+ * ("Not ranked", "No sample prompt") rather than a punctuation mark.
+ *
+ * `text-slate-500` is the palette's existing muted step and is the only muted
+ * value that is remapped in BOTH themes: index.css:143 lifts it to
+ * rgb(148 163 184) in dark and index.css:170 drops it to rgb(85 100 121) in
+ * light, precisely so it stays muted without going invisible. No new token is
+ * needed and index.css is not touched.
+ */
+function NoData({ children }: { children: ReactNode }) {
+  return <span className="text-slate-500 font-normal">{children}</span>
+}
+
+/**
+ * Segmented trend control. The hit area, not the label, is what was undersized:
+ * these measured 29x24 (audit F3, floor 44x44 for touch). The visual stays
+ * compact on a mouse at 32x32 — comfortably past WCAG 2.2 SC 2.5.8's 24x24 AA
+ * minimum — and only grows to 44x44 where a finger is actually the input, via a
+ * coarse-pointer query rather than a width breakpoint. A width breakpoint would
+ * be the wrong test: a narrow window on a desktop is still a mouse, and a tablet
+ * at 1024px is still a finger.
+ */
+const TREND_CHIP_TARGET =
+  'inline-flex items-center justify-center min-w-[32px] min-h-[32px] ' +
+  '[@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px]'
 
 /**
  * Competitor rows are not engines (dashboard-visual-system.md §9.5). Colour is
@@ -301,7 +334,7 @@ export default function Competitors() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
+          <div className="text-xs text-slate-500 mb-1">AI mentions of {brandName}</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{brandMentions}</div>
           <div className="text-xs text-slate-500 mt-0.5">
             {brandAvgPos ? `Avg position #${brandAvgPos}` : 'No position data'}
@@ -310,10 +343,12 @@ export default function Competitors() {
         <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Top competitor</div>
           <div className="text-sm font-bold text-red-300 leading-tight mt-1">
-            {topCompetitors[0]?.name ?? '—'}
+            {topCompetitors[0]?.name ?? <NoData>None yet</NoData>}
           </div>
           <div className="text-xs text-slate-500 mt-0.5">
-            {topCompetitors[0] ? `${topCompetitors[0].totalMentions} AI mentions` : 'None found yet'}
+            {topCompetitors[0]
+              ? `${topCompetitors[0].totalMentions} AI mentions`
+              : 'No competitor named in AI responses'}
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-4">
@@ -434,21 +469,21 @@ export default function Competitors() {
           </div>
           <div className="px-3 py-3 text-center font-bold text-emerald-400 tabular-nums">{brandMentions}</div>
           <div className="px-3 py-3 text-center tabular-nums text-emerald-400 font-semibold">
-            {brandAvgPos ? `#${brandAvgPos}` : '—'}
+            {brandAvgPos ? `#${brandAvgPos}` : <NoData>Not ranked</NoData>}
           </div>
           <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">
             {activeEngines.filter(e => (engineStats[e]?.mentioned ?? 0) > 0).map(e => (
               <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={ENGINE_LABEL[e]} />
             ))}
           </div>
-          <div className="px-3 py-3 text-xs text-slate-500">—</div>
+          <div className="px-3 py-3 text-xs"><NoData>No sample prompt</NoData></div>
         </div>
 
         {topCompetitors.length === 0 ? (
           <SharedEmptyState
             icon={Tag}
             title="Not measured yet"
-            body="Competitors mentioned by AI will appear here automatically once a collection runs — or add one manually below."
+            body="Competitors mentioned by AI appear here automatically once a collection runs. You can also add one manually below."
             actionLabel="Run a collection"
             actionTo="/ai-visibility"
           />
@@ -481,7 +516,7 @@ export default function Competitors() {
                   )}
                 </div>
                 <div className="px-3 py-3 text-center tabular-nums text-slate-300">
-                  {c.avgPos ? `#${c.avgPos}` : '—'}
+                  {c.avgPos ? `#${c.avgPos}` : <NoData>Not ranked</NoData>}
                 </div>
                 <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">
                   {engineDots.map(e => (
@@ -489,7 +524,7 @@ export default function Competitors() {
                   ))}
                 </div>
                 <div className="px-3 py-3 text-xs text-slate-500 truncate" title={samplePrompt ?? ''}>
-                  {sampleText ?? <span className="text-slate-700">—</span>}
+                  {sampleText ?? <NoData>No sample prompt</NoData>}
                 </div>
               </div>
             )
@@ -531,7 +566,7 @@ export default function Competitors() {
           <div>
             <h2 className="text-sm font-semibold text-slate-300">Performance Over Time</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              AI mention trends — {brandName} vs top competitors
+              AI mention trends for {brandName} vs top competitors
             </p>
           </div>
           <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
@@ -539,7 +574,7 @@ export default function Competitors() {
               <button key={p} onClick={() => setTrendPeriod(p)}
                 aria-pressed={trendPeriod === p}
                 aria-label={`View ${p} trend`}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                className={`${TREND_CHIP_TARGET} px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                 }`}>
                 {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}

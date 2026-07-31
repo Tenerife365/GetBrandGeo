@@ -120,6 +120,21 @@ function computeTrend(events: SentimentEvent[], period: TrendPeriod) {
     .map(([p, c]) => ({ period: p, Positive: c.positive, Neutral: c.neutral, Negative: c.negative }))
 }
 
+/**
+ * Same segmented-control hit-area treatment as Competitors.tsx, and the same
+ * reasoning: these chips measured 24.5x20.5 (audit 2026-07-30, F3), the worst
+ * targets on the page. The visual stays compact on a mouse at 32x32, past WCAG
+ * 2.2 SC 2.5.8's 24x24 AA minimum, and grows to 44x44 only under a coarse
+ * pointer, which is the input the 44px floor is actually about.
+ *
+ * Duplicated rather than shared because this fix is scoped to two page files
+ * and a shared control would have to live in src/components/. Worth extracting
+ * next time either page is opened; noted in the handoff.
+ */
+const TREND_CHIP_TARGET =
+  'inline-flex items-center justify-center min-w-[32px] min-h-[32px] ' +
+  '[@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px]'
+
 function buildEngineSentimentData(
   byEngine: Partial<Record<LLMName, SentimentCounts & { total: number }>>,
   activeEngines: EngineId[],
@@ -241,8 +256,13 @@ export default function BrandSentiment() {
             </span>
           )}
         </div>
+        {/* The em dash is gone (audit F4) and so is the second {brandName}: the
+            old string named the brand twice, which reads badly for anything
+            longer than one word. "mention{s}" agrees with the count — the old
+            copy said "1 response that mention", which was already wrong. */}
         <p className="text-sm text-slate-400 mt-0.5">
-          How AI engines talk about {brandName} — sentiment across {total} response{total !== 1 ? 's' : ''} that mention {brandName}
+          How AI engines talk about {brandName}, measured across {total} response{total !== 1 ? 's' : ''} that
+          {' '}mention{total === 1 ? 's' : ''} it
         </p>
       </div>
 
@@ -261,8 +281,15 @@ export default function BrandSentiment() {
             <Sparkles size={12} className="text-brand-400" />
             <span className="text-xs text-slate-500">Sentiment score</span>
           </div>
+          {/* The null branch used to render a bare em dash. A dash is not a
+              measurement and does not say why there is none, which is the same
+              defect fixed on /competitors (audit F4/F5). text-slate-500 is the
+              muted step that is remapped legibly in both themes
+              (index.css:143 dark, :170 light). */}
           <div className={`text-2xl font-bold tabular-nums ${scoreColor}`}>
-            {score !== null ? score : '—'}
+            {score !== null
+              ? score
+              : <span className="text-base font-semibold text-slate-500">Not measured</span>}
             {score !== null && <span className="text-sm text-slate-500 font-normal">/100</span>}
           </div>
           <div className={`text-xs mt-0.5 ${scoreColor}`}>{scoreLabel}</div>
@@ -368,7 +395,7 @@ export default function BrandSentiment() {
                     <button key={p} onClick={() => setTrendPeriod(p)}
                       aria-pressed={trendPeriod === p}
                       aria-label={`View ${p} trend`}
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                      className={`${TREND_CHIP_TARGET} px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
                         trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                       }`}>
                       {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}

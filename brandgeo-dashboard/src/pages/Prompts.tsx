@@ -374,7 +374,7 @@ export default function Prompts() {
           <button
             onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
             aria-expanded={showDiscover}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors ${
               showDiscover
                 ? 'bg-brand-500/30 text-brand-200 border border-brand-500/50'
                 : 'bg-brand-500/15 text-brand-300 hover:bg-brand-500/25 border border-brand-500/20'
@@ -387,7 +387,7 @@ export default function Prompts() {
             onClick={() => (capBlocks ? setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
             aria-disabled={capBlocks}
             title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors border ${
+            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors border ${
               capBlocks
                 ? 'bg-dark-800 text-slate-500 border-dark-700 cursor-not-allowed'
                 : 'bg-dark-700 text-slate-300 hover:bg-dark-600 border-dark-600'
@@ -425,7 +425,9 @@ export default function Prompts() {
       {capError && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
           <span>{capError}</span>
-          <button onClick={() => setCapError(null)} aria-label="Dismiss" className="text-red-300/70 hover:text-red-200">
+          {/* 14x14 glyph, 44x44 target. Extends over the message text beside it,
+              which is not interactive, and 3px past the banner padding. */}
+          <button onClick={() => setCapError(null)} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
             <X size={14} />
           </button>
         </div>
@@ -437,7 +439,7 @@ export default function Prompts() {
           <button
             onClick={() => setFilterCat('all')}
             aria-pressed={filterCat === 'all'}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+            className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
               filterCat === 'all'
                 ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
                 : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
@@ -450,7 +452,7 @@ export default function Prompts() {
               key={cat}
               onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}
               aria-pressed={filterCat === cat}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
                 filterCat === cat
                   ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
                   : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
@@ -518,7 +520,7 @@ export default function Prompts() {
                     onClick={() => addSuggestion(s, i)}
                     disabled={s.added}
                     aria-label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
-                    className={`shrink-0 p-1 rounded-lg transition-colors ${
+                    className={`relative shrink-0 p-1 rounded-lg transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-12px] ${
                       s.added
                         ? 'text-emerald-500 cursor-default'
                         : 'text-slate-500 hover:text-brand-300 hover:bg-brand-500/10'
@@ -545,7 +547,7 @@ export default function Prompts() {
               onClick={sendMessage}
               disabled={!userInput.trim() || aiLoading}
               aria-label="Send message"
-              className="px-3 py-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center justify-center px-3 py-2 max-md:min-w-[44px] max-md:min-h-[44px] rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
             >
               <Send size={14} />
             </button>
@@ -567,9 +569,11 @@ export default function Prompts() {
             />
             <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text — no need to pick one.</p>
           </div>
-          <div className="flex gap-2 pt-0.5">
-            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"><Check size={16} /></button>
-            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors"><X size={16} /></button>
+          {/* 32x32 visible, 44x44 target below md, and the gap goes to 16px there
+              so the two targets do not overlap (32 + 12 = 44, centres 48 apart). */}
+          <div className="flex gap-2 max-md:gap-4 pt-0.5">
+            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="relative p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><Check size={16} /></button>
+            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="relative p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><X size={16} /></button>
           </div>
         </div>
       )}
@@ -583,7 +587,7 @@ export default function Prompts() {
               <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${CAT_BADGE}`}>{promptCategoryLabel(p.category)}</span>
               {isEditing ? (
-                <div className="flex-1 flex gap-2 items-center">
+                <div className="flex-1 flex gap-3 items-center">
                   <input
                     autoFocus
                     value={editText}
@@ -592,15 +596,48 @@ export default function Prompts() {
                     aria-label="Edit prompt text"
                     className="flex-1 bg-dark-700 border border-brand-500/50 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
                   />
-                  <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>
-                  <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600"><X size={14} /></button>
+                  {/* Same 44x44 target and 20px separation as the resting row
+                      above. Cancel throws away what was just typed, so it gets
+                      the same treatment Delete does. The outer gap is 12px, not
+                      8px, so Save's hit box does not reach back over the input
+                      it sits beside (9px of extension, 12px of gap, 3px clear). */}
+                  <div className="flex gap-5 flex-shrink-0">
+                    <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="relative p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 after:absolute after:content-[''] after:[inset:-9px]"><Check size={14} /></button>
+                    <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="relative p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 after:absolute after:content-[''] after:[inset:-9px]"><X size={14} /></button>
+                  </div>
                 </div>
               ) : (
                 <>
                   <span className="flex-1 text-sm text-slate-300">{p.text}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
+                  {/* Row actions. Three separate things are going on here, all of
+                      them the same defect measured from different angles
+                      (dashboard-uiux-audit-2026-07-30.md F3):
+
+                      1. TAP AREA. The icons stay 26x26 — that is the size the row
+                         density wants, and growing them would push the row from
+                         52px to ~70px and change how many prompts fit on a
+                         screen. The TARGET grows instead, via a transparent
+                         ::after inset -9px, giving 44x44. Same technique the
+                         shipped .time-pill / .engine-chip rules in index.css
+                         already use. 44 on desktop as well as mobile, not just
+                         mobile: Delete is destructive and a mouse can miss too.
+                      2. SEPARATION. 44px targets 4px apart overlap by 14px, so
+                         the fix above would have made mis-tapping WORSE. gap-5
+                         (20px) puts the centres 46px apart, so the two hit boxes
+                         clear each other by 2px and a thumb cannot take Delete
+                         when it meant Edit.
+                      3. REACHABILITY. opacity-0 + group-hover has no meaning on a
+                         touch device, which has no hover: these were invisible on
+                         a phone, which is a worse problem than being small. They
+                         are always visible below md now, and unchanged above it.
+                         md:focus-within keeps them visible for keyboard users on
+                         desktop, where they were previously focusable at opacity
+                         0 (the responsive variant has to be doubled up because
+                         Tailwind emits media queries after pseudo-class variants,
+                         so a bare focus-within: would lose to md:opacity-0). */}
+                  <div className="flex gap-5 flex-shrink-0 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Pencil size={14} /></button>
+                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Trash2 size={14} /></button>
                   </div>
                 </>
               )}

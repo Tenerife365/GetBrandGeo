@@ -306,7 +306,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
             )}
-            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-2" aria-label="Close menu">
+            {/* md:hidden, so this only ever exists on a touch-sized viewport:
+                44x44 unconditionally rather than behind a query. The 18px glyph
+                is unchanged; only the box around it grew, and the header is
+                72px tall so nothing moves. */}
+            <button onClick={closeSidebar} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-slate-400 hover:text-white transition-colors" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
@@ -518,9 +522,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs text-slate-600 uppercase tracking-wider">{t.sidebar_market}</span>
+            {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
+                text button so there is no padding to grow without moving the
+                MARKET header row it shares (this row is deliberately compact,
+                see the "reclaims vertical space" note further down). The target
+                grows instead: inset -14px vertical, -8px horizontal, giving
+                50.6 x 44.5 while the label stays exactly where it was. */}
             <button
               onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              className="relative flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
               aria-expanded={showMarketEditor}
             >
               {showMarketEditor ? 'Done' : 'Edit'}
@@ -564,7 +574,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {selections.length > 1 && (
                     <button
                       onClick={() => removeSelection(sel.market.id)}
-                      className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                      className="relative p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px]"
                       title={`Remove ${sel.market.label}`}
                       aria-label={`Remove ${sel.market.label} from selected markets`}
                     >
@@ -581,7 +591,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         const r = sel.market.regions.find(r => r.id === e.target.value)
                         if (r) updateRegion(sel.market.id, r)
                       }}
-                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 max-md:min-h-[44px] text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
                       aria-label={`Region for ${sel.market.label}`}
                     >
                       {sel.market.regions.map(r => (
@@ -599,7 +609,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative" ref={marketMenuRef}>
               <button
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
                 aria-haspopup="listbox"
                 aria-expanded={showAddMarket}
               >
@@ -656,7 +666,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative flex-1 min-w-0" ref={langMenuRef}>
               <button
                 onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}
                 title="Language"
@@ -680,13 +690,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
+            {/* Theme and sign out: 36x36 for a mouse, 44x44 below md. Both are
+                real boxes, not pseudo-element extensions, so however tight the
+                6px gap is their hit areas cannot overlap each other. */}
             <button
               onClick={toggle}
               role="switch"
               aria-checked={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={t.sidebar_darkMode}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
             >
               {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -695,7 +708,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               aria-label={t.sidebar_signOut}
               title={t.sidebar_signOut}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
             >
               <LogOut size={16} />
             </button>
@@ -732,7 +745,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Mobile header */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-2" aria-label="Open menu">
+          {/* Mobile-only header, so 44x44 unconditionally. h-14 (56px) has room. */}
+          <button onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 text-slate-400 hover:text-white transition-colors" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
