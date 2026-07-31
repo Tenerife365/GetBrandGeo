@@ -194,11 +194,6 @@ async function handleCheckoutCompleted(session, log) {
     return
   }
 
-  // Did this purchase come through the contract gate? (ROADMAP Stream C, C3.)
-  // Deliberately placed here, after the two early returns and before any
-  // provisioning branch, so it observes every checkout that will be acted on and
-  // can influence none of them.
-  await checkContractAcceptance({ session, email, log })
 
   // Resolve the purchased plan from the line item's price. The line item itself
   // is kept, not just its price: the package path checks quantity off it (S3).
@@ -252,6 +247,27 @@ async function handleCheckoutCompleted(session, log) {
     }
     planSource = 'stripe'
     grantUntil = null
+  }
+
+  // Did this purchase come through the contract gate? (ROADMAP Stream C, C3.)
+  //
+  // PLACED HERE, AFTER PLAN RESOLUTION, AND THAT POSITION IS THE FIX for two
+  // false-alarm sources found in review. Above this point the plan is unknown,
+  // so the check fired on things that could not possibly carry an acceptance and
+  // then asserted a bypass had happened:
+  //
+  //   - PACKAGES are created by hand in Stripe (see the customer_creation note
+  //     above) and _terms_gate.js knows only the three subscription tiers, so a
+  //     package can never carry a client_reference_id. Skipped outright.
+  //   - SALES-ASSISTED and unknown-price subscriptions (managed, enterprise, the
+  //     four previous payment links still live in Stripe) return at the `else`
+  //     branch above, so they no longer reach this at all.
+  //
+  // An alert that cries bypass at a legitimate sale is worse than no alert: it
+  // trains the reader to dismiss it, and it would send someone rotating live
+  // payment links in response to a purchase that was fine.
+  if (!isPackage) {
+    await checkContractAcceptance({ session, email, plan, log })
   }
 
   // Wording for the admin feed, so a package and a subscription are told apart
@@ -443,7 +459,23 @@ async function handleCheckoutCompleted(session, log) {
 // It cannot throw. A throw here would release the idempotency lock in the
 // handler above and make Stripe redeliver the session forever. recordAdminEvent
 // is already best-effort by construction; the try/catch covers the query.
-async function checkContractAcceptance({ session, email, log }) {
+//
+// AND NOT THROWING IS NOT THE SAME AS NOT BLOCKING. This was a real regression
+// in the first version of this function and is worth stating so nobody
+// reintroduces it. recordAdminEvent defaults to `email: true`, which sends
+// through _email.js, whose fetch to Resend has no timeout and no AbortController.
+// This function runs IN FRONT OF provisioning, under the 15s ceiling in
+// netlify.toml. If Resend hung, the platform would kill the invocation, and a
+// platform kill is not an exception: the catch in the handler above never runs,
+// so the idempotency row is never deleted, so Stripe's retry hits the 23505
+// duplicate branch and returns 200 "already handled". The customer would have
+// paid and never been provisioned, silently, which is the exact failure the
+// admin event exists to prevent.
+//
+// So the alert writes the feed row and sends NO email. The row is what makes it
+// visible in the product; an email is not worth putting a network call with no
+// timeout in front of a paid customer's entitlement.
+async function checkContractAcceptance({ session, email, plan, log }) {
   try {
     const reference = session.client_reference_id || null
 
@@ -473,16 +505,25 @@ async function checkContractAcceptance({ session, email, log }) {
     await recordAdminEvent(supabase, {
       type: 'checkout_without_acceptance',
       client_id: null,
-      title: 'Payment taken with no recorded Terms acceptance',
-      body: `${email} completed a checkout that did not come through the contract gate`
-          + `${reference ? `, and carried a client_reference_id (${reference}) matching no acceptance on record` : ' and carried no client_reference_id'}. `
-          + 'The customer has been provisioned as normal. This means a live Stripe payment link was used directly, '
-          + 'which is possible because the links are permanent and are published in the public repository and its history. '
-          + 'Rotating the links, and keeping their replacements out of the repo, is what closes this.',
+      // See the note above: no email. This runs in front of provisioning.
+      email: false,
+      title: 'Paid subscription with no recorded Terms acceptance',
+      // States what was OBSERVED and offers the likeliest cause as a likelihood,
+      // not as a finding. The first draft asserted "a live Stripe payment link
+      // was used directly", which would have been stated as fact about sales
+      // that had nothing to do with it.
+      body: `${email} completed a paid ${plan} subscription that did not come through the contract gate`
+          + `${reference ? `. It carried a client_reference_id (${reference}) matching no acceptance on record` : ' and carried no client_reference_id'}. `
+          + 'The customer HAS been provisioned as normal; nothing is owed to them. '
+          + 'The likeliest cause is that one of the live Stripe payment links was opened directly, which is possible '
+          + 'because those links are permanent and are published in the public repository and its history. '
+          + 'Rotating them, and keeping the replacements in env vars, is what closes that. '
+          + 'Check terms_acceptances before concluding: a gate acceptance that failed to record would look identical from here.',
       meta: {
         checkout_session: session.id,
         client_reference_id: reference,
         email: email || null,
+        plan: plan || null,
         amount_total: session.amount_total ?? null,
         currency: session.currency ?? null,
       },

@@ -850,12 +850,18 @@
           // few hundred milliseconds. But a navigation can be blocked, refused
           // by an extension, or simply slow, and `busy` also gates closeGate():
           // leaving it set would freeze the panel with Cancel AND Escape both
-          // inert, in front of a visitor who is trying to pay. Release it after
-          // a beat so the panel stays usable if the move never happens.
+          // inert, in front of a visitor who is trying to pay.
+          //
+          // So `busy` is released, which restores Cancel and Escape, but the
+          // Continue button is NOT re-enabled. Re-enabling it would let a second
+          // click through, and every click writes a terms_acceptances row, so a
+          // slow navigation would record the same buyer accepting twice and make
+          // "no matched_at means abandoned" untrue. Closing and reopening is the
+          // retry, and it produces exactly one fresh acceptance.
           setTimeout(function() {
             busy = false;
-            continueEl.textContent = 'Continue to payment';
-            continueEl.disabled = !acceptEl.checked;
+            continueEl.textContent = 'Checkout opened';
+            setError('If the payment page did not open, close this and try again.');
           }, 4000);
           return;
         }

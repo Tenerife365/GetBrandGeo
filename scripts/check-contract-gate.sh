@@ -131,6 +131,12 @@ if [ -f "$ENDPOINT" ]; then
   grep -q "terms_acceptances" "$ENDPOINT" \
     || note "$ENDPOINT writes no terms_acceptances row, so an acceptance leaves no evidence"
 
+  # COVERAGE LIMIT, stated so no reader assumes more than is here. Only the
+  # REFUSAL paths are exercised. The allow path inserts a terms_acceptances row
+  # before it answers, which needs a database, so an accept-terms.js that
+  # returned a URL WITHOUT inserting would still pass this script. That half is
+  # covered by the webhook instead: stripe-webhook.js looks the reference up and
+  # raises checkout_without_acceptance when it finds nothing.
   (cd brandgeo-dashboard && node -e '
     const gate = require("./netlify/functions/_terms_gate.js");
     const { handler } = require("./netlify/functions/accept-terms.js");
@@ -168,6 +174,36 @@ fi
 
 [ -f "$MIGRATION" ] \
   || note "$MIGRATION is missing (terms_acceptances has no schema on disk)"
+
+# --- 3b. The webhook still consumes the acceptance ---------------------------
+#
+# While the six payment links remain permanent and published, the webhook is the
+# ONLY thing that can tell a gated purchase from a direct one, so it is the whole
+# of the enforcement. Nothing else in this script would notice if it were
+# refactored away, and it is far from the code it protects.
+WEBHOOK="$FN_DIR/stripe-webhook.js"
+if [ -f "$WEBHOOK" ]; then
+  grep -q "client_reference_id" "$WEBHOOK" \
+    || note "$WEBHOOK no longer reads client_reference_id, so a purchase that skipped the contract gate is invisible again"
+  grep -q "terms_acceptances" "$WEBHOOK" \
+    || note "$WEBHOOK no longer looks up terms_acceptances"
+  grep -q "checkout_without_acceptance" "$WEBHOOK" \
+    || note "$WEBHOOK no longer raises checkout_without_acceptance"
+  # The alert must not send an email: it runs in front of provisioning, and
+  # _email.js's fetch has no timeout. A hang there is a paid, unprovisioned
+  # customer (see the note in checkContractAcceptance).
+  node -e '
+    const fs = require("fs");
+    const src = fs.readFileSync(process.argv[1], "utf8");
+    const i = src.indexOf("checkout_without_acceptance");
+    if (i === -1) process.exit(0);   // already reported
+    const block = src.slice(i, i + 1600);
+    if (!/email:\s*false/.test(block)) {
+      console.log("FAIL: the checkout_without_acceptance admin event does not pass email:false. It runs in front of provisioning and _email.js has no fetch timeout, so a hung send means a customer who paid and was never provisioned.");
+      process.exit(1);
+    }
+  ' "$WEBHOOK" || fail=1
+fi
 
 # --- 4. The three copies of TERMS_VERSION must agree -------------------------
 #
