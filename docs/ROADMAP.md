@@ -116,23 +116,34 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   | essentials | 2 |
   | growth | 2 |
   | growth_pro | **3** |
-  | managed | multi-site too, **count not yet given** |
-  | pro / enterprise | not stated |
+  | managed | 10 |
+  | pro | 20 |
+  | enterprise | to be decided |
 
   Each site keeps that plan's engine set and limits. **Cross-tier across SITES
   is explicitly allowed** and is a different thing from the cross-tier package
   stacking refused above: a Growth customer may run a second, smaller site on
   Essentials. Not a loophole, a real case.
 
-  **THE OPEN QUESTION, and it decides the margin. Are plan limits PER SITE or
-  SHARED across the allowance?** Growth PRO at 3 sites x 35 prompts is 105
-  prompts and roughly triple the collection spend on the same EUR 449, against
-  Growth's 35. Per-site makes multi-site the whole value ladder and roughly
-  triples cost of goods for the tier. Shared makes it a convenience feature and
-  protects margin. `PLAN_MONTHLY_API_BUDGET_EUR` is per client today
-  (`_cost.js`), so "per client" silently means "per site" the moment D1 ships,
-  and the expensive answer is the one that happens by DEFAULT if nobody
-  decides. Decide before build, not after.
+  **DECIDED 2026-07-31: limits are SHARED across the allowance, not per site.**
+  Protects the margin: per-site would have made Growth PRO 105 prompts and
+  roughly triple the collection spend on the same EUR 449. Note the trap this
+  avoids, because it was the default: `PLAN_MONTHLY_API_BUDGET_EUR` is per
+  client in `_cost.js`, so "per client" would silently have become "per site"
+  the moment D1 shipped, with nobody choosing it. Shared limits must therefore
+  be enforced as an ACCOUNT-level sum, not by leaving the per-client budget in
+  place, or the decision is decorative.
+
+  **Consequence that must be resolved before this ships: the ladder inverts.**
+  With shared limits and today's caps, prompts per site are essentials 7.5,
+  growth 17.5, growth_pro 11.7, managed 12. **Growth PRO gives fewer prompts
+  per site than Growth, for EUR 150 more**, so the upgrade makes each
+  individual site worse and the D1-upsell nudge ("higher limits and more
+  options") would be untrue as written. `PLAN_PROMPTS` has to rise for
+  `growth_pro` at minimum, and probably for `managed`, so that both the total
+  and the per-site figure improve as you climb. That is a pricing decision, not
+  an implementation detail, and `plan_prompt_caps` in Postgres has to move with
+  `planConfig.ts` or the trigger will refuse what the page promises.
 
 - **D1-upsell. DECIDED 2026-07-31.** When a customer adds a site at a lower
   tier, show a nudge before they commit, of the form "Are you sure you want to
