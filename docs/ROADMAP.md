@@ -90,6 +90,46 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   single highest-risk item on the board and it is live today.
   `check: node -e "const s=require('fs').readFileSync('brandgeo-dashboard/netlify/functions/stripe-webhook.js','utf8'); process.exit(/mode !== 'subscription'/.test(s) && !/mode === 'payment'/.test(s) ? 1 : 0)"`
 
+- **A1-S2-tier. DECIDED 2026-07-31, not yet built.** A lower-tier package must
+  NOT stack onto a higher-tier live grant. Refuse it. The builder correctly
+  declined to invent this, because Constantin had ruled on months and not on
+  tiers; he has now ruled. Today a client with a live Growth PRO comp who buys
+  a 3-month Essentials package is dropped to Essentials immediately and keeps
+  the stacked tail. Unreachable until a package is sold. **Fold into the next
+  builder pass on `_package_checkout.js` rather than opening a third round on
+  the same file.**
+  Constantin's reasoning is worth keeping, because it reframes the whole
+  question: mixing tiers is not a renewal case at all, it is the multi-site
+  case below. One account, several websites, each on its own plan.
+  `check: node brandgeo-dashboard/tests/package_provisioning.test.js` (with a
+  lower-tier-onto-higher-grant fixture asserting refusal)
+
+- **D1. One account, many websites. Each website its own dashboard and its own
+  plan.** Constantin, 2026-07-31: clients and agencies with several websites or
+  products need one login and a dashboard per site, not one login per site.
+  **This is not a feature gap, it is a tenancy model change.** Today the binding
+  is one user to exactly one client, and it is enforced server-side, not merely
+  in the UI: `user_profiles.client_id` is a single FK and `_auth.js:116`
+  rejects any request whose `clientId` does not equal it. `clients[]` in
+  `clientContext.tsx:33` is commented "populated for admin only". So the client
+  switcher an agency needs already exists and is deliberately unreachable for
+  the people who would pay for it.
+  What that implies, and why this is `bg-architect` before anyone writes code:
+  - user-to-client becomes many-to-many (a membership table with a role per
+    membership), and `_auth.js`'s ownership check becomes a membership test.
+    That is the security boundary of the entire product; getting it wrong is a
+    cross-tenant data leak, and this codebase has had leaky RLS before (§6.4
+    step 7, nine permissive policies that ORed away per-client isolation).
+  - RLS policies keyed on `user_profiles.client_id` all have to change with it.
+  - billing becomes per-site, not per-account: several subscriptions under one
+    login, which touches every assumption in `stripe-webhook.js` about one
+    customer mapping to one client.
+  - it interacts with A5 and A6: limits, consumption and bonus grants are
+    per-site, and an agency will expect a roll-up across sites.
+  Sequence: `bg-architect`, then `bg-verify` on the auth boundary BEFORE any
+  build, then backend, then app. Not a single cycle.
+  `check: test -f docs/arch/multi-site-tenancy.md`
+
 - **A6. A client can always see their own plan limits and consumption.**
   Constantin, 2026-07-31. Today they cannot see either: `/usage` is the admin
   cost estimator and renders "Access restricted to admins." for a viewer
