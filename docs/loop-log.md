@@ -117,3 +117,46 @@ Carried forward:
 
 **NEEDS CONSTANTIN:** re-derive the `.claude/` schedules for +01:00; create the
 Sentry account so B4 can be wired; say whether the C1a handover fix ships today.
+
+## 2026-07-31 14:0x — cycle 4 (day window, attended): the build was red for 4 hours
+
+**Trigger:** Constantin pasted the Netlify history. Three Failed, three Canceled.
+
+**Root cause:** `6d2196c` widened `featureUnlockPlan` from `Plan` to `Plan | null`
+and added `ADMIN_ONLY_FEATURES`, without updating `FeatureLocked.tsx`, the only
+consumer that indexes `PLAN_LABELS[plan]` with the result. Two TS2538 errors,
+`tsc` exits 2, so `npm run build` fails.
+
+Bisected by typechecking each commit from a clean `git archive`, not from the
+working tree:
+
+```
+08514dd CLEAN   46b92fc CLEAN   b9d8a43 CLEAN   6d2196c FAILS   ff7cae3 FAILS
+```
+
+Fixed in `0bdb1d5`. Netlify deploy `6a6ca9a3` is `ready`, `error_message: null`,
+57s, 76 functions, `commit_ref 0bdb1d5`.
+
+Four things worth carrying, because the interesting part is not the type error.
+
+7. **The Canceled rows were correct and the Failed rows were one bug, not
+   three.** Netlify's `CACHED_COMMIT_REF` only advances on a SUCCESSFUL build,
+   so every push after `6d2196c` re-diffed against the last good commit, rebuilt
+   the same broken tree, and failed again. A docs-only commit appeared to fail
+   the build. Do not debug the newest red build; find the first one.
+8. **Production was never down.** It served the last good build (`46b92fc`) and
+   silently ignored everything after. A red pipeline here does not page anyone,
+   it just quietly stops shipping. Nobody noticed for about four hours.
+9. **A green local build is not evidence.** `npm run build` passed on the
+   working tree at the same commit where a clean checkout failed, because
+   uncommitted work on disk supplied the fix. This is the working-tree trap from
+   cycle 1 wearing different clothes, and I walked into it: my own build check on
+   `46b92fc` was green for exactly this reason, even though that commit happened
+   to be innocent.
+   **Build from `git archive <sha>`, not from the tree, before believing green.**
+10. **Fifth instance in three days of work that exists and never reached git.**
+   The correct fix was already written in the working tree, matching what
+   `6d2196c`'s own docstring asked for. It had simply never been committed.
+
+**NEEDS CONSTANTIN:** nothing new from this cycle. The preventive worth adding
+is a clean-checkout build check; filed in ROADMAP Stream B.
