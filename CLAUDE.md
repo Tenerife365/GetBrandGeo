@@ -90,7 +90,21 @@ Sprint task S3, roadmap Stream C. The Stripe payment links are **no longer in
 `brandgeo/web/site.js`**: they moved to `netlify/functions/_terms_gate.js` and
 are issued one at a time by `accept-terms.js`, which records a
 `terms_acceptances` row first and returns nothing if it cannot. Never put a
-checkout URL back in a browser-served file. Also: the audit success path now
+checkout URL back in a browser-served file.
+
+**But do not read C3 as closed, and this is the load-bearing correction.** Those
+links are Stripe **Payment Links**: permanent, reusable, and enough on their own
+to pay. `_terms_gate.js` is in the **public** repo, the links are in four
+committed docs, and they are in git history forever. Moving them gated the route
+and not the destination. `stripe-webhook.js` now raises a
+`checkout_without_acceptance` admin event when a payment arrives without a
+matching acceptance, so a bypass is visible; it never withholds provisioning.
+**Rotating the six links, and keeping the replacements in env vars, is what
+actually closes it, and it needs Constantin.** Caught by `bg-verify`, which
+returned FAIL on the first four commits: an earlier commit message here claimed
+the gate was real and it was not.
+
+Also: the audit success path now
 offers signup with `?domain=` prefilled (it previously offered nothing, while
 the FAILURE path offered exactly that), the domain survives into `/welcome`, and
 a failed HubSpot push records why on `prospect_leads.hubspot_error` instead of a

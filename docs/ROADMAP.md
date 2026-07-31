@@ -475,7 +475,22 @@ Scope: `brandgeo/web/`, `brandgeo-dashboard/src/pages/Signup.tsx`,
   the visitor forward with their domain
   ```
 
-- **C3. DONE 2026-07-31. Payment gated behind the contract, server-side.**
+- **C3. PARTLY DONE 2026-07-31, and the remaining half is Constantin's.**
+  Read the caveat at the end of this item before recording it as closed.
+  **The gate works on the ROUTE, not on the DESTINATION.** `bg-verify` found this
+  and it is right: these are Stripe **Payment Links**, permanent and reusable, so
+  possession of the string is enough to pay. They were moved out of the docroot
+  into `_terms_gate.js`, which is **in the same public repository**, and they are
+  also in four committed docs and permanently in git history. So a visitor who
+  reads the source can still pay without ever seeing the contract.
+  **What closes it: rotate the six links, and keep the replacements out of the
+  repo (env vars).** `scripts/stripe-retire-catalogue.js` exists for the rotation.
+  Until then, C3 is enforcement by DETECTION: `stripe-webhook.js` matches
+  `client_reference_id` against `terms_acceptances` and raises a
+  `checkout_without_acceptance` admin event when a payment did not come through
+  the gate. It never withholds provisioning, because the money is already
+  captured and refusing a paying customer is the worse failure.
+  Everything below is true and shipped; it is simply not the whole of C3.
   The six Stripe payment links have been REMOVED from `brandgeo/web/site.js`,
   where a `STRIPE_LINKS` map had been writing them onto every Subscribe button
   on load. That is what makes this not decorative: while the destination was in
