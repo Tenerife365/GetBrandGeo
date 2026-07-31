@@ -104,6 +104,43 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   `check: node brandgeo-dashboard/tests/package_provisioning.test.js` (with a
   lower-tier-onto-higher-grant fixture asserting refusal)
 
+- **D1-pricing. DECIDED 2026-07-31 by Constantin.** No agency SKU and no
+  multi-account pricing structure. Multi-site is an ALLOWANCE inside the
+  existing ladder, which is a better answer than a new tier: it gives Growth
+  PRO the differentiator it has never had (today it is +0 prompts and +0
+  engines over Growth for EUR 150 more).
+
+  | plan | websites |
+  |---|---|
+  | free | 1 |
+  | essentials | 2 |
+  | growth | 2 |
+  | growth_pro | **3** |
+  | managed | multi-site too, **count not yet given** |
+  | pro / enterprise | not stated |
+
+  Each site keeps that plan's engine set and limits. **Cross-tier across SITES
+  is explicitly allowed** and is a different thing from the cross-tier package
+  stacking refused above: a Growth customer may run a second, smaller site on
+  Essentials. Not a loophole, a real case.
+
+  **THE OPEN QUESTION, and it decides the margin. Are plan limits PER SITE or
+  SHARED across the allowance?** Growth PRO at 3 sites x 35 prompts is 105
+  prompts and roughly triple the collection spend on the same EUR 449, against
+  Growth's 35. Per-site makes multi-site the whole value ladder and roughly
+  triples cost of goods for the tier. Shared makes it a convenience feature and
+  protects margin. `PLAN_MONTHLY_API_BUDGET_EUR` is per client today
+  (`_cost.js`), so "per client" silently means "per site" the moment D1 ships,
+  and the expensive answer is the one that happens by DEFAULT if nobody
+  decides. Decide before build, not after.
+
+- **D1-upsell. DECIDED 2026-07-31.** When a customer adds a site at a lower
+  tier, show a nudge before they commit, of the form "Are you sure you want to
+  add Essentials? Upgrading to Growth PRO gives you an extra website, higher
+  limits and more included." A recommendation, never a block: the lower tier
+  must remain choosable in one click, or it reads as a dark pattern rather than
+  a helpful comparison. Copy belongs to `bg-copy`, not to whoever builds it.
+
 - **D1. One account, many websites. Each website its own dashboard and its own
   plan.** Constantin, 2026-07-31: clients and agencies with several websites or
   products need one login and a dashboard per site, not one login per site.
