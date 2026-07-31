@@ -568,6 +568,90 @@ const PLAN_COLLECTION_COOLDOWN_HOURS = {
   managed: 168, pro: 168, enterprise: 0,
 }
 
+// ── Automatic refresh cadence (2026-07-31) ───────────────────────────────────
+// The cooldown above is a PERMISSION: how often a customer may press the button.
+// This is what actually happens on its own. Until this existed, nothing in the
+// repo wrote clients.refresh_cadence, all 36 production rows sat at the column
+// default 'manual', and schedule-collections.js did nothing for anybody — so a
+// tier sold on a weekly refresh delivered one run a month, and only when a human
+// clicked. THIS IS THE SERVER-SIDE COPY: the provisioning and plan-change paths
+// read it, so this is the copy that decides what gets written to the column.
+// Mirror of src/lib/planConfig.ts PLAN_REFRESH_CADENCE / refreshCadenceFor.
+// tests/refresh_cadence.test.js parses BOTH files and fails if they diverge.
+
+// The cadence values schedule-collections.js understands, and nothing else. Its
+// CADENCE_DAYS is { weekly: 7, biweekly: 14, monthly: 30 }; anything outside
+// that map (including 'manual') never auto-refreshes. Adding a fifth value here
+// without adding it there produces a client that is silently never collected.
+const REFRESH_CADENCES = ['manual', 'weekly', 'biweekly', 'monthly']
+
+// The category that never gets an automatic cadence. See refreshCadenceFor.
+const RESEARCH_CATEGORY = 'research'
+
+// The category a brand-new clients row lands in — the DB default from
+// db/supabase-clients-category-migration.sql (`category text NOT NULL DEFAULT
+// 'active'`). Stated as a constant because three provisioning paths insert a
+// client without naming a category and then have to reason about what it is.
+const DEFAULT_CLIENT_CATEGORY = 'active'
+
+// FREE = 'monthly' IS A SPEND DECISION, REVERSIBLE BY CHANGING THIS ONE WORD TO
+// 'manual'. Marginal cash today is EUR 0 (free runs gemini only, a
+// FIXED_FEE_ENGINE that is genuinely free under 1,500 grounded requests a day);
+// the modelled EUR 0.160/month is an accounting figure. It is bounded twice
+// without new machinery: PLAN_MONTHLY_API_BUDGET_EUR.free is 0.30 and _auth.js
+// blocks at it, and a client with no active prompts enqueues nothing at all. The
+// reason to spend it: one data point is not a trend, and the trend is the whole
+// upgrade argument. Trip-wire is gemini's 1,500/day free tier, comfortable to
+// roughly 5,000 free clients. Full reasoning in planConfig.ts.
+const PLAN_REFRESH_CADENCE = {
+  free: 'monthly',
+  radar: 'weekly',
+  essentials: 'weekly',
+  growth: 'weekly',
+  growth_pro: 'weekly',
+  managed: 'weekly',
+  pro: 'weekly',
+  enterprise: 'weekly',
+}
+
+/**
+ * refreshCadenceFor(plan, category) -> one of REFRESH_CADENCES
+ *
+ * The ONLY place cadence is computed. provision-account.js, onboard-client.js,
+ * stripe-webhook.js, set-client-plan.js and expire-plan-grants.js call this
+ * rather than deciding for themselves, so a sixth call site cannot get it wrong.
+ *
+ * ── DO NOT DELETE THE RESEARCH BRANCH ───────────────────────────────────────
+ * A client with category 'research' NEVER gets an automatic cadence, on any
+ * plan, ever. It stays 'manual' and is collected only when a human deliberately
+ * runs a study.
+ *
+ * WHAT IT PROTECTS, measured against production 2026-07-31: 27 of the 36 clients
+ * in the database are BrandGEO's own city-research studies and ALL 27 sit on plan
+ * 'pro', whose PLAN_MONTHLY_API_BUDGET_EUR is 225.00 each. A cadence derived from
+ * plan alone would switch on **EUR 6,075 a month of budget ceiling** for rows
+ * that are not customers and do not pay — and at their current 176 active
+ * prompts, roughly EUR 171 a month of real modelled spend, starting on the first
+ * hourly cron after deploy. This is the single largest cost consequence of
+ * making cadence automatic, and it is a branch rather than a convention because
+ * an exclusion you have to REMEMBER is one admin click away from EUR 6,075.
+ * schedule-collections.js carries a second, independent guard on the same
+ * category for the case where the column got set by some other route.
+ *
+ * UNKNOWN PLAN -> 'manual'. Unreachable from any current call site (all of them
+ * validate the plan first), so this is pure defence; the right answer to a
+ * config error on a SPENDING path is to spend nothing until it is fixed, and the
+ * affected rows are trivially findable:
+ *   SELECT id, plan, category FROM clients
+ *    WHERE refresh_cadence = 'manual' AND category <> 'research';
+ */
+function refreshCadenceFor(plan, category) {
+  const cat = (category === undefined || category === null) ? DEFAULT_CLIENT_CATEGORY : category
+  if (cat === RESEARCH_CATEGORY) return 'manual'
+  if (!Object.prototype.hasOwnProperty.call(PLAN_REFRESH_CADENCE, plan)) return 'manual'
+  return PLAN_REFRESH_CADENCE[plan]
+}
+
 // Engines capped at 1 run per (client, prompt) per MONTHLY_CAP_DAYS — a hard
 // throttle regardless of manual/force/scheduled, to protect a metered external
 // budget. Both capped engines run no_cache, so every call consumes a SerpApi
@@ -655,6 +739,11 @@ module.exports = {
   activeEnginesFor,
   PLAN_MONTHLY_API_BUDGET_EUR,
   PLAN_COLLECTION_COOLDOWN_HOURS,
+  PLAN_REFRESH_CADENCE,
+  REFRESH_CADENCES,
+  RESEARCH_CATEGORY,
+  DEFAULT_CLIENT_CATEGORY,
+  refreshCadenceFor,
   MONTHLY_CAPPED_ENGINES,
   MONTHLY_CAP_DAYS,
 }

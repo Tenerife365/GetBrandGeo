@@ -551,6 +551,109 @@ export const PLAN_COLLECTION_COOLDOWN_HOURS: Record<Plan, number> = {
   managed: 168, pro: 168, enterprise: 0,
 }
 
+// ── Automatic refresh cadence ────────────────────────────────────────────────
+// Added 2026-07-31. Until this existed, PLAN_COLLECTION_COOLDOWN_HOURS above was
+// only a PERMISSION — it said how often a customer was allowed to press the
+// button, not how often anything happened. Nothing in the repo ever wrote
+// clients.refresh_cadence, every one of the 36 production rows sat at the column
+// default 'manual', and schedule-collections.js therefore did nothing for
+// anybody. A tier sold on a weekly refresh delivered one run a month, and only
+// if a human clicked. This map is what makes the advertised cadence real.
+//
+// Keep in sync with netlify/functions/_cost.js, which is the copy the server
+// reads when it writes the column. tests/refresh_cadence.test.js parses both
+// files and fails if they diverge, so this pair cannot rot the way the engine
+// lists did.
+
+/** The cadence values schedule-collections.js understands, and nothing else.
+ *  CADENCE_DAYS there is { weekly: 7, biweekly: 14, monthly: 30 }; anything not
+ *  in that map (including 'manual') never auto-refreshes. Do not invent a fifth
+ *  value here without adding it there in the same change. */
+export type RefreshCadence = 'manual' | 'weekly' | 'biweekly' | 'monthly'
+
+/** The category that is NEVER given an automatic cadence. See refreshCadenceFor. */
+export const RESEARCH_CATEGORY = 'research'
+
+/** The category a brand-new clients row lands in. This is the DB default from
+ *  db/supabase-clients-category-migration.sql (`category text NOT NULL DEFAULT
+ *  'active'`), stated as a constant because three provisioning paths insert a
+ *  client WITHOUT naming a category and then have to reason about it. */
+export const DEFAULT_CLIENT_CATEGORY = 'active'
+
+/** Plan → automatic collection cadence.
+ *
+ *  Derived from the tier, not chosen per client: every paid tier is sold on a
+ *  weekly refresh (PLAN_COLLECTION_COOLDOWN_HOURS = 168 for all of them), so
+ *  weekly is what they get. Free is monthly, matching its own 720h cooldown.
+ *
+ *  FREE = 'monthly' IS A SPEND DECISION AND IT IS REVERSIBLE IN ONE LINE
+ *  (change it to 'manual'). It is monthly rather than manual because:
+ *    - the marginal cash cost today is EUR 0. Free runs one engine, gemini,
+ *      which is a FIXED_FEE_ENGINE and genuinely free under 1,500 grounded
+ *      requests a day; the modelled EUR 0.160 a month (5 prompts x 0.032) is an
+ *      accounting figure, not cash out.
+ *    - it is bounded twice over without any new machinery:
+ *      PLAN_MONTHLY_API_BUDGET_EUR.free is 0.30 and _auth.js blocks at it, and
+ *      a client with no active prompts enqueues nothing at all
+ *      (_enqueue.js "no active prompts"), so a signup that never sets anything
+ *      up costs one SELECT a month and zero euros.
+ *    - one data point is not a trend, and the trend is the entire upgrade
+ *      argument for Radar. A free account that collects once and never again can
+ *      never show movement, so the product has nothing to sell against.
+ *  THE TRIP-WIRE: gemini's free tier is 1,500 grounded requests per DAY. At 5
+ *  prompts a month per free client that is comfortable to roughly 5,000 free
+ *  clients (5,000 x 5 = 25,000/month = 833/day). Revisit this line, not the
+ *  budget, if the free book approaches that. */
+export const PLAN_REFRESH_CADENCE: Record<Plan, RefreshCadence> = {
+  free: 'monthly',
+  radar: 'weekly',
+  essentials: 'weekly',
+  growth: 'weekly',
+  growth_pro: 'weekly',
+  managed: 'weekly',
+  pro: 'weekly',
+  enterprise: 'weekly',
+}
+
+/**
+ * The cadence a client should hold, given its plan and its category. This is the
+ * ONLY place cadence is computed; the provisioning and plan-change paths call it
+ * rather than deciding for themselves, so a fifth call site cannot get it wrong.
+ *
+ * ── DO NOT DELETE THE RESEARCH BRANCH ────────────────────────────────────────
+ * A client with category 'research' NEVER gets an automatic cadence, on any
+ * plan, ever. It stays 'manual' and is collected only when a human deliberately
+ * runs it.
+ *
+ * WHAT IT PROTECTS, measured against production 2026-07-31: 27 of the 36 clients
+ * in the database are BrandGEO's own city-research studies, and all 27 sit on
+ * plan 'pro'. `pro` carries PLAN_MONTHLY_API_BUDGET_EUR of EUR 225.00 each, so a
+ * cadence derived from plan ALONE would switch on **EUR 6,075 a month of budget
+ * ceiling** for clients that are not customers, do not pay, and are supposed to
+ * be collected once per study. At their current 176 active prompts that is about
+ * EUR 171 a month of modelled spend arriving immediately, on the very first
+ * hourly cron after deploy.
+ *
+ * This is the single largest cost consequence of making cadence automatic. It is
+ * a branch and not a convention on purpose: an exclusion enforced by "remember
+ * not to set it" is one admin click away from EUR 6,075. schedule-collections.js
+ * carries a second, independent guard on the same category, for the case where
+ * the column was set by some other route entirely.
+ *
+ * UNKNOWN PLAN -> 'manual', not free's monthly. Unreachable from any current
+ * call site (all four validate the plan first), so this is pure defence, and the
+ * correct response to a configuration error on a SPENDING path is to spend
+ * nothing until it is fixed. It is also loud rather than silent: the affected
+ * clients are exactly the rows returned by
+ *   SELECT id, plan, category FROM clients
+ *    WHERE refresh_cadence = 'manual' AND category <> 'research';
+ */
+export function refreshCadenceFor(plan: string, category?: string | null): RefreshCadence {
+  if ((category ?? DEFAULT_CLIENT_CATEGORY) === RESEARCH_CATEGORY) return 'manual'
+  if (!PLAN_ORDER.includes(plan as Plan)) return 'manual'
+  return PLAN_REFRESH_CADENCE[plan as Plan]
+}
+
 /** AI SEO — max pages that can be crawled/audited (0 = feature locked). */
 // MOVED TO GROWTH+ 2026-07-29 (was Essentials at 1 page). Site audit is now one
 // of the three things separating Essentials from Growth, alongside engines

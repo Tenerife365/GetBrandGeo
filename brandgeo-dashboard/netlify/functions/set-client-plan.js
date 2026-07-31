@@ -23,6 +23,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('./_auth');
 const { isValidPlan, planRank, planUnlocks, PLAN_LABELS, PLAN_ORDER } = require('./_plans');
+const { refreshCadenceFor } = require('./_cost');
 const { sendBrandedEmail, APP_URL } = require('./_email');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -139,14 +140,31 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
   // Load the current state (for from_plan, brand name, Stripe warning).
+  // `category` is read for the refresh-cadence write below and for NOTHING else:
+  // it is what keeps the 27 city-research clients out of automatic collection
+  // even if an admin grants one of them a paid plan from this endpoint.
   const { data: client, error: ce } = await supabase
-    .from('clients').select('id, name, plan, plan_source, stripe_subscription_id').eq('id', client_id).single();
+    .from('clients').select('id, name, plan, category, plan_source, stripe_subscription_id').eq('id', client_id).single();
   if (ce || !client) return { statusCode: 404, headers, body: JSON.stringify({ error: 'client not found' }) };
 
   const fromPlan = client.plan || 'free';
 
   // ---- update the plan ------------------------------------------------------
-  const update = { plan, plan_source: grant_type };
+  // refresh_cadence is written HERE, alongside plan, because this is one of the
+  // moments a tier is established and the two must never disagree (2026-07-31).
+  // Before this, an admin could move a client to Growth and the client would keep
+  // whatever cadence it happened to hold — in practice 'manual', so the weekly
+  // refresh the tier is sold on simply never happened. refreshCadenceFor returns
+  // 'manual' for a research client regardless of the plan being granted.
+  //
+  // This writes cadence on an EXISTING row, which is correct and is not the
+  // backfill that was ruled out: the trigger is a deliberate plan change by an
+  // admin, not a sweep over the current book.
+  //
+  // last_refresh_at is deliberately NOT touched. A client mid-cycle keeps its
+  // pending refresh; a plan change should not restart or skip the clock.
+  const cadence = refreshCadenceFor(plan, client.category);
+  const update = { plan, plan_source: grant_type, refresh_cadence: cadence };
   if (grant_type === 'trial' || grant_type === 'comp') {
     update.plan_grant_until = grantUntil;
     update.plan_grant_note = note || `${PLAN_LABELS[plan]} ${grant_type}`;
@@ -165,7 +183,7 @@ exports.handler = async (event) => {
   const eventType = grant_type === 'trial' ? 'trial_grant' : grant_type === 'comp' ? 'comp_grant' : 'plan_change';
   await supabase.from('client_events').insert({
     client_id, actor: auth.user.id, type: eventType, from_plan: fromPlan, to_plan: plan,
-    meta: { grant_until: grantUntil, note: note || null, notified: notify },
+    meta: { grant_until: grantUntil, note: note || null, notified: notify, refresh_cadence: cadence },
   });
 
   // A manual change to a Stripe-billed client can be overwritten by the next
@@ -204,11 +222,12 @@ exports.handler = async (event) => {
     }
   }
 
-  console.log(`[set-client-plan] client ${client_id}: ${fromPlan} -> ${plan} (${grant_type}${grantUntil ? ' until ' + grantUntil : ''}) by ${auth.user.id}`);
+  console.log(`[set-client-plan] client ${client_id}: ${fromPlan} -> ${plan} (${grant_type}${grantUntil ? ' until ' + grantUntil : ''}, cadence ${cadence}) by ${auth.user.id}`);
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
       ok: true, client_id, plan, plan_source: grant_type, plan_grant_until: grantUntil,
+      refresh_cadence: cadence,
       tone: notice.tone, warning, notified: notify, email: emailResult,
     }),
   };

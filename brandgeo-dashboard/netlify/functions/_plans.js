@@ -64,18 +64,26 @@ const PLAN_BLURB = {
   // weekly (PLAN_COLLECTION_COOLDOWN_HOURS.radar = 168), one website. It does
   // not mention ChatGPT, which Radar does not carry, and it does not promise a
   // prompt count above the tier's own (ruling decision 4).
-  // "checked weekly" was a promise the product does not keep (bg-verify F2).
-  // NOTHING in this repo ever writes clients.refresh_cadence: there are readers
-  // and a column default, and no writer. All 36 production clients are
-  // 'manual', so schedule-collections stays inert and no automatic collection
-  // happens for anyone. What IS true is the cooldown: PLAN_COLLECTION_COOLDOWN
-  // _HOURS.radar is 168, so a customer may run a fresh check once a week.
+  // "checked weekly" WAS a promise the product did not keep (bg-verify F2):
+  // nothing wrote clients.refresh_cadence, every row sat at the column default
+  // 'manual', schedule-collections was inert, and no automatic collection ever
+  // happened for anyone.
   //
-  // This string is read by a customer at the moment they are charged, which is
-  // the worst possible place to overstate. Reworded to the capability we
-  // actually ship. If automatic weekly collection is built later, change this
-  // back in the same commit.
-  radar:      'Two AI engines, Gemini and Claude, across seven buyer prompts for one website, with a fresh check available every week.',
+  // RESTORED 2026-07-31, in the same change that made it true, exactly as the
+  // note here asked. refreshCadenceFor() in _cost.js now derives the cadence from
+  // the tier and five paths write it whenever a plan is established, so a Radar
+  // client is provisioned with refresh_cadence='weekly' and the hourly
+  // schedule-collections cron collects them. The other half of the claim was
+  // already true and still is: PLAN_COLLECTION_COOLDOWN_HOURS.radar is 168, so
+  // the customer may also force a fresh check once a week themselves.
+  //
+  // THE ONE CAVEAT, and it is why this says "from signup". No backfill was run,
+  // so a client that existed before that change keeps 'manual' until its plan is
+  // next written. Every Radar client is necessarily new, so the claim holds for
+  // every reader of this string. If Radar is ever granted to a pre-existing
+  // client by some route that does not write cadence, this sentence stops being
+  // true for them.
+  radar:      'Two AI engines, Gemini and Claude, across seven buyer prompts for one website, checked automatically every week from the day you sign up.',
   essentials: 'The three core AI engines, self-serve, for teams that run their own visibility.',
   // CORRECTED 2026-07-29. Three claims here were false at the moment of charge.
   // `growth` sold AI Social, which is admin-only and shows as coming soon to

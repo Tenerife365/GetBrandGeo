@@ -55,7 +55,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
-const { PLAN_LIVE_ENGINES } = require('./_cost')
+const { PLAN_LIVE_ENGINES, refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 
 // Derive the accepted ladder from _cost.js, never by hand. _cost.js is the
 // current server-side mirror of planConfig.ts and is the copy that enforces
@@ -107,6 +107,26 @@ exports.handler = async (event) => {
   // (least privilege), the opposite of defaulting a plan down to Essentials.
   const userRole = VALID_ROLES.includes(role) ? role : 'viewer'
 
+  // Automatic refresh cadence, derived from the tier at the moment the tier is
+  // established (2026-07-31), so it can never drift from the plan. This INSERT
+  // names no category, so the row lands on the column default
+  // (DEFAULT_CLIENT_CATEGORY), which is not 'research'.
+  //
+  // THE CITY-RESEARCH CASE, because this is the wizard those studies are created
+  // with. A research client made here is 'active' until an admin flips it with
+  // set-client-category, so for a short window it holds a paid cadence. Two
+  // things close that: last_refresh_at is stamped below, so the first automatic
+  // run is a full period away rather than within the hour, and
+  // schedule-collections.js refuses category 'research' outright at the point of
+  // spend, whatever the column says. Flip the category any time inside the first
+  // week and nothing is ever collected.
+  //
+  // last_refresh_at IS STAMPED AT CREATION deliberately: isDue() in
+  // schedule-collections.js treats NULL as "due now", so an unstamped new client
+  // is collected by the next hourly cron on top of the wizard's own initial
+  // collection run. Stamping starts the cadence clock at provisioning.
+  const refreshCadence = refreshCadenceFor(clientPlan, DEFAULT_CLIENT_CATEGORY)
+
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
   // 1. Create client row
@@ -115,6 +135,8 @@ exports.handler = async (event) => {
     .insert({
       name, slug, brand_website, brand_aliases, known_competitors,
       plan: clientPlan,
+      refresh_cadence: refreshCadence,
+      last_refresh_at: new Date().toISOString(),
       default_market_id: default_market_id || null,
       default_region_id: default_region_id || null,
     })
@@ -217,6 +239,7 @@ exports.handler = async (event) => {
         role:              userRole,
         plan_provided:     planProvided,   // false = the DEFAULT_PLAN default was applied
         prompts_created:   promptsCreated,
+        refresh_cadence:   refreshCadence,
         default_market_id: default_market_id || null,
       },
     })
@@ -238,6 +261,7 @@ exports.handler = async (event) => {
       user_id:         authData.user.id,
       plan:            client.plan,
       role:            userRole,
+      refresh_cadence: client.refresh_cadence ?? refreshCadence,
       engines_enabled: client.engines_enabled ?? null,
       prompts_created: promptsCreated,
       audit_logged:    auditLogged,

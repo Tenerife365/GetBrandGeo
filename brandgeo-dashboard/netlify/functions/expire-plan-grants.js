@@ -29,6 +29,7 @@
 // ============================================================================
 const { createClient } = require('@supabase/supabase-js');
 const { PLAN_LABELS } = require('./_plans');
+const { refreshCadenceFor } = require('./_cost');
 const { sendBrandedEmail, APP_URL } = require('./_email');
 const { recordAdminEvent } = require('./_admin_notify');
 const { requireCronAuth } = require('./_cron_auth');
@@ -166,7 +167,8 @@ exports.handler = async (event) => {
     // stripe_subscription_id is selected for the liveness guard below, NOT
     // filtered on in SQL. Filtering would hide held clients entirely; the whole
     // point is that a held client is reported rather than silently skipped.
-    .select('id, name, plan, plan_source, plan_grant_until, stripe_subscription_id')
+    // `category` is read for the refresh-cadence write below and nothing else.
+    .select('id, name, plan, category, plan_source, plan_grant_until, stripe_subscription_id')
     .in('plan_source', ['trial', 'comp', 'package'])
     .not('plan_grant_until', 'is', null)
     .lt('plan_grant_until', today)
@@ -190,8 +192,16 @@ exports.handler = async (event) => {
   const expired = [];
   for (const c of toExpire) {
     const fromPlan = c.plan;
+    // refresh_cadence follows the plan, added 2026-07-31 with the automatic
+    // cadence. This is the FIFTH place clients.plan is written, and it is the one
+    // that is easiest to forget: a lapsed trial reverted to Free while keeping a
+    // weekly cadence would keep collecting weekly for someone who is no longer
+    // entitled to it, bounded only by the EUR 0.30 free budget, and would look
+    // like a product fault rather than an expiry. Cadence is derived from the
+    // plan being written (free), never from the plan being left.
     const { error: ue } = await supabase.from('clients').update({
       plan: 'free', plan_source: 'expired', plan_grant_until: null, plan_grant_note: null,
+      refresh_cadence: refreshCadenceFor('free', c.category),
     }).eq('id', c.id);
     if (ue) { console.error(`[expire-plan-grants] update ${c.id} failed:`, ue.message); continue; }
 

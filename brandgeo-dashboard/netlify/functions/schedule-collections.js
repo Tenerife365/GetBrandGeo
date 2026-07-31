@@ -22,12 +22,23 @@
  * this function does NOTHING until someone sets a real cadence per client. That
  * is deliberate — see the migration note (avoids surprise-spending every existing
  * client the moment this ships).
+ *
+ * WHAT CHANGED 2026-07-31, and what did NOT. The column now gets written: every
+ * path that establishes a plan (provision-account, onboard-client,
+ * stripe-webhook, set-client-plan, expire-plan-grants) writes refresh_cadence
+ * derived from the tier via refreshCadenceFor() in _cost.js. So the safe default
+ * above still holds for every row that already existed — no backfill was run and
+ * all 36 production clients remain 'manual' — but a NEW client, or one whose plan
+ * changes, arrives here with a real cadence. This function is unchanged apart
+ * from the research guard below; the budget gate at line ~100 is what keeps that
+ * safe, and it is checked before anything is enqueued.
  */
 
 const { createClient } = require('@supabase/supabase-js')
 const { checkCollectionLimits } = require('./_auth')
 const { enqueueClientCollection, triggerWorker } = require('./_enqueue')
 const { requireCronAuth } = require('./_cron_auth')
+const { RESEARCH_CATEGORY } = require('./_cost')
 
 const CADENCE_DAYS = { weekly: 7, biweekly: 14, monthly: 30 }
 
@@ -62,10 +73,27 @@ exports.handler = async (event) => {
   const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
 
   // Only clients that have opted into a cadence.
+  //
+  // ── SECOND, INDEPENDENT RESEARCH GUARD. DO NOT REMOVE AS A TIDY-UP. ────────
+  // refreshCadenceFor() in _cost.js already refuses to WRITE a cadence for a
+  // research client. This refuses to ACT on one, whatever the column says, which
+  // covers every route the first guard cannot see: a hand-run UPDATE, a restored
+  // backup, a client provisioned as 'active' and re-categorised later, or a
+  // future sixth plan-writing path that forgets to call the helper.
+  //
+  // WHAT IT PROTECTS, measured 2026-07-31: 27 of the 36 clients in production are
+  // BrandGEO's own city-research studies and ALL 27 sit on plan 'pro', whose
+  // per-client monthly budget ceiling is EUR 225. Acting on them automatically
+  // would switch on EUR 6,075 a month of ceiling for rows that are not customers
+  // and do not pay, and about EUR 171 a month of real modelled spend at their
+  // current 176 active prompts. They are collected when a study is deliberately
+  // run, and never otherwise. It is one .neq() against the largest single cost
+  // exposure this function has.
   const { data: clients, error } = await supabase
     .from('clients')
     .select('id, name, refresh_cadence, last_refresh_at')
     .in('refresh_cadence', Object.keys(CADENCE_DAYS))
+    .neq('category', RESEARCH_CATEGORY)
   if (error) {
     console.error(`[Scheduler/${invId}] client load failed:`, error.message)
     await recordJobRun(supabase, false, { invId, error: error.message })

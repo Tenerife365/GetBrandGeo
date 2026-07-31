@@ -38,6 +38,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { isPlausibleDomain, normalizeDomain } = require('./_prospect_guard')
 const { recordAdminEvent } = require('./_admin_notify')
+const { refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 
 const ALLOWED_ORIGINS = [
   'https://app.getbrandgeo.com',
@@ -156,6 +157,22 @@ exports.handler = async (event) => {
   // ── First-time provisioning: create clients row, then user_profiles ───────
   const baseSlug = slugify(accountType === 'company' ? brandWebsite.split('.')[0] : brandName)
 
+  // Automatic refresh cadence, derived from the tier at the moment the tier is
+  // established (2026-07-31). This row is created with plan 'free' and NO
+  // category, so it lands on the column default — DEFAULT_CLIENT_CATEGORY —
+  // which is not 'research', so refreshCadenceFor returns free's cadence.
+  //
+  // last_refresh_at IS STAMPED AT CREATION, and that is a deliberate spend
+  // decision rather than bookkeeping. schedule-collections.js's isDue() treats a
+  // NULL last_refresh_at as "due now", so without this stamp every newly
+  // provisioned client would be collected by the very next hourly cron — on top
+  // of the activation collection the app already fires at signup. Stamping it
+  // starts the cadence clock at provisioning, so the first AUTOMATIC run lands
+  // one full period later, which is both cheaper and what "weekly from when I
+  // signed up" actually means.
+  const refreshCadence = refreshCadenceFor('free', DEFAULT_CLIENT_CATEGORY)
+  const cadenceClockStart = new Date().toISOString()
+
   let clientRow = null
   let clientErr = null
   for (let attempt = 0; attempt < 5 && !clientRow; attempt++) {
@@ -168,6 +185,8 @@ exports.handler = async (event) => {
         brand_website: brandWebsite,
         brand_aliases: brandAliases,
         plan: 'free',
+        refresh_cadence: refreshCadence,
+        last_refresh_at: cadenceClockStart,
         default_market_id: 'WW',         // never default to a country (§4.1)
         onboarding_complete: true,
       })
@@ -233,6 +252,7 @@ exports.handler = async (event) => {
         brand_website: brandWebsite || null,
         email:         user.email || null,
         role:          'viewer',
+        refresh_cadence: refreshCadence,
       },
     })
     if (evErr) console.error(`[provision] audit row failed for client ${clientRow.id}: ${evErr.message}`)

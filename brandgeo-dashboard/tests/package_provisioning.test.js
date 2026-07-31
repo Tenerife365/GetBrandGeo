@@ -356,8 +356,29 @@ section('7. subscription-liveness guard (S1, HIGH)')
   ok('partition is total, order-preserving, and never throws on a malformed row')
 
   const exp = readCode('netlify/functions/expire-plan-grants.js')
-  assert.match(exp, /\.select\('id, name, plan, plan_source, plan_grant_until, stripe_subscription_id'\)/,
-    'the job cannot apply the guard to a column it never selects')
+  // Asserted COLUMN BY COLUMN rather than as one pinned string. The intent here
+  // is "the job cannot apply the guard to a column it never selects", and pinning
+  // the whole list made this fail on 2026-07-31 for a purely ADDITIVE change
+  // (`category`, needed for the refresh_cadence write) — a false failure that
+  // says nothing about the guard. Each column is asserted for the reason it is
+  // read, so a genuine removal still fails and an addition does not.
+  // Anchored on .from('clients'): expire-plan-grants also selects from
+  // admin_notifications (the held-alert dedupe), and that one is a bare
+  // .select('id') that appears FIRST in the file.
+  const expSelect = (exp.match(/\.from\('clients'\)[\s\S]{0,800}?\.select\('([^']*)'\)/) || [])[1] || ''
+  assert.ok(expSelect, "could not find the clients .select() in expire-plan-grants.js")
+  const expCols = expSelect.split(',').map((s) => s.trim())
+  for (const [col, why] of [
+    ['id', 'to update the right row'],
+    ['name', 'for the admin alert'],
+    ['plan', 'for from_plan on the audit row'],
+    ['plan_source', 'to word the notice by grant type'],
+    ['plan_grant_until', 'to dedupe the held-grant alert'],
+    ['stripe_subscription_id', 'THE GUARD ITSELF — a live subscription is never reverted'],
+    ['category', 'so the refresh_cadence write cannot give a research client a cadence'],
+  ]) {
+    assert.ok(expCols.includes(col), `expire-plan-grants must select "${col}" (${why})`)
+  }
   assert.match(exp, /const \{ held, toExpire \} = partitionDueGrants\(due\)/,
     'the handler must actually partition rather than compute a guard it ignores')
   assert.match(exp, /for \(const c of toExpire\)/,

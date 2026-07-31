@@ -32,6 +32,15 @@
  * see recordPlanEvent below for why from_plan has to be read before the write
  * and why the insert is best-effort.
  *
+ * REFRESH CADENCE, added 2026-07-31. Every branch that writes clients.plan also
+ * writes clients.refresh_cadence, derived from the tier by refreshCadenceFor()
+ * in _cost.js. A plan without a cadence is a tier sold on a weekly refresh that
+ * never happens; a cadence without a plan behind it is spend on a customer who
+ * has stopped paying. The one branch that does NOT write it is the held-package
+ * half of subscription.deleted, because that branch does not change the plan
+ * either. On the two update paths the client's `category` is read first and the
+ * cadence write is SKIPPED if that read failed — see readCurrentPlan.
+ *
  * AUTH MODEL — this function does NOT call requireAuth(event) (see spec §2).
  * Stripe calls it server-to-server with no JWT and not from the site's origin,
  * so _auth.js's JWT + origin whitelist would reject every call. Authentication
@@ -46,6 +55,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const { createClient } = require('@supabase/supabase-js')
 const { recordAdminEvent, clientLabel } = require('./_admin_notify')
 const { PLAN_LABELS } = require('./_plans')
+const { refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 const {
   SELF_SERVE_PLANS,
   PACKAGE_PLAN_SOURCE,
@@ -194,21 +204,30 @@ exports.handler = async (event) => {
 // money path, and a customer must not go unprovisioned because the audit could
 // not read a column. A null from_plan is a weaker record than a real one; a 500
 // here is a Stripe redelivery loop around a paid checkout.
+//
+// ALSO READS `category`, added 2026-07-31 with the refresh-cadence write. The
+// two are read together because they are needed at the same instant and both are
+// unrecoverable after the update. `read` distinguishes "we looked and the client
+// is 'active'" from "the lookup failed and we know nothing" — the caller must not
+// grant an automatic cadence on a guess, because a guess of 'active' against a
+// real 'research' row is the EUR 6,075 mistake refreshCadenceFor exists to stop.
+// from_plan keeps its old policy of degrading to null; only the cadence write is
+// suppressed when the read fails.
 async function readCurrentPlan(clientId, log) {
   try {
     const { data, error } = await supabase
       .from('clients')
-      .select('plan')
+      .select('plan, category')
       .eq('id', clientId)
       .maybeSingle()
     if (error) {
       log('prior-plan lookup failed (continuing, from_plan will be null):', error.message)
-      return null
+      return { plan: null, category: null, read: false }
     }
-    return data?.plan ?? null
+    return { plan: data?.plan ?? null, category: data?.category ?? null, read: true }
   } catch (e) {
     log('prior-plan lookup threw (continuing, from_plan will be null):', e.message)
-    return null
+    return { plan: null, category: null, read: false }
   }
 }
 
@@ -420,7 +439,8 @@ async function handleCheckoutCompleted(session, log) {
       // customer's months and MUST throw, while an audit read must never be
       // able to fail a checkout. Audit machinery does not get to sit on the
       // critical path, not even in its error handling.
-      const fromPlan = await readCurrentPlan(profile.client_id, log)
+      const prior = await readCurrentPlan(profile.client_id, log)
+      const fromPlan = prior.plan
       let priorSource = null
       let priorGrantUntil = null
 
@@ -486,6 +506,22 @@ async function handleCheckoutCompleted(session, log) {
       const update = { plan, stripe_customer_id: custId, plan_source: planSource, plan_grant_until: grantUntil }
       if (!isPackage) update.stripe_subscription_id = subId
 
+      // Automatic refresh cadence follows the tier the customer just bought
+      // (2026-07-31). Written here rather than anywhere else because this is one
+      // of the moments a plan is established, and cadence that does not follow
+      // the plan is a tier sold on a weekly refresh that never happens.
+      //
+      // ONLY when the prior read actually succeeded. If it did not we do not know
+      // this client's category, and writing a paid cadence onto a row that might
+      // be category 'research' is exactly the mistake refreshCadenceFor guards.
+      // The cost of skipping is that the customer keeps 'manual' and is found by
+      // one query; the cost of guessing wrong is EUR 225 of budget ceiling per
+      // row. last_refresh_at is left alone: an upgrade should not restart or skip
+      // a cycle already in flight.
+      const cadence = prior.read ? refreshCadenceFor(plan, prior.category) : null
+      if (cadence) update.refresh_cadence = cadence
+      else log(`refresh_cadence NOT written for client ${profile.client_id}: category unknown (prior read failed)`)
+
       const { error: updErr } = await supabase
         .from('clients')
         .update(update)
@@ -508,6 +544,9 @@ async function handleCheckoutCompleted(session, log) {
           // here means "not read", not "was null".
           previous_plan_source: priorSource,
           previous_grant_until: priorGrantUntil,
+          // null = the category read failed, so cadence was deliberately left
+          // untouched. Not the same as "cadence is null".
+          refresh_cadence: cadence,
         },
       })
       await recordAdminEvent(supabase, {
@@ -733,13 +772,24 @@ async function handleSubscriptionUpdated(sub, log) {
   // Best-effort by design. This handler had no read before, and a subscription
   // change must not start failing because an AUDIT read failed. On error the map
   // stays empty and from_plan lands null.
+  //
+  // `category` joined this read on 2026-07-31 for the refresh-cadence write in
+  // the loop below. It is deliberately NOT folded into the blanket update that
+  // follows: that update matches every row for the customer at once, and cadence
+  // depends on each row's own category, so it is written per row from this map.
+  // A row absent from the map (read failed, or created between the two queries)
+  // gets no cadence write at all rather than a guessed one.
   const priorPlans = new Map()
+  const priorCategories = new Map()
   const { data: before, error: beforeErr } = await supabase
     .from('clients')
-    .select('id, plan')
+    .select('id, plan, category')
     .eq('stripe_customer_id', custId)
   if (beforeErr) log('prior-plan lookup failed (continuing, from_plan will be null):', beforeErr.message)
-  else for (const r of before || []) priorPlans.set(r.id, r.plan ?? null)
+  else for (const r of before || []) {
+    priorPlans.set(r.id, r.plan ?? null)
+    priorCategories.set(r.id, r.category ?? null)
+  }
 
   const { data, error } = await supabase
     .from('clients')
@@ -759,6 +809,27 @@ async function handleSubscriptionUpdated(sub, log) {
   }
   log(`subscription.updated: cust ${custId} → plan ${plan} (${data.length} client row(s))`)
   for (const row of data) {
+    // Automatic refresh cadence follows the tier this subscription now carries.
+    // Per row, because cadence depends on the row's category and this handler can
+    // match more than one. Skipped entirely when the prior read did not see this
+    // row: guessing 'active' for a row that is really 'research' is the EUR 6,075
+    // mistake. Best-effort — a cadence write must not fail a subscription change,
+    // and the plan write above has already landed.
+    let cadence = null
+    if (priorCategories.has(row.id)) {
+      cadence = refreshCadenceFor(plan, priorCategories.get(row.id))
+      const { error: cadErr } = await supabase
+        .from('clients')
+        .update({ refresh_cadence: cadence })
+        .eq('id', row.id)
+      if (cadErr) {
+        log(`refresh_cadence update failed for client ${row.id} (plan already set): ${cadErr.message}`)
+        cadence = null
+      }
+    } else {
+      log(`refresh_cadence NOT written for client ${row.id}: category unknown (prior read failed)`)
+    }
+
     await recordPlanEvent({
       client_id: row.id,
       type: 'stripe_change',
@@ -770,6 +841,8 @@ async function handleSubscriptionUpdated(sub, log) {
         stripe_subscription_id: sub.id,
         price: price?.id || null,
         client_name: row.name || null,
+        // null = not written (category unknown, or the cadence update failed).
+        refresh_cadence: cadence,
       },
     })
     await recordAdminEvent(supabase, {
@@ -811,7 +884,9 @@ async function handleSubscriptionDeleted(sub, log) {
     .from('clients')
     // `name`: see the note on the subscription.updated select above. Both
     // cancellation notices below name the client.
-    .select('id, name, plan, plan_source, plan_grant_until')
+    // `category` is read for the refresh-cadence write on the reverting branch
+    // below, and for nothing else.
+    .select('id, name, plan, category, plan_source, plan_grant_until')
     .eq('stripe_customer_id', custId)
   if (selErr) throw new Error(`clients lookup failed: ${selErr.message}`)
 
@@ -834,9 +909,16 @@ async function handleSubscriptionDeleted(sub, log) {
     // growth_pro → growth_pro would put noise in the one log that is supposed
     // to answer "what changed". That branch's admin_notifications row already
     // records the cancellation.
+    // refresh_cadence follows plan, so it moves on exactly the branch plan moves
+    // on and stays put on the other. A held package keeps its paid tier, so it
+    // keeps its paid cadence; a client reverted to Free drops to Free's cadence.
+    // Without this the cancelled customer would keep collecting weekly on a Free
+    // plan — spend on someone who has stopped paying, capped only by the EUR 0.30
+    // free budget, which would then read as a product fault rather than a
+    // cancellation.
     const update = holdsLivePackage
       ? { stripe_subscription_id: null }
-      : { plan: 'free', stripe_subscription_id: null }
+      : { plan: 'free', stripe_subscription_id: null, refresh_cadence: refreshCadenceFor('free', row.category) }
 
     const { error: updErr } = await supabase.from('clients').update(update).eq('id', row.id)
     if (updErr) throw new Error(`clients downgrade failed: ${updErr.message}`)
@@ -926,6 +1008,19 @@ async function createClientRow({ email, plan, custId, subId, planSource, grantUn
         stripe_subscription_id: subId ?? null,
         plan_source: planSource,
         plan_grant_until: grantUntil ?? null,
+        // Automatic refresh cadence for the tier just purchased (2026-07-31).
+        // This INSERT names no category, so the row lands on the column default
+        // DEFAULT_CLIENT_CATEGORY, which is not 'research' — a Stripe checkout
+        // cannot create a research client.
+        //
+        // last_refresh_at IS STAMPED, and it is a spend decision, not
+        // bookkeeping: schedule-collections.js's isDue() reads a NULL
+        // last_refresh_at as "due now", so an unstamped new subscriber would be
+        // collected by the next hourly cron on top of whatever the app runs at
+        // activation. Stamping starts their cadence clock at purchase, which is
+        // both cheaper and what "weekly" means to someone who just paid.
+        refresh_cadence: refreshCadenceFor(plan, DEFAULT_CLIENT_CATEGORY),
+        last_refresh_at: new Date().toISOString(),
         default_market_id: 'WW',
       })
       .select()
