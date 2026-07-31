@@ -105,8 +105,11 @@ export default function Signup() {
             {signupDomain ? <>Start tracking {signupDomain}</> : 'Start for free'}
           </h1>
           <p className="text-sm text-slate-400 mb-6">
+            {/* No "continuously" here: the free tier is one engine, five
+                prompts and a manual refresh. More engines and automatic
+                refreshes are what a plan adds. */}
             {signupDomain
-              ? 'Free to start, no credit card required. We will keep watching how AI answers name you.'
+              ? 'Free to start, no credit card required. See how AI answers name you, and add engines when you are ready.'
               : 'Track a company or your personal brand in AI answers. No credit card required.'}
           </p>
 

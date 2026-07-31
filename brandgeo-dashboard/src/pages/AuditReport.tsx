@@ -308,8 +308,13 @@ function FullReportView({ report }: { report: FullReport }) {
           A router <Link>, not an absolute URL, because this page is already
           served from app.getbrandgeo.com. Same destination, no full reload, and
           the query string survives either way. */}
+      {/* The question above the button has to match where the button goes. It
+          used to ask about continuous monitoring and lead to pricing, which was
+          consistent. It now leads to FREE signup, and the free tier is one
+          engine, five prompts and a manual refresh, so the continuous claim
+          moved down to the line that leads to the plans. */}
       <div className="bg-brand-500/10 border border-brand-500/20 rounded-xl p-5 text-center">
-        <p className="text-sm text-slate-300 mb-3">Want this monitored continuously, with recommendations to fix each gap?</p>
+        <p className="text-sm text-slate-300 mb-3">Want to keep track of this, and work through each gap?</p>
         <Link
           to={`/signup?domain=${encodeURIComponent(report.domain)}`}
           className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
@@ -317,7 +322,8 @@ function FullReportView({ report }: { report: FullReport }) {
           Start tracking {report.domain} →
         </Link>
         <p className="text-xs text-slate-500 mt-3">
-          Free to start. Or <a href="https://getbrandgeo.com/#pricing" className="text-slate-400 hover:text-slate-300 underline">see the plans</a> first.
+          Free to start, no credit card. For every engine, automatic refreshes and fix recommendations,{' '}
+          <a href="https://getbrandgeo.com/#pricing" className="text-slate-400 hover:text-slate-300 underline">see the plans</a>.
         </p>
       </div>
     </div>

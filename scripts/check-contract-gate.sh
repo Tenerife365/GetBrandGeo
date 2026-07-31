@@ -118,21 +118,108 @@ if [ -f "$GATE" ]; then
   ' "$GATE" || fail=1
 fi
 
-# --- 3. The endpoint records WHO accepted WHAT, and when ---------------------
+# --- 3. The ENDPOINT itself refuses, not just the module it imports ----------
+#
+# Executed, not grepped. An accept-terms.js that requires _terms_gate and then
+# ignores what it says would satisfy any number of greps, so the handler is
+# invoked directly with an unaccepted request and with a bot submission.
+#
+# Both of those paths return before the endpoint constructs a Supabase client,
+# which is why this needs no credentials, no network and no database.
 if [ -f "$ENDPOINT" ]; then
   node --check "$ENDPOINT" >/dev/null 2>&1 || note "$ENDPOINT is not valid JavaScript"
-  grep -q "_terms_gate" "$ENDPOINT" \
-    || note "$ENDPOINT does not use _terms_gate.js, so it has its own ungated copy of the decision"
   grep -q "terms_acceptances" "$ENDPOINT" \
     || note "$ENDPOINT writes no terms_acceptances row, so an acceptance leaves no evidence"
+
+  (cd brandgeo-dashboard && node -e '
+    const gate = require("./netlify/functions/_terms_gate.js");
+    const { handler } = require("./netlify/functions/accept-terms.js");
+    let bad = 0;
+    const fail = (m) => { console.log("FAIL: " + m); bad = 1; };
+    const post = (body) => handler({
+      httpMethod: "POST",
+      headers: { origin: "https://getbrandgeo.com" },
+      body: JSON.stringify(body),
+    });
+
+    (async () => {
+      const cases = [
+        ["an unaccepted request", { plan: "growth", period: "monthly", accepted: false, accepted_version: gate.TERMS_VERSION }],
+        ["a stale contract version", { plan: "growth", period: "monthly", accepted: true, accepted_version: "1999-01-01" }],
+        ["a sales-assisted plan", { plan: "managed", period: "monthly", accepted: true, accepted_version: gate.TERMS_VERSION }],
+        ["a bot submission (honeypot filled)", { plan: "growth", period: "monthly", accepted: true, accepted_version: gate.TERMS_VERSION, honeypot: "x" }],
+      ];
+      for (const [label, body] of cases) {
+        let res;
+        try { res = await post(body); }
+        catch (e) { fail(`accept-terms.js threw on ${label}: ${e.message}`); continue; }
+        const text = JSON.stringify(res);
+        if (text.includes("buy.stripe.com")) fail(`accept-terms.js returned a checkout URL for ${label}`);
+        // The honeypot answers 200 by design, to avoid telling a bot it was
+        // caught. What matters for all four is that no URL comes back.
+        if (!label.startsWith("a bot") && res.statusCode !== 403) {
+          fail(`accept-terms.js answered ${res.statusCode} for ${label}, expected 403`);
+        }
+      }
+      process.exit(bad);
+    })();
+  ') || fail=1
 fi
 
 [ -f "$MIGRATION" ] \
   || note "$MIGRATION is missing (terms_acceptances has no schema on disk)"
 
-# --- 4. The contract itself is one click away at the point of sale -----------
-grep -q "terms.html" "$INDEX_HTML" \
-  || note "$INDEX_HTML does not link terms.html, so there is nothing to read before accepting"
+# --- 4. The three copies of TERMS_VERSION must agree -------------------------
+#
+# The version lives in _terms_gate.js (which refuses anything that disagrees with
+# it), in site.js (which submits it), and as the effective date on terms.html
+# (which is what the buyer actually reads). site.js and _terms_gate.js deploy
+# through DIFFERENT pipelines, cPanel and Netlify, so on the next terms update
+# whichever lands second gives every buyer a version_mismatch and a "please
+# refresh" they cannot act on, because the skew is server to server.
+gate_v=$(node -e 'process.stdout.write(String(require("./brandgeo-dashboard/netlify/functions/_terms_gate.js").TERMS_VERSION))' 2>/dev/null || echo "")
+site_v=$(grep -oP "var TERMS_VERSION = '\K[^']+" "$SITE_JS" 2>/dev/null || echo "")
+terms_v=$(grep -oP 'Effective date:\s*\K[0-9]{1,2} \w+ [0-9]{4}' brandgeo/web/terms.html 2>/dev/null || echo "")
+# terms.html prints a human date ("13 July 2026"); normalise to the ISO form the
+# other two use rather than requiring the page to change format.
+terms_iso=$(node -e '
+  const s = process.argv[1];
+  if (!s) { process.stdout.write(""); process.exit(0); }
+  const d = new Date(s + " UTC");
+  process.stdout.write(isNaN(d) ? "" : d.toISOString().slice(0, 10));
+' "$terms_v" 2>/dev/null || echo "")
+
+[ -n "$gate_v" ] || note "could not read TERMS_VERSION from _terms_gate.js"
+[ -n "$site_v" ] || note "could not read TERMS_VERSION from $SITE_JS"
+[ -n "$terms_iso" ] || note "could not read the effective date from brandgeo/web/terms.html"
+if [ -n "$gate_v" ] && [ -n "$site_v" ] && [ "$gate_v" != "$site_v" ]; then
+  note "TERMS_VERSION disagrees: _terms_gate.js says $gate_v, $SITE_JS says $site_v. Every buyer would get version_mismatch."
+fi
+if [ -n "$gate_v" ] && [ -n "$terms_iso" ] && [ "$gate_v" != "$terms_iso" ]; then
+  note "TERMS_VERSION ($gate_v) does not match terms.html's effective date ($terms_iso). Acceptances would record a contract nobody was shown."
+fi
+
+# --- 5. The contract is one click away INSIDE the gate -----------------------
+#
+# Asserted within the gate panel, not anywhere in the page. A site-wide grep for
+# terms.html has passed since long before this gate existed, because the footer
+# links it on every page, so it proved nothing about the point of sale.
+node -e '
+  const fs = require("fs");
+  const src = fs.readFileSync(process.argv[1], "utf8");
+  const start = src.indexOf("id=\"termsGate\"");
+  if (start === -1) { console.log("FAIL: index.html has no #termsGate panel"); process.exit(1); }
+  const end = src.indexOf("</div>", src.indexOf("terms-gate-actions", start));
+  const panel = src.slice(start, end === -1 ? src.length : end);
+  if (!/terms\.html/.test(panel)) {
+    console.log("FAIL: the #termsGate panel does not link terms.html, so the contract is not readable at the point of acceptance");
+    process.exit(1);
+  }
+  if (!/type="checkbox"/.test(panel)) {
+    console.log("FAIL: the #termsGate panel has no explicit accept checkbox");
+    process.exit(1);
+  }
+' "$INDEX_HTML" || fail=1
 
 if [ "$fail" = 0 ]; then
   echo "OK: no checkout URL is served to the browser, and the server refuses to issue one without a recorded acceptance of $(node -e 'console.log(require("./brandgeo-dashboard/netlify/functions/_terms_gate.js").TERMS_VERSION)')"

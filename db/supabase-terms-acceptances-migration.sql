@@ -42,8 +42,18 @@ CREATE TABLE IF NOT EXISTS terms_acceptances (
   created_at         timestamptz NOT NULL DEFAULT now()
 );
 
+-- Stamped by stripe-webhook.js when a completed checkout's client_reference_id
+-- matches this row (added later the same day, after review finding S1). They tie
+-- the contract to the purchase it authorised, so the acceptance can be evidenced
+-- from either side. All NULL means the acceptance never led to a payment, which
+-- is the ordinary state of an abandoned checkout and not a fault.
+ALTER TABLE terms_acceptances ADD COLUMN IF NOT EXISTS stripe_session_id text;
+ALTER TABLE terms_acceptances ADD COLUMN IF NOT EXISTS matched_email     text;
+ALTER TABLE terms_acceptances ADD COLUMN IF NOT EXISTS matched_at        timestamptz;
+
 CREATE INDEX IF NOT EXISTS idx_terms_acceptances_reference ON terms_acceptances(reference);
 CREATE INDEX IF NOT EXISTS idx_terms_acceptances_created   ON terms_acceptances(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_terms_acceptances_session   ON terms_acceptances(stripe_session_id);
 
 -- Deny-all by default, same posture as prospect_audits and prospect_leads: no
 -- policy is created, so only the service key (server-side Netlify functions)

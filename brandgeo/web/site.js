@@ -299,9 +299,16 @@
         // Here it stays on screen for as long as the visitor is deciding, next
         // to the report CTA, which is the moment the score has just landed.
         // The report page carries the same step afterwards (AuditReport.tsx).
+        // "Start a free account", NOT "continuous tracking". This link goes to
+        // free signup, and the Free tier is one engine, five prompts, and a
+        // manual refresh (planConfig.ts PLAN_ENGINES.free, PLAN_PROMPTS.free,
+        // refresh_cadence DEFAULT 'manual'). Continuous multi-engine monitoring
+        // is what a plan adds, so promising it above a free-signup button would
+        // be a claim the product does not keep at the exact moment someone
+        // decides to trust it.
         '<div class="audit-forward">Or ' +
           '<a class="audit-forward-link" href="' + signupUrl(domain) + '">' +
-          'set up continuous tracking for ' + escapeHtml(domain) + ' &rarr;</a>' +
+          'start a free account for ' + escapeHtml(domain) + ' &rarr;</a>' +
         '</div>' +
         '<div class="audit-status is-error" id="auditEmailError" hidden></div>';
 
@@ -785,7 +792,34 @@
     cancelEl.addEventListener('click', closeGate);
     gate.addEventListener('click', function(e) { if (e.target === gate) closeGate(); });
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && !gate.hidden) closeGate();
+      if (gate.hidden) return;
+      if (e.key === 'Escape') { closeGate(); return; }
+
+      // Focus trap. The panel is role="dialog" aria-modal="true", which tells a
+      // screen reader the rest of the page is inert; without this, Tab walks out
+      // of the panel and behind a 78% scrim, so the focus ring is visible on
+      // content that is not. On the last screen before payment, and the screen
+      // where a legal acceptance is captured, that is worth the twelve lines.
+      if (e.key !== 'Tab') return;
+      var focusable = gate.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])');
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      // Covers the case where focus is somewhere outside the panel entirely,
+      // which is what happens on the very first Tab if the browser restored
+      // focus elsewhere.
+      if (!gate.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     });
 
     continueEl.addEventListener('click', function() {
@@ -812,7 +846,18 @@
       }).then(function(r) {
         if (r.ok && r.data && r.data.url) {
           window.location.href = r.data.url;
-          return;   // leave the button in its busy state; the page is going away
+          // The page is going away, so the busy state is correct for the next
+          // few hundred milliseconds. But a navigation can be blocked, refused
+          // by an extension, or simply slow, and `busy` also gates closeGate():
+          // leaving it set would freeze the panel with Cancel AND Escape both
+          // inert, in front of a visitor who is trying to pay. Release it after
+          // a beat so the panel stays usable if the move never happens.
+          setTimeout(function() {
+            busy = false;
+            continueEl.textContent = 'Continue to payment';
+            continueEl.disabled = !acceptEl.checked;
+          }, 4000);
+          return;
         }
         busy = false;
         continueEl.textContent = 'Continue to payment';

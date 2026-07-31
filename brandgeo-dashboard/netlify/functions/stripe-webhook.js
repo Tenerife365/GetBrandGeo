@@ -194,6 +194,12 @@ async function handleCheckoutCompleted(session, log) {
     return
   }
 
+  // Did this purchase come through the contract gate? (ROADMAP Stream C, C3.)
+  // Deliberately placed here, after the two early returns and before any
+  // provisioning branch, so it observes every checkout that will be acted on and
+  // can influence none of them.
+  await checkContractAcceptance({ session, email, log })
+
   // Resolve the purchased plan from the line item's price. The line item itself
   // is kept, not just its price: the package path checks quantity off it (S3).
   const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 })
@@ -408,6 +414,84 @@ async function handleCheckoutCompleted(session, log) {
       : `${email} subscribed to the ${planLabel} plan.`,
     meta: eventMeta(),
   })
+}
+
+// Was this checkout preceded by a recorded acceptance of the Terms?
+// (ROADMAP Stream C, C3, added 2026-07-31 after review finding S1.)
+//
+// WHY THIS EXISTS. accept-terms.js will not issue a checkout URL without first
+// writing a terms_acceptances row, and it appends that row's reference to the
+// payment link as client_reference_id. But the six links are Stripe PAYMENT
+// LINKS: permanent, reusable, and sufficient on their own to pay. They are
+// published in this repository, which is public, and they are in its history.
+// So the gate in front of the pricing page is a gate on the ROUTE, not on the
+// destination, and anyone who reads the source can pay without ever seeing the
+// contract. Removing the links from the docroot did not change that and it was
+// wrong to record it as if it had.
+//
+// This closes the half that can be closed in code: such a purchase is no longer
+// INVISIBLE. It does not close the hole. Only rotating the payment links, and
+// keeping their replacements out of the repository, does that.
+//
+// IT NEVER WITHHOLDS PROVISIONING, and that is the whole design. The money is
+// already captured by the time this runs. Refusing to provision a paying
+// customer because a query did not find a row would take a real defect (a
+// missing acceptance record) and turn it into a much worse one (a customer who
+// paid and got nothing). So this observes, records, and alerts, and provisioning
+// downstream proceeds exactly as it did before.
+//
+// It cannot throw. A throw here would release the idempotency lock in the
+// handler above and make Stripe redeliver the session forever. recordAdminEvent
+// is already best-effort by construction; the try/catch covers the query.
+async function checkContractAcceptance({ session, email, log }) {
+  try {
+    const reference = session.client_reference_id || null
+
+    if (reference) {
+      const { data: acceptance } = await supabase
+        .from('terms_acceptances')
+        .select('id, terms_version, plan, period')
+        .eq('reference', reference)
+        .maybeSingle()
+
+      if (acceptance) {
+        // Tie the contract to the purchase it authorised, so the acceptance can
+        // be evidenced from either side later.
+        await supabase.from('terms_acceptances').update({
+          stripe_session_id: session.id,
+          matched_email: email,
+          matched_at: new Date().toISOString(),
+        }).eq('id', acceptance.id)
+        log(`contract acceptance matched: ref=${reference} v${acceptance.terms_version} (${acceptance.plan}/${acceptance.period})`)
+        return
+      }
+      // A reference that matches nothing is more interesting than none at all:
+      // it means someone constructed one, or a row was deleted.
+      log(`contract acceptance NOT FOUND for reference ${reference}`)
+    }
+
+    await recordAdminEvent(supabase, {
+      type: 'checkout_without_acceptance',
+      client_id: null,
+      title: 'Payment taken with no recorded Terms acceptance',
+      body: `${email} completed a checkout that did not come through the contract gate`
+          + `${reference ? `, and carried a client_reference_id (${reference}) matching no acceptance on record` : ' and carried no client_reference_id'}. `
+          + 'The customer has been provisioned as normal. This means a live Stripe payment link was used directly, '
+          + 'which is possible because the links are permanent and are published in the public repository and its history. '
+          + 'Rotating the links, and keeping their replacements out of the repo, is what closes this.',
+      meta: {
+        checkout_session: session.id,
+        client_reference_id: reference,
+        email: email || null,
+        amount_total: session.amount_total ?? null,
+        currency: session.currency ?? null,
+      },
+    })
+    log('admin event raised: checkout_without_acceptance')
+  } catch (e) {
+    // Never let observability break provisioning.
+    log('contract acceptance check failed (continuing):', e.message)
+  }
 }
 
 // A package checkout that took money but could not be provisioned. Arch §3.2

@@ -68,22 +68,56 @@ export function domainFromQuery(search: string): string | null {
   return isPlausibleDomain(raw) ? normalizeDomain(raw) : null
 }
 
+/**
+ * How long a carried domain stays useful. clearSignupDomain() on successful
+ * provisioning is the normal way it goes away, but an ABANDONED signup never
+ * reaches that call, and localStorage has no expiry of its own: without this the
+ * value would sit there forever and prefill the next person's company setup on a
+ * shared machine.
+ *
+ * 24 hours is generous for the round trip it has to survive (an invite email,
+ * read whenever the person next opens their inbox) and short enough that it is
+ * gone by the following day.
+ */
+const MAX_AGE_MS = 24 * 60 * 60 * 1000
+
 /** Persist a domain for the next step. Silently does nothing if it is not one. */
 export function rememberSignupDomain(input: string | null | undefined): void {
   if (!input || !isPlausibleDomain(input)) return
   try {
-    localStorage.setItem(STORAGE_KEY, normalizeDomain(input))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ domain: normalizeDomain(input), at: Date.now() }))
   } catch {
     // Private mode, a full quota, or storage disabled by policy. The prefill is
     // a nicety; losing it must never break signup, so this is swallowed.
   }
 }
 
-/** The remembered domain, or null. Re-validated on read: storage is user-writable too. */
+/**
+ * The remembered domain, or null.
+ *
+ * Re-validated on read, because localStorage is writable by whoever owns the
+ * browser, and expired entries are removed rather than merely ignored so they do
+ * not linger. Anything unparseable is treated as absent: a value from before
+ * this became a JSON envelope, a hand-edited entry, or junk.
+ */
 export function readSignupDomain(): string | null {
   try {
-    const v = localStorage.getItem(STORAGE_KEY)
-    return v && isPlausibleDomain(v) ? normalizeDomain(v) : null
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+
+    let parsed: { domain?: unknown; at?: unknown }
+    try { parsed = JSON.parse(raw) } catch { clearSignupDomain(); return null }
+
+    const domain = typeof parsed?.domain === 'string' ? parsed.domain : null
+    const at = typeof parsed?.at === 'number' ? parsed.at : null
+    if (!domain || !at || !isPlausibleDomain(domain)) { clearSignupDomain(); return null }
+
+    // `Date.now() < at` catches a clock that moved backwards, where the age
+    // would compute as negative and the entry would never expire.
+    const age = Date.now() - at
+    if (age > MAX_AGE_MS || age < 0) { clearSignupDomain(); return null }
+
+    return normalizeDomain(domain)
   } catch {
     return null
   }
