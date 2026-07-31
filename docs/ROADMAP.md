@@ -151,6 +151,29 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   `bg-app`. Not a lone build.
   `check: test -f docs/design/client-plan-usage.md`
 
+- **A4b. DECIDED 2026-07-31: `PLAN_PROMPTS` is enforced SERVER-SIDE and also
+  displayed.** Constantin: "so we don't have issues in the future." This closes
+  the long-open decision and unblocks A5's prompt half and A6.
+  Today it is display-only: read at `planConfig.ts:516` for the plan card and
+  enforced nowhere. So a Free client can create 500 prompts and every one of
+  them collects, against a EUR 0.30 monthly budget.
+  Two things this must not become:
+  - **Enforcement cannot be a frontend guard.** `Prompts.tsx` hiding the Add
+    button is not enforcement; the insert path is what has to refuse. Same
+    lesson as `_auth.js` being the real tenancy boundary while the UI merely
+    looked like one.
+  - **Existing clients might have been over the new cap.** Measured against
+    production 2026-07-31 rather than assumed, and **nobody is even close**:
+    free holds at most 2 of 5, essentials 1 of 15, growth 8 of 35, managed 6 of
+    120, pro 8 of 120. So enforcement ships with no migration, no grandfather
+    clause, and no risk of cutting off a paying customer. Re-measure before
+    building; this is a snapshot, not a guarantee.
+  Sequence: `bg-backend` on the insert path plus the collection queue, then
+  surface the number in A6. Note the caps are generous enough that enforcement
+  is protection against a future runaway, not a limit anyone is feeling today,
+  which is the cheapest possible moment to add it.
+  `check: (a prompt insert beyond the plan cap is refused server-side, asserted in a harness)`
+
 - **A5. Admin can grant bonus prompts and bonus collection credits per account.**
   Constantin, 2026-07-31: the founding-client package does NOT bundle prompts,
   but an admin should be able to open any account and hand out extra prompts as
