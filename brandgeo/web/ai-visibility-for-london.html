@@ -3,10 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
@@ -17,9 +25,9 @@
   <meta property="og:description" content="We ran 8 real London buyer prompts across 4 AI engines and compared the answers. Some categories are unanimous. Others are wide open. Here's the original data.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://getbrandgeo.com/ai-visibility-for-london.html">
-  <meta property="og:image" content="https://getbrandgeo.com/logo.png">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:image" content="https://getbrandgeo.com/logo.png">
+  <meta property="og:image" content="https://getbrandgeo.com/images/og/og-ai-visibility-for-london.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/og/og-ai-visibility-for-london.png">
   <meta name="keywords" content="AI visibility London, GEO London businesses, London AI search recommendations, ChatGPT London law firms, AI brand visibility research, generative engine optimization UK">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,9 +61,9 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
-      {"@type":"Question","name":"Is this real data, or a hypothetical example?","acceptedAnswer":{"@type":"Answer","text":"It's real. BrandGEO ran 8 actual commercial-buyer prompts (\"best CRM software for a small business in London,\" \"best independent financial advisors in London,\" and similar) through its own collection pipeline against Claude, Gemini, Meta AI, and Perplexity, then compared what each engine actually answered. Nothing here is simulated or estimated — it's a direct read of what these engines say today."}},
-      {"@type":"Question","name":"Why do some categories have a clear AI-recommended leader and others don't?","acceptedAnswer":{"@type":"Answer","text":"It comes down to how much consistent, citable information exists about brands in that category across the sources AI engines draw from. Categories like fintech banking apps and CRM software have a small number of well-documented, frequently-reviewed products, so every engine converges on the same names. Categories like employment law and independent financial advice have thousands of qualified firms with thin, inconsistent online footprints, so each engine ends up naming a different set — there's no consensus because there's no dominant signal for any engine to latch onto."}},
-      {"@type":"Question","name":"What does it mean if my business isn't named in any of these results?","acceptedAnswer":{"@type":"Answer","text":"These 8 prompts only cover a handful of categories — not naming a specific business here doesn't mean it's invisible everywhere. But if your category is one of the fragmented ones (employment law, independent financial advice), it's worth checking whether your own brand shows up at all when these exact questions are asked, since the data shows the field is genuinely wide open in categories like these right now."}}
+      {"@type":"Question","name":"Is this real data, or a hypothetical example?","acceptedAnswer":{"@type":"Answer","text":"It's real. BrandGEO ran 8 actual commercial-buyer prompts (\"best CRM software for a small business in London,\" \"best independent financial advisors in London,\" and similar) through its own collection pipeline against Claude, Gemini, Meta AI, and Perplexity, then compared what each engine actually answered. Nothing here is simulated or estimated. It's a direct read of what these engines say today."}},
+      {"@type":"Question","name":"Why do some categories have a clear AI-recommended leader and others don't?","acceptedAnswer":{"@type":"Answer","text":"It comes down to how much consistent, citable information exists about brands in that category across the sources AI engines draw from. Categories like fintech banking apps and CRM software have a small number of well-documented, frequently-reviewed products, so every engine converges on the same names. Categories like employment law and independent financial advice have thousands of qualified firms with thin, inconsistent online footprints, so each engine ends up naming a different set: there's no consensus because there's no dominant signal for any engine to latch onto."}},
+      {"@type":"Question","name":"What does it mean if my business isn't named in any of these results?","acceptedAnswer":{"@type":"Answer","text":"These 8 prompts only cover a handful of categories; not naming a specific business here doesn't mean it's invisible everywhere. But if your category is one of the fragmented ones (employment law, independent financial advice), it's worth checking whether your own brand shows up at all when these exact questions are asked, since the data shows the field is genuinely wide open in categories like these right now."}}
     ]
   }
   </script>
@@ -63,24 +71,24 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050508; --s: #0e0e17; --s2: #12121c;
-      --bd: rgba(255,255,255,.07); --bd2: rgba(255,255,255,.13);
-      --ac: #6c63ff; --ac2: #00d4aa;
-      --t: #ffffff; --t2: rgba(255,255,255,.6); --t3: rgba(255,255,255,.35);
-      --nav: rgba(5,5,8,.85); --r: 12px;
+      --bg: #0a0b0e; --s: #101116; --s2: #16171e;
+      --bd: #23242b; --bd2: #32333c;
+      --ac: #8b5cf6; --ac2: #34d399;
+      --t: #e8e9ed; --t2: #9ba1ac; --t3: #7d838f;
+      --nav: rgba(10,11,14,.85); --r: 12px;
     }
     [data-theme="light"] {
       --bg: #f7f7fc; --s: #ffffff; --s2: #f4f4fb;
-      --bd: rgba(0,0,0,.08); --bd2: rgba(0,0,0,.14);
-      --t: #09090f; --t2: rgba(9,9,15,.58); --t3: rgba(9,9,15,.35);
-      --nav: rgba(247,247,252,.88);
+      --bd: #e2e2ea; --bd2: #cfcfda;
+      --t: #09090f; --t2: #55555e; --t3: #6b6b75;
+      --nav: rgba(247,247,252,.88);      --ac: #7c3aed; --ac-text: #6d28d9; --ac-strong: #6d28d9; --ac2: #047857;      --ok: #047857; --part: #b45309; --bad: #b91c1c; --info: #6d28d9;
     }
     body { background: var(--bg); color: var(--t); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid var(--bd); position: sticky; top: 0; background: var(--nav); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text { font-size: 1.15rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; color: var(--t); }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
     nav a:hover { color: var(--t); }
     .nav-cta { background: var(--ac) !important; color: #fff !important; padding: 8px 18px; border-radius: 8px; font-weight: 700; margin-left: 16px !important; }
@@ -178,17 +186,51 @@
 
     @media(max-width:640px) {
       nav { padding: 14px 20px; }
-      nav a:not(.nav-cta) { display: none; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
       .page-hero, .wrap, .breadcrumb { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 20px; }
       .findings-bar { padding: 24px 20px; border-radius: 12px; }
       .consensus-table { font-size: 0.8rem; }
       .consensus-table th, .consensus-table td { padding: 10px 8px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -216,8 +258,8 @@
 <div class="page-hero">
   <div class="hero-badge">City Research &middot; London</div>
   <h1>AI Visibility in London: What <em>ChatGPT, Gemini &amp; Perplexity</em> Actually Recommend</h1>
-  <p>We didn't guess at this one. BrandGEO ran 8 real commercial-buyer prompts — the exact kind of question a Londoner types when they need a lawyer, a CRM, or a wealth manager — through its own collection pipeline against four major AI engines, then compared every answer side by side.</p>
-  <p>Some categories turned out to be <strong>completely unanimous</strong>: every engine names the same handful of brands. Others are <strong>wide open</strong>, with every engine naming an entirely different set of firms and no agreement at all. Both are useful signals — one tells you who currently owns the AI narrative, the other tells you the field is still up for grabs.</p>
+  <p>We didn't guess at this one. BrandGEO ran 8 real commercial-buyer prompts (the exact kind of question a Londoner types when they need a lawyer, a CRM, or a wealth manager) through its own collection pipeline against four major AI engines, then compared every answer side by side.</p>
+  <p>Some categories turned out to be <strong>completely unanimous</strong>: every engine names the same handful of brands. Others are <strong>wide open</strong>, with every engine naming an entirely different set of firms and no agreement at all. Both are useful signals: one tells you who currently owns the AI narrative, the other tells you the field is still up for grabs.</p>
   <div class="updated-note">Original research &middot; data collected 2026-07-10 &middot; BrandGEO's own AI Visibility pipeline</div>
 </div>
 
@@ -232,46 +274,46 @@
       </div>
       <div class="finding">
         <div class="finding-number">4</div>
-        <div class="finding-desc">AI engines compared per prompt &mdash; Claude, Gemini, Meta AI, and Perplexity</div>
+        <div class="finding-desc">AI engines compared per prompt: Claude, Gemini, Meta AI, and Perplexity</div>
       </div>
       <div class="finding">
         <div class="finding-number">3 of 8</div>
-        <div class="finding-desc">Categories where every engine named the exact same top brand(s) &mdash; total consensus</div>
+        <div class="finding-desc">Categories where every engine named the exact same top brand(s): total consensus</div>
       </div>
       <div class="finding">
         <div class="finding-number">2 of 8</div>
-        <div class="finding-desc">Categories where no two engines agreed on a single leading name &mdash; total fragmentation</div>
+        <div class="finding-desc">Categories where no two engines agreed on a single leading name: total fragmentation</div>
       </div>
     </div>
   </div>
 
   <h2>What we actually asked the AI engines</h2>
-  <p class="lede">These are the real prompts run against London-based categories — not hypothetical examples. Each one is a moment where an AI engine either names a brand a Londoner will act on, or doesn't.</p>
+  <p class="lede">These are the real prompts run against London-based categories, not hypothetical examples. Each one is a moment where an AI engine either names a brand a Londoner will act on, or doesn't.</p>
   <div class="prompt-grid">
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best UK-based CRM software for a small business in London"<span>Unanimous &mdash; 4/4 engines</span></div>
+      <div class="prompt-text">"Best UK-based CRM software for a small business in London"<span>Unanimous: 4/4 engines</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best fintech apps for business banking in the UK"<span>Unanimous &mdash; 4/4 engines</span></div>
+      <div class="prompt-text">"Best fintech apps for business banking in the UK"<span>Unanimous: 4/4 engines</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Top project management SaaS tools used by London startups"<span>Unanimous &mdash; 4/4 engines</span></div>
+      <div class="prompt-text">"Top project management SaaS tools used by London startups"<span>Unanimous: 4/4 engines</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best employment law firms in London"<span>Fragmented &mdash; no consensus</span></div>
+      <div class="prompt-text">"Best employment law firms in London"<span>Fragmented: no consensus</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best independent financial advisors in London"<span>Fragmented &mdash; no consensus</span></div>
+      <div class="prompt-text">"Best independent financial advisors in London"<span>Fragmented: no consensus</span></div>
     </div>
   </div>
 
   <h2>The headline consensus, category by category</h2>
-  <p class="lede">"Consensus" here means how many of the 4 engines independently named the same brand for that prompt — not a ranking BrandGEO assigned, just a count of how often the engines agreed with each other.</p>
+  <p class="lede">"Consensus" here means how many of the 4 engines independently named the same brand for that prompt, not a ranking BrandGEO assigned, just a count of how often the engines agreed with each other.</p>
   <table class="consensus-table">
     <thead>
       <tr><th>Category</th><th>Top AI-visible name(s)</th><th>Engine agreement</th></tr>
@@ -283,18 +325,18 @@
       <tr><td class="vertical">Fintech business banking</td><td class="leader"><strong>Starling Bank, Monzo, Revolut</strong></td><td class="score">4 of 4 each</td></tr>
       <tr><td class="vertical">Wealth management (expats)</td><td class="leader"><strong>Titan Wealth International</strong></td><td class="score">3 of 4</td></tr>
       <tr><td class="vertical">Property solicitors</td><td class="leader"><strong>Farrer &amp; Co</strong></td><td class="score">3 of 4</td></tr>
-      <tr><td class="vertical">Employment law</td><td class="leader frag">No consensus leader</td><td class="score frag">&mdash;</td></tr>
-      <tr><td class="vertical">Independent financial advisors</td><td class="leader frag">No consensus leader</td><td class="score frag">&mdash;</td></tr>
+      <tr><td class="vertical">Employment law</td><td class="leader frag">No consensus leader</td><td class="score frag">None</td></tr>
+      <tr><td class="vertical">Independent financial advisors</td><td class="leader frag">No consensus leader</td><td class="score frag">None</td></tr>
     </tbody>
   </table>
 
   <div class="callout teal">
     <div class="callout-label">Why this split matters</div>
-    <p>Fintech, CRM, and project-management tools have a small number of well-documented, frequently-reviewed products — so every engine converges on the same names. Employment law and independent financial advice have thousands of qualified firms with thin or inconsistent footprints across the sources AI engines actually draw from — so each engine names a completely different set. In categories like these, <em>no one currently owns the AI narrative</em>, which means the field is still genuinely open for whichever firm gets its structured data, directory presence, and citable content in order first.</p>
+    <p>Fintech, CRM, and project-management tools have a small number of well-documented, frequently-reviewed products, so every engine converges on the same names. Employment law and independent financial advice have thousands of qualified firms with thin or inconsistent footprints across the sources AI engines actually draw from, so each engine names a completely different set. In categories like these, <em>no one currently owns the AI narrative</em>, which means the field is still genuinely open for whichever firm gets its structured data, directory presence, and citable content in order first.</p>
   </div>
 
   <h2>Engines don't all recommend the same kind of brand</h2>
-  <p class="lede">Beyond raw agreement, the <em>type</em> of brand each engine favors differs in ways that matter if you're trying to be one of them. Perplexity leaned toward claimant-side and directory-style answers (Leigh Day, Thompsons, Unbiased, VouchedFor) where Claude and Meta AI leaned toward established City firms. On property, Claude's list of solicitors was entirely disjoint from the other three engines' — smaller high-street conveyancing names on one side, prime-property specialists like Farrer &amp; Co and Forsters on the other. A brand can be highly visible on one engine and completely invisible on another, which is exactly why checking a single engine tells you far less than checking all of them.</p>
+  <p class="lede">Beyond raw agreement, the <em>type</em> of brand each engine favors differs in ways that matter if you're trying to be one of them. Perplexity leaned toward claimant-side and directory-style answers (Leigh Day, Thompsons, Unbiased, VouchedFor) where Claude and Meta AI leaned toward established City firms. On property, Claude's list of solicitors was entirely disjoint from the other three engines': smaller high-street conveyancing names on one side, prime-property specialists like Farrer &amp; Co and Forsters on the other. A brand can be highly visible on one engine and completely invisible on another, which is exactly why checking a single engine tells you far less than checking all of them.</p>
 
   <h2>What this means if your business is in one of these categories</h2>
   <ol class="checklist">
@@ -302,7 +344,7 @@
       <div class="check-num">1</div>
       <div class="check-body">
         <h4>If your category is unanimous, find out if you're one of the names</h4>
-        <p>In categories like CRM, PM tools, and fintech banking, AI engines have already converged on a short list. If you're a challenger brand in one of these spaces, being absent from that list is a real, measurable gap — not a hypothetical one.</p>
+        <p>In categories like CRM, PM tools, and fintech banking, AI engines have already converged on a short list. If you're a challenger brand in one of these spaces, being absent from that list is a real, measurable gap, not a hypothetical one.</p>
       </div>
     </li>
     <li>
@@ -323,7 +365,7 @@
       <div class="check-num">4</div>
       <div class="check-body">
         <h4>Re-run this regularly, not once</h4>
-        <p>These answers reflect what the engines say today. AI-generated recommendations shift as engines re-crawl directories, reviews, and press coverage — a snapshot from six months ago won't tell you what's true now.</p>
+        <p>These answers reflect what the engines say today. AI-generated recommendations shift as engines re-crawl directories, reviews, and press coverage. A snapshot from six months ago won't tell you what's true now.</p>
       </div>
     </li>
   </ol>
@@ -332,15 +374,15 @@
   <div class="mini-faq">
     <div class="mini-faq-item">
       <h4>Is this real data, or a hypothetical example?</h4>
-      <p>It's real. BrandGEO ran 8 actual commercial-buyer prompts ("best CRM software for a small business in London," "best independent financial advisors in London," and similar) through its own collection pipeline against Claude, Gemini, Meta AI, and Perplexity, then compared what each engine actually answered. Nothing here is simulated or estimated — it's a direct read of what these engines say today.</p>
+      <p>It's real. BrandGEO ran 8 actual commercial-buyer prompts ("best CRM software for a small business in London," "best independent financial advisors in London," and similar) through its own collection pipeline against Claude, Gemini, Meta AI, and Perplexity, then compared what each engine actually answered. Nothing here is simulated or estimated. It's a direct read of what these engines say today.</p>
     </div>
     <div class="mini-faq-item">
       <h4>Why do some categories have a clear AI-recommended leader and others don't?</h4>
-      <p>It comes down to how much consistent, citable information exists about brands in that category across the sources AI engines draw from. Categories like fintech banking apps and CRM software have a small number of well-documented, frequently-reviewed products, so every engine converges on the same names. Categories like employment law and independent financial advice have thousands of qualified firms with thin, inconsistent online footprints, so each engine ends up naming a different set — there's no consensus because there's no dominant signal for any engine to latch onto.</p>
+      <p>It comes down to how much consistent, citable information exists about brands in that category across the sources AI engines draw from. Categories like fintech banking apps and CRM software have a small number of well-documented, frequently-reviewed products, so every engine converges on the same names. Categories like employment law and independent financial advice have thousands of qualified firms with thin, inconsistent online footprints, so each engine ends up naming a different set: there's no consensus because there's no dominant signal for any engine to latch onto.</p>
     </div>
     <div class="mini-faq-item">
       <h4>What does it mean if my business isn't named in any of these results?</h4>
-      <p>These 8 prompts only cover a handful of categories — not naming a specific business here doesn't mean it's invisible everywhere. But if your category is one of the fragmented ones (employment law, independent financial advice), it's worth checking whether your own brand shows up at all when these exact questions are asked, since the data shows the field is genuinely wide open in categories like these right now.</p>
+      <p>These 8 prompts only cover a handful of categories; not naming a specific business here doesn't mean it's invisible everywhere. But if your category is one of the fragmented ones (employment law, independent financial advice), it's worth checking whether your own brand shows up at all when these exact questions are asked, since the data shows the field is genuinely wide open in categories like these right now.</p>
     </div>
   </div>
 
@@ -349,7 +391,7 @@
     <a href="/bg-008.html" class="related-card">
       <div class="related-id">BG-008</div>
       <div class="related-title">AI Visibility by Industry: Who Wins, Who Loses</div>
-      <div class="related-hook">The industry-level version of this same pattern &mdash; which sectors have consensus and which don't.</div>
+      <div class="related-hook">The industry-level version of this same pattern: which sectors have consensus and which don't.</div>
     </a>
     <a href="/bg-005.html" class="related-card">
       <div class="related-id">BG-005</div>
@@ -365,7 +407,7 @@
 
   <div class="cta-box">
     <h3>See how your London business actually shows up in AI search</h3>
-    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Meta AI &mdash; no signup, no credit card, no tool to configure.</p>
+    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode. No signup, no credit card, no tool to configure.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">Want the industry-level version of this research? Read <a href="/bg-008.html" style="color:var(--ac2)">AI Visibility by Industry</a>.</p>
   </div>
@@ -386,6 +428,14 @@
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
       <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

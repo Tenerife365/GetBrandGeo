@@ -6,6 +6,7 @@ import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, type Plan } from '../lib/pla
 import { MARKETS } from '../lib/marketContext'
 import { supabase } from '../lib/supabase'
 import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus } from 'lucide-react'
+import { PageTitle } from '../components/Typography'
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -180,7 +181,7 @@ export default function Onboard() {
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Onboard New Client</h1>
+        <PageTitle className="mb-1">Onboard New Client</PageTitle>
         <p className="text-sm text-slate-400">Set up a new client account with AI monitoring in minutes.</p>
       </div>
 
@@ -205,7 +206,10 @@ export default function Onboard() {
         })}
       </div>
 
-      <div className="bg-dark-800 border border-dark-700 rounded-2xl p-6">
+      {/* rounded-xl (12px), not rounded-2xl (16px) — the only 16px radius left in
+          the app (dashboard-visual-system.md A8/F-20); every other card uses the
+          same --card-radius value. */}
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
 
         {/* ── Step 1: Company info ── */}
         {step === 1 && (
@@ -226,7 +230,7 @@ export default function Onboard() {
                 placeholder="bucate-pe-roate" />
               {slugStatus === 'checking' && <p className="text-xs text-slate-500 mt-1">Checking availability…</p>}
               {slugStatus === 'available' && <p className="text-xs text-emerald-400 mt-1">✓ Available</p>}
-              {slugStatus === 'taken' && <p className="text-xs text-red-400 mt-1">✗ Already taken by another client — choose a different slug</p>}
+              {slugStatus === 'taken' && <p className="text-xs text-red-400 mt-1">✗ Already taken by another client. Choose a different slug.</p>}
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Globe size={11} /> Website domain</label>
@@ -259,7 +263,7 @@ export default function Onboard() {
             </div>
             <p className="text-xs text-slate-500 -mt-2">
               Plan controls which AI engines collect for this client. Market and region set what
-              this client's dashboard defaults to before they pick their own — without it, new
+              this client's dashboard defaults to before they pick their own. Without it, new
               clients otherwise default to Romania regardless of who they are.
             </p>
             <button disabled={!name || !slug || slugStatus === 'taken' || slugStatus === 'checking'}
@@ -336,7 +340,7 @@ export default function Onboard() {
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><MessageSquarePlus size={18} className="text-brand-400" /> Initial Prompts</h2>
             <p className="text-xs text-slate-500">
               Real questions a customer might ask an AI assistant when looking for a business like this one.
-              These are what get sent to each AI engine every month — at least one is required, since without
+              These are what get sent to each AI engine every month. At least one is required, since without
               it there's nothing for the collection step to run.
             </p>
             <div className="flex gap-2">
@@ -353,7 +357,7 @@ export default function Onboard() {
                   <button onClick={() => setPrompts(prev => prev.filter(x => x !== p))} className="text-slate-600 hover:text-red-400 shrink-0 ml-2">×</button>
                 </span>
               ))}
-              {prompts.length === 0 && <span className="text-xs text-slate-600 italic">No prompts added yet — at least one is required</span>}
+              {prompts.length === 0 && <span className="text-xs text-slate-600 italic">No prompts added yet. At least one is required.</span>}
             </div>
             <div className="flex gap-2">
               <button onClick={() => setStep(3)} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors">Back</button>
@@ -388,8 +392,8 @@ export default function Onboard() {
               <label className="block text-xs text-slate-400 mb-1">Access level</label>
               <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'viewer')}
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
-                <option value="viewer">Viewer — sees only this client's data</option>
-                <option value="admin">Admin — full access to every client</option>
+                <option value="viewer">Viewer: sees only this client's data</option>
+                <option value="admin">Admin: full access to every client</option>
               </select>
               {role === 'admin' && (
                 <p className="text-xs text-amber-400 mt-1">
@@ -401,11 +405,15 @@ export default function Onboard() {
             {/* Summary */}
             <div className="rounded-lg bg-dark-700/50 border border-dark-600 p-4 space-y-1.5 text-xs text-slate-400">
               <div><span className="text-slate-600">Company:</span> <span className="text-slate-300">{name}</span></div>
-              <div><span className="text-slate-600">Website:</span> <span className="text-slate-300">{website || '—'}</span></div>
+              <div><span className="text-slate-600">Website:</span> {website
+                ? <span className="text-slate-300">{website}</span>
+                : <span className="text-slate-300 italic">Not set</span>}</div>
               <div><span className="text-slate-600">Plan:</span> <span className="text-slate-300">{PLAN_LABELS[plan]}</span></div>
               <div><span className="text-slate-600">Access:</span> <span className="text-slate-300">{role === 'admin' ? 'Admin' : 'Viewer'}</span></div>
               <div><span className="text-slate-600">Market:</span> <span className="text-slate-300">{selectedMarket.regions.find(r => r.id === regionId)?.label ?? regionId}, {selectedMarket.label}</span></div>
-              <div><span className="text-slate-600">Aliases:</span> <span className="text-slate-300">{aliases.join(', ') || '—'}</span></div>
+              <div><span className="text-slate-600">Aliases:</span> {aliases.length > 0
+                ? <span className="text-slate-300">{aliases.join(', ')}</span>
+                : <span className="text-slate-300 italic">None added</span>}</div>
               <div><span className="text-slate-600">Competitors:</span> <span className="text-slate-300">{competitors.length} added</span></div>
               <div><span className="text-slate-600">Prompts:</span> <span className="text-slate-300">{prompts.length} added</span></div>
             </div>

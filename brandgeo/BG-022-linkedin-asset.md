@@ -45,7 +45,7 @@ Link in first comment ↓
 
 Full breakdown, including the honest scope note straight from our own code comments: https://getbrandgeo.com/bg-022.html
 
-Same series as the last two pieces on scoring reliability and the weighting formula: https://getbrandgeo.com/bg-020.html · https://getbrandgeo.com/bg-021.html
+Same series as the last two pieces on scoring reliability and the weighting formula: https://getbrandgeo.com/bg-020.html · https://getbrandgeo.com/bg-026.html
 
 ---
 

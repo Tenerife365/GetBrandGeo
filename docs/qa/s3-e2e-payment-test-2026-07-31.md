@@ -1,0 +1,212 @@
+# End-to-end payment test, and the link rotation
+
+## RESULT: the test PASSED, and it caused one incident
+
+Paid 2026-07-31 14:01. **`client_reference_id` DOES survive a Stripe Payment
+Link on this account**, which was the single unverified assumption the whole S1
+remediation rested on:
+
+```
+matched_at        2026-07-31 14:01:32
+matched_email     constantin@talentwelove.com
+stripe_session_id cs_live_a1c7wUoZef1ulMHKHtn7d0rBK3jfkrtT5kKQXA0bU7vDJazIxdI9E6nfpb
+admin_notifications  subscription_new "Subscription: Essentials"
+                     NO checkout_without_acceptance  <- no false alarm
+```
+
+So the gate, the reference, the webhook match and the provisioning path all work
+end to end against real money.
+
+### INCIDENT: the test overwrote a real client's plan
+
+**The test email was `constantin@talentwelove.com`, which is the ADMIN user, and
+`user_profiles.client_id` for that user is 1, Bucate pe Roate.** The webhook does
+`findUserByEmail(email)`, followed it to client 1, and set a REAL client to
+`essentials` with `plan_source = 'stripe'` and the test subscription attached.
+
+BpR was NOT on essentials. Proven, not assumed: it has `grok` and `ai_overview`
+rows from 2026-07-29/30, and those engines exist only on `growth_pro`, `managed`
+and `pro`. Essentials has three engines and none of them are those. There is no
+`client_events` history for client 1, so the exact prior tier could not be read
+back.
+
+Restored to `pro`, with the Stripe fields cleared and the subscription cancelled.
+`pro` and `managed` are **identical** in what they grant (7 engines, 120 prompts,
+EUR 225 budget), so entitlement is whole either way; only the label is uncertain.
+~~**Constantin should confirm whether BpR was `pro` or `managed`.**~~
+
+> **ANSWERED 2026-07-31 by Constantin: it was `growth_pro`, which was NEITHER of
+> the two options this section offered.** The row now reads `growth_pro`,
+> verified.
+>
+> **The inference method was wrong, and that is the part worth keeping.** The
+> tier was deduced from the presence of `grok` and `ai_overview` rows, on the
+> reasoning that those engines exist only above Growth. True, but not
+> discriminating: `growth_pro`, `managed` and `pro` ALL carry `grok` and
+> `ai_overview` (`planConfig.ts:93-96`). The evidence narrowed seven plans to
+> three and was then read as though it had picked one. It landed on `pro`, which
+> grants **9 engines and a EUR 225 budget** against Growth PRO's **7 and EUR
+> 67.35**, so a real customer sat over-entitled until it was corrected.
+>
+> Restated as a rule: evidence that excludes is not evidence that selects. When
+> a measurement narrows the field without closing it, say which candidates
+> remain rather than naming the most likely one.
+>
+> **`client_events` for client 1 held ZERO rows through all three plan changes**,
+> which is why none of this could be read back from the database. Constantin
+> approved the fix the same day: every path that writes `clients.plan` appends a
+> `client_events` row. `stripe-webhook.js` and `provision-account.js` had none at
+> all, and `stripe-webhook.js` is the path that handles real payments.
+
+**The lesson, and it generalises:** never run a payment test with an email that
+already belongs to a user, because provisioning resolves by email and will attach
+to whatever client that user points at. Use an address that is not any client's
+login. This is the same trap the roster memory already recorded for testing the
+`/welcome` flow.
+
+---
+
+
+Written 2026-07-31. Everything here is against the LIVE Stripe account
+(`acct_1LHjKrKh2GaZE2B4`, `livemode: true`). There is no test mode.
+
+---
+
+## 1. The cheap real-subscriber test
+
+**Constantin asked for EUR 0.10. Stripe refuses it:** the minimum charge for EUR
+is EUR 0.50 (`The Checkout Session's total amount due must add up to at least
+€0.50 EUR`). The test is EUR 0.50, the cheapest a live card payment can be.
+
+**It is hidden by never being published, not by any access control.** A Stripe
+Payment Link cannot be password protected. This one is not on any page, not in
+`STRIPE_CHECKOUT_LINKS`, and not reachable from the gate. It must be
+**deactivated the moment the test is done** (step 5), because until then it sells
+Essentials for EUR 0.50 a month to anyone holding the URL.
+
+| | |
+|---|---|
+| Product | `prod_UzFFI2hqJm3PZo` "BrandGEO Internal End-to-End Test" |
+| Price | `price_1TzGlqKh2GaZE2B41PgbiNwS`, EUR 0.50/month, `metadata.plan = essentials` |
+| Payment link | `plink_1TzGlyKh2GaZE2B48LnghDoN` |
+| Acceptance reference | `65ae0d80-f08d-4377-86d3-9d24d917bf8c` (a real row, written by the live gate) |
+
+**The URL to pay, with the acceptance attached:**
+
+```
+https://buy.stripe.com/5kQcN66KU8qwcYAgoOdZ60h?client_reference_id=65ae0d80-f08d-4377-86d3-9d24d917bf8c
+```
+
+`metadata.plan = essentials` is deliberate: `stripe-webhook.js` resolves the tier
+from it, so this exercises the real provisioning path and will create a real
+Essentials client for whichever email pays. That is the point, and it is also why
+step 5 exists.
+
+### What it proves that nothing else can
+
+`client_reference_id` survives a Stripe Payment Link **on this account**. That is
+currently an assumption, and the whole S1 remediation rests on it: if it does not
+survive, every legitimate purchase raises `checkout_without_acceptance` and the
+alert becomes noise within a week.
+
+### After paying, check exactly this
+
+```sql
+-- 1. The acceptance was matched to the payment it authorised.
+select reference, plan, matched_at, matched_email, stripe_session_id
+from terms_acceptances
+where reference = '65ae0d80-f08d-4377-86d3-9d24d917bf8c';
+-- EXPECT: matched_at, matched_email and stripe_session_id all NON-NULL.
+
+-- 2. No false alarm was raised.
+select type, title, created_at from admin_notifications
+where type = 'checkout_without_acceptance' order by created_at desc limit 5;
+-- EXPECT: nothing new. A row here means client_reference_id did NOT survive,
+-- which is the single most important thing this test can tell us.
+
+-- 3. The customer was actually provisioned.
+select id, name, plan, plan_source, stripe_subscription_id
+from clients order by created_at desc limit 3;
+-- EXPECT: a new client on essentials.
+```
+
+### Step 5, the cleanup, which is not optional
+
+1. Cancel the subscription in Stripe (Customers, find the payment, cancel).
+2. Deactivate the payment link `plink_1TzGlyKh2GaZE2B48LnghDoN`.
+3. Archive the price `price_1TzGlqKh2GaZE2B41PgbiNwS` and the product.
+4. Delete or downgrade the client the webhook created, so it does not sit in the
+   roster as a paying Essentials customer (`delete-client` or set plan to free).
+5. Delete the `terms_acceptances` row above, or leave it as the record of the
+   test. Leaving it is fine and arguably better.
+
+A second price, `price_1TzGksKh2GaZE2B4lp6FYZiH` at EUR 0.10, was created before
+the minimum was known and is **already archived**. It was never payable.
+
+---
+
+## 2. The link rotation (roadmap C3, review finding S1)
+
+Six new payment links were created against the **same prices**. No price, amount,
+currency or `metadata.plan` changed, so the catalogue is identical and nothing
+about what a customer is charged moved.
+
+| plan / period | new link id |
+|---|---|
+| essentials monthly | `plink_1TzGZ2Kh2GaZE2B4tPOXVvdi` |
+| essentials annual | `plink_1TzGZEKh2GaZE2B4x7F2Iz9c` |
+| growth monthly | `plink_1TzGZKKh2GaZE2B4PBoSmG2k` |
+| growth annual | `plink_1TzGZRKh2GaZE2B49CuHG0rm` |
+| growth_pro monthly | `plink_1TzGZeKh2GaZE2B4CCCBgDEM` |
+| growth_pro annual | `plink_1TzGZmKh2GaZE2B4LTb92NIK` |
+
+The URLs are in `STRIPE_CHECKOUT_LINKS` on the Netlify project and deliberately
+not written down here. This file is in the public repo, which is the entire
+reason the rotation happened.
+
+The six OLD links (`plink_1Ty5ZzKh…` through `plink_1Ty5aAKh…`) are **still
+active on purpose**, see below.
+
+### LIVE OUTAGE, open at time of writing: checkout returns `no_link`
+
+The rotation deploy LANDED (the gate now answers `no_link`, a response only the
+new code can produce), but **`STRIPE_CHECKOUT_LINKS` is not reaching the
+function**, so every Subscribe button fails closed. Nobody can subscribe.
+
+Diagnosis: other env vars DO reach `accept-terms` (it writes to Supabase on every
+call, using `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`), so this is specific to
+this one variable. The only thing different about it is that it was created with
+**`is_secret: true`**. That is the prime suspect.
+
+Fix, in the Netlify UI (agent env-var writes are blocked by policy):
+Site configuration -> Environment variables -> `STRIPE_CHECKOUT_LINKS` ->
+recreate it **not** marked secret, scopes including **Functions**, context All,
+then **trigger a redeploy** (functions pick env up at deploy time).
+
+Verify with the command below; it must return the NEW growth-monthly link.
+
+### SEQUENCING, and it is the whole risk
+
+`_terms_gate.js` reading from the env var is **committed and pushed (`ff7cae3`)
+but was NOT deployed** as of writing: Netlify's current deploy is still
+`31f8dc0`, ~15 minutes after the push, and the live gate therefore still issues
+the OLD links.
+
+**Do not deactivate the old links until the new code is live.** Doing it now
+sends every buyer to a dead Stripe page. Order:
+
+1. Confirm the deploy has landed:
+   ```bash
+   curl -s -X POST https://app.getbrandgeo.com/.netlify/functions/accept-terms \
+     -H "Content-Type: application/json" -H "Origin: https://getbrandgeo.com" \
+     -d '{"plan":"growth","period":"monthly","accepted":true,"accepted_version":"2026-07-13"}'
+   ```
+   The returned `url` must be the NEW growth-monthly link, not
+   `…/7sY3cw9X6ayEf6IegGdZ607`. **Each call writes a terms_acceptances row**, so
+   delete them afterwards rather than polling this in a loop (twenty rows were
+   created and deleted this way while waiting).
+2. Only then deactivate the six old links.
+3. Re-run `bash scripts/check-contract-gate.sh`.
+
+Until step 2, the exposure the rotation exists to close is still open, because
+the old URLs remain payable and are still in git history.

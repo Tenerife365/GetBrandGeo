@@ -3,10 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BG-013 — How Often You Need to Publish to Stay Cited by AI | BrandGEO Research™</title>
-  <meta name="description" content="Content under 30 days old earns up to 3.2x more AI citations. Here's the real refresh cadence — by content type — that keeps you cited.">
-  <meta property="og:title" content="How Often You Need to Publish to Stay Cited by AI — BrandGEO Research™">
-  <meta property="og:description" content="AI engines reward recent content — but not evenly. Here's the actual cadence that keeps you visible, broken down by content type.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>BG-013: How Often You Need to Publish to Stay Cited by AI | BrandGEO Research™</title>
+  <meta name="description" content="Content under 30 days old earns up to 3.2x more AI citations. Here's the real refresh cadence, by content type, that keeps you cited.">
+  <meta property="og:title" content="How Often You Need to Publish to Stay Cited by AI: BrandGEO Research™">
+  <meta property="og:description" content="AI engines reward recent content, but not evenly. Here's the actual cadence that keeps you visible, broken down by content type.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-013-hero.png">
   <meta property="og:url" content="https://getbrandgeo.com/bg-013.html">
@@ -21,7 +36,7 @@
     "@context": "https://schema.org",
     "@type": "Article",
     "headline": "How Often You Need to Publish to Stay Cited by AI",
-    "description": "BrandGEO Research: a practical breakdown of how often different content types actually need to be refreshed to stay eligible for AI citation — and when old, authoritative content gets a pass.",
+    "description": "BrandGEO Research: a practical breakdown of how often different content types actually need to be refreshed to stay eligible for AI citation, and when old, authoritative content gets a pass.",
     "image": "https://getbrandgeo.com/images/bg-013-hero.png",
     "datePublished": "2026-07-09",
     "author": {"@type": "Organization", "name": "BrandGEO Research"},
@@ -37,13 +52,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -51,16 +66,16 @@
       --surface: #ffffff;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -160,16 +175,50 @@
 
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 24px; }
       .compare-table { font-size: 0.85rem; }
       .compare-table th, .compare-table td { padding: 10px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -204,7 +253,7 @@
     <span class="badge-tag">GEO</span>
   </div>
   <h1>How Often You Need to <em>Publish</em> to Stay Cited by AI</h1>
-  <p class="article-subtitle">AI engines reward recent content — but not evenly across content types. Here's the actual refresh cadence, and when "old" genuinely stops mattering.</p>
+  <p class="article-subtitle">AI engines reward recent content, but not evenly across content types. Here's the actual refresh cadence, and when "old" genuinely stops mattering.</p>
   <div class="article-meta">
     <span class="meta-item"><strong>BrandGEO Research</strong></span>
     <span class="meta-item">July 9, 2026</span>
@@ -214,17 +263,17 @@
 </div>
 
 <div class="article-hero">
-  <img src="/images/bg-013-hero.png" alt="A publishing cadence framework showing how often different content types — comparison pages, evergreen guides, and reference content — need to be refreshed to stay eligible for AI citation." loading="eager">
+  <img src="/images/bg-013-hero.png" alt="A publishing cadence framework showing how often different content types (comparison pages, evergreen guides, and reference content) need to be refreshed to stay eligible for AI citation." loading="eager">
 </div>
 
 <!-- KEY FINDINGS -->
 <div class="findings-bar">
   <div class="findings-inner">
-    <div class="findings-label">● Key Findings — BG-013</div>
+    <div class="findings-label">● Key Findings: BG-013</div>
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">3.2x</div>
-        <div class="finding-desc">More ChatGPT citations for content updated in the last 30 days versus older pages — even when the older page ranks higher organically</div>
+        <div class="finding-desc">More ChatGPT citations for content updated in the last 30 days versus older pages, even when the older page ranks higher organically</div>
       </div>
       <div class="finding">
         <div class="finding-number">82%</div>
@@ -232,7 +281,7 @@
       </div>
       <div class="finding">
         <div class="finding-number">50%</div>
-        <div class="finding-desc">Of all AI-cited content is under 13 weeks old, per Amsive's 2026 analysis — the finding <a href="/bg-007.html" style="color:inherit">BG-007</a> first surfaced and this article builds on directly</div>
+        <div class="finding-desc">Of all AI-cited content is under 13 weeks old, per Amsive's 2026 analysis (the finding <a href="/bg-007.html" style="color:inherit">BG-007</a> first surfaced and this article builds on directly)</div>
       </div>
       <div class="finding">
         <div class="finding-number">40-60%</div>
@@ -246,19 +295,19 @@
 <div class="article-body">
 
   <h2 id="direct-answer">The direct answer</h2>
-  <p>It depends on what the page is for, and the gap between content types is bigger than most publishing calendars account for. Comparison, ranking, and pricing-shaped content needs a real refresh every <strong>60-90 days</strong> to stay eligible for citation. Evergreen how-to and pillar guides can run on a <strong>6-month</strong> cycle. Pure reference and definition content — the kind that answers "what is X" rather than "what's the best X right now" — can often go a full <strong>year</strong> between updates and still hold its citation share, provided the underlying facts haven't actually changed. Treating all three the same way is the most common mistake: it either burns effort refreshing pages that didn't need it, or leaves fast-decaying commercial pages stale for months at a time.</p>
+  <p>It depends on what the page is for, and the gap between content types is bigger than most publishing calendars account for. Comparison, ranking, and pricing-shaped content needs a real refresh every <strong>60-90 days</strong> to stay eligible for citation. Evergreen how-to and pillar guides can run on a <strong>6-month</strong> cycle. Pure reference and definition content (the kind that answers "what is X" rather than "what's the best X right now") can often go a full <strong>year</strong> between updates and still hold its citation share, provided the underlying facts haven't actually changed. Treating all three the same way is the most common mistake: it either burns effort refreshing pages that didn't need it, or leaves fast-decaying commercial pages stale for months at a time.</p>
 
   <h2 id="why-freshness">Why freshness is a mechanical requirement, not a ranking preference</h2>
-  <p>Every answer from ChatGPT, Gemini, Perplexity, or Claude that cites a source is built the same way under the hood: retrieve a set of candidate documents first, then generate an answer grounded in whatever was retrieved. Freshness gets applied as a filter at that retrieval step, not as a stylistic nudge afterward — when two sources cover the same claim, the system preferentially pulls the newer one into the candidate set before generation even starts. That's a structural difference from classic search ranking, where an old, well-linked page can still win a position indefinitely.</p>
-  <p>This isn't a theory. A researcher who reverse-engineered ChatGPT's production search configuration found <code>use_freshness_scoring_profile: true</code> set directly in its reranker settings — freshness isn't incidental, it's a named, deliberately tuned parameter in the pipeline. GrowByData's 2026 study of ChatGPT citation patterns quantified the effect: content updated within the last 30 days earns <strong>3.2x more citations</strong> than older pages on the same topic, and 76.4% of ChatGPT's most-cited pages had been updated within that same 30-day window.</p>
-  <p>Perplexity runs an even more time-sensitive version of the same mechanic, and it does so through two separate systems: PerplexityBot continuously refreshes the index behind cited answers, while a second live-fetch layer pulls pages in real time for a subset of queries. The result is a sharper cliff than ChatGPT's — content published in the last 30 days captures <strong>82% of Perplexity's citations</strong> for a given topic, and that share falls to just 37% once a page crosses six months old. Claude is the outlier worth knowing about: per the same research, it weights recency relatively lightly compared to the other three engines, which matters for how you prioritize a refresh queue if Claude visibility is a real part of your mix.</p>
+  <p>Every answer from ChatGPT, Gemini, Perplexity, or Claude that cites a source is built the same way under the hood: retrieve a set of candidate documents first, then generate an answer grounded in whatever was retrieved. Freshness gets applied as a filter at that retrieval step, not as a stylistic nudge afterward: when two sources cover the same claim, the system preferentially pulls the newer one into the candidate set before generation even starts. That's a structural difference from classic search ranking, where an old, well-linked page can still win a position indefinitely.</p>
+  <p>This isn't a theory. A researcher who reverse-engineered ChatGPT's production search configuration found <code>use_freshness_scoring_profile: true</code> set directly in its reranker settings: freshness isn't incidental, it's a named, deliberately tuned parameter in the pipeline. GrowByData's 2026 study of ChatGPT citation patterns quantified the effect: content updated within the last 30 days earns <strong>3.2x more citations</strong> than older pages on the same topic, and 76.4% of ChatGPT's most-cited pages had been updated within that same 30-day window.</p>
+  <p>Perplexity runs an even more time-sensitive version of the same mechanic, and it does so through two separate systems: PerplexityBot continuously refreshes the index behind cited answers, while a second live-fetch layer pulls pages in real time for a subset of queries. The result is a sharper cliff than ChatGPT's: content published in the last 30 days captures <strong>82% of Perplexity's citations</strong> for a given topic, and that share falls to just 37% once a page crosses six months old. Claude is the outlier worth knowing about: per the same research, it weights recency relatively lightly compared to the other three engines, which matters for how you prioritize a refresh queue if Claude visibility is a real part of your mix.</p>
 
   <div class="callout teal">
     <div class="callout-label">The mechanism in one line</div>
     <p>Freshness isn't a tiebreaker applied after an AI engine decides what's good. It's a filter applied before the engine ever sees your content as a candidate to cite.</p>
   </div>
 
-  <h2 id="cadence-by-type">A practical cadence, by content type — not a blanket rule</h2>
+  <h2 id="cadence-by-type">A practical cadence, by content type: not a blanket rule</h2>
   <p>Applying one refresh schedule to an entire site gets the incentive backwards, because different content types decay at genuinely different rates. The table below is the cadence that a real refresh program should run on, reconciling the 30/90/180-day cliffs above with how differently each content type actually ages.</p>
   <div class="compare-table-wrap">
     <table class="compare-table">
@@ -266,24 +315,24 @@
       <tr><td>Comparison / "X vs Y" / rankings</td><td>60-90 days</td><td>Competitive landscape moves fast; highest measured citation sensitivity to age</td></tr>
       <tr><td>Pricing / product pages</td><td>60-90 days, or the moment facts change</td><td>Stale pricing directly damages both trust and citation eligibility</td></tr>
       <tr><td>News / "state of X in [year]" content</td><td>30-60 days</td><td>Time-anchored by definition; shortest useful shelf life of any content type</td></tr>
-      <tr><td>Evergreen how-to / pillar guides</td><td>6 months</td><td>Moderate decay — benefits from periodic updates, not constant rewrites</td></tr>
+      <tr><td>Evergreen how-to / pillar guides</td><td>6 months</td><td>Moderate decay: benefits from periodic updates, not constant rewrites</td></tr>
       <tr><td>Reference / glossary / definition pages</td><td>12 months</td><td>Slowest decay; can retain citation share well past a year if facts are stable</td></tr>
     </table>
   </div>
-  <p>The underlying logic tracks the mechanism above: fast-moving, comparison-shaped content is exactly what Perplexity's 82%-to-37% cliff and GrowByData's 3.2x multiplier were measured on, while reference content behaves closer to the pattern <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a>'s six discipline definitions are built around — content whose value comes from being correct, not from being new.</p>
+  <p>The underlying logic tracks the mechanism above: fast-moving, comparison-shaped content is exactly what Perplexity's 82%-to-37% cliff and GrowByData's 3.2x multiplier were measured on, while reference content behaves closer to the pattern <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a>'s six discipline definitions are built around: content whose value comes from being correct, not from being new.</p>
 
   <h2 id="does-old-get-a-pass">Does old, authoritative content ever get a pass?</h2>
-  <p>Partially, and it's worth being precise about where the line actually falls rather than treating "freshness matters" as absolute. Gander's 2026 half-life study — measuring the internal retrieval layer across 194,077 sources — found that AI retrieval visibility drops roughly 40-60% for every year a page ages, which sounds like a hard ceiling on anything old. But that number is an average across all content types, and it masks a real split underneath: Ahrefs' own analysis of evergreen content in AI search found that a <em>two-year-old definition page can still earn citations if its claims are independently corroborated by newer sources</em>, while a two-year-old market analysis or vendor comparison is, in their words, effectively invisible to AI retrieval. The decay curve isn't one curve — it's steep for time-anchored claims and much gentler for stable, corroborated facts.</p>
-  <p>There's a second nuance worth knowing before you build a refresh calendar around any of this: AI systems can tell the difference between a real update and a cosmetic one. Swapping "2025" for "2026" in a title without changing anything underneath doesn't register as freshness signal — the content itself, not just the timestamp, is what gets re-evaluated. That's the same distinction <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> already drew when it found that 50% of AI-cited content is under 13 weeks old: the win goes to content that's genuinely been reworked — new data, corrected claims, an added section — not to whichever page's metadata was touched most recently.</p>
-  <p>Practically, this means a page like <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a>'s GEO-vs-SEO breakdown is a reasonable candidate to age gracefully on something closer to the 12-month cycle, provided the core distinction it draws stays accurate — while a page ranking specific vendors or naming current pricing has no such grace period, regardless of how well-written or well-linked it is.</p>
+  <p>Partially, and it's worth being precise about where the line actually falls rather than treating "freshness matters" as absolute. Gander's 2026 half-life study (measuring the internal retrieval layer across 194,077 sources) found that AI retrieval visibility drops roughly 40-60% for every year a page ages, which sounds like a hard ceiling on anything old. But that number is an average across all content types, and it masks a real split underneath: Ahrefs' own analysis of evergreen content in AI search found that a <em>two-year-old definition page can still earn citations if its claims are independently corroborated by newer sources</em>, while a two-year-old market analysis or vendor comparison is, in their words, effectively invisible to AI retrieval. The decay curve isn't one curve: it's steep for time-anchored claims and much gentler for stable, corroborated facts.</p>
+  <p>There's a second nuance worth knowing before you build a refresh calendar around any of this: AI systems can tell the difference between a real update and a cosmetic one. Swapping "2025" for "2026" in a title without changing anything underneath doesn't register as freshness signal: the content itself, not just the timestamp, is what gets re-evaluated. That's the same distinction <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> already drew when it found that 50% of AI-cited content is under 13 weeks old: the win goes to content that's genuinely been reworked (new data, corrected claims, an added section), not to whichever page's metadata was touched most recently.</p>
+  <p>Practically, this means a page like <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a>'s GEO-vs-SEO breakdown is a reasonable candidate to age gracefully on something closer to the 12-month cycle, provided the core distinction it draws stays accurate, while a page ranking specific vendors or naming current pricing has no such grace period, regardless of how well-written or well-linked it is.</p>
 
   <h2 id="recommendations">What to actually do with this</h2>
   <ul>
     <li><strong>Split your content inventory into the three tiers above before scheduling anything.</strong> A single "refresh everything quarterly" policy either wastes effort on reference pages that don't need it or leaves your highest-decay pages stale for months.</li>
-    <li><strong>Refresh means new substance, not a new date.</strong> Update the actual data, add a section that reflects something that's changed, correct a claim — a timestamp change alone doesn't move any of the citation numbers above.</li>
+    <li><strong>Refresh means new substance, not a new date.</strong> Update the actual data, add a section that reflects something that's changed, correct a claim. A timestamp change alone doesn't move any of the citation numbers above.</li>
     <li><strong>Put comparison and pricing content on the tightest cycle you can sustain.</strong> This is the category with the steepest measured decay in every study cited here.</li>
-    <li><strong>Don't over-invest in refreshing genuinely stable reference content.</strong> Per the Ahrefs finding above, a well-corroborated definitional page can hold its citation share well past a year — that effort is better spent on the pages actually decaying.</li>
-    <li><strong>Track which of your pages are actually getting cited, and by which engine, before deciding what to refresh next.</strong> Claude's lighter recency weighting versus Perplexity's 180-day cliff means the "right" refresh priority can differ by which engines matter most to your brand — a decision <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a> covers in more depth for ChatGPT specifically.</li>
+    <li><strong>Don't over-invest in refreshing genuinely stable reference content.</strong> Per the Ahrefs finding above, a well-corroborated definitional page can hold its citation share well past a year. That effort is better spent on the pages actually decaying.</li>
+    <li><strong>Track which of your pages are actually getting cited, and by which engine, before deciding what to refresh next.</strong> Claude's lighter recency weighting versus Perplexity's 180-day cliff means the "right" refresh priority can differ by which engines matter most to your brand, a decision <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a> covers in more depth for ChatGPT specifically.</li>
   </ul>
 
   <h2 id="related-research">Related research</h2>
@@ -292,7 +341,7 @@
     <a href="/bg-007.html" class="related-card">
       <div class="related-id">BG-007</div>
       <div class="related-title">The Anatomy of an AI-Cited Brand</div>
-      <div class="related-hook">The original finding this article builds on — half of all AI-cited content is under 13 weeks old.</div>
+      <div class="related-hook">The original finding this article builds on: half of all AI-cited content is under 13 weeks old.</div>
     </a>
     <a href="/bg-001.html" class="related-card">
       <div class="related-id">BG-001</div>
@@ -302,22 +351,22 @@
     <a href="/bg-005.html" class="related-card">
       <div class="related-id">BG-005</div>
       <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
-      <div class="related-hook">Why AI citation runs on different rules than classic ranking — the reason freshness behaves as a filter, not a preference.</div>
+      <div class="related-hook">Why AI citation runs on different rules than classic ranking: the reason freshness behaves as a filter, not a preference.</div>
     </a>
     <a href="/bg-003.html" class="related-card">
       <div class="related-id">BG-003</div>
       <div class="related-title">How Does ChatGPT Decide Which Brands to Recommend?</div>
-      <div class="related-hook">The sources-and-signals stage — where freshness gets evaluated alongside everything else in this article's cadence table.</div>
+      <div class="related-hook">The sources-and-signals stage: where freshness gets evaluated alongside everything else in this article's cadence table.</div>
     </a>
   </div>
 
   <h2>How BrandGEO treats this differently</h2>
-  <p>Most content audits check whether a page exists and whether it once ranked well. BrandGEO's recommendation engine goes a step further for content already flagged as high-value to your AI Visibility Score — surfacing which of your best-performing pages are drifting past the citation-relevant age for their content type, so a refresh gets prioritized before an engine quietly stops citing you, not months after.</p>
+  <p>Most content audits check whether a page exists and whether it once ranked well. BrandGEO's recommendation engine goes a step further for content already flagged as high-value to your AI Visibility Score, surfacing which of your best-performing pages are drifting past the citation-relevant age for their content type, so a refresh gets prioritized before an engine quietly stops citing you, not months after.</p>
 
   <!-- CTA -->
   <div class="cta-box">
     <h3>Find out whether your content's age is quietly costing you AI citations</h3>
-    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <p>We'll run your brand through the same real-question, multi-engine audit, free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
@@ -343,6 +392,14 @@
       <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

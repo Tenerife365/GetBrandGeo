@@ -8,6 +8,7 @@ import {
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { hasFeature, getPlanLimits, channelBaseAvailable, channelTier } from '../lib/planConfig'
+import { PageTitle } from '../components/Typography'
 import FeatureLocked from '../components/FeatureLocked'
 import AllowanceMeter from '../components/AllowanceMeter'
 import type {
@@ -198,8 +199,13 @@ export default function Social() {
   const [bindBusy, setBindBusy] = useState(false)
   const [bindMsg, setBindMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // ADMIN-ONLY GUARD, do not drop. AI Social is admin-only and coming soon
+  // (planConfig ADMIN_ONLY_FEATURES), and all eleven social-*.js functions are
+  // requireAuth({ adminOnly: true }). A non-admin renders <FeatureLocked/> below,
+  // but React still runs every effect in this component, so an ungated loader
+  // fires a request that can only 403. The guard belongs here, not in the JSX.
   const loadAccounts = useCallback(async () => {
-    if (!activeClientId || isDemoMode) { setAccountsLoading(false); return }
+    if (!activeClientId || isDemoMode || !isAdmin) { setAccountsLoading(false); return }
     setAccountsLoading(true)
     try {
       const data = await authedPost<{ configured: boolean; bound?: boolean; profile_title?: string | null; accounts: SocialAccount[]; hint?: string; error?: string }>(
@@ -224,7 +230,7 @@ export default function Social() {
     } finally {
       setAccountsLoading(false)
     }
-  }, [activeClientId])
+  }, [activeClientId, isAdmin])
 
   useEffect(() => { loadAccounts() }, [loadAccounts])
 
@@ -248,7 +254,7 @@ export default function Social() {
   // at publish time.
   const [channelPostCounts, setChannelPostCounts] = useState<Record<string, number>>({})
   const loadChannelPostCounts = useCallback(async () => {
-    if (!activeClientId || isDemoMode) { setChannelPostCounts({}); return }
+    if (!activeClientId || isDemoMode || !isAdmin) { setChannelPostCounts({}); return }
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
     const { data } = await supabase
       .from('social_post_targets').select('platform, status')
@@ -259,7 +265,7 @@ export default function Social() {
       counts[r.platform] = (counts[r.platform] ?? 0) + 1
     }
     setChannelPostCounts(counts)
-  }, [activeClientId])
+  }, [activeClientId, isAdmin])
   useEffect(() => { loadChannelPostCounts() }, [loadChannelPostCounts])
 
   // Admin: read the current binding (and the key hint, which social-accounts
@@ -557,6 +563,10 @@ export default function Social() {
 
   // ── Brand Kit ──────────────────────────────────────────────────────────────
   const loadKit = useCallback(async () => {
+    // Same admin-only guard as loadAccounts above. This one runs on MOUNT for
+    // everyone, because the effect below fires it for the default Composer tab.
+    // setKitLoaded(true) settles the effect so it does not retry every render.
+    if (!activeClientId || isDemoMode || !isAdmin) { setKitLoaded(true); return }
     setKitLoading(true)
     try {
       const data = await authedPost<{ brand_kit?: Partial<BrandKit> }>(
@@ -566,7 +576,7 @@ export default function Social() {
     } catch { /* leave empty */ } finally {
       setKitLoading(false); setKitLoaded(true)
     }
-  }, [activeClientId])
+  }, [activeClientId, isAdmin])
 
   const saveKit = async () => {
     if (kitSaving) return
@@ -655,10 +665,10 @@ export default function Social() {
             'social-delete', { client_id: activeClientId, post_id: editingPostId },
           )
           editNote = del.error
-            ? ' The previous scheduled post could not be canceled automatically — cancel it from the Calendar.'
+            ? ' The previous scheduled post could not be canceled automatically. Cancel it from the Calendar.'
             : ' The previous scheduled post was canceled.'
         } catch {
-          editNote = ' The previous scheduled post could not be canceled automatically — cancel it from the Calendar.'
+          editNote = ' The previous scheduled post could not be canceled automatically. Cancel it from the Calendar.'
         }
         setEditingPostId(null)
       }
@@ -690,7 +700,7 @@ export default function Social() {
   const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const loadPosts = useCallback(async () => {
-    if (!activeClientId || isDemoMode) { setPostsLoading(false); return }
+    if (!activeClientId || isDemoMode || !isAdmin) { setPostsLoading(false); return }
     setPostsLoading(true)
     const { data } = await supabase
       .from('social_posts')
@@ -700,7 +710,7 @@ export default function Social() {
       .limit(50)
     setPosts((data as (SocialPost & { targets: SocialPostTarget[] })[]) ?? [])
     setPostsLoading(false)
-  }, [activeClientId])
+  }, [activeClientId, isAdmin])
 
   useEffect(() => { loadPosts() }, [loadPosts])
 
@@ -710,7 +720,7 @@ export default function Social() {
   const [queueLoading, setQueueLoading] = useState(false)
 
   const loadQueue = useCallback(async () => {
-    if (!activeClientId || isDemoMode) return
+    if (!activeClientId || isDemoMode || !isAdmin) return
     setQueueLoading(true)
     try {
       const data = await authedPost<{ posts: RemotePost[] }>(
@@ -718,7 +728,7 @@ export default function Social() {
       )
       setRemoteQueue(data.posts ?? [])
     } catch { setRemoteQueue([]) } finally { setQueueLoading(false) }
-  }, [activeClientId])
+  }, [activeClientId, isAdmin])
 
   useEffect(() => { if (tab === 'calendar') loadQueue() }, [tab, loadQueue])
   // Load the kit on the Brand kit tab AND the Composer (the cover-image tool
@@ -786,9 +796,10 @@ export default function Social() {
   const history = posts.filter(p => p.status !== 'scheduled')
 
   // ── Plan gate ────────────────────────────────────────────────────────────
-  // AI Social is a Growth+ feature. Admins keep access for every client (they
-  // manage/set up publishing); a client on a plan below it sees the upgrade
-  // screen. Placed after all hooks so hook order is stable.
+  // AI Social is ADMIN-ONLY and coming soon: no plan grants it (planConfig
+  // ADMIN_ONLY_FEATURES), so every non-admin sees the coming-soon screen, and
+  // admins keep access for every client so the feature can be tested on real
+  // accounts. Placed after all hooks so hook order is stable.
   if (!isAdmin && !hasFeature(activeClient?.plan ?? 'free', 'ai_social')) {
     return <FeatureLocked feature="ai_social" />
   }
@@ -804,7 +815,7 @@ export default function Social() {
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-5xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">AI Social</h1>
+        <PageTitle>AI Social</PageTitle>
         <p className="text-sm text-slate-400 mt-1">
           Write once, adapt per platform, publish or schedule for {activeClient?.name ?? 'this workspace'}.
         </p>
@@ -881,7 +892,7 @@ export default function Social() {
                     placeholder="e.g. BrandGEO measures and improves how brands appear in AI answers." />
                 </KitField>
 
-                <KitField label="Key facts" hint="One per line. Only true, verifiable facts — the AI may use these and invent no others. Review anything that was auto-filled before saving.">
+                <KitField label="Key facts" hint="One per line. Only true, verifiable facts. The AI may use these and invent no others. Review anything that was auto-filled before saving.">
                   <textarea rows={5} className={inputCls} value={kit.key_facts.join('\n')}
                     onChange={e => setKit(k => ({ ...k, key_facts: e.target.value.split('\n') }))}
                     placeholder={'Monitors ChatGPT, Gemini, Claude, Perplexity and Google AI\nShows exactly where a brand is missing in AI answers\nManaged service, not just a dashboard'} />
@@ -1112,7 +1123,7 @@ export default function Social() {
           </div>
 
           {accountsNote && (
-            <p className="text-xs text-slate-400 bg-dark-800 border border-dark-700 rounded-lg p-3">{accountsNote}</p>
+            <p className="text-xs text-slate-400 bg-dark-800 border border-dark-700 rounded-lg p-card-compact">{accountsNote}</p>
           )}
 
           {/* One card per CONNECTED ACCOUNT, not per network: a client may run
@@ -1134,7 +1145,7 @@ export default function Social() {
                       <p className="text-sm text-white font-medium">{p.label}</p>
                       <p className="text-xs text-slate-500 truncate">Not connected</p>
                     </div>
-                    <span className="text-xs text-slate-600">—</span>
+                    {/* No status badge here: the row already reads "Not connected". */}
                   </div>
                 )]
               }
@@ -1391,7 +1402,7 @@ export default function Social() {
                     <button
                       key={p.id}
                       disabled
-                      title="Growth PRO add-on — not yet available for self-serve purchase. Contact us to enable it."
+                      title="Growth PRO add-on. Not yet available for self-serve purchase. Contact us to enable it."
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 bg-dark-800/60 text-slate-600 cursor-not-allowed"
                     >
                       <Lock size={13} /> {p.label}
@@ -1404,7 +1415,7 @@ export default function Social() {
                     key={p.id}
                     onClick={() => togglePlatform(p.id)}
                     aria-pressed={on}
-                    title={isConnected ? 'Connected' : 'Not connected yet — publishing will fail until it is linked'}
+                    title={isConnected ? 'Connected' : 'Not connected yet. Publishing will fail until it is linked.'}
                     className={[
                       'inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                       on

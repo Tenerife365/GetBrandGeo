@@ -22,9 +22,70 @@ function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/**
+ * Optional personal sign-off, rendered under the CTA.
+ *
+ * Exists because a product update from a no-reply address converts worse than
+ * the same words from a person. The sender stays noreply@ (it is the
+ * DKIM/SPF/DMARC-verified domain and changing it risks deliverability), and
+ * this block plus `replyTo` supply the human end: a face, a name, and two ways
+ * to answer.
+ *
+ * DESIGNED FOR IMAGES OFF, which is the default in Outlook and for any
+ * recipient who has not whitelisted us. The name, the role and both buttons are
+ * real text and real links, so nothing load-bearing is inside the image. With
+ * no avatarUrl at all it draws initials in a violet disc, which is better than
+ * a broken-image icon and needs no hosting.
+ *
+ * Tables, not flexbox: Outlook's Word rendering engine ignores flex and would
+ * stack this into a column. width/height attributes are set on the img as
+ * ATTRIBUTES as well as CSS for the same reason.
+ *
+ * signature = { name, role?, avatarUrl?, email?, linkedin? }
+ */
+function renderSignature(sig) {
+  if (!sig || !sig.name) return '';
+  const initials = String(sig.name).trim().split(/\s+/).slice(0, 2)
+    .map(w => w[0] || '').join('').toUpperCase();
+
+  const face = sig.avatarUrl
+    ? `<img src="${esc(sig.avatarUrl)}" alt="${esc(sig.name)}" width="56" height="56" `
+      + `style="display:block;width:56px;height:56px;border-radius:28px;object-fit:cover;border:1px solid #e2e8f0;">`
+    : `<div style="width:56px;height:56px;border-radius:28px;background:#8b5cf6;color:#ffffff;`
+      + `font-size:20px;font-weight:700;line-height:56px;text-align:center;">${esc(initials)}</div>`;
+
+  const buttons = [];
+  if (sig.email) {
+    buttons.push(
+      `<a href="mailto:${esc(sig.email)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;`
+      + `text-decoration:none;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;margin:0 8px 8px 0;">`
+      + `Reply to me</a>`);
+  }
+  if (sig.linkedin) {
+    buttons.push(
+      `<a href="${esc(sig.linkedin)}" style="display:inline-block;background:#ffffff;color:#6d28d9;`
+      + `text-decoration:none;font-size:13px;font-weight:600;padding:7px 13px;border-radius:8px;`
+      + `border:1px solid #c4b5fd;margin:0 8px 8px 0;">Connect on LinkedIn</a>`);
+  }
+
+  return `<div style="margin:26px 0 0;padding:18px 0 0;border-top:1px solid #e2e8f0;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="padding-right:12px;vertical-align:top;">${face}</td>
+    <td style="vertical-align:middle;">
+      <div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;">${esc(sig.name)}</div>
+      ${sig.role ? `<div style="font-size:13px;color:#64748b;line-height:1.4;">${esc(sig.role)}</div>` : ''}
+      ${sig.email ? `<div style="font-size:13px;line-height:1.4;"><a href="mailto:${esc(sig.email)}" style="color:#6d28d9;text-decoration:none;">${esc(sig.email)}</a></div>` : ''}
+    </td>
+  </tr></table>
+  ${buttons.length ? `<div style="margin-top:12px;">${buttons.join('')}</div>` : ''}
+</div>`;
+}
+
 // Build the branded HTML shell. `paragraphs` and `bullets` are plain strings
 // (escaped here). `cta` = { label, url } renders a violet button.
-function renderShell({ heading, paragraphs = [], bullets = [], cta = null, footerNote = null }) {
+// `signature` = see renderSignature above; omitted by every existing caller, so
+// their output is byte-identical to before this was added.
+function renderShell({ heading, paragraphs = [], bullets = [], cta = null, footerNote = null, signature = null }) {
   const body = [];
   body.push(
     `<h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;font-weight:700;">${esc(heading)}</h1>`,
@@ -44,6 +105,9 @@ function renderShell({ heading, paragraphs = [], bullets = [], cta = null, foote
       `<p style="margin:22px 0 8px;"><a href="${esc(cta.url)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:11px 22px;border-radius:10px;">${esc(cta.label || 'Open BrandGEO')}</a></p>`,
     );
   }
+  // Signature sits ABOVE the footer note: the sign-off is part of the message,
+  // the footer note is administrative (why you got this, how to stop).
+  if (signature) body.push(renderSignature(signature));
   if (footerNote) {
     body.push(`<p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#94a3b8;">${esc(footerNote)}</p>`);
   }
@@ -57,20 +121,20 @@ function renderShell({ heading, paragraphs = [], bullets = [], cta = null, foote
       <div style="padding:26px 24px 28px;">${body.join('')}</div>
     </div>
     <p style="margin:16px 4px 0;font-size:11px;line-height:1.5;color:#94a3b8;">
-      BrandGEO — AI visibility &amp; brand perception. <a href="${APP_URL}" style="color:#8b5cf6;text-decoration:none;">app.getbrandgeo.com</a>
+      BrandGEO. AI visibility &amp; brand perception. <a href="${APP_URL}" style="color:#8b5cf6;text-decoration:none;">app.getbrandgeo.com</a>
     </p>
   </div>
 </body></html>`;
 }
 
 // Send a branded email. Returns { ok, skipped?, error? }; never throws.
-async function sendBrandedEmail({ to, subject, heading, paragraphs, bullets, cta, footerNote, replyTo }) {
+async function sendBrandedEmail({ to, subject, heading, paragraphs, bullets, cta, footerNote, replyTo, signature }) {
   const key = process.env.RESEND_API_KEY;
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
   if (!key) return { ok: false, skipped: true, error: 'RESEND_API_KEY not set' };
   if (!recipients.length) return { ok: false, skipped: true, error: 'no recipient' };
 
-  const html = renderShell({ heading, paragraphs, bullets, cta, footerNote });
+  const html = renderShell({ heading, paragraphs, bullets, cta, footerNote, signature });
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: 'POST',

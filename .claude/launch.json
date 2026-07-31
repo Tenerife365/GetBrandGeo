@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "comment": "autoPort because 5173 is often taken by another project. The browser never sees this port: it loads the app through the editor proxy on 3000, so _auth.js ALLOWED_ORIGINS is satisfied by 3000 regardless of what Vite binds to.",
+      "name": "brandgeo-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "brandgeo-dashboard",
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "brandgeo-next",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "brandgeo-next",
+      "port": 3000
+    },
+    {
+      "name": "brandgeo-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8899", "--directory", "brandgeo/web"],
+      "port": 8899
+    },
+    {
+      "name": "brandgeo-web-editor",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["docs/growth/local-preview/devserver.py", "8900"],
+      "port": 8900
+    },
+    {
+      "comment": "Editor overlay in front of the Vite dashboard. Port 3000 is not arbitrary: netlify/functions/_auth.js ALLOWED_ORIGINS whitelists only app.getbrandgeo.com, localhost:5173 and localhost:3000, so any other port would be rejected by every API call and login would fail. Start brandgeo-dashboard first; this proxies it.",
+      "name": "brandgeo-dashboard-editor",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["docs/growth/local-preview/devserver.py", "3000", "--proxy", "http://localhost:5174"],
+      "port": 3000
+    },
+    {
+      "name": "brandgeo-next-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve@14", "out", "-l", "4173"],
+      "cwd": "brandgeo-next",
+      "port": 4173
+    }
+  ]
+}

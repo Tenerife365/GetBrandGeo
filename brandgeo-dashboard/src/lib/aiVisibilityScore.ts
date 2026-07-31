@@ -51,6 +51,30 @@ export interface ScoreInputRow extends ScoreResultRow {
   checked_at?: string | null
   /** 'error' rows are API failures, never real "not mentioned" results (CLAUDE.md §4.8). */
   status?: string | null
+  /** Carries the `[no_ai_overview]` marker. See isNoAnswerRow below. */
+  response_snippet?: string | null
+}
+
+/**
+ * True when the engine ran fine but produced no answer for a brand to appear in.
+ *
+ * Today that means one thing: Google renders an AI Overview for some queries and
+ * not others, and `_collect.js` labels the empty case with a `[no_ai_overview]`
+ * prefix. Nothing failed, so `status` is 'ok' and the row looks identical to a
+ * genuine "we checked and your brand was absent" — which is why it scored
+ * clients down for something that was never winnable.
+ *
+ * Measured on BpR in production 2026-07-31: of 6 `ai_overview` rows, 3 were
+ * `[no_ai_overview]`. The client saw 33%; the rate over answerable queries was
+ * 67%. Exactly half the reported number.
+ *
+ * This predicate was inlined in AIVisibility.tsx alone, so the page showed 67%
+ * while the Overview headline score, computed here, still said 33%. Shared now
+ * so the two cannot disagree again.
+ */
+export function isNoAnswerRow(row: { response_snippet?: string | null }): boolean {
+  return typeof row.response_snippet === 'string'
+    && row.response_snippet.startsWith('[no_ai_overview]')
 }
 
 /**
@@ -176,6 +200,7 @@ export function buildScoreResultMap(
 
   rows.forEach(r => {
     if (r.status === 'error') return                    // never a real "not mentioned"
+    if (isNoAnswerRow(r)) return                        // no answer existed to appear in
     if (allowed && !allowed.has(r.llm)) return          // engine not on this client's plan
 
     if (!map.has(r.prompt_id)) {

@@ -13,7 +13,7 @@ import {
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
 import { motion } from 'motion/react'
-import { Smile, Meh, Frown, Bot, ChevronDown, Sparkles } from 'lucide-react'
+import { Smile, Meh, Frown, ChevronDown, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
@@ -24,6 +24,12 @@ import { useChartTheme } from '../lib/chartTheme'
 import { staggerContainer } from '../lib/motion'
 import MotionCard from '../components/MotionCard'
 import { SentimentDot } from '../components/ScoreBadge'
+import EngineChip from '../components/EngineChip'
+import { PageTitle } from '../components/Typography'
+import ChartTooltip from '../components/ChartTooltip'
+import ChartLegend from '../components/ChartLegend'
+import SharedEmptyState from '../components/EmptyState'
+import { formatDate } from '../lib/format'
 import type { LLMName, Sentiment } from '../types'
 
 // --- Types -------------------------------------------------------------------
@@ -70,12 +76,16 @@ function computeStats(events: SentimentEvent[]) {
   return { total, counts, byEngine, score }
 }
 
+// Sentiment tokens (dashboard-visual-system.md §8.5) carry the two unambiguous
+// ends; "Mixed / Neutral" now uses the neutral token too (was blue — Gemini's
+// engine hue, a direct F-14-class collision). Amber stays for the one band
+// with no defined token ("Needs Attention" sits between neutral and negative).
 function scoreMeta(score: number | null) {
   if (score === null) return { label: 'No data yet', color: 'text-slate-500' }
-  if (score >= 75) return { label: 'Mostly Positive', color: 'text-emerald-400' }
-  if (score >= 50) return { label: 'Mixed / Neutral', color: 'text-blue-400' }
+  if (score >= 75) return { label: 'Mostly Positive', color: 'text-sentiment-positive' }
+  if (score >= 50) return { label: 'Mixed / Neutral', color: 'text-sentiment-neutral' }
   if (score >= 25) return { label: 'Needs Attention', color: 'text-amber-400' }
-  return { label: 'Mostly Negative', color: 'text-red-400' }
+  return { label: 'Mostly Negative', color: 'text-sentiment-negative' }
 }
 
 type TrendPeriod = 'weekly' | 'monthly' | 'quarterly'
@@ -109,6 +119,26 @@ function computeTrend(events: SentimentEvent[], period: TrendPeriod) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([p, c]) => ({ period: p, Positive: c.positive, Neutral: c.neutral, Negative: c.negative }))
 }
+
+/**
+ * Same segmented-control hit-area treatment as Competitors.tsx, and the same
+ * reasoning, which is written out in full there. Short version: these chips
+ * measured 24.5x20.5 in the first audit and 32x33 after the earlier pass. The
+ * visual stays 32x32; a transparent `::after` at -6px on all four sides takes
+ * the TARGET to 44x44 at every width, replacing a coarse-pointer query that left
+ * a narrow desktop window (still `pointer: fine`) at 32x33.
+ *
+ * The group gap goes from 4px to 12px because that is the exact arithmetic floor
+ * for three non-overlapping 44px targets around 32px visuals. Do not lower it.
+ *
+ * Duplicated rather than shared because this fix is scoped to two page files
+ * and a shared control would have to live in src/components/. Worth extracting
+ * next time either page is opened; noted in the handoff.
+ */
+const TREND_CHIP_TARGET =
+  "relative inline-flex items-center justify-center min-w-[32px] min-h-[32px] " +
+  "after:content-[''] after:absolute after:-inset-1.5"
+const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
 
 function buildEngineSentimentData(
   byEngine: Partial<Record<LLMName, SentimentCounts & { total: number }>>,
@@ -224,15 +254,20 @@ export default function BrandSentiment() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-0.5">
-          <h1 className="text-2xl font-bold text-white">Brand Sentiment</h1>
+          <PageTitle>Brand Sentiment</PageTitle>
           {primaryMarket && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
               {primaryMarket.flag} {primaryMarket.id} results
             </span>
           )}
         </div>
+        {/* The em dash is gone (audit F4) and so is the second {brandName}: the
+            old string named the brand twice, which reads badly for anything
+            longer than one word. "mention{s}" agrees with the count — the old
+            copy said "1 response that mention", which was already wrong. */}
         <p className="text-sm text-slate-400 mt-0.5">
-          How AI engines talk about {brandName} — sentiment across {total} response{total !== 1 ? 's' : ''} that mention {brandName}
+          How AI engines talk about {brandName}, measured across {total} response{total !== 1 ? 's' : ''} that
+          {' '}mention{total === 1 ? 's' : ''} it
         </p>
       </div>
 
@@ -246,48 +281,60 @@ export default function BrandSentiment() {
         className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
         variants={staggerContainer} initial="hidden" animate="show"
       >
-        <MotionCard stagger className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-brand-500/30 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
             <Sparkles size={12} className="text-brand-400" />
             <span className="text-xs text-slate-500">Sentiment score</span>
           </div>
+          {/* The null branch used to render a bare em dash. A dash is not a
+              measurement and does not say why there is none, which is the same
+              defect fixed on /competitors (audit F4/F5). text-slate-500 is the
+              muted step that is remapped legibly in both themes
+              (index.css:143 dark, :170 light). */}
           <div className={`text-2xl font-bold tabular-nums ${scoreColor}`}>
-            {score !== null ? score : '—'}
+            {score !== null
+              ? score
+              : <span className="text-base font-semibold text-slate-500">Not measured</span>}
             {score !== null && <span className="text-sm text-slate-500 font-normal">/100</span>}
           </div>
           <div className={`text-xs mt-0.5 ${scoreColor}`}>{scoreLabel}</div>
         </MotionCard>
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Smile size={12} className="text-emerald-400" />
+            <Smile size={12} className="text-sentiment-positive" />
             <span className="text-xs text-slate-500">Positive</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-400 tabular-nums">{counts.positive}</div>
+          <div className="text-2xl font-bold text-sentiment-positive tabular-nums">{counts.positive}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>
         </MotionCard>
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Meh size={12} className="text-slate-400" />
+            <Meh size={12} className="text-sentiment-neutral" />
             <span className="text-xs text-slate-500">Neutral</span>
           </div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{counts.neutral}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>
         </MotionCard>
-        <MotionCard stagger className="bg-dark-800 border border-dark-700 rounded-xl p-4">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Frown size={12} className="text-red-400" />
+            <Frown size={12} className="text-sentiment-negative" />
             <span className="text-xs text-slate-500">Negative</span>
           </div>
-          <div className="text-2xl font-bold text-red-400 tabular-nums">{counts.negative}</div>
+          <div className="text-2xl font-bold text-sentiment-negative tabular-nums">{counts.negative}</div>
           <div className="text-xs text-slate-500 mt-0.5">{pct(counts.negative)}% of mentions</div>
         </MotionCard>
       </motion.div>
 
       {total === 0 ? (
-        <div className="bg-dark-800 rounded-xl py-16 text-center mb-6">
-          <Meh size={28} className="text-slate-700 mx-auto mb-3" />
-          <p className="text-slate-500 text-sm mb-1">No sentiment data yet</p>
-          <p className="text-xs text-slate-600">Run a collection from the AI Visibility tab — sentiment appears here once AI engines mention {brandName}.</p>
+        <div className="bg-dark-800 rounded-xl mb-6">
+          <SharedEmptyState
+            icon={Meh}
+            title="Not measured yet"
+            body={`Sentiment appears here once AI engines mention ${brandName}. Run a collection to check.`}
+            actionLabel="Run a collection"
+            actionTo="/ai-visibility"
+            minHeight={220}
+          />
         </div>
       ) : (
         <>
@@ -296,15 +343,17 @@ export default function BrandSentiment() {
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
               Overall Breakdown
             </h2>
+            {/* Fixed order, positive-neutral-negative, left to right — position
+                also encodes polarity, per §8.5's mandatory secondary encoding. */}
             <div className="h-3 w-full rounded-full overflow-hidden flex bg-dark-700">
-              {counts.positive > 0 && <div className="h-full bg-emerald-500" style={{ width: `${pct(counts.positive)}%` }} title={`Positive ${pct(counts.positive)}%`} />}
-              {counts.neutral > 0 && <div className="h-full bg-slate-500" style={{ width: `${pct(counts.neutral)}%` }} title={`Neutral ${pct(counts.neutral)}%`} />}
-              {counts.negative > 0 && <div className="h-full bg-red-500" style={{ width: `${pct(counts.negative)}%` }} title={`Negative ${pct(counts.negative)}%`} />}
+              {counts.positive > 0 && <div className="h-full bg-sentiment-positive" style={{ width: `${pct(counts.positive)}%` }} title={`Positive ${pct(counts.positive)}%`} />}
+              {counts.neutral > 0 && <div className="h-full bg-sentiment-neutral" style={{ width: `${pct(counts.neutral)}%` }} title={`Neutral ${pct(counts.neutral)}%`} />}
+              {counts.negative > 0 && <div className="h-full bg-sentiment-negative" style={{ width: `${pct(counts.negative)}%` }} title={`Negative ${pct(counts.negative)}%`} />}
             </div>
             <div className="flex items-center gap-4 mt-3">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-emerald-500" />Positive {pct(counts.positive)}%</span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-500" />Neutral {pct(counts.neutral)}%</span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-red-500" />Negative {pct(counts.negative)}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-positive" />Positive {pct(counts.positive)}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-neutral" />Neutral {pct(counts.neutral)}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-negative" />Negative {pct(counts.negative)}%</span>
             </div>
           </div>
 
@@ -320,19 +369,21 @@ export default function BrandSentiment() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={engineData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                    <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-                    <XAxis dataKey="engine" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                    {/* Solid hairline grid, no dashing (§9.2 F-21 — dashing reads as
+                        "projection", this is neither) */}
+                    <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                    <XAxis dataKey="engine" tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} width={40} tickCount={4} />
                     <Tooltip
-                      contentStyle={chart.tooltipContent}
-                      labelStyle={chart.tooltipLabel}
-                      itemStyle={chart.tooltipItem}
-                      formatter={(v: any) => [`${v}%`]}
+                      content={<ChartTooltip formatValue={item => `${item.value}%`} />}
+                      cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 6 }} />
-                    <Bar dataKey="Positive" stackId="s" fill="#10b981" radius={[0, 0, 0, 0]} maxBarSize={28} />
-                    <Bar dataKey="Neutral" stackId="s" fill="#64748b" maxBarSize={28} />
-                    <Bar dataKey="Negative" stackId="s" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                    <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                    {/* Fixed order + a stroke gap between segments so they read as
+                        separate quantities, not one blended bar (§9.5). */}
+                    <Bar dataKey="Positive" stackId="s" fill={chart.sentimentPositive} stroke={chart.cardSurface} strokeWidth={2} maxBarSize={28} />
+                    <Bar dataKey="Neutral" stackId="s" fill={chart.sentimentNeutral} stroke={chart.cardSurface} strokeWidth={2} maxBarSize={28} />
+                    <Bar dataKey="Negative" stackId="s" fill={chart.sentimentNegative} stroke={chart.cardSurface} strokeWidth={2} radius={[3, 3, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -344,12 +395,12 @@ export default function BrandSentiment() {
                 <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   Sentiment Over Time
                 </h2>
-                <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
+                <div className={TREND_GROUP}>
                   {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
                     <button key={p} onClick={() => setTrendPeriod(p)}
                       aria-pressed={trendPeriod === p}
                       aria-label={`View ${p} trend`}
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                      className={`${TREND_CHIP_TARGET} px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
                         trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                       }`}>
                       {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}
@@ -365,18 +416,19 @@ export default function BrandSentiment() {
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={trendData} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
-                    <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
-                    <XAxis dataKey="period" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                    <XAxis dataKey="period" tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={24} />
+                    <YAxis tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} width={40} tickCount={4} />
                     <Tooltip
-                      contentStyle={chart.tooltipContent}
-                      labelStyle={chart.tooltipLabel}
-                      itemStyle={chart.tooltipItem}
+                      content={<ChartTooltip />}
+                      cursor={{ stroke: chart.gridLine, strokeWidth: 1 }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 8 }} />
-                    <Line type="monotone" dataKey="Positive" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Neutral" stroke="#64748b" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Negative" stroke="#ef4444" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
+                    <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                    {/* All series the same strokeWidth (§9.5) — the old 2 vs 1.5 said
+                        "Positive matters more" when it doesn't. */}
+                    <Line type="monotone" dataKey="Positive" stroke={chart.sentimentPositive} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }} />
+                    <Line type="monotone" dataKey="Neutral" stroke={chart.sentimentNeutral} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }} />
+                    <Line type="monotone" dataKey="Negative" stroke={chart.sentimentNegative} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -413,23 +465,19 @@ export default function BrandSentiment() {
                 }`}>
                 All engines
               </button>
-              {activeEngines.filter(e => (byEngine[e]?.total ?? 0) > 0).map(e => {
-                const meta = ENGINE_META[e]
-                return (
-                  <button key={e} onClick={() => setFilterEngine(e === filterEngine ? 'all' : e)}
-                    aria-pressed={filterEngine === e}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
-                      filterEngine === e ? `${meta.bg} ${meta.color} border-transparent` : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
-                    }`}>
-                    <Bot size={11} />{meta.label}
-                  </button>
-                )
-              })}
+              {activeEngines.filter(e => (byEngine[e]?.total ?? 0) > 0).map(e => (
+                <EngineChip
+                  key={e}
+                  id={e as EngineId}
+                  selected={filterEngine === e}
+                  onClick={() => setFilterEngine(e === filterEngine ? 'all' : e)}
+                />
+              ))}
             </div>
 
             <div className="space-y-2">
               {filtered.map(e => {
-                const meta = ENGINE_META[e.llm as EngineId] ?? ENGINE_META.chatgpt
+                const engineId = (ENGINE_META[e.llm as EngineId] ? e.llm : 'chatgpt') as EngineId
                 const isOpen = expanded === e.id
                 return (
                   <div key={e.id} className="bg-dark-800 rounded-xl overflow-hidden">
@@ -440,7 +488,7 @@ export default function BrandSentiment() {
                         <div className="shrink-0 w-10 text-center mt-0.5">
                           {e.brand_position ? (
                             <>
-                              <div className="text-lg font-bold text-emerald-400 tabular-nums">#{e.brand_position}</div>
+                              <div className="text-lg font-bold text-sentiment-positive tabular-nums">#{e.brand_position}</div>
                               <div className="text-[10px] text-slate-600">pos</div>
                             </>
                           ) : (
@@ -449,9 +497,7 @@ export default function BrandSentiment() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-transparent ${meta.bg} ${meta.color}`}>
-                              <Bot size={10} />{meta.label}
-                            </span>
+                            <EngineChip id={engineId} interactive={false} />
                             <span className="flex items-center gap-1 text-xs text-slate-400 capitalize">
                               <SentimentDot value={e.sentiment} />{e.sentiment}
                             </span>
@@ -466,12 +512,12 @@ export default function BrandSentiment() {
                       <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
                         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Response snippet</div>
                         <blockquote className={`text-sm text-slate-300 italic leading-relaxed border-l-2 pl-3 ${
-                          e.sentiment === 'positive' ? 'border-emerald-500/40' : e.sentiment === 'negative' ? 'border-red-500/40' : 'border-slate-500/40'
+                          e.sentiment === 'positive' ? 'border-sentiment-positive' : e.sentiment === 'negative' ? 'border-sentiment-negative' : 'border-sentiment-neutral'
                         }`}>
                           "{e.response_snippet}"
                         </blockquote>
                         <div className="mt-3 text-xs text-slate-600">
-                          Checked {new Date(e.checked_at).toLocaleDateString()}
+                          Checked {formatDate(e.checked_at)}
                         </div>
                       </div>
                     )}

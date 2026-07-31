@@ -38,6 +38,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { isPlausibleDomain, normalizeDomain } = require('./_prospect_guard')
 const { recordAdminEvent } = require('./_admin_notify')
+const { refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 
 const ALLOWED_ORIGINS = [
   'https://app.getbrandgeo.com',
@@ -124,6 +125,14 @@ exports.handler = async (event) => {
   if (existingProfile && existingProfile.client_id) {
     // Never create a second client, never touch role. Just refresh the brand
     // fields for the client this user already owns, and mark onboarding done.
+    //
+    // NO client_events ROW HERE, and that is a decision rather than an omission:
+    // this update writes name / brand_website / brand_aliases /
+    // onboarding_complete and deliberately does NOT write `plan`. Whatever tier
+    // the client is on — including a paid one, if they bought before re-running
+    // onboarding — survives untouched. There is no plan change, so there is
+    // nothing for the plan audit log to say. If `plan` is ever added to this
+    // update, it needs an event exactly like the creation path below.
     const { error: updErr } = await supabase
       .from('clients')
       .update({
@@ -148,6 +157,22 @@ exports.handler = async (event) => {
   // ── First-time provisioning: create clients row, then user_profiles ───────
   const baseSlug = slugify(accountType === 'company' ? brandWebsite.split('.')[0] : brandName)
 
+  // Automatic refresh cadence, derived from the tier at the moment the tier is
+  // established (2026-07-31). This row is created with plan 'free' and NO
+  // category, so it lands on the column default — DEFAULT_CLIENT_CATEGORY —
+  // which is not 'research', so refreshCadenceFor returns free's cadence.
+  //
+  // last_refresh_at IS STAMPED AT CREATION, and that is a deliberate spend
+  // decision rather than bookkeeping. schedule-collections.js's isDue() treats a
+  // NULL last_refresh_at as "due now", so without this stamp every newly
+  // provisioned client would be collected by the very next hourly cron — on top
+  // of the activation collection the app already fires at signup. Stamping it
+  // starts the cadence clock at provisioning, so the first AUTOMATIC run lands
+  // one full period later, which is both cheaper and what "weekly from when I
+  // signed up" actually means.
+  const refreshCadence = refreshCadenceFor('free', DEFAULT_CLIENT_CATEGORY)
+  const cadenceClockStart = new Date().toISOString()
+
   let clientRow = null
   let clientErr = null
   for (let attempt = 0; attempt < 5 && !clientRow; attempt++) {
@@ -160,10 +185,12 @@ exports.handler = async (event) => {
         brand_website: brandWebsite,
         brand_aliases: brandAliases,
         plan: 'free',
+        refresh_cadence: refreshCadence,
+        last_refresh_at: cadenceClockStart,
         default_market_id: 'WW',         // never default to a country (§4.1)
         onboarding_complete: true,
       })
-      .select('id')
+      .select('id, slug')     // slug is for the audit row's meta, nothing else
       .single()
     if (!error) { clientRow = data; break }
     clientErr = error
@@ -188,6 +215,50 @@ exports.handler = async (event) => {
   }
 
   console.log(`[provision] ${accountType} account: user ${user.id} -> client ${clientRow.id} (viewer)`)
+
+  // ── Plan audit ────────────────────────────────────────────────────────────
+  // The clients INSERT above writes `plan: 'free'`, which makes this function a
+  // plan-writing path, and until 2026-07-31 it recorded nothing. Every account
+  // in the product therefore begins with a hole in its own history: the log
+  // could not even say when the client started on Free, so a later change had
+  // nothing to be a change FROM. See docs/qa/s3-e2e-payment-test-2026-07-31.md.
+  //
+  // from_plan is null because this is a plan write from NOTHING — the row did
+  // not exist a moment ago. type 'signup' (one of the values the migration
+  // documents) is what distinguishes creation from a change when reading back.
+  //
+  // actor is the signing-up user, not null: unlike the Stripe and cron paths,
+  // this write has a real authenticated human behind it and naming them costs
+  // nothing.
+  //
+  // Best-effort, and placed AFTER every step that can still roll back — the
+  // same placement and the same reasoning as onboard-client.js:206. An account
+  // that was created correctly must not be undone because an audit row failed,
+  // and an account must never fail to be created because of one. If a rollback
+  // above did fire this line is never reached, so no event is written for a
+  // client that no longer exists (and client_events cascades on client delete
+  // in any case).
+  try {
+    const { error: evErr } = await supabase.from('client_events').insert({
+      client_id: clientRow.id,
+      actor:     user.id,
+      type:      'signup',
+      from_plan: null,
+      to_plan:   'free',
+      meta: {
+        source:        'provision-account',
+        account_type:  accountType,
+        slug:          clientRow.slug ?? null,
+        brand_website: brandWebsite || null,
+        email:         user.email || null,
+        role:          'viewer',
+        refresh_cadence: refreshCadence,
+      },
+    })
+    if (evErr) console.error(`[provision] audit row failed for client ${clientRow.id}: ${evErr.message}`)
+  } catch (e) {
+    console.error(`[provision] audit row threw for client ${clientRow.id}: ${e.message}`)
+  }
 
   // Notify the admin now that a real, named brand exists (best-effort, never
   // throws). Fires here rather than at invite time so abandoned invites (a user

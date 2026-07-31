@@ -193,9 +193,16 @@ async function callGemini(prompt, ctx, opts) {
   return { text: null, ...last }
 }
 
-// ─── OpenRouter — Perplexity (web search built-in) and Meta (training data) ────
-// (verbatim from collect-prompt.js)
-async function callOpenRouter(model, prompt, ctx) {
+// ─── OpenRouter — Perplexity (search built-in) and Grok (search via plugin) ────
+// (verbatim from collect-prompt.js, plus the web plugin + real-cost metering)
+//
+// opts.web — attach OpenRouter's `web` plugin. Perplexity/sonar does NOT need
+// it (Sonar bundles retrieval into its token price); Grok DOES, and without it
+// Grok answers from training data only, which is the exact low-signal shape
+// that got Meta AI retired on 2026-07-16. maxResults is billed per RESULT
+// ($4/1,000), so it is the main cost lever on this path — 2 results keeps a
+// Grok call near EUR 0.012 all-in.
+async function callOpenRouter(model, prompt, ctx, opts = {}) {
   if (!process.env.OPENROUTER_API_KEY) {
     console.error(`[OpenRouter:${model}] OPENROUTER_API_KEY not set — engine skipped`)
     return { text: null, errorCode: 'auth_error', detail: 'OPENROUTER_API_KEY not set' }
@@ -204,6 +211,48 @@ async function callOpenRouter(model, prompt, ctx) {
     { role: 'system', content: ctx },
     { role: 'user',   content: prompt },
   ]
+  const body = {
+    model,
+    messages,
+    max_tokens: 1000,
+    // Ask OpenRouter to return what it ACTUALLY billed. This is strictly better
+    // than modelling the price from tokens, because it already includes the web
+    // plugin's per-result fee, provider routing markups and any mid-flight price
+    // change. costForRow() prefers this over MODEL_PRICE_USD when present.
+    usage: { include: true },
+  }
+  if (opts.web) {
+    body.plugins = [{ id: 'web', max_results: opts.maxResults ?? 2 }]
+  }
+  // REASONING OFF, and this is the third time this codebase has been bitten by
+  // the same thing. gpt-5.5 billed reasoning as uncapped output until effort was
+  // capped to 'low'. gemini-3.5-flash thought by default and timed out on 10 of
+  // 10 grounded calls, forcing a revert to 2.5-flash. grok-4.5 does it too.
+  //
+  // Measured on the first six production calls, 2026-07-29: EUR 0.165 per call
+  // against a budgeted 0.012, which back-solves to roughly 30,000 output tokens
+  // for an answer we truncate for analysis anyway. Four of those six also timed
+  // out. The cost and the timeouts were never two bugs; they were one.
+  //
+  // BrandGEO measures what an engine ANSWERS, not how well it deliberates, so
+  // extended reasoning buys nothing here and costs on both axes.
+  // HOW it is turned down matters. `{ enabled: false }` is the obvious spelling
+  // and it is the one that broke grok: 03df188 shipped it at 14:28 on 2026-07-29
+  // and every grok call after that returned api_error, where calls before it
+  // either succeeded or timed out. It is never quota (402/429/"credit" are
+  // classified separately above), and OpenRouter lists x-ai/grok-4.5 as
+  // supporting a `reasoning` parameter, so the field itself is understood. A
+  // reasoning-native model refusing to have reasoning switched off entirely is
+  // the reading that fits every observation.
+  //
+  // `{ effort: 'low' }` is the spelling that is already proven in this codebase:
+  // it is exactly what capped gpt-5.5 (see callChatGPT below, which carries a
+  // do-not-touch note about it). It keeps the model within its supported range
+  // instead of asking it to stop thinking, and still collapses the ~30,000
+  // output tokens that made grok cost EUR 0.165 a call.
+  if (opts.noReasoning) {
+    body.reasoning = { effort: 'low' }
+  }
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -212,7 +261,7 @@ async function callOpenRouter(model, prompt, ctx) {
       'HTTP-Referer': 'https://getbrandgeo.com',
       'X-Title':      'BrandGEO Monitor',
     },
-    body: JSON.stringify({ model, messages, max_tokens: 1000 }),
+    body: JSON.stringify(body),
   })
   const d = await r.json()
   if (d.error) {
@@ -222,18 +271,62 @@ async function callOpenRouter(model, prompt, ctx) {
     return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error', detail: `HTTP ${r.status} ${d.error.message || ''}`.trim() }
   }
   const text = d.choices?.[0]?.message?.content ?? null
+  // Real token counts for metering. OpenRouter mirrors the OpenAI chat shape.
+  // searches:0 — Sonar bundles search into its token price, no separate fee.
+  // costUsd is OpenRouter's own billed figure (credits charged for this call).
+  // When present it wins over token-modelled pricing in estimateCostEur().
+  const usage = d.usage
+    ? {
+        inputTokens:  d.usage.prompt_tokens ?? 0,
+        outputTokens: d.usage.completion_tokens ?? 0,
+        searches:     0,
+        costUsd:      typeof d.usage.cost === 'number' ? d.usage.cost : undefined,
+      }
+    : null
   if (text) {
-    console.log(`[OpenRouter:${model}] ok | preview:`, text.slice(0, 200))
+    console.log(`[OpenRouter:${model}] ok | tokens:`, usage ? `${usage.inputTokens}in/${usage.outputTokens}out` : 'n/a', '| preview:', text.slice(0, 200))
   } else {
     console.warn(`[OpenRouter:${model}] empty response:`, JSON.stringify(d).slice(0, 300))
   }
-  return { text, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
+  return { text, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
 }
 
 // ─── ChatGPT — OpenAI Responses API, gpt-5.5, web_search_preview + geo ─────────
 // (verbatim LIVE version from collect-chatgpt.js — reasoning:low cost cap; do NOT
 // add max_output_tokens (400s the request) or text.verbosity (truncates lists).)
-async function callChatGPT(prompt, ctx, marketId, regionLabel) {
+/**
+ * Which OpenAI model represents "ChatGPT" for a given plan.
+ *
+ * TIERED ON PURPOSE, 2026-07-29, owner's decision after seeing the cost of the
+ * flat switch to 4o-mini. That switch cut a Growth run 42% and immediately
+ * changed a measurement: Bucate pe Roate was mentioned on the certification
+ * prompt under gpt-5.5 at 13:05 and absent under gpt-4o-mini at 18:11, same
+ * prompt, same day. Nothing failed; the weaker model simply answered
+ * differently.
+ *
+ * That is the whole trade. A visibility score is only worth what the model
+ * behind it is worth, and a person asking ChatGPT today gets GPT-5.x. So paying
+ * plans, where the number is the product, keep the accurate model. Free and
+ * Essentials, where the job is to show the product works at a price that has to
+ * stay near zero marginal cost, get the cheap one.
+ *
+ * An unknown plan falls back to the CHEAP model deliberately. A corrupt or
+ * missing plan value should not be able to spend the expensive one.
+ */
+const CHATGPT_MODEL_BY_PLAN = {
+  free:       'gpt-4o-mini',
+  essentials: 'gpt-4o-mini',
+  growth:     'gpt-5.5',
+  growth_pro: 'gpt-5.5',
+  managed:    'gpt-5.5',
+  pro:        'gpt-5.5',
+  enterprise: 'gpt-5.5',
+}
+function chatgptModelForPlan(plan) {
+  return CHATGPT_MODEL_BY_PLAN[plan] || 'gpt-4o-mini'
+}
+
+async function callChatGPT(prompt, ctx, marketId, regionLabel, plan) {
   const isSpecificRegion = regionLabel &&
     !regionLabel.startsWith('All ') &&
     regionLabel !== 'All regions' &&
@@ -244,20 +337,54 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     ? { type: 'approximate', country: marketId, ...(isSpecificRegion ? { city: regionLabel } : {}) }
     : null
 
-  const r = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model:        'gpt-5.5',
-      instructions: ctx,
-      tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
-      input:        prompt,
-      reasoning:    { effort: 'low' },
-    }),
-  })
-  const d = await r.json()
+  // MODEL SWITCH, 2026-07-29, owner's decision. gpt-5.5 measured EUR 0.108 a
+  // call and is 74% of all marginal collection spend. It is also legacy since
+  // the GPT-5.6 release, and OpenAI doubled the GPT-5 line on 2026-04-23, so we
+  // were paying twice the old price for a superseded model. gpt-4o-mini is
+  // $0.15/$0.60 per 1M against $5.00/$30.00.
+  //
+  // `reasoning` MUST NOT be sent to a non-reasoning model. It is a GPT-5-family
+  // parameter and 4o-mini rejects it. This is the exact shape that broke grok
+  // earlier today: one unsupported parameter, every call returning api_error,
+  // and nobody noticing for hours. Hence the family check rather than a
+  // hardcoded body.
+  //
+  // FALLBACK, and it is the reason this can ship the night before a customer
+  // walkthrough. ChatGPT runs on EVERY plan including Free, so a wrong guess
+  // here breaks collection for every client. If the primary model returns an
+  // API error that is not a quota problem, we retry once on gpt-5.5. A 4xx
+  // comes back in well under a second, so the retry fits inside the budget. The
+  // worst case is the old cost and a loud log line, never a dead engine.
+  // Remove the fallback once metered rows prove the primary works.
+  const PRIMARY  = process.env.OPENAI_COLLECT_MODEL || chatgptModelForPlan(plan)
+  const FALLBACK = 'gpt-5.5'
+  const isReasoningModel = (m) => /^(gpt-5|o[134])/.test(m)
+
+  const callOnce = async (model) => {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model,
+        instructions: ctx,
+        tools:        [{ type: 'web_search_preview', ...(userLocation ? { user_location: userLocation } : {}) }],
+        input:        prompt,
+        ...(isReasoningModel(model) ? { reasoning: { effort: 'low' } } : {}),
+      }),
+    })
+    return { res, json: await res.json() }
+  }
+
+  let { res: r, json: d } = await callOnce(PRIMARY)
+  let modelUsed = PRIMARY
+  if (d.error && r.status !== 429 && r.status !== 402 && d.error.code !== 'insufficient_quota'
+      && PRIMARY !== FALLBACK) {
+    console.error(`[ChatGPT] ${PRIMARY} failed, falling back to ${FALLBACK}:`, JSON.stringify(d.error))
+    ;({ res: r, json: d } = await callOnce(FALLBACK))
+    modelUsed = FALLBACK
+  }
   if (d.error) {
-    console.error('[ChatGPT] API error:', JSON.stringify(d.error))
+    console.error(`[ChatGPT:${modelUsed}] API error:`, JSON.stringify(d.error))
     const isQuota = r.status === 429 || r.status === 402 || d.error.code === 'insufficient_quota'
     return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error', detail: `HTTP ${r.status} ${d.error.message || ''}`.trim() }
   }
@@ -267,17 +394,33 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel) {
     .flatMap(o => (o.content || []).filter(c => c.type === 'output_text').map(c => c.text))
     .join('\n')
 
+  // Real token counts. The Responses API bills web-search results as input
+  // tokens, so d.usage.input_tokens already includes the retrieved content —
+  // no separate accounting needed for it. The $10/1k tool fee is added by
+  // _cost.js from TOOL_FEE_USD; count the actual web_search calls made.
+  const searches = (d.output || []).filter(o => o.type === 'web_search_call').length
+  const usage = d.usage
+    // `model` lets _cost.js price this row against the model that actually
+    // answered rather than a single per-engine figure. chatgpt now runs two
+    // models depending on plan, and they differ in price by more than 30x.
+    ? { inputTokens: d.usage.input_tokens ?? 0, outputTokens: d.usage.output_tokens ?? 0, searches, model: modelUsed }
+    : null
   if (text) {
-    console.log('[ChatGPT] location used:', userLocation || 'none (worldwide)', '| preview:', text.slice(0, 200))
+    console.log(`[ChatGPT:${modelUsed}] location used:`, userLocation || 'none (worldwide)',
+      '| tokens:', usage ? `${usage.inputTokens}in/${usage.outputTokens}out/${searches}search` : 'n/a',
+      '| preview:', text.slice(0, 200))
   } else {
     console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
   }
-  return { text: text || null, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
+  return { text: text || null, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
 }
 
-// ─── Claude — training-data mode, streaming with a wall-clock time budget ──────
-// (verbatim LIVE version from collect-claude.js — NO web search, time budget not
-// a char cap. See §8.4 finding 1.4 / §12.3 before touching this.)
+// ─── Claude — web search ON, streaming with a wall-clock time budget ──────────
+// (LIVE version from collect-claude.js. The "NO web search" that used to be on
+// this line was stale: 8b7496c removed web search and was reverted, and the
+// long note on the anthropic-beta header below is the authority. Web search is
+// ON and must stay on. Time budget is not a char cap. See §8.4 finding 1.4 /
+// §12.3 before touching this.)
 async function callClaude(prompt, ctx, opts) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error', detail: 'ANTHROPIC_API_KEY not set' } }
@@ -329,6 +472,13 @@ async function callClaude(prompt, ctx, opts) {
     let text       = ''
     let stopReason = null
     let timedOut   = false
+    // Usage arrives split across two SSE events: message_start carries
+    // input_tokens (which INCLUDE the web-search results Anthropic injects),
+    // message_delta carries the running output_tokens. server_tool_use counts
+    // the billable searches. Captured for real metering in _cost.js.
+    let inputTokens  = 0
+    let outputTokens = 0
+    let searches     = 0
 
     while (true) {
       const remaining = deadline - Date.now()
@@ -369,7 +519,15 @@ async function callClaude(prompt, ctx, opts) {
           if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
             text += ev.delta.text ?? ''
           }
-          if (ev.type === 'message_delta') stopReason = ev.delta?.stop_reason ?? stopReason
+          if (ev.type === 'message_start') {
+            inputTokens  = ev.message?.usage?.input_tokens  ?? inputTokens
+            outputTokens = ev.message?.usage?.output_tokens ?? outputTokens
+          }
+          if (ev.type === 'content_block_start' && ev.content_block?.type === 'server_tool_use') searches++
+          if (ev.type === 'message_delta') {
+            stopReason   = ev.delta?.stop_reason ?? stopReason
+            outputTokens = ev.usage?.output_tokens ?? outputTokens
+          }
           if (ev.type === 'error') console.error('[Claude] stream error:', JSON.stringify(ev.error))
         } catch { /* skip malformed SSE */ }
       }
@@ -377,8 +535,11 @@ async function callClaude(prompt, ctx, opts) {
 
     if (text) {
       console.log('[Claude] ok | stop:', timedOut ? 'time_budget' : stopReason,
+        '| tokens:', `${inputTokens}in/${outputTokens}out/${searches}search`,
         '| len:', text.length, '| preview:', text.slice(0, 200))
-      return { text, errorCode: null, detail: null }
+      // A time-budget cancel still incurred every token generated up to the
+      // cut, so meter what actually ran rather than dropping the row's cost.
+      return { text, usage: { inputTokens, outputTokens, searches }, errorCode: null, detail: null }
     }
     console.warn('[Claude] stream done but no text | stop_reason:', timedOut ? 'time_budget' : stopReason)
     return { text: null, errorCode: 'empty_response', detail: `no text (stop_reason=${timedOut ? 'time_budget' : stopReason})` }
@@ -411,7 +572,7 @@ function flattenAiModeBlocks(blocks) {
 async function callGoogleAiMode(prompt, _ctx, opts) {
   const key = process.env.SERPAPI_KEY
   if (!key) {
-    console.error('[GoogleAIMode] SERPAPI_KEY not set — engine skipped')
+    console.error('[GoogleAIMode] SERPAPI_KEY not set, engine skipped')
     return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
   }
   const params = new URLSearchParams({ engine: 'google_ai_mode', q: prompt, api_key: key })
@@ -482,16 +643,240 @@ async function callGoogleAiMode(prompt, _ctx, opts) {
   }
 }
 
+// ─── Google AI Overviews, via SerpApi ────────────────────────────────────────
+// A DIFFERENT SURFACE FROM google_ai, deliberately. `google_ai` is Google AI
+// Mode: the separate conversational tab a user has to switch to on purpose. AI
+// Overviews is the AI summary block that appears on an ORDINARY google.com
+// results page by default, which is a far higher-reach surface. A brand can be
+// present in one and absent from the other, so they are two engines, not two
+// names for the same measurement. Do not merge them.
+//
+// SERPAPI FLOW IS TWO-STEP AND BOTH BRANCHES ARE LIVE:
+//   1. engine=google with the prompt as `q`. If the response's `ai_overview`
+//      object carries `text_blocks`, the content arrived in ONE search.
+//   2. If it carries `page_token` instead, Google deferred rendering and the
+//      content needs a SECOND call to engine=google_ai_overview with that
+//      token. That second call BILLS AS A SECOND SERPAPI SEARCH. The token
+//      expires in roughly 4 minutes, so it is followed immediately in the same
+//      invocation and never queued.
+//   3. No `ai_overview` key at all, or an `ai_overview.error`, is a LEGITIMATE
+//      MEASUREMENT rather than a failure. See AI_OVERVIEW_NOT_SHOWN below.
+//
+// usage.serpSearches carries the real count (1 or 2) so _cost.js bills what was
+// actually consumed instead of a blended average.
+
+// WHY THIS IS A NORMAL 'ok' ROW AND NOT AN ERROR CODE.
+// "Google showed no AI Overview for this query" is the single most common
+// outcome on this surface and it is a real result: the brand was not surfaced,
+// because nothing was surfaced. Recording it as status='error' would be wrong
+// three times over. (a) The dashboard greys an engine card as "Temporarily
+// unavailable" when it sees error rows and no ok rows, so a correctly working
+// engine would read as broken. (b) Every ai_results query in the app filters
+// with .neq('status','error'), so the measurement would be silently dropped
+// from the score instead of counted as a miss. (c) It would still be charged
+// full cost, since the SerpApi search was consumed either way.
+//
+// buildResultRow() treats falsy text as error_code 'no_response', so the row
+// carries this sentinel string rather than an empty one. analyseResponse() on
+// it yields brand_mentioned=false, position null, sentiment neutral, no
+// competitors, which is exactly the intended record. The wording deliberately
+// avoids "Google" and any other plausible brand alias, because matchesAlias()
+// runs boundary-aware regexes over the whole response text and a customer
+// aliased to a word appearing here would register a false mention.
+const AI_OVERVIEW_NOT_SHOWN =
+  '[no_ai_overview] No AI Overview block was rendered for this query in this location.'
+
+// Flatten SerpApi's nested text_blocks into one plain-text string for
+// analyseResponse. Block shapes seen in the wild: `paragraph` ({snippet}),
+// `list` ({list:[{title?,snippet}]}) and `expandable` ({title, text_blocks}).
+//
+// List items are emitted as markdown BULLETS, never as a numbered list. That is
+// a correctness constraint, not a style choice: _analysis.js's
+// extractTopRankedResults() reads literal "1." lines as a ranking, and an AI
+// Overview bullet list is frequently unordered ("things to consider"), so
+// numbering it here would fabricate a brand_position. As bullets, a position is
+// only derived when detectBulletPosition() finds a lead-in that explicitly
+// declares an ordering, which is the existing never-fabricate-a-rank rule.
+function flattenAiOverviewBlocks(blocks, { asList = false, depth = 0 } = {}) {
+  const out = []
+  if (depth > 6) return out   // defensive: expandable blocks nest, but not deeply
+  for (const b of (Array.isArray(blocks) ? blocks : [])) {
+    if (!b || typeof b !== 'object') continue
+    const title = typeof b.title === 'string' ? b.title.trim() : ''
+    const snip  = typeof b.snippet === 'string' ? b.snippet.trim() : ''
+    const line  = [title, snip].filter(Boolean).join(': ')
+    if (line) out.push(asList ? `- ${line}` : line)
+    if (Array.isArray(b.list))        out.push(...flattenAiOverviewBlocks(b.list,        { asList: true,  depth: depth + 1 }))
+    if (Array.isArray(b.text_blocks)) out.push(...flattenAiOverviewBlocks(b.text_blocks, { asList: false, depth: depth + 1 }))
+  }
+  return out
+}
+
+// Shared SerpApi error classification for both AI surfaces.
+function classifySerpApiError(httpStatus, msg) {
+  const lower = String(msg || '').toLowerCase()
+  if (httpStatus === 401 || lower.includes('invalid api key') || lower.includes('unauthorized')) return 'auth_error'
+  if (httpStatus === 429 || lower.includes('run out of searches') || lower.includes('exceeded') || lower.includes('rate limit')) return 'quota_exceeded'
+  return 'api_error'
+}
+
+async function callGoogleAiOverview(prompt, _ctx, opts) {
+  const key = process.env.SERPAPI_KEY
+  if (!key) {
+    console.error('[AIOverview] SERPAPI_KEY not set, engine skipped')
+    return { text: null, errorCode: 'auth_error', detail: 'SERPAPI_KEY not set' }
+  }
+
+  // Geo, derived exactly as callGoogleAiMode derives it, plus SerpApi's
+  // `location` for a named region. `location` only accepts SerpApi's own
+  // canonical location names and 400s on anything else, so a region that is not
+  // a real place name (or is spelled differently than SerpApi expects) would
+  // otherwise take the whole engine down for that client. One retry without it
+  // covers that. A 400 on an invalid parameter is not a completed search and is
+  // not billed by SerpApi, so the retry does not double-charge.
+  const marketId = opts?.marketId
+  const regionLabel = opts?.regionLabel
+  const hasSpecificRegion = regionLabel &&
+    !String(regionLabel).startsWith('All ') &&
+    regionLabel !== 'All regions' && regionLabel !== 'All states' &&
+    regionLabel !== 'All provinces' && regionLabel !== 'All emirates'
+
+  const buildParams = (withLocation) => {
+    const p = new URLSearchParams({ engine: 'google', q: prompt, api_key: key })
+    if (marketId && marketId !== 'WW') p.set('gl', String(marketId).toLowerCase())
+    if (withLocation && hasSpecificRegion) p.set('location', String(regionLabel))
+    return p
+  }
+
+  // searches counts SerpApi searches that actually returned a result payload.
+  // A rejected request (bad parameter, auth) is not counted, because SerpApi
+  // does not bill failed searches.
+  let searches = 0
+
+  try {
+    let r = await fetch(`https://serpapi.com/search?${buildParams(true).toString()}`)
+    let d
+    try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response` } }
+
+    // Retry once without `location` if that is what SerpApi rejected.
+    if (d.error && /location/i.test(String(d.error)) && hasSpecificRegion) {
+      console.warn('[AIOverview] SerpApi rejected location, retrying country-only:', String(d.error).slice(0, 160))
+      r = await fetch(`https://serpapi.com/search?${buildParams(false).toString()}`)
+      try { d = await r.json() } catch { return { text: null, errorCode: 'api_error', detail: `HTTP ${r.status} non-JSON response (location retry)` } }
+    }
+
+    const idTag = d?.search_metadata?.id ? ` [serpapi:${d.search_metadata.id}]` : ''
+
+    if (d.error) {
+      const msg = String(d.error)
+      const errorCode = classifySerpApiError(r.status, msg)
+      console.error('[AIOverview] error:', msg)
+      return { text: null, errorCode, detail: `HTTP ${r.status} ${msg}${idTag}`.slice(0, 400) }
+    }
+    searches = 1
+
+    let ao = d.ai_overview
+    const usage = () => ({ serpSearches: searches })
+
+    // Branch 3, no AI Overview on this SERP. A real measurement, not a fault.
+    if (!ao || typeof ao !== 'object') {
+      console.log(`[AIOverview] no ai_overview block on the SERP${idTag} | searches:`, searches)
+      return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+    }
+
+    // Branch 2 — Google deferred the overview; follow the token immediately.
+    if (!Array.isArray(ao.text_blocks) && ao.page_token) {
+      const p2 = new URLSearchParams({ engine: 'google_ai_overview', page_token: ao.page_token, api_key: key })
+      const r2 = await fetch(`https://serpapi.com/search?${p2.toString()}`)
+      let d2
+      try { d2 = await r2.json() } catch { return { text: null, usage: usage(), errorCode: 'api_error', detail: `page_token follow-up: HTTP ${r2.status} non-JSON response${idTag}` } }
+      if (d2.error) {
+        const msg = String(d2.error)
+        // A token that has expired (roughly 4 minutes) or a deferred overview
+        // Google never rendered both land here. Neither is a broken engine.
+        const lower = msg.toLowerCase()
+        if (lower.includes("hasn't returned") || lower.includes('no results') || lower.includes('not found') || lower.includes('expired')) {
+          searches = 2
+          console.warn(`[AIOverview] page_token follow-up returned nothing: ${msg}${idTag}`)
+          return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+        }
+        searches = 2
+        console.error('[AIOverview] page_token follow-up error:', msg)
+        return { text: null, usage: usage(), errorCode: classifySerpApiError(r2.status, msg), detail: `page_token follow-up: HTTP ${r2.status} ${msg}${idTag}`.slice(0, 400) }
+      }
+      searches = 2
+      ao = d2.ai_overview || {}
+    }
+
+    // SerpApi reports "Google hasn't returned any AI overview for this query"
+    // as an error nested INSIDE ai_overview rather than at the top level.
+    if (ao.error && !Array.isArray(ao.text_blocks)) {
+      console.log(`[AIOverview] not shown: ${String(ao.error).slice(0, 160)}${idTag} | searches:`, searches)
+      return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+    }
+
+    const text = flattenAiOverviewBlocks(ao.text_blocks).join('\n').trim()
+
+    // CITATIONS ARE PERSISTED as of 2026-07-29, to ai_results.citations (see
+    // db/supabase-citations-migration.sql). They go in their OWN column and never
+    // into response_text: that field is the exact string analyseResponse()
+    // parses, so appending "Sources: ..." would feed citation titles and domains
+    // into competitor extraction and a cited publisher would start showing up in
+    // the customer's competitor list.
+    //
+    // Normalised to a stable shape here rather than stored raw, so a change in
+    // SerpApi's response shape does not silently change what is in the column.
+    // Capped at 20 to bound the row.
+    const refs = (Array.isArray(ao.references) ? ao.references : [])
+      .slice(0, 20)
+      .map((r, i) => ({
+        title:  typeof r?.title  === 'string' ? r.title.slice(0, 300) : null,
+        link:   typeof r?.link   === 'string' ? r.link.slice(0, 1000) : null,
+        source: typeof r?.source === 'string' ? r.source.slice(0, 200) : null,
+        index:  typeof r?.index  === 'number' ? r.index : i,
+      }))
+      .filter(r => r.link || r.source || r.title)
+
+    if (text) {
+      console.log('[AIOverview] ok | len:', text.length, '| searches:', searches,
+        '| refs:', refs.length, refs.slice(0, 5).map(x => x?.source || x?.link).filter(Boolean).join(', '),
+        '| preview:', text.slice(0, 200))
+      return { text, usage: usage(), citations: refs, errorCode: null, detail: null }
+    }
+
+    // An ai_overview object with no readable text_blocks is the same outcome as
+    // no ai_overview at all: nothing was shown to a searcher.
+    console.log(`[AIOverview] ai_overview present but empty${idTag} | searches:`, searches)
+    return { text: AI_OVERVIEW_NOT_SHOWN, usage: usage(), errorCode: null, detail: null }
+  } catch (e) {
+    if (e.name === 'AbortError') return { text: null, usage: searches ? { serpSearches: searches } : null, errorCode: 'timeout', detail: 'aborted' }
+    console.error('[AIOverview] threw:', e.message)
+    return { text: null, usage: searches ? { serpSearches: searches } : null, errorCode: 'api_error', detail: `threw ${e.message}` }
+  }
+}
+
 // ─── Engine registry ──────────────────────────────────────────────────────────
 // Normalized caller map: every engine is (promptText, ctx, opts) => { text, errorCode, detail }.
 // opts carries { marketId, regionLabel } (ChatGPT + Google AI Mode use them).
 const ENGINE_CALLERS = {
-  chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel),
+  chatgpt:    (p, ctx, o) => callChatGPT(p, ctx, o?.marketId, o?.regionLabel, o?.plan),
   gemini:     (p, ctx, o) => callGemini(p, ctx, o),
   claude:     (p, ctx, o) => callClaude(p, ctx, o),
   perplexity: (p, ctx)    => callOpenRouter('perplexity/sonar', p, ctx),
   meta:       (p, ctx)    => callOpenRouter('meta-llama/llama-3.1-70b-instruct', p, ctx),
   google_ai:  (p, ctx, o) => callGoogleAiMode(p, ctx, o),
+  // Grok went live 2026-07-29 as the 6th engine, Growth PRO and up. Routed
+  // through OpenRouter rather than xAI directly for two reasons: the transport
+  // already exists and is proven, and xAI's own free-credit tier is paid for
+  // with a data-sharing opt-in that would put customer prompts into xAI's
+  // training set — not acceptable for a B2B product. web:true is load-bearing,
+  // see the note on callOpenRouter.
+  grok:       (p, ctx)    => callOpenRouter('x-ai/grok-4.5', p, ctx, { web: true, noReasoning: true }),
+  // Google AI Overviews went live as the 7th engine, Growth PRO and up. Same
+  // SerpApi account as google_ai but a different Google surface: the AI summary
+  // on an ordinary results page, not the AI Mode tab. Costs 1 SerpApi search,
+  // or 2 when Google defers the overview behind a page_token.
+  ai_overview: (p, ctx, o) => callGoogleAiOverview(p, ctx, o),
 }
 
 // Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
@@ -506,8 +891,35 @@ const ENGINE_TIMEOUT_MS = {
   perplexity: 20000,
   meta:       20000,
   claude:     24000,
-  chatgpt:    40000,
+  // 24000, down from 40000, for the same reason as grok below. 40000 is well past
+  // this function's 26s Netlify wall, so it could never fire: any chatgpt call
+  // slower than the wall was killed by the platform with no row written. Nothing
+  // real is lost by capping it, because a call returning at 25s still cannot have
+  // its row inserted before the kill — that window was never actually succeeding,
+  // it was only failing invisibly. At 24000 it fails visibly instead. The worker
+  // path (ENGINE_TIMEOUT_MS_WORKER) keeps its long budget and is where slow
+  // chatgpt calls are supposed to run.
+  chatgpt:    24000,
   google_ai:  22000,   // SerpApi AI Mode scrape; a touch over the fast engines
+  // 21000, down from 26000. 26000 was EXACTLY the Netlify wall for this function
+  // (netlify.toml sets collect-prompt to 26s), so there was no headroom at all:
+  // when grok ran long, the platform killed the process at the same instant the
+  // AbortController was due to fire. The abort never ran, the error row was never
+  // inserted, and the request simply died. That breaks the #109 guarantee of one
+  // row per engine, ok OR error, never silence — and to the user it looks like
+  // the refresh button does nothing at all, with no error anywhere to explain it.
+  // Reported live 2026-07-29: repeated refreshes produced a perplexity row and no
+  // grok row of any kind.
+  //
+  // 21000 leaves ~5s to build and insert the rows, so a slow grok now lands as a
+  // visible timeout instead of vanishing. With reasoning disabled (03df188) grok
+  // returns well inside this; if it does not, the model is the problem and the
+  // error row will say so. The worker path keeps 60000 and is unaffected.
+  grok:       21000,
+  // Up to TWO sequential SerpApi calls (the page_token branch), so it needs more
+  // headroom than google_ai. Still under Netlify's 26s wall; if it does blow,
+  // the row lands as a timeout, having consumed 1-2 SerpApi searches.
+  ai_overview: 24000,
 }
 
 // WORKER path (collection-worker-background.js): the whole reason the queue
@@ -523,6 +935,8 @@ const ENGINE_TIMEOUT_MS_WORKER = {
   claude:     60000,
   chatgpt:    90000,
   google_ai:  45000,   // SerpApi AI Mode can be slow; generous in the 15-min worker
+  grok:       60000,   // worker path, matched to claude rather than sonar
+  ai_overview: 60000,  // two sequential SerpApi calls; generous in the 15-min worker
 }
 
 // Gemini's internal model-fallback budget is separate from the outer timeout
@@ -544,7 +958,7 @@ const CLAUDE_BUDGET_WORKER_MS = 55000
 // and the three HTTP endpoints agree byte-for-byte. run_id is set only when the
 // caller passes one (the queue worker does; the manual endpoints leave it null,
 // keeping their rows out of the uq_ai_results_run_prompt_llm partial index).
-function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, errorCode, detail, client_config }) {
+function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config }) {
   const base = { prompt_id, llm: engine, client_id, checked_at: new Date().toISOString() }
   if (run_id != null) base.run_id = run_id
 
@@ -555,7 +969,9 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: errorCode,
       brand_mentioned: false,
       response_text: detail ? String(detail).slice(0, 10000) : null,
-      cost_eur: costForRow(engine, errorCode),
+      // Metered from real tokens when the provider returned usage before the
+      // failure; falls back to the flat estimate otherwise.
+      cost_eur: costForRow(engine, errorCode, usage),
     }
   }
 
@@ -566,7 +982,7 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: 'no_response',
       brand_mentioned: false,
       response_text: 'engine returned no text and no error code',
-      cost_eur: costForRow(engine, 'no_response'),
+      cost_eur: costForRow(engine, 'no_response', usage),
     }
   }
 
@@ -580,7 +996,7 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
       error_code: 'analysis_error',
       brand_mentioned: false,
       response_text: `${e.message}\n---\n${text}`.slice(0, 10000),
-      cost_eur: costForRow(engine, 'analysis_error'),
+      cost_eur: costForRow(engine, 'analysis_error', usage),
     }
   }
 
@@ -593,7 +1009,11 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
     response_snippet:      analysis.response_snippet,
     competitors_mentioned: analysis.competitors_mentioned,
     response_text:         typeof text === 'string' ? text.slice(0, 10000) : null,
-    cost_eur:              costForRow(engine, null),
+    cost_eur:              costForRow(engine, null, usage),
+    // NULL when the engine returned no citation data at all (six of seven
+    // today), [] when it ran and cited nothing. Those are different findings and
+    // must not collapse into each other.
+    citations:             Array.isArray(citations) ? citations : null,
   }
 }
 
@@ -608,6 +1028,11 @@ function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, err
 async function collectEngines(engines, {
   prompt_id, prompt_text, client_id, client_config,
   market_label, region_label, market_id, run_id = null, worker = false,
+  // Selects the ChatGPT model (see CHATGPT_MODEL_BY_PLAN). MUST be resolved
+  // server-side from the clients table, never taken from the request body: the
+  // browser sends client_config, so a viewer claiming 'managed' would otherwise
+  // buy themselves the expensive model on our account. Absent means cheap.
+  plan = null,
 }) {
   const ctx  = buildSystemContext(client_config, market_label, region_label)
   // Context-aware timeouts (CLAUDE.md §12.6): the worker gets generous budgets
@@ -617,6 +1042,7 @@ async function collectEngines(engines, {
   const opts = {
     marketId: market_id,
     regionLabel: region_label,
+    plan,
     ...(worker ? {
       geminiBudgetMs:  GEMINI_BUDGET_WORKER_MS,
       geminiAttemptMs: GEMINI_ATTEMPT_WORKER_MS,
@@ -645,8 +1071,8 @@ async function collectEngines(engines, {
       continue
     }
 
-    const { text, errorCode, detail } = s.value ?? { text: null, errorCode: null }
-    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, errorCode, detail, client_config })
+    const { text, errorCode, detail, usage, citations } = s.value ?? { text: null, errorCode: null }
+    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config })
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }
@@ -660,7 +1086,12 @@ async function collectEngines(engines, {
     if (row.status !== 'ok' || !row.competitors_mentioned) return
     let cands
     try { cands = JSON.parse(row.competitors_mentioned) } catch { return }
-    const kept = await classifyCompetitors(cands, { cfg: client_config, snippet: row.response_snippet })
+    // prompt_text is what tells the gate which product category the buyer is
+    // shopping for; without it the model guesses from the brand name alone and
+    // keeps adjacent businesses (venues for a caterer). See _competitor_filter.js.
+    const kept = await classifyCompetitors(cands, {
+      cfg: client_config, snippet: row.response_snippet, promptText: prompt_text,
+    })
     row.competitors_mentioned = kept.length ? JSON.stringify(kept) : null
   }))
 
@@ -675,5 +1106,6 @@ module.exports = {
   buildResultRow,
   collectEngines,
   // exported individually too, for any caller that wants one engine directly
-  callChatGPT, callClaude, callGemini, callOpenRouter,
+  callChatGPT, callClaude, callGemini, callOpenRouter, callGoogleAiOverview,
+  flattenAiOverviewBlocks, AI_OVERVIEW_NOT_SHOWN,
 }

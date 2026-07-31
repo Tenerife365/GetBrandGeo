@@ -65,15 +65,30 @@ async function submitToIndexNow(url, fetchImpl = fetch) {
 }
 
 /**
- * Notify Google + IndexNow for a single URL. Publishes to Google (THROWS on
- * credential/API failure, so callers can preserve their 500/502 contract) then
- * submits to IndexNow (never throws). Returns { google: <data>, bing: <status> }.
+ * Notify Google + IndexNow for a single URL.
+ *
+ * Neither leg can prevent the other from running. This used to await
+ * createGoogleIndexer() first and let it THROW, so a missing Google credential
+ * meant IndexNow was never called at all. GOOGLE_JSON_KEY was permanently
+ * dropped on 2026-07-28 (4KB Lambda env ceiling), which under the old shape
+ * would have left this helper, and therefore force-index.js, dead forever
+ * despite IndexNow needing no Google credential whatsoever.
+ *
+ * Returns { google: <data|null>, googleError: <code|null>, bing: <status> }.
+ * Callers decide what constitutes success; the usual rule is "either leg
+ * accepted it". This function does not throw for a missing credential.
  */
 async function pingUrl(url, type = 'URL_UPDATED', { fetchImpl } = {}) {
-  const indexer = await createGoogleIndexer()
-  const googleData = await indexer.publish(url, type)
+  let google = null
+  let googleError = null
+  try {
+    const indexer = await createGoogleIndexer()
+    google = await indexer.publish(url, type)
+  } catch (err) {
+    googleError = err.code || err.message
+  }
   const bing = await submitToIndexNow(url, fetchImpl)
-  return { google: googleData, bing }
+  return { google, googleError, bing }
 }
 
 module.exports = { pingUrl, createGoogleIndexer, submitToIndexNow, loadGoogleCredentials }

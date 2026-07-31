@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle, Lock } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
 import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import { PLAN_PROMPTS, PLAN_LABELS, type Plan } from '../lib/planConfig'
 
 // Category is a grouping, not an alert — one quiet neutral chip everywhere, and
 // the label comes from the shared general taxonomy (lib/promptCategories.ts).
@@ -48,10 +50,16 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, isAdmin } = useClient()
   const brandName = activeClient?.name
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
+  // Cap is read from the DB (plan_prompt_caps) rather than from PLAN_PROMPTS,
+  // so the number shown here is the number the trigger actually enforces. The
+  // planConfig value is only a fallback for demo mode and for the moment before
+  // the fetch resolves. See db/supabase-prompt-cap-migration.sql.
+  const [cap, setCap] = useState<number | null>(null)
+  const [capError, setCapError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState<string>('all')
   const [editId, setEditId] = useState<number | null>(null)
@@ -86,7 +94,7 @@ export default function Prompts() {
         setClientConfig(data)
         // Auto-trigger prompt generation using the client website
         const autoMsg = data.brand_website
-          ? `Analyze this business and generate monitoring prompts: ${data.name} — website: ${data.brand_website}`
+          ? `Analyze this business and generate monitoring prompts: ${data.name}, website: ${data.brand_website}`
           : `Generate monitoring prompts for: ${data.name}`
         // Use a short delay so the panel renders first
         setTimeout(() => {
@@ -158,6 +166,30 @@ export default function Prompts() {
   }
 
   useEffect(() => { load() }, [activeClientId])
+
+  // Plan prompt cap. Falls back to PLAN_PROMPTS if the table is not there yet
+  // (the migration is applied separately), so this page never breaks on a
+  // missing table — it just stops showing a cap.
+  useEffect(() => {
+    const plan = (activeClient?.plan ?? 'free') as Plan
+    if (isDemoMode) { setCap(PLAN_PROMPTS[plan] ?? null); return }
+    supabase
+      .from('plan_prompt_caps')
+      .select('prompt_cap')
+      .eq('plan', plan)
+      .maybeSingle()
+      .then(({ data }) => setCap(data?.prompt_cap ?? PLAN_PROMPTS[plan] ?? null))
+  }, [activeClient?.plan])
+
+  // Only ACTIVE prompts consume the allowance — same rule the DB trigger uses.
+  // `prompts` is already filtered to is_active in load().
+  const used = prompts.length
+  const atCap = cap !== null && used >= cap
+  // Admins may deliberately exceed a customer's cap (the trigger lets them
+  // through too). isAdmin is false while an admin is viewing-as-customer, which
+  // is correct: that mode exists to show what the customer sees.
+  const capBlocks = atCap && !isAdmin
+  const remaining = cap === null ? Infinity : Math.max(0, cap - used)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, suggestions])
 
   const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
@@ -177,11 +209,19 @@ export default function Prompts() {
   const deletePrompt = async (id: number) => {
     if (!isDemoMode) await supabase.from('prompts').delete().eq('id', id)
     setPrompts(prev => prev.filter(p => p.id !== id))
+    setCapError(null)   // a deletion is what unblocks a capped client
   }
 
-  const addPrompt = async (text?: string) => {
+  const addPrompt = async (text?: string): Promise<boolean> => {
     const promptText = (text ?? newText).trim()
-    if (!promptText) return
+    if (!promptText) return false
+    // Client-side check is a courtesy, not the limit — the real one is the
+    // enforce_prompt_cap() trigger, which is why the insert error below is
+    // handled rather than assumed away.
+    if (capBlocks) {
+      setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`)
+      return false
+    }
     // Category is auto-assigned from the prompt text (general taxonomy), not
     // chosen by the user — clients are diverse, so the old per-client picker is
     // gone. See lib/promptCategories.ts.
@@ -189,28 +229,56 @@ export default function Prompts() {
     setSaving(true)
     const position = prompts.length + 1
     if (!isDemoMode) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('prompts')
         .insert({ text: promptText, category: cat, position, client_id: activeClientId })
         .select()
         .single()
+      if (error) {
+        // The trigger raises with this token when the plan cap is hit. Anything
+        // else is a real failure and is shown verbatim rather than swallowed —
+        // this insert used to discard its error entirely, so a rejected write
+        // just silently did nothing.
+        // When the cap itself is unknown, say so in words. The old fallback
+        // interpolated a bare dash glyph, producing the broken string
+        // "Your plan allows [dash] active prompts."
+        setCapError(
+          !error.message.includes('prompt_cap_reached')
+            ? `Could not add prompt: ${error.message}`
+            : cap != null
+              ? `Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`
+              : 'You have reached your plan\'s active prompt limit. Delete one to add another, or upgrade.'
+        )
+        setSaving(false)
+        return false
+      }
       if (data) setPrompts(prev => [...prev, data])
     } else {
       setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
+    setCapError(null)
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
+    return true
   }
 
   const addSuggestion = async (s: SuggestedPrompt, idx: number) => {
-    await addPrompt(s.text)
-    setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
+    const ok = await addPrompt(s.text)
+    if (ok) setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
   }
 
   const addAllSuggestions = async () => {
-    const toAdd = suggestions.filter(s => !s.added && !prompts.some(p => p.text === s.text))
-    for (const s of toAdd) await addPrompt(s.text)
-    setSuggestions(prev => prev.map(s => ({ ...s, added: true })))
+    const toAdd = suggestions
+      .filter(s => !s.added && !prompts.some(p => p.text === s.text))
+      // Take only what fits. Without this, "Add all" on a 12-prompt suggestion
+      // list for a Free tenant fires 12 inserts, 7 of which the trigger rejects,
+      // and the user gets seven identical error messages for one action.
+      .slice(0, isAdmin ? undefined : remaining)
+    const addedText = new Set<string>()
+    for (const s of toAdd) {
+      if (await addPrompt(s.text)) addedText.add(s.text)
+    }
+    setSuggestions(prev => prev.map(s => (addedText.has(s.text) ? { ...s, added: true } : s)))
   }
 
   const sendMessage = async () => {
@@ -287,10 +355,24 @@ export default function Prompts() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">{t.pr_title}</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{fmt(t.pr_titleCount, { n: prompts.length })}</p>
+      {/* flex-wrap + min-w-0 are load-bearing at 320: without them the title
+          column cannot shrink below its content and the button group cannot drop
+          to a second line, so <main> overflowed (358 against a 320 clientWidth).
+          Pre-existing, found 2026-07-30 when 320 was first tested, and unchanged
+          by the touch-target work: forcing the old gaps back still measured 358.
+          The document itself never overflowed, so only a checker reading <main>
+          could see it. */}
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <PageTitle>{t.pr_title}</PageTitle>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {cap === null || cap >= 100000
+              ? fmt(t.pr_titleCount, { n: used })
+              : <>
+                  <span className={atCap ? 'text-amber-300 font-medium' : ''}>{used} of {cap}</span>
+                  <span> prompts used on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}</span>
+                </>}
+          </p>
         </div>
         {/* Prompt management is available to any signed-in user for THEIR OWN
             client — not admin-only. This used to be gated behind `isAdmin`,
@@ -304,7 +386,7 @@ export default function Prompts() {
           <button
             onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
             aria-expanded={showDiscover}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors ${
               showDiscover
                 ? 'bg-brand-500/30 text-brand-200 border border-brand-500/50'
                 : 'bg-brand-500/15 text-brand-300 hover:bg-brand-500/25 border border-brand-500/20'
@@ -314,14 +396,54 @@ export default function Prompts() {
             {t.pr_aiDiscover}
           </button>
           <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-dark-700 text-slate-300 hover:bg-dark-600 transition-colors border border-dark-600"
+            onClick={() => (capBlocks ? setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
+            aria-disabled={capBlocks}
+            title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
+            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors border ${
+              capBlocks
+                ? 'bg-dark-800 text-slate-500 border-dark-700 cursor-not-allowed'
+                : 'bg-dark-700 text-slate-300 hover:bg-dark-600 border-dark-600'
+            }`}
           >
-            <Plus size={14} />
+            {capBlocks ? <Lock size={14} /> : <Plus size={14} />}
             {t.pr_addPrompt}
           </button>
         </div>
       </div>
+
+      {/* Plan cap notice. Two distinct states: a customer who is blocked and
+          needs to know the way out (delete one), and an admin who is over a
+          customer's cap on purpose and needs to know they are. */}
+      {atCap && (
+        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+          capBlocks
+            ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+            : 'border-brand-500/30 bg-brand-500/10 text-brand-200'
+        }`}>
+          {capBlocks ? (
+            <>
+              <strong>You have used all {cap} prompts on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}.</strong>{' '}
+              Delete a prompt you no longer track to add a new one, or upgrade for more.
+            </>
+          ) : (
+            <>
+              <strong>This client is at its plan limit ({used} of {cap}).</strong>{' '}
+              You can add beyond it as an admin. The customer cannot.
+            </>
+          )}
+        </div>
+      )}
+
+      {capError && (
+        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
+          <span>{capError}</span>
+          {/* 14x14 glyph, 44x44 target. Extends over the message text beside it,
+              which is not interactive, and 3px past the banner padding. */}
+          <button onClick={() => setCapError(null)} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Dynamic category filter — shows only categories that exist in this client's prompts */}
       {usedCategories.length > 0 && (
@@ -329,7 +451,7 @@ export default function Prompts() {
           <button
             onClick={() => setFilterCat('all')}
             aria-pressed={filterCat === 'all'}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+            className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
               filterCat === 'all'
                 ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
                 : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
@@ -342,7 +464,7 @@ export default function Prompts() {
               key={cat}
               onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}
               aria-pressed={filterCat === cat}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
                 filterCat === cat
                   ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
                   : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
@@ -410,7 +532,7 @@ export default function Prompts() {
                     onClick={() => addSuggestion(s, i)}
                     disabled={s.added}
                     aria-label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
-                    className={`shrink-0 p-1 rounded-lg transition-colors ${
+                    className={`relative shrink-0 p-1 rounded-lg transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-12px] ${
                       s.added
                         ? 'text-emerald-500 cursor-default'
                         : 'text-slate-500 hover:text-brand-300 hover:bg-brand-500/10'
@@ -437,7 +559,7 @@ export default function Prompts() {
               onClick={sendMessage}
               disabled={!userInput.trim() || aiLoading}
               aria-label="Send message"
-              className="px-3 py-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center justify-center px-3 py-2 max-md:min-w-[44px] max-md:min-h-[44px] rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
             >
               <Send size={14} />
             </button>
@@ -457,24 +579,32 @@ export default function Prompts() {
               aria-label="New prompt text"
               className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
             />
-            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text — no need to pick one.</p>
+            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
           </div>
-          <div className="flex gap-2 pt-0.5">
-            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"><Check size={16} /></button>
-            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors"><X size={16} /></button>
+          {/* 32x32 visible, 44x44 target below md, and the gap goes to 16px there
+              so the two targets do not overlap (32 + 12 = 44, centres 48 apart). */}
+          <div className="flex gap-2 max-md:gap-4 pt-0.5">
+            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="relative p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><Check size={16} /></button>
+            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="relative p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><X size={16} /></button>
           </div>
         </div>
       )}
 
+      <SectionHeading className="sr-only">Prompts</SectionHeading>
       <div className="space-y-1.5">
         {filtered.map((p, i) => {
           const isEditing = editId === p.id
+          // gap-2 below sm: three of this row's four children are flex-shrink-0
+          // (index, category badge, actions), so at 320 the three 16px gaps were
+          // 48px of fixed cost the row could not give back, and it overflowed
+          // <main>. The text span also needs min-w-0 below, or `flex-1` still
+          // cannot shrink past its longest word.
           return (
-            <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-4 group hover:border-dark-600 transition-colors">
+            <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-2 sm:gap-4 group hover:border-dark-600 transition-colors">
               <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${CAT_BADGE}`}>{promptCategoryLabel(p.category)}</span>
               {isEditing ? (
-                <div className="flex-1 flex gap-2 items-center">
+                <div className="flex-1 flex gap-3 items-center">
                   <input
                     autoFocus
                     value={editText}
@@ -483,15 +613,48 @@ export default function Prompts() {
                     aria-label="Edit prompt text"
                     className="flex-1 bg-dark-700 border border-brand-500/50 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
                   />
-                  <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40"><Check size={14} /></button>
-                  <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600"><X size={14} /></button>
+                  {/* Same 44x44 target and 20px separation as the resting row
+                      above. Cancel throws away what was just typed, so it gets
+                      the same treatment Delete does. The outer gap is 12px, not
+                      8px, so Save's hit box does not reach back over the input
+                      it sits beside (9px of extension, 12px of gap, 3px clear). */}
+                  <div className="flex gap-5 flex-shrink-0">
+                    <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="relative p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 after:absolute after:content-[''] after:[inset:-9px]"><Check size={14} /></button>
+                    <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="relative p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 after:absolute after:content-[''] after:[inset:-9px]"><X size={14} /></button>
+                  </div>
                 </div>
               ) : (
                 <>
-                  <span className="flex-1 text-sm text-slate-300">{p.text}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
+                  <span className="flex-1 min-w-0 text-sm text-slate-300">{p.text}</span>
+                  {/* Row actions. Three separate things are going on here, all of
+                      them the same defect measured from different angles
+                      (dashboard-uiux-audit-2026-07-30.md F3):
+
+                      1. TAP AREA. The icons stay 26x26 — that is the size the row
+                         density wants, and growing them would push the row from
+                         52px to ~70px and change how many prompts fit on a
+                         screen. The TARGET grows instead, via a transparent
+                         ::after inset -9px, giving 44x44. Same technique the
+                         shipped .time-pill / .engine-chip rules in index.css
+                         already use. 44 on desktop as well as mobile, not just
+                         mobile: Delete is destructive and a mouse can miss too.
+                      2. SEPARATION. 44px targets 4px apart overlap by 14px, so
+                         the fix above would have made mis-tapping WORSE. gap-5
+                         (20px) puts the centres 46px apart, so the two hit boxes
+                         clear each other by 2px and a thumb cannot take Delete
+                         when it meant Edit.
+                      3. REACHABILITY. opacity-0 + group-hover has no meaning on a
+                         touch device, which has no hover: these were invisible on
+                         a phone, which is a worse problem than being small. They
+                         are always visible below md now, and unchanged above it.
+                         md:focus-within keeps them visible for keyboard users on
+                         desktop, where they were previously focusable at opacity
+                         0 (the responsive variant has to be doubled up because
+                         Tailwind emits media queries after pseudo-class variants,
+                         so a bare focus-within: would lose to md:opacity-0). */}
+                  <div className="flex gap-5 flex-shrink-0 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Pencil size={14} /></button>
+                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Trash2 size={14} /></button>
                   </div>
                 </>
               )}

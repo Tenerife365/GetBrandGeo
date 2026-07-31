@@ -14,15 +14,20 @@ import { useCollection } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
-  getPlanLimits,
+  getPlanLimits, QUEUE_ONLY_ENGINES,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
-import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
+import { computeAiVisibilityScore, isNoAnswerRow } from '../lib/aiVisibilityScore'
 import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import { aggregateCompetitors } from '../lib/competitorFilter'
 import { promptCategoryLabel } from '../lib/promptCategories'
+import { useChartTheme } from '../lib/chartTheme'
+import SharedEmptyState from '../components/EmptyState'
+import { formatDate, formatRelativeOrDate } from '../lib/format'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -95,7 +100,7 @@ function EngineToggleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
           <div>
@@ -125,12 +130,15 @@ function EngineToggleModal({
               <div key={engine} className="flex items-center gap-3 px-5 py-3.5">
                 <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 rounded-lg object-contain shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-medium ${meta.color}`}>{meta.label}</div>
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-white">
+                    <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.chartColor }} />
+                    {meta.label}
+                  </div>
                   {!isBuilt && (
-                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon — not yet collecting data</div>
+                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon, not yet collecting data</div>
                   )}
                   {isBuilt && !isEnabled && (
-                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled — shown as Coming Soon to client</div>
+                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled, shown as Coming Soon to client</div>
                   )}
                 </div>
 
@@ -174,6 +182,23 @@ export default function AIVisibility() {
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
   const { theme } = useTheme()
+  const chart = useChartTheme()
+
+  // Customer-facing allowance, derived from the plan rather than from spend.
+  // Both come from getPlanLimits so this page cannot drift from what the
+  // pricing page publishes or the DB trigger enforces.
+  const planLimits    = getPlanLimits(activeClient?.plan ?? 'free')
+  const planPromptCap = planLimits.prompts
+  // Cooldown hours describe how often a run is allowed, which is what a
+  // customer means by "how often do you check". 0 means no cooldown at all.
+  const planCadence = (() => {
+    const h = planLimits.collectionCooldownH
+    if (h === 0)    return { label: 'On demand' }
+    if (h <= 24)    return { label: 'Daily' }
+    if (h <= 168)   return { label: 'Weekly, about 4 per month' }
+    if (h <= 336)   return { label: 'Every two weeks' }
+    return { label: 'Monthly' }
+  })()
 
   const [prompts, setPrompts]           = useState<Prompt[]>([])
   const [results, setResults]           = useState<ResultMap>(new Map())
@@ -182,6 +207,27 @@ export default function AIVisibility() {
   // distinct from errorEngines (fully-failed only). Nielsen audit: the mixed case
   // silently showed a percentage with no hint that anything failed to sync.
   const [partialErrorEngines, setPartialErrorEngines] = useState<Set<LLMName>>(new Set())
+  // Per-engine health, added 2026-07-29 after a real report of "the refresh
+  // button does nothing". It DID run: it wrote an error row. But `isUnavailable`
+  // requires checked === 0, so an engine holding older successful rows kept
+  // rendering its old percentage and the failed attempt was invisible. The
+  // spinner stopped and the card did not change, which is indistinguishable
+  // from a dead button. lastAttempt* is the most recent attempt whatever its
+  // outcome; lastOkAt is the most recent SUCCESS, which is what "checked" means
+  // to a customer reading a number.
+  // `${prompt_id}:${llm}` cells where the engine ran fine but produced no answer
+  // to be present in. Only Google AI Overviews does this: Google renders an
+  // overview for some queries and not others. These are excluded from the score
+  // (see the load loop) but must NOT render as "Not checked", which is what they
+  // did when they were simply dropped, and which reads as our failure rather
+  // than as an absent Google feature.
+  const [noAnswerCells, setNoAnswerCells] = useState<Set<string>>(new Set())
+  const [engineHealth, setEngineHealth] = useState<Map<LLMName, {
+    lastAttemptAt: string | null
+    lastAttemptFailed: boolean
+    lastErrorCode: string | null
+    lastOkAt: string | null
+  }>>(new Map())
   // Fix This hub: show top 3 by default, reveal the rest on demand (Nielsen audit
   // edge case: "add a Show all when there are more than 3 items").
   const [showAllFixes, setShowAllFixes] = useState(false)
@@ -190,6 +236,10 @@ export default function AIVisibility() {
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
   const [lastChecked, setLastChecked]   = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
+  // Click-toggle state for the score-weighting help popup. Hover and keyboard focus
+  // still reveal it via the CSS `group` pattern; this exists so touch users, who
+  // have no hover state, can reach the same content.
+  const [scoreInfoOpen, setScoreInfoOpen] = useState(false)
   const [showFixHub, setShowFixHub]     = useState(true)
   const [copiedFix, setCopiedFix]       = useState<number | null>(null)
   const [refreshed, setRefreshed]       = useState(false)
@@ -265,6 +315,7 @@ export default function AIVisibility() {
     const map: ResultMap = new Map()
     const errEngines = new Set<LLMName>()
     const okEngines  = new Set<LLMName>()
+    const noAnswer   = new Set<string>()
     let latestChecked = lastChecked
     if (rData) {
       rData.forEach((r: AIResult) => {
@@ -273,6 +324,15 @@ export default function AIVisibility() {
         if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
         const llmMap = map.get(r.prompt_id)!
         const llm = r.llm as LLMName
+        // Drops rows where the engine ran but produced no answer, from BOTH
+        // numerator and denominator. Rationale and the measured impact live on
+        // isNoAnswerRow in aiVisibilityScore.ts. This check used to be inlined
+        // here and nowhere else, which is how this page and the Overview
+        // headline came to report different numbers for the same client.
+        if (isNoAnswerRow(r)) {
+          noAnswer.add(`${r.prompt_id}:${llm}`)
+          return
+        }
         if (!llmMap.has(llm)) {
           if (r.status === 'error') {
             // Track error but exclude from analysis — don't count as a real result
@@ -290,8 +350,36 @@ export default function AIVisibility() {
     // Mixed/partial: engine had at least one failed check AND at least one OK result.
     setPartialErrorEngines(new Set([...errEngines].filter(e => okEngines.has(e))))
 
+    // Per-engine health. rData is ordered checked_at DESC, so the FIRST row seen
+    // for an engine is its most recent attempt. Deliberately walks every row
+    // rather than the per-prompt map above, because that map skips error rows
+    // entirely — which is exactly how a failed refresh became invisible.
+    const health = new Map<LLMName, {
+      lastAttemptAt: string | null
+      lastAttemptFailed: boolean
+      lastErrorCode: string | null
+      lastOkAt: string | null
+    }>()
+    rData?.forEach((r: AIResult) => {
+      const llm = r.llm as LLMName
+      if (!activeEngines.includes(llm as EngineId)) return
+      let h = health.get(llm)
+      if (!h) {
+        h = { lastAttemptAt: null, lastAttemptFailed: false, lastErrorCode: null, lastOkAt: null }
+        health.set(llm, h)
+      }
+      if (!h.lastAttemptAt) {
+        h.lastAttemptAt     = r.checked_at
+        h.lastAttemptFailed = r.status === 'error'
+        h.lastErrorCode     = r.error_code ?? null
+      }
+      if (!h.lastOkAt && r.status !== 'error') h.lastOkAt = r.checked_at
+    })
+    setEngineHealth(health)
+
     if (pData) setPrompts(pData)
     setResults(map)
+    setNoAnswerCells(noAnswer)
     if (latestChecked) setLastChecked(latestChecked)
     setLoading(false)
     setRefreshed(true)
@@ -375,30 +463,30 @@ export default function AIVisibility() {
   // (Rules of Hooks).
   const displayedScore = useCountUp(aiScore, !loading)
 
-  const competitorFreq = (() => {
-    const freq: Record<string, { count: number; positions: number[] }> = {}
-    results.forEach(llmMap => {
-      llmMap.forEach(r => {
-        parseCompetitors(r.competitors_mentioned).forEach(c => {
-          const key = c.name.toLowerCase().trim()
-          if (!key || key.length < 2) return
-          if (!freq[key]) freq[key] = { count: 0, positions: [] }
-          freq[key].count++
-          freq[key].positions.push(c.pos)
-        })
-      })
-    })
-    return Object.entries(freq)
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
-      .map(([name, { count, positions }]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        count,
-        avgPos: positions.length > 0
-          ? Math.round(positions.reduce((s, p) => s + p, 0) / positions.length * 10) / 10
-          : null,
-      }))
-  })()
+  // Uses the SHARED aggregator now. This page carried its own copy that averaged
+  // the pos:99 prose sentinel into the displayed rank, which is not a rank at all
+  // but the marker _analysis.js writes for a name found in prose by
+  // scanForKnownCompetitors. Competitors.tsx and Recommendations.tsx were both
+  // migrated onto competitorFilter.ts on 2026-07-13 precisely to kill this; this
+  // page was missed and kept publishing the wrong number for two weeks.
+  //
+  // Measured on Bucate pe Roate the day this was fixed: "elegant catering" showed
+  // avg #61.3 against a true #2.1, "royal catering" #20.6 against #3.2. Those are
+  // not slightly-off numbers, they are arithmetic on a sentinel, and one of them
+  // was being printed into the headline Fix This card as the competitor beating
+  // the client.
+  const competitorFreq = aggregateCompetitors(
+    Array.from(results.values()).flatMap(llmMap => Array.from(llmMap.values())),
+    8,
+  ).map(c => ({
+    name: c.name,
+    count: c.totalMentions,
+    // Genuine ranks only. Null when an engine has never once ranked this name,
+    // which the UI must render as "no rank" rather than inventing one.
+    avgPos: c.avgPos,
+    rankedMentions: c.rankedMentions,
+    proseOnly: c.proseOnly,
+  }))
 
   const totalChecked = (() => {
     let n = 0
@@ -426,7 +514,13 @@ export default function AIVisibility() {
         if (bestPos === null || r.brand_position < bestPos) bestPos = r.brand_position
       }
     })
-    return { ...s, status, bestPos, isUnavailable }
+    const health = engineHealth.get(s.id as LLMName)
+    return {
+      ...s, status, bestPos, isUnavailable,
+      lastOkAt:          health?.lastOkAt ?? null,
+      lastAttemptFailed: health?.lastAttemptFailed ?? false,
+      lastErrorCode:     health?.lastErrorCode ?? null,
+    }
   })
 
   // Coming-soon and locked engines for the status grid
@@ -451,17 +545,23 @@ export default function AIVisibility() {
       items.push({
         priority: 'P1',
         title: `Low visibility in ${e.label} (${e.pct}%)`,
-        description: `Brand appears inconsistently — in ${e.mentioned} of ${e.checked} prompts checked.`,
+        description: `Brand appears inconsistently, in ${e.mentioned} of ${e.checked} prompts checked.`,
         fix: `Strengthen brand authority signals for ${e.label}: publish 3+ long-form pages that directly answer your tracked queries, build backlinks from industry media mentioning ${brandName} in context, and add FAQ schema markup to your site's key landing pages.`,
       })
     })
 
-    if (competitorFreq[0] && gapCount > 0) {
+    // "Outranked by" is a claim about RANK, so it now requires a rank on both
+    // sides. It used to fire on `competitorFreq[0] && gapCount > 0`, which never
+    // read a position at all: a name mentioned only in prose, carrying no rank
+    // whatsoever, was announced as outranking the client in the headline P1.
+    // Recommendations.tsx already gated this correctly; this page did not.
+    const topRanked = competitorFreq.find(c => !c.proseOnly && c.avgPos !== null)
+    if (topRanked && gapCount > 0) {
       items.push({
         priority: 'P1',
-        title: `Outranked by ${competitorFreq[0].name} (avg #${competitorFreq[0].avgPos ?? '?'})`,
-        description: `${competitorFreq[0].name} appears ${competitorFreq[0].count}x across AI results while ${brandName} is absent in ${gapCount} checks.`,
-        fix: `Publish a detailed comparison page: "${brandName} vs ${competitorFreq[0].name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
+        title: `Outranked by ${topRanked.name} (avg #${topRanked.avgPos})`,
+        description: `${topRanked.name} is ranked by an engine in ${topRanked.rankedMentions} of its ${topRanked.count} appearances, while ${brandName} is absent in ${gapCount} checks.`,
+        fix: `Publish a detailed comparison page: "${brandName} vs ${topRanked.name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
       })
     }
 
@@ -488,7 +588,6 @@ export default function AIVisibility() {
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.aiv_loading}</div>
 
-  const scoreColor      = aiScore >= 60 ? '#10b981' : aiScore >= 35 ? '#f59e0b' : '#ef4444'
   const circumference   = 2 * Math.PI * 54
   const dashOffset      = circumference - (aiScore / 100) * circumference
   const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
@@ -531,7 +630,7 @@ export default function AIVisibility() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <h1 className="text-2xl font-bold text-white">{t.aiv_title}</h1>
+            <PageTitle>{t.aiv_title}</PageTitle>
             {selections.map(sel => (
               <span
                 key={sel.market.id}
@@ -550,7 +649,7 @@ export default function AIVisibility() {
             {t.aiv_subtitle}
             {lastChecked && (
               <span className="ml-2 text-slate-600">
-                - {fmt(t.aiv_lastChecked, { date: new Date(lastChecked).toLocaleDateString() })}
+                - {fmt(t.aiv_lastChecked, { date: formatDate(lastChecked) })}
               </span>
             )}
           </p>
@@ -592,8 +691,8 @@ export default function AIVisibility() {
             <button
               onClick={forceCollection}
               disabled={collecting || loading}
-              title="Force Refresh — wipes existing results and re-runs all engines"
-              aria-label="Force refresh — wipes existing results and re-runs all engines"
+              title="Force Refresh: wipes existing results and re-runs all engines"
+              aria-label="Force refresh: wipes existing results and re-runs all engines"
               /* Grouped with the other secondary actions (same outlined base), but keeps a
                  muted orange label/border so it still reads as the destructive one — Error
                  Prevention cue preserved, per the Nielsen audit's own praise for it. */
@@ -615,29 +714,67 @@ export default function AIVisibility() {
         </div>
       </div>
 
-      {/* Collection allowance row (PRICING-STRATEGY-2026-07 §12 T2a) — cooldown
-          countdown (viewers only; admins bypass the cooldown server-side) +
-          monthly € budget meter (applies to everyone, admins included). */}
-      {!isDemoMode && (collectionAllowance.nextAvailableAt || collectionAllowance.budgetCapEur > 0) && (
+      {/* Collection allowance row.
+          SPLIT BY AUDIENCE 2026-07-29, owner's call. It used to show every user
+          a "Monthly API budget" meter in euros. That is OUR cost of goods, not
+          the customer's allowance: it answers "how much does BrandGEO spend on
+          you" when the customer is asking "how much can I still use". Worse, it
+          moves for reasons the customer cannot see or control, because a euro
+          of ChatGPT buys a different amount of work than a euro of SerpApi.
+
+          Customers now see what they bought: how often collection runs, and how
+          many of their prompts are in use. Admins keep the euro meter, because
+          for them it IS the operative number, and it is the one that actually
+          blocks a run in _auth.js. */}
+      {!isDemoMode && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {!isAdmin && collectionAllowance.nextAvailableAt && (
             <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
           )}
-          <AllowanceMeter
-            label="Monthly API budget"
-            used={collectionAllowance.budgetSpentEur}
-            cap={collectionAllowance.budgetCapEur}
-            format={n => `€${n.toFixed(2)}`}
-          />
+
+          {!isAdmin && (
+            <>
+              <div className="min-w-[140px]">
+                <div className="text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+                  Included runs
+                </div>
+                <div className="text-[11px] tabular-nums font-medium text-slate-400">
+                  {planCadence.label}
+                </div>
+              </div>
+              {/* Prompts is the allowance a customer can actually act on: it is
+                  the number they see on the pricing page, the number Prompts.tsx
+                  meters, and the number the DB trigger enforces. */}
+              <AllowanceMeter
+                label="Prompts in use"
+                used={prompts.length}
+                cap={planPromptCap}
+                hideWhenUnlimited={planPromptCap >= 100000}
+              />
+            </>
+          )}
+
+          {isAdmin && collectionAllowance.budgetCapEur > 0 && (
+            <AllowanceMeter
+              label="Monthly API budget"
+              used={collectionAllowance.budgetSpentEur}
+              cap={collectionAllowance.budgetCapEur}
+              format={n => `€${n.toFixed(2)}`}
+            />
+          )}
         </div>
       )}
 
       {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
+      <SectionHeading className="sr-only">AI Visibility Score</SectionHeading>
       <motion.div
         className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center"
         variants={heroReveal} initial="hidden" animate="show"
       >
         <div className="flex flex-col items-center gap-3">
+          {/* Empty state (§11): ring at --grid-line, centre reads "Not measured
+              yet", no percentage, no band label — never a 0% ring, which reads
+              as a verdict rather than an absence of measurement (F-03). */}
           <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
             <defs>
               <linearGradient id="scoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
@@ -650,29 +787,86 @@ export default function AIVisibility() {
               </filter>
             </defs>
             <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-              filter="url(#scoreGlow)" opacity="0.3"
-              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-              transition={{ duration: 1.4, ease: EASE_OUT }} />
-            <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
-              strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-              initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-              transition={{ duration: 1.4, ease: EASE_OUT }} />
+            {totalChecked === 0 ? (
+              <circle cx="60" cy="60" r="54" fill="none" stroke={chart.gridLine} strokeWidth="6" />
+            ) : (
+              <>
+                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+                  filter="url(#scoreGlow)" opacity="0.3"
+                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+                  transition={{ duration: 1.4, ease: EASE_OUT }} />
+                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
+                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
+                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
+                  transition={{ duration: 1.4, ease: EASE_OUT }} />
+              </>
+            )}
             <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
-              <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
+              {totalChecked === 0 ? (
+                <tspan fontSize="15" fontWeight="600" fill={chart.axisInk} textAnchor="middle">
+                  <tspan x="60" dy="-6">Not</tspan>
+                  <tspan x="60" dy="18">measured</tspan>
+                </tspan>
+              ) : (
+                <>
+                  <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
+                  <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
+                </>
+              )}
             </text>
           </svg>
           <div className="text-center -mt-1">
             {/* Score-weighting transparency (Nielsen audit): an info affordance explaining
                 how the headline number derives from the 6 sub-dimensions. Weights mirror
-                aiVisibilityScore.ts exactly. Reachable by keyboard (focus), not hover-only. */}
+                aiVisibilityScore.ts exactly.
+
+                2026-07-30 a11y pass. It used to be a bare `<span tabIndex={0}>` with an
+                aria-label and no role, so AT announced a label attached to nothing, and
+                it carried `cursor: auto`, so a mouse user got no signal at all. It is a
+                real <button> now, which supplies the role, the keyboard activation and
+                the global :focus-visible ring for free.
+                It is also a DISCLOSURE, not a pure tooltip: hover-only reveal is
+                unreachable on touch, where there is no hover state to enter, so click
+                toggles it open as well and aria-expanded reports which it is.
+                The `after:-inset-[7px]` grows an 11px control to a 25px hit target
+                without moving a pixel of the visible layout. Same transparent-::after
+                trick already shipped for .time-pill and .engine-chip in index.css;
+                written inline here because index.css is off limits this pass. */}
             <div className="flex items-center justify-center gap-1 mb-2">
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</span>
-              <span className="relative group inline-flex" tabIndex={0} aria-label="How the AI Visibility Score is calculated">
-                <Info size={11} className="text-slate-500 hover:text-slate-300 cursor-help" />
-                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block group-focus-within:block w-60 z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal">
+              <span className="relative group inline-flex">
+                <button
+                  type="button"
+                  onClick={() => setScoreInfoOpen(v => !v)}
+                  onKeyDown={e => { if (e.key === 'Escape') setScoreInfoOpen(false) }}
+                  onBlur={() => setScoreInfoOpen(false)}
+                  aria-expanded={scoreInfoOpen}
+                  aria-controls="score-weighting-help"
+                  aria-label="How the AI Visibility Score is calculated"
+                  className="relative inline-flex items-center justify-center rounded text-slate-500 hover:text-slate-300 cursor-help after:content-[''] after:absolute after:-inset-[7px]"
+                >
+                  <Info size={11} aria-hidden="true" />
+                </button>
+                <span
+                  id="score-weighting-help"
+                  /* The width cap is not decorative, and the constant is not arbitrary.
+                     This popup is centred on the TRIGGER, and the trigger sits at the
+                     right-hand end of a row that is itself centred in the viewport, so
+                     its centre is offset from the viewport centre by half the row width
+                     minus half the icon: measured at 66.34px. A centred box therefore
+                     clips once its width passes `100vw - 132.68px`. At 320 the fixed
+                     240px w-60 overran the right edge by 26.34px and pushed <main>
+                     (the real scroll container, overflow-x:auto) to scrollWidth 346.
+                     11rem = 176px leaves 43.32px of headroom over the geometric
+                     requirement, i.e. 21.66px of clearance each side, which also
+                     absorbs a classic 15px scrollbar gutter on platforms where 100vw
+                     exceeds clientWidth. It is inert at >=~1440 (cap 1264px vs 240px),
+                     so wide layouts are byte-identical.
+                     If the "AI Visibility Score" label above ever gets longer, the
+                     66.34px offset grows and this constant must grow with it. */
+                  className={`pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${scoreInfoOpen ? 'block' : 'hidden group-hover:block group-focus-within:block'} w-60 max-w-[calc(100vw-11rem)] z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal`}
+                >
                   <span className="block text-[11px] font-semibold text-slate-200 mb-1.5">How this score is calculated</span>
                   <span className="block text-[10px] text-slate-400 leading-relaxed">
                     A weighted average of six signals: Recognition 25%, Knowledge 20%, Sentiment 15%, Accuracy 15%, Reach 15%, Consistency 10%.
@@ -680,14 +874,24 @@ export default function AIVisibility() {
                 </span>
               </span>
             </div>
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
-              aiScore >= 60 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              : 'bg-red-500/10 text-red-400 border-red-500/20'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-emerald-400' : aiScore >= 35 ? 'bg-amber-400' : 'bg-red-400'}`} />
-              {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
-            </div>
+            {/* Never issue a verdict before there is data (§11 rule 1 / F-03): a
+                brand with zero checks previously read "Needs Work" — a judgement,
+                not an absence of measurement. */}
+            {totalChecked === 0 ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border bg-dark-700/60 text-slate-400 border-dark-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                Not measured yet
+              </div>
+            ) : (
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                aiScore >= 60 ? 'bg-sentiment-positive-15 text-sentiment-positive border-sentiment-positive-30'
+                : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-sentiment-negative-15 text-sentiment-negative border-sentiment-negative-30'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-sentiment-positive' : aiScore >= 35 ? 'bg-amber-400' : 'bg-sentiment-negative'}`} />
+                {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -731,18 +935,35 @@ export default function AIVisibility() {
             UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
           }[e.status]
           return (
-            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-3 flex items-center gap-3 transition-colors ${statusStyles.card}`}>
-              {isAdmin && (
-                <button
-                  onClick={() => handleRefreshEngine(e.id)}
-                  disabled={collecting || refreshingEngine !== null}
-                  className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-dark-600 text-slate-500 hover:text-slate-200 transition-all disabled:opacity-30"
-                  title={`Force refresh ${e.label} only — re-runs all prompts on ${e.label} and charges for this engine alone`}
-                  aria-label={`Force refresh ${e.label} only`}
-                >
-                  <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
-                </button>
-              )}
+            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${statusStyles.card}`}>
+              {/* Top-right cluster: when this engine last returned data, and the
+                  control to re-run it. Previously the button was opacity-0 until
+                  hover, so on a trackpad or touch screen it was effectively
+                  undiscoverable, and there was no freshness signal anywhere on
+                  the card. The timestamp is always visible and quiet; the button
+                  sits at 60% and comes up on hover or keyboard focus, so it
+                  reads as available without competing with the score. */}
+              <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                {e.lastOkAt && !e.isUnavailable && (
+                  <span
+                    className="text-[9px] leading-none text-slate-500 tabular-nums"
+                    title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
+                  >
+                    {formatRelativeOrDate(e.lastOkAt)}
+                  </span>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => handleRefreshEngine(e.id)}
+                    disabled={collecting || refreshingEngine !== null}
+                    className="p-1 rounded-md opacity-60 hover:opacity-100 focus-visible:opacity-100 hover:bg-dark-600 text-slate-400 hover:text-slate-100 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+                    title={`Re-run every prompt on ${e.label} only. Charges for this engine alone.`}
+                    aria-label={`Re-run all prompts on ${e.label}`}
+                  >
+                    <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
+                  </button>
+                )}
+              </div>
 
               {/* Logo tile — left */}
               <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60 ${e.isUnavailable ? 'opacity-40' : ''}`}>
@@ -751,7 +972,10 @@ export default function AIVisibility() {
 
               {/* Details — right */}
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 pr-4">
+                {/* pr-16 clears the absolutely-positioned timestamp + refresh
+                    cluster above. pr-4 only cleared the icon and the label now
+                    runs under the timestamp. */}
+                <div className="flex items-center gap-1.5 pr-16">
                   <span className={`text-sm font-semibold truncate ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</span>
                   <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
                     {e.isUnavailable
@@ -774,11 +998,28 @@ export default function AIVisibility() {
                     </div>
                     {/* Mixed-case fetch failure (Nielsen audit): some checks errored while others
                         succeeded, so the % above is partial. Admins retry via the refresh icon (hover). */}
-                    {partialErrorEngines.has(e.id) && (
+                    {/* The MOST RECENT attempt failed, even though older rows
+                        succeeded and the % above is real. This is the state that
+                        used to be completely silent: you press refresh, the
+                        spinner stops, the card is unchanged, and nothing tells
+                        you the run failed. It outranks the partial notice below
+                        because it describes what just happened, not the history. */}
+                    {e.lastAttemptFailed && (
+                      <div
+                        className="flex items-center gap-1 text-[10px] text-red-400 mt-0.5"
+                        title={isAdmin
+                          ? `The last run of ${e.label} failed${e.lastErrorCode ? ` (${e.lastErrorCode})` : ''}. The figures above come from earlier successful checks. Use the refresh icon to try again.`
+                          : `The last check of ${e.label} did not complete. The figures above come from earlier successful checks.`}
+                      >
+                        <AlertTriangle size={9} />
+                        Last run failed{e.lastErrorCode ? ` · ${e.lastErrorCode.replace(/_/g, ' ')}` : ''}
+                      </div>
+                    )}
+                    {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
                       <div
                         className="flex items-center gap-1 text-[10px] text-amber-400/80 mt-0.5"
                         title={isAdmin
-                          ? 'Some checks failed to sync — this % is partial. Hover the card and use the refresh icon to retry this engine.'
+                          ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
                           : 'Some checks failed to sync, so this percentage is partial.'}
                       >
                         <AlertTriangle size={9} /> Some checks failed
@@ -795,7 +1036,7 @@ export default function AIVisibility() {
         {comingSoonEngines.map(id => {
           const meta = ENGINE_META[id]
           return (
-            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-3 flex items-center gap-3 opacity-70">
+            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-card-compact flex items-center gap-3 opacity-70">
               <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/40">
                 <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 object-contain grayscale" />
               </div>
@@ -830,7 +1071,7 @@ export default function AIVisibility() {
               <div
                 key={id}
                 className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40"
-                title={`${meta.label} — unlocks on the ${planLabel} plan`}
+                title={`${meta.label} is available on the ${planLabel} plan and above`}
               >
                 <img src={meta.logoUrl} alt={meta.label} className="w-4 h-4 object-contain grayscale opacity-70" />
                 <span className="text-xs font-medium text-slate-500">{meta.label}</span>
@@ -852,7 +1093,10 @@ export default function AIVisibility() {
             <div className="flex items-center gap-2">
               <Zap size={15} className="text-brand-400" />
               <span className="text-sm font-semibold text-white">Fix This</span>
-              <span className="text-xs text-slate-500">— {fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
+              {/* The separator here used to be a leading em dash. The parent row is
+                  already `flex items-center gap-2`, so the 8px gap does the separating
+                  and the dash was carrying no information the layout did not. */}
+              <span className="text-xs text-slate-500">{fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
               <div className="flex items-center gap-1 ml-1">
                 {(['P0','P1','P2'] as const).map(p => {
                   const count = fixItems.filter(i => i.priority === p).length
@@ -982,7 +1226,7 @@ export default function AIVisibility() {
           {activeLLMs.map(llm => (
             <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
               <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-              <span className={`text-[11px] font-semibold ${llm.color}`}>{llm.label}</span>
+              <span className="text-[11px] font-semibold text-slate-300">{llm.label}</span>
             </div>
           ))}
         </div>
@@ -1011,7 +1255,7 @@ export default function AIVisibility() {
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
-                aria-label={`${prompt.text} — expand for engine-by-engine detail`}
+                aria-label={`${prompt.text}. Expand for engine-by-engine detail.`}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -1021,7 +1265,15 @@ export default function AIVisibility() {
               >
                 <div className="px-2 py-3.5 self-center">
                   <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-md bg-dark-700 text-[11px] font-semibold text-slate-500 tabular-nums">
-                    {prompt.position || i + 1}
+                    {/* Sequential, never the stored `position`. That column is a
+                        sort key, not a label: it keeps the gaps left by prompts
+                        that were suggested and never kept, and by deactivated
+                        ones. BpR's six active prompts carried positions 2, 4, 5,
+                        6, 9 and 10 and the list read as though four were
+                        missing. It can also duplicate (two of BpR's sit at 3),
+                        so it is not even unique. The row index always reads
+                        1..n. */}
+                    {i + 1}
                   </span>
                 </div>
 
@@ -1058,13 +1310,32 @@ export default function AIVisibility() {
 
                 {activeLLMs.map(llm => {
                   const r = rowResults?.get(llm.id)
-                  if (!r) return (
-                    <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60" title="Not checked">
-                        <Minus size={13} />
-                      </span>
-                    </div>
-                  )
+                  if (!r) {
+                    // Ran fine, but the engine produced no answer for this query
+                    // at all, so there was nothing for the brand to appear in.
+                    // Distinct from "Not checked", which means we never asked.
+                    // Showing these identically was the bug: a client reads a
+                    // grey dash as our system failing, when it is Google simply
+                    // not rendering an AI Overview for that question.
+                    const noAnswer = noAnswerCells.has(`${prompt.id}:${llm.id}`)
+                    return (
+                      <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full ${noAnswer
+                            ? 'bg-dark-700/20 text-slate-700 ring-1 ring-dashed ring-dark-600/40'
+                            : 'bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60'}`}
+                          title={noAnswer
+                            ? `${llm.label} showed no answer for this query, so there was nothing to appear in. Not counted for or against you.`
+                            : 'Not checked'}
+                        >
+                          <Minus size={13} />
+                        </span>
+                        {noAnswer && (
+                          <span className="text-[9px] text-slate-700 leading-none">no answer</span>
+                        )}
+                      </div>
+                    )
+                  }
                   const competitors = parseCompetitors(r.competitors_mentioned)
                   const topComp = competitors[0] ?? null
                   return (
@@ -1122,21 +1393,48 @@ export default function AIVisibility() {
                       ].sort((a, b) => a.pos - b.pos)
 
                       return (
-                        <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-emerald-500/5 border-emerald-500/20' : r ? 'bg-red-500/5 border-red-500/20' : 'bg-dark-800 border-dark-700'}`}>
-                          <div className={`text-xs font-semibold ${llm.color} mb-2 flex items-center gap-1.5`}>
+                        <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-sentiment-positive-15 border-sentiment-positive-20' : r ? 'bg-sentiment-negative-15 border-sentiment-negative-20' : 'bg-dark-800 border-dark-700'}`}>
+                          <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
                             <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                             {llm.label}
-                            {isAdmin && (
+                            {/* QUEUE_ONLY_ENGINES cannot finish inside the 26s
+                                Netlify wall this button posts to, so for them it
+                                could only ever spin and fail. Measured, not
+                                assumed: grok timed out at 21s on this exact path
+                                on 2026-07-29. It is disabled and says why, and
+                                points at the engine card refresh, which runs on
+                                the queue with a 15 minute budget. Leaving it
+                                enabled is what produced a repeated cycle of
+                                pressing a button that could not work. */}
+                            {/* A queue-only engine still gets a PRESSABLE control
+                                here. The first version of this showed a dead
+                                clock and told the user to go find another button
+                                at the top of the page, which is a dead end
+                                wearing an explanation. Pressing it now starts
+                                the background run for that engine, the same
+                                thing the engine card does. The clock icon says
+                                it is slow, not that it is broken. */}
+                            {isAdmin && (QUEUE_ONLY_ENGINES.includes(llm.id) ? (
+                              <button
+                                onClick={(ev) => { ev.stopPropagation(); handleRefreshEngine(llm.id) }}
+                                disabled={collecting || refreshingEngine !== null}
+                                className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                                title={`${llm.label} is too slow for an instant re-run, so this starts it in the background across all prompts. It keeps running if you leave the page.`}
+                                aria-label={`Re-run ${llm.label} in the background`}
+                              >
+                                <Clock size={11} className={refreshingEngine === llm.id ? 'animate-spin' : ''} />
+                              </button>
+                            ) : (
                               <button
                                 onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
                                 disabled={refreshingCell !== null || collecting}
                                 className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
-                                title={`Re-run this prompt on ${llm.label} only — charges for one engine call`}
+                                title={`Re-run this prompt on ${llm.label} only. Charges for one engine call.`}
                                 aria-label={`Re-run this prompt on ${llm.label} only`}
                               >
                                 <RotateCcw size={11} className={refreshingCell === `${prompt.id}:${llm.id}` ? 'animate-spin' : ''} />
                               </button>
-                            )}
+                            ))}
                           </div>
                           {r ? (
                             <>
@@ -1162,7 +1460,7 @@ export default function AIVisibility() {
                               )}
                               {r.checked_at && (
                                 <div className="text-[10px] text-slate-600 font-mono">
-                                  {new Date(r.checked_at).toLocaleDateString()}
+                                  {formatDate(r.checked_at)}
                                 </div>
                               )}
                               {r.response_snippet && (
@@ -1202,7 +1500,17 @@ export default function AIVisibility() {
         </AnimatePresence>
 
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
+          prompts.length === 0 ? (
+            <SharedEmptyState
+              icon={Target}
+              title="No prompts yet"
+              body={t.aiv_noPrompts}
+              actionLabel="Add prompts"
+              actionTo="/prompts"
+            />
+          ) : (
+            <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
+          )
         )}
         </div>
         </div>
@@ -1239,7 +1547,7 @@ export default function AIVisibility() {
           <Collapse open={showInsights}>
             <div className="px-5 pb-4 border-t border-dark-700/50">
               <p className="text-xs text-slate-500 mt-3 mb-3">
-                Companies that appear most often in AI top-5 rankings across all prompts — real response data only.
+                Companies that appear most often in AI top-5 rankings across all prompts. Real response data only.
               </p>
               <div className="flex flex-wrap gap-2">
                 {competitorFreq.map(({ name, count, avgPos }) => (

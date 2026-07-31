@@ -14,9 +14,9 @@
 export interface PromptCategoryDef { id: string; label: string; hint: string }
 
 export const PROMPT_CATEGORIES: PromptCategoryDef[] = [
-  { id: 'discovery',  label: 'Discovery',       hint: 'Finding options — "best / top X", "recommend a …"' },
+  { id: 'discovery',  label: 'Discovery',       hint: 'Finding options: "best / top X", "recommend a …"' },
   { id: 'comparison', label: 'Comparison',      hint: '"X vs Y", "alternatives to …"' },
-  { id: 'local',      label: 'Local',           hint: 'Location-based — "near me", "in <place>"' },
+  { id: 'local',      label: 'Local',           hint: 'Location-based: "near me", "in <place>"' },
   { id: 'problem',    label: 'Problem-solving', hint: '"how to …", "help with …", need-based' },
   { id: 'brand',      label: 'Brand',           hint: "Mentions the client's own brand name" },
   { id: 'general',    label: 'General',         hint: 'Anything else' },

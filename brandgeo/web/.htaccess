@@ -31,7 +31,12 @@
   # theme-toggle script on 2026-07-13. Verify any new inline script actually
   # runs (check window/document state in a live browser), don't just confirm
   # the tag exists in page source.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://plausible.io https://formsubmit.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
+  # askmywebsiteai (support assistant, injected from site.js). Its SDK loads
+  # from app.askmywebsiteai.com, injects its own stylesheet and font, talks
+  # back to the same origin it was served from, and can open an iframe, hence
+  # the entry in five directives. No wss: needed, it uses plain fetch. Note a
+  # wildcard would NOT cover the apex, so the host is listed literally.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io https://www.googletagmanager.com https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://app.getbrandgeo.com https://plausible.io https://formsubmit.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://app.askmywebsiteai.com; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
 </IfModule>
 
 # ─── Force HTTPS ───────────────────────────────────────────────────────────────

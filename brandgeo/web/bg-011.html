@@ -3,10 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BG-011 — Why Reddit Mentions Move the Needle on AI Citations | BrandGEO Research™</title>
-  <meta name="description" content="Reddit is the most-cited domain across ChatGPT, Gemini, and Perplexity — up to 24% of citations on some engines. Here's why, and what actually earns it.">
-  <meta property="og:title" content="Why Reddit Mentions Move the Needle on AI Citations — BrandGEO Research™">
-  <meta property="og:description" content="OpenAI and Google together pay Reddit over $130M a year for its data. Here's why one platform matters this much to AI citations — and what backfires.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>BG-011: Why Reddit Mentions Move the Needle on AI Citations | BrandGEO Research™</title>
+  <meta name="description" content="Reddit is the most-cited domain across ChatGPT, Gemini, and Perplexity, up to 24% of citations on some engines. Here's why, and what actually earns it.">
+  <meta property="og:title" content="Why Reddit Mentions Move the Needle on AI Citations: BrandGEO Research™">
+  <meta property="og:description" content="OpenAI and Google together pay Reddit over $130M a year for its data. Here's why one platform matters this much to AI citations, and what backfires.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-011-hero.png">
   <meta property="og:url" content="https://getbrandgeo.com/bg-011.html">
@@ -38,13 +53,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -52,16 +67,16 @@
       --surface: #ffffff;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -161,16 +176,50 @@
 
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 24px; }
       .compare-table { font-size: 0.85rem; }
       .compare-table th, .compare-table td { padding: 10px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -205,7 +254,7 @@
     <span class="badge-tag">GEO</span>
   </div>
   <h1>Why <em>Reddit Mentions</em> Move the Needle on AI Citations</h1>
-  <p class="article-subtitle">OpenAI and Google both pay Reddit for its data. The citation data shows exactly why — and it isn't just about training corpora.</p>
+  <p class="article-subtitle">OpenAI and Google both pay Reddit for its data. The citation data shows exactly why, and it isn't just about training corpora.</p>
   <div class="article-meta">
     <span class="meta-item"><strong>BrandGEO Research</strong></span>
     <span class="meta-item">July 9, 2026</span>
@@ -215,17 +264,17 @@
 </div>
 
 <div class="article-hero">
-  <img src="/images/bg-011-hero.png" alt="A six-step diagram of how an AI engine decides which brands to recommend — question, knowledge and retrieval, reasoning, sources and signals, recommendation, and answer — with 'Citations & Mentions Across the Web' listed among the signals that matter most." loading="eager">
+  <img src="/images/bg-011-hero.png" alt="A six-step diagram of how an AI engine decides which brands to recommend (question, knowledge and retrieval, reasoning, sources and signals, recommendation, and answer) with 'Citations & Mentions Across the Web' listed among the signals that matter most." loading="eager">
 </div>
 
 <!-- KEY FINDINGS -->
 <div class="findings-bar">
   <div class="findings-inner">
-    <div class="findings-label">● Key Findings — BG-011</div>
+    <div class="findings-label">● Key Findings: BG-011</div>
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">24%</div>
-        <div class="finding-desc">Of all Perplexity citations came from Reddit alone in January 2026 — the highest single-domain concentration measured on any engine</div>
+        <div class="finding-desc">Of all Perplexity citations came from Reddit alone in January 2026, the highest single-domain concentration measured on any engine</div>
       </div>
       <div class="finding">
         <div class="finding-number">44%</div>
@@ -247,32 +296,32 @@
 <div class="article-body">
 
   <h2 id="direct-answer">The short answer</h2>
-  <p>If you had to pick one platform to prioritize for AI citation right now, the data gives an almost uncomfortable answer: Reddit. Not your own blog, not a press release, not a comparison landing page — Reddit threads. Reddit is now cited more often than any other single domain across ChatGPT, Gemini, Perplexity, Google's AI Mode, and AI Overviews combined, and on some engines the gap isn't close. That's not a fluke of one study; it's confirmed by independent citation-tracking research and by the fact that OpenAI and Google are both paying Reddit real money, on an ongoing basis, specifically for structured access to it.</p>
+  <p>If you had to pick one platform to prioritize for AI citation right now, the data gives an almost uncomfortable answer: Reddit. Not your own blog, not a press release, not a comparison landing page: Reddit threads. Reddit is now cited more often than any other single domain across ChatGPT, Gemini, Perplexity, Google's AI Mode, and AI Overviews combined, and on some engines the gap isn't close. That's not a fluke of one study; it's confirmed by independent citation-tracking research and by the fact that OpenAI and Google are both paying Reddit real money, on an ongoing basis, specifically for structured access to it.</p>
 
   <h2 id="why-reddit">Why Reddit specifically</h2>
   <p>Two separate things are happening at once, and it's worth untangling them, because they lead to different advice.</p>
-  <p>The first is contractual. In February 2024, Reddit signed a data-licensing agreement with Google reportedly worth <strong>$60 million a year</strong>, giving Google real-time access to Reddit's user-generated content for training and grounding its models. A few months later, Reddit struck a similar deal with OpenAI, estimated at roughly <strong>$70 million a year</strong>, built on Reddit's Data API — real-time, structured access to posts and comments, not just a one-time training-data dump. Combined, that's north of $130 million a year in direct payments for one platform's content. Companies don't sign nine-figure recurring deals for data they consider marginal; they sign them because the retrieval and grounding pipelines behind ChatGPT and Gemini demonstrably perform better with continuous, structured Reddit access than without it.</p>
-  <p>The second is about what kind of content Reddit actually is. Reddit is almost entirely first-person, comparison-heavy, question-and-answer text, written in the same register people use when they type a question into ChatGPT or Perplexity in the first place — "has anyone actually used X," "what did you switch to after Y stopped working," "is this worth the price." Marketing copy, landing pages, and press releases are written to be persuasive; Reddit threads are written to actually answer the question, complete with disagreement, caveats, and follow-up replies. For a system trying to synthesize a trustworthy, nuanced answer, that's a fundamentally more useful shape of text than a single polished claim — and it's the same underlying instinct <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> already found in the data: unlinked brand mentions correlate with AI citation far more strongly than backlinks do, because independent, unprompted discussion is a stronger trust signal than anything a brand controls directly. Reddit is simply the single largest concentrated source of exactly that kind of mention.</p>
+  <p>The first is contractual. In February 2024, Reddit signed a data-licensing agreement with Google reportedly worth <strong>$60 million a year</strong>, giving Google real-time access to Reddit's user-generated content for training and grounding its models. A few months later, Reddit struck a similar deal with OpenAI, estimated at roughly <strong>$70 million a year</strong>, built on Reddit's Data API: real-time, structured access to posts and comments, not just a one-time training-data dump. Combined, that's north of $130 million a year in direct payments for one platform's content. Companies don't sign nine-figure recurring deals for data they consider marginal; they sign them because the retrieval and grounding pipelines behind ChatGPT and Gemini demonstrably perform better with continuous, structured Reddit access than without it.</p>
+  <p>The second is about what kind of content Reddit actually is. Reddit is almost entirely first-person, comparison-heavy, question-and-answer text, written in the same register people use when they type a question into ChatGPT or Perplexity in the first place: "has anyone actually used X," "what did you switch to after Y stopped working," "is this worth the price." Marketing copy, landing pages, and press releases are written to be persuasive; Reddit threads are written to actually answer the question, complete with disagreement, caveats, and follow-up replies. For a system trying to synthesize a trustworthy, nuanced answer, that's a fundamentally more useful shape of text than a single polished claim, and it's the same underlying instinct <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> already found in the data: unlinked brand mentions correlate with AI citation far more strongly than backlinks do, because independent, unprompted discussion is a stronger trust signal than anything a brand controls directly. Reddit is simply the single largest concentrated source of exactly that kind of mention.</p>
 
   <h2 id="citation-data">The citation-share data</h2>
-  <p>The scale of this is easy to understate until you see the platform-by-platform numbers. Per citation-tracking research published in early 2026, <strong>Reddit accounted for 24% of all Perplexity citations in January 2026</strong> — meaning roughly one in four sources Perplexity cited, across every topic and query type measured, came from a single domain. On Google's side, <strong>Reddit made up 44% of AI Overviews' social-source citations</strong>, and a separate 2026 industry index profiling ChatGPT's shopping and recommendation answers named Reddit — alongside Wikipedia — as one of the two dominant sources shaping what the model tells people to buy. Tinuiti's Q1 2026 AI Citations Trends Report found Reddit's citation share grew by <strong>at least 73% across commercial categories</strong> like technology and electronics quarter-over-quarter, more than doubling in several.</p>
-  <p>Worth holding two ideas at once here, because the honest picture isn't "Reddit always dominates everywhere, forever." Citation share by domain is measurably volatile — ChatGPT's own Reddit citation share reportedly fell from roughly 60% to around 10% within six weeks in late 2025, following a single change to how Google surfaces Reddit results, since OpenAI's web-search layer partly depends on Google's index. That's a real, documented swing, and it's a useful check against treating any one platform's current citation share as a permanent fact. What hasn't moved is the underlying reason Reddit keeps reappearing at the top of these studies across every engine tested: it's the largest concentrated pool of the kind of independent, first-person brand discussion that <a href="/bg-006.html" style="color:var(--accent2)">BG-006</a> found Perplexity's retrieval pipeline actively cross-verifies brands against — 3 to 5 independent sources per query, filtered for relevance and cross-source corroboration. Reddit alone can often supply several of those sources for a single query.</p>
+  <p>The scale of this is easy to understate until you see the platform-by-platform numbers. Per citation-tracking research published in early 2026, <strong>Reddit accounted for 24% of all Perplexity citations in January 2026</strong>, meaning roughly one in four sources Perplexity cited, across every topic and query type measured, came from a single domain. On Google's side, <strong>Reddit made up 44% of AI Overviews' social-source citations</strong>, and a separate 2026 industry index profiling ChatGPT's shopping and recommendation answers named Reddit, alongside Wikipedia, as one of the two dominant sources shaping what the model tells people to buy. Tinuiti's Q1 2026 AI Citations Trends Report found Reddit's citation share grew by <strong>at least 73% across commercial categories</strong> like technology and electronics quarter-over-quarter, more than doubling in several.</p>
+  <p>Worth holding two ideas at once here, because the honest picture isn't "Reddit always dominates everywhere, forever." Citation share by domain is measurably volatile: ChatGPT's own Reddit citation share reportedly fell from roughly 60% to around 10% within six weeks in late 2025, following a single change to how Google surfaces Reddit results, since OpenAI's web-search layer partly depends on Google's index. That's a real, documented swing, and it's a useful check against treating any one platform's current citation share as a permanent fact. What hasn't moved is the underlying reason Reddit keeps reappearing at the top of these studies across every engine tested: it's the largest concentrated pool of the kind of independent, first-person brand discussion that <a href="/bg-006.html" style="color:var(--accent2)">BG-006</a> found Perplexity's retrieval pipeline actively cross-verifies brands against: 3 to 5 independent sources per query, filtered for relevance and cross-source corroboration. Reddit alone can often supply several of those sources for a single query.</p>
 
   <div class="callout teal">
     <div class="callout-label">The reframe that matters</div>
-    <p>This isn't a new SEO channel to game. It's the same shift <a href="/bg-002.html" style="color:var(--accent2)">BG-002</a> already documented — AI engines rewarding recommendation over ranking — showing up concentrated on one specific platform, because Reddit happens to be where the largest volume of real, unprompted recommendation-style conversation already lives.</p>
+    <p>This isn't a new SEO channel to game. It's the same shift <a href="/bg-002.html" style="color:var(--accent2)">BG-002</a> already documented, AI engines rewarding recommendation over ranking, showing up concentrated on one specific platform, because Reddit happens to be where the largest volume of real, unprompted recommendation-style conversation already lives.</p>
   </div>
 
-  <h2 id="what-actually-helps">What kind of Reddit presence actually helps — and what backfires</h2>
+  <h2 id="what-actually-helps">What kind of Reddit presence actually helps, and what backfires</h2>
   <p>This is the part brands get wrong most often, usually by treating Reddit like just another channel to run a campaign on. It isn't, and the platform's own users and moderators are unusually good at spotting when someone tries.</p>
-  <p><strong>What actually helps</strong> is presence that would exist whether or not you were watching: a founder or support team member answering a question in a relevant subreddit with genuine expertise and disclosed affiliation; customers organically comparing your product to alternatives in a thread they started for their own reasons; a track record of threads, replies, and karma that reads as a real account with real history, not one created the week of a launch. This is exactly the kind of unlinked, independent mention <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> found correlates most strongly with AI citation — and it's genuinely difficult to manufacture at scale, which is precisely why it carries weight.</p>
-  <p><strong>What backfires</strong> is manufactured presence, and the evidence that it backfires is concrete, not theoretical. In late 2025, a game-marketing agency posted roughly 100 fake "organic" comments promoting a client's title across Reddit, then published its own blog post bragging about how it did it — the CEO publicly confirmed the tactic once it was caught. Reddit's own moderation has kept pace: the platform now uses LLM-based systems that flag an estimated 25,000 spammy or inauthentic posts and comments every single day, checking posting timing, account age, karma history, and comment structure for exactly the patterns astroturfing campaigns produce. And the reputational cost compounds: a callout thread titled "this company faked their Reddit reviews" doesn't disappear — it sits in search results and gets picked up by the same AI retrieval pipelines you were trying to influence, for years, every time someone searches your brand name.</p>
+  <p><strong>What actually helps</strong> is presence that would exist whether or not you were watching: a founder or support team member answering a question in a relevant subreddit with genuine expertise and disclosed affiliation; customers organically comparing your product to alternatives in a thread they started for their own reasons; a track record of threads, replies, and karma that reads as a real account with real history, not one created the week of a launch. This is exactly the kind of unlinked, independent mention <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> found correlates most strongly with AI citation, and it's genuinely difficult to manufacture at scale, which is precisely why it carries weight.</p>
+  <p><strong>What backfires</strong> is manufactured presence, and the evidence that it backfires is concrete, not theoretical. In late 2025, a game-marketing agency posted roughly 100 fake "organic" comments promoting a client's title across Reddit, then published its own blog post bragging about how it did it. The CEO publicly confirmed the tactic once it was caught. Reddit's own moderation has kept pace: the platform now uses LLM-based systems that flag an estimated 25,000 spammy or inauthentic posts and comments every single day, checking posting timing, account age, karma history, and comment structure for exactly the patterns astroturfing campaigns produce. And the reputational cost compounds: a callout thread titled "this company faked their Reddit reviews" doesn't disappear: it sits in search results and gets picked up by the same AI retrieval pipelines you were trying to influence, for years, every time someone searches your brand name.</p>
 
   <h2 id="side-by-side">Reddit presence, side by side</h2>
   <div class="compare-table-wrap">
     <table class="compare-table">
       <tr><th>Presence type</th><th>Effect</th><th>Why</th></tr>
-      <tr><td>Genuine participation in relevant subreddits</td><td>Helps</td><td>Reads as an independent, unlinked mention — the exact signal citation data rewards</td></tr>
+      <tr><td>Genuine participation in relevant subreddits</td><td>Helps</td><td>Reads as an independent, unlinked mention, the exact signal citation data rewards</td></tr>
       <tr><td>Disclosed founder/employee answers</td><td>Helps</td><td>Builds real thread history AI retrieval pipelines can cross-verify against other sources</td></tr>
       <tr><td>Organic customer comparisons and recommendations</td><td>Helps</td><td>The first-person, comparison-heavy language AI engines are actively retrieving for</td></tr>
       <tr><td>Paid or ghostwritten "organic-sounding" posts</td><td>Backfires</td><td>Against Reddit's rules, increasingly detected by its own LLM-based moderation, and traceable</td></tr>
@@ -282,9 +331,9 @@
 
   <h2 id="practical-guidance">Practical guidance for brands</h2>
   <ul>
-    <li><strong>Show up as a participant, not a promoter.</strong> Answer questions in subreddits genuinely relevant to your category, with disclosed affiliation when you're representing the brand — not as an anonymous account pushing product mentions.</li>
-    <li><strong>Let real customers talk, unprompted.</strong> Don't incentivize, script, or ghostwrite reviews and comparisons. The value of a Reddit mention comes specifically from its independence — manufacturing that independence defeats the point and risks the backfire above.</li>
-    <li><strong>Fix what's actually being said before you try to add more of it.</strong> If existing threads describe real problems with your product, that's the priority — a citation pipeline that's already surfacing your brand will surface the complaints too.</li>
+    <li><strong>Show up as a participant, not a promoter.</strong> Answer questions in subreddits genuinely relevant to your category, with disclosed affiliation when you're representing the brand, not as an anonymous account pushing product mentions.</li>
+    <li><strong>Let real customers talk, unprompted.</strong> Don't incentivize, script, or ghostwrite reviews and comparisons. The value of a Reddit mention comes specifically from its independence. Manufacturing that independence defeats the point and risks the backfire above.</li>
+    <li><strong>Fix what's actually being said before you try to add more of it.</strong> If existing threads describe real problems with your product, that's the priority: a citation pipeline that's already surfacing your brand will surface the complaints too.</li>
     <li><strong>Don't try to out-game the moderation.</strong> Detection has gotten materially better, not worse, and the reputational cost of getting caught outlasts any short-term visibility gain by years.</li>
     <li><strong>Track what's already there before deciding what to do next.</strong> Most brands have no idea what their existing Reddit footprint looks like, good or bad, until they actually check it engine by engine.</li>
   </ul>
@@ -292,7 +341,7 @@
   <hr class="divider">
 
   <h2 id="what-this-means">What this means for your brand</h2>
-  <p>Reddit isn't a niche channel anymore for AI citation purposes — for a meaningful share of commercial and recommendation-style queries, it's the largest single source feeding the answer. That doesn't mean building a Reddit strategy from scratch overnight, and it definitely doesn't mean paying anyone to manufacture posts. It means treating your existing Reddit footprint — the threads that already exist about your brand and your category, whether you've ever looked at them or not — as seriously as you'd treat your own website, because for a growing share of AI-generated answers, it's carrying more weight than your website does. It's one more data point in the same picture <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a> laid out from the start: AI Visibility is built from several distinct disciplines, and off-site presence on the platforms AI engines actually retrieve from is one most brands haven't started measuring yet.</p>
+  <p>Reddit isn't a niche channel anymore for AI citation purposes. For a meaningful share of commercial and recommendation-style queries, it's the largest single source feeding the answer. That doesn't mean building a Reddit strategy from scratch overnight, and it definitely doesn't mean paying anyone to manufacture posts. It means treating your existing Reddit footprint (the threads that already exist about your brand and your category, whether you've ever looked at them or not) as seriously as you'd treat your own website, because for a growing share of AI-generated answers, it's carrying more weight than your website does. It's one more data point in the same picture <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a> laid out from the start: AI Visibility is built from several distinct disciplines, and off-site presence on the platforms AI engines actually retrieve from is one most brands haven't started measuring yet.</p>
 
   <h2 id="related-research">Related research</h2>
   <p>The mechanisms and data referenced above, in full:</p>
@@ -300,12 +349,12 @@
     <a href="/bg-001.html" class="related-card">
       <div class="related-id">BG-001</div>
       <div class="related-title">The AI Visibility Gap</div>
-      <div class="related-hook">The six disciplines that feed AI Visibility — including Entity SEO, the foundation independent mentions like Reddit's build on.</div>
+      <div class="related-hook">The six disciplines that feed AI Visibility, including Entity SEO, the foundation independent mentions like Reddit's build on.</div>
     </a>
     <a href="/bg-002.html" class="related-card">
       <div class="related-id">BG-002</div>
       <div class="related-title">From Rankings to Recommendations</div>
-      <div class="related-hook">The broader shift toward AI rewarding recommendation over ranking — the reason Reddit's real-user language carries so much weight.</div>
+      <div class="related-hook">The broader shift toward AI rewarding recommendation over ranking, the reason Reddit's real-user language carries so much weight.</div>
     </a>
     <a href="/bg-006.html" class="related-card">
       <div class="related-id">BG-006</div>
@@ -315,17 +364,17 @@
     <a href="/bg-007.html" class="related-card">
       <div class="related-id">BG-007</div>
       <div class="related-title">The Anatomy of an AI-Cited Brand</div>
-      <div class="related-hook">The data showing unlinked brand mentions — Reddit's native format — beat backlinks 3x on AI citation correlation.</div>
+      <div class="related-hook">The data showing unlinked brand mentions (Reddit's native format) beat backlinks 3x on AI citation correlation.</div>
     </a>
   </div>
 
   <h2>How BrandGEO treats this differently</h2>
-  <p>BrandGEO doesn't run a Reddit-only check — it monitors what AI engines actually say, in full, across every source they draw from. When ChatGPT or Perplexity cites a Reddit thread inside an answer about your category, that citation shows up in the same response text our collectors analyze for brand mentions, sentiment, and competitor presence. So if a competitor is getting recommended off the back of a Reddit thread and you're not, that gap surfaces in your BrandGEO results the same way any other citation would — engine by engine, on a recurring basis, instead of you finding out by manually searching Reddit yourself.</p>
+  <p>BrandGEO doesn't run a Reddit-only check. It monitors what AI engines actually say, in full, across every source they draw from. When ChatGPT or Perplexity cites a Reddit thread inside an answer about your category, that citation shows up in the same response text our collectors analyze for brand mentions, sentiment, and competitor presence. So if a competitor is getting recommended off the back of a Reddit thread and you're not, that gap surfaces in your BrandGEO results the same way any other citation would, engine by engine, on a recurring basis, instead of you finding out by manually searching Reddit yourself.</p>
 
   <!-- CTA -->
   <div class="cta-box">
     <h3>Find out whether Reddit is already shaping your AI Visibility</h3>
-    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <p>We'll run your brand through the same real-question, multi-engine audit, free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
@@ -336,7 +385,7 @@
 <div class="next-post">
   <div>
     <div class="next-label">More research →</div>
-    <div class="next-title"><a href="/bg-012.html" style="color:inherit;text-decoration:none;">BG-012: AI Visibility vs. Brand Mentions — What's the Difference?</a></div>
+    <div class="next-title"><a href="/bg-012.html" style="color:inherit;text-decoration:none;">BG-012: AI Visibility vs. Brand Mentions. What's the Difference?</a></div>
   </div>
   <a href="/bg-012.html" class="next-link">Read BG-012 →</a>
 </div>
@@ -351,6 +400,14 @@
       <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

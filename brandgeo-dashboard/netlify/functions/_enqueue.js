@@ -26,7 +26,7 @@
  * newest-per-(prompt,engine)); doing it now would inflate those aggregates.
  */
 
-const { activeEnginesFor, WEEKLY_CAPPED_ENGINES, WEEKLY_CAP_DAYS, PLAN_COLLECTION_COOLDOWN_HOURS } = require('./_cost')
+const { activeEnginesFor, MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS, PLAN_COLLECTION_COOLDOWN_HOURS } = require('./_cost')
 
 // ISO 3166-1 alpha-2 → country name, for scheduled runs that resolve geo from
 // the client's default_market_id (manual runs pass full labels from the browser).
@@ -93,6 +93,12 @@ async function enqueueClientCollection(supabase, {
     brand_aliases:     client.brand_aliases     ?? [],
     brand_website:     client.brand_website     ?? '',
     known_competitors: client.known_competitors ?? [],
+    // Selects the ChatGPT model on the worker path (CHATGPT_MODEL_BY_PLAN in
+    // _collect.js). Safe to carry here because this object is built server-side
+    // from the clients row, never from a request body. Snapshotted with the job,
+    // so a plan change mid-queue does not retroactively alter jobs already
+    // enqueued, which is the behaviour we want for a run the customer triggered.
+    plan:              client.plan ?? null,
   }
 
   // 4. Geo — explicit (manual) or resolved from the client default (scheduled)
@@ -110,19 +116,19 @@ async function enqueueClientCollection(supabase, {
   // 5. Decide each prompt's engine subset (force vs skip)
   const promptIds = prompts.map(p => p.id)
 
-  // Weekly cap (WEEKLY_CAPPED_ENGINES, e.g. google_ai/SerpApi): find the
-  // (prompt, engine) pairs that already ran within WEEKLY_CAP_DAYS. Computed
+  // Monthly cap (MONTHLY_CAPPED_ENGINES, e.g. google_ai/SerpApi): find the
+  // (prompt, engine) pairs that already ran within MONTHLY_CAP_DAYS. Computed
   // BEFORE the force-delete below, so a force refresh can't erase the evidence
   // and bypass the cap. Applies to force AND non-force alike.
   let cappedSet = new Set()
-  if (WEEKLY_CAPPED_ENGINES.some(e => engines.includes(e))) {
-    const capWindow = new Date(Date.now() - WEEKLY_CAP_DAYS * 86400000).toISOString()
+  if (MONTHLY_CAPPED_ENGINES.some(e => engines.includes(e))) {
+    const capWindow = new Date(Date.now() - MONTHLY_CAP_DAYS * 86400000).toISOString()
     const { data: recentCapped } = await supabase
       .from('ai_results')
       .select('prompt_id, llm')
       .eq('client_id', clientId)
       .in('prompt_id', promptIds)
-      .in('llm', WEEKLY_CAPPED_ENGINES)
+      .in('llm', MONTHLY_CAPPED_ENGINES)
       .gte('checked_at', capWindow)
     cappedSet = new Set((recentCapped || []).map(r => `${r.prompt_id}:${r.llm}`))
   }
@@ -133,7 +139,7 @@ async function enqueueClientCollection(supabase, {
     // Delete existing rows for the engines we're about to re-run — but NEVER
     // delete a weekly-capped engine (that would wipe the row the cap relies on,
     // and its cadence is managed by the cap, not by force).
-    const enginesForDelete = engines.filter(e => !WEEKLY_CAPPED_ENGINES.includes(e))
+    const enginesForDelete = engines.filter(e => !MONTHLY_CAPPED_ENGINES.includes(e))
     if (enginesForDelete.length > 0) {
       const { error: delErr } = await supabase
         .from('ai_results')
@@ -165,7 +171,7 @@ async function enqueueClientCollection(supabase, {
   // any prompt that already ran it inside the window.
   if (cappedSet.size > 0) {
     for (const [pid, engs] of perPromptEngines) {
-      const kept = engs.filter(e => !(WEEKLY_CAPPED_ENGINES.includes(e) && cappedSet.has(`${pid}:${e}`)))
+      const kept = engs.filter(e => !(MONTHLY_CAPPED_ENGINES.includes(e) && cappedSet.has(`${pid}:${e}`)))
       if (kept.length > 0) perPromptEngines.set(pid, kept)
       else perPromptEngines.delete(pid)
     }

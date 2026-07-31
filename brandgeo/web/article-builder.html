@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BrandGEO — Article Builder</title>
+  <title>BrandGEO: Article Builder</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; line-height: 1.6; }
 
     .app { display: grid; grid-template-columns: 420px 1fr; min-height: 100vh; }
 
@@ -16,7 +16,7 @@
     .panel-sub { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
 
     .section { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
-    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 14px; }
+    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8b5cf6; margin-bottom: 14px; }
 
     .field { margin-bottom: 14px; }
     label { display: block; font-size: 0.75rem; font-weight: 600; color: #555; margin-bottom: 5px; }
@@ -25,20 +25,20 @@
       padding: 9px 12px; font-size: 0.88rem; font-family: inherit; color: #1a1a2e;
       outline: none; transition: border-color .2s; resize: vertical;
     }
-    input:focus, textarea:focus, select:focus { border-color: #6c63ff; }
+    input:focus, textarea:focus, select:focus { border-color: #8b5cf6; }
     textarea { min-height: 80px; }
 
     .field-hint { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
 
     .finding-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 10px; align-items: start; }
     .add-btn { background: none; border: 1.5px dashed #bbb; color: #888; border-radius: 7px; padding: 8px 12px; font-size: 0.8rem; cursor: pointer; width: 100%; margin-top: 4px; transition: border-color .2s, color .2s; }
-    .add-btn:hover { border-color: #6c63ff; color: #6c63ff; }
+    .add-btn:hover { border-color: #8b5cf6; color: #8b5cf6; }
     .remove-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 4px; transition: color .2s; }
     .remove-btn:hover { color: #e55; }
     .section-block { background: #f8f8fc; border: 1px solid #e8e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; position: relative; }
     .section-block .remove-btn { position: absolute; top: 10px; right: 10px; }
 
-    .gen-btn { background: #6c63ff; color: #fff; border: none; border-radius: 9px; padding: 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 24px; transition: opacity .15s; }
+    .gen-btn { background: #8b5cf6; color: #fff; border: none; border-radius: 9px; padding: 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 24px; transition: opacity .15s; }
     .gen-btn:hover { opacity: .88; }
 
     /* ── Right panel ── */
@@ -49,9 +49,9 @@
     /* Tabs */
     .tab-bar { display: flex; gap: 4px; flex: 1; }
     .tab { background: #f0f0f8; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #888; transition: all .15s; }
-    .tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+    .tab.active { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
 
-    .copy-btn { background: #6c63ff; color: #fff; border: none; border-radius: 7px; padding: 8px 18px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+    .copy-btn { background: #8b5cf6; color: #fff; border: none; border-radius: 7px; padding: 8px 18px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
     .copy-btn:hover { opacity: .88; }
     .copy-btn.copied { background: #00b894; }
 
@@ -67,20 +67,18 @@
 
     .blog-card-pane { flex: 1; padding: 20px; overflow-y: auto; background: #1e1e2e; display: flex; flex-direction: column; gap: 20px; }
     .blog-card-section { background: #13131f; border: 1px solid #2a2a40; border-radius: 8px; padding: 16px; }
-    .blog-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6c63ff; margin-bottom: 10px; }
+    .blog-card-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #8b5cf6; margin-bottom: 10px; }
     .blog-card-instructions { font-size: 0.78rem; color: #8888aa; line-height: 1.55; margin-bottom: 12px; }
     .blog-card-instructions strong { color: #00d4aa; }
     pre.blog-card-code { font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all; color: #cdd6f4; }
 
     /* ── Steps hint ── */
     .steps-hint { background: #f0f0ff; border: 1px solid #d8d8ff; border-radius: 8px; padding: 12px 14px; font-size: 0.76rem; color: #555; line-height: 1.6; margin-bottom: 20px; }
-    .steps-hint strong { color: #6c63ff; }
+    .steps-hint strong { color: #8b5cf6; }
     .steps-hint ol { padding-left: 16px; margin-top: 6px; }
 
     @media(max-width: 900px) { .app { grid-template-columns: 1fr; } .output-panel { min-height: 50vh; } }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
@@ -96,7 +94,7 @@
   <!-- ══════════ LEFT: FORM ══════════ -->
   <div class="panel">
     <div class="panel-title">📝 Article Builder</div>
-    <div class="panel-sub">BrandGEO Research™ — fill in, generate, copy HTML + blog card.</div>
+    <div class="panel-sub">BrandGEO Research™: fill in, generate, copy HTML + blog card.</div>
 
     <div class="steps-hint">
       <strong>How to publish:</strong>
@@ -201,14 +199,14 @@
     <div class="output-pane" id="pane-blog">
       <div class="blog-card-pane">
         <div class="blog-card-section">
-          <div class="blog-card-label">Grid Card — paste into blog.html</div>
+          <div class="blog-card-label">Grid Card: paste into blog.html</div>
           <div class="blog-card-instructions">
             Find the matching <strong>BG-00X "coming soon"</strong> card in blog.html and replace it with this block. If there's no placeholder for this ID yet, paste it inside the <code>&lt;div class="posts-grid"&gt;</code>.
           </div>
           <pre class="blog-card-code" id="blogCardCode">← Generate HTML first</pre>
         </div>
         <div class="blog-card-section">
-          <div class="blog-card-label">Featured Card — optional, replaces the top hero</div>
+          <div class="blog-card-label">Featured Card: optional, replaces the top hero</div>
           <div class="blog-card-instructions">
             Only use this if you want to make the new article the <strong>Featured Research</strong> at the top of blog.html. Replace the existing <code>&lt;a href="..." class="featured-card"&gt;</code> block.
           </div>
@@ -246,7 +244,7 @@ function addSection(heading='', body='') {
       <input type="text" class="sec-heading" placeholder="e.g. The Shift Nobody Saw Coming" value="${heading}">
     </div>
     <div class="field">
-      <label>Body — new line = new paragraph · • for bullets · > for blockquote · *word* for bold</label>
+      <label>Body: new line = new paragraph · • for bullets · > for blockquote · *word* for bold</label>
       <textarea class="sec-body" rows="6" placeholder="Paragraph one.\n\n• Bullet one\n• Bullet two\n\n> Key insight quote">${body}</textarea>
     </div>`;
   c.appendChild(div);
@@ -396,13 +394,24 @@ function generate() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>${id} — ${titlePlain} | BrandGEO Research™</title>
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>${id}: ${titlePlain} | BrandGEO Research™</title>
   <meta name="description" content="${subtitle}">
-  <meta property="og:title" content="${id}: ${titlePlain} — BrandGEO Research™">
+  <meta property="og:title" content="${id}: ${titlePlain} | BrandGEO Research™">
   <meta property="og:description" content="${subtitle}">
   <meta property="og:type" content="article">
   <meta property="article:published_time" content="${pubDate}">${ogImage}
@@ -421,13 +430,17 @@ function generate() {
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f; --surface: #13131a; --border: #22223a;
-      --accent: #6c63ff; --accent2: #00d4aa;
-      --text: #e8e8f0; --muted: #8888aa; --radius: 12px;
+      --bg: #0a0b0e; --surface: #101116; --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed; --accent2: #34d399;
+      --text: #e8e9ed; --muted: #9ba1ac; --radius: 12px;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; }
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,.92); backdrop-filter: blur(12px); z-index: 100; }
-    .logo { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; text-decoration: none; }
+    /* Tracking conformed to the signed-off lockup 2026-07-29 (-3 at font-size
+       94 in docs/growth/brand-identity-2026-07-29/v3/logo-full.svg). This page
+       is an internal tool and is deliberately excluded from the cPanel upload,
+       so it keeps its text-only wordmark rather than the tile lockup. */
+    .logo { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -.032em; text-decoration: none; }
     .logo span { color: var(--accent); }
     nav a { color: var(--muted); text-decoration: none; font-size: .95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
@@ -522,7 +535,7 @@ function generate() {
 
     <div class="cta-box">
       <h3>See how visible your brand is to AI engines</h3>
-      <p>Get your free AI Visibility Snapshot — delivered within 48 hours, no commitment.</p>
+      <p>Get your free AI Visibility Snapshot, delivered within 48 hours, no commitment.</p>
       <a href="/#contact" class="cta-btn">Request Free Audit →</a>
     </div>
   </div>
@@ -575,7 +588,7 @@ function generate() {
     </div>`;
 
   const findingPills = findings.slice(0,4).map(f =>
-    `<span class="finding-pill">${f.stat}${f.stat && f.desc ? ' — ' : ''}${f.desc}</span>`
+    `<span class="finding-pill">${f.stat}${f.stat && f.desc ? ': ' : ''}${f.desc}</span>`
   ).join('\n        ');
 
   const featuredCard = `<a href="/${filename}" class="featured-card">

@@ -4,6 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
+  Eye, EyeOff, LifeBuoy,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -12,6 +13,7 @@ import { hasFeature } from '../lib/planConfig'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
+import BrandGeoMark from './BrandGeoLogo'
 import ClientBanner from './ClientBanner'
 import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
@@ -20,17 +22,19 @@ import { useCollection } from '../lib/collectionContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import type { TimeRange } from '../lib/timeFilterContext'
 
-function BrandGeoLogo() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
+// The wordmark is a link to Overview in both shells (sidebar + mobile header).
+// It used to be an inert <div>, so the most-clicked "take me home" affordance on
+// the web did nothing here. The mark itself is aria-hidden inside BrandGeoLogo:
+// the wordmark text already names the brand, and the link carries its own label.
+// 'md' is the 32px website-parity size, matching brandgeo/web/index.html's .logo.
+function BrandGeoLogo({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <div className="flex items-center gap-2">
-      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '32px', width: 'auto', display: 'block' }} />
-      <div className="leading-none">
-        <span className={`font-bold text-base tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Brand</span>
-        <span className="font-bold text-base tracking-tight" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-      </div>
-    </div>
+    <BrandGeoMark
+      size="md"
+      to="/"
+      onClick={onNavigate}
+      ariaLabel="BrandGEO: go to Overview"
+    />
   )
 }
 
@@ -70,7 +74,7 @@ const INTERNAL_GROUP_KEYS: ClientGroupKey[] = ['research', 'archived']
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
-  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, updateClientCategory } = useClient()
+  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection } = useCollection()
@@ -173,34 +177,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // AI SEO — the content-action layer (Growth+; below that shown locked,
         // routing to the upgrade screen). Admins always have access.
         { to: '/seo', icon: FileSearch, label: 'AI SEO' },
+        // One route for everyone, two views (Tickets.tsx). An admin sees the
+        // triage queue, which also holds BrandGEO's own internal work, so the
+        // label differs; a customer sees only its own requests. Deliberately
+        // NOT added to the mobile bottom bar, which is a fixed 7-icon strip:
+        // this is reachable on mobile through the same sidebar, via the
+        // hamburger menu.
+        { to: '/tickets', icon: LifeBuoy, label: isAdmin ? 'Tickets' : 'Support' },
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],
     },
   ]
 
-  // Stronger active-state indicator: left accent rail + bg tint, not just a bg tint (§7.4 Phase 2)
+  // Active nav state (dashboard-visual-system.md §4.2, replacing the old
+  // bg-brand-500/15 + before:bg-brand-400 rail-only treatment measured at
+  // 1.17:1 background / 1.24:1 text — both effectively invisible with the
+  // rail hidden). `.nav-item`/`.is-active` (index.css) carry the whole state:
+  // a solid raised fill (--surface-nav-active), white/ink semibold text
+  // (--text-nav-active), and the rail (--rail-active) — three cues, of which
+  // two clear the 1.5:1 rail-hidden floor independently (§4.2's table; dark
+  // clears it on background, light on text — that split is forced, see §4.2).
   //
-  // The rail is a centered pseudo-element pill, NOT a border-l: a 2px left
-  // border on an element with rounded-lg gets clipped by the corner radius into
-  // a short curved smear rather than reading as a rail.
-  //
-  // Inactive items sit at slate-300, not slate-400. The dark-mode contrast fix
-  // in index.css remaps text-slate-600 (the nav group headers) onto
-  // text-slate-400's value, so slate-400 nav items had become the exact same
-  // colour as the "INSIGHTS"/"STRATEGY" headers above them and the hierarchy
-  // went flat. Brightening the items — rather than re-dimming the headers,
-  // which would fail AA again — restores the ordering: active accent >
-  // item (slate-300, ~11.4:1) > group header (slate-400, 6.96:1).
+  // Inactive items are NOT dimmed. They stay at --text-nav-idle, unchanged in
+  // value from the slate-300 this app already used — the comment this
+  // replaces recorded that they were deliberately brightened to stay distinct
+  // from the group headers, and this spec doesn't reopen that; the active
+  // state moved instead (judgement call J6).
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
-    [
-      'relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-colors',
-      'before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2',
-      'before:w-[3px] before:rounded-full before:transition-all',
-      isActive
-        ? 'bg-brand-500/15 text-brand-300 font-medium hover:bg-brand-500/25 before:h-5 before:bg-brand-400'
-        : 'text-slate-300 hover:text-white hover:bg-dark-700 before:h-0 before:bg-transparent',
-    ].join(' ')
+    `nav-item${isActive ? ' is-active' : ''}`
 
   const handleLogout = async () => {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -236,7 +241,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const closeSidebar = () => setSidebarOpen(false)
   // The profile page has no historical data, so hide the global time-filter bar there.
-  const hideTimeFilter = useLocation().pathname === '/account'
+  const { pathname } = useLocation()
+  const hideTimeFilter = pathname === '/account'
+
+  // Scroll resets to the top on every route change. <main> is the scroll
+  // container (not the window), so this resets that element, and react-router's
+  // <ScrollRestoration> is not an option here — it requires a data router and
+  // this app mounts <BrowserRouter>. Without this, arriving on a page mid-scroll
+  // lands the reader below the H1 and the headline stats.
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [pathname])
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
 
@@ -258,9 +272,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — its own named surface (--surface-nav), not the card surface
+          (--dark-800). border-nav is a SOLID token (dashboard-visual-system.md
+          A1/A2): it must clear 3:1 against both the canvas and this surface, and
+          an alpha border cannot be measured without knowing what's behind it —
+          that's exactly how the previous 1.31:1/1.07:1 readings went unnoticed. */}
       <aside className={[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-dark-800 border-r border-dark-700/60 flex flex-col',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-surface-nav border-r border-nav flex flex-col',
         'transition-transform duration-200 ease-in-out',
         'md:relative md:w-64 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
@@ -268,13 +286,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Logo */}
         <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
-          <BrandGeoLogo />
+          <BrandGeoLogo onNavigate={closeSidebar} />
           <div className="flex items-center gap-2">
+            {/* Enter view-as-user. Exiting is deliberately NOT here — this
+                control disappears the moment it is used, because the whole
+                point is that the admin chrome goes away. The exit lives in the
+                banner, which is always visible while impersonating. */}
+            {isRealAdmin && !viewingAsUser && (
+              <button
+                onClick={() => setViewingAsUser(true)}
+                title="View this client as one of its users"
+                aria-label="View as user"
+                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                <Eye size={16} />
+              </button>
+            )}
             <AdminBell />
             {isDemoMode && (
               <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
             )}
-            <button onClick={closeSidebar} className="md:hidden text-slate-400 hover:text-white transition-colors p-2" aria-label="Close menu">
+            {/* md:hidden, so this only ever exists on a touch-sized viewport:
+                44x44 unconditionally rather than behind a query. The 18px glyph
+                is unchanged; only the box around it grew, and the header is
+                72px tall so nothing moves. */}
+            <button onClick={closeSidebar} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-slate-400 hover:text-white transition-colors" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
@@ -433,7 +469,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[11px] text-slate-400 bg-dark-700/40 border border-dark-600/60 hover:text-slate-200 hover:border-dark-500 transition-colors"
                   aria-haspopup="listbox"
                   aria-expanded={showInternal}
-                  title="Internal research workspaces for content and other uses — not customer accounts"
+                  title="Internal research workspaces for content and other uses, not customer accounts"
                 >
                   <FlaskConical size={12} className="flex-shrink-0" />
                   <span className="flex-1 text-left">Internal / Research</span>
@@ -486,9 +522,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs text-slate-600 uppercase tracking-wider">{t.sidebar_market}</span>
+            {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
+                text button so there is no padding to grow without moving the
+                MARKET header row it shares (this row is deliberately compact,
+                see the "reclaims vertical space" note further down). The target
+                grows instead: inset -14px vertical, -8px horizontal, giving
+                50.6 x 44.5 while the label stays exactly where it was. */}
             <button
               onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              className="relative flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
               aria-expanded={showMarketEditor}
             >
               {showMarketEditor ? 'Done' : 'Edit'}
@@ -532,7 +574,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {selections.length > 1 && (
                     <button
                       onClick={() => removeSelection(sel.market.id)}
-                      className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0"
+                      className="relative p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px]"
                       title={`Remove ${sel.market.label}`}
                       aria-label={`Remove ${sel.market.label} from selected markets`}
                     >
@@ -549,7 +591,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         const r = sel.market.regions.find(r => r.id === e.target.value)
                         if (r) updateRegion(sel.market.id, r)
                       }}
-                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 max-md:min-h-[44px] text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
                       aria-label={`Region for ${sel.market.label}`}
                     >
                       {sel.market.regions.map(r => (
@@ -567,7 +609,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative" ref={marketMenuRef}>
               <button
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
                 aria-haspopup="listbox"
                 aria-expanded={showAddMarket}
               >
@@ -624,7 +666,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative flex-1 min-w-0" ref={langMenuRef}>
               <button
                 onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}
                 title="Language"
@@ -648,13 +690,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
+            {/* Theme and sign out: 36x36 for a mouse, 44x44 below md. Both are
+                real boxes, not pseudo-element extensions, so however tight the
+                6px gap is their hit areas cannot overlap each other. */}
             <button
               onClick={toggle}
               role="switch"
               aria-checked={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={t.sidebar_darkMode}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
             >
               {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -663,7 +708,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               aria-label={t.sidebar_signOut}
               title={t.sidebar_signOut}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
             >
               <LogOut size={16} />
             </button>
@@ -671,12 +716,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* Main. canvas-bleed (index.css) is the depth cue from §4.1: a 24px
+          gradient painted on the CANVAS side of the divider, decaying to
+          nothing, so the canvas reads as sitting behind the rail rather than
+          beside it. It contributes nothing to any measured ratio — the
+          border-nav divider on <aside> alone carries the 3:1. */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden canvas-bleed">
+
+        {/* View-as-user banner. Sits outside the scroll container on purpose, so
+            it cannot be scrolled out of sight — an admin must never mistake an
+            impersonated view for the real product. Amber, not brand violet,
+            because it is a state warning and not a feature. */}
+        {viewingAsUser && (
+          <div className="flex-shrink-0 bg-amber-500/15 border-b border-amber-500/40 px-4 sm:px-6 py-2 flex items-center gap-3">
+            <Eye size={14} className="text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-200 min-w-0">
+              Viewing as a user of <strong className="font-semibold">{activeClient?.name ?? 'this client'}</strong>.
+              <span className="hidden sm:inline text-amber-200/70"> Admin controls are hidden. Your own permissions are unchanged.</span>
+            </p>
+            <button
+              onClick={() => setViewingAsUser(false)}
+              className="ml-auto flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-amber-100 bg-amber-500/25 hover:bg-amber-500/40 border border-amber-500/40 rounded-md px-2.5 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            >
+              <EyeOff size={13} /> Exit
+            </button>
+          </div>
+        )}
 
         {/* Mobile header */}
         <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white transition-colors p-2" aria-label="Open menu">
+          {/* Mobile-only header, so 44x44 unconditionally. h-14 (56px) has room. */}
+          <button onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 text-slate-400 hover:text-white transition-colors" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
@@ -688,19 +758,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        {/* Global time filter bar — hidden on the profile page (no historical data there) */}
+        {/* Global time filter bar — hidden on the profile page (no historical data
+            there). Solid --surface-bar (A7), not a translucent bg-dark-800/60 —
+            a translucent chrome surface can't be verified against 3:1 without
+            knowing what's scrolling under it. #0d1425 is the exact value the old
+            60% composite already produced over the dark canvas, so dark mode
+            doesn't change visually, it only becomes measurable. The border is
+            decorative here (40% alpha is fine): the 3:1 divider requirement is
+            the sidebar's, not this strip's (§4.4). */}
         {!hideTimeFilter && (
-        <div className="flex-shrink-0 border-b border-dark-700/40 bg-dark-800/60 backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
+        <div className="flex-shrink-0 border-b border-nav-40 bg-surface-bar backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
           {((['7d', '30d', '90d', 'all'] as const)).map(r => (
             <button
               key={r}
               onClick={() => setTimeRange(r)}
               aria-pressed={timeRange === r}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                timeRange === r
-                  ? 'bg-brand-500/20 text-brand-300'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-dark-700/50'
-              }`}
+              className={`time-pill${timeRange === r ? ' is-pressed' : ''}`}
             >
               {TIME_LABELS[r]}
             </button>
@@ -708,36 +781,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         )}
 
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
           <ClientBanner />
           {children}
         </main>
       </div>
 
-      {/* Mobile bottom nav bar */}
-      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-dark-800/95 backdrop-blur-md border-t border-dark-700 flex items-stretch justify-around safe-area-pb">
+      {/* Mobile bottom nav bar (§4.5) — --surface-nav at 95%, same rail token as
+          the desktop sidebar, moved to the item's TOP edge since these are a
+          vertical icon+label stack (a left rail would read as a divider
+          between items, not a selection). */}
+      <nav aria-label="Primary mobile" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb">
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             onClick={closeSidebar}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-0.5 px-2 py-2 flex-1 transition-colors min-w-0 ${
-                isActive ? 'text-brand-300' : 'text-slate-500 active:text-slate-300'
-              }`
-            }
+            className={({ isActive }) => `mobile-nav-item${isActive ? ' is-active' : ''}`}
           >
             <Icon size={19} />
-            <span className="text-[9px] font-medium leading-none truncate max-w-full">
+            <span className="mobile-nav-label">
               {label.split(' ')[0]}
             </span>
           </NavLink>
         ))}
       </nav>
 
-      {/* Floating support widget — present on every dashboard page. */}
-      <SupportWidget />
+      {/* Our own support widget is RETIRED from the UI as of 2026-07-29, in
+          favour of the askmywebsiteai assistant loaded in index.html, which
+          will feed tickets in from now on.
+
+          It is unmounted rather than deleted: SupportWidget.tsx, its
+          support-request function and the tickets pipeline behind it all still
+          work, so this is one line to reverse if the new assistant does not
+          work out.
+
+          It also had to go for the new one to be VISIBLE at all. Ours is
+          `fixed z-50 bottom-right`, which is exactly where a launcher of this
+          kind sits, so it was covering the askmywebsiteai launcher rather than
+          sitting beside it. Two floating buttons in one corner is not a layout
+          to fix, it is a decision to make, and the decision is that there is
+          one assistant. */}
+      {/* <SupportWidget /> */}
     </div>
   )
 }

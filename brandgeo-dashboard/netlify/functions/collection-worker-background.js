@@ -62,6 +62,8 @@ async function processJob(supabase, job, invId) {
       region_label:  job.region_label,
       market_id:     job.market_id,
       run_id:        job.run_id,
+      // Set by _enqueue.js from the clients row when the job was created.
+      plan:          job.client_config?.plan ?? null,
       worker:        true,   // generous per-engine timeouts (15-min budget) — CLAUDE.md §12.6
     })
 

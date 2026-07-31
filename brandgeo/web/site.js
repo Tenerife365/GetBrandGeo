@@ -1,3 +1,4 @@
+/* build: 2026-07-26 hook-rebuild */
 (function() {
   // Theme toggle (all pages)
   var themeBtn = document.getElementById('themeBtn');
@@ -16,64 +17,79 @@
 
   // ── Homepage instant-score widget (index.html only) ──────────────────
   //
-  // SALES-ENGINE.md Component D: visitor enters a domain -> we call
-  // Component A's public audit endpoint -> show a live teaser score ->
-  // email-gate the full report. Component A (the backend that actually
-  // runs the audit) is owned by a different session (Master-DashboardDesign)
-  // and, as of this writing, has NOT been built yet -- there is no
-  // brandgeo-dashboard/**/*audit* file and nothing documented in CLAUDE.md
-  // beyond SALES-ENGINE.md's prose description. So this widget is built
-  // against the STUB CONTRACT below and fails open: any non-200 response,
-  // network error, malformed JSON, or timeout is treated as "Component A
-  // isn't live yet" and silently falls back to the pre-existing, already-
-  // working flow (redirect to signup with the domain pre-filled) --
-  // zero regression today, and the richer experience turns on by itself
-  // the moment Component A ships a matching endpoint. No code change is
-  // needed here when that happens, only these two URLs below (and possibly
-  // the response-field names, if A ships something different).
+  // SALES-ENGINE.md Component D: visitor enters a domain -> we call the audit
+  // endpoint -> show a live teaser score -> email-gate the full report.
   //
-  // STUB CONTRACT (Master-DashboardDesign should confirm/adjust, not the
-  // other way around -- this file assumes, doesn't dictate):
+  // 2026-07-26: this block used to point at `public-audit` and
+  // `public-audit-unlock`, names invented by the stub contract it was written
+  // against before Component A existed. Component A did ship, under different
+  // names, and nobody came back and changed these two URLs. Both returned 404
+  // in production, so every visitor who typed a domain fell into the catch
+  // below and was redirected to signup. The instant audit had never once
+  // resolved in place. The names below are read from the deployed functions.
   //
-  //   POST https://app.getbrandgeo.com/.netlify/functions/public-audit
-  //   Body:    { "domain": "example.com" }
-  //   200 OK:  { "score": 34, "topGap": "ChatGPT has never mentioned your
-  //              brand.", "token": "aud_9f3e2b1c" }
-  //   Anything else (4xx/5xx/network error/timeout/malformed JSON) is
-  //   treated as "not available" by this widget.
+  // REAL CONTRACT (brandgeo-dashboard/netlify/functions/audit-domain.js and
+  // get-audit-report.js and unlock-audit-report.js):
   //
-  //   POST https://app.getbrandgeo.com/.netlify/functions/public-audit-unlock
-  //   Body:    { "token": "aud_9f3e2b1c", "email": "visitor@company.com",
-  //              "domain": "example.com" }
-  //   200 OK:  { "ok": true }  -- server emails the full report and
-  //             captures the lead (HubSpot, per SALES-ENGINE.md). This
-  //             widget just shows a thank-you state on 200.
+  //   POST /.netlify/functions/audit-domain
+  //   Body:    { "domain": "example.com", "honeypot": "" }
+  //   Public callers are always forced to 'screening' depth (audit-domain.js:74),
+  //   which runs to completion synchronously, so this stays a single call:
+  //   200 OK:  { "token": "...", "status": "ready",
+  //              "teaser": { "domain": ..., "ai_score": 41, "category": ... } }
+  //   400/429: { "error": "<message meant for the visitor>" } -- shown as-is,
+  //            not treated as "endpoint down". A paused-for-the-month 429 must
+  //            not dump someone into signup.
   //
-  //   CORS NOTE for whoever builds Component A: this widget runs on
-  //   https://getbrandgeo.com and calls app.getbrandgeo.com cross-origin.
-  //   The existing authenticated dashboard functions' origin whitelist
-  //   (_auth.js) does NOT include getbrandgeo.com -- this is a separate,
-  //   intentionally-unauthenticated public endpoint, so it needs its own
-  //   CORS allow-list entry for https://getbrandgeo.com (and
-  //   https://www.getbrandgeo.com if that's ever used), not a loosening
-  //   of the authenticated functions' existing lock.
+  //   GET  /.netlify/functions/get-audit-report?token=...
+  //   200 OK:  { "status": "ready", "unlocked": false, "domain", "category",
+  //              "ai_score", "low_confidence", "gap_count" }
+  //   Called once after the score lands, only to build the gap sentence. Its
+  //   failure is non-fatal: the score still renders without it.
+  //
+  //   POST /.netlify/functions/unlock-audit-report
+  //   Body:    { "token": ..., "email": ..., "honeypot": "" }
+  //   200 OK:  server emails the full report and captures the lead.
+  //
+  //   CORS: _prospect_guard.js:19 allowlists https://getbrandgeo.com,
+  //   https://www.getbrandgeo.com and https://app.getbrandgeo.com. The
+  //   marketing site's own CSP must also list app.getbrandgeo.com in
+  //   connect-src -- it did not until 2026-07-26, see brandgeo/web/.htaccess.
   //
   //   RATE LIMITING: this file only does a soft, client-side,
   //   localStorage-based limit (bot/UX deterrent, trivially bypassed by
-  //   clearing storage or using another browser). Real enforcement must
-  //   live server-side in Component A, per SALES-ENGINE.md's guardrail
-  //   against auditing the whole internet.
+  //   clearing storage or using another browser). Real enforcement lives
+  //   server-side in _prospect_guard.js (per-IP plus a monthly spend cap).
   var brandInput = document.getElementById('brandInput');
   var auditBtn = document.getElementById('auditBtn');
   var auditHp = document.getElementById('auditHp');
   var auditStatus = document.getElementById('auditStatus');
   var auditResult = document.getElementById('auditResult');
+  // The scanning skeleton and the result both live in the evidence card's
+  // position, and swap with it. docs/design/homepage-hook.md §8.
+  var previewCard = document.getElementById('previewCard');
+  var auditSkeleton = document.getElementById('auditSkeleton');
 
   if (brandInput && auditBtn && auditResult) {
-    var AUDIT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/public-audit';
-    var AUDIT_UNLOCK_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/public-audit-unlock';
-    var AUDIT_TIMEOUT_MS = 12000;
+    var AUDIT_BASE = 'https://app.getbrandgeo.com/.netlify/functions/';
+    var AUDIT_ENDPOINT = AUDIT_BASE + 'audit-domain';
+    var AUDIT_REPORT_ENDPOINT = AUDIT_BASE + 'get-audit-report';
+    var AUDIT_UNLOCK_ENDPOINT = AUDIT_BASE + 'unlock-audit-report';
+    // Where the unlocked report actually lives (App.tsx:106, /audit/:token).
+    // Added 2026-07-31 closing acquisition-funnel-audit.md F1/F2/F4: the report
+    // was built, deployed, working and unreachable, because nothing ever handed
+    // the visitor this URL. unlock-audit-report.js sends NO email (the files
+    // that touch a mailer and the files that touch a prospect audit are
+    // disjoint sets), so the old "check your inbox" copy promised a delivery
+    // that could not happen, to every person who converted.
+    var AUDIT_REPORT_URL = 'https://app.getbrandgeo.com/audit/';
+    // A real screening audit measured 26.9s end to end on 2026-07-26. The old
+    // 12s ceiling aborted every one of them, so even once the URLs were right
+    // the widget would still have redirected to signup. Netlify's synchronous
+    // limit is 26s of function time, so this sits just past it.
+    var AUDIT_TIMEOUT_MS = 32000;
     var AUDIT_UNLOCK_TIMEOUT_MS = 10000;
+    var AUDIT_REPORT_TIMEOUT_MS = 8000;
     var AUDIT_RATE_KEY = 'bgAuditAttempts';
     var AUDIT_RATE_MAX = 3;
     var AUDIT_RATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
@@ -84,10 +100,19 @@
       });
     }
 
-    function redirectToSignup(domain) {
+    // Split out of redirectToSignup() 2026-07-31 so the SUCCESS path can offer
+    // the same destination the error path has always redirected to, built the
+    // same way. Two hand-built copies of this URL is how one of them quietly
+    // loses ?domain= and starts asking the visitor to retype what they typed
+    // into the widget thirty seconds earlier.
+    function signupUrl(domain) {
       var url = 'https://app.getbrandgeo.com/signup';
       if (domain) url += '?domain=' + encodeURIComponent(domain);
-      window.location.href = url;
+      return url;
+    }
+
+    function redirectToSignup(domain) {
+      window.location.href = signupUrl(domain);
     }
 
     function getAuditAttempts() {
@@ -130,21 +155,49 @@
       auditStatus.classList.toggle('is-error', !!isError);
     }
 
+    // Shows the skeleton in the evidence card's slot. A skeleton that matches
+    // the result layout, not a spinner that reflows: its job is to hold the
+    // shape the answer will land in while up to 12s of latency passes.
+    function showSlot(which) {
+      if (previewCard) previewCard.hidden = (which !== 'card');
+      if (auditSkeleton) auditSkeleton.hidden = (which !== 'skeleton');
+      auditResult.hidden = (which !== 'result');
+    }
+
+    // The audit runs for the better part of half a minute. One static line for
+    // that long reads as a hang, so the label reports where it has got to. Job:
+    // mask latency, per docs/design/homepage-hook.md §7. Times are wall clock,
+    // not progress, and the copy is careful not to claim otherwise.
+    var skTimers = [];
+    function startSkeletonProgress() {
+      stopSkeletonProgress();
+      var el = document.getElementById('skLabel');
+      if (!el) return;
+      el.textContent = 'Asking the engines about your brand';
+      skTimers.push(setTimeout(function() { el.textContent = 'Reading what each engine came back with'; }, 7000));
+      skTimers.push(setTimeout(function() { el.textContent = 'Scoring the answers, nearly there'; }, 16000));
+    }
+    function stopSkeletonProgress() {
+      for (var i = 0; i < skTimers.length; i++) { clearTimeout(skTimers[i]); }
+      skTimers = [];
+    }
+
     function setButtonScanning(on) {
+      if (!on) stopSkeletonProgress();
       if (on) {
         auditBtn.disabled = true;
         brandInput.disabled = true;
-        auditBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Scanning 5 AI engines&hellip;';
+        auditBtn.textContent = 'Scanning the engines…';
       } else {
         auditBtn.disabled = false;
         brandInput.disabled = false;
-        auditBtn.innerHTML = 'Check My AI Visibility &rarr;';
+        auditBtn.innerHTML = 'Check my visibility &rarr;';
       }
     }
 
     function animateAuditScore(score) {
       var ring = document.getElementById('auditRingProgress');
-      var circumference = 150.8; // 2 * PI * r(24), matches the SVG below
+      var circumference = 213.63; // 2 * PI * r(34), matches the SVG below
       var offset = circumference * (1 - score / 100);
       var numEl = document.getElementById('auditRingNum');
       var inlineEl = document.getElementById('auditScoreInline');
@@ -172,16 +225,36 @@
       requestAnimationFrame(step);
     }
 
-    function renderAuditResult(domain, score, topGap, token) {
+    // Replaces the gap sentence once the locked report lands. Only three fields
+    // are readable before the email step: ai_score, category and gap_count.
+    function setAuditGap(rep) {
+      var el = document.getElementById('auditGap');
+      if (!el) return;
+      var n = typeof rep.gap_count === 'number' ? rep.gap_count : null;
+      var where = rep.category ? ' in ' + rep.category : '';
+      var msg;
+      if (n === null)   msg = 'Scored across the engines your customers ask' + where + '.';
+      else if (n === 0) msg = 'No blocking gaps found' + where + '. The full report shows what is holding the score back.';
+      else if (n === 1) msg = 'One gap is holding this score down' + where + '. The full report names it.';
+      else              msg = n + ' gaps are holding this score down' + where + '. The full report names them.';
+      if (rep.low_confidence) msg += ' Confidence is low on this one, the engines returned little to read.';
+      el.textContent = msg;
+    }
+
+    function renderAuditResult(domain, score, token, category) {
       score = Math.max(0, Math.min(100, Math.round(score)));
-      auditResult.hidden = false;
+      showSlot('result');
+      // The email row inside the result is now the next step, so the hero
+      // button steps down to "check another domain".
+      auditBtn.classList.add('is-secondary');
+      auditBtn.innerHTML = 'Check another &rarr;';
       auditResult.innerHTML =
         '<div class="audit-result-top">' +
           '<div class="audit-ring-wrap">' +
-            '<svg viewBox="0 0 60 60" style="transform:rotate(-90deg)" aria-hidden="true">' +
-              '<circle cx="30" cy="30" r="24" fill="none" stroke="var(--bd2)" stroke-width="5"></circle>' +
-              '<circle id="auditRingProgress" cx="30" cy="30" r="24" fill="none" stroke="url(#auditScoreGrad)" stroke-width="5" ' +
-                'stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round"></circle>' +
+            '<svg viewBox="0 0 88 88" style="transform:rotate(-90deg)" aria-hidden="true">' +
+              '<circle cx="44" cy="44" r="34" fill="none" stroke="var(--bd2)" stroke-width="6"></circle>' +
+              '<circle id="auditRingProgress" cx="44" cy="44" r="34" fill="none" stroke="url(#auditScoreGrad)" stroke-width="6" ' +
+                'stroke-dasharray="213.63" stroke-dashoffset="213.63" stroke-linecap="round"></circle>' +
               '<defs><linearGradient id="auditScoreGrad" x1="0%" y1="0%">' +
                 '<stop offset="0%" stop-color="#c4b5fd"></stop><stop offset="100%" stop-color="#6d28d9"></stop>' +
               '</linearGradient></defs>' +
@@ -193,15 +266,59 @@
             '<div class="audit-domain">' + escapeHtml(domain) + '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="audit-gap">' + escapeHtml(topGap) + '</div>' +
+        // Filled in by setAuditGap() once get-audit-report answers. Starts with
+        // the category the audit classified the domain into, which is already
+        // known and is better than an empty box.
+        '<div class="audit-gap" id="auditGap">' +
+          (category ? 'Scored against the brands AI names in ' + escapeHtml(category) + '.'
+                    : 'Scored across the engines your customers ask.') +
+        '</div>' +
         '<form class="audit-email-row" id="auditEmailForm" novalidate>' +
           '<input type="email" id="auditEmail" placeholder="you@company.com" aria-label="Your email" required>' +
-          '<button type="submit" class="audit-email-btn">Email me the full breakdown &rarr;</button>' +
+          // "Show me", not "Email me". No email is sent on unlock and none ever
+          // was; see the AUDIT_REPORT_URL note above. The label now describes
+          // what the button does. If the unlock email is ever built, this and
+          // the success copy below are the two strings to change back.
+          '<button type="submit" class="audit-email-btn">Show me the full breakdown &rarr;</button>' +
         '</form>' +
-        '<div class="audit-fine-print">One-time report. No spam, unsubscribe any time.</div>' +
+        // "One-time report" implied a delivery. The report opens in the browser
+        // instead, so say that. The no-spam line stays true: the address is
+        // kept as a lead (prospect_leads), it is simply not mailed a report.
+        '<div class="audit-fine-print">Opens in your browser. No spam, unsubscribe any time.</div>' +
+        // The forward step the success path never had (C1b, funnel audit F3).
+        // redirectToSignup() was called from exactly one place in this file, the
+        // error handler inside startAudit(), so a visitor whose audit FAILED was
+        // carried to signup with their domain prefilled while a visitor whose
+        // audit SUCCEEDED reached a dead end. The better the product performed,
+        // the less it invited anyone to do.
+        //
+        // It sits on the RESULT card rather than inside the unlock-success
+        // block, which is where the eye is but not where a link survives: that
+        // block navigates to the report after 900ms (see the unlock handler
+        // below), so anything rendered beside it is gone before it can be read.
+        // Here it stays on screen for as long as the visitor is deciding, next
+        // to the report CTA, which is the moment the score has just landed.
+        // The report page carries the same step afterwards (AuditReport.tsx).
+        // "Start a free account", NOT "continuous tracking". This link goes to
+        // free signup, and the Free tier is one engine, five prompts, and a
+        // manual refresh (planConfig.ts PLAN_ENGINES.free, PLAN_PROMPTS.free,
+        // refresh_cadence DEFAULT 'manual'). Continuous multi-engine monitoring
+        // is what a plan adds, so promising it above a free-signup button would
+        // be a claim the product does not keep at the exact moment someone
+        // decides to trust it.
+        '<div class="audit-forward">Or ' +
+          '<a class="audit-forward-link" href="' + signupUrl(domain) + '">' +
+          'start a free account for ' + escapeHtml(domain) + ' &rarr;</a>' +
+        '</div>' +
         '<div class="audit-status is-error" id="auditEmailError" hidden></div>';
 
       animateAuditScore(score);
+
+      // Below 900px the evidence card sits under the field, so bring the
+      // answer into view rather than leaving it just off screen.
+      if (window.innerWidth < 900 && auditResult.scrollIntoView) {
+        auditResult.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
 
       var form = document.getElementById('auditEmailForm');
       if (!form) return;
@@ -221,18 +338,35 @@
         fetchWithTimeout(AUDIT_UNLOCK_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: token, email: email, domain: domain })
+          body: JSON.stringify({ token: token, email: email, honeypot: '' })
         }, AUDIT_UNLOCK_TIMEOUT_MS).then(function(res) {
           if (!res.ok) throw new Error('unlock failed');
           return res.json();
-        }).then(function() {
+        }).then(function(data) {
+          // Hand over the report the visitor just unlocked. Announce, then move,
+          // matching the pattern the failure path already uses at the bottom of
+          // this file so a full-page navigation never arrives unannounced.
+          //
+          // The link is rendered as well as followed, deliberately: it survives
+          // a blocked navigation, a slow connection, and a visitor who wants to
+          // open it in a new tab. Never replace it with the redirect alone.
+          //
+          // `token` is the one from the audit that is already in scope; the
+          // response echoes it back (unlock-audit-report.js:63) and is preferred
+          // only so a future server-side token rotation cannot break this.
+          var reportToken = (data && data.token) || token;
+          var reportUrl = AUDIT_REPORT_URL + encodeURIComponent(reportToken);
           auditResult.innerHTML =
-            '<div class="audit-success">Check your inbox &mdash; the full AI Visibility report for ' +
-            '<strong>' + escapeHtml(domain) + '</strong> is on its way.</div>';
+            '<div class="audit-success">Your full AI Visibility report for ' +
+            '<strong>' + escapeHtml(domain) + '</strong> is ready. ' +
+            '<a class="audit-success-link" href="' + reportUrl + '">Open it now &rarr;</a></div>';
+          setTimeout(function() { window.location.href = reportUrl; }, 900);
         }).catch(function() {
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Email me the full breakdown →'; }
+          // Must match the label rendered above, or a failed attempt silently
+          // rewrites the button to a promise the product does not keep.
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Show me the full breakdown →'; }
           if (errEl) {
-            errEl.textContent = 'Something went wrong sending that — try again, or start your full audit instead.';
+            errEl.textContent = 'Something went wrong sending that. Try again, or start your full audit instead.';
             errEl.hidden = false;
           }
         });
@@ -243,38 +377,80 @@
       var val = brandInput.value.trim();
       if (auditHp && auditHp.value) return; // honeypot tripped -- silently drop
       if (val.length < 2) {
+        // Was a silent focus() with no message, which reads as a dead button.
+        setAuditStatus('Enter your domain, for example yourcompany.com', true);
         brandInput.focus();
         return;
       }
       if (getAuditAttempts().length >= AUDIT_RATE_MAX) {
-        setAuditStatus('You’ve checked a few brands already — try again in a few minutes, or start your full audit now.', true);
+        setAuditStatus('You’ve checked a few brands already. Try again in a few minutes, or start your full audit now.', true);
         return;
       }
       setAuditStatus('');
-      auditResult.hidden = true;
       auditResult.innerHTML = '';
+      auditBtn.classList.remove('is-secondary');
+      showSlot('skeleton');
+      startSkeletonProgress();
       setButtonScanning(true);
       recordAuditAttempt();
 
       fetchWithTimeout(AUDIT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: val })
+        body: JSON.stringify({ domain: val, honeypot: '' })
       }, AUDIT_TIMEOUT_MS).then(function(res) {
-        if (!res.ok) throw new Error('audit endpoint not ready');
+        // 400 and 429 carry a message written for the visitor (a bad domain, a
+        // per-IP limit, the monthly cap). Those are answers, not outages, so
+        // they are shown rather than treated as "endpoint down".
+        if (res.status === 400 || res.status === 429) {
+          return res.json().catch(function() { return {}; }).then(function(d) {
+            var e = new Error('handled'); e.handled = true;
+            e.userMessage = (d && d.error) || 'That domain could not be checked. Try another.';
+            throw e;
+          });
+        }
+        if (!res.ok) throw new Error('audit endpoint not reachable');
         return res.json();
       }).then(function(data) {
-        if (!data || typeof data.score !== 'number' || !data.topGap) {
+        var teaser = data && data.teaser;
+        var score = teaser && teaser.ai_score;
+        if (typeof score !== 'number') {
+          // 'collecting' should not reach a public caller, which is forced to
+          // screening depth, but if it ever does this widget cannot wait for it.
           throw new Error('unexpected audit response shape');
         }
         setButtonScanning(false);
-        renderAuditResult(val, data.score, data.topGap, data.token);
-      }).catch(function() {
-        // Component A isn't live yet (or errored/timed out) -- fall back
-        // to the pre-existing, already-working flow rather than leaving
-        // the visitor stuck on a dead button.
+        renderAuditResult(val, score, data.token, teaser.category);
+        // Second, non-fatal call: the gap sentence. The score is already on
+        // screen, so a failure here changes nothing the visitor can see.
+        fetchWithTimeout(AUDIT_REPORT_ENDPOINT + '?token=' + encodeURIComponent(data.token || ''), {
+          method: 'GET'
+        }, AUDIT_REPORT_TIMEOUT_MS).then(function(r) {
+          return r.ok ? r.json() : null;
+        }).then(function(rep) {
+          if (rep && rep.status === 'ready') setAuditGap(rep);
+        }).catch(function() { /* score stands on its own */ });
+      }).catch(function(err) {
+        if (err && err.handled) {
+          setButtonScanning(false);
+          showSlot('card');
+          setAuditStatus(err.userMessage, true);
+          brandInput.focus();
+          return;
+        }
+        // The audit endpoint errored, timed out, or answered in a shape this
+        // widget does not recognise. Fall back to the pre-existing flow rather
+        // than leaving the visitor stuck on a dead button.
+        //
+        // This is a failure path INSIDE the primary CTA, not a second CTA, so
+        // it is never offered as a choice (hook-thesis-web.md §3). The skeleton
+        // holds and one line explains the handoff, so a full-page redirect does
+        // not arrive unannounced.
         setButtonScanning(false);
-        redirectToSignup(val);
+        var sk = document.getElementById('skLabel');
+        if (sk) sk.textContent = 'Taking you to the full audit for ' + val;
+        setAuditStatus('Taking you to the full audit…');
+        setTimeout(function() { redirectToSignup(val); }, 600);
       });
     }
 
@@ -303,8 +479,14 @@
     }
   }
 
-  // Animated score ring + counting number + dimension-bar fill-in (index.html "what you get" mockup).
-  // Runs once, the first time the preview card scrolls into view.
+  // Animated score ring + counting number on the hero evidence card.
+  //
+  // Delayed 900ms on purpose (docs/design/homepage-hook.md §7): its job is to
+  // move the eye to the evidence AFTER the headline and the domain field have
+  // landed, not to compete with them in the first second. The dimension bars
+  // are no longer in this card -- they live in proof block 2 and animate on
+  // their own observer below, when that block is actually reached.
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var previewWrap = document.querySelector('.preview-wrap');
   if (previewWrap) {
     var animatePreview = function() {
@@ -321,7 +503,7 @@
       if (numEl) {
         var target = parseInt(numEl.getAttribute('data-target'), 10) || 0;
         var start = null;
-        var duration = 1400;
+        var duration = 900;
         var step = function(ts) {
           if (!start) start = ts;
           var progress = Math.min((ts - start) / duration, 1);
@@ -330,26 +512,18 @@
         };
         requestAnimationFrame(step);
       }
-      document.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
-        var w = bar.getAttribute('data-w');
-        requestAnimationFrame(function() { bar.style.width = w + '%'; });
-      });
     };
-    var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducedMotion) {
       // Respect the user's preference: set final values instantly, no animation.
       var ring0 = document.getElementById('scoreRingProgress');
       if (ring0) ring0.style.strokeDashoffset = ring0.getAttribute('data-target-offset');
       var num0 = document.getElementById('scoreNum');
       if (num0) num0.textContent = num0.getAttribute('data-target');
-      document.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
-        bar.style.width = bar.getAttribute('data-w') + '%';
-      });
     } else if ('IntersectionObserver' in window) {
       var previewIO = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
           if (entry.isIntersecting) {
-            animatePreview();
+            setTimeout(animatePreview, 900);
             previewIO.unobserve(entry.target);
           }
         });
@@ -357,6 +531,29 @@
       previewIO.observe(previewWrap);
     } else {
       animatePreview();
+    }
+  }
+
+  // Proof block 2: the six dimension bars fill when that block is reached.
+  var dimsBox = document.querySelector('.preview-dims-box');
+  if (dimsBox) {
+    var fillDims = function() {
+      dimsBox.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
+        var w = bar.getAttribute('data-w');
+        requestAnimationFrame(function() { bar.style.width = w + '%'; });
+      });
+    };
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      dimsBox.querySelectorAll('.dim-fill[data-w]').forEach(function(bar) {
+        bar.style.width = bar.getAttribute('data-w') + '%';
+      });
+    } else {
+      var dimsIO = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) { fillDims(); dimsIO.unobserve(entry.target); }
+        });
+      }, { threshold: 0.3 });
+      dimsIO.observe(dimsBox);
     }
   }
 
@@ -383,29 +580,10 @@
     });
   }
 
-  // "Live" activity ticker on the preview card — cross-fades through a
-  // handful of illustrative example signals every few seconds, reinforcing
-  // that this is a running system rather than a static screenshot. Content
-  // is representative example data, the same convention already used by
-  // the surrounding mockup's own scores/positions, not a real client feed.
-  var tickerEl = document.getElementById('tickerText');
-  if (tickerEl && !prefersReduced) {
-    var tickerItems = [
-      'ChatGPT mentioned your brand — 2 min ago',
-      'Sentiment shifted positive on Gemini — 14 min ago',
-      'New competitor spotted in Perplexity — 38 min ago',
-      'Position improved to #2 on ChatGPT — 1 hr ago'
-    ];
-    var tickerIndex = 0;
-    setInterval(function() {
-      tickerEl.style.opacity = 0;
-      setTimeout(function() {
-        tickerIndex = (tickerIndex + 1) % tickerItems.length;
-        tickerEl.textContent = tickerItems[tickerIndex];
-        tickerEl.style.opacity = 1;
-      }, 400);
-    }, 4200);
-  }
+  // The "live" activity ticker was removed from the hero on 2026-07-26. It
+  // announced events ("ChatGPT mentioned your brand, 2 min ago") that had not
+  // happened to the visitor reading them, and it was a tenth competing element
+  // in a three-second window. docs/design/homepage-hook.md §3.5.
 
   // Engine chip tooltips (hero, index.html only) — hover (desktop) or tap
   // (touch/keyboard) reveals a short, clearly-labelled illustrative example
@@ -493,40 +671,244 @@
     window.addEventListener('resize', function() { if (activeChip) positionTooltip(activeChip); });
   }
 
-  // ── Self-serve Stripe checkout links (index.html pricing) ──────────────────
-  // PASTE YOUR 4 STRIPE PAYMENT LINK URLS BELOW.
-  // Create them in Stripe → Payment Links (Essentials & Growth, each monthly +
-  // annual), then replace the 4 placeholder strings with the real https://
-  // URLs. Until a real URL is pasted for a given button, that button safely
-  // falls back to the signup page (the href set in index.html), so it never
-  // dead-ends. Managed / Pro / Enterprise stay on #contact (sales-assisted).
-  var STRIPE_LINKS = {
-    essentials: {
-      monthly: 'https://buy.stripe.com/fZu4gAb1adKQ7EgdcCdZ600',
-      annual:  'https://buy.stripe.com/7sY7sMfhq4agaQsa0qdZ604'
-    },
-    growth: {
-      monthly: 'https://buy.stripe.com/5kQ8wQd9i4ag6Ac4G6dZ602',
-      annual:  'https://buy.stripe.com/fZu6oI4CM6iobUwdcCdZ603'
-    }
-  };
+  // ── Contract gate before checkout (index.html pricing) ─────────────────────
+  //
+  // THE STRIPE LINKS USED TO BE HERE AND ARE GONE ON PURPOSE (ROADMAP Stream C,
+  // C3, 2026-07-31). A STRIPE_LINKS map held all six payment URLs and
+  // applyCheckoutLinks() wrote them onto every Subscribe button on load. That
+  // shipped the destination to every visitor, which meant no gate in front of
+  // those buttons could ever have been more than a suggestion: the URL was in
+  // the page, readable from view-source, reachable from an old bookmark, and
+  // reachable with JavaScript switched off.
+  //
+  // The links now live in netlify/functions/_terms_gate.js and are issued, one
+  // at a time, by accept-terms.js in response to a request that carries an
+  // acceptance, which that endpoint records before it answers. So the tick box
+  // below is not the gate. The gate is that this file does not know where
+  // Stripe is. Never reintroduce a checkout URL here.
+  //
+  // The Subscribe buttons keep their index.html href to the signup page, which
+  // is what a visitor with no JavaScript gets: a free account, not a payment
+  // page. Managed and Custom Enterprise carry no data-checkout at all and stay
+  // on #contact, sales-assisted by design.
+  var CHECKOUT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/accept-terms';
+  var CHECKOUT_TIMEOUT_MS = 12000;
 
-  function applyCheckoutLinks(yearly) {
-    document.querySelectorAll('[data-checkout]').forEach(function(el) {
-      var plan = STRIPE_LINKS[el.getAttribute('data-checkout')];
-      if (!plan) return;
-      var url = yearly ? plan.annual : plan.monthly;
-      // Only override the href when a real Stripe URL has been pasted;
-      // otherwise keep the HTML fallback (signup) so the button still works.
-      if (url && /^https?:\/\//.test(url)) el.setAttribute('href', url);
+  // Must match TERMS_VERSION in _terms_gate.js, which refuses any acceptance
+  // that does not. That refusal is deliberate: it is what stops a tab opened
+  // before a contract update from accepting terms nobody was shown. When
+  // terms.html's effective date changes, all three change together.
+  var TERMS_VERSION = '2026-07-13';
+
+  // Display names only. No prices: those live in the pricing cards and in
+  // Stripe, and a third copy here would be a fourth place for them to drift.
+  // `radar` added 2026-07-31, once its Stripe price and payment link existed.
+  // This map is what decides whether the contract gate offers a plan at all: a
+  // key that is absent here makes the Subscribe button fall through to plain
+  // /signup, which is exactly how Radar's card shipped earlier today, on
+  // purpose, while there was nothing to sell.
+  var PLAN_LABELS = { radar: 'Radar', essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO' };
+
+  // Hoisted out of the billing toggle below, where it used to be a local. The
+  // gate has to know which period the visitor is looking at at the moment they
+  // click Subscribe, and the toggle is the only thing that knows.
+  var billingYearly = false;
+
+  (function initContractGate() {
+    var gate = document.getElementById('termsGate');
+    if (!gate) return;   // not the pricing page
+
+    var planEl     = document.getElementById('termsGatePlan');
+    var versionEl  = document.getElementById('termsGateVersion');
+    var acceptEl   = document.getElementById('termsGateAccept');
+    var continueEl = document.getElementById('termsGateContinue');
+    var cancelEl   = document.getElementById('termsGateCancel');
+    var errEl      = document.getElementById('termsGateError');
+    // The redesigned notice (index.html, 2026-07-31) wraps setError's message
+    // in an icon + text row rather than one bare paragraph, so the message
+    // now targets this inner span. errEl.textContent would also erase the
+    // icon svg, since textContent replaces all children of the node it is
+    // set on.
+    var errTextEl  = document.getElementById('termsGateErrorText');
+    if (!planEl || !acceptEl || !continueEl || !cancelEl || !errEl || !errTextEl) return;
+
+    var pendingPlan = null;
+    var lastFocused = null;
+    var busy = false;
+
+    // Local, deliberately. escapeHtml() and fetchWithTimeout() further up this
+    // file are declared inside `if (brandInput && auditBtn && auditResult)`, so
+    // they exist only on a page that has the audit widget AND only after that
+    // block has run. Borrowing them would make the checkout path depend on the
+    // hero widget being present, which is a coupling nobody would expect and
+    // that fails silently as an undefined function at the moment someone tries
+    // to pay.
+    function gateFetch(url, opts, ms) {
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      if (ctrl) opts.signal = ctrl.signal;
+      var timer = setTimeout(function() { if (ctrl) ctrl.abort(); }, ms);
+      return fetch(url, opts).then(function(res) {
+        clearTimeout(timer);
+        return res;
+      }, function(e) {
+        clearTimeout(timer);
+        throw e;
+      });
+    }
+
+    versionEl.textContent = 'Terms version ' + TERMS_VERSION + '. A copy is recorded with your subscription.';
+
+    function setError(msg) {
+      errTextEl.textContent = msg || '';
+      errEl.hidden = !msg;
+    }
+
+    function closeGate() {
+      if (busy) return;   // never yank the panel out from under an in-flight request
+      gate.hidden = true;
+      pendingPlan = null;
+      acceptEl.checked = false;
+      continueEl.disabled = true;
+      continueEl.textContent = 'Continue to payment';
+      setError('');
+      if (lastFocused && lastFocused.focus) lastFocused.focus();
+    }
+
+    function openGate(plan, trigger) {
+      pendingPlan = plan;
+      lastFocused = trigger || null;
+      acceptEl.checked = false;
+      continueEl.disabled = true;
+      setError('');
+      // Built with textContent rather than an HTML string. Every value here is
+      // a constant from PLAN_LABELS, so nothing needs escaping today; doing it
+      // this way means nothing will need escaping if a future value ever stops
+      // being a constant.
+      planEl.textContent = 'You are subscribing to ';
+      var planName = document.createElement('strong');
+      planName.textContent = PLAN_LABELS[plan];
+      planEl.appendChild(planName);
+      planEl.appendChild(document.createTextNode(', billed ' + (billingYearly ? 'yearly' : 'monthly') + '.'));
+      gate.hidden = false;
+      acceptEl.focus();
+    }
+
+    // The disabled button is a courtesy, not the gate: the server refuses an
+    // unaccepted request whatever this checkbox says.
+    acceptEl.addEventListener('change', function() {
+      continueEl.disabled = !acceptEl.checked;
+      if (acceptEl.checked) setError('');
     });
-  }
-  applyCheckoutLinks(false); // set monthly links on load (no-op on other pages)
+
+    cancelEl.addEventListener('click', closeGate);
+    gate.addEventListener('click', function(e) { if (e.target === gate) closeGate(); });
+    document.addEventListener('keydown', function(e) {
+      if (gate.hidden) return;
+      if (e.key === 'Escape') { closeGate(); return; }
+
+      // Focus trap. The panel is role="dialog" aria-modal="true", which tells a
+      // screen reader the rest of the page is inert; without this, Tab walks out
+      // of the panel and behind a 78% scrim, so the focus ring is visible on
+      // content that is not. On the last screen before payment, and the screen
+      // where a legal acceptance is captured, that is worth the twelve lines.
+      if (e.key !== 'Tab') return;
+      var focusable = gate.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])');
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      // Covers the case where focus is somewhere outside the panel entirely,
+      // which is what happens on the very first Tab if the browser restored
+      // focus elsewhere.
+      if (!gate.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    continueEl.addEventListener('click', function() {
+      if (!pendingPlan || !acceptEl.checked || busy) return;
+      busy = true;
+      continueEl.disabled = true;
+      continueEl.textContent = 'Opening checkout…';
+      setError('');
+
+      gateFetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: pendingPlan,
+          period: billingYearly ? 'annual' : 'monthly',
+          accepted: true,
+          accepted_version: TERMS_VERSION,
+          honeypot: ''
+        })
+      }, CHECKOUT_TIMEOUT_MS).then(function(res) {
+        return res.json().catch(function() { return {}; }).then(function(data) {
+          return { ok: res.ok, status: res.status, data: data };
+        });
+      }).then(function(r) {
+        if (r.ok && r.data && r.data.url) {
+          window.location.href = r.data.url;
+          // The page is going away, so the busy state is correct for the next
+          // few hundred milliseconds. But a navigation can be blocked, refused
+          // by an extension, or simply slow, and `busy` also gates closeGate():
+          // leaving it set would freeze the panel with Cancel AND Escape both
+          // inert, in front of a visitor who is trying to pay.
+          //
+          // So `busy` is released, which restores Cancel and Escape, but the
+          // Continue button is NOT re-enabled. Re-enabling it would let a second
+          // click through, and every click writes a terms_acceptances row, so a
+          // slow navigation would record the same buyer accepting twice and make
+          // "no matched_at means abandoned" untrue. Closing and reopening is the
+          // retry, and it produces exactly one fresh acceptance.
+          setTimeout(function() {
+            busy = false;
+            continueEl.textContent = 'Checkout opened';
+            setError('If the payment page did not open, close this and try again.');
+          }, 4000);
+          return;
+        }
+        busy = false;
+        continueEl.textContent = 'Continue to payment';
+        continueEl.disabled = !acceptEl.checked;
+        // A stale tab is the one failure the visitor can actually fix, so it
+        // gets its own message rather than the generic one.
+        if (r.data && r.data.reason === 'version_mismatch') {
+          setError('Our terms have been updated since this page loaded. Please refresh and accept the current version.');
+        } else {
+          setError('We could not open checkout just now. Please try again, or contact us and we will set it up with you.');
+        }
+      }).catch(function() {
+        busy = false;
+        continueEl.textContent = 'Continue to payment';
+        continueEl.disabled = !acceptEl.checked;
+        setError('We could not reach checkout just now. Please try again, or contact us and we will set it up with you.');
+      });
+    });
+
+    document.querySelectorAll('[data-checkout]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        var plan = el.getAttribute('data-checkout');
+        // An unrecognised plan is left to the button's own href (signup) rather
+        // than opening a panel that cannot lead anywhere.
+        if (!Object.prototype.hasOwnProperty.call(PLAN_LABELS, plan)) return;
+        e.preventDefault();
+        openGate(plan, el);
+      });
+    });
+  })();
 
   // Billing toggle (index.html only)
   var billingToggle = document.getElementById('billingToggle');
   if (billingToggle) {
-    var billingYearly = false;
     billingToggle.addEventListener('click', function() {
       billingYearly = !billingYearly;
       var monthlyLbl = document.getElementById('toggle-monthly-lbl');
@@ -542,7 +924,9 @@
       document.querySelectorAll('.billing-yearly').forEach(function(el) {
         el.style.display = billingYearly ? '' : 'none';
       });
-      applyCheckoutLinks(billingYearly); // swap checkout links to match period
+      // No checkout links to swap any more: the period is read off billingYearly
+      // at the moment Subscribe is clicked and sent to accept-terms.js, which
+      // resolves it to a URL server-side. See the contract gate above.
     });
   }
 
@@ -557,8 +941,8 @@
   var modeCaption = document.getElementById('modeCaption');
   if (modeBtns.length && gridSelf && gridManaged) {
     var MODE_CAPTIONS = {
-      self: 'Run it yourself — subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.',
-      managed: 'Done for you — our team runs the strategy, research and reporting. You get the results, not the busywork.'
+      self: 'Run it yourself: subscribe, log in, and track your AI visibility. Upgrade, downgrade or cancel anytime.',
+      managed: 'Done for you: our team runs the strategy, research and reporting. You get the results, not the busywork.'
     };
     modeBtns.forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -615,7 +999,18 @@
       '.bg-nav-drawer{display:contents;}' +
       '.bg-nav-toggle{display:none;}' +
       '@media(max-width:640px){' +
-        'nav a:not(.nav-cta){display:none;}' +
+        // `:not(.logo)` added 2026-07-29, and it is load bearing. This rule
+        // collapses the nav text links so the drawer above can own them. But
+        // the header lockup is `<a class="logo">`, a direct child of <nav>,
+        // so it matched `nav a:not(.nav-cta)` too and was hidden below 640px
+        // on every page that loads this file: measured at 375px, .logo
+        // computed display:none with a 0x0 box, leaving the phone header with
+        // no mark and no wordmark. The drawer is unaffected, because .logo is
+        // never collected into it (the collector only walks `nav > div`).
+        // The static pages carry a byte-identical copy of this rule in their
+        // own <style>; both copies need the guard, since this sheet is
+        // appended later and would otherwise win the cascade tie on its own.
+        'nav a:not(.nav-cta):not(.logo){display:none;}' +
         '.bg-nav-toggle{display:flex;flex-direction:column;justify-content:center;gap:4px;width:36px;height:36px;margin-left:10px;padding:0 8px;background:none;border:1px solid var(--bd2);border-radius:8px;cursor:pointer;flex-shrink:0;}' +
         '.bg-nav-toggle span{display:block;height:2px;width:100%;background:var(--t2);border-radius:2px;transition:transform .2s ease,opacity .2s ease;}' +
         'nav.bg-menu-open .bg-nav-toggle span:nth-child(1){transform:translateY(6px) rotate(45deg);}' +
@@ -666,12 +1061,48 @@
   })();
 })();
 
-// ── BrandGEO site chat assistant (ASSISTANT-SPEC.md) ──────────────────────
+// ── askmywebsiteai support assistant ──────────────────────────────────────
+// Injected from here rather than pasted into all 76 html files, because every
+// public page already loads site.js and one copy cannot drift from another.
+// The vendor snippet reads its keys off document.currentScript.dataset, which
+// resolves to this element while it executes, so setting the attributes before
+// appending is equivalent to the static tag they document.
+//
+// This is the LANDING SITE's app. The dashboard runs a DIFFERENT one
+// (app_e9a0360bb6095088, in brandgeo-dashboard/index.html). One app per host,
+// each rejecting the other's origin, so never copy an id between the two.
+//
+// Requires the CSP allowances in .htaccess. Note the widget will not render
+// until the app's config is PUBLISHED vendor-side; an unpublished app fails
+// silently with one console line and no visible symptom.
+(function() {
+  if (document.querySelector('script[data-app-id]')) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://app.askmywebsiteai.com/sdk.js';
+  s.setAttribute('data-app-id', 'app_a16a65082c9e13c7');
+  s.setAttribute('data-public-key', 'pk_live_352f98333e403138c8f2a64432ffe776');
+  document.body.appendChild(s);
+})();
+
+// ── BrandGEO site chat assistant "Jamie" (ASSISTANT-SPEC.md) ──────────────
 // Self-contained: floating launcher + panel, injected on every page that loads
 // this script. Talks to two PUBLIC Netlify functions on app.getbrandgeo.com
 // (assistant / assistant-lead). Uses the site's own CSS custom properties so it
 // inherits dark/light theme automatically; no per-page HTML edits needed.
+//
+// RETIRING: Jamie is being handed over to the askmywebsiteai assistant above,
+// and will be recalibrated for outbound/inbound lead work instead. Flip
+// JAMIE_RETIRED to true to take it off the site. It is deliberately still
+// false: Jamie is the only lead capture on the public site (its "Talk to a
+// human" form posts to assistant-lead), and the askmywebsiteai app above is
+// not publishing its config yet, so retiring Jamie today would leave
+// getbrandgeo.com with no assistant and no lead capture at all. Flip this the
+// moment the vendor config goes live, not before.
+var JAMIE_RETIRED = false;
+
 (function() {
+  if (JAMIE_RETIRED) return;
   if (!window.fetch || document.getElementById('bg-asst-launcher')) return;
 
   var ASSISTANT_ENDPOINT = 'https://app.getbrandgeo.com/.netlify/functions/assistant';
@@ -683,7 +1114,7 @@
   var TIMEOUT_MS = 22000;
   var SESSION_MSG_CAP = 30; // soft client-side cap; the server enforces the real one
 
-  var WELCOME = "Hi — I'm the BrandGEO assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
+  var WELCOME = "Hi, I'm Jamie, BrandGEO's assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
   var OPENING_CHIPS = [
     { label: '💶 See pricing',       send: 'What does BrandGEO cost?' },
     { label: '🔍 Run a free audit',  send: 'I want to run a free audit.' },
@@ -694,16 +1125,33 @@
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var history = [];   // [{role,content}] sent to the assistant endpoint
   var sentCount = 0, busy = false, lastFocus = null;
+  // Once the assistant classifies the conversation "hot" (strong buying signal),
+  // we latch this and echo it back on every later request + on lead capture, so
+  // the server bumps to the senior model and the lead is flagged HOT for the team.
+  var hot = false;
   var launcher, panel, msgs, composer, ta, sendBtn, chipsRow, greeted = false;
 
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   function scrollDown(){ if (msgs) msgs.scrollTop = msgs.scrollHeight; }
 
+  // Strip the markdown the model can still emit (bold, inline code, headings,
+  // bullet markers) — the chat bubble renders plain text (white-space:pre-wrap),
+  // so raw ** / # / - would otherwise show as literal symbols. Line breaks are
+  // preserved; bullets collapse to a clean "• ".
+  function tidyMarkdown(text){
+    return String(text)
+      .replace(/\*\*(.+?)\*\*/g, '$1')     // **bold**
+      .replace(/__(.+?)__/g, '$1')         // __bold__
+      .replace(/`([^`]+)`/g, '$1')         // `code`
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')  // # headings
+      .replace(/^\s*[-*]\s+/gm, '• ');// "- item" / "* item" -> "• item"
+  }
+
   // Escape text and turn bare URLs into safe new-tab links.
   function fillText(node, text){
     var re = /(https?:\/\/[^\s<>()]+[^\s<>().,!?])/g, idx = 0, m;
-    text = String(text);
+    text = tidyMarkdown(text);
     while ((m = re.exec(text))) {
       if (m.index > idx) node.appendChild(document.createTextNode(text.slice(idx, m.index)));
       var a = el('a', 'bg-asst-link'); a.href = m[0]; a.textContent = m[0];
@@ -750,6 +1198,24 @@
     scrollDown();
   }
 
+  function delay(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  // Ask the assistant, retrying ONCE on a failed / empty response before giving
+  // up. The common failure here is a cold start or a just-deployed function
+  // returning a transient non-JSON error; the retry hits a now-warm function and
+  // succeeds, so a real hiccup never surfaces the fallback on the first click.
+  function requestReply(attemptsLeft){
+    return fetchJson(ASSISTANT_ENDPOINT, { messages: history, hot: hot }).then(function(res){
+      var d = res.data || {};
+      if (typeof d.reply === 'string' && d.reply) return { res: res, d: d };
+      if (attemptsLeft > 0) return delay(1200).then(function(){ return requestReply(attemptsLeft - 1); });
+      return { res: res, d: {} };
+    }).catch(function(e){
+      if (attemptsLeft > 0) return delay(1200).then(function(){ return requestReply(attemptsLeft - 1); });
+      throw e;
+    });
+  }
+
   function fetchJson(url, payload){
     var ctrl = window.AbortController ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, TIMEOUT_MS) : null;
@@ -790,7 +1256,7 @@
   // in the widget so they can still run the free audit, see pricing, or reach a
   // human without leaving the page.
   function fallbackHelp(){
-    addBubble('assistant', "I'm having a brief hiccup on my end — but I can still point you the right way:");
+    addBubble('assistant', "I'm having a brief hiccup on my end, but I can still point you the right way:");
     var wrap = el('div', 'bg-asst-msg bg-asst-assistant');
     var box = el('div', 'bg-asst-actions');
     var audit = el('a', 'bg-asst-btn', 'Run my free audit →');
@@ -799,7 +1265,7 @@
     price.href = 'https://getbrandgeo.com/#pricing'; price.target = '_blank'; price.rel = 'noopener noreferrer';
     var human = el('button', 'bg-asst-btn bg-asst-btn-sec', 'Talk to a human'); human.type = 'button';
     human.addEventListener('click', function(){
-      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      addBubble('assistant', 'Happy to connect you. Leave your details and the team will reach out.');
       showLeadForm('sales', null);
     });
     box.appendChild(audit); box.appendChild(price); box.appendChild(human);
@@ -810,7 +1276,7 @@
     text = String(text || '').trim();
     if (!text || busy) return;
     if (sentCount >= SESSION_MSG_CAP) {
-      addBubble('assistant', 'That’s a lot of questions — the best next step is to talk to the team at ' + SUPPORT_EMAIL + ', or tap “Talk to a human” below.');
+      addBubble('assistant', 'That’s a lot of questions. The best next step is to talk to the team at ' + SUPPORT_EMAIL + ', or tap “Talk to a human” below.');
       return;
     }
     if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
@@ -819,13 +1285,14 @@
     sentCount++;
     busy = true; setBusy(true); showTyping();
 
-    fetchJson(ASSISTANT_ENDPOINT, { messages: history }).then(function(res){
+    requestReply(1).then(function(out){
       hideTyping();
-      var d = res.data || {};
+      var d = out.d || {};
       if (typeof d.reply === 'string' && d.reply) {
+        if (out.res.ok && d.intent === 'hot') hot = true;   // latch: senior model + HOT lead from here on
         addBubble('assistant', d.reply);
-        if (res.ok) history.push({ role: 'assistant', content: d.reply });
-        if (res.ok && d.action) renderAction(d.action);
+        if (out.res.ok) history.push({ role: 'assistant', content: d.reply });
+        if (out.res.ok && d.action) renderAction(d.action);
       } else {
         fallbackHelp();
       }
@@ -869,12 +1336,12 @@
       submit.disabled = true; submit.textContent = 'Sending…';
       fetchJson(LEAD_ENDPOINT, {
         name: name.value.trim(), email: em, need: need.value.trim(),
-        reason: reason, domain: domain || '', honeypot: hp.value
+        reason: reason, domain: domain || '', honeypot: hp.value, hot: hot
       }).then(function(res){
         if (res.ok && res.data && res.data.ok) {
           row.removeChild(form);
           var ok = el('div', 'bg-asst-bubble');
-          fillText(ok, 'Thanks — I’ve passed your details to the team. Someone will be in touch by email shortly.');
+          fillText(ok, 'Thanks, I’ve passed your details to the team. Someone will be in touch by email shortly.');
           row.appendChild(ok); scrollDown();
         } else {
           err.textContent = (res.data && res.data.error) || 'Something went wrong. Please email ' + SUPPORT_EMAIL + '.';
@@ -928,25 +1395,44 @@
     launcher = el('button', 'bg-asst-launcher');
     launcher.id = 'bg-asst-launcher';
     launcher.type = 'button';
-    launcher.setAttribute('aria-label', 'Open the BrandGEO assistant chat');
+    launcher.setAttribute('aria-label', 'Chat with Jamie, the BrandGEO assistant');
     launcher.setAttribute('aria-expanded', 'false');
     launcher.innerHTML =
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' +
-      '<span class="bg-asst-launch-label">Ask us</span>';
-    if (!reduced) launcher.classList.add('bg-asst-pulse');
+      '<span class="bg-asst-launch-label">Ask Jamie</span>';
+    // The pulse waits until the hero has left the viewport. An animated control
+    // in the corner competes with the primary CTA during the three seconds the
+    // hero has to land (docs/design/homepage-hook.md §3.5). Pages with no hero
+    // pulse immediately, as before.
+    if (!reduced) {
+      var heroEl = document.querySelector('.hero');
+      if (!heroEl || !('IntersectionObserver' in window)) {
+        launcher.classList.add('bg-asst-pulse');
+      } else {
+        var pulseIO = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (!entry.isIntersecting) {
+              launcher.classList.add('bg-asst-pulse');
+              pulseIO.disconnect();
+            }
+          });
+        }, { threshold: 0 });
+        pulseIO.observe(heroEl);
+      }
+    }
     launcher.addEventListener('click', open);
 
     // Panel
     panel = el('div', 'bg-asst-panel');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-label', 'BrandGEO assistant');
+    panel.setAttribute('aria-label', 'Jamie, the BrandGEO assistant');
 
     var head = el('div', 'bg-asst-head');
     head.appendChild(el('span', 'bg-asst-dot'));
     var titleWrap = el('div', 'bg-asst-titlewrap');
-    titleWrap.appendChild(el('div', 'bg-asst-title', 'BrandGEO Assistant'));
-    titleWrap.appendChild(el('div', 'bg-asst-sub', 'Online · usually replies instantly'));
+    titleWrap.appendChild(el('div', 'bg-asst-title', 'Jamie'));
+    titleWrap.appendChild(el('div', 'bg-asst-sub', 'BrandGEO assistant · usually replies instantly'));
     head.appendChild(titleWrap);
     var closeBtn = el('button', 'bg-asst-close', '×');
     closeBtn.type = 'button'; closeBtn.setAttribute('aria-label', 'Close chat');
@@ -975,7 +1461,7 @@
     human.type = 'button';
     human.addEventListener('click', function(){
       if (chipsRow) { chipsRow.parentNode.removeChild(chipsRow); chipsRow = null; }
-      addBubble('assistant', 'Happy to connect you — leave your details and the team will reach out.');
+      addBubble('assistant', 'Happy to connect you. Leave your details and the team will reach out.');
       showLeadForm('sales', null);
     });
     foot.appendChild(composer); foot.appendChild(human);
@@ -989,7 +1475,7 @@
   function injectCss(){
     var css = document.createElement('style');
     css.textContent =
-      '.bg-asst-launcher{position:fixed;bottom:20px;right:20px;z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border:none;border-radius:999px;cursor:pointer;font:inherit;font-weight:600;font-size:.92rem;color:#fff;background:linear-gradient(135deg,var(--ac),#8b7bff);box-shadow:0 10px 30px rgba(108,99,255,.42);transition:transform .18s ease,box-shadow .18s ease;}' +
+      '.bg-asst-launcher{position:fixed;bottom:20px;right:20px;z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border:none;border-radius:999px;cursor:pointer;font:inherit;font-weight:600;font-size:.92rem;color:#fff;background:linear-gradient(135deg,var(--ac-strong),#6d28d9);box-shadow:0 10px 30px rgba(108,99,255,.42);transition:transform .18s ease,box-shadow .18s ease;}' +
       '.bg-asst-launcher:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(108,99,255,.5);}' +
       '.bg-asst-launcher.bg-asst-hidden{display:none;}' +
       '.bg-asst-launch-label{white-space:nowrap;}' +
@@ -1009,7 +1495,7 @@
       '.bg-asst-user{justify-content:flex-end;}' +
       '.bg-asst-bubble{max-width:84%;padding:10px 13px;border-radius:14px;font-size:.9rem;line-height:1.5;color:var(--t);white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;}' +
       '.bg-asst-assistant .bg-asst-bubble{background:var(--s2);border:1px solid var(--bd);border-bottom-left-radius:4px;}' +
-      '.bg-asst-user .bg-asst-bubble{background:linear-gradient(135deg,var(--ac),#8b7bff);color:#fff;border-bottom-right-radius:4px;}' +
+      '.bg-asst-user .bg-asst-bubble{background:linear-gradient(135deg,var(--ac-strong),#6d28d9);color:#fff;border-bottom-right-radius:4px;}' +
       '.bg-asst-link{color:var(--ac);text-decoration:underline;}' +
       '.bg-asst-user .bg-asst-link{color:#fff;}' +
       '.bg-asst-typing{display:flex;gap:4px;align-items:center;}' +

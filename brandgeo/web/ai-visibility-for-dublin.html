@@ -3,10 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
@@ -17,9 +25,9 @@
   <meta property="og:description" content="8 real Dublin prompts, 4 AI engines. Monday.com and Revolut Business won unanimous 4/4 consensus, while Meta AI kept recommending the same big institutional names regardless of what was actually asked. Here's the data.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://getbrandgeo.com/ai-visibility-for-dublin.html">
-  <meta property="og:image" content="https://getbrandgeo.com/logo.png">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:image" content="https://getbrandgeo.com/logo.png">
+  <meta property="og:image" content="https://getbrandgeo.com/images/og/og-ai-visibility-for-dublin.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/og/og-ai-visibility-for-dublin.png">
   <meta name="keywords" content="AI visibility Dublin, GEO Dublin businesses, ChatGPT solicitors Dublin, AI search Ireland, generative engine optimization Ireland, Dublin startups AI recommendations">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,9 +61,9 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
-      {"@type":"Question","name":"What was the most unusual finding in the Dublin data?","acceptedAnswer":{"@type":"Answer","text":"Meta AI showed a recurring big-name bias that ignored what was actually being asked. For financial advisors, wealth management for expats, and property-purchase solicitors, Meta's answers were nearly identical to its answer for an unrelated commercial-litigation prompt — the same large corporate law firms and institutional wealth brands, regardless of query intent. Claude, Gemini, and Perplexity all differentiated cleanly between boutique and institutional options depending on what was asked."}},
-      {"@type":"Question","name":"Did any brands achieve full consensus in Dublin?","acceptedAnswer":{"@type":"Answer","text":"Yes — two categories reached a clean 4/4 unanimous top pick: Monday.com for project management software, and Revolut Business for business banking fintech. That's the strongest full-consensus rate of any city tested in this research program so far, a direct contrast to Rome, where no brand reached even 3/4 agreement."}},
-      {"@type":"Question","name":"Why is ChatGPT missing from this data?","acceptedAnswer":{"@type":"Answer","text":"ChatGPT's collection failed on every Dublin prompt this run — a technical error, not evidence ChatGPT has zero visibility for Dublin brands. This page reflects the engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds."}}
+      {"@type":"Question","name":"What was the most unusual finding in the Dublin data?","acceptedAnswer":{"@type":"Answer","text":"Meta AI showed a recurring big-name bias that ignored what was actually being asked. For financial advisors, wealth management for expats, and property-purchase solicitors, Meta's answers were nearly identical to its answer for an unrelated commercial-litigation prompt: the same large corporate law firms and institutional wealth brands, regardless of query intent. Claude, Gemini, and Perplexity all differentiated cleanly between boutique and institutional options depending on what was asked."}},
+      {"@type":"Question","name":"Did any brands achieve full consensus in Dublin?","acceptedAnswer":{"@type":"Answer","text":"Yes: two categories reached a clean 4/4 unanimous top pick: Monday.com for project management software, and Revolut Business for business banking fintech. That is two of Dublin's eight categories, the highest rate of the seven cities collected on 2026-07-10, and a direct contrast to Rome from the same run, where no brand reached even 3/4 agreement."}},
+      {"@type":"Question","name":"Why is ChatGPT missing from this data?","acceptedAnswer":{"@type":"Answer","text":"ChatGPT's collection failed on every Dublin prompt this run, a technical error, not evidence ChatGPT has zero visibility for Dublin brands. This page reflects the engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds."}}
     ]
   }
   </script>
@@ -63,24 +71,24 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050508; --s: #0e0e17; --s2: #12121c;
-      --bd: rgba(255,255,255,.07); --bd2: rgba(255,255,255,.13);
-      --ac: #6c63ff; --ac2: #00d4aa;
-      --t: #ffffff; --t2: rgba(255,255,255,.6); --t3: rgba(255,255,255,.35);
-      --nav: rgba(5,5,8,.85); --r: 12px;
+      --bg: #0a0b0e; --s: #101116; --s2: #16171e;
+      --bd: #23242b; --bd2: #32333c;
+      --ac: #8b5cf6; --ac2: #34d399;
+      --t: #e8e9ed; --t2: #9ba1ac; --t3: #7d838f;
+      --nav: rgba(10,11,14,.85); --r: 12px;
     }
     [data-theme="light"] {
       --bg: #f7f7fc; --s: #ffffff; --s2: #f4f4fb;
-      --bd: rgba(0,0,0,.08); --bd2: rgba(0,0,0,.14);
-      --t: #09090f; --t2: rgba(9,9,15,.58); --t3: rgba(9,9,15,.35);
-      --nav: rgba(247,247,252,.88);
+      --bd: #e2e2ea; --bd2: #cfcfda;
+      --t: #09090f; --t2: #55555e; --t3: #6b6b75;
+      --nav: rgba(247,247,252,.88);      --ac: #7c3aed; --ac-text: #6d28d9; --ac-strong: #6d28d9; --ac2: #047857;      --ok: #047857; --part: #b45309; --bad: #b91c1c; --info: #6d28d9;
     }
     body { background: var(--bg); color: var(--t); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 40px; border-bottom: 1px solid var(--bd); position: sticky; top: 0; background: var(--nav); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -.4px; line-height: 1; color: var(--t); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text { font-size: 1.15rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; color: var(--t); }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--t2); text-decoration: none; font-size: 0.88rem; font-weight: 500; margin-left: 28px; transition: color .15s; }
     nav a:hover { color: var(--t); }
     .nav-cta { background: var(--ac) !important; color: #fff !important; padding: 8px 18px; border-radius: 8px; font-weight: 700; margin-left: 16px !important; }
@@ -178,17 +186,51 @@
 
     @media(max-width:640px) {
       nav { padding: 14px 20px; }
-      nav a:not(.nav-cta) { display: none; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
       .page-hero, .wrap, .breadcrumb { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 20px; }
       .findings-bar { padding: 24px 20px; border-radius: 12px; }
       .consensus-table { font-size: 0.8rem; }
       .consensus-table th, .consensus-table td { padding: 10px 8px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -216,7 +258,7 @@
 <div class="page-hero">
   <div class="hero-badge">City Research &middot; Dublin</div>
   <h1>AI Visibility in Dublin: When One Engine <em>Answers Every Question the Same Way</em></h1>
-  <p>BrandGEO ran 8 real commercial-buyer prompts &mdash; the kind of question a Dubliner actually types when they need a solicitor, a CRM, or a wealth manager &mdash; through its own collection pipeline against four major AI engines, then compared every answer side by side.</p>
+  <p>BrandGEO ran 8 real commercial-buyer prompts (the kind of question a Dubliner actually types when they need a solicitor, a CRM, or a wealth manager) through its own collection pipeline against four major AI engines, then compared every answer side by side.</p>
   <p>Two categories landed on a <strong>clean, unanimous 4/4 pick</strong>. But the more interesting result is a pattern in how one engine answered: regardless of whether the question was about boutique financial planners or residential property solicitors, it kept reaching for the same set of big, institutional names.</p>
   <div class="updated-note">Original research &middot; data collected 2026-07-10 &middot; BrandGEO's own AI Visibility pipeline</div>
 </div>
@@ -228,11 +270,11 @@
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">2 of 8</div>
-        <div class="finding-desc">Categories with a clean 4/4 unanimous pick &mdash; the strongest full-consensus rate of any city in this program</div>
+        <div class="finding-desc">Categories with a clean 4/4 unanimous pick, the highest rate of the seven cities collected 2026-07-10</div>
       </div>
       <div class="finding">
         <div class="finding-number">3 of 8</div>
-        <div class="finding-desc">Prompts where Meta AI's answer echoed a completely different, unrelated prompt's answer &mdash; a big-name bias</div>
+        <div class="finding-desc">Prompts where Meta AI's answer echoed a completely different, unrelated prompt's answer: a big-name bias</div>
       </div>
       <div class="finding">
         <div class="finding-number">0</div>
@@ -246,19 +288,19 @@
   </div>
 
   <h2>What we actually asked the AI engines</h2>
-  <p class="lede">Ireland is an English-first market, so all 8 prompts were asked once, in English &mdash; unlike the bilingual design used for Berlin, Madrid, Paris, and Rome.</p>
+  <p class="lede">Ireland is an English-first market, so all 8 prompts were asked once, in English, unlike the bilingual design used for Berlin, Madrid, Paris, and Rome.</p>
   <div class="prompt-grid">
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best project management software for Irish startups"<span>Unanimous &mdash; Monday.com, 4/4 engines</span></div>
+      <div class="prompt-text">"Best project management software for Irish startups"<span>Unanimous: Monday.com, 4/4 engines</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Best fintech apps for business banking in Ireland"<span>Unanimous &mdash; Revolut Business, 4/4 engines</span></div>
+      <div class="prompt-text">"Best fintech apps for business banking in Ireland"<span>Unanimous: Revolut Business, 4/4 engines</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
-      <div class="prompt-text">"Which Dublin law firm should I use for a commercial contract dispute?"<span>3/3 &mdash; Ireland's "Big Five" corporate firms</span></div>
+      <div class="prompt-text">"Which Dublin law firm should I use for a commercial contract dispute?"<span>3/3: Ireland's "Big Five" corporate firms</span></div>
     </div>
     <div class="prompt-card">
       <div class="prompt-icon">?</div>
@@ -271,7 +313,7 @@
   </div>
 
   <h2>The headline consensus, category by category</h2>
-  <p class="lede">"Engine agreement" counts how many of the 4 engines independently named the same brand for that prompt &mdash; not a ranking BrandGEO assigned, just a count of how often the engines agreed with each other.</p>
+  <p class="lede">"Engine agreement" counts how many of the 4 engines independently named the same brand for that prompt, not a ranking BrandGEO assigned, just a count of how often the engines agreed with each other.</p>
   <table class="consensus-table">
     <thead>
       <tr><th>Category</th><th>Top AI-visible name(s)</th><th>Engine agreement</th></tr>
@@ -290,15 +332,15 @@
 
   <div class="callout teal">
     <div class="callout-label">One engine, one answer, regardless of the question</div>
-    <p>Meta AI's response to "best financial advisors in Dublin" named Davy Private Clients, Investec Wealth &amp; Investment, KBC Wealth, Goodbody Stockbrokers, and Quilter Cheviot &mdash; large institutional wealth managers, with zero overlap with the boutique independent planners that Claude, Gemini, and Perplexity all named for the exact same prompt. Ask Meta about wealth management for expats, and the pattern repeats: Davy Wealth, Cantor Fitzgerald, Investec, Brewin Dolphin, Sarasin &amp; Partners &mdash; again all large institutions, again with almost no overlap with the other three engines' boutique, expat-focused picks. And for residential property-purchase solicitors, Meta answered with nearly the exact same "Big Five" corporate litigation firms (McCann FitzGerald, A&amp;L Goodbody, Arthur Cox, Mason Hayes &amp; Curran) it had already given for an unrelated commercial-dispute prompt. The firm names Meta extracts are all real &mdash; this isn't a data-quality issue. It looks like a genuine tendency to default to well-known, large institutional names regardless of what the query is actually asking for.</p>
+    <p>Meta AI's response to "best financial advisors in Dublin" named Davy Private Clients, Investec Wealth &amp; Investment, KBC Wealth, Goodbody Stockbrokers, and Quilter Cheviot, large institutional wealth managers, with zero overlap with the boutique independent planners that Claude, Gemini, and Perplexity all named for the exact same prompt. Ask Meta about wealth management for expats, and the pattern repeats: Davy Wealth, Cantor Fitzgerald, Investec, Brewin Dolphin, Sarasin &amp; Partners, again all large institutions, again with almost no overlap with the other three engines' boutique, expat-focused picks. And for residential property-purchase solicitors, Meta answered with nearly the exact same "Big Five" corporate litigation firms (McCann FitzGerald, A&amp;L Goodbody, Arthur Cox, Mason Hayes &amp; Curran) it had already given for an unrelated commercial-dispute prompt. The firm names Meta extracts are all real. This isn't a data-quality issue. It looks like a genuine tendency to default to well-known, large institutional names regardless of what the query is actually asking for.</p>
   </div>
 
-  <h2>The strongest full-consensus rate of any city so far</h2>
-  <p class="lede">Two categories &mdash; project management software and business banking fintech &mdash; landed on a clean 4/4 unanimous top pick, Monday.com and Revolut Business respectively. That's a direct structural contrast to Rome, the previous city in this research program, where zero brands reached even 3-of-4 agreement anywhere in the dataset. Dublin sits at the opposite end of the consensus spectrum.</p>
+  <h2>The highest full-consensus rate of the 2026-07-10 run</h2>
+  <p class="lede">Two categories (project management software and business banking fintech) landed on a clean 4/4 unanimous top pick, Monday.com and Revolut Business respectively. That's a direct structural contrast to Rome, collected the same day, where zero brands reached even 3-of-4 agreement anywhere in the dataset. Dublin sits at the opposite end of the consensus spectrum.</p>
 
   <div class="callout">
     <div class="callout-label">A data-quality note, not a finding</div>
-    <p>ChatGPT's collection failed on every Dublin prompt this run (a technical error, `status: error`) &mdash; it isn't included in the tables above. Separately, Gemini returned zero structured competitors on 3 of the 8 prompts (employment solicitors, commercial contract dispute, wealth management for expats), despite discussing firms in its own prose for at least two of those &mdash; consistent with the same extraction gap already documented in New York (4 of 8) and Rome (5 of 8).</p>
+    <p>ChatGPT's collection failed on every Dublin prompt this run (a technical error, `status: error`). It isn't included in the tables above. Separately, Gemini returned zero structured competitors on 3 of the 8 prompts (employment solicitors, commercial contract dispute, wealth management for expats), despite discussing firms in its own prose for at least two of those, consistent with the same extraction gap already documented in New York (4 of 8) and Rome (5 of 8).</p>
   </div>
 
   <h2>What this means if your business is in Dublin</h2>
@@ -328,7 +370,7 @@
       <div class="check-num">4</div>
       <div class="check-body">
         <h4>Re-run this regularly, not once</h4>
-        <p>These answers reflect what the engines say today, this week. Extraction quality and engine behavior both shift between runs &mdash; a one-time check tells you less than an ongoing one.</p>
+        <p>These answers reflect what the engines say today, this week. Extraction quality and engine behavior both shift between runs. A one-time check tells you less than an ongoing one.</p>
       </div>
     </li>
   </ol>
@@ -337,15 +379,15 @@
   <div class="mini-faq">
     <div class="mini-faq-item">
       <h4>What was the most unusual finding in the Dublin data?</h4>
-      <p>Meta AI showed a recurring big-name bias that ignored what was actually being asked. For financial advisors, wealth management for expats, and property-purchase solicitors, Meta's answers were nearly identical to its answer for an unrelated commercial-litigation prompt &mdash; the same large corporate law firms and institutional wealth brands, regardless of query intent. Claude, Gemini, and Perplexity all differentiated cleanly between boutique and institutional options depending on what was asked.</p>
+      <p>Meta AI showed a recurring big-name bias that ignored what was actually being asked. For financial advisors, wealth management for expats, and property-purchase solicitors, Meta's answers were nearly identical to its answer for an unrelated commercial-litigation prompt: the same large corporate law firms and institutional wealth brands, regardless of query intent. Claude, Gemini, and Perplexity all differentiated cleanly between boutique and institutional options depending on what was asked.</p>
     </div>
     <div class="mini-faq-item">
       <h4>Did any brands achieve full consensus in Dublin?</h4>
-      <p>Yes &mdash; two categories reached a clean 4/4 unanimous top pick: Monday.com for project management software, and Revolut Business for business banking fintech. That's the strongest full-consensus rate of any city tested in this research program so far, a direct contrast to Rome, where no brand reached even 3/4 agreement.</p>
+      <p>Yes: two categories reached a clean 4/4 unanimous top pick: Monday.com for project management software, and Revolut Business for business banking fintech. That is two of Dublin's eight categories, the highest rate of the seven cities collected on 2026-07-10, and a direct contrast to Rome from the same run, where no brand reached even 3/4 agreement.</p>
     </div>
     <div class="mini-faq-item">
       <h4>Why is ChatGPT missing from this data?</h4>
-      <p>ChatGPT's collection failed on every Dublin prompt this run &mdash; a technical error, not evidence ChatGPT has zero visibility for Dublin brands. This page reflects the engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds.</p>
+      <p>ChatGPT's collection failed on every Dublin prompt this run, a technical error, not evidence ChatGPT has zero visibility for Dublin brands. This page reflects the engines that returned usable results: Claude, Gemini, Meta AI, and Perplexity. A future re-run will include ChatGPT once the collection succeeds.</p>
     </div>
   </div>
 
@@ -354,7 +396,7 @@
     <a href="/ai-visibility-for-rome.html" class="related-card">
       <div class="related-id">City Research</div>
       <div class="related-title">AI Visibility in Rome</div>
-      <div class="related-hook">The opposite consensus pattern &mdash; zero brands achieved cross-engine agreement anywhere in the dataset.</div>
+      <div class="related-hook">The opposite consensus pattern: zero brands achieved cross-engine agreement anywhere in the dataset.</div>
     </a>
     <a href="/ai-visibility-for-london.html" class="related-card">
       <div class="related-id">City Research</div>
@@ -364,13 +406,13 @@
     <a href="/bg-008.html" class="related-card">
       <div class="related-id">BG-008</div>
       <div class="related-title">AI Visibility by Industry: Who Wins, Who Loses</div>
-      <div class="related-hook">The industry-level version of the same pattern &mdash; some categories are AI-visibility winners, others are invisible.</div>
+      <div class="related-hook">The industry-level version of the same pattern: some categories are AI-visibility winners, others are invisible.</div>
     </a>
   </div>
 
   <div class="cta-box">
     <h3>See how your Dublin business actually shows up in AI search</h3>
-    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Meta AI. No signup, no credit card, no tool to configure.</p>
+    <p>Get a free, one-time AI Visibility audit across ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode. No signup, no credit card, no tool to configure.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">Curious how AI Visibility varies by industry? Read <a href="/bg-008.html" style="color:var(--ac2)">BG-008</a>.</p>
   </div>
@@ -391,6 +433,14 @@
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
       <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

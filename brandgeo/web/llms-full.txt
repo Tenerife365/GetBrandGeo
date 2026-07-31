@@ -30,10 +30,11 @@ domains is describing a different, unrelated entity.
 ## Product
 
 BrandGEO monitors how AI engines mention, rank, and describe a brand. It
-runs a client's real, commercial-buyer-style prompts against five AI
-engines on a recurring basis: ChatGPT, Gemini, Claude, Perplexity, and Meta
-AI. Two more engines (Microsoft Copilot, Google AI Overviews via a
-dedicated tracker) and others are planned but not yet live.
+runs a client's real, commercial-buyer-style prompts against up to seven AI
+engines on a recurring basis: ChatGPT, Gemini, Claude, Perplexity, Google AI
+Mode, Grok, and Google AI Overviews. How many of the seven a given brand is
+monitored across depends on its plan (see Plans below). Microsoft Copilot
+and DeepSeek are not live on any plan and collect no data.
 
 The platform also tracks named competitors per prompt, sentiment trends
 over time, and surfaces a prioritized "Fix This" action hub of specific
@@ -43,21 +44,23 @@ does with the results.
 
 ### Plans
 
-- Free: EUR 0/month - 1 project, 5 prompts, ChatGPT only, monthly refresh, self-serve
-- Essentials: EUR 99/month - 30 prompts, ChatGPT + Gemini + Claude, weekly monitoring, competitor tracking, CSV export, self-serve, no setup fee
-- Growth: EUR 299/month - 150 prompts, all 5 AI engines, daily/weekly refresh, 1 onboarding call, self-serve, no setup fee
-- Managed: EUR 900/month or EUR 9,000/year - full managed service (strategy, research, monthly executive report, monthly strategy call, priority support); EUR 1,250 one-time setup fee on the monthly option only, waived on annual
-- Pro: from EUR 1,500/month, no setup fee - multiple countries, multiple brands, larger prompt coverage, executive reporting, plus add-ons for extra scale, done-for-you managed service
-- Enterprise: from roughly EUR 10,000/month, custom pricing - unlimited scale across all markets, white-label, dedicated support, done-for-you managed service
+Six tiers. No tier carries a setup fee.
 
-Free, Essentials, and Growth are self-serve software - full dashboard
-access at app.getbrandgeo.com, and the client configures their own prompts
-and markets. Managed, Pro, and Enterprise add a fully managed service on
-top - the BrandGEO team handles setup, ongoing strategy and research, and
-monthly reporting and strategy calls, so the client doesn't have to
-configure anything themselves. Every tier includes real-time dashboard
-access regardless of how much of the ongoing work the team does versus the
-client.
+- Free: EUR 0/month - 1 project, 5 prompts, 1 engine (ChatGPT), monthly refresh, self-serve
+- Essentials: EUR 99/month or EUR 990/year - 15 prompts, 3 engines (ChatGPT, Gemini, Claude), weekly refresh, competitor tracking, self-serve, no setup fee
+- Growth: EUR 299/month or EUR 2,990/year - 35 prompts, 5 engines (adds Perplexity and Google AI Mode), weekly refresh, site audit of up to 10 pages, 1 onboarding call, self-serve, no setup fee
+- Growth PRO: EUR 449/month or EUR 4,490/year - 35 prompts, 7 engines (adds Grok and Google AI Overviews), weekly refresh on a priority queue, site audit of up to 30 pages, self-serve, no setup fee
+- Managed: from EUR 1,500/month or EUR 15,000/year - 120 prompts, all 7 engines, plus a fully managed service (AI Visibility strategy, buyer-journey and prompt research, competitor research, website AI audit with citation analysis, monthly executive report, monthly strategy call, quarterly optimisation review, priority support). No separate setup fee: onboarding is included in the first month's payment. Final scope and price are confirmed in a written proposal.
+- Custom Enterprise: custom pricing, scoped on a call, no published figure - everything in Managed plus unlimited scale across all markets, multiple brands, white-label, dedicated support, custom integrations and SLAs.
+
+Free, Essentials, Growth, and Growth PRO are self-serve software - full
+dashboard access at app.getbrandgeo.com, and the client configures their own
+prompts and markets. Managed and Custom Enterprise add a fully managed
+service on top - the BrandGEO team handles setup, ongoing strategy and
+research, and monthly reporting and strategy calls, so the client doesn't
+have to configure anything themselves. Every tier includes real-time
+dashboard access regardless of how much of the ongoing work the team does
+versus the client.
 
 ## Methodology
 
@@ -66,11 +69,12 @@ name lookup. During onboarding, the team identifies the real questions a
 brand's potential customers actually ask AI engines when looking for
 brands in that category - commercial-buyer-style prompts such as "best
 catering company in Madrid," not just "what is [brand name]." Those
-queries are then run across all five monitored engines on a recurring
-schedule - weekly by default, daily or weekly on Growth and above - with
+queries are then run across every engine the client's plan covers on a
+recurring schedule - weekly on every paid plan, monthly on Free - with
 live web search enabled where the engine supports it, specifically to
 capture current engine behaviour rather than cached or stale training-data
-responses.
+responses. Refresh cadence is the same on every paid tier; the tiers differ
+on engine coverage, prompt volume, and site-audit depth, not on frequency.
 
 Each collection run is measured and reported on:
 
@@ -98,7 +102,7 @@ trend over time. The exact weighting used in scoring:
 - Knowledge (20% weight) - when the brand is mentioned, how good is the position. A #1 mention scores highest; the score decays toward a floor as position gets worse.
 - Sentiment (15% weight) - is the framing positive, neutral, or negative when the brand is mentioned.
 - Accuracy (15% weight) - of the brand's mentions, what share land in the top 3 (a mention with no clear numbered position is treated as accurate by default).
-- Reach (15% weight) - what share of the five monitored engines mention the brand in at least one prompt, rather than just one or two of them.
+- Reach (15% weight) - what share of the engines monitored on the client's plan mention the brand in at least one prompt, rather than just one or two of them.
 - Consistency (10% weight) - across all tracked prompts, what share have at least 60% of the checked engines mentioning the brand - i.e. does the brand show up reliably, not just occasionally.
 
 Three status labels are also used per engine per query category, shown on
@@ -117,14 +121,15 @@ brand at all.
 
 ## Capabilities
 
-- Five-engine monitoring: ChatGPT (OpenAI, GPT-4o with web search enabled), Gemini (Google, web-integrated), Claude (Anthropic, reasoning-focused, selective citations), Perplexity (real-time cited web search), and Meta AI (embedded across WhatsApp, Instagram, and Facebook). Queries run with live web search enabled where available, to capture current engine behaviour rather than stale training-data responses.
+- Up to seven-engine monitoring. Five core engines from Growth up: ChatGPT (OpenAI, with web search enabled), Gemini (Google, web-integrated), Claude (Anthropic, reasoning-focused, selective citations), Perplexity (real-time cited web search), and Google AI Mode (Google's generative search tab, the one a searcher switches to on purpose). Growth PRO and above add two more, for seven: Grok (xAI), the only monitored engine that reads live X/Twitter as well as the open web, and Google AI Overviews (Google), the AI summary shown at the top of an ordinary results page, which is a separate surface from AI Mode and reaches far more searchers. Essentials covers the first three; Free covers ChatGPT only. Queries run with live web search enabled where available, to capture current engine behaviour rather than stale training-data responses.
 - A weighted 0-100 AI Visibility Score across six dimensions (see above), recalculated on every collection run with week-over-week trend tracking.
 - Competitor tracking against 3-5 named competitors per prompt, including which competitor gets named instead when the brand itself is missing.
 - Multi-market and multi-language monitoring, including local-language versus English query comparisons for the same brand and category - see the City AI Visibility Studies below for real, published examples of this in practice.
 - A "Fix This" action hub of specific, prioritized recommendations tied to the actual query results the brand received, not generic advice.
 - A free, one-time AI Visibility audit, available once per brand domain (see FAQ summaries below for what it includes).
-- Self-serve dashboard access (app.getbrandgeo.com) on every tier, plus a fully managed, done-for-you service option (Managed, Pro, Enterprise) where the BrandGEO team runs strategy, research, and reporting directly rather than the client operating the dashboard alone.
-- Weekly reporting (on monitored tiers) covering the overall score and its direction, exact quotes of what each engine said about the brand, competitor comparison, which engines did and didn't mention the brand, what changed since the prior week, and specific prioritized recommendations.
+- A site audit of the brand's own website on Growth and above: up to 10 pages on Growth, 30 on Growth PRO, 100 on Managed.
+- Self-serve dashboard access (app.getbrandgeo.com) on every tier, plus a fully managed, done-for-you service option (Managed, Custom Enterprise) where the BrandGEO team runs strategy, research, and reporting directly rather than the client operating the dashboard alone.
+- Weekly reporting (on the paid tiers) covering the overall score and its direction, exact quotes of what each engine said about the brand, competitor comparison, which engines did and didn't mention the brand, what changed since the prior week, and specific prioritized recommendations.
 
 ## Published Academic Research
 
@@ -191,7 +196,7 @@ cities test the identical prompt in the local language versus English.
 - **Madrid** (ai-visibility-for-madrid.html): Spanish vs. English testing. One brand (an airport hotel) swept every engine unanimously in both languages. For other categories, some engines gave a stable answer regardless of language while others flipped their entire recommended set depending on which language was used.
 - **New York** (ai-visibility-for-newyork.html): 8 categories, 4 engines. A rental-listing platform swept every responding engine. Legacy, nationally-known brokerages beat individually-named star agents; national law firms beat NYC-specific boutiques - institutions and national recognition outperforming local/individual reputation.
 - **Paris** (ai-visibility-for-paris.html): French vs. English testing across 4 categories. One digital bank was named unanimously by every engine in both languages. In wealth management, the query language changed which type of competitor was recommended entirely, not just the ranking.
-- **Rome** (ai-visibility-for-rome.html): Italian vs. English testing. One engine reproduced an identical, identically-ordered ranked list in both languages for one category - the strongest single-engine language-stability result found in this research program. No brand achieved full cross-engine consensus in Rome.
+- **Rome** (ai-visibility-for-rome.html): Italian vs. English testing. One engine reproduced an identical, identically-ordered ranked list in both languages for one category - the strongest single-engine language-stability result among the four cities this program asked in two languages (Berlin, Madrid, Paris, Rome, all collected 2026-07-10). No brand achieved full cross-engine consensus in Rome.
 - **Dublin** (ai-visibility-for-dublin.html): 8 English-language prompts, 4 engines. Two categories (project management software, business banking) hit unanimous 4/4 consensus. One engine showed a recurring bias toward the same large institutional names regardless of what was actually asked.
 
 ## Industry Guides
@@ -228,21 +233,22 @@ sides, not one-sided marketing copy.
 - **vs Goodie AI** (brandgeo-vs-goodie.html): Positions as a single-platform tool combining monitoring, optimization, attribution, and content intelligence; sales-led, pricing not public.
 
 Across every one of these, most competing AI visibility tools - Peec,
-Profound, Otterly, Semrush AI Toolkit, and others - are self-serve SaaS
-dashboards only: sign up, configure your own prompts, interpret the data
-yourself. BrandGEO offers that same self-serve path on Free, Essentials,
-and Growth, but also adds a genuinely done-for-you service on Managed and
-Pro - the team handles strategy, research, and reporting directly - at
-software-level pricing, rather than the $1,500-5,000+/month a dedicated
-GEO agency retainer typically costs. Full list and comparison hub:
+Profound, Otterly, Scrunch, Semrush AI Toolkit, and others - are self-serve
+SaaS dashboards only: sign up, configure your own prompts, interpret the
+data yourself. BrandGEO offers that same self-serve path on Free,
+Essentials, Growth, and Growth PRO, but also adds a genuinely done-for-you
+service on Managed and Custom Enterprise, where the team handles strategy,
+research, and reporting directly. Several of the competitors above have no
+managed-service equivalent at any price point, which is the structural
+difference rather than a price claim. Full list and comparison hub:
 https://getbrandgeo.com/blog.html#compare
 
 ## Glossary summaries
 
 Full glossary with cross-links to the research that covers each term in
 depth: https://getbrandgeo.com/glossary.html. 22 terms across four
-categories, each defined in one line below (verbatim from the published
-DefinedTermSet structured data on that page):
+categories, each defined in one line below, condensed from the published
+DefinedTermSet structured data on that page:
 
 Core GEO Disciplines:
 - **Generative Engine Optimization (GEO)**: The practice of structuring content and brand signals so generative AI engines synthesize a brand directly into the answers they generate, rather than simply linking to its site.
@@ -253,7 +259,7 @@ Core GEO Disciplines:
 - **Technical SEO**: The foundational discipline of keeping a site crawlable, fast, and well-structured, which every AI retrieval system still depends on even when generating conversational answers.
 
 Measurement & Product Concepts:
-- **AI Visibility**: A brand's ability to be mentioned, recommended, or cited in answers generated by AI engines such as ChatGPT, Gemini, Claude, Perplexity, and Meta AI.
+- **AI Visibility**: A brand's ability to be mentioned, recommended, or cited in answers generated by AI engines such as ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Grok, and Google AI Overviews.
 - **AI Visibility Score**: A composite measurement of a brand's AI Visibility across multiple weighted dimensions, rather than a single mention count.
 - **AI Visibility Gap**: The difference between a brand's ranking in traditional search and its presence in AI-generated recommendations for the same queries.
 - **Share of Voice (in LLMs)**: The proportion of AI-generated answers, within a given category or query set, that mention a specific brand relative to its competitors.
@@ -280,7 +286,7 @@ Full FAQ (20 questions, six categories) at https://getbrandgeo.com/faq.html.
 Condensed, accurate summaries of every question below, grouped by category:
 
 AI Visibility & Generative Engine Optimization:
-- **What is AI Visibility?** A brand's ability to be mentioned, recommended, or cited in AI-generated answers (ChatGPT, Gemini, Claude, Perplexity, Meta AI) - entirely distinct from traditional search ranking, since a brand can rank #1 on Google and still be completely absent from AI recommendations.
+- **What is AI Visibility?** A brand's ability to be mentioned, recommended, or cited in AI-generated answers (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Grok, Google AI Overviews) - entirely distinct from traditional search ranking, since a brand can rank #1 on Google and still be completely absent from AI recommendations.
 - **What is Generative Engine Optimization (GEO)?** The practice of optimizing a brand's presence so AI engines are more likely to mention, recommend, or cite it. Three pillars: entity recognition, concept association, and trust signals - not keyword rankings or click-through rates.
 - **How is AI Visibility different from SEO?** SEO gets a brand traffic via a clicked search result; AI Visibility gets a brand a citation, often with no link ever clicked. The two require different content strategies and different measurement.
 - **Do I still need SEO if I'm doing GEO?** Yes - they're parallel disciplines. Technical SEO and Entity SEO are foundational to both; keyword density, backlink volume, and anchor text (the tactical core of classic SEO) don't carry over the same way.
@@ -292,21 +298,21 @@ The AI Visibility Score:
 - **What does the position number (#1, #2, #3) mean?** The rank at which a brand was named when an AI engine mentions multiple brands in one answer; #1 carries the highest weight in the score.
 
 BrandGEO Platform:
-- **Which AI engines does BrandGEO monitor?** ChatGPT, Gemini, Claude, Perplexity, and Meta AI, all queried with live web search enabled where available.
-- **How does BrandGEO measure AI Visibility?** A structured query methodology built on the client's actual customer-facing questions, run weekly across all five engines - see the Methodology section above.
+- **Which AI engines does BrandGEO monitor?** Five core engines from Growth up - ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode - with Grok and Google AI Overviews added on Growth PRO and above, for seven in total. Essentials covers the first three; Free covers ChatGPT only. All queried with live web search enabled where available.
+- **How does BrandGEO measure AI Visibility?** A structured query methodology built on the client's actual customer-facing questions, run weekly across every engine the plan covers - see the Methodology section above.
 - **What does the weekly report include?** The overall score and its direction, exact quotes of what each engine said, competitor comparison, which engines did and didn't mention the brand, what changed since last week, and specific P0/P1/P2 recommendations.
-- **Is BrandGEO a managed service or a self-serve tool?** Both, depending on plan - Free/Essentials/Growth are self-serve; Managed/Pro/Enterprise add a fully managed service on top, with dashboard access included on every tier either way.
+- **Is BrandGEO a managed service or a self-serve tool?** Both, depending on plan - Free, Essentials, Growth and Growth PRO are self-serve; Managed and Custom Enterprise add a fully managed service on top, with dashboard access included on every tier either way.
 
 Comparisons:
-- **How does BrandGEO compare to other AI visibility tools like Peec, Profound, or Semrush AI Toolkit?** Most competitors are self-serve-only dashboards. BrandGEO offers that same self-serve path plus a genuinely done-for-you managed tier at software-level pricing, versus the $1,500-5,000+/month a dedicated GEO agency retainer typically costs.
+- **How does BrandGEO compare to other AI visibility tools like Peec, Profound, or Semrush AI Toolkit?** Most competitors are self-serve-only dashboards. BrandGEO offers that same self-serve path plus a genuinely done-for-you managed tier, which several of those competitors have no equivalent for at any price point.
 
 Free Audit:
-- **What does the free audit include?** A one-time snapshot delivered within 48 hours: the AI Visibility Score, per-engine KNOW/PARTIAL/MISSING status, top 3 improvement areas, and a comparison against 1-2 direct competitors. Does not include dashboard access or ongoing monitoring.
+- **What does the free audit include?** A one-time snapshot across the five core engines (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode), delivered within 48 hours: the AI Visibility Score, per-engine KNOW/PARTIAL/MISSING status, top 3 improvement areas, and a comparison against 1-2 direct competitors. Does not include dashboard access or ongoing monitoring.
 - **How often can I get the free audit?** Once per brand domain, refreshable after 6 months. Ongoing monitoring before that point is what the paid plans are for.
-- **What's the difference between the free plan and a paid plan?** Free gives a baseline (1 project, 5 prompts, ChatGPT only, monthly refresh). Paid tiers add more engines, more prompts, faster refresh cadence, competitor tracking, and (on Managed and above) a managed service.
+- **What's the difference between the free plan and a paid plan?** Free gives a baseline (1 project, 5 prompts, ChatGPT only, monthly refresh). Paid tiers move to a weekly refresh and add more engines, more prompts, competitor tracking, a site audit (Growth and above), and, on Managed and Custom Enterprise, a managed service.
 
 Pricing & Plans:
-- **What does BrandGEO cost?** Six tiers from Free (EUR 0) through Enterprise (from roughly EUR 10,000/month) - see the Plans section above for the full breakdown.
-- **Is there a contract or minimum commitment?** Essentials, Growth, and Managed monthly have no minimum - cancel anytime. Managed yearly and Pro's annual option are 12-month commitments paid upfront.
-- **Are there any hidden fees?** No. The only fee beyond the listed price is Managed's one-time EUR 1,250 setup fee on the monthly option only (waived on annual), always shown upfront.
-- **What is your refund policy?** Monthly plans: cancel anytime, no proration on partial months already billed. Yearly plans: non-refundable after the first 14 days, full refund within 14 days if no reports have been delivered yet.
+- **What does BrandGEO cost?** Six tiers: Free (EUR 0), Essentials (EUR 99/mo or EUR 990/yr), Growth (EUR 299/mo or EUR 2,990/yr), Growth PRO (EUR 449/mo or EUR 4,490/yr), Managed (from EUR 1,500/mo or EUR 15,000/yr), and Custom Enterprise (custom pricing, scoped on a call) - see the Plans section above for the full breakdown.
+- **Is there a contract or minimum commitment?** Essentials, Growth, Growth PRO, and Managed monthly all have no minimum - cancel anytime. The annual options (Essentials EUR 990, Growth EUR 2,990, Growth PRO EUR 4,490, Managed EUR 15,000) are 12-month commitments paid upfront.
+- **Are there any hidden fees?** No. No tier carries a setup fee, and the listed plan price is the only fee. On Managed, onboarding and the baseline report are included in the first month's payment rather than billed separately.
+- **What is your refund policy?** Monthly plans: cancel anytime, no proration on partial months already billed. Annual plans: full refund within 14 calendar days of the start date provided no reports have been delivered and no onboarding call has taken place; non-refundable after that window.

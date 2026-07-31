@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Loader2, AlertTriangle, TrendingUp, Mail } from 'lucide-react'
 import { SentimentDot } from '../components/ScoreBadge'
+import BrandGeoMark from '../components/BrandGeoLogo'
 
 type ReportStatus = 'pending' | 'generating_prompts' | 'collecting' | 'ready' | 'error'
 
@@ -118,7 +119,7 @@ export default function AuditReport() {
       if (!res.ok) { setUnlockError(data.error || 'Could not unlock report.'); setUnlocking(false); return }
       await fetchReport()
     } catch {
-      setUnlockError('Network error — please try again.')
+      setUnlockError('Network error. Please try again.')
     }
     setUnlocking(false)
   }
@@ -126,12 +127,11 @@ export default function AuditReport() {
   return (
     <div className="min-h-screen bg-dark-900 px-4 py-10">
       <div className="max-w-2xl mx-auto">
-        <Link to="/audit" className="inline-flex items-center gap-2 mb-6">
-          <img src="/logo.png" alt="BrandGEO" style={{ height: 28, width: 'auto' }} />
-          <span className="font-bold text-base text-white">
-            Brand<span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-          </span>
-        </Link>
+        {/* Goes to the marketing site, not to /audit. This route is
+            `/audit/:token`, public and usually reached from an emailed link by
+            someone who has never signed in, so "home" for them is
+            getbrandgeo.com. /audit is a sibling form, not a parent. */}
+        <BrandGeoMark size="sm" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" className="mb-6" />
 
         {loadError && (
           <div className="bg-dark-800 border border-red-500/20 rounded-xl p-6 text-sm text-red-400 flex items-center gap-2">
@@ -152,7 +152,7 @@ export default function AuditReport() {
             <p className="text-sm text-slate-400">
               {report.status === 'error'
                 ? (report as PendingReport).error_message || 'Please try running a new audit.'
-                : 'Asking AI assistants what they know about your business — this usually takes under a minute.'}
+                : 'Asking AI assistants what they know about your business. This usually takes under a minute.'}
             </p>
           </div>
         )}
@@ -166,12 +166,12 @@ export default function AuditReport() {
             <h1 className="text-lg font-semibold text-white mb-1">AI Visibility Score</h1>
             <p className="text-sm text-slate-400 mb-6">
               {report.gap_count > 0
-                ? `We found ${report.gap_count} visibility gap${report.gap_count === 1 ? '' : 's'} — see exactly where AI assistants aren't finding you.`
+                ? `We found ${report.gap_count} visibility gap${report.gap_count === 1 ? '' : 's'}. See exactly where AI assistants aren't finding you.`
                 : `Enter your email to see the full per-engine breakdown.`}
             </p>
             {report.low_confidence && (
               <p className="text-xs text-amber-400/80 mb-4">
-                We couldn't fully analyse your homepage, so this is a lower-confidence estimate — the full report will still show exactly what we checked.
+                We couldn't fully analyse your homepage, so this is a lower-confidence estimate. The full report will still show exactly what we checked.
               </p>
             )}
             <form onSubmit={unlock} className="max-w-sm mx-auto space-y-3">
@@ -242,7 +242,7 @@ function FullReportView({ report }: { report: FullReport }) {
               key={engine}
               className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATE_STYLE[state] ?? STATE_STYLE.unavailable}`}
               title={state === 'unavailable'
-                ? 'We could not reach this engine during your audit — this is not a result about your brand.'
+                ? 'We could not reach this engine during your audit. This is not a result about your brand.'
                 : undefined}
             >
               {ENGINE_LABEL[engine] ?? engine}: {state.toUpperCase()}
@@ -252,7 +252,7 @@ function FullReportView({ report }: { report: FullReport }) {
         {Object.values(report.engine_states).includes('unavailable') && (
           <p className="text-xs text-slate-500 mt-3">
             One or more engines could not be reached during your audit. They are shown as
-            UNAVAILABLE and are excluded from your score — they are not counted against you.
+            UNAVAILABLE and are excluded from your score, so they are not counted against you.
           </p>
         )}
       </div>
@@ -297,14 +297,34 @@ function FullReportView({ report }: { report: FullReport }) {
         </div>
       </div>
 
+      {/* Terminal CTA. Until 2026-07-31 the only outbound link here was the
+          marketing pricing anchor (funnel audit F5): a reader who had just been
+          shown their own gaps was sent across domains to find for themselves the
+          signup link this page could hand them with their domain already filled
+          in. Pricing survives below as a secondary line, because wanting the
+          price before opening an account is reasonable; it is simply no longer
+          the only way out.
+
+          A router <Link>, not an absolute URL, because this page is already
+          served from app.getbrandgeo.com. Same destination, no full reload, and
+          the query string survives either way. */}
+      {/* The question above the button has to match where the button goes. It
+          used to ask about continuous monitoring and lead to pricing, which was
+          consistent. It now leads to FREE signup, and the free tier is one
+          engine, five prompts and a manual refresh, so the continuous claim
+          moved down to the line that leads to the plans. */}
       <div className="bg-brand-500/10 border border-brand-500/20 rounded-xl p-5 text-center">
-        <p className="text-sm text-slate-300 mb-3">Want this monitored continuously, with recommendations to fix each gap?</p>
-        <a
-          href="https://getbrandgeo.com/#pricing"
+        <p className="text-sm text-slate-300 mb-3">Want to keep track of this, and work through each gap?</p>
+        <Link
+          to={`/signup?domain=${encodeURIComponent(report.domain)}`}
           className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
         >
-          See BrandGEO plans
-        </a>
+          Start tracking {report.domain} →
+        </Link>
+        <p className="text-xs text-slate-500 mt-3">
+          Free to start, no credit card. For every engine, automatic refreshes and fix recommendations,{' '}
+          <a href="https://getbrandgeo.com/#pricing" className="text-slate-400 hover:text-slate-300 underline">see the plans</a>.
+        </p>
       </div>
     </div>
   )

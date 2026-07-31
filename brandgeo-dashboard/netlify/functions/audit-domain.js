@@ -220,7 +220,12 @@ exports.handler = async (event) => {
   await Promise.all(engineResults.map(async (er, i) => {
     if (!er.competitors_mentioned) return
     let cands; try { cands = JSON.parse(er.competitors_mentioned) } catch { return }
-    const kept = await classifyCompetitors(cands, { brand: generated.brandName || domain.split('.')[0], snippet: er.snippet })
+    const kept = await classifyCompetitors(cands, {
+      brand: generated.brandName || domain.split('.')[0],
+      snippet: er.snippet,
+      promptText: er.prompt,          // which category the buyer is shopping for
+      industry: generated.category,   // the audit path really does know this
+    })
     const val = kept.length ? JSON.stringify(kept) : null
     er.competitors_mentioned = val
     if (scoreRows[i]) scoreRows[i].competitors_mentioned = val

@@ -2,22 +2,21 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { useTheme } from '../lib/themeContext'
 import SocialAuthButtons from '../components/SocialAuthButtons'
+import BrandGeoMark from '../components/BrandGeoLogo'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
+// Unauthenticated shell, so the wordmark links to the marketing site, NOT to "/",
+// which is gated and would bounce straight back here. Before this the only way off
+// the sign-in screen was the browser back button.
 function BrandGeoLogo() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
   return (
-    <div className="flex items-center gap-2.5">
-      <img src="/logo.png" alt="BrandGEO icon" style={{ height: '40px', width: 'auto', display: 'block' }} />
-      <span className="text-2xl font-bold tracking-tight">
-        <span className={isDark ? 'text-white' : 'text-slate-900'}>Brand</span>
-        <span style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6D28D9 55%, #8B5CF6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>GEO</span>
-      </span>
-    </div>
+    <BrandGeoMark
+      size="xl"
+      href="https://getbrandgeo.com"
+      ariaLabel="BrandGEO: go to getbrandgeo.com"
+    />
   )
 }
 

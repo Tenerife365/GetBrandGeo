@@ -1,5 +1,5 @@
 /**
- * Account.tsx — the client's profile page (viewer or admin).
+ * Account.tsx: the client's profile page (viewer or admin).
  * Header reads as the brand's own profile (logo + brand name + site + plan).
  * Shows plan-as-blocks with the current tier highlighted, subscription status +
  * billing dates (started / paid-until — manual for non-Stripe Managed clients,
@@ -12,7 +12,9 @@ import {
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS, PLAN_ORDER, type Plan } from '../lib/planConfig'
+import { PageTitle } from '../components/Typography'
 import BrandLogo from '../components/BrandLogo'
+import PromotionsPanel from '../components/PromotionsPanel'
 
 interface ClientEvent {
   id: number
@@ -28,15 +30,27 @@ const GRANT_TYPE_LABELS: Record<string, string> = {
 }
 
 /** Plan ladder for the "plans as blocks" section — display prices only (source
- *  of truth for billing is Stripe / PRICING-SPEC.md). */
+ *  of truth for billing is Stripe / PRICING-STRATEGY-2026-07.md §2). 'pro' is
+ *  deliberately excluded here (legacy, no new signups — see planConfig.ts) and
+ *  re-appended dynamically below ONLY for a client still on it, so existing Pro
+ *  clients keep seeing their tier highlighted without it being offered to anyone
+ *  else as an upgrade target. */
 const PLAN_TIERS: { id: string; label: string; price: string }[] = [
   { id: 'free',       label: 'Free',       price: '€0' },
+  // `radar` added 2026-07-31 (bg-verify F4). Without it `currentIdx` resolves to
+  // -1 for a Radar client, so they see no current plan and no upgrade CTA on
+  // their own account page. That was already reachable before the tier was
+  // buyable, because both admin plan pickers enumerate PLAN_ORDER rather than
+  // this list, so an admin could assign Radar to someone the page could not
+  // then describe.
+  { id: 'radar',      label: 'Radar',      price: '€29 / mo' },
   { id: 'essentials', label: 'Essentials', price: '€99 / mo' },
   { id: 'growth',     label: 'Growth',     price: '€299 / mo' },
-  { id: 'managed',    label: 'Managed',    price: '€900 / mo' },
-  { id: 'pro',        label: 'Pro',        price: 'from €1,500 / mo' },
+  { id: 'growth_pro', label: 'Growth PRO', price: '€449 / mo' },
+  { id: 'managed',    label: 'Managed',    price: 'from €1,500 / mo' },
   { id: 'enterprise', label: 'Enterprise', price: 'Custom' },
 ]
+const PRO_TIER_LEGACY = { id: 'pro', label: 'Pro (legacy)', price: 'from €1,500 / mo' }
 
 function domainOf(url?: string | null): string | null {
   if (!url) return null
@@ -277,7 +291,7 @@ export default function Account() {
     setEmailSaving(false)
     if (error) { setEmailMsg({ ok: false, text: error.message }); return }
     setNewEmail('')
-    setEmailMsg({ ok: true, text: 'Confirmation sent — check both your old and new inbox to complete the change.' })
+    setEmailMsg({ ok: true, text: 'Confirmation sent. Check both your old and new inbox to complete the change.' })
   }
 
   // Step 1: verify the current password, then email a confirmation code.
@@ -308,11 +322,24 @@ export default function Account() {
     setPwMsg({ ok: true, text: 'Password updated.' })
   }
 
-  const planLabel = activeClient
+  /**
+   * null when no client record is loaded, NOT an em dash. The old '—' fallback was
+   * rendered straight into "{planLabel} plan" in the header, which read as the
+   * broken string "— plan" rather than as an absence (UI/UX audit 2026-07-30, F4).
+   * Every consumer below now words its own empty case.
+   */
+  const planLabel: string | null = activeClient
     ? (PLAN_LABELS[activeClient.plan as keyof typeof PLAN_LABELS] ?? activeClient.plan)
-    : '—'
+    : null
   const hasStripe = !!activeClient?.stripe_customer_id
-  const currentIdx = PLAN_TIERS.findIndex(p => p.id === activeClient?.plan)
+  // Show the legacy Pro block only for a client still on it (see PLAN_TIERS comment
+  // above). Insert it where planConfig.ts's PLAN_ORDER puts it, before Enterprise,
+  // not appended last — otherwise currentIdx lands on the final block and Enterprise
+  // stops reading as an upgrade for the one client type that can still be on Pro.
+  const displayedTiers = activeClient?.plan === 'pro'
+    ? PLAN_TIERS.flatMap(t => t.id === 'enterprise' ? [PRO_TIER_LEGACY, t] : [t])
+    : PLAN_TIERS
+  const currentIdx = displayedTiers.findIndex(p => p.id === activeClient?.plan)
 
   const upgradeTo = (tier: { id: string; label: string }) => {
     if (hasStripe) return openBilling()
@@ -362,7 +389,7 @@ export default function Account() {
   }
 
   const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50'
+  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-3xl mx-auto">
@@ -370,7 +397,7 @@ export default function Account() {
       <div className="flex items-center gap-4 mb-8">
         <BrandLogo name={brandName} website={website} sizeClass="w-14 h-14" roundedClass="rounded-2xl" textClass="text-lg" />
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-white tracking-tight truncate">{brandName}</h1>
+          <PageTitle className="truncate">{brandName}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5 truncate flex items-center gap-2 flex-wrap">
             {domain && (
               <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer"
@@ -379,7 +406,7 @@ export default function Account() {
               </a>
             )}
             {domain && <span className="text-slate-600">·</span>}
-            <span>{planLabel} plan</span>
+            <span>{planLabel ? `${planLabel} plan` : 'No plan set'}</span>
           </p>
         </div>
       </div>
@@ -388,10 +415,10 @@ export default function Account() {
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
         <h2 className="text-sm font-semibold text-slate-300 mb-4">Profile</h2>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
-          <Field icon={<Globe size={15} />}       label="Website"      value={domain || '—'} />
-          <Field icon={<Mail size={15} />}        label="Email"        value={email || '—'} />
+          <Field icon={<Globe size={15} />}       label="Website"      value={domain}      emptyLabel="No website on file" />
+          <Field icon={<Mail size={15} />}        label="Email"        value={email}       emptyLabel="No email on file" />
           <Field icon={<ShieldCheck size={15} />} label="Access level" value={isAdmin ? 'Admin' : 'Member'} />
-          <Field icon={<CreditCard size={15} />}  label="Current plan" value={planLabel} />
+          <Field icon={<CreditCard size={15} />}  label="Current plan" value={planLabel}   emptyLabel="Not set" />
         </div>
       </div>
 
@@ -414,7 +441,9 @@ export default function Account() {
               )}
             </>
           ) : (
-            <span className="text-slate-500">You&apos;re on the <span className="text-slate-300 font-medium">{planLabel}</span> plan.</span>
+            planLabel
+              ? <span className="text-slate-500">You&apos;re on the <span className="text-slate-300 font-medium">{planLabel}</span> plan.</span>
+              : <span className="text-slate-500">No plan is set on this account yet.</span>
           )}
           {hasStripe && (
             <button onClick={openBilling} disabled={billingLoading}
@@ -429,7 +458,7 @@ export default function Account() {
         <div className="flex flex-wrap items-center gap-x-10 gap-y-3 mb-5 pb-5 border-b border-dark-700">
           <div>
             <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Client since</div>
-            <div className="text-sm text-slate-200 font-medium">{startedStr ?? '—'}</div>
+            <div className={`text-sm font-medium ${startedStr ? 'text-slate-200' : 'text-slate-300 italic'}`}>{startedStr ?? 'Not set'}</div>
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Paid until</div>
@@ -473,7 +502,7 @@ export default function Account() {
 
         {/* Plans as blocks — current highlighted, higher tiers upgradeable */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {PLAN_TIERS.map((tier, i) => {
+          {displayedTiers.map((tier, i) => {
             const isCurrent = tier.id === activeClient?.plan
             const isUpgrade = currentIdx >= 0 && i > currentIdx
             return (
@@ -503,7 +532,7 @@ export default function Account() {
           })}
         </div>
         {!hasStripe && (
-          <p className="text-[11px] text-slate-600 mt-3">Managed plans are handled by our team — upgrading opens an email to us.</p>
+          <p className="text-[11px] text-slate-600 mt-3">Managed plans are handled by our team, so upgrading opens an email to us.</p>
         )}
       </div>
 
@@ -535,13 +564,13 @@ export default function Account() {
           <div className="mb-5">
             <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Users on this account (notifications go here)</div>
             {clientUsers.length === 0 ? (
-              <p className="text-xs text-slate-500">No login user attached yet — a grant will show the dashboard banner but has no address to email.</p>
+              <p className="text-xs text-slate-500">No login user attached yet, so a grant will show the dashboard banner but has no address to email.</p>
             ) : (
               <ul className="space-y-1">
                 {clientUsers.map((u, i) => (
                   <li key={i} className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
                     <Mail size={12} className="text-slate-500 shrink-0" />
-                    <span className="text-slate-200">{u.email ?? '—'}</span>
+                    <span className={u.email ? 'text-slate-200' : 'text-slate-300 italic'}>{u.email ?? 'No email on file'}</span>
                     <span className="text-slate-600">· {u.role}</span>
                     {!u.confirmed && <span className="text-amber-400/80">· not confirmed</span>}
                     <span className="text-slate-600">· {u.last_sign_in_at ? `last in ${fmtDateStr(u.last_sign_in_at)}` : 'never signed in'}</span>
@@ -596,7 +625,7 @@ export default function Account() {
             <label className="block mt-3 max-w-xl">
               <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Extra line in the message (optional)</span>
               <textarea rows={2} value={planMessage} onChange={e => setPlanMessage(e.target.value)}
-                placeholder="e.g. Thanks for being an early supporter — enjoy Managed on us." className={inputCls} />
+                placeholder="e.g. Thanks for being an early supporter, enjoy Managed on us." className={inputCls} />
             </label>
           )}
 
@@ -618,7 +647,7 @@ export default function Account() {
                     <span className="text-slate-500">{fmtDateStr(ev.created_at)}</span>
                     <span className="text-slate-300">
                       {ev.from_plan ? `${PLAN_LABELS[ev.from_plan as Plan] ?? ev.from_plan} → ` : ''}
-                      {PLAN_LABELS[ev.to_plan as Plan] ?? ev.to_plan ?? '—'}
+                      {PLAN_LABELS[ev.to_plan as Plan] ?? ev.to_plan ?? 'an unrecorded plan'}
                     </span>
                     <span className="text-slate-600">· {ev.type.replace(/_/g, ' ')}</span>
                     {ev.meta?.grant_until && <span className="text-amber-400/80">until {fmtDateStr(ev.meta.grant_until)}</span>}
@@ -629,6 +658,9 @@ export default function Account() {
           )}
         </div>
       )}
+
+      {/* Promotions (admin, platform-wide — PRICING-STRATEGY-2026-07.md §8, §12 T2b) */}
+      {isAdmin && <PromotionsPanel />}
 
       {/* Change email */}
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
@@ -719,13 +751,29 @@ export default function Account() {
   )
 }
 
-function Field({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+/**
+ * A labelled profile value. An absent value says what is absent, in words, rather
+ * than rendering a bare em dash: the audit found five of those on this page and a
+ * dash carries the meaning "no data" without ever saying it (F4/F5). The empty
+ * wording is deliberately NOT dimmed to slate-500/600 the way a placeholder dash
+ * usually is; it renders at the same text-slate-300 the rest of the page uses for
+ * secondary copy, because at 4.5:1 the reader has to be able to read the reason
+ * the field is blank.
+ */
+function Field({ icon, label, value, emptyLabel = 'Not set' }: {
+  icon: React.ReactNode
+  label: string
+  value: string | null | undefined
+  emptyLabel?: string
+}) {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5 text-slate-500 mb-1">
         {icon}<span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className="text-sm text-slate-200 font-medium break-words">{value}</div>
+      {value
+        ? <div className="text-sm text-slate-200 font-medium break-words">{value}</div>
+        : <div className="text-sm text-slate-300 italic break-words">{emptyLabel}</div>}
     </div>
   )
 }

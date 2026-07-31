@@ -3,24 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <!-- Honor the visitor's saved light/dark preference (set via the toggle on other pages) before paint, so this page matches the rest of the site -->
-  <script>(function(){try{var t=localStorage.getItem('bgTheme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <script src="theme-init.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
-  <title>Privacy Policy — BrandGEO</title>
+  <title>Privacy Policy: BrandGEO</title>
   <meta name="description" content="BrandGEO's privacy policy: what data we collect, how it is used, and your rights as a user of our AI visibility platform." />
-  <meta name="robots" content="noindex" />
   <link rel="canonical" href="https://getbrandgeo.com/privacy.html" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050508; --surface: #0e0e17; --border: rgba(255,255,255,.07);
-      --text: #ffffff; --muted: rgba(255,255,255,.5); --accent: #6c63ff;
+      --bg: #0a0b0e; --surface: #101116; --border: #23242b;
+      --text: #e8e9ed; --muted: #9ba1ac; --accent: #8b5cf6;
     }
     [data-theme="light"] {
       --bg: #f7f7fc; --surface: #ffffff; --border: rgba(0,0,0,.08);
@@ -28,8 +38,18 @@
     }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 16px; line-height: 1.7; }
     nav { padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-weight: 700; font-size: 1.1rem; text-decoration: none; color: var(--text); }
-    .logo span { background: linear-gradient(90deg,#6c63ff,#a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    /* Upgraded to the approved lockup 2026-07-29. This page was the last public
+       page still on the text-only wordmark: no tile mark at all, and the type
+       carried no tracking. Structure and values now match cookies.html, the
+       sibling utility page, so the header reads identically across the site.
+       Tracking is -.032em, from the signed-off lockup
+       docs/growth/brand-identity-2026-07-29/v3/logo-full.svg, whose <text> is
+       letter-spacing -3 at font-size 94. Gradient stops are carried over
+       unchanged from the rule this replaces. */
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .back { font-size: 0.88rem; color: var(--muted); text-decoration: none; }
     .back:hover { color: var(--text); }
     main { max-width: 760px; margin: 60px auto; padding: 0 24px 80px; }
@@ -43,41 +63,87 @@
     a:hover { text-decoration: underline; }
     .gdpr-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 20px 24px; margin: 32px 0; }
     .gdpr-box p { margin: 0; }
+    .tablewrap { overflow-x: auto; margin: 16px 0 22px; border: 1px solid var(--border); border-radius: 10px; }
+    table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 0.84rem; }
+    th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--surface); font-weight: 700; white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    code { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 0.86em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     footer { text-align: center; padding: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
 <nav>
-  <a href="/" class="logo">Brand<span>GEO</span></a>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:30px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
   <a href="/" class="back">← Back to home</a>
 </nav>
 
 <main>
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: July 1, 2026 &nbsp;·&nbsp; BrandGEO / getbrandgeo.com</p>
+  <p class="meta">Last updated: 29 July 2026 &nbsp;·&nbsp; BrandGEO / getbrandgeo.com</p>
 
   <div class="gdpr-box">
-    <p>&#x1F512; BrandGEO is based in the European Union (Santa Cruz de Tenerife, Canary Islands, Spain) and is fully committed to compliance with the General Data Protection Regulation (GDPR — EU 2016/679).</p>
+    <p>&#x1F512; BrandGEO is based in the European Union (Santa Cruz de Tenerife, Canary Islands, Spain) and is fully committed to compliance with the General Data Protection Regulation (GDPR, EU 2016/679).</p>
   </div>
 
   <h2>1. Who We Are</h2>
   <p>BrandGEO ("we", "us", "our") is an AI Visibility Intelligence service operating under the domain getbrandgeo.com, based in Santa Cruz de Tenerife, Canary Islands, Spain (European Union).</p>
-  <p>Contact: <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
+  <p>Data protection contact: <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a> &nbsp;&middot;&nbsp; General contact: <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
 
   <h2>2. What Data We Collect</h2>
-  <p>We collect only the data you voluntarily provide through our contact/audit request form:</p>
+  <p><strong>From the public website</strong>, only what you voluntarily submit through our contact or audit request form:</p>
   <ul>
     <li>Full name</li>
     <li>Business email address</li>
     <li>Company or brand name</li>
     <li>Industry</li>
-    <li>Optional message / notes</li>
+    <li>Optional message or notes</li>
   </ul>
-  <p>We do not collect sensitive personal data, payment information, or data from minors.</p>
+  <p><strong>From the dashboard</strong>, if you hold an account, we additionally process:</p>
+  <ul>
+    <li>Account details: your email address, your role, and the client account you belong to</li>
+    <li>Brand configuration: brand name, aliases, website and named competitors</li>
+    <li>The monitoring prompts you create, and the responses AI engines return for them</li>
+    <li>Support tickets and any messages you send us through the dashboard</li>
+    <li>Billing status. Payment is handled by Stripe and we never see or store full card numbers.</li>
+  </ul>
+  <p>We do not collect special category data under Article 9 GDPR, and our services are not directed at children.</p>
 
   <h2>3. How We Use Your Data</h2>
   <p>Your data is used solely to:</p>
@@ -94,36 +160,62 @@
   <h2>5. Data Retention</h2>
   <p>We apply the following retention periods:</p>
   <ul>
-    <li><strong>Contact enquiries</strong> — retained for 24 months from the date of enquiry, or until you request deletion, whichever comes first.</li>
-    <li><strong>AI visibility results</strong> (<code>ai_results</code>) — retained for 24 months from the date of collection, then automatically and permanently deleted. This allows clients to analyse 2 years of brand visibility trends while ensuring data does not accumulate indefinitely.</li>
-    <li><strong>Client account data</strong> — retained for the duration of the active subscription plus 90 days after termination, to allow for data export. Deleted permanently thereafter upon written request.</li>
-    <li><strong>User accounts</strong> — deleted upon written request to <a href="mailto:hello@getbrandgeo.com">hello@getbrandgeo.com</a>.</li>
+    <li><strong>Contact enquiries</strong>: retained for 24 months from the date of enquiry, or until you request deletion, whichever comes first.</li>
+    <li><strong>AI visibility results</strong> (<code>ai_results</code>): retained for 24 months from the date of collection, then automatically and permanently deleted. This allows clients to analyse 2 years of brand visibility trends while ensuring data does not accumulate indefinitely.</li>
+    <li><strong>Client account data</strong>: retained for the duration of the active subscription plus 90 days after termination, to allow for data export. Deleted permanently thereafter upon written request.</li>
+    <li><strong>User accounts</strong>: deleted upon written request to <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a>.</li>
   </ul>
   <p>Retention is enforced automatically. You may request early deletion of your data at any time.</p>
 
-  <h2>6. Third-Party Services</h2>
-  <p>We use the following third-party services to operate our platform:</p>
-  <ul>
-    <li><strong>FormSubmit.co</strong> — processes contact form submissions (no data stored beyond email delivery)</li>
-    <li><strong>Supabase</strong> — database and authentication for the dashboard (EU-compatible, data stored in secure cloud infrastructure)</li>
-    <li><strong>Netlify</strong> — hosting for the dashboard (app.getbrandgeo.com)</li>
-  </ul>
+  <h2>6. Sub-processors</h2>
+  <p>To deliver the service we share data with the processors listed below. Each acts on our documented instructions under a data processing agreement, and none is permitted to use your data for its own purposes.</p>
+  <p><strong>What the AI engines receive.</strong> BrandGEO works by sending your monitoring prompts to AI engines and reading what they answer. Those prompts and the resulting responses are transmitted to the engine providers listed under "AI engines" below. Prompts are business queries you write, such as "best catering company in Madrid", and are not intended to contain personal data. Please do not put personal data into a prompt, because doing so sends it to those providers.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Processor</th><th>Purpose</th><th>Data shared</th><th>Location</th><th>Transfer basis</th></tr></thead>
+      <tbody>
+        <tr><td colspan="5"><strong>Infrastructure</strong></td></tr>
+        <tr><td>Cyberfolks (cyberfolks.ro)</td><td>Hosting for the public website getbrandgeo.com</td><td>Server access logs, including IP address</td><td>Romania (EU)</td><td>No transfer, data stays in the EU</td></tr>
+        <tr><td>Supabase</td><td>Database, authentication and file storage for the dashboard</td><td>Account data, prompts, AI results, support tickets</td><td>Ireland (EU, AWS eu-west-1)</td><td>No transfer, data stays in the EU</td></tr>
+        <tr><td>Netlify</td><td>Hosting and serverless functions for app.getbrandgeo.com</td><td>Request data in transit, IP address</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>AI engines</strong></td></tr>
+        <tr><td>OpenAI</td><td>ChatGPT monitoring and prompt suggestions</td><td>Prompt text, brand and competitor names</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td>Anthropic</td><td>Claude monitoring, response analysis, recommendations, SEO drafting</td><td>Prompt text, engine response text, brand names</td><td>United States</td><td>EU-US Data Privacy Framework and Standard Contractual Clauses</td></tr>
+        <tr><td>Google</td><td>Gemini monitoring</td><td>Prompt text</td><td>United States and EU</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>OpenRouter</td><td>Routing layer for Perplexity and Grok monitoring</td><td>Prompt text</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>SerpApi</td><td>Google AI Mode and Google AI Overviews monitoring</td><td>Prompt text</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>Operations</strong></td></tr>
+        <tr><td>Stripe</td><td>Payment and subscription processing</td><td>Name, email, billing details. We never see or store full card numbers.</td><td>Ireland and United States</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>Resend</td><td>Transactional email, including account and support notifications</td><td>Name, email address, message content</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>FormSubmit.co</td><td>Delivery of the public contact and audit request form</td><td>Form fields you submit</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td>HubSpot</td><td>Customer relationship management for enquiries. <strong>Not currently in use.</strong> The integration exists but is disabled, and no data is sent to HubSpot while it stays that way.</td><td>Name, email, company name</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
+        <tr><td>Ayrshare</td><td>Social publishing for the AI Social feature. Not available to customers at present.</td><td>Post content and connected account tokens</td><td>United States</td><td>Standard Contractual Clauses</td></tr>
+        <tr><td colspan="5"><strong>Analytics</strong></td></tr>
+        <tr><td>Plausible</td><td>Cookieless website analytics</td><td>Aggregate page views only, no identifier</td><td>European Union</td><td>No transfer</td></tr>
+        <tr><td>Google Analytics</td><td>Website analytics. Loaded only with your consent.</td><td>Usage and device data, IP anonymised</td><td>United States</td><td>EU-US Data Privacy Framework</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>We update this list when a processor is added or removed. If you need the current list in writing for your own records, or a copy of the relevant safeguards, contact <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a>.</p>
 
   <h2>7. Cookies &amp; Analytics</h2>
-  <p>The getbrandgeo.com website uses <strong>Plausible Analytics</strong>, a privacy-friendly analytics tool that does not use cookies, does not collect personal data, and does not track visitors across sites. Plausible processes aggregate traffic data (page views, referrer, country, device type) without storing any personally identifiable information. No cookie consent is required. You can review Plausible's data policy at <a href="https://plausible.io/data-policy" target="_blank" rel="noopener">plausible.io/data-policy</a>.</p>
-  <p>The dashboard (app.getbrandgeo.com) uses only essential session cookies required for authentication. No advertising or third-party tracking cookies are used on any BrandGEO property.</p>
+  <p>Full detail, including a cookie-by-cookie schedule and retention periods, is in our <a href="/cookies.html">Cookie Policy</a>. In summary:</p>
+  <p><strong>Google Analytics is loaded only if you consent.</strong> When you first visit getbrandgeo.com you are asked whether to allow it. Until you accept, no request is made to Google and no analytics cookies are set. If you accept, Google Analytics sets the <code>_ga</code> and <code>_ga_&lt;id&gt;</code> cookies. If you decline, they are never set and the Google script is never loaded at all. Accepting and declining are offered with equal prominence, nothing is pre-selected, and continuing to browse is not treated as consent. You can change your answer at any time using the <strong>Cookie settings</strong> link in the footer of any page, and we ask again at least every 12 months.</p>
+  <p><strong>Plausible Analytics runs for every visitor and requires no consent.</strong> It sets no cookies, stores no identifier on your device and collects no personal data, processing only aggregate traffic figures such as page views, referrer, country and device type. Because it neither stores nor accesses information on your device, the consent requirement in Article 5(3) of the ePrivacy Directive does not apply. See <a href="https://plausible.io/data-policy" target="_blank" rel="noopener">plausible.io/data-policy</a>.</p>
+  <p><strong>We use no advertising or cross-site tracking cookies.</strong> Google advertising signals are held at "denied" at all times, including for visitors who accept analytics, so no advertising profile is built and no audience pixel fires.</p>
+  <p>The dashboard (app.getbrandgeo.com) uses only strictly necessary authentication storage and your own interface preferences, such as theme and language. It carries no analytics and no advertising technology of any kind.</p>
 
   <h2>8. Your Rights Under GDPR</h2>
   <p>As a data subject in the EU, you have the right to:</p>
   <ul>
-    <li><strong>Access</strong> — request a copy of the personal data we hold about you</li>
-    <li><strong>Rectification</strong> — request correction of inaccurate data</li>
-    <li><strong>Erasure</strong> — request deletion of your personal data ("right to be forgotten")</li>
-    <li><strong>Restriction</strong> — request that we limit how we process your data</li>
-    <li><strong>Portability</strong> — receive your data in a structured, machine-readable format</li>
-    <li><strong>Objection</strong> — object to processing based on legitimate interest</li>
+    <li><strong>Access</strong>: request a copy of the personal data we hold about you</li>
+    <li><strong>Rectification</strong>: request correction of inaccurate data</li>
+    <li><strong>Erasure</strong>: request deletion of your personal data ("right to be forgotten")</li>
+    <li><strong>Restriction</strong>: request that we limit how we process your data</li>
+    <li><strong>Portability</strong>: receive your data in a structured, machine-readable format</li>
+    <li><strong>Objection</strong>: object to processing based on legitimate interest</li>
   </ul>
-  <p>To exercise any of these rights, contact us at <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>. We will respond within 30 days.</p>
+  <p>To exercise any of these rights, contact us at <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a>. We respond within one month, extendable by two further months for complex requests, and we will tell you if an extension applies. Exercising your rights is free of charge.</p>
 
   <h2>9. Data Security</h2>
   <p>We implement appropriate technical and organisational measures to protect your personal data against unauthorised access, loss, or disclosure. All data is transmitted over encrypted HTTPS connections.</p>
@@ -132,12 +224,20 @@
   <p>We may update this Privacy Policy from time to time. The "Last updated" date at the top of this page reflects the most recent revision. Continued use of our services after changes constitutes acceptance of the updated policy.</p>
 
   <h2>11. Contact & Complaints</h2>
-  <p>For any privacy-related questions, contact us at <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>.</p>
+  <p>For any data protection question, contact <a href="mailto:gdpr@getbrandgeo.com">gdpr@getbrandgeo.com</a>. For legal notices, <a href="mailto:legal@getbrandgeo.com">legal@getbrandgeo.com</a>. For technical support, <a href="mailto:support@getbrandgeo.com">support@getbrandgeo.com</a>. For anything else, <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a>.</p>
   <p>If you believe we have not handled your data correctly, you have the right to lodge a complaint with your local data protection authority. In Spain, this is the <a href="https://www.aepd.es" target="_blank" rel="noopener">Agencia Española de Protección de Datos (AEPD)</a>.</p>
 </main>
 
 <footer>
   <p>&copy; BrandGEO Global &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a> &nbsp;·&nbsp; Worldwide &nbsp;·&nbsp; Based in Spain 🇪🇸 (EU) &nbsp;·&nbsp; <a href="mailto:contact@getbrandgeo.com">contact@getbrandgeo.com</a></p>
+  <div class="f-social f-social-center">
+    <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+    <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+    <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+    <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+    <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+    <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+  </div>
 </footer>
 
 </body>

@@ -1,0 +1,896 @@
+[
+  {
+    "id": 1,
+    "kind": "element",
+    "page": "/",
+    "received_at": "2026-07-29T13:27:10+00:00",
+    "note": "New Logo and BrandGEO is not aligned, andfont of Brand GEO doesn't follow theme guidelines",
+    "element": {
+      "selector": "html > body > nav",
+      "tag": "nav",
+      "classes": null,
+      "text": "BrandGEO\nHow it works\nPricing\nFAQ\nResearch\nNews\nGet started",
+      "box": {
+        "w": 1905,
+        "h": 76,
+        "top": 0
+      },
+      "lineBoxes": 5,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "25.6px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(10, 11, 14, 0.85)"
+      },
+      "layout": {
+        "display": "flex",
+        "position": "sticky",
+        "padding": "14px 40px",
+        "margin": "0px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    }
+  },
+  {
+    "id": 2,
+    "kind": "element",
+    "page": "/",
+    "received_at": "2026-07-29T13:36:10+00:00",
+    "note": "te entire sample report needs to be improved to give more data and be similar to what we have actually on the dashboard,",
+    "element": {
+      "selector": "section.hero > div.hero-split > div.hero-visual > div.preview-wrap",
+      "tag": "div",
+      "classes": "preview-wrap",
+      "text": "Sample report\n64\n/100\nAI Visibility Score\nImproving, +8 pts vs last audit\nENGINE SPLIT VIEW\nChatGPT\n#2\nKNOW\nGemini\n#1\nKNOW\nClaude\n#4\nPARTIAL",
+      "box": {
+        "w": 471,
+        "h": 352,
+        "top": 317
+      },
+      "lineBoxes": 23,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "25.6px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "block",
+        "position": "relative",
+        "padding": "0px",
+        "margin": "0px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    }
+  },
+  {
+    "id": 3,
+    "kind": "element",
+    "page": "/",
+    "received_at": "2026-07-29T13:36:10+00:00",
+    "note": "coockes banner needs to be smaller and more discreet",
+    "element": {
+      "selector": "html > body > div.bg-cc",
+      "tag": "div",
+      "classes": "bg-cc",
+      "text": "Cookies\n\nWe use Google Analytics to see which pages are useful. It sets cookies, so we only load it if you agree.",
+      "box": {
+        "w": 680,
+        "h": 172,
+        "top": 723
+      },
+      "lineBoxes": 7,
+      "type": {
+        "family": "Inter",
+        "size": "14.4px",
+        "weight": "400",
+        "lineHeight": "23.04px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgb(16, 17, 22)"
+      },
+      "layout": {
+        "display": "block",
+        "position": "fixed",
+        "padding": "18px 20px",
+        "margin": "0px 596.5px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    }
+  },
+  {
+    "id": 4,
+    "kind": "element",
+    "page": "/",
+    "received_at": "2026-07-29T13:36:10+00:00",
+    "note": "this button show be in the colors of the theme to pop out like the violet style we use for the accept for cookies",
+    "element": {
+      "selector": "body > nav > div > a.nav-cta",
+      "tag": "a",
+      "classes": "nav-cta",
+      "text": "Get started",
+      "box": {
+        "w": 115,
+        "h": 47,
+        "top": 14
+      },
+      "lineBoxes": 1,
+      "type": {
+        "family": "Inter",
+        "size": "14.08px",
+        "weight": "700",
+        "lineHeight": "22.528px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "11px 18px",
+        "margin": "0px 0px 0px 16px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    }
+  },
+  {
+    "kind": "element",
+    "note": "needs better alignement it feels like the text is higher than the logo",
+    "element": {
+      "selector": "html > body > nav > a.logo",
+      "tag": "a",
+      "classes": "logo",
+      "text": "BrandGEO",
+      "box": {
+        "w": 123,
+        "h": 44,
+        "top": 15
+      },
+      "lineBoxes": 3,
+      "type": {
+        "family": "Inter",
+        "size": "14.08px",
+        "weight": "500",
+        "lineHeight": "22.528px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "flex",
+        "position": "static",
+        "padding": "6px 0px",
+        "margin": "0px 0px 0px 28px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "received_at": "2026-07-29T15:03:57+00:00",
+    "id": 5
+  },
+  {
+    "kind": "element",
+    "note": "we are missing the new engines added today grok and ai overviews",
+    "element": {
+      "selector": "html > body > div.engines-strip.reveal.is-visible",
+      "tag": "div",
+      "classes": "engines-strip reveal is-visible",
+      "text": "WEB2 AI\nChatGPT\nGemini\nClaude\nPerplexity\nGoogle AI Mode\nWEB3 · COMING SOON\nBittensor\nMind Network",
+      "box": {
+        "w": 1060,
+        "h": 103,
+        "top": 516
+      },
+      "lineBoxes": 6,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "25.6px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "flex",
+        "position": "static",
+        "padding": "20px 40px",
+        "margin": "40px 422.5px 0px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "received_at": "2026-07-29T15:03:57+00:00",
+    "id": 6
+  },
+  {
+    "kind": "element",
+    "note": "missing the new 2 engines added today",
+    "element": {
+      "selector": "#previewCard > div.preview-engines-grid",
+      "tag": "div",
+      "classes": "preview-engines-grid",
+      "text": "ChatGPT\n#2\nKNOW\nGemini\n#1\nKNOW\nClaude\n#4\nPARTIAL\nPerplexity\nn/a\nMISSING\nGoogle AI\nn/a\nMISSING",
+      "box": {
+        "w": 455,
+        "h": 104,
+        "top": 494
+      },
+      "lineBoxes": 10,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "25.6px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "grid",
+        "position": "static",
+        "padding": "0px",
+        "margin": "0px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "received_at": "2026-07-29T15:03:57+00:00",
+    "id": 7
+  },
+  {
+    "kind": "element",
+    "note": "text doesn't look right parsed",
+    "element": {
+      "selector": "#grid-self > div.pricing-box > ul.pricing-features > li:nth-of-type(4)",
+      "tag": "li",
+      "classes": null,
+      "text": "Site audit: 30 pages\n· 3x Growth",
+      "box": {
+        "w": 200,
+        "h": 46,
+        "top": 655
+      },
+      "lineBoxes": 3,
+      "type": {
+        "family": "Inter",
+        "size": "12.8px",
+        "weight": "400",
+        "lineHeight": "17.28px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(155, 161, 172)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "flex",
+        "position": "static",
+        "padding": "5px 0px",
+        "margin": "0px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "received_at": "2026-07-29T15:13:15+00:00",
+    "id": 8
+  },
+  {
+    "kind": "element",
+    "note": "this buttom from header menu after I click it it turns to Blog, instead of Research, one or the other only.",
+    "element": {
+      "selector": "nav > div > div.bg-nav-drawer > a:nth-of-type(4)",
+      "tag": "a",
+      "classes": null,
+      "text": "Research",
+      "box": {
+        "w": 63,
+        "h": 45,
+        "top": 15
+      },
+      "lineBoxes": 1,
+      "type": {
+        "family": "Inter",
+        "size": "14.08px",
+        "weight": "500",
+        "lineHeight": "22.528px",
+        "letterSpacing": "normal"
+      },
+      "colour": {
+        "fg": "rgb(232, 233, 237)",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "11px 0px",
+        "margin": "0px 0px 0px 28px"
+      },
+      "viewport": {
+        "w": 1905,
+        "h": 911
+      },
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "received_at": "2026-07-29T15:16:31+00:00",
+    "id": 9
+  },
+  {
+    "kind": "element",
+    "note": "AI social should move under AI SEO since its locked",
+    "element": {
+      "selector": "div:nth-of-type(3) > div.space-y-1 > a.nav-item:nth-of-type(2)",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "a",
+      "id": null,
+      "classes": "nav-item",
+      "text": "AI Social",
+      "ownText": "AI Social",
+      "action": {
+        "href": "/social",
+        "hrefResolved": "http://localhost:3000/social"
+      },
+      "box": {
+        "x": 16,
+        "y": 489,
+        "w": 213,
+        "h": 40,
+        "right": 229,
+        "bottom": 529,
+        "top": 489,
+        "left": 16,
+        "pageX": 16,
+        "pageY": 489
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 3,
+      "type": {
+        "family": "Inter",
+        "size": "14px",
+        "weight": "400",
+        "lineHeight": "20px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "start"
+      },
+      "colour": {
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgba(30, 41, 59, 0.55)",
+        "bgEffective": {
+          "colour": "rgba(30, 41, 59, 0.55)",
+          "paintedBy": "self"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "flex",
+        "position": "relative",
+        "padding": "10px 14px",
+        "margin": "4px 0px 0px",
+        "gap": "12px",
+        "alignItems": "center",
+        "justifyContent": "normal",
+        "width": "213px",
+        "height": "40px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "div.space-y-1",
+        "div",
+        "nav.space-y-6.overflow-y-auto.p-4"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/",
+    "url": "http://localhost:3000/",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 10
+  },
+  {
+    "kind": "element",
+    "note": "this chart needs improvement its not very clear for a customer.",
+    "element": {
+      "selector": "div.mt-4.p-6.rounded-xl > div.recharts-responsive-container > div.recharts-wrapper > svg.recharts-surface",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "svg",
+      "id": null,
+      "classes": "recharts-surface",
+      "text": null,
+      "ownText": null,
+      "action": null,
+      "box": {
+        "x": 563,
+        "y": 635,
+        "w": 1040,
+        "h": 220,
+        "right": 1603,
+        "bottom": 855,
+        "top": 635,
+        "left": 563,
+        "pageX": 563,
+        "pageY": 635
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 14,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "24px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "start"
+      },
+      "colour": {
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgEffective": {
+          "colour": "rgb(15, 23, 42)",
+          "paintedBy": "div.mt-4.p-6.rounded-xl"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "0px",
+        "margin": "0px",
+        "gap": null,
+        "alignItems": "normal",
+        "justifyContent": "normal",
+        "width": "1040px",
+        "height": "220px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "div.recharts-wrapper",
+        "div.recharts-responsive-container",
+        "div.mt-4.p-6.rounded-xl"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/competitors",
+    "url": "http://localhost:3000/competitors",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 11
+  },
+  {
+    "kind": "element",
+    "note": "the scroll bar in this sections needs to be optimized to match the brand kit pallete,",
+    "element": {
+      "selector": "nav.space-y-6.overflow-y-auto.flex-1",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "nav",
+      "id": null,
+      "classes": "flex-1 p-4 space-y-6 overflow-y-auto",
+      "text": "INSIGHTS\nOverview\nAI Visibility\nBrand Sentiment\nAI Mentions\nSTRATEGY\nCompetitors\nRecommendations\nMANAGE\nPrompts\nAI Social\nAI SEO\nSupport",
+      "ownText": null,
+      "action": {
+        "ariaLabel": "Primary"
+      },
+      "box": {
+        "x": 0,
+        "y": 73,
+        "w": 255,
+        "h": 560,
+        "right": 255,
+        "bottom": 633,
+        "top": 73,
+        "left": 0,
+        "pageX": 0,
+        "pageY": 73
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 16,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "24px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "start"
+      },
+      "colour": {
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgEffective": {
+          "colour": "rgb(236, 234, 246)",
+          "paintedBy": "aside.inset-y-0.w-64.bg-surface-nav"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "16px",
+        "margin": "0px",
+        "gap": null,
+        "alignItems": "normal",
+        "justifyContent": "normal",
+        "width": "255px",
+        "height": "560px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "aside.inset-y-0.w-64.bg-surface-nav",
+        "div.h-screen.bg-dark-900.overflow-hidden",
+        "div#root"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/competitors",
+    "url": "http://localhost:3000/competitors",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 12
+  },
+  {
+    "kind": "element",
+    "note": "on light mode, this area needs to be differentiated better from rest of the page, as its the main menu, use more contrast following the pallete colors we have",
+    "element": {
+      "selector": "nav.space-y-6.overflow-y-auto.flex-1",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "nav",
+      "id": null,
+      "classes": "flex-1 p-4 space-y-6 overflow-y-auto",
+      "text": "INSIGHTS\nOverview\nAI Visibility\nBrand Sentiment\nAI Mentions\nSTRATEGY\nCompetitors\nRecommendations\nMANAGE\nPrompts\nAI Social\nAI SEO\nSupport",
+      "ownText": null,
+      "action": {
+        "ariaLabel": "Primary"
+      },
+      "box": {
+        "x": 0,
+        "y": 73,
+        "w": 255,
+        "h": 560,
+        "right": 255,
+        "bottom": 633,
+        "top": 73,
+        "left": 0,
+        "pageX": 0,
+        "pageY": 73
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 16,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "24px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "start"
+      },
+      "colour": {
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgEffective": {
+          "colour": "rgb(236, 234, 246)",
+          "paintedBy": "aside.inset-y-0.w-64.bg-surface-nav"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "16px",
+        "margin": "0px",
+        "gap": null,
+        "alignItems": "normal",
+        "justifyContent": "normal",
+        "width": "255px",
+        "height": "560px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "aside.inset-y-0.w-64.bg-surface-nav",
+        "div.h-screen.bg-dark-900.overflow-hidden",
+        "div#root"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/competitors",
+    "url": "http://localhost:3000/competitors",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 13
+  },
+  {
+    "kind": "element",
+    "note": "the green we use in this section is off totally, we need to align the green on the charts and bar to a pallete color",
+    "element": {
+      "selector": "div.max-w-6xl.mx-auto.p-4",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "div",
+      "id": null,
+      "classes": "p-4 sm:p-6 md:p-8 max-w-6xl mx-auto",
+      "text": "Brand Sentiment\nRO results\n\nHow AI engines talk about Bucate pe Roate — sentiment across 28 responses that mention Bucate pe Roate\n\nSentimen",
+      "ownText": null,
+      "action": null,
+      "box": {
+        "x": 507,
+        "y": 49,
+        "w": 1152,
+        "h": 3447,
+        "right": 1659,
+        "bottom": 3496,
+        "top": 49,
+        "left": 507,
+        "pageX": 507,
+        "pageY": 49
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 127,
+      "type": {
+        "family": "Inter",
+        "size": "16px",
+        "weight": "400",
+        "lineHeight": "24px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "start"
+      },
+      "colour": {
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgEffective": {
+          "colour": "rgb(247, 247, 251)",
+          "paintedBy": "div.h-screen.bg-dark-900"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "32px",
+        "margin": "0px 251px",
+        "gap": null,
+        "alignItems": "normal",
+        "justifyContent": "normal",
+        "width": "1152px",
+        "height": "3447.3px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "main#main-content.overflow-auto.scrollbar-thin.pb-16",
+        "div.canvas-bleed.flex-col",
+        "div.h-screen.bg-dark-900"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/sentiment",
+    "url": "http://localhost:3000/sentiment",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 14
+  },
+  {
+    "kind": "element",
+    "note": "the upgrade buttons from all plans need to point to checkout on stripe, not to email",
+    "element": {
+      "selector": "button.text-brand-400.text-left.mt-3",
+      "selectorCheck": {
+        "reQueried": true,
+        "matches": 1,
+        "resolvesToPickedElement": true,
+        "strategy": "structural-path"
+      },
+      "pickedVia": "click",
+      "tag": "button",
+      "id": null,
+      "classes": "mt-3 text-xs font-medium text-brand-400 hover:text-brand-300 text-left",
+      "text": "Upgrade →",
+      "ownText": "Upgrade →",
+      "action": {
+        "buttonType": "submit"
+      },
+      "box": {
+        "x": 1215,
+        "y": 272,
+        "w": 171,
+        "h": 16,
+        "right": 1386,
+        "bottom": 288,
+        "top": 272,
+        "left": 1215,
+        "pageX": 1215,
+        "pageY": 272
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 911,
+        "dpr": 1,
+        "scrollY": 0
+      },
+      "lineBoxes": 1,
+      "type": {
+        "family": "Inter",
+        "size": "12px",
+        "weight": "500",
+        "lineHeight": "16px",
+        "letterSpacing": "normal",
+        "transform": "none",
+        "align": "left"
+      },
+      "colour": {
+        "fg": "rgb(109, 40, 217)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgEffective": {
+          "colour": "rgb(255, 255, 255)",
+          "paintedBy": "div.border-dark-700.flex-col.rounded-xl"
+        },
+        "border": "rgb(229, 231, 235)",
+        "borderWidth": "0px",
+        "opacity": "1"
+      },
+      "layout": {
+        "display": "block",
+        "position": "static",
+        "padding": "0px",
+        "margin": "12px 0px 0px",
+        "gap": null,
+        "alignItems": "normal",
+        "justifyContent": "normal",
+        "width": "171.328px",
+        "height": "16px",
+        "zIndex": "auto"
+      },
+      "ancestors": [
+        "div.border-dark-700.flex-col.rounded-xl",
+        "div.grid-cols-2.grid.gap-3",
+        "div.mb-6.p-6.bg-dark-800"
+      ],
+      "overflowsViewport": false
+    },
+    "page": "/account",
+    "url": "http://localhost:3000/account",
+    "pageTitle": "BrandGEO — Dashboard",
+    "viewport": {
+      "w": 1920,
+      "h": 911
+    },
+    "received_at": "2026-07-29T18:30:06+00:00",
+    "id": 15
+  }
+]

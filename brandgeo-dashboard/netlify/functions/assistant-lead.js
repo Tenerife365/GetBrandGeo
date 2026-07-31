@@ -25,6 +25,8 @@ const {
   corsHeaders, preflight, hashIp, isPlausibleDomain, normalizeDomain,
 } = require('./_prospect_guard')
 
+const { ADMIN_ALERT_EMAIL } = require('./_admin_notify')
+
 const DAILY_LEAD_CAP = 10   // per-IP/day — abuse guard on the lead endpoint
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -55,7 +57,10 @@ async function emailLeadToTeam({ name, email, domain, need, reason, hot }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
         from: 'BrandGEO Assistant <noreply@mail.getbrandgeo.com>',
-        to: ['constantin@getbrandgeo.com'],
+        // Was a hardcoded personal address, the third independent copy of
+        // this routing decision. Uses the shared constant now, so changing
+        // where admin mail goes is one edit rather than three.
+        to: [ADMIN_ALERT_EMAIL],
         reply_to: email || undefined,
         subject: `${hot ? '🔥 HOT lead' : '[Assistant lead]'} ${name} — ${reason}`,
         html,

@@ -28,7 +28,27 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai"
+    # askmywebsiteai (in-dashboard support assistant, added 2026-07-29). The
+    # snippet alone would have done NOTHING: script-src was 'self' only, so the
+    # SDK was blocked before it ran, and the failure is a console line nobody
+    # reads. default-src 'self' also covers frame-src by fallback, so any widget
+    # iframe was blocked too, and connect-src blocked its API calls.
+    #
+    # Scoped to the vendor's own origins, never a wildcard: this CSP is the last
+    # thing standing between a third-party script and a page showing signed-in
+    # customer data. If the widget still fails, read the console for the exact
+    # blocked origin and add THAT, rather than loosening a directive.
+# frame-src is now explicit because relying on the default-src fallback
+    # would silently re-block the widget the next time default-src changes.
+    #
+    # Scope verified by reading the 414KB bundle on 2026-07-29, not assumed:
+    # it resolves its API base as new URL(script.src).origin, which is
+    # app.askmywebsiteai.com, and it creates no iframe, no WebSocket and no
+    # EventSource. So no wss: entry is needed. The apex askmywebsiteai.com
+    # appears only as a target=_blank footer link, which is navigation and
+    # needs no CSP allowance. Note a CSP wildcard does NOT match the apex, so
+    # if the vendor ever moves the API there it must be listed explicitly.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com"
 
 [[redirects]]
   from = "/*"
@@ -56,9 +76,12 @@
 [functions."set-client-plan"]
   timeout = 26
 
-# Daily: revert expired trial/comp grants to Free, notify client + admin.
+# Daily cron job (pg_cron -> pg_net, 06:10 UTC): revert expired trial/comp grants
+# to Free, notify client + admin. Loops per expiring client with four sequential
+# DB writes plus a Resend email each, and was inheriting the 10s default because
+# it only declared a cron string. Same reasoning as set-client-plan above.
 [functions."expire-plan-grants"]
-  schedule = "0 6 * * *"
+  timeout = 26
 
 # Admin-only: resolve a client's login users (one auth.admin lookup per user).
 [functions."client-users"]
@@ -68,9 +91,6 @@
 # Loops auth.admin.deleteUser per user + several table deletes, so needs > 10s.
 [functions."delete-client"]
   timeout = 26
-
-[functions."purge-old-results"]
-  schedule = "0 3 * * *"
 
 [functions."signup-client"]
   timeout = 15
@@ -99,6 +119,12 @@
 [functions."set-client-billing"]
   timeout = 15
 
+# Admin-only: platform-wide promotion codes (list / create / toggle). One DB op
+# per call, so the default would do; 15s matches the other admin endpoints and
+# leaves room for a cold start.
+[functions."promotions-admin"]
+  timeout = 15
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26
@@ -113,15 +139,20 @@
 # filename suffix triggers this automatically) — it gets up to 15 minutes and
 # doesn't take a `timeout` setting the way synchronous functions above do.
 
-[functions."purge-old-audits"]
-  schedule = "0 4 * * *"
+# Retention for prospect_audits / prospect_leads is now a direct pg_cron SQL job
+# (db/supabase-scheduled-jobs-migration.sql). It needed nothing from Node, so it
+# no longer exists as a public HTTP endpoint. Same for the ai_results retention
+# delete, which pg_cron jobid 1 had been doing in parallel all along.
 
 # ── Collection queue (SCALE-SPEC.md §3) ───────────────────────────────────────
-# Hourly scheduler: enqueues a fresh run for every client whose refresh_cadence
-# is due, then kicks the worker. Does nothing for refresh_cadence='manual' (the
-# default), so this is inert until cadences are set per client.
+# Hourly cron job (pg_cron -> pg_net, :10 past the hour): enqueues a fresh run
+# for every client whose refresh_cadence is due, then kicks the worker. Does
+# nothing for refresh_cadence='manual' (the default), so it is inert until
+# cadences are set per client. Loops per due client with a limits check, an
+# enqueue and an update each across 36 clients, and was inheriting the 10s
+# default because it only declared a cron string.
 [functions."schedule-collections"]
-  schedule = "0 * * * *"
+  timeout = 26
 
 # Manual "Run collection" / "Force Refresh" enqueue endpoint (browser-called).
 # Fast: writes the queue + one worker kick, no engine calls.
@@ -150,12 +181,23 @@
 [functions."assistant-lead"]
   timeout = 15
 
+# Dashboard support widget -> ticket. Was inheriting the 10s default, which no
+# longer fits: the request is now auth (2 Supabase round trips) + ticket insert
+# + a client lookup + one Haiku triage call (its own hard timeout is 6s) + a
+# priority update + 2 comment inserts + the admin-notify row/email + the Resend
+# notification. On a cold start that exceeds 10s, and a timeout there is worse
+# than it looks: the ticket INSERT has already committed, so the customer would
+# see a 502 for a request that actually succeeded and would file it again.
+# Same reasoning as assistant.js, which also wraps a Haiku call.
+[functions."support-request"]
+  timeout = 26
+
 # ── Auto-notify search engines of new/changed pages (ping-sitemap.js) ─────────
-# Daily: diff the live sitemap against the sitemap_pings table, ping new/changed
-# URLs to Google + IndexNow. Automatic replacement for firing force-index by hand.
+# Daily cron job (pg_cron -> pg_net, 05:10 UTC): diff the live sitemap against
+# the sitemap_pings table, ping new/changed URLs to Google + IndexNow. Automatic
+# replacement for firing force-index by hand.
 # 26s so a first-run batch (auth reused across URLs, capped at 25) fits comfortably.
 [functions."ping-sitemap"]
-  schedule = "0 5 * * *"
   timeout = 26
 
 # ── AI Social publishing (social-*.js) ────────────────────────────────────────

@@ -5,7 +5,7 @@
  * Radar chart: 5 axes = 5 AI engines, showing visibility profile per entity.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
@@ -15,15 +15,21 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
-import { ENGINE_META } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
+import ChartTooltip from '../components/ChartTooltip'
+import ChartLegend from '../components/ChartLegend'
+import { PageTitle, SectionHeading } from '../components/Typography'
+import SharedEmptyState from '../components/EmptyState'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
 
 // ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
-const ENGINES: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
+// Derived, never hand-listed — see LIVE_ENGINES in planConfig.ts. The old
+// hardcoded five-engine array was already stale for grok and ai_overview.
+const ENGINES = LIVE_ENGINES as LLMName[]
 // Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
 // file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
 // ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.
@@ -142,17 +148,72 @@ function computeTrend(
 
 const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
 
+/**
+ * Empty-cell placeholder. Replaces the bare em dash this page used to render in
+ * `text-slate-700`, which measured 1.72:1 on --dark-800 and was the last
+ * dark-mode contrast failure anywhere in the app (audit 2026-07-30, F5).
+ *
+ * Two faults were wearing one glyph. It was unreadable, and a lone dash does not
+ * say WHAT is missing on a product whose whole claim is honest measurement, so
+ * every call site below now passes the specific reason the cell is empty
+ * ("Not ranked", "No sample prompt") rather than a punctuation mark.
+ *
+ * `text-slate-500` is the palette's existing muted step and is the only muted
+ * value that is remapped in BOTH themes: index.css:143 lifts it to
+ * rgb(148 163 184) in dark and index.css:170 drops it to rgb(85 100 121) in
+ * light, precisely so it stays muted without going invisible. No new token is
+ * needed and index.css is not touched.
+ */
+function NoData({ children }: { children: ReactNode }) {
+  return <span className="text-slate-500 font-normal">{children}</span>
+}
+
+/**
+ * Segmented trend control. The hit area, not the label, is what was undersized:
+ * these measured 29x24 in the first audit and 32x33 once the earlier pass landed
+ * a 32px floor. 32x33 passes WCAG 2.2 SC 2.5.8 (24x24 minimum) but sits under the
+ * 44x44 best practice, which the owner has decided to meet at every width, not
+ * only under a coarse pointer. The previous coarse-pointer clause is therefore
+ * gone: it delivered 44x44 only on touch hardware, and a desktop browser at
+ * 375px wide still reports `pointer: fine`, so the narrow case measured 32x33.
+ *
+ * The visual stays 32x32. The target is expanded by a transparent `::after` at a
+ * negative inset, the pattern index.css already ships for `.time-pill` and
+ * `.engine-chip`. -inset-1.5 is -6px on all four sides, so 32 + 6 + 6 = 44 in
+ * both axes. Expressed as a utility here rather than a rule because index.css is
+ * owned by the coordinator and off limits to this change.
+ *
+ * The gap-3 in TREND_GROUP is load-bearing and must not be reduced. Three 44px
+ * targets whose visuals are 32px wide need their centres at least 44px apart, so
+ * the gap floor is 44 - 32 = 12px exactly. This was verified on the running app
+ * rather than argued: with the ::after in place but the gap forced back to 4px,
+ * the three chips hit-test at 37x45, 36x45 and 44x45, because a later sibling's
+ * pseudo-element paints over an earlier one and the first two chips lose 8px of
+ * their own hit area to their right-hand neighbour. Raising the target without
+ * raising the gap would have made mis-taps worse, not better. At gap-3 all three
+ * measure 44 to 45 in both axes with zero overlap.
+ */
+const TREND_CHIP_TARGET =
+  "relative inline-flex items-center justify-center min-w-[32px] min-h-[32px] " +
+  "after:content-[''] after:absolute after:-inset-1.5"
+const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
+
+/**
+ * Competitor rows are not engines (dashboard-visual-system.md §9.5). Colour is
+ * resolved at RENDER time from the current chart theme, not baked in here:
+ * the tenant's own brand renders in --rail-active and every competitor
+ * renders in one flat --sentiment-neutral — identity here is "you vs. the
+ * field", not nine distinguishable hues. Rank is already carried by bar
+ * length and sort order, which is the whole reason the old index-keyed
+ * per-position colour arrays existed here and drifted (F-22).
+ */
 function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
   return [
-    { name: short(brandName), fullName: brandName, mentions: brandMentions, fill: '#8b5cf6', isYou: true },
+    { name: short(brandName), fullName: brandName, mentions: brandMentions, isYou: true },
     ...topCompetitors.map(c => ({
       name: short(c.name),
       fullName: c.name,
       mentions: c.totalMentions,
-      // Competitors share one quiet hue — the brand's violet bar is the focal
-      // point (you vs them), and the x-axis label already identifies each
-      // competitor, so 5 different bar colors was decorative rainbow, not meaning.
-      fill: '#64748b',
       isYou: false,
     })),
   ]
@@ -255,19 +316,25 @@ export default function Competitors() {
   const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
   const barData         = buildBarData(brandName, brandMentions, topCompetitors)
   const engineGroupData = buildEngineGroupData(brandName, engineStats, topCompetitors, activeEngines as LLMName[])
-  const groupColors     = ['#8b5cf6', '#ef4444', '#f59e0b', '#3b82f6']
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendData       = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
-  const trendColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4']
+  // "You vs. the field" (§9.5) — resolved from the live chart theme, never a
+  // hand-picked hex, and never an array index (that's what F-22 was).
+  const colorForKey = (key: string) => key === brandName ? chart.railActive : chart.sentimentNeutral
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
 
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-0.5">
-            <h1 className="text-2xl font-bold text-white">Competitors</h1>
+      {/* Header. flex-wrap + min-w-0 are load-bearing at 320: without them the
+          title column cannot shrink below its content and the Add manually
+          button cannot drop to a second line, so <main> overflowed (338 against
+          a 320 clientWidth). Pre-existing, found 2026-07-30 when 320 was first
+          tested. The document itself never overflowed, so only a checker reading
+          <main> could see it. */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3 mb-0.5">
+            <PageTitle>Competitors</PageTitle>
             {primaryMarket && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
                 {primaryMarket.flag} {primaryMarket.id} results
@@ -289,7 +356,7 @@ export default function Competitors() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">{brandName} — AI mentions</div>
+          <div className="text-xs text-slate-500 mb-1">AI mentions of {brandName}</div>
           <div className="text-2xl font-bold text-brand-300 tabular-nums">{brandMentions}</div>
           <div className="text-xs text-slate-500 mt-0.5">
             {brandAvgPos ? `Avg position #${brandAvgPos}` : 'No position data'}
@@ -298,10 +365,12 @@ export default function Competitors() {
         <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">Top competitor</div>
           <div className="text-sm font-bold text-red-300 leading-tight mt-1">
-            {topCompetitors[0]?.name ?? '—'}
+            {topCompetitors[0]?.name ?? <NoData>None yet</NoData>}
           </div>
           <div className="text-xs text-slate-500 mt-0.5">
-            {topCompetitors[0] ? `${topCompetitors[0].totalMentions} AI mentions` : 'None found yet'}
+            {topCompetitors[0]
+              ? `${topCompetitors[0].totalMentions} AI mentions`
+              : 'No competitor named in AI responses'}
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-4">
@@ -312,7 +381,7 @@ export default function Competitors() {
         <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">AI responses analysed</div>
           <div className="text-2xl font-bold text-slate-300 tabular-nums">{totalResponses}</div>
-          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engines</div>
+          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engine{activeEngines.length === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -359,18 +428,19 @@ export default function Competitors() {
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={barData} margin={{ left: -20, bottom: 10, right: 8 }}>
-                <XAxis dataKey="name" tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false}
+                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false}
                   interval={0} />
-                <YAxis tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} width={40} tickCount={4} />
                 <Tooltip
-                  contentStyle={chart.tooltipContent}
-                  labelStyle={chart.tooltipLabel}
-                  itemStyle={chart.tooltipItem}
-                  labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName ?? ''}
-                  formatter={(v: any) => [v, 'AI mentions']}
+                  content={<ChartTooltip
+                    formatValue={item => `${item.value} AI mentions`}
+                    formatLabel={(_l, payload) => String(payload?.[0]?.payload?.fullName ?? '')}
+                  />}
+                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                 />
-                <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]}>
-                  {barData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                  {barData.map(entry => <Cell key={entry.fullName} fill={entry.isYou ? chart.railActive : chart.sentimentNeutral} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -384,18 +454,16 @@ export default function Competitors() {
             <p className="text-[11px] text-slate-600 mb-3">% of prompts where each brand appears, per AI engine</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={engineGroupData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="engine" tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: chart.axisTick, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                <XAxis dataKey="engine" tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} width={40} tickCount={4} />
                 <Tooltip
-                  contentStyle={chart.tooltipContent}
-                  labelStyle={chart.tooltipLabel}
-                  itemStyle={chart.tooltipItem}
-                  formatter={(v: any) => [`${v}%`]}
+                  content={<ChartTooltip formatValue={item => `${item.value}%`} />}
+                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                 />
-                <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 6 }} />
-                {groupKeys.map((key, i) => (
-                  <Bar key={key} dataKey={key} fill={groupColors[i]} radius={[3, 3, 0, 0]} maxBarSize={28} />
+                <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                {groupKeys.map(key => (
+                  <Bar key={key} dataKey={key} fill={colorForKey(key)} radius={[3, 3, 0, 0]} maxBarSize={28} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -423,22 +491,24 @@ export default function Competitors() {
           </div>
           <div className="px-3 py-3 text-center font-bold text-emerald-400 tabular-nums">{brandMentions}</div>
           <div className="px-3 py-3 text-center tabular-nums text-emerald-400 font-semibold">
-            {brandAvgPos ? `#${brandAvgPos}` : '—'}
+            {brandAvgPos ? `#${brandAvgPos}` : <NoData>Not ranked</NoData>}
           </div>
           <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">
             {activeEngines.filter(e => (engineStats[e]?.mentioned ?? 0) > 0).map(e => (
               <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={ENGINE_LABEL[e]} />
             ))}
           </div>
-          <div className="px-3 py-3 text-xs text-slate-500">—</div>
+          <div className="px-3 py-3 text-xs"><NoData>No sample prompt</NoData></div>
         </div>
 
         {topCompetitors.length === 0 ? (
-          <div className="py-16 text-center">
-            <Tag size={28} className="text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm mb-1">No competitors found in AI responses yet</p>
-            <p className="text-xs text-slate-600">Run a collection from the AI Visibility tab — competitors mentioned by AI will appear here automatically.</p>
-          </div>
+          <SharedEmptyState
+            icon={Tag}
+            title="Not measured yet"
+            body="Competitors mentioned by AI appear here automatically once a collection runs. You can also add one manually below."
+            actionLabel="Run a collection"
+            actionTo="/ai-visibility"
+          />
         ) : (
           topCompetitors.map((c, idx) => {
             const engineDots = activeEngines.filter(e => (c.byEngine[e] ?? 0) > 0)
@@ -468,7 +538,7 @@ export default function Competitors() {
                   )}
                 </div>
                 <div className="px-3 py-3 text-center tabular-nums text-slate-300">
-                  {c.avgPos ? `#${c.avgPos}` : '—'}
+                  {c.avgPos ? `#${c.avgPos}` : <NoData>Not ranked</NoData>}
                 </div>
                 <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">
                   {engineDots.map(e => (
@@ -476,7 +546,7 @@ export default function Competitors() {
                   ))}
                 </div>
                 <div className="px-3 py-3 text-xs text-slate-500 truncate" title={samplePrompt ?? ''}>
-                  {sampleText ?? <span className="text-slate-700">—</span>}
+                  {sampleText ?? <NoData>No sample prompt</NoData>}
                 </div>
               </div>
             )
@@ -518,15 +588,15 @@ export default function Competitors() {
           <div>
             <h2 className="text-sm font-semibold text-slate-300">Performance Over Time</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              AI mention trends — {brandName} vs top competitors
+              AI mention trends for {brandName} vs top competitors
             </p>
           </div>
-          <div className="flex gap-1 bg-dark-700 rounded-lg p-1">
+          <div className={TREND_GROUP}>
             {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
               <button key={p} onClick={() => setTrendPeriod(p)}
                 aria-pressed={trendPeriod === p}
                 aria-label={`View ${p} trend`}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                className={`${TREND_CHIP_TARGET} px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
                 }`}>
                 {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}
@@ -545,42 +615,47 @@ export default function Competitors() {
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
+              <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
               <XAxis
                 dataKey="period"
-                tick={{ fill: chart.axisTick, fontSize: 10 }}
+                tick={{ fill: chart.axisInk, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
+                minTickGap={24}
               />
               <YAxis
-                tick={{ fill: chart.axisTick, fontSize: 10 }}
+                tick={{ fill: chart.axisInk, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
+                width={40}
+                tickCount={4}
               />
               <Tooltip
-                contentStyle={chart.tooltipContent}
-                labelStyle={chart.tooltipLabel}
-                itemStyle={chart.tooltipItem}
+                content={<ChartTooltip />}
+                cursor={{ stroke: chart.gridLine, strokeWidth: 1 }}
               />
-              <Legend wrapperStyle={{ fontSize: 10, color: chart.legend, paddingTop: 8 }} />
+              <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+              {/* "You vs. the field" (§9.5) — same colorForKey as the grouped bar
+                  chart above, so brand vs. competitor reads identically in both
+                  charts on this page. All series share one strokeWidth. */}
               <Line
                 type="monotone"
                 dataKey={brandName}
-                stroke="#8b5cf6"
-                strokeWidth={2.5}
+                stroke={colorForKey(brandName)}
+                strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4 }}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }}
               />
-              {topCompetitors.slice(0, 4).map((c, i) => (
+              {topCompetitors.slice(0, 4).map(c => (
                 <Line
                   key={c.name}
                   type="monotone"
                   dataKey={c.name}
-                  stroke={trendColors[i]}
-                  strokeWidth={1.5}
+                  stroke={colorForKey(c.name)}
+                  strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 3 }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }}
                 />
               ))}
             </LineChart>

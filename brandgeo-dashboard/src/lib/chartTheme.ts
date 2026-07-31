@@ -1,84 +1,89 @@
 /**
  * src/lib/chartTheme.ts
- * Theme-aware palette for the Recharts "chrome" — gridlines, axis ticks and
- * tooltips.
+ * Theme-aware palette for the Recharts "chrome" — gridlines, axis ticks,
+ * tooltip, and the sentiment ramp — per
+ * docs/design/dashboard-visual-system.md §9.1.
  *
- * Why this exists: Recharts takes its colours as JS props (`stroke`, `fill`,
- * `contentStyle`), not CSS classes, so it sits completely outside the
- * `html.light` overrides in index.css that theme the rest of the app. Every
- * chart page had therefore hardcoded dark-only hexes inline — which meant that
- * in LIGHT mode the charts rendered a near-black tooltip box and dark slate
- * gridlines on a white page. Nothing themed them, because nothing could.
+ * Why this exists: Recharts writes SVG presentation attributes and does not
+ * reliably resolve `rgb(var(--token))` strings, so it sits completely outside
+ * the `html.light` CSS-variable overrides that theme the rest of the app.
+ * Every chart therefore reads its resolved hexes from this one module instead
+ * of hardcoding them inline — before this existed, BrandSentiment.tsx alone
+ * used two different axis-tick colours in two charts on the same screen, and
+ * light mode rendered a near-black tooltip on a white page because nothing
+ * could theme it.
  *
- * Same reasoning as motion.ts: one file so every page's charts share a palette
- * instead of each page inventing its own. Before this, BrandSentiment.tsx alone
- * used two different axis-tick colours in two charts on the same screen
- * (#94a3b8 and #64748b), and #64748b measured 3.75:1 on --dark-800 — a
- * WCAG 1.4.3 failure for 10px axis labels, which are text.
+ * Every value below is exactly the §3 (A9) and §8.5 token value for the
+ * corresponding theme — this module re-expresses those tokens in a form
+ * Recharts can consume, it does not invent or duplicate a colour.
  *
- * Contrast, measured (axis ticks and tooltip label text are TEXT, so 4.5:1):
- *   dark  — axisTick #94a3b8 on --dark-800 ....... 6.96:1  PASS
- *           tooltipLabel #e2e8f0 on #1e293b ...... 12.1:1  PASS
- *   light — axisTick #475569 on #ffffff ........... 7.57:1  PASS
- *           tooltipLabel #0f172a on #ffffff ....... 17.9:1  PASS
- *
- * Gridlines are decorative, not UI components conveying state, so they sit
- * below the 3:1 bar deliberately — a gridline that meets 3:1 competes with the
- * data series for attention.
- *
- * The DATA series colours (emerald / red / slate / brand) are NOT here. They
- * carry meaning, are shared across both themes, and already clear the 3:1
- * graphical minimum against both surfaces — slate #64748b, the weakest, is
- * 3.75:1 on --dark-800 and 4.76:1 on white.
+ * Engine colours are NOT here. They live in ENGINE_META (planConfig.ts) and do
+ * not fork by theme (§8.2, judgement call J1) — every chart keys its engine
+ * fills off ENGINE_META[id].chartColor directly, never off this module.
  */
 import { useTheme } from './themeContext'
 
 export interface ChartTheme {
-  /** CartesianGrid stroke. */
-  grid: string
-  /** XAxis/YAxis tick fill — this is text, so it meets 4.5:1. */
-  axisTick: string
-  /** Tooltip `contentStyle` — ready to spread directly onto the prop. */
-  tooltipContent: {
-    background: string
-    border: string
-    borderRadius: number
-    boxShadow: string
-  }
-  /** Tooltip `labelStyle`. */
-  tooltipLabel: { color: string; fontSize: number }
-  /** Tooltip `itemStyle`. */
-  tooltipItem: { color: string; fontSize: number }
-  /** Legend `wrapperStyle` colour. */
-  legend: string
+  /** CartesianGrid stroke — §3 A9 --grid-line. Decorative, deliberately below 3:1 (gridlines are exempt from WCAG 1.4.11). */
+  gridLine: string
+  /** XAxis/YAxis tick fill — §3 A9 --axis-ink. This is text, so it clears 4.5:1 in both themes. */
+  axisInk: string
+  tooltipSurface: string
+  tooltipBorder: string
+  tooltipInk: string
+  /** The card surface a chart sits on — the stroke gap between stacked bar segments (§9.5) and the activeDot border use this. */
+  cardSurface: string
+  /** §8.5 sentiment ramp, resolved to hex for the current theme. */
+  sentimentPositive: string
+  sentimentNeutral: string
+  sentimentNegative: string
+  /** §9.5 — the tenant's own brand series in a competitor chart. Same value as --rail-active. */
+  railActive: string
 }
 
 const DARK: ChartTheme = {
-  grid: '#334155',
-  axisTick: '#94a3b8',
-  tooltipContent: {
-    background: '#1e293b',
-    border: '1px solid #334155',
-    borderRadius: 8,
-    boxShadow: '0 8px 24px rgb(0 0 0 / 0.45)',
-  },
-  tooltipLabel: { color: '#e2e8f0', fontSize: 12 },
-  tooltipItem: { color: '#cbd5e1', fontSize: 11 },
-  legend: '#94a3b8',
+  gridLine: '#243044',
+  axisInk: '#94a3b8',
+  tooltipSurface: '#1e293b',
+  tooltipBorder: '#334155',
+  tooltipInk: '#e2e8f0',
+  cardSurface: '#0f172a',
+  sentimentPositive: '#84cc16',
+  sentimentNeutral: '#94a3b8',
+  sentimentNegative: '#fb7185',
+  railActive: '#a78bfa',
 }
 
+// SYNCED 2026-07-30 with the light-mode contrast fixes in index.css. Two values
+// here had gone stale the moment those tokens moved, which is the failure mode
+// this module's own docstring cannot prevent: --axis-ink and --grid-line are
+// defined in index.css and referenced by NOTHING, so the CSS side is dead
+// documentation and this file is the only thing that paints. Nothing errors
+// when they diverge.
+//   axisInk          #64748b -> #556479. The comment on the interface says this
+//                    "clears 4.5:1 in both themes"; at #64748b it measured 4.76
+//                    and only because every chart happens to sit on a white
+//                    card. On the page it was 4.45 and on --dark-700 3.95, so
+//                    the claim held by placement, not by the value. Now 6.03 on
+//                    the card, 5.00 on the darkest light surface.
+//   sentimentPositive #4d7c0f -> #3f6212, matching --sentiment-positive, which
+//                    moved because .text-sentiment-positive is real text
+//                    (TrendDelta.tsx:37) and measured 4.09 on its own lime tint.
+//                    As a chart fill either value clears the 3:1 non-text floor,
+//                    so this change is for token truth, not for the chart.
+// sentimentNeutral stays #64748b deliberately: --sentiment-neutral was left
+// alone because it only fills a 2x2 dot. See the note beside it in index.css.
 const LIGHT: ChartTheme = {
-  grid: '#e2e8f0',
-  axisTick: '#475569',
-  tooltipContent: {
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    borderRadius: 8,
-    boxShadow: '0 8px 24px rgb(15 23 42 / 0.12)',
-  },
-  tooltipLabel: { color: '#0f172a', fontSize: 12 },
-  tooltipItem: { color: '#334155', fontSize: 11 },
-  legend: '#475569',
+  gridLine: '#eaeaf2',
+  axisInk: '#556479',
+  tooltipSurface: '#ffffff',
+  tooltipBorder: '#d8d6e6',
+  tooltipInk: '#0f172a',
+  cardSurface: '#ffffff',
+  sentimentPositive: '#3f6212',
+  sentimentNeutral: '#64748b',
+  sentimentNegative: '#9f1239',
+  railActive: '#7c3aed',
 }
 
 export function useChartTheme(): ChartTheme {

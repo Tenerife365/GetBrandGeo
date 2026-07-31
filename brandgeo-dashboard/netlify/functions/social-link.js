@@ -12,7 +12,15 @@ const { getProvider } = require('./_publishing');
 const { ensureSocialProfile } = require('./_social');
 
 exports.handler = async (event) => {
-  const auth = await requireAuth(event);
+  // ADMIN-ONLY 2026-07-31. AI Social is unfinished and is presented to customers
+  // as coming soon; admins drive it for any account to test. This endpoint is NOT
+  // an OAuth callback: it MINTS a linking URL hosted at the provider's domain
+  // (Ayrshare /profiles/generateJWT) and returns it to the browser. Nothing
+  // external ever calls back into it, so adminOnly is the correct gate and does
+  // not break the integration. Until this line the only gate was the client-side
+  // plan check in Social.tsx, so a non-admin viewer could call it directly, and
+  // it auto-provisions a provider profile as a side effect (see below).
+  const auth = await requireAuth(event, { adminOnly: true });
   if (auth.response) return auth.response;
   const { headers, supabase, profile } = auth;
 

@@ -1,6 +1,11 @@
-# CLAUDE.md — BrandGEO Platform Memory
+﻿# CLAUDE.md — BrandGEO Platform Memory
 
-> **Last updated:** 2026-07-08 (task #103 shipped, not yet built/committed; task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)
+> ⚠️ **§0 through §7 below were last updated 2026-07-08 and are PARTLY STALE.**
+> The "CURRENT STATE" section immediately below this header was verified against
+> the live sites and the working tree on 2026-07-26 and wins wherever the two
+> disagree. Known-stale items are marked inline where they occur.
+>
+> **Last updated (§0 to §7):** 2026-07-08 (task #103 shipped, not yet built/committed; task #83 shipped + pushed; git index corruption resolved; #100/#102 closed)
 > **New this pass:** #103 (fixed onboarding — seeds initial prompts, fires
 > all 3 collection functions with plan gating; build/commit still pending
 > on Constantin's machine, see §5). Previous pass: #73 (onboarding flow doc,
@@ -12,6 +17,776 @@
 > **Dashboard repo:** `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-dashboard` (Netlify)  
 > **Website files:** `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo\web\` + `brandgeo-signup\`  
 > **Admin email:** `constantin@talentwelove.com` (Supabase admin, NOT workfully.com)
+
+---
+
+## CURRENT STATE (verified 2026-07-26)
+
+Every claim in this section was checked against the live sites, the running
+bundle, or the working tree. Not remembered. If you change something here, check
+it the same way. This section takes precedence over §0 through §7 below.
+
+### 2026-07-31: the pricing ladder is ruled (S1). One follow-on unsigned.
+
+`docs/strategy/sprint-ladder-ruling.md` is now the single source for the ladder,
+argued with its arithmetic in euros, and **all four decisions carry Constantin's
+`DECIDED 2026-07-31` lines.** A Radar entry tier at EUR 39 list and EUR 29 launch
+for the first 100, **Gemini and Claude** (he amended this off ChatGPT and Gemini:
+ChatGPT at EUR 0.108 a check was 77 percent of Radar's cost, and the amendment
+saves EUR 227.55 a month at 100 subscribers), 7 prompts, weekly, 1 site.
+`PLAN_PROMPTS = 5, 7, 18, 35, 56, 200, 200`, sentinel for enterprise, which holds
+the 15 percent ceiling, closes both inversions and reduces nothing. SUM the D1
+pools, MAX the site allowance, enforced at ACCOUNT level or it is decorative.
+
+**The amendment created decision 1b, also ruled the same day:
+`PLAN_ENGINES.free = ['gemini']`, was `['chatgpt']`.** Otherwise a Free client
+paying EUR 29 for Radar would have LOST ChatGPT. Radar is now a strict superset
+of Free. **Consequence S2 owns: ChatGPT is first sold at Essentials, so the
+locked-engine "upgrade to unlock" nudge on Free must name Essentials and not the
+next rung.** Consequence for the constants: Free costs EUR 0.160 a month, so
+**`PLAN_MONTHLY_API_BUDGET_EUR.free` stays at 0.30 and the raise to 0.60 drafted
+in decision 2 is cancelled.** Radar ships at 7 prompts; the optional 8 was
+declined.
+
+Three findings from the costing that stand on their own. The free tier's EUR 0.30
+budget cannot pay for its own 5 ChatGPT prompts (EUR 0.540), so a free signup
+collects 3 and gets a billing error, and this is LIVE until S2 ships 1b. One
+Managed client at 200 prompts consumes
+the entire 500 credit monthly SerpApi pool, platform wide. And the ladder's
+headline numbers depend on `MONTHLY_CAPPED_ENGINES` in `_cost.js:541`: delete
+that constant and Growth PRO and Managed breach by EUR 8.61 and EUR 46.27, so S2
+should pin it with an assertion. The stale ladder comment at
+`planConfig.ts:400-420` must be deleted in the same commit as the new constants.
+
+### 2026-07-31: outbound sending infrastructure (S8), instructions written
+
+`docs/growth/outbound-infra.md` is the full build-out for the cold channel:
+secondary sending domain `trybrandgeo.com` (never send cold from
+`getbrandgeo.com`), two Google Workspace inboxes on a SEPARATE subscription so a
+suspension cannot reach company mail, exact SPF/DKIM/DMARC records, cPanel root
+redirect, Instantly warmup and the per-inbox cap ramp, plus the GBP description
+and services rewrite with the lineup read from `planConfig.ts`. Registrar and
+DNS host is **CyberFolks**, mail is **Google Workspace**, cPanel IP is
+**91.200.121.45**, all measured not remembered. Two open findings recorded
+there: the plan's Day 25 to 28 volumes (55 to 70/day) exceed two inboxes' safe
+capacity, so inboxes 3 and 4 must be created on Day 12; and the new domain's
+DMARC moves to `p=quarantine` on Day 15. S8 stays IN PROGRESS until mail-tester
+scores 9+ on both inboxes and the public GBP profile is re-checked.
+
+Two rulings recorded in that doc rather than left to be re-argued. **A subdomain
+was rejected**: `getbrandgeo.com` publishes `p=none` with no `sp=` tag, so under
+RFC 7489 a sending subdomain inherits `none` and could not move to
+`p=quarantine` independently, and organisational-domain scoring plus domain
+blocklists would put the primary inside the blast radius. A subdomain is still
+the right answer for opted-in mail later (`mail.getbrandgeo.com`). **The name is
+`trybrandgeo.com`**, Constantin's suggestion, over the original
+`trygetbrandgeo.com` which stutters at the `try-get` seam.
+
+**Found while checking that name, and it is a decision owed:
+`brandgeo.com` is for sale at USD 9,995** on Atom.com (`ns1/ns2.atom.com`, 302s
+to `atom.com/name/BrandGEO`). It is parked marketplace inventory, not an
+operating competitor, which is what makes `trybrandgeo.com` safe to use.
+**Constantin's ruling 2026-07-31: keep it OPEN, no funds available for now.**
+Deferred, not closed and not to be re-argued from scratch. Revisit triggers are
+the Day 30 close-out, the Atom listing changing, or any GEO competitor being
+seen on it. Nothing in the sprint depends on it.
+
+### 2026-07-31: the acquisition funnel has a forward step, and payment has a gate
+
+Sprint task S3, roadmap Stream C. The Stripe payment links are **no longer in
+`brandgeo/web/site.js`**: they moved to `netlify/functions/_terms_gate.js` and
+are issued one at a time by `accept-terms.js`, which records a
+`terms_acceptances` row first and returns nothing if it cannot. Never put a
+checkout URL back in a browser-served file.
+
+**But do not read C3 as closed, and this is the load-bearing correction.** Those
+links are Stripe **Payment Links**: permanent, reusable, and enough on their own
+to pay. `_terms_gate.js` is in the **public** repo, the links are in four
+committed docs, and they are in git history forever. Moving them gated the route
+and not the destination. `stripe-webhook.js` now raises a
+`checkout_without_acceptance` admin event when a payment arrives without a
+matching acceptance, so a bypass is visible; it never withholds provisioning.
+**Rotating the six links, and keeping the replacements in env vars, is what
+actually closes it, and it needs Constantin.** Caught by `bg-verify`, which
+returned FAIL on the first four commits: an earlier commit message here claimed
+the gate was real and it was not.
+
+Also: the audit success path now
+offers signup with `?domain=` prefilled (it previously offered nothing, while
+the FAILURE path offered exactly that), the domain survives into `/welcome`, and
+a failed HubSpot push records why on `prospect_leads.hubspot_error` instead of a
+silent `false`. Two new checks: `scripts/check-funnel-accept-path.sh` and
+`scripts/check-contract-gate.sh`, both exit 0, both proven to fail on the commit
+before. Full detail in `docs/ROADMAP.md` Stream C.
+
+### 2026-07-28: colour system, engine lineup and plan limits (all LIVE)
+
+Four commits, all pushed and verified over HTTP against getbrandgeo.com.
+`7da5a67` `9b6bbe3` `49c5c72` `0acd83b` `68b8e1d`.
+
+**The palette is now derived from measurement and is documented in place** in
+`index.html`'s `:root` block. Full teardown, sources and method:
+`docs/research/competitive-and-conversion-2026-07-28.md`. Headlines:
+
+- `--t` moved off `#ffffff` (20.9:1, halation range) to `#E8E9ED` (16.2:1).
+- Surfaces were OKLCH C 0.019 at hue 284 while `--ac` is C 0.219 at hue 293, so
+  the accent sat on a desaturated copy of itself. Surfaces are near-neutral now.
+  **The violet did not change and should not.** Of ten competitors scraped none
+  owns it; peec.ai `#6b5bff` and AthenaHQ `#4f39f6` sit at hue 277-281 and
+  BrandGEO's `#8b5cf6` is 293, clear of that cluster.
+- Alpha text/border tokens are solid hexes now, so they can be contrast-checked.
+- **Light mode is no longer UNAUDITED.** It failed at the token level on every
+  page (`--t2` 4.09:1, `--t3` 2.19:1, `--ac2` 1.79:1) and 76 of 79 pages never
+  overrode the accent tokens in their light block at all. Fixed everywhere.
+- `--ac` `#8b5cf6` is a FILL only in dark; white on it is 4.23:1. `--ac-strong`
+  `#7c3aed` (5.7:1) is the button fill, `--ac-text` `#a78bfa` (7.23:1) is accent
+  text. New `--ok/--part/--bad/--info` and `--warn` carry status and risk.
+- Verified in-browser at 1280px: 292 text nodes, **0 contrast failures in dark,
+  0 real failures in light**, no horizontal overflow.
+
+**Engine lineup is corrected in every product claim.** Growth gained `google_ai`
+(`9b6bbe3`), so Growth and Growth PRO now have identical 5-engine coverage. All
+ten `brandgeo-vs-*.html` pages had advertised "ChatGPT, Gemini, Claude,
+Perplexity, and Meta AI" — a retired engine — and `brandgeo-vs-profound.html`
+additionally conceded Google AI Mode to Profound twice. `faq.html` answered
+"Which AI engines does BrandGEO monitor?" with Meta AI in the visible copy AND
+the JSON-LD. 22 claims corrected. **Historical research pages were deliberately
+left alone**; when a city study reports what Meta AI answered in a given run,
+that is a measured result and rewriting it would falsify the record.
+
+**Published plan limits now match `planConfig.ts`.** The page had promised
+Essentials 30 prompts (enforced 20) and Growth 150 (enforced **75**), plus
+"4 AI engines" for Growth (now 5) and "Daily/weekly refresh" against a 48h
+cooldown. Corrected downward to reality, because the code has enforced the lower
+numbers all along so no customer ever received the published figure.
+
+**Three FAQPage schemas were invalid and silently dropped** on Baltimore,
+Charlotte and Detroit: the last FAQ entry closed with `"}]` instead of `"}}]`,
+leaving `acceptedAnswer` unclosed. Pre-existing, confirmed identical at
+`0c6e740`. Site-wide JSON-LD now validates **110/111**; the one failure is
+`article-builder.html`, an internal tool excluded from the cPanel upload.
+**Add a JSON-LD validation step to any content workflow** — this went unnoticed
+on a product whose whole thesis is being parsed correctly by AI engines.
+
+**Open decisions this created, none of which a copy edit can settle:**
+1. **Growth PRO's ladder is thin.** EUR 449 vs EUR 299 now buys +25 prompts and
+   a 12h faster refresh, with identical engines. Direct consequence of giving
+   Growth `google_ai`.
+2. Whether to raise `PLAN_PROMPTS` to the previously published numbers instead
+   of having lowered the page. That roughly doubles Growth's collection spend.
+3. The two uncited hero stats (73%, 4.2x) still need a source or removal.
+4. Otterly's pricing in the research doc is secondary-sourced (they 403 a plain
+   client) and needs a first-party check before it appears in public copy.
+
+**Measurement traps that produced two false findings in that session, worth
+knowing before trusting any browser audit:** a hidden/throttled tab does not
+advance CSS transitions, so `getComputedStyle` returns the pre-transition value
+indefinitely (this made light mode look completely broken, 107 phantom
+failures). Kill transitions at *matching specificity* — a `*` rule loses to a
+class rule carrying its own `!important` transition — then force a reflow. And a
+zero-width viewport reports every element as overflowing; assert
+`document.documentElement.clientWidth` before trusting any layout number.
+
+### Agent Operating System
+- Constitution: `docs/AGENT-OS.md` (roster, model routing, waterfall, handoff
+  packet schema, command set, guardrails). Binding on every agent and session.
+- Agent prompts: `.claude/agents/*.md` (12: ten `bg-` waterfall agents plus two
+  portable read-only auditors, `dashboard-auditor` and `landing-page-optimizer`,
+  which write one exact file each into `docs/audit/`). Roster and the reason the
+  auditors are separate: `docs/AGENT-OS.md` §1.
+- Handoff packets: `.claude/handoffs/` (the only state that crosses a session
+  boundary). Template: `.claude/handoffs/_TEMPLATE.md`.
+- Artifacts: `docs/strategy/`, `docs/arch/`, `docs/design/`, `docs/copy/`,
+  `docs/qa/`.
+- Start any multi-department initiative with `bg-orchestrator /plan`, run each
+  stage in a fresh session, `/clear` between stages.
+
+### Deploy pipelines (read before reporting a deploy as broken)
+
+Two independent pipelines. A failure in one says nothing about the other.
+
+- **`getbrandgeo.com` (marketing) deploys via GitHub webhook to
+  `brandgeo/web/deploy.php` on cPanel.** Netlify is not involved.
+- **`app.getbrandgeo.com` (dashboard) deploys via Netlify** from
+  `brandgeo-dashboard/`.
+
+**Netlify showing "Canceled" on a run of deploys is normal and intended.**
+`brandgeo-dashboard/netlify.toml` sets
+`ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."`. Netlify's
+`ignore` inverts the usual convention: exit 0 means cancel. `git diff --quiet`
+exits 0 when nothing changed, so any push that does not touch
+`brandgeo-dashboard/` is cancelled on purpose and labelled "Canceled" rather
+than "Skipped". Without it the dashboard rebuilds on every marketing and blog
+push. `$CACHED_COMMIT_REF` tracks the last commit actually built, so the diff is
+cumulative and no dashboard change is lost to a run of cancellations.
+
+Verified live 2026-07-26: `getbrandgeo.com/site.js` line 1 is
+`/* build: 2026-07-26 hook-rebuild */` and `index.html` carries the same stamp as
+its first `<body>` comment, so the cPanel pipeline is delivering. CSP is a
+response header from `brandgeo/web/.htaccess`, not a meta tag, and the live
+header includes `connect-src ... https://app.getbrandgeo.com`.
+
+### Engine lineup and collection (supersedes §1.2, §2.8, §4.9)
+
+- `meta` is RETIRED as of 2026-07-16 and is in no plan set. Kept in `ENGINE_META`
+  so historical rows render, and in `collect-prompt.js` `FAST_ENGINES` so a stale
+  request does not error (`planConfig.ts:41`, `collect-prompt.js:31`).
+- `google_ai` (Google AI Mode via SerpApi) went live 2026-07-16, Growth PRO and
+  up only, to cap SerpApi spend (`planConfig.ts:43`).
+- **§2.8 "No Scheduled Collection" is WRONG now.** Collection is server-side: a
+  queue, `collection-worker-background`, and an hourly `schedule-collections`
+  cron that is inert while `refresh_cadence` is `manual` (the default).
+  `docs/STATE-OF-PRODUCT.md` §4.1 is stale on this too.
+- Plan ladder single source of truth is `src/lib/planConfig.ts`. `_cost.js` is a
+  current mirror and is the copy that ENFORCES entitlement and budget.
+  `_plans.js` is a DRIFTED mirror, see the defect below.
+
+### Content pipeline
+BG-001 through BG-019 are live in `brandgeo/web/` (19 `bg-*.html` files,
+counted; `bg-018.html` and its hero image are live but still untracked in git,
+`bg-019.html` is committed and pushed at `e6d9af4`). 27 city AI-visibility
+research pages are live (the original 7 plus 20 more US cities added
+2026-07-24/25), 10 industry pages, 10 comparison pages, 1 AI Visibility Index
+issue (#1, 2026-07-14), 2 press releases. Recent `ROADMAP-*.md` and
+`linkedin-posts-*.md` live in `docs/`, not the repo root, per reorg commit
+`5326a59`.
+
+**Weekly content roadmap, run 2026-07-27:** `docs/ROADMAP-2026-07-27.md`.
+Decided focus: BG-020, a cross-city consensus follow-up to BG-016 using the
+now-27-city dataset (needs no new collection). AI Visibility Index Issue #2
+confirmed not due, no client of any kind has more than one distinct collection
+day in `ai_results` yet, so there is no trend data to report regardless of the
+30-day day-count. Full detail, sources, and an important flag in that file:
+this scheduled task was briefed to read `CLAUDE.md` §9/§12/§13, which **do not
+exist** — see the note directly below.
+
+### Dashboard: shipped and verified live 2026-07-26
+
+Pushed, built by Netlify, and confirmed against the running bundle. This was the
+first dashboard deploy since `2c0f281` (2026-07-24). The served bundle is
+`index-DzC066bP.js`; its prices read €0, €99, €299, €449, from €1,500, `€900` is
+gone, and `Pro (legacy)` and `promotions-admin` are both present. An
+unauthenticated POST to `/.netlify/functions/promotions-admin` returns
+`401 Unauthorized: missing token`, so the function deployed and its auth gate
+works.
+
+- `34e41bb` `fix(app)`: aligns `PLAN_TIERS` with the 2026 ladder (Free,
+  Essentials €99, Growth €299, Growth PRO €449, Managed from €1,500, Enterprise
+  custom). Legacy `pro` is dropped from the offered ladder and re-inserted,
+  labelled legacy, only for a client still on it, positioned before Enterprise
+  per `planConfig.ts:159` so Enterprise still reads as an upgrade for them. This
+  closes the live mismatch where the dashboard showed Managed €900 while the
+  marketing site published €1,500 in its JSON-LD product schema
+  (`index.html:82` to `:85`).
+- `3dadd8b` `feat(app)`: the admin Promotions panel plus its backend,
+  `promotions-admin.js` (list/create/toggle, service key behind
+  `requireAuth({ adminOnly: true })`), plus `db/supabase-promotions-migration.sql`.
+- `97b3723` `docs`: superseded by this restore, see the note at the end.
+
+**The promotions migration was APPLIED 2026-07-26** and verified: `pg_policies`
+returns exactly three rows for `promotions` (`promotions_select`,
+`promotions_insert`, `promotions_update`). There is no delete policy by design,
+so promotions deactivate and never disappear, and `promotions-admin.js` exposes
+no delete action to match. `db/supabase-promotions-migration.sql` is now a record
+of a migration already run, like the rest of `db/`, and is safe to re-run.
+
+The table records which promotions exist. It prices nothing. Nothing on the
+checkout path reads it and no Stripe coupon is created, so no promotion created
+here changes what any customer is charged until the Stripe wiring is built.
+
+`promotions-admin.js` validates plans against `_cost.js`, not `_plans.js`.
+Validating against the drifted mirror would reject a promo targeting Growth PRO,
+which is C1 one layer down. `_auth.js:28` derives its plan list the same way.
+
+### Growth PRO is unsellable and unassignable (revenue defect)
+
+Found by `bg-architect`, recorded in `docs/arch/activation-path.md` §3.
+`planConfig.ts` is authoritative and `_cost.js` matches it, so entitlement and
+spend are NOT affected. `_plans.js` is the lone drifted mirror:
+
+- **C1.** `_plans.js:9` `PLAN_ORDER` has no `growth_pro`, and
+  `set-client-plan.js:116` gates on its `isValidPlan`. `set-client-plan` is the
+  only admin path that writes `clients.plan`, so Growth PRO cannot be assigned by
+  anyone. It also has no Stripe price or checkout link (`site.js:513`,
+  `stripe-webhook.js:37` to `:45`), so it cannot be bought self-serve either.
+- **C2.** `_plans.js:20` gives Growth five engines including `google_ai`.
+  `planConfig.ts:49` and `_cost.js:112` give four, deliberately. So a client
+  upgrading to Growth is emailed a written promise of "Google AI Mode", an engine
+  the product will never collect for them, at the moment they pay more.
+
+- **C3, found by B1 and worse than C1/C2.** `planUnlocks` (`_plans.js:58`) opens
+  with `const key = isValidPlan(plan) ? plan : 'free'`, so an unknown plan does
+  not throw or render blank, it silently becomes Free. `planRank` degrades the
+  same way, returning 0. If `growth_pro` reaches `buildNotice()`, a €449 upgrade
+  is announced to the buyer as "1 AI engine monitored: ChatGPT", with the Free
+  plan's blurb, in a DOWNGRADE-toned email, because `planRank('growth_pro')` is 0
+  against `planRank('growth')` of 2. `activation-path.md` §3.3 originally
+  recorded this as an empty section; running the code proved otherwise.
+- **C4, latent.** `managed`, `pro` and `enterprise` each sit one rank lower in
+  `_plans.js` than in `planConfig.ts`. Harmless today because every comparison
+  happens within one file, and fixed for free by the same edit.
+
+Fix direction is `activation-path.md` §3.4, adjudicated by
+`docs/qa/plans-divergence-b1.md` §5, which also ships a runnable harness in §4 so
+the fix has a pass or fail condition rather than a judgement call. `bg-backend`,
+Opus not Sonnet: it rewrites the copy a paying customer is emailed on upgrade,
+which is billing under AGENT-OS §2. Packet `005` is written and ready.
+
+**UPDATE 2026-07-26, `bg-backend` ran packet `005`.** `_plans.js` and
+`set-client-plan.js` are edited on the working tree, per the "Do" list in
+`005`. C1 through C4 are all addressed: `growth_pro` is now `isValidPlan`,
+`PLAN_ENGINES` is deleted (`planUnlocks` now derives from `_cost.js`'s
+`activeEnginesFor()`), `PLAN_BLURB.growth` no longer claims a fifth engine, and
+`planRank` matches `planConfig.ts` for all seven plans. The §4 harness printed
+`PASS`. **These changes are UNCOMMITTED — no git command has been run**, per
+`005`'s "Do not" list and AGENT-OS's builder/reviewer separation. Packet `006`
+(`bg-backend` → `bg-verify`) is written and READY; it is the next thing to run,
+before anything is committed. Full detail, the harness output, and the exact
+commit command bg-backend drafted: `.claude/handoffs/006-bg-backend-to-bg-verify-plans-drift.md`.
+
+### Conversion initiative: where the waterfall stands
+
+| Stage | Agent | Artifact | State |
+|---|---|---|---|
+| S0 | bg-strategy | `docs/strategy/hook-thesis-web.md`, `activation-thesis-app.md` | COMPLETE |
+| A1 | bg-design | `docs/design/homepage-hook.md` | COMPLETE |
+| A2 | bg-copy | `docs/copy/` | **BYPASSED, never ran** |
+| A3 | bg-web | `brandgeo/web/index.html`, `site.js` | **SHIPPED LIVE, UNREVIEWED** (`801732c` plus 4 follow-ups) |
+| A4 | bg-verify (web) | `docs/qa/web-hook-verification.md` | NOT RUN |
+| B1 | bg-verify | `docs/qa/plans-divergence-b1.md` | **COMPLETE** |
+| (B1 slot) | bg-architect | `docs/arch/activation-path.md` | COMPLETE, then amended by B1 |
+| B2 | bg-design | `docs/design/activation-path.md` | READY, packet `004` on disk, not started |
+| (`_plans.js` fix) | bg-backend | `_plans.js`, `set-client-plan.js` | **COMMITTED `f6deb01`, not yet pushed** |
+| (`_plans.js` review) | bg-verify | `docs/qa/plans-drift-fix-006.md` | **COMPLETE 2026-07-26, verdict PASS WITH FINDINGS** |
+| B3 to B5 | copy, app, backend, verify | | BLOCKED on B2 |
+| (none) | bg-app, bg-backend | `34e41bb`, `3dadd8b` | SHIPPED OUTSIDE THE WATERFALL |
+
+Packets `001` to `006` all exist in `.claude/handoffs/`. `005` (`bg-verify` to
+`bg-backend`, the `_plans.js` drift fix) has been run — see the UPDATE note
+above. `006` (`bg-backend` to `bg-verify`, reviewing that fix) **has now been
+run**: verdict `PASS WITH FINDINGS`, report `docs/qa/plans-drift-fix-006.md`.
+`bg-verify` reproduced the §4 harness independently (`PASS`, exit 0), confirmed
+all four B1 findings closed and all seven of packet `005`'s acceptance criteria
+met, and traced the `growth_pro` assignment path across 14 hops without finding
+any remaining consumer of the old `PLAN_ORDER` / `PLAN_ENGINES` shape. It wrote
+the commit command itself rather than verifying a drafted one, because
+**packet `006` contains no commit command** — an earlier claim in this file that
+it did was wrong, corrected below.
+
+Findings from the review, none of which block the commit:
+
+- **V1, MEDIUM, CLOSED 2026-07-26 by query.** `clients.plan` has no `CREATE` or
+  `ALTER` anywhere in `db/` (the column was made ad hoc, see #94), so `bg-verify`
+  could not close the Supabase write from source and flagged the risk that an
+  ad-hoc CHECK constraint over the old six-plan ladder would keep Growth PRO
+  unassignable, turning a fixed 400 into a 500. **Checked against production:**
+  `pg_constraint` returns exactly two CHECK constraints on `public.clients`,
+  `clients_category_check` (on `category`) and `clients_type_check` (on `type`).
+  Neither touches `plan`. There is no constraint blocking `growth_pro`, so the
+  fix reaches production intact. The underlying gap stands and is worth closing
+  on its own: `clients.plan` still has no migration file in `db/` while every
+  other column on that table does.
+- **V2, LOW, pre-existing.** `_cost.js:135` falls back to `essentials` for an
+  unknown plan while `planConfig.ts:329` falls back to `free`. Unreachable via
+  `planUnlocks`, reachable via the collection queue with a corrupt `clients.plan`.
+- **V3, LOW, pre-existing.** `_prospect_engines.js:384`'s comment still claims
+  Growth has five live engines. Comment only.
+
+`npm run build` was deliberately not run: `tsconfig.json` has
+`"include": ["src"]`, so neither changed file is compiled or even read by it,
+and a green build would be evidence about a different part of the repo.
+
+State of the protocol, corrected 2026-07-26 20:45:
+
+1. **B1 ran and is complete.** An earlier pass in this file claimed it was skipped
+   and `docs/qa/` was empty. That was wrong: the observation was made before
+   15:22 and not rechecked. B1 loaded `_plans.js` and `_cost.js` in Node and
+   called them, with the harness reproduced in its §4. It confirmed four findings
+   and corrected `activation-path.md` §3.3 where reading the code had suggested a
+   milder fault than running it does.
+2. **The A branch is the real gap, not the B branch.** `bg-web` shipped the
+   public homepage with no `bg-copy` stage and no `bg-verify` stage, then patched
+   the same surface four more times (`82f0474`, `68afbaa`, `662ea8e`, `4ed6a94`).
+   This is the largest unreviewed surface in the initiative and it is live to
+   every visitor.
+3. **Packet ids are allocated when a packet is written, never reserved in advance
+   inside an artifact.** `homepage-hook.md` §13 drafts a `bg-copy` packet as `003`
+   and a `bg-web` packet as `004`; both numbers are consumed by other packets and
+   those drafts are dead. An artifact refers to a downstream packet by
+   from/to/slug, never by number. `bg-orchestrator` assigns the number on write.
+4. **Not a defect:** the design artifact is `homepage-hook.md`, not the plan's
+   `web-hook-and-conversion.md`. Packet `002`'s `scope_write` names
+   `homepage-hook.md`. The packet superseded the plan's stale filename.
+5. `bg-architect` read the WORKING TREE, not `HEAD`. Its `Account.tsx:41`
+   citation pointed at then-uncommitted work. The load-bearing claim
+   (`set-client-plan.js:116`) is committed code and stands regardless.
+6. **Untracked, and this is load-bearing.** Packets `003`, `004`, `005` and
+   `docs/qa/plans-divergence-b1.md` are untracked, and
+   `docs/arch/activation-path.md` has B1's uncommitted amendment. Until they are
+   committed, a fresh session cannot cold-start from them per AGENT-OS §4, and
+   committed state misrepresents the initiative. That is exactly what produced
+   the false claim in item 1.
+
+### Priority backlog
+
+Rewritten 2026-07-26 23:10 against the full commit history of the day and every
+artifact on disk. Ordered by exposure, then revenue, then everything else. The
+top two are live and reachable by anyone on the internet right now.
+
+> **UPDATE 2026-07-28: the first Live exposure item below is CLOSED and the
+> entry is stale.** `6accc67` shipped the gate; the migration was applied
+> 2026-07-27 and the whole chain is verified end to end. Anonymous `POST` to
+> `schedule-collections`, `expire-plan-grants` and `ping-sitemap` returns `401`;
+> the two deleted functions answer identically to a name that never existed
+> (Netlify returns `400 Bad request, missing form`, not `404` — the criterion's
+> expected code was wrong, the outcome was not). `cron.job` holds five active
+> jobs, `public.job_runs` is filling (`schedule-collections` 17 consecutive
+> `ok = true`), and all 17 runs land at minute `:10`, none at `:00`, so Netlify's
+> old schedule is confirmed not double-firing. Review:
+> `docs/qa/scheduled-function-auth-012-review.md`, verdict PASS WITH FINDINGS.
+
+| (scheduled-function auth) | bg-verify | `docs/qa/scheduled-function-auth-012-review.md` | **COMPLETE 2026-07-27, verdict PASS WITH FINDINGS** |
+
+#### Decision 2026-07-28: Google Indexing API dropped, indexing goes manual
+
+`GOOGLE_JSON_KEY` is **not being restored.** A service account was re-created and
+Search Console re-authorised on 2026-07-28, but the Netlify deploy hit the same
+4KB Lambda env-var ceiling that caused the original deletion. Constantin's call:
+drop it, submit URLs by hand via Search Console's URL Inspection tool instead.
+
+The reasoning that made this cheap, from `_indexing.js:11-14`, which is honest
+about it: Google documents the Indexing API as supported **only** for JobPosting
+and BroadcastEvent pages. Every BrandGEO page is blog, comparison, industry or
+city research, so Google returns a real `200` with no documented crawl benefit.
+The service-account JSON costs ~2.3KB of a 4KB budget for that.
+
+**Consequences, all live, none yet fixed in code:**
+
+1. `ping-sitemap` fails every day at 05:10 UTC with
+   `{"stage":"google_auth","error":"NO_CREDENTIALS"}`. Permanent `ok = false`
+   noise in `job_runs`, which erodes the exact observability packet `012` just
+   built. Cheapest stopgap is one line, and it is reversible:
+   `SELECT cron.unschedule('ping-sitemap');`
+2. **IndexNow is dark as collateral damage and should not be.**
+   `ping-sitemap.js:120-126` returns `500` at `createGoogleIndexer()` before
+   IndexNow is ever called, and the loop at `:131-133` awaits `indexer.publish()`
+   first. IndexNow needs no Google credential, acts on arbitrary URLs, reaches
+   Bing/Yandex/Seznam/Naver, costs ~32 bytes of env, and its verification file is
+   live (`getbrandgeo.com/b857aee5749c1fb84e8cf6b220793454.txt`, `200`, 32 bytes).
+   It has been down since 2026-07-19 for no reason of its own.
+3. `force-index.js` reads the same variable, so the in-product manual tool is
+   dead too. "Manual" now means Search Console by hand, not that endpoint.
+4. 22 sitemap URLs are unsubmitted (`sitemap_pings` last wrote 2026-07-19
+   05:07 UTC, 57 rows). These are the 20 US city pages plus two.
+
+> ✅ **CLOSED. Items 1 to 4 above are STALE and were already fixed by `933dd6a`
+> (2026-07-28), which this file never recorded.** Verified independently against
+> production on 2026-07-29, not taken from the commit message:
+>
+> - `job_runs` for `ping-sitemap`: **2026-07-28 05:10 `ok=false`**
+>   `{"error":"NO_CREDENTIALS","stage":"google_auth","changed":22}`, then
+>   **2026-07-29 05:10 `ok=true`**
+>   `{"pinged":22,"indexnowOk":22,"googleOk":0,"google_skipped":"NO_CREDENTIALS"}`.
+>   The last run under the old code failed, the first under the new code
+>   succeeded.
+> - `sitemap_pings` is at **79 rows** (was 57), `last_pinged_at` 2026-07-29
+>   05:10 UTC, and **22 rows written in the last two days** — exactly the 22
+>   stuck URLs.
+> - `cron.job` id 5 `ping-sitemap` `10 5 * * *` is `active = true`. It was never
+>   unscheduled, so the suggested `cron.unschedule` stopgap was never needed.
+>   To pause it in future use `cron.alter_job(job_id => 5, active => false)`,
+>   NOT `cron.unschedule`, which deletes the row.
+>
+> Google is now optional at all three touch points, IndexNow runs and is
+> reported independently, and a Google-absent run is a SUCCESS rather than a
+> logged failure.
+>
+> **A cycle was wasted on this**: an agent was dispatched on 2026-07-29 to build
+> a fix that already existed, because this backlog entry was believed over the
+> commit history. Check `git log -- <file>` before briefing any backlog item in
+> this file.
+>
+> **One real gap remains, worth a decision.** `job_runs.ok` is `true` whenever a
+> submitter was merely CONFIGURED, even if every submission failed. It does not
+> distinguish "pinged 22 URLs" from "pinged 0". `pinged` / `indexnowOk` in
+> `detail` carry that signal; `ok` does not. Only a both-credentials-absent run
+> returns 500. That undercuts the observability packet `012` was built for.
+
+**Still open, owner `bg-backend`:** R1, `collection-worker-background.js:35-43`
+fail-open, latent not live (Constantin confirmed `INTERNAL_AUDIT_KEY` IS set in
+Netlify 2026-07-28).
+
+#### Live exposure
+
+- [ ] **All five scheduled Netlify functions accept an unauthenticated public
+      POST and do real work.** `docs/qa/deploy-pipeline-netlify.md` F1, escalated
+      to Opus by that audit and re-confirmed here from source: none of
+      `expire-plan-grants.js`, `purge-old-results.js`, `purge-old-audits.js`,
+      `schedule-collections.js` or `ping-sitemap.js` calls `requireAuth`, wraps
+      itself in `schedule()`, or checks any secret. The only thing protecting
+      them is that the URL is not advertised. Consequences if hit:
+      `purge-old-results` and `purge-old-audits` DELETE rows,
+      `expire-plan-grants` reverts customer plans to Free and emails them,
+      `schedule-collections` enqueues collection runs and spends LLM budget.
+      **DESIGNED 2026-07-27, NOT YET BUILT.**
+      `docs/arch/scheduled-function-auth.md` is the binding architecture and
+      packet `010` is READY for `bg-backend` on Opus. Ruling: Netlify's
+      scheduled-invocation signal is a `POST` body `{"next_run": "..."}` with no
+      signature and no secret, so it is **not a credential** and cannot be gated
+      on. The shared secret wins, which forces the caller to change, because
+      Netlify's scheduler cannot attach a custom header. **Supabase `pg_cron`
+      becomes the scheduler.** It was already installed (1.6.4) and
+      `cron.job_run_details` shows jobid 1 succeeding within 210ms of 03:00:00
+      UTC for 12 consecutive days, and unlike Netlify its history is queryable by
+      any agent. Two of the five are pure SQL and get **deleted, not gated**:
+      `purge-old-results.js` is fully redundant with that existing pg_cron job,
+      which has been running the identical 24-month `ai_results` delete on the
+      identical schedule, undetected. Surface drops five endpoints to three and
+      both service-key `DELETE` endpoints stop existing. **Do not migrate to the
+      `schedule()` wrapper**: same platform mechanism, no credential gained, and
+      it would force a CommonJS to ESM conversion on functions that delete rows
+      and email customers (arch §3.2).
+      **Prerequisites are DONE** (2026-07-27): `pg_net` 0.20.3 enabled with
+      `net.http_post` signature confirmed and its functions in schema `net`, not
+      `extensions`; `cron_secret` in Supabase Vault verified as 64 lowercase hex;
+      `CRON_SECRET` set in Netlify. Sequencing is load-bearing and is arch §8:
+      apply the migration while the functions are **still ungated**, verify in
+      SQL, and only then ship the gating deploy. A fail-closed gate deployed
+      ahead of the secret breaks every job at once.
+- [ ] **Correction to `deploy-pipeline-netlify.md` §5.2 and F1(b): the Netlify
+      schedules probably ARE firing.** That audit inferred non-registration from
+      five `200` responses. Checked 2026-07-27: `sitemap_pings` records a write at
+      **2026-07-19 05:07 UTC**, inside `ping-sitemap`'s `0 5 * * *` slot. The
+      silence since is not evidence of anything, because `ping-sitemap.js:79`
+      throws at `createGoogleIndexer()` and returns before any row is written
+      (`:82`), so nothing has been recorded since the Google credential broke.
+      Evidence for, not proof: the database records the effect, not the caller.
+      The consequence is that in this project a toml-declared scheduled function
+      appears to be **both scheduled and publicly HTTP-invokable**, contradicting
+      Netlify's own documentation, which is why the design deliberately does not
+      depend on the platform gate.
+- [ ] **Files never meant to be public are live in the cPanel docroot.**
+      `docs/qa/deploy-pipeline-cpanel.md` F1, confirmed over HTTP, owner
+      `bg-web`. F3 is adjacent and latent: `deploy-secret.php` sits inside the
+      public docroot with no deny rule, so it is one PHP misconfiguration away
+      from serving the webhook secret as text.
+
+#### Revenue
+
+- [ ] **Run packet `008`: the onboarding plan coercion.** `bg-backend` on Opus,
+      then `bg-verify`. `onboard-client.js:44` `VALID_PLANS` is a FOURTH hardcoded
+      copy of the ladder, missing `growth` and `growth_pro`, and line 67 coerces
+      instead of rejecting: `VALID_PLANS.includes(plan) ? plan : 'essentials'`.
+      `Onboard.tsx:242` offers the real ladder from `PLAN_ORDER`, so a client
+      onboarded on Growth (€299) or Growth PRO (€449) is silently provisioned
+      with Essentials (€99) entitlements and no error is raised anywhere. Broader
+      than the `_plans.js` C1 defect that `f6deb01` closed, which covered only
+      `growth_pro` and only via `set-client-plan.js`.
+      **Detection caveat, load-bearing:** affected rows cannot be found in
+      Supabase. A coerced row reads `essentials` and is identical to a genuine
+      Essentials customer, and `onboard-client.js` writes no `client_events` row
+      (unlike `set-client-plan.js:166`). Finding victims requires cross
+      referencing Stripe subscriptions against `clients.plan`. Constantin ran that
+      comparison 2026-07-26; **the result was never recorded.** Record it in
+      packet `008` before closing it.
+- [ ] Create the Stripe price and checkout link for Growth PRO. `f6deb01` made the
+      tier assignable by an admin, so this is the only remaining reason it cannot
+      be bought self-serve. External dependency; sequencing is `bg-strategy`'s per
+      `activation-path.md` §5.5.
+- [ ] Wire promotions to Stripe coupons and redemption at checkout. Table and
+      admin CRUD exist as of `3dadd8b` and the migration is applied; nothing
+      prices or discounts anything yet, by design
+      (`PRICING-STRATEGY-2026-07.md` §8).
+
+#### Review debt on work already shipped
+
+- [ ] **Retroactive `bg-verify` on `b6d4038` (view as current user).** It shipped
+      without the independent review its own backlog entry required, and it is
+      auth adjacent. Check the stated invariant holds everywhere: presentation
+      only, `isRealAdmin` never weakened, no token minted or swapped, no
+      server-side check softened, impersonated state continuously visible.
+- [ ] **Retroactive `bg-verify` scoped to `3dadd8b` (promotions).**
+      `promotions-admin.js` holds the service key behind
+      `requireAuth({ adminOnly: true })` and that gate has never been tested with
+      a real viewer token; the live 401 only proves it rejects a MISSING token,
+      the weaker test. Also covers the three applied RLS policies and an
+      independent close on `SECURITY-AUDIT.md` F1's `role` provisioning path.
+      `34e41bb` does NOT need this: B1 treated `planConfig.ts` as its subject and
+      confirmed `_cost.js` matches it, so ordering was violated but coverage was
+      not.
+- [ ] **Close the A branch gap.** `bg-web` shipped `801732c` plus four follow-ups
+      with no copy stage and no verification stage, so this is a review and copy
+      pass over live pages, not a build. Sequence: run `landing-page-optimizer`
+      against the live homepage first, since it produces the evidence the other
+      two stages need, then `bg-copy` against its ledger, then `bg-verify` (A4).
+      Note `docs/design/homepage-hook.md` §2 already measured the page as FAILING
+      the three-second test at 1280x800, and §12 recorded seven defects of which
+      F6 and F7 were never assigned. The optimizer should try to REFUTE those
+      rather than inherit them; two audits today earned their keep that way.
+
+#### Deploy pipeline hardening
+
+- [ ] **Deploy success is unobservable from outside the cPanel server**
+      (`deploy-pipeline-cpanel.md` F2, High, owner `bg-backend`). GitHub returns
+      202 whether or not the copy worked, so the webhook delivery list proves
+      nothing. F4 is the same gap one level down: nothing records which
+      acknowledgement branch fired.
+- [ ] **Pushes over 20 commits silently under-deploy** (`deploy-pipeline-cpanel.md`
+      F5). GitHub caps the webhook payload's `commits[]`, so files changed in the
+      overflow never reach the docroot and nothing reports it. F6, self-overwrite
+      with no guard, is recorded alongside it.
+- [ ] **All 23 `_` prefixed helpers are deployed as public function endpoints**
+      (`deploy-pipeline-netlify.md` F2). Low severity, confirmed here: `_auth.js`,
+      `_cost.js` and `_plans.js` export no handler, so the endpoints do nothing.
+      But **`CLAUDE.md` §4.6 states the `_` prefix stops Netlify exposing them,
+      and that is false.** Correct the guardrail text so nobody relies on it.
+- [ ] **Three functions call external APIs on the inherited 10s timeout**
+      (`deploy-pipeline-netlify.md` F3), while comparable functions in
+      `netlify.toml` were deliberately given 26s. Owner `bg-backend`.
+- [ ] **Two packets share id `006`**: `006-bg-backend-to-bg-verify-plans-drift.md`
+      and `006-bg-orchestrator-to-bg-verify-deploy-cpanel.md`. Exactly the
+      collision the numbering rule exists to prevent. Renumber one and record the
+      rule: ids are allocated when a packet is written, never reserved inside an
+      artifact.
+
+#### Product quality
+
+- [ ] **`bg-design` spec for contrast and first-run**, then `bg-app` builds it.
+      Both from the 2026-07-26 dashboard audit, both measured: side panel vs
+      canvas **1.07:1** (border 1.31:1), active nav tab differs from inactive by
+      **1.24:1** text and 1.17:1 background with the whole active state resting on
+      one 3px rail, and the time-filter bar is worse at **1.39:1** with no rail.
+      WCAG 1.4.11 wants 3:1. First-run: a zero-data tenant sees "0% AI VISIBILITY
+      SCORE" across all six dimensions and AI Visibility calls an unmeasured brand
+      "Needs Work", so the product issues a verdict before it has data.
+      `/sentiment` at zero data renders 0 buttons and 0 links, an absolute dead
+      end. Census: 52% reachable, 24% dead ends, five of six hit on day one.
+- [ ] **Engine palette is broken twice over** (audit §Amendment 4, validated with
+      `dataviz`'s validator, not by eye). Claude `#f97316` vs Meta `#f59e0b` is
+      ΔE **9.6** normal vision against a floor of 15, and 3.4 for tritanopia, and
+      they co-render on the `/sentiment` and `/mentions` filter chip rows. Grok
+      `#94a3b8` fails the chroma floor and reads as a disabled series. Deeper
+      problem underneath: `#10b981` means ChatGPT AND Positive, `#ef4444` means
+      Google AI Mode AND Negative AND a categorical series. One hue, three
+      meanings, so this is a token-semantics fix, not a recolor.
+      `Competitors.tsx:258` carries a fourth independent palette assigned by
+      array index.
+- [ ] **Light mode is UNAUDITED** (~60 `!important` overrides in `index.css`).
+      The dashboard audit could not exercise it because doing so mutates a
+      persisted preference.
+
+#### Decisions owed
+
+- [ ] Decide whether `PLAN_PROMPTS` is enforced server-side or stays display-only
+      (`activation-path.md` §5.4).
+- [ ] Decide whether `free` clients get a non-manual `refresh_cadence`, a spend
+      decision against a €0.30 monthly budget (`activation-path.md` §5.3).
+      Blocked in practice until the scheduled-function exposure above is settled,
+      since that is the same code path.
+
+#### Hygiene
+
+- [ ] **Confirm the Promotions panel renders for an admin** on the live Account
+      page: the amber "backend isn't deployed yet" banner should be gone and
+      replaced by "No promotions yet." plus a New promotion button. Everything
+      either side of that call is verified; this last hop needs an admin login,
+      which no agent has.
+- [ ] Write a migration file for `clients.plan` in `db/`. The column was created
+      ad hoc and is the only column on `clients` with no migration on disk, which
+      is what made V1 unverifiable from source. No CHECK constraint exists on it
+      (confirmed 2026-07-26), so this is hygiene, not a live defect.
+- [ ] Commit or discard the last untracked items: `docs/audit/`,
+      `docs/linkedin-posts-2026-07-24.md`, and the modified
+      `.claude/agents/README.md`. Everything else is now committed.
+- [ ] Refresh `docs/STATE-OF-PRODUCT.md` §4.1, stale on collection architecture.
+- [ ] Reconcile §5's task list (#1 to #97) and §7 against reality; much of it
+      predates the 2026-07 work.
+- [ ] Sonnet 5 / Opus 4.8 hybrid model migration in the collection functions.
+- [ ] Shared authentication / SSO with TalentWeLove and RecruiterAI portals.
+
+Closed 2026-07-26:
+- ~~Growth PRO unassignable (`_plans.js` C1 to C4).~~ `f6deb01` shipped and is
+  pushed. `growth_pro` is assignable in production. Reviewed in
+  `docs/qa/plans-drift-fix-006.md`, verdict PASS WITH FINDINGS, all seven of
+  packet `005`'s acceptance criteria met and B1's harness reproduced independently.
+- ~~The cPanel 10 second webhook ceiling.~~ **CONTRADICTED by measurement** up to
+  20 files per push (`deploy-pipeline-cpanel.md` F7): 59 pages deployed in
+  batches of 2, 5, 12, 20 and 20, all verified live byte for byte. The batch that
+  previously returned 504 and copied nothing now completes in about a second. The
+  real limit is the 20-commit payload cap, filed as F5 above.
+- ~~"View as current user" spec'd but not built.~~ `b6d4038`. Needs the
+  retroactive review filed above.
+- ~~Untracked packets and QA artifacts.~~ `695d3f7` committed the outstanding
+  packets, QA artifacts and the `dashboard-auditor` agent.
+- ~~Dashboard plan ladder vs marketing site pricing mismatch.~~ `34e41bb`, live;
+  the served bundle no longer contains €900.
+- ~~Promotions panel had no backend.~~ `3dadd8b`; migration applied and verified.
+- ~~Confirm cPanel re-upload of `index.html` + `site.js` (CSP fix landing).~~
+  Verified live, see Deploy pipelines above.
+- ~~Scheduled background triggers for engine evaluation runs.~~ Built, but see the
+  exposure and the unproven cron registration at the top of this list before
+  treating them as working.
+- ~~Logo is not clickable, scroll carried across routes, viewer blank on
+  `/usage`.~~ All `2e7f048`, verified on the deployed bundle. Note for whoever
+  touches scroll next: react-router's `<ScrollRestoration>` is NOT usable here,
+  it requires a data router and this app mounts `BrowserRouter`, and the scroll
+  container is `<main>`, not the window.
+- ~~Em and en dashes across the marketing site.~~ Removed in `c9a2451`, `3a8e3d5`,
+  `cc45220`, `bf009ea`, `a896349`.
+
+### Four §7.1 claims REFUTED by measurement 2026-07-26 — do not re-file
+
+The dashboard audit (`docs/qa/dashboard-audit-2026-07-26.md`) measured these and
+found nothing to fix. §7.1 below is stale on all four; re-filing any of them burns
+a build cycle.
+
+1. **"Overview renders light-themed."** False. `documentElement.className` is `""`
+   and body measures `rgb(10,15,30)` on all 12 routes.
+2. **"Overview chart overflows its container."** False. A real horizontal scroll
+   was attempted; `scrollX` never moved, and `docScrollW === innerWidth` at both
+   1280 and 375. `scrollWidth` alone is not evidence — ancestor-clipped decorative
+   elements are intentional.
+3. **"Cards are flat with no elevation."** False. 163 of 164 cards carry a
+   computed box-shadow (`index.css:269` to `:286`).
+4. **"Teal used for active states."** False. Zero `teal-` occurrences in
+   `AIVisibility.tsx` or `Prompts.tsx`.
+
+Also corrected: the scrollbar IS styled and passes contrast at 4.01:1, and
+`motion` v12 is Framer Motion under its current package name with
+`MotionConfig reducedMotion="user"` already wired at `App.tsx:88`.
+
+Role gating came out better than expected: all twelve privileged Netlify functions
+enforce `requireAuth({ adminOnly: true })` server-side against `user_profiles.role`
+— no surface hides a link and relies on that hiding for protection.
+
+Largest thing the audit could NOT reach: **light mode** (~60 `!important`
+overrides in `index.css`), untouched because exercising it mutates a persisted
+preference. Treat light mode as UNAUDITED.
+
+### Note on this file's history
+
+On 2026-07-26 a session found `CLAUDE.md` replaced in the working tree by a
+65-line stub while the committed version was this 1,268-line document. The stub
+was committed in `97b3723`, deleting §0 through §7. That was a mistake and this
+file restores them. **Do not truncate this file.** If a section is stale, mark it
+stale in place, as done for §2.8 above.
+
+**Confirmed 2026-07-27, this restore is incomplete in a way worth knowing.**
+This file used to have sections well past §7 (at least a §9 Content, SEO &
+Own-GEO Initiative, a §12 State of Product, a §13 Client Health, and more,
+`docs/ROADMAP-2026-07-20.md` cites reading §8, §9, §11, §12, §13, and §18.1
+directly). Checked via `git log -- CLAUDE.md`: the commit right before
+`97b3723` (`205fb30`, 2026-07-09) is already only 1,268 lines, §0-7, same as
+what `97b3723`'s parent shows. So those later sections were never committed at
+any point, they only ever existed in an uncommitted working tree between
+roughly 2026-07-09 and 2026-07-20, and are gone for good, not recoverable from
+git history. The restore in this file's own header only restored what git
+had, §0-7, which is genuinely all that git ever had. If those sections matter
+going forward, they need to be deliberately rebuilt from what still exists in
+`docs/` (`CONTENT-STRATEGY-OVERVIEW.md`, `STATE-OF-PRODUCT.md`,
+`CLIENT-HEALTH-BPR.md`, and others cover overlapping ground) as their own
+task, and then actually committed this time, not left to accumulate
+uncommitted again.
 
 ---
 
@@ -244,6 +1019,14 @@ Force Refresh deletes ALL rows (including error rows) before re-collecting.
 ## 2. Current Limitations
 
 ### 2.1 `analyseResponse` Duplication
+> ⚠️ **STALE, verified 2026-07-29. This limitation no longer exists.** The
+> extraction happened: `analyseResponse` is defined exactly once, in
+> `netlify/functions/_analysis.js:738` (exported at `:874`), and is required by
+> `_collect.js`, which the three HTTP collectors are now thin wrappers over.
+> `grep -c "^function analyseResponse"` returns 0 for `collect-prompt.js`,
+> `collect-claude.js` and `collect-chatgpt.js`, and 1 for `_analysis.js`. The
+> paragraph below describes the pre-`_collect.js` architecture.
+
 The full analysis function is **copy-pasted** into all three collect functions (`collect-chatgpt.js`, `collect-claude.js`, `collect-prompt.js`). Changes must be made in three places. **Fix:** extract to a shared `_analysis.js` helper (not yet done).
 
 ### 2.2 Netlify Hard Timeout (26s)
@@ -268,6 +1051,11 @@ Sentiment is detected by simple word lists (`posWords`, `negWords`). No LLM-base
 Both Perplexity and Meta AI are routed through OpenRouter. If OpenRouter credits run out, both engines fail simultaneously.
 
 ### 2.8 No Scheduled Collection
+> ⚠️ **STALE as of 2026-07-26. This limitation no longer exists.** A collection
+> queue, `collection-worker-background`, and an hourly `schedule-collections`
+> cron are all live. The cron is inert only because `refresh_cadence` defaults to
+> `manual`. See CURRENT STATE above.
+
 Collection is manual (dashboard "Run Collection" button) or triggered post-onboarding. There is a `purge-old-results` scheduled function (3am daily) but no scheduled collect.
 
 ### 2.9 `collect-prompt.js` Gemini Fallback Chain
@@ -1051,6 +1839,13 @@ ongoing/occasional-update area, not a single scoped task), not be folded into
 unrelated task chats.
 
 ### 7.1 Audit findings (design-critique pass, 2026-07-08, live site + dashboard)
+
+> ⚠️ **STALE as of 2026-07-26. Four of this section's findings were REFUTED by
+> measurement** — the light-theme Overview, the chart overflow, the flat cards,
+> and the teal active states. See "Four §7.1 claims REFUTED by measurement" in
+> CURRENT STATE above before acting on anything below. The real defects on these
+> surfaces are contrast (side panel 1.07:1, active tab 1.24:1) and the first-run
+> experience, neither of which this section names.
 
 Checked live via browser: `getbrandgeo.com` (hero + "what you get" section)
 and `app.getbrandgeo.com` (Overview page), plus source-code check of

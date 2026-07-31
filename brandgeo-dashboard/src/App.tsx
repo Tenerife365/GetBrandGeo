@@ -25,6 +25,7 @@ import Usage from './pages/Usage'
 import Social from './pages/Social'
 import SEO from './pages/SEO'
 import Account from './pages/Account'
+import Tickets from './pages/Tickets'
 import AuditRequest from './pages/AuditRequest'
 import AuditReport from './pages/AuditReport'
 
@@ -115,6 +116,10 @@ export default function App() {
               <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Usage /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
+              {/* One route, two views. Admins get the triage queue (customer
+                  requests plus BrandGEO's own internal work); everyone else
+                  gets their own requests. The split is inside Tickets.tsx. */}
+              <Route path="/tickets" element={<PrivateRoute><OnboardGate><Layout><Tickets /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

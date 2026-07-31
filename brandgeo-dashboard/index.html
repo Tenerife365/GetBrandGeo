@@ -6,6 +6,14 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc" />
+    <meta name="msapplication-TileColor" content="#8b5cf6" />
+    <meta name="msapplication-TileImage" content="/mstile-150x150.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BrandGEO — Dashboard</title>
 
@@ -26,5 +34,59 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- askmywebsiteai — in-dashboard support assistant, added 2026-07-29.
+         Placed before </body> rather than in <head>, and marked async, so a slow
+         or unreachable vendor cannot delay first paint of the app itself. The
+         keys are publishable by design (app id + pk_live), meant to sit in
+         client code, so they are not a secret and this repo being public does
+         not change that.
+
+         REQUIRES the CSP allowances in netlify.toml. Without them the browser
+         blocks this file before a line of it executes and the only symptom is a
+         console message.
+
+         BUT a correct CSP is not sufficient, and on 2026-07-30 that was not
+         the fault. The SDK loaded and ran, then its own config call was
+         refused by the vendor, so it disabled itself with no symptom beyond
+         one console line: "[ai-guidance] failed to load config, widget
+         disabled". Invisible widget, healthy-looking page.
+
+         THERE ARE TWO SEPARATE askmywebsiteai APPS, one per host, and each
+         one only accepts its own host as an origin. This file had been given
+         the LANDING SITE's app id and key, so the dashboard was asking a
+         vendor app that does not recognise app.getbrandgeo.com. Do not carry
+         an install snippet across from getbrandgeo.com to here; they are not
+         interchangeable and the failure is silent.
+
+           app_e9a0360bb6095088   app.getbrandgeo.com   (this file)
+           app_a16a65082c9e13c7   getbrandgeo.com       (marketing site)
+
+         Probe the endpoint directly rather than guessing, because the browser
+         collapses every one of these into "Failed to fetch":
+
+           curl -s "https://app.askmywebsiteai.com/v1/apps/<app-id>/config" \
+             -H "Origin: https://app.getbrandgeo.com" \
+             -H "x-public-key: <pk_live...>"
+
+         {"error":"origin not allowed"}  -> wrong app for this host, or the
+                                           host is missing from that app's
+                                           allowed origins. No wildcard covers
+                                           a subdomain; app.getbrandgeo.com is
+                                           its own entry, separate from the
+                                           apex and from www.
+         {"error":"app not live"}        -> right app, but not published yet.
+         a JSON config object            -> vendor side is fine, look here.
+
+         It loads on EVERY route including the login screen, so it is present
+         for signed-out visitors and for admins as well as customers. That is
+         the vendor's supported install and the simplest thing that works; gate
+         it behind auth from React if that turns out to matter. -->
+    <script
+      async
+      src="https://app.askmywebsiteai.com/sdk.js"
+      data-app-id="app_e9a0360bb6095088"
+      data-public-key="pk_live_727b3cd724ff6e10ee345d9cb240f6f6">
+    </script>
   </body>
 </html>

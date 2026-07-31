@@ -29,15 +29,18 @@ export function AllowanceMeter({
 
   const pct = Math.min(100, Math.round((used / cap) * 100))
   const state = pct >= 100 ? 'full' : pct >= 85 ? 'warn' : 'ok'
-  const barColor = state === 'full' ? 'bg-rose-500' : state === 'warn' ? 'bg-amber-400' : 'bg-brand-500'
-  const textColor = state === 'full' ? 'text-rose-400' : state === 'warn' ? 'text-amber-400' : 'text-slate-400'
+  // Status tokens (dashboard-visual-system.md §8.5), not a hand-picked
+  // rose/amber pair — "full" is the unfavourable pole, "ok" is neutral.
+  const barColor = state === 'full' ? 'bg-sentiment-negative' : state === 'warn' ? 'bg-amber-400' : 'bg-brand-500'
+  const textColor = state === 'full' ? 'text-sentiment-negative' : state === 'warn' ? 'text-amber-400' : 'text-slate-400'
 
   return (
     <div className="min-w-[140px]">
       <div className="flex items-center justify-between mb-1">
         <span className="text-[11px] text-slate-500 uppercase tracking-wide font-medium">{label}</span>
+        {/* "n of m", never a bare fraction (§12.1). */}
         <span className={`text-[11px] tabular-nums font-medium ${textColor}`}>
-          {format(used)} / {format(cap)}
+          {format(used)} of {format(cap)}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">

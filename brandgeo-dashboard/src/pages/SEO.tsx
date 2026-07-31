@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
+import { PageTitle } from '../components/Typography'
 import { hasFeature, getPlanLimits } from '../lib/planConfig'
 import FeatureLocked from '../components/FeatureLocked'
 import AllowanceMeter from '../components/AllowanceMeter'
@@ -474,7 +475,7 @@ export default function SEO() {
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-5xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-white tracking-tight">AI SEO</h1>
+        <PageTitle>AI SEO</PageTitle>
         <p className="text-sm text-slate-400 mt-1">
           Turn {activeClient?.name ?? 'this workspace'}'s AI visibility gaps into content built to be cited by AI answer engines.
         </p>

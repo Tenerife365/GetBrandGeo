@@ -3,14 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>BG-005 — GEO vs SEO: The Fundamental Difference | BrandGEO Research™</title>
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>BG-005 | GEO vs SEO: The Fundamental Difference | BrandGEO Research™</title>
   <meta name="description" content="Ranking in Google and being cited by AI are different problems, solved differently. Why treating GEO as 'AI SEO' costs brands real visibility.">
-  <meta property="og:title" content="GEO vs SEO: The Fundamental Difference — BrandGEO Research™">
-  <meta property="og:description" content="Why ranking in Google and being cited by AI are completely different problems — with completely different solutions.">
+  <meta property="og:title" content="GEO vs SEO: The Fundamental Difference | BrandGEO Research™">
+  <meta property="og:description" content="Why ranking in Google and being cited by AI are completely different problems, with completely different solutions.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-005-hero.png">
   <meta property="og:url" content="https://getbrandgeo.com/bg-005.html">
@@ -42,13 +53,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -56,16 +67,16 @@
       --surface: #ffffff;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -165,16 +176,50 @@
 
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 24px; }
       .compare-table { font-size: 0.85rem; }
       .compare-table th, .compare-table td { padding: 10px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -209,7 +254,7 @@
     <span class="badge-tag">Strategy</span>
   </div>
   <h1>GEO vs SEO: The Fundamental <em>Difference</em></h1>
-  <p class="article-subtitle">Why ranking in Google and being cited by AI are completely different problems — with completely different solutions.</p>
+  <p class="article-subtitle">Why ranking in Google and being cited by AI are completely different problems, with completely different solutions.</p>
   <div class="article-meta">
     <span class="meta-item"><strong>BrandGEO Research</strong></span>
     <span class="meta-item">July 9, 2026</span>
@@ -225,7 +270,7 @@
 <!-- KEY FINDINGS -->
 <div class="findings-bar">
   <div class="findings-inner">
-    <div class="findings-label">● Key Findings — BG-005</div>
+    <div class="findings-label">● Key Findings: BG-005</div>
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">93%</div>
@@ -251,20 +296,20 @@
 <div class="article-body">
 
   <h2 id="two-different-games">Same conversation, two different games</h2>
-  <p>"We need AI SEO." It's become the reflexive response to a genuinely disruptive shift: people are asking ChatGPT, Gemini, and Perplexity the questions they used to type into Google, and a growing share of them never click through to a website at all. But treating Generative Engine Optimization as a variant of SEO — the same tactics, aimed at a new target — misreads what actually changed. SEO and GEO share a business problem (how do potential customers find you) and almost nothing about how that problem gets solved.</p>
-  <p>The scale of the shift is why the distinction can't wait. Inside Google's own AI Mode, <strong>93% of searches now end without a single click</strong> to an external website, per Semrush's 2026 clickstream analysis. AI Overviews — Google's own answer-synthesis layer, sitting directly on top of its classic results — now appear on <strong>48% of tracked queries</strong>, according to BrightEdge's 2026 tracking study, up from 31% barely a year earlier, and reduce clicks to the top-ranking page by more than half. Across the open web, AI platforms now generate session volume equal to <strong>56% of all traditional search worldwide</strong> — roughly 45 billion monthly sessions, per Similarweb/Datos session-volume research — and in the US that volume is growing at roughly 300% year over year. None of that traffic is scanning a page of ranked links. It's receiving one synthesized answer, and moving on.</p>
-  <p>We saw exactly what that gap looks like up close in <a href="/bg-004.html" style="color:var(--accent2)">BG-004</a>: a brand ranked #1 on three separate AI engines, with a page-one Google presence to match — and was completely, silently absent on a fourth. Not lower-ranked. Not on page two. Simply not part of the answer. That's not an SEO failure. It's a different failure mode entirely, and it needs a different name and a different fix.</p>
+  <p>"We need AI SEO." It's become the reflexive response to a genuinely disruptive shift: people are asking ChatGPT, Gemini, and Perplexity the questions they used to type into Google, and a growing share of them never click through to a website at all. But treating Generative Engine Optimization as a variant of SEO (the same tactics, aimed at a new target) misreads what actually changed. SEO and GEO share a business problem (how do potential customers find you) and almost nothing about how that problem gets solved.</p>
+  <p>The scale of the shift is why the distinction can't wait. Inside Google's own AI Mode, <strong>93% of searches now end without a single click</strong> to an external website, per Semrush's 2026 clickstream analysis. AI Overviews (Google's own answer-synthesis layer, sitting directly on top of its classic results) now appear on <strong>48% of tracked queries</strong>, according to BrightEdge's 2026 tracking study, up from 31% barely a year earlier, and reduce clicks to the top-ranking page by more than half. Across the open web, AI platforms now generate session volume equal to <strong>56% of all traditional search worldwide</strong> (roughly 45 billion monthly sessions, per Similarweb/Datos session-volume research), and in the US that volume is growing at roughly 300% year over year. None of that traffic is scanning a page of ranked links. It's receiving one synthesized answer, and moving on.</p>
+  <p>We saw exactly what that gap looks like up close in <a href="/bg-004.html" style="color:var(--accent2)">BG-004</a>: a brand ranked #1 on three separate AI engines, with a page-one Google presence to match, and was completely, silently absent on a fourth. Not lower-ranked. Not on page two. Simply not part of the answer. That's not an SEO failure. It's a different failure mode entirely, and it needs a different name and a different fix.</p>
 
   <h2 id="side-by-side">The core difference, side by side</h2>
   <p>Laid out directly, the two disciplines diverge on almost every dimension that matters:</p>
   <div class="compare-table-wrap">
     <table class="compare-table">
       <tr><th></th><th>SEO</th><th>GEO</th></tr>
-      <tr><td>Objective</td><td>Rank as high as possible in a list of links</td><td>Be named — or better, recommended — inside a single generated answer</td></tr>
-      <tr><td>Unit of success</td><td>Position on a results page (#1–#10)</td><td>Presence, framing, and sentiment inside one response</td></tr>
+      <tr><td>Objective</td><td>Rank as high as possible in a list of links</td><td>Be named (or better, recommended) inside a single generated answer</td></tr>
+      <tr><td>Unit of success</td><td>Position on a results page (#1 to #10)</td><td>Presence, framing, and sentiment inside one response</td></tr>
       <tr><td>What the user sees</td><td>Ten ranked links they still have to evaluate themselves</td><td>One synthesized answer, often citing zero to three sources</td></tr>
       <tr><td>How the system decides</td><td>Crawl → index → rank by relevance and authority signals</td><td>Retrieve → verify entity and trust signals → synthesize an answer</td></tr>
-      <tr><td>Does "close enough" still win?</td><td>Usually — page 2 or 3 still reaches a persistent searcher</td><td>Rarely — most answers name very few brands, sometimes exactly one</td></tr>
+      <tr><td>Does "close enough" still win?</td><td>Usually, page 2 or 3 still reaches a persistent searcher</td><td>Rarely, most answers name very few brands, sometimes exactly one</td></tr>
       <tr><td>How you measure it</td><td>Rankings, organic traffic, click-through rate</td><td>Mention rate, position within the answer, sentiment, per-engine visibility</td></tr>
     </table>
   </div>
@@ -275,21 +320,21 @@
   </div>
 
   <h2 id="why-not-semantics">Why this isn't just semantics</h2>
-  <p>The mechanism gap is the whole story. In classic SEO, the ranking system produces a list, and the user does the final evaluation — reading titles, scanning snippets, deciding for themselves. There's room for a brand to be imperfect and still get found, because the searcher is doing real work on the other end.</p>
-  <p>In GEO, the AI engine does that evaluation on the user's behalf, before the user ever sees the underlying options. As we broke down in <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a>, an engine like ChatGPT moves through a sources-and-signals stage and a synthesis stage before it ever produces the sentence a user reads — and if your brand doesn't clear that bar internally, you don't appear "lower down." You don't appear. There's no page two to be found on, and no snippet for a persistent user to click past a competitor's listing to find you anyway.</p>
+  <p>The mechanism gap is the whole story. In classic SEO, the ranking system produces a list, and the user does the final evaluation: reading titles, scanning snippets, deciding for themselves. There's room for a brand to be imperfect and still get found, because the searcher is doing real work on the other end.</p>
+  <p>In GEO, the AI engine does that evaluation on the user's behalf, before the user ever sees the underlying options. As we broke down in <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a>, an engine like ChatGPT moves through a sources-and-signals stage and a synthesis stage before it ever produces the sentence a user reads, and if your brand doesn't clear that bar internally, you don't appear "lower down." You don't appear. There's no page two to be found on, and no snippet for a persistent user to click past a competitor's listing to find you anyway.</p>
 
   <h2 id="where-they-overlap">Where the two disciplines actually overlap</h2>
-  <p>This isn't a clean break, and treating GEO as a total departure from SEO is its own mistake. GEO still depends on several of the same foundations classic SEO was built on — just not the ones most teams reach for first. In <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a> we mapped six disciplines that all feed AI Visibility; two of them are direct SEO carryovers. <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">Technical SEO</a> — crawlability, clean structured data, a site an AI engine's retrieval systems can actually parse — is table stakes for GEO exactly as it always was for classic search. And <a href="/bg-001.html#entity-seo" style="color:var(--accent2)">Entity SEO</a> — being an unambiguous, well-defined entity with consistent facts across the web — turns out to matter more under GEO, not less, since an AI engine has to verify who you are before it will risk citing you.</p>
-  <p>What doesn't carry over as directly is the tactical core of traditional SEO: keyword density, backlink volume, exact-match anchor text, the whole toolkit built around influencing a ranking algorithm that scores and sorts links. An AI engine isn't paging through your keyword usage. It's evaluating whether your brand is a trustworthy, citable answer to the actual question someone asked — a much closer relative of PR and reputation than of classic on-page SEO.</p>
+  <p>This isn't a clean break, and treating GEO as a total departure from SEO is its own mistake. GEO still depends on several of the same foundations classic SEO was built on, just not the ones most teams reach for first. In <a href="/bg-001.html" style="color:var(--accent2)">BG-001</a> we mapped six disciplines that all feed AI Visibility; two of them are direct SEO carryovers. <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">Technical SEO</a> (crawlability, clean structured data, a site an AI engine's retrieval systems can actually parse) is table stakes for GEO exactly as it always was for classic search. And <a href="/bg-001.html#entity-seo" style="color:var(--accent2)">Entity SEO</a> (being an unambiguous, well-defined entity with consistent facts across the web) turns out to matter more under GEO, not less, since an AI engine has to verify who you are before it will risk citing you.</p>
+  <p>What doesn't carry over as directly is the tactical core of traditional SEO: keyword density, backlink volume, exact-match anchor text, the whole toolkit built around influencing a ranking algorithm that scores and sorts links. An AI engine isn't paging through your keyword usage. It's evaluating whether your brand is a trustworthy, citable answer to the actual question someone asked, a much closer relative of PR and reputation than of classic on-page SEO.</p>
 
   <h2 id="strategic-mistake">The strategic mistake most brands are making right now</h2>
-  <p>The most common response we see is folding GEO into the existing SEO team's task list, measured with the SEO team's existing metrics — rankings, organic sessions, keyword position. Those metrics were built to capture clicks inside a list. They capture nothing about whether an AI engine actually named your brand in an answer, because that event happens entirely outside any tool built to track search rankings.</p>
-  <p>That's the exact blind spot behind <a href="/bg-002.html" style="color:var(--accent2)">BG-002</a>'s core finding: the questions worth asking have shifted from "how do I rank" to "will I be the answer" — and a team still watching only the first question has no way to see the second one slipping. BG-004's catering brand wasn't neglecting SEO. By every SEO measure available to them, they looked fine. The gap on Gemini was invisible to every tool they were already using, because none of those tools were built to check it.</p>
+  <p>The most common response we see is folding GEO into the existing SEO team's task list, measured with the SEO team's existing metrics: rankings, organic sessions, keyword position. Those metrics were built to capture clicks inside a list. They capture nothing about whether an AI engine actually named your brand in an answer, because that event happens entirely outside any tool built to track search rankings.</p>
+  <p>That's the exact blind spot behind <a href="/bg-002.html" style="color:var(--accent2)">BG-002</a>'s core finding: the questions worth asking have shifted from "how do I rank" to "will I be the answer", and a team still watching only the first question has no way to see the second one slipping. BG-004's catering brand wasn't neglecting SEO. By every SEO measure available to them, they looked fine. The gap on Gemini was invisible to every tool they were already using, because none of those tools were built to check it.</p>
 
   <hr class="divider">
 
   <h2 id="what-this-means">What this means for your brand</h2>
-  <p>SEO and GEO need to run in parallel, measured separately, not folded into one score or one team's existing dashboard. You still need the SEO foundation — you won't get cited if you're not crawlable, indexed, and structured the way retrieval systems expect. But that foundation is necessary, not sufficient. On top of it, you need a distinct, ongoing check of what AI engines are actually saying about you when a real customer asks — because that's the one signal no SEO tool you already own was built to show you.</p>
+  <p>SEO and GEO need to run in parallel, measured separately, not folded into one score or one team's existing dashboard. You still need the SEO foundation. You won't get cited if you're not crawlable, indexed, and structured the way retrieval systems expect. But that foundation is necessary, not sufficient. On top of it, you need a distinct, ongoing check of what AI engines are actually saying about you when a real customer asks, because that's the one signal no SEO tool you already own was built to show you.</p>
 
   <h2 id="related-research">Related research</h2>
   <p>The disciplines and case data referenced above, in full:</p>
@@ -302,7 +347,7 @@
     <a href="/bg-002.html" class="related-card">
       <div class="related-id">BG-002</div>
       <div class="related-title">From Rankings to Recommendations</div>
-      <div class="related-hook">Why "will I be the answer" is a different question than "how do I rank" — and why most teams still aren't asking it.</div>
+      <div class="related-hook">Why "will I be the answer" is a different question than "how do I rank", and why most teams still aren't asking it.</div>
     </a>
     <a href="/bg-003.html" class="related-card">
       <div class="related-id">BG-003</div>
@@ -317,12 +362,12 @@
   </div>
 
   <h2>How BrandGEO treats this differently</h2>
-  <p>BrandGEO doesn't replace your SEO stack — it measures the thing your SEO stack was never built to see. We run the same real customer questions across every major AI engine on a recurring basis, and report whether your brand is actually named, how it's framed, and where the gap is before a competitor's name fills it instead.</p>
+  <p>BrandGEO doesn't replace your SEO stack, it measures the thing your SEO stack was never built to see. We run the same real customer questions across every major AI engine on a recurring basis, and report whether your brand is actually named, how it's framed, and where the gap is before a competitor's name fills it instead.</p>
 
   <!-- CTA -->
   <div class="cta-box">
     <h3>Find out if your ranking success is hiding a GEO gap</h3>
-    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <p>We'll run your brand through the same real-question, multi-engine audit: free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
@@ -333,7 +378,7 @@
 <div class="next-post">
   <div>
     <div class="next-label">More research →</div>
-    <div class="next-title"><a href="/bg-006.html" style="color:inherit;text-decoration:none;">BG-006: Perplexity vs Gemini — Which AI Cites Brands Most?</a></div>
+    <div class="next-title"><a href="/bg-006.html" style="color:inherit;text-decoration:none;">BG-006: Perplexity vs Gemini: Which AI Cites Brands Most?</a></div>
   </div>
   <a href="/bg-006.html" class="next-link">Read BG-006 →</a>
 </div>
@@ -348,6 +393,14 @@
       <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

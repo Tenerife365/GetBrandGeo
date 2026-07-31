@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line
+  BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid,
 } from 'recharts'
 import { RefreshCw, Sparkles, ChevronDown, ChevronUp, TrendingUp, Target, Hash, Eye } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -11,9 +11,9 @@ import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { useTheme } from '../lib/themeContext'
-import { ENGINE_META } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import {
-  computeAiVisibilityScore, buildScoreResultMap,
+  computeAiVisibilityScore, buildScoreResultMap, isNoAnswerRow,
   type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
@@ -21,15 +21,21 @@ import { useChartTheme } from '../lib/chartTheme'
 import MotionCard from '../components/MotionCard'
 import Skeleton from '../components/Skeleton'
 import Collapse from '../components/Collapse'
+import { PageTitle } from '../components/Typography'
+import ChartTooltip from '../components/ChartTooltip'
+import SharedEmptyState from '../components/EmptyState'
+import { formatDate, formatOrdinal } from '../lib/format'
 import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
 
 // Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
 // page's palette from drifting out of sync with AIVisibility.tsx (DESIGN-SYSTEM.md §1/§5).
-const LLM_IDS: LLMName[] = ['chatgpt', 'gemini', 'claude', 'perplexity', 'google_ai']
+// Derived, never hand-listed. This array was hardcoded to five engines and was
+// already missing grok and ai_overview within hours of each shipping, so the
+// chart quietly under-reported what the product collects. See LIVE_ENGINES.
+const LLM_IDS = LIVE_ENGINES as LLMName[]
 const LLMS = LLM_IDS.map(id => ({
   id,
   label: ENGINE_META[id].label,
-  color: ENGINE_META[id].color,
   chartColor: ENGINE_META[id].chartColor,
 }))
 
@@ -71,7 +77,15 @@ interface TopRec {
   priority: 'critical' | 'high' | 'medium'
 }
 
-function computeStats(rows: AIResultRow[]): OverviewStats {
+function computeStats(allRows: AIResultRow[]): OverviewStats {
+  // Drop rows where the engine ran but produced no answer at all (Google
+  // declining to render an AI Overview). They are not failures, so they arrive
+  // with status 'ok' and are indistinguishable from a real absence unless you
+  // check the marker. Counting them sank Mention Rate for something that was
+  // never winnable. Excluded from the denominator AND from Total Checks, so
+  // this card cannot disagree with the AI Visibility Score below it, which
+  // excludes them in buildScoreResultMap.
+  const rows = allRows.filter(r => !isNoAnswerRow(r))
   const mentionCount = rows.filter(r => r.brand_mentioned).length
   const posRows = rows.filter(r => r.brand_mentioned && r.brand_position != null)
   const avgPos = posRows.length > 0
@@ -199,7 +213,12 @@ export default function Dashboard() {
       // carrying checked_at/status, so buildScoreResultMap can enforce
       // newest-non-error-wins itself rather than trusting this query's shape.
       supabase.from('ai_results')
-        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status')
+        // response_snippet is selected ONLY so buildScoreResultMap can spot the
+        // `[no_ai_overview]` marker. Drop it and the exclusion silently stops
+        // working: every row arrives with response_snippet undefined, the
+        // predicate returns false for all of them, and the score quietly goes
+        // back to counting unanswerable queries as misses.
+        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status, response_snippet')
         .eq('client_id', activeClientId)
         .neq('status', 'error')
         .order('checked_at', { ascending: false }),
@@ -267,11 +286,11 @@ export default function Dashboard() {
     const lRows     = rows.filter(r => r.llm === l.id)
     const lMentions = lRows.filter(r => r.brand_mentioned).length
     return {
+      id:        l.id,
       label:     l.label,
       rate:      lRows.length > 0 ? Math.round((lMentions / lRows.length) * 100) : 0,
       count:     lRows.length,
       color:     l.chartColor,
-      textColor: l.color,
     }
   }).filter(d => d.count > 0)
 
@@ -309,7 +328,7 @@ export default function Dashboard() {
         <Skeleton className="h-9 w-28 rounded-lg" />
       </div>
 
-      <div className="bg-dark-800 rounded-xl p-6 sm:p-10 mb-8 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+      <div className="bg-dark-800 rounded-card p-card-feature mb-8 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 shrink-0">
           <Skeleton className="w-36 h-36 sm:w-48 sm:h-48 rounded-full" />
           <Skeleton className="h-3 w-24" />
@@ -358,7 +377,7 @@ export default function Dashboard() {
     <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">{greeting}, {brandName}</h1>
+          <PageTitle>{greeting}, {brandName}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5">Here&apos;s your AI visibility snapshot.</p>
         </div>
         <button onClick={load}
@@ -366,9 +385,35 @@ export default function Dashboard() {
           <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
 
-      {scoreData && (
+      {/* Zero-data first run (dashboard-visual-system.md §11 rule 1 / audit F-02,
+          the single worst moment in the product per the audit's verdict): a
+          brand-new tenant used to see "0% AI VISIBILITY SCORE" across all six
+          dimensions — a verdict, not an absence of measurement. Never render a
+          zero as though it were a measurement. Routes to /prompts when there are
+          no prompts yet, otherwise to /ai-visibility to run the first collection. */}
+      {scoreData && stats && stats.totalChecks === 0 && (
         <motion.div
-          className="bg-dark-800 rounded-xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
+          className="bg-dark-800 rounded-xl mb-6"
+          variants={heroReveal} initial="hidden" animate="show"
+        >
+          <SharedEmptyState
+            icon={Target}
+            title="Not measured yet"
+            body={
+              stats.promptCount === 0
+                ? `BrandGEO measures how AI engines like ChatGPT and Gemini answer real buyer questions about ${brandName}. Add a prompt to start.`
+                : `BrandGEO is about to check how AI engines answer ${stats.promptCount} tracked prompt${stats.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
+            }
+            actionLabel={stats.promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
+            actionTo={stats.promptCount === 0 ? '/prompts' : '/ai-visibility'}
+            minHeight={220}
+          />
+        </motion.div>
+      )}
+
+      {scoreData && stats && stats.totalChecks > 0 && (
+        <motion.div
+          className="bg-dark-800 rounded-card p-card-feature mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <div className="flex flex-col items-center gap-3 shrink-0">
@@ -415,8 +460,10 @@ export default function Dashboard() {
                 <div className="text-lg font-bold text-white tabular-nums">{scoreData.dimensions[key]}%</div>
               </div>
             ))}
+            {/* Padded to a real 44px/40px touch target (WCAG 2.5.8, F-18) — this was
+                a bare 16px-tall text link and the only link on the page at 375. */}
             <Link to="/ai-visibility"
-              className="col-span-2 sm:col-span-3 mt-1 text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors">
+              className="col-span-2 sm:col-span-3 mt-1 flex items-center min-h-[44px] sm:min-h-[40px] text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors">
               View full breakdown →
             </Link>
           </div>
@@ -461,7 +508,7 @@ export default function Dashboard() {
           genuine anomaly (Gestalt Focal-Point Law). */}
       {stats && (
         <motion.div
-          className="bg-dark-800 rounded-xl p-6 sm:p-7 mb-6"
+          className="bg-dark-800 rounded-card p-card-feature mb-6"
           variants={heroReveal} initial="hidden" animate="show"
         >
           <h2 className="text-sm font-semibold text-slate-300 mb-4">Key metrics</h2>
@@ -477,7 +524,7 @@ export default function Dashboard() {
             <Stat
               icon={<Target size={15} />}
               label={t.dash_statAvgPos}
-              value={stats.avgPosition != null ? `#${stats.avgPosition}` : '—'}
+              value={stats.avgPosition != null ? `#${stats.avgPosition}` : null}
               sub={t.dash_statAvgPosSub}
               tone={stats.avgPosition != null && stats.avgPosition > 6 ? 'warn' : 'neutral'}
               spark={avgPosSpark}
@@ -506,7 +553,7 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         variants={staggerContainer} initial="hidden" animate="show"
       >
-        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_mentionRate}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionRateDesc, { brand: brandName })}</p>
           {llmData.length === 0 ? (
@@ -514,25 +561,26 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={llmData} margin={{ left: -20, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: chart.axisTick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" width={40} tickCount={4} />
                 <Tooltip
-                  contentStyle={chart.tooltipContent}
-                  labelStyle={chart.tooltipLabel} itemStyle={chart.tooltipItem}
-                  formatter={(v: any) => [`${v}%`, 'Mention rate']}
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  content={<ChartTooltip formatValue={item => `${item.value}%`} />}
+                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
                 />
-                {/* Single calm brand hue — the x-axis label already identifies each
-                    engine, so 5 different bar colors was decorative rainbow, not
-                    meaning (Gestalt Focal-Point Law). */}
+                {/* Coloured per engine (§8.6 rule 2 — colour follows the entity, brand
+                    violet is chrome not data, §8.6 rule 3) rather than one flat hue:
+                    the x-axis label already names each engine, and the swatch is the
+                    same identity used everywhere else engines appear. */}
                 <Bar
                   dataKey="rate"
-                  fill="#8b5cf6"
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={!prefersReducedMotion}
                   animationDuration={700}
                   animationEasing="ease-out"
-                />
+                >
+                  {llmData.map(d => <Cell key={d.id} fill={d.color} />)}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -545,7 +593,7 @@ export default function Dashboard() {
           </div>
         </MotionCard>
 
-        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-4">{t.dash_brandVisibility}</h2>
           {stats && stats.totalChecks > 0 ? (
             <>
@@ -583,7 +631,7 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         variants={staggerContainer} initial="hidden" animate="show"
       >
-        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
           {recentMentioned.length === 0 ? (
@@ -601,7 +649,7 @@ export default function Dashboard() {
           )}
         </MotionCard>
 
-        <MotionCard stagger className="bg-dark-800 rounded-xl p-6">
+        <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
           {recentNotMentioned.length === 0 ? (
@@ -629,31 +677,42 @@ export default function Dashboard() {
   )
 }
 
-const LLM_COLOR: Record<string, string> = {
-  chatgpt:    'text-emerald-400 bg-emerald-400/10',
-  gemini:     'text-blue-400 bg-blue-400/10',
-  claude:     'text-orange-400 bg-orange-400/10',
-  perplexity: 'text-cyan-400 bg-cyan-400/10',
-  meta:       'text-amber-400 bg-amber-400/10',
-}
-const LLM_LABEL: Record<string, string> = {
-  chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', perplexity: 'Perplexity', meta: 'Meta AI'
+// LLM_COLOR/LLM_LABEL (a sixth independent hand-picked engine-colour map,
+// keying off Tailwind class names rather than hex, which is why the earlier
+// V5 hex/ENGINE_META greps never caught it) are DELETED —
+// dashboard-visual-system.md §8.4: one source (ENGINE_META[id].chartColor),
+// never a second hand-picked map. This one was live on Overview, the
+// highest-traffic route, still rendering the pre-spec Claude-orange /
+// Meta-amber pair the audit measured at dE 9.6 normal / 3.4 tritan.
+// EngineTag mirrors ScoreBadge's swatch-plus-text-token treatment; the
+// fallback keeps a historical row with a retired/unknown engine id rendering
+// (grey dot, raw id as label) instead of blanking.
+function EngineTag({ id }: { id: string }) {
+  const meta = ENGINE_META[id as keyof typeof ENGINE_META]
+  const chart = useChartTheme()
+  return (
+    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-dark-700 text-slate-300">
+      <span
+        className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ backgroundColor: meta?.chartColor ?? chart.sentimentNeutral }}
+      />
+      {meta?.label ?? id}
+    </span>
+  )
 }
 
 function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean }) {
   const { t } = useI18n()
   return (
     <div className="flex items-start gap-3">
-      <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${LLM_COLOR[row.llm] ?? 'text-slate-400 bg-slate-400/10'}`}>
-        {LLM_LABEL[row.llm] ?? row.llm}
-      </span>
+      <EngineTag id={row.llm} />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-300 truncate">
           {row.prompts?.text ?? `Prompt #${row.prompt_id}`}
         </p>
         <p className="text-[10px] text-slate-600 mt-0.5">
-          {new Date(row.checked_at).toLocaleDateString('en-GB')}
-          {mentioned && row.brand_position != null && ` · position #${row.brand_position}`}
+          {formatDate(row.checked_at)}
+          {mentioned && row.brand_position != null && ` · ${formatOrdinal(row.brand_position)} position`}
         </p>
       </div>
       <span className={`shrink-0 text-[10px] font-semibold ${mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -704,13 +763,14 @@ function Sparkline({ data, color, connectNulls = false }: {
 // Rendered inside ONE shared KPI card (Hick's Law — one island, not four). The
 // muted icon + one-line descriptor keep each number self-explanatory for a
 // first-time reader without adding color noise.
-function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }: {
-  icon: React.ReactNode; label: string; value: string; sub: string
+function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls, emptyLabel = 'Not measured yet' }: {
+  icon: React.ReactNode; label: string; value: string | null; sub: string
   tone?: 'neutral' | 'warn' | 'alert'; spark?: SparkPoint[]; connectNulls?: boolean
+  emptyLabel?: string
 }) {
   const valueColor = tone === 'alert' ? 'text-red-400' : tone === 'warn' ? 'text-amber-400' : 'text-white'
   // The sparkline stroke was hardcoded #94a3b8, which measures 2.56:1 against a
-  // white page — below the 3:1 graphical minimum in light mode.
+  // white page, below the 3:1 graphical minimum in light mode.
   const chart = useChartTheme()
   return (
     <div>
@@ -718,9 +778,17 @@ function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls }
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
+      {/* A null value is an ABSENCE, never a dash glyph. `value={'—'}` used to be
+          passed here for an unmeasured average position, which reads as a broken
+          string rather than "we have not measured this" (UI/UX audit 2026-07-30),
+          besides breaking the no-dash content rule. The empty label sits in a
+          fixed h-8 box so it occupies the same 32px line box as a real value and
+          the four KPI columns stay on the same baseline grid. */}
+      {value !== null
+        ? <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
+        : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">{emptyLabel}</div>}
       {spark && spark.length >= 2 && (
-        <Sparkline data={spark} color={chart.axisTick} connectNulls={connectNulls} />
+        <Sparkline data={spark} color={chart.axisInk} connectNulls={connectNulls} />
       )}
       <p className="text-xs text-slate-500 mt-1.5 leading-snug">{sub}</p>
     </div>

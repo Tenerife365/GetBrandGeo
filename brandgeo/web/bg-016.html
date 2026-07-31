@@ -3,6 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <title>BG-016: Cross-Engine Consensus, When AI Engines Agree, and When They Don't | BrandGEO Research™</title>
   <meta name="description" content="We tested 20 real buyer categories across four cities and five AI engines. Half converged on the same brand. Half didn't agree at all. Here's what separates them.">
   <meta property="og:title" content="Cross-Engine Consensus, When AI Engines Agree, and When They Don't: BrandGEO Research™">
@@ -39,13 +54,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -53,16 +68,16 @@
       --surface: #ffffff;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -146,16 +161,50 @@
 
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 24px; }
       .compare-table { font-size: 0.85rem; }
       .compare-table th, .compare-table td { padding: 10px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -217,11 +266,11 @@
       </div>
       <div class="finding">
         <div class="finding-number">0</div>
-        <div class="finding-desc">Categories in Rome where any brand reached even a 3-engine consensus &mdash; the only city where none did</div>
+        <div class="finding-desc">Categories in Rome where any brand reached even a 3-engine consensus, the only city where none did</div>
       </div>
       <div class="finding">
         <div class="finding-number">11%</div>
-        <div class="finding-desc">Domain-citation overlap between ChatGPT and Perplexity for identical queries &mdash; one engine is rarely the whole picture</div>
+        <div class="finding-desc">Domain-citation overlap between ChatGPT and Perplexity for identical queries, one engine is rarely the whole picture</div>
       </div>
     </div>
   </div>
@@ -230,15 +279,15 @@
 <div class="article-body">
 
   <h2 id="what-consensus-means">What "cross-engine consensus" actually measures</h2>
-  <p>Ask five different AI engines the same commercial-buyer question and you'll get five answers. Sometimes those answers overlap almost completely: every engine names the same handful of brands, in roughly the same order. Sometimes they don't overlap at all: five engines, five entirely different lists, no shared names anywhere. BrandGEO calls the first case <a href="/glossary.html#term-cross-engine-consensus">cross-engine consensus</a> &mdash; the degree to which independently-queried engines converge on the same brand or set of brands for the same question.</p>
-  <p>Consensus matters because it's a durability signal, not a popularity contest. A brand with high cross-engine consensus is visible no matter which AI tool a buyer happens to reach for. A brand that only shows up on one engine is one habit change away from disappearing from a buyer's search entirely. We wanted to know how often consensus actually happens in practice, and what separates the categories where it does from the categories where it doesn't &mdash; so we ran the same kind of test across four cities and read every response by hand.</p>
+  <p>Ask five different AI engines the same commercial-buyer question and you'll get five answers. Sometimes those answers overlap almost completely: every engine names the same handful of brands, in roughly the same order. Sometimes they don't overlap at all: five engines, five entirely different lists, no shared names anywhere. BrandGEO calls the first case <a href="/glossary.html#term-cross-engine-consensus">cross-engine consensus</a>: the degree to which independently-queried engines converge on the same brand or set of brands for the same question.</p>
+  <p>Consensus matters because it's a durability signal, not a popularity contest. A brand with high cross-engine consensus is visible no matter which AI tool a buyer happens to reach for. A brand that only shows up on one engine is one habit change away from disappearing from a buyer's search entirely. We wanted to know how often consensus actually happens in practice, and what separates the categories where it does from the categories where it doesn't, so we ran the same kind of test across four cities and read every response by hand.</p>
 
   <h2 id="where-it-happens">Where AI engines already agree</h2>
-  <p>The cleanest result we found anywhere in this dataset came from Paris. Asked which online bank to recommend for a French small business, every AI engine that returned a structured answer named <strong>Qonto</strong> as its #1 pick &mdash; Claude, Gemini, Meta AI, and Perplexity, in both French and English, with no exceptions. That's a complete, unanimous, always-#1 sweep across four engines and two languages at once, the strongest single-brand result in the entire program.</p>
-  <p>London produced six categories like this, just not quite as extreme. Every engine tested agreed on <strong>Capsule CRM</strong> for UK-based CRM software, on <strong>Starling Bank, Monzo, and Revolut</strong> together for fintech business banking, and on <strong>Asana, Trello, and ClickUp</strong> together for project-management software &mdash; each a 4-of-4 sweep. Berlin showed the same shape: <strong>Lexware / Lexoffice</strong> for accounting software (4 of 4 in the German-language run) and <strong>Personio</strong> for HR software (3 of 4). New York and Dublin each produced their own unanimous or near-unanimous picks &mdash; <strong>StreetEasy</strong> for rental listings, <strong>Monday.com</strong> and <strong>Revolut Business</strong> for project management and business banking respectively.</p>
+  <p>The cleanest result we found anywhere in this dataset came from Paris. Asked which online bank to recommend for a French small business, every AI engine that returned a structured answer named <strong>Qonto</strong> as its #1 pick: Claude, Gemini, Meta AI, and Perplexity, in both French and English, with no exceptions. That's a complete, unanimous, always-#1 sweep across four engines and two languages at once, the strongest single-brand result in the entire program.</p>
+  <p>London produced six categories like this, just not quite as extreme. Every engine tested agreed on <strong>Capsule CRM</strong> for UK-based CRM software, on <strong>Starling Bank, Monzo, and Revolut</strong> together for fintech business banking, and on <strong>Asana, Trello, and ClickUp</strong> together for project-management software, each a 4-of-4 sweep. Berlin showed the same shape: <strong>Lexware / Lexoffice</strong> for accounting software (4 of 4 in the German-language run) and <strong>Personio</strong> for HR software (3 of 4). New York and Dublin each produced their own unanimous or near-unanimous picks: <strong>StreetEasy</strong> for rental listings, <strong>Monday.com</strong> and <strong>Revolut Business</strong> for project management and business banking respectively.</p>
 
   <h2 id="where-it-doesnt">Where they don't agree at all</h2>
-  <p>The opposite result showed up just as reliably. Employment law was fragmented in both London and Berlin &mdash; every engine named a different mix of firms and individual practitioners, with no name appearing on more than two engines' lists. Independent financial advice in London and real estate agencies in Rome told the same story.</p>
+  <p>The opposite result showed up just as reliably. Employment law was fragmented in both London and Berlin, every engine named a different mix of firms and individual practitioners, with no name appearing on more than two engines' lists. Independent financial advice in London and real estate agencies in Rome told the same story.</p>
   <p>Rome is the one city in this program where <strong>no category reached even a 3-engine consensus</strong>. Instead, the notable result was <em>within-engine</em> stability rather than cross-engine agreement: Meta AI reproduced a word-for-word identical, identically-ordered five-restaurant list for a business-dinner prompt asked in both Italian and English, and Perplexity named essentially the same nine real-estate agencies in both languages, just reordered. Each engine was internally consistent with itself. None of them agreed with each other. Rome's AI-visibility landscape currently reads less like "the engines agree" and more like "each engine has built its own stable, self-contained worldview that doesn't transfer to the others."</p>
 
   <h2 id="what-decides-it">What actually decides which side a category falls on</h2>
@@ -253,22 +302,22 @@
       <tr><td>Rental listing platforms (New York)</td><td>Boutique hotels (Rome, partial)</td></tr>
     </table>
   </div>
-  <p>The mechanism is straightforward once you see it laid out this way: AI engines converge when there's a small, well-documented set of options with consistent, citable coverage across review sites, comparison articles, and press &mdash; the exact material a language model can draw the same conclusion from no matter which engine is doing the drawing. They fragment when the category is genuinely large and thinly documented, so each engine ends up leaning on whatever narrower slice of the internet it happened to retrieve from. <a href="/bg-008.html">BG-008</a> found the same split at the industry level, across a completely different dataset &mdash; this is the second time the same structural pattern has shown up, which is a reasonable basis for treating it as a real finding rather than a coincidence in one dataset.</p>
+  <p>The mechanism is straightforward once you see it laid out this way: AI engines converge when there's a small, well-documented set of options with consistent, citable coverage across review sites, comparison articles, and press, the exact material a language model can draw the same conclusion from no matter which engine is doing the drawing. They fragment when the category is genuinely large and thinly documented, so each engine ends up leaning on whatever narrower slice of the internet it happened to retrieve from. <a href="/bg-008.html">BG-008</a> found the same split at the industry level, across a completely different dataset. This is the second time the same structural pattern has shown up, which is a reasonable basis for treating it as a real finding rather than a coincidence in one dataset.</p>
 
   <div class="callout teal">
     <div class="callout-label">The part that's actually useful to know</div>
-    <p>A converged category is a hard one to break into &mdash; the incumbent already owns the AI narrative and a challenger has to out-document them across the same sources. A fragmented category is the opposite: no one has won yet, which means whichever brand gets its structured data, directory presence, and citable content in order first has a real, currently-open shot at becoming the name every engine converges on next.</p>
+    <p>A converged category is a hard one to break into, the incumbent already owns the AI narrative and a challenger has to out-document them across the same sources. A fragmented category is the opposite: no one has won yet, which means whichever brand gets its structured data, directory presence, and citable content in order first has a real, currently-open shot at becoming the name every engine converges on next.</p>
   </div>
 
   <h2 id="language-changes-the-set">A separate finding: language can change the competitive set, not just the ranking</h2>
-  <p>One result in this dataset doesn't fit the consensus-versus-fragmentation frame at all, and it's worth calling out on its own. Asking for wealth management advisors in Paris <strong>in French</strong> surfaced boutique, independent French patrimoine firms &mdash; Cheval Blanc Patrimoine appeared in 3 of 4 French-language engine responses and in zero English-language ones. Asking the identical question <strong>in English</strong> surfaced major international private banks instead, with Soci&eacute;t&eacute; G&eacute;n&eacute;rale Private Banking and BNP Paribas Wealth Management both effectively unanimous once the English runs are combined. That's not the same information reordered by language &mdash; it's a different competitive set entirely, depending only on which language the question was asked in. A firm that only publishes in French is structurally invisible to English-language AI searchers in this category, by design of how the engines retrieved their answer, not by accident.</p>
+  <p>One result in this dataset doesn't fit the consensus-versus-fragmentation frame at all, and it's worth calling out on its own. Asking for wealth management advisors in Paris <strong>in French</strong> surfaced boutique, independent French patrimoine firms: Cheval Blanc Patrimoine appeared in 3 of 4 French-language engine responses and in zero English-language ones. Asking the identical question <strong>in English</strong> surfaced major international private banks instead, with Soci&eacute;t&eacute; G&eacute;n&eacute;rale Private Banking and BNP Paribas Wealth Management both effectively unanimous once the English runs are combined. That's not the same information reordered by language: it's a different competitive set entirely, depending only on which language the question was asked in. A firm that only publishes in French is structurally invisible to English-language AI searchers in this category, by design of how the engines retrieved their answer, not by accident.</p>
 
   <h2 id="what-to-do">What this means if your category is on one side or the other</h2>
   <ul>
     <li><strong>If your category shows up in the "converges" column, find out if you're the name it converged on.</strong> Being absent from a category AI engines have already settled on is a measurable, specific gap, not a hypothetical one.</li>
     <li><strong>If your category is fragmented, treat it as an open door, not a bad sign.</strong> No engine has committed to an incumbent yet. That's the easiest kind of category to become visible in, precisely because there's nothing established to displace.</li>
-    <li><strong>Check more than one engine before drawing any conclusion.</strong> The 11% domain-citation overlap between ChatGPT and Perplexity means a single-engine check can look completely different from the full picture &mdash; a brand can dominate one engine's answers and be entirely missing from another's.</li>
-    <li><strong>If you operate in more than one language, check each language separately.</strong> Paris shows this isn't a theoretical risk &mdash; it changed which entire class of competitor an engine considered, not just who ranked first.</li>
+    <li><strong>Check more than one engine before drawing any conclusion.</strong> The 11% domain-citation overlap between ChatGPT and Perplexity means a single-engine check can look completely different from the full picture: a brand can dominate one engine's answers and be entirely missing from another's.</li>
+    <li><strong>If you operate in more than one language, check each language separately.</strong> Paris shows this isn't a theoretical risk: it changed which entire class of competitor an engine considered, not just who ranked first.</li>
   </ul>
 
   <div class="section-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:48px 0 16px;">● Related Research</div>
@@ -322,6 +371,14 @@
       <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

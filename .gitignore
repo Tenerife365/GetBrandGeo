@@ -1,6 +1,11 @@
 # brandgeo/ — ignore everything except the public website files
 brandgeo/*
 !brandgeo/web/
+# ...but never the deploy webhook secret or its log. These live only on the
+# server (uploaded by hand), must stay out of git, and must never be copied
+# into the public docroot by the webhook deploy.
+brandgeo/web/deploy-secret.php
+brandgeo/web/deploy.log
 
 
 # Secrets — never commit these
@@ -46,3 +51,18 @@ integration-guides_*.zip
 *-private-key.key
 *.pem
 integration-guides_*/
+
+# Quarantined stray copies from the 2026-07-24 repo reorg — redundant dups of
+# now-tracked files, the 3 differing spec variants, and local-only secrets.
+# Review and delete when confirmed unneeded. Never commit (contains secrets).
+/_reorg-stray/
+.aidesigner/*
+!.aidesigner/.gitkeep
+
+# Piper voice models: ~63MB each, re-downloadable in seconds with
+# `python -m piper.download_voices <name> --download-dir assets/voices`.
+# The .json configs and the licence README ARE tracked, so the licence
+# decision survives even though the weights do not.
+assets/voices/**/*.onnx
+assets/audio/*.wav
+assets/samples/*.wav

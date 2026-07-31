@@ -3,9 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BG-010 — Schema Markup for AI Search: The Complete Implementation Guide | BrandGEO Research™</title>
-  <meta name="description" content="Schema's AI-citation boost is contested — 2.3x in one study, none in another. Here's what actually matters to implement, and why.">
-  <meta property="og:title" content="Schema Markup for AI Search: The Complete Implementation Guide — BrandGEO Research™">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <title>BG-010: Schema Markup for AI Search: The Complete Implementation Guide | BrandGEO Research™</title>
+  <meta name="description" content="Schema's AI-citation boost is contested: 2.3x in one study, none in another. Here's what actually matters to implement, and why.">
+  <meta property="og:title" content="Schema Markup for AI Search: The Complete Implementation Guide | BrandGEO Research™">
   <meta property="og:description" content="The citation-boost claim is contested. The case for implementing schema correctly anyway isn't. A practical, sourced guide to what to build and what to skip.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://getbrandgeo.com/images/bg-010-hero.png">
@@ -21,7 +36,7 @@
     "@context": "https://schema.org",
     "@type": "Article",
     "headline": "Schema Markup for AI Search: The Complete Implementation Guide",
-    "description": "BrandGEO Research: a practical, sourced guide to which schema.org types actually matter for AI visibility in 2026 — what the contested citation-boost research really shows, and what to implement regardless.",
+    "description": "BrandGEO Research: a practical, sourced guide to which schema.org types actually matter for AI visibility in 2026: what the contested citation-boost research really shows, and what to implement regardless.",
     "image": "https://getbrandgeo.com/images/bg-010-hero.png",
     "datePublished": "2026-07-09",
     "author": {"@type": "Organization", "name": "BrandGEO Research"},
@@ -37,13 +52,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --bg: #0a0b0e;
+      --surface: #101116;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -51,16 +66,16 @@
       --surface: #ffffff;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -160,16 +175,50 @@
 
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .article-header, .article-body, .findings-bar, .next-post { padding-left: 20px; padding-right: 20px; }
       .cta-box { padding: 32px 24px; }
       .compare-table { font-size: 0.85rem; }
       .compare-table th, .compare-table td { padding: 10px; }
     }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -214,13 +263,13 @@
 </div>
 
 <div class="article-hero">
-  <img src="/images/bg-010-hero.png" alt="SEO-optimized websites rank in ten blue links; AI-optimized websites get recommended directly by name across ChatGPT, Gemini, Claude, Perplexity, Copilot, Meta AI, and Grok — the shift from ranking to being the cited answer that structured data is meant to support." loading="eager">
+  <img src="/images/bg-010-hero.png" alt="SEO-optimized websites rank in ten blue links; AI-optimized websites get recommended directly by name across ChatGPT, Gemini, Claude, Perplexity, Copilot, Meta AI, and Grok: the shift from ranking to being the cited answer that structured data is meant to support." loading="eager">
 </div>
 
 <!-- KEY FINDINGS -->
 <div class="findings-bar">
   <div class="findings-inner">
-    <div class="findings-label">● Key Findings — BG-010</div>
+    <div class="findings-label">● Key Findings: BG-010</div>
     <div class="findings-grid">
       <div class="finding">
         <div class="finding-number">2.3x</div>
@@ -228,11 +277,11 @@
       </div>
       <div class="finding">
         <div class="finding-number">1,885</div>
-        <div class="finding-desc">Pages Ahrefs tracked adding JSON-LD schema — found no major AI-citation uplift from schema alone</div>
+        <div class="finding-desc">Pages Ahrefs tracked adding JSON-LD schema, and found no major AI-citation uplift from schema alone</div>
       </div>
       <div class="finding">
         <div class="finding-number">May 2026</div>
-        <div class="finding-desc">Google deprecated FAQ rich results in Search — the markup itself remains valid, the rich snippet doesn't</div>
+        <div class="finding-desc">Google deprecated FAQ rich results in Search. The markup itself remains valid, the rich snippet doesn't</div>
       </div>
       <div class="finding">
         <div class="finding-number">5</div>
@@ -246,38 +295,38 @@
 <div class="article-body">
 
   <h2 id="direct-answer">The direct answer</h2>
-  <p>Should you implement schema markup to get cited more by AI engines? Yes — but not because the evidence that it directly drives citations is settled. It isn't. One large 2026 study found a real, measurable citation lift from structured data. Another, just as rigorous, found almost none. What isn't contested is the case for schema on every other ground BrandGEO's own GEO philosophy already rests on: machine-parseability, entity clarity, and giving every AI system an unambiguous, verifiable read on who you are and what you sell. This is the practical version — which schema types matter, what to actually implement, and the mistakes that waste the effort.</p>
+  <p>Should you implement schema markup to get cited more by AI engines? Yes, but not because the evidence that it directly drives citations is settled. It isn't. One large 2026 study found a real, measurable citation lift from structured data. Another, just as rigorous, found almost none. What isn't contested is the case for schema on every other ground BrandGEO's own GEO philosophy already rests on: machine-parseability, entity clarity, and giving every AI system an unambiguous, verifiable read on who you are and what you sell. This is the practical version: which schema types matter, what to actually implement, and the mistakes that waste the effort.</p>
 
-  <h2 id="contested-backdrop">The contested backdrop — and why it doesn't settle the question</h2>
-  <p>We already flagged this honestly in <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a>: the data on whether schema markup itself boosts AI citations doesn't point in one direction. Digital Applied's 2026 analysis of 1,000 AI Overviews — comparing 4,243 cited URLs against roughly 50,000 non-cited controls, controlling for domain authority — found pages carrying Article and BreadcrumbList schema were cited <strong>2.3x more often</strong> than otherwise-comparable unstructured pages. Ahrefs ran the opposite kind of test: tracking <strong>1,885 pages</strong> that added JSON-LD schema between August 2025 and March 2026, and found that adding schema alone produced no major uplift in citations on any platform.</p>
-  <p>Both studies are real, and both are probably right about what they actually measured. Digital Applied studied pages already being cited at some rate and asked what correlated with citation frequency — schema showed up as one signal among several compounding ones, alongside domain authority, content length, and named-source citations in the body. Ahrefs studied the marginal effect of <em>adding</em> schema to a fixed set of pages and found it didn't move the needle in isolation. The likely reconciliation, consistent with BG-007's own framing: schema is an amplifier riding on top of strong content, not a citation-generating mechanism in its own right. Adding FAQPage markup to a thin, generic page won't make an AI engine cite it. Adding the same markup to a page that's already well-mentioned, current, and cross-source-verified gives that page one more way to be understood correctly.</p>
+  <h2 id="contested-backdrop">The contested backdrop, and why it doesn't settle the question</h2>
+  <p>We already flagged this honestly in <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a>: the data on whether schema markup itself boosts AI citations doesn't point in one direction. Digital Applied's 2026 analysis of 1,000 AI Overviews (comparing 4,243 cited URLs against roughly 50,000 non-cited controls, controlling for domain authority) found pages carrying Article and BreadcrumbList schema were cited <strong>2.3x more often</strong> than otherwise-comparable unstructured pages. Ahrefs ran the opposite kind of test: tracking <strong>1,885 pages</strong> that added JSON-LD schema between August 2025 and March 2026, and found that adding schema alone produced no major uplift in citations on any platform.</p>
+  <p>Both studies are real, and both are probably right about what they actually measured. Digital Applied studied pages already being cited at some rate and asked what correlated with citation frequency: schema showed up as one signal among several compounding ones, alongside domain authority, content length, and named-source citations in the body. Ahrefs studied the marginal effect of <em>adding</em> schema to a fixed set of pages and found it didn't move the needle in isolation. The likely reconciliation, consistent with BG-007's own framing: schema is an amplifier riding on top of strong content, not a citation-generating mechanism in its own right. Adding FAQPage markup to a thin, generic page won't make an AI engine cite it. Adding the same markup to a page that's already well-mentioned, current, and cross-source-verified gives that page one more way to be understood correctly.</p>
 
   <div class="callout teal">
     <div class="callout-label">Why we're building this guide anyway</div>
-    <p>If schema doesn't reliably create citations on its own, it's still worth doing correctly — for the same reason keeping your books clean is worth doing even though it doesn't grow revenue on its own. It's infrastructure, not a growth lever. Treat it that way and the mistakes below stop happening.</p>
+    <p>If schema doesn't reliably create citations on its own, it's still worth doing correctly, for the same reason keeping your books clean is worth doing even though it doesn't grow revenue on its own. It's infrastructure, not a growth lever. Treat it that way and the mistakes below stop happening.</p>
   </div>
 
   <h2 id="why-anyway">Why implement it anyway: the case beyond citation-boost</h2>
-  <p>Google's own AI-features documentation is explicit that no special "AI schema" exists — there's no AIPage type, no LLMOptimized property, nothing added specifically for AI Overviews or AI Mode. What Google does say is that Gemini-powered AI Mode reads your existing schema.org markup as a trust and verification signal, not a display trigger — the same markup that once earned a rich snippet now helps an AI system disambiguate who you are before it decides whether to cite you at all. As <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already established, GEO isn't SEO with new keywords — it's a different verification process, and schema plays a genuine role in that process even when it isn't the thing that gets you cited.</p>
-  <p>A February 2026 controlled experiment, run by SEO researcher Mark Williams-Cook and reported by Search Engine Roundtable, tested something more specific: does an LLM actually parse your JSON-LD, or does it just read it as text? He built a page for a fake company with an address embedded exclusively inside deliberately invalid, malformed JSON-LD — nowhere in the visible content. Both ChatGPT and Perplexity extracted and returned the address correctly. The finding: both engines tokenize the <code>&lt;script&gt;</code> block as raw text rather than parsing it as validated structured data — they never checked whether the schema was syntactically correct, they just read the characters. Two practical conclusions follow. First, the facts inside your schema function as machine-readable content even when the syntax is imperfect — which is a real, if modest, argument for using it at all. Second, don't lean on schema syntax as a substitute for saying the same thing in visible copy, since visible text is what every engine primarily reasons over, and a fact that only exists inside a script tag is one AI Overview redesign away from being invisible again.</p>
+  <p>Google's own AI-features documentation is explicit that no special "AI schema" exists: there's no AIPage type, no LLMOptimized property, nothing added specifically for AI Overviews or AI Mode. What Google does say is that Gemini-powered AI Mode reads your existing schema.org markup as a trust and verification signal, not a display trigger. The same markup that once earned a rich snippet now helps an AI system disambiguate who you are before it decides whether to cite you at all. As <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already established, GEO isn't SEO with new keywords: it's a different verification process, and schema plays a genuine role in that process even when it isn't the thing that gets you cited.</p>
+  <p>A February 2026 controlled experiment, run by SEO researcher Mark Williams-Cook and reported by Search Engine Roundtable, tested something more specific: does an LLM actually parse your JSON-LD, or does it just read it as text? He built a page for a fake company with an address embedded exclusively inside deliberately invalid, malformed JSON-LD, nowhere in the visible content. Both ChatGPT and Perplexity extracted and returned the address correctly. The finding: both engines tokenize the <code>&lt;script&gt;</code> block as raw text rather than parsing it as validated structured data: they never checked whether the schema was syntactically correct, they just read the characters. Two practical conclusions follow. First, the facts inside your schema function as machine-readable content even when the syntax is imperfect, which is a real, if modest, argument for using it at all. Second, don't lean on schema syntax as a substitute for saying the same thing in visible copy, since visible text is what every engine primarily reasons over, and a fact that only exists inside a script tag is one AI Overview redesign away from being invisible again.</p>
 
   <h2 id="which-types">Which schema types actually matter for AI visibility</h2>
-  <p>Structured data sits inside the Technical SEO discipline BrandGEO's own framework defines in <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">BG-001</a> — one of six disciplines that feed AI Visibility, not the whole of it. Within that discipline, 2026 structured-data guidance from Digital Applied, Search Engine Land, and the wider GEO practitioner community converges on the same short list, in roughly this priority order:</p>
+  <p>Structured data sits inside the Technical SEO discipline BrandGEO's own framework defines in <a href="/bg-001.html#technical-seo" style="color:var(--accent2)">BG-001</a>, one of six disciplines that feed AI Visibility, not the whole of it. Within that discipline, 2026 structured-data guidance from Digital Applied, Search Engine Land, and the wider GEO practitioner community converges on the same short list, in roughly this priority order:</p>
   <ul>
-    <li><strong>Organization.</strong> The most important type of all, because it establishes a single, disambiguated brand entity every engine can cross-reference — name, logo, and <code>sameAs</code> links to your verified social/Wikidata/Crunchbase profiles. Without it, an AI system has no confirmed anchor for who you actually are, which matters most for newer brands or ones sharing a name with something else.</li>
-    <li><strong>Article / BlogPosting.</strong> Carries authorship and, critically, <code>datePublished</code>/<code>dateModified</code> — the same freshness signal <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> found among the strongest predictors of AI citation. Only useful if the dates are genuinely kept current, not just re-stamped.</li>
-    <li><strong>FAQPage.</strong> Still valid markup, no longer worth chasing for a rich-result payoff — see the mistakes section below.</li>
+    <li><strong>Organization.</strong> The most important type of all, because it establishes a single, disambiguated brand entity every engine can cross-reference: name, logo, and <code>sameAs</code> links to your verified social/Wikidata/Crunchbase profiles. Without it, an AI system has no confirmed anchor for who you actually are, which matters most for newer brands or ones sharing a name with something else.</li>
+    <li><strong>Article / BlogPosting.</strong> Carries authorship and, critically, <code>datePublished</code>/<code>dateModified</code>: the same freshness signal <a href="/bg-007.html" style="color:var(--accent2)">BG-007</a> found among the strongest predictors of AI citation. Only useful if the dates are genuinely kept current, not just re-stamped.</li>
+    <li><strong>FAQPage.</strong> Still valid markup, no longer worth chasing for a rich-result payoff. See the mistakes section below.</li>
     <li><strong>Product.</strong> High priority for e-commerce: price, availability, and review data an AI system can cross-check against what's actually on the live page.</li>
-    <li><strong>LocalBusiness.</strong> High priority for local and service brands — address, hours, and service area feed exactly the kind of cross-source footprint consistency that determines whether a local brand shows up in an AI recommendation at all, not just Google's map pack.</li>
+    <li><strong>LocalBusiness.</strong> High priority for local and service brands: address, hours, and service area feed exactly the kind of cross-source footprint consistency that determines whether a local brand shows up in an AI recommendation at all, not just Google's map pack.</li>
   </ul>
 
   <h2 id="checklist">A practical implementation checklist</h2>
   <div class="compare-table-wrap">
     <table class="compare-table">
       <tr><th>Schema type</th><th>Priority</th><th>What it establishes</th><th>Get this right first</th></tr>
-      <tr><td>Organization</td><td>Highest — implement first</td><td>A single, disambiguated brand entity every engine can cross-reference</td><td>name, logo, sameAs profiles, url — on every page, not just the homepage</td></tr>
-      <tr><td>Article / BlogPosting</td><td>High — every published page</td><td>Authorship and a genuine freshness signal</td><td>dateModified kept honest, not silently re-stamped</td></tr>
-      <tr><td>FAQPage</td><td>Medium — keep, don't chase</td><td>Clean, quotable Q&amp;A structure</td><td>Match the visible on-page Q&amp;A exactly; don't invent questions</td></tr>
+      <tr><td>Organization</td><td>Highest: implement first</td><td>A single, disambiguated brand entity every engine can cross-reference</td><td>name, logo, sameAs profiles, url, on every page, not just the homepage</td></tr>
+      <tr><td>Article / BlogPosting</td><td>High: every published page</td><td>Authorship and a genuine freshness signal</td><td>dateModified kept honest, not silently re-stamped</td></tr>
+      <tr><td>FAQPage</td><td>Medium: keep, don't chase</td><td>Clean, quotable Q&amp;A structure</td><td>Match the visible on-page Q&amp;A exactly; don't invent questions</td></tr>
       <tr><td>Product</td><td>High for e-commerce</td><td>Price, availability, and review data an engine can verify</td><td>Price/availability synced live, real aggregateRating only</td></tr>
       <tr><td>LocalBusiness</td><td>High for local/service brands</td><td>Address, hours, and service-area footprint</td><td>NAP consistency across every profile you're marked up on</td></tr>
     </table>
@@ -285,11 +334,11 @@
 
   <h2 id="mistakes">Common mistakes worth avoiding</h2>
   <ul>
-    <li><strong>Chasing FAQPage for a rich result that no longer exists.</strong> Google deprecated FAQ rich results in Search on May 7, 2026 — the expandable dropdown under your listing is gone for every site. The markup itself is still valid and doesn't hurt anything left in place, but building new FAQPage schema specifically for a SERP feature is optimizing for something that no longer ships.</li>
-    <li><strong>Assuming AI engines validate your schema.</strong> Per the February 2026 finding above, ChatGPT and Perplexity tokenize JSON-LD as raw text rather than parsing it — both engines extracted facts successfully even from deliberately invalid schema. Don't assume perfect syntax buys you extra credit with an LLM, and don't assume sloppy syntax is harmless either — put the same facts in visible copy too.</li>
-    <li><strong>Marking up numbers that drift from the live page.</strong> Product price, availability, review counts, business hours — schema that disagrees with what a visitor (or an AI engine's own page fetch) actually sees is a trust problem, not a technical one.</li>
-    <li><strong>Skipping Organization schema because it feels too basic to matter.</strong> It's the one type every study and Google's own guidance agree on — and it's the cheapest to implement well.</li>
-    <li><strong>Treating schema as the whole GEO strategy.</strong> Per BG-007, the strongest AI-citation signals are unlinked brand mentions and content freshness, not markup. Schema is worth doing correctly — it's never a substitute for being genuinely, verifiably talked about elsewhere.</li>
+    <li><strong>Chasing FAQPage for a rich result that no longer exists.</strong> Google deprecated FAQ rich results in Search on May 7, 2026. The expandable dropdown under your listing is gone for every site. The markup itself is still valid and doesn't hurt anything left in place, but building new FAQPage schema specifically for a SERP feature is optimizing for something that no longer ships.</li>
+    <li><strong>Assuming AI engines validate your schema.</strong> Per the February 2026 finding above, ChatGPT and Perplexity tokenize JSON-LD as raw text rather than parsing it: both engines extracted facts successfully even from deliberately invalid schema. Don't assume perfect syntax buys you extra credit with an LLM, and don't assume sloppy syntax is harmless either: put the same facts in visible copy too.</li>
+    <li><strong>Marking up numbers that drift from the live page.</strong> Product price, availability, review counts, business hours: schema that disagrees with what a visitor (or an AI engine's own page fetch) actually sees is a trust problem, not a technical one.</li>
+    <li><strong>Skipping Organization schema because it feels too basic to matter.</strong> It's the one type every study and Google's own guidance agree on, and it's the cheapest to implement well.</li>
+    <li><strong>Treating schema as the whole GEO strategy.</strong> Per BG-007, the strongest AI-citation signals are unlinked brand mentions and content freshness, not markup. Schema is worth doing correctly, but it's never a substitute for being genuinely, verifiably talked about elsewhere.</li>
   </ul>
 
   <hr class="divider">
@@ -300,7 +349,7 @@
     <a href="/bg-007.html" class="related-card">
       <div class="related-id">BG-007</div>
       <div class="related-title">The Anatomy of an AI-Cited Brand</div>
-      <div class="related-hook">The mention, freshness, and cross-source signals that actually predict AI citation — and where schema's contested boost fits in.</div>
+      <div class="related-hook">The mention, freshness, and cross-source signals that actually predict AI citation, and where schema's contested boost fits in.</div>
     </a>
     <a href="/bg-001.html" class="related-card">
       <div class="related-id">BG-001</div>
@@ -315,17 +364,17 @@
     <a href="/bg-005.html" class="related-card">
       <div class="related-id">BG-005</div>
       <div class="related-title">GEO vs SEO: The Fundamental Difference</div>
-      <div class="related-hook">Why a schema checklist alone was never going to be the whole strategy — the verification process it feeds into.</div>
+      <div class="related-hook">Why a schema checklist alone was never going to be the whole strategy, and the verification process it feeds into.</div>
     </a>
   </div>
 
   <h2>How BrandGEO treats this differently</h2>
-  <p>BrandGEO doesn't score you on whether schema is installed — it tracks whether AI engines are actually citing and recommending you, across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, on the real questions your buyers ask. Structured data is one input among the mention, freshness, and cross-source signals <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a> and <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already break down — worth getting right, never worth mistaking for the whole picture.</p>
+  <p>BrandGEO doesn't score you on whether schema is installed, it tracks whether AI engines are actually citing and recommending you, across ChatGPT, Gemini, Claude, Perplexity, and Meta AI, on the real questions your buyers ask. Structured data is one input among the mention, freshness, and cross-source signals <a href="/bg-003.html" style="color:var(--accent2)">BG-003</a> and <a href="/bg-005.html" style="color:var(--accent2)">BG-005</a> already break down, worth getting right, never worth mistaking for the whole picture.</p>
 
   <!-- CTA -->
   <div class="cta-box">
     <h3>Find out whether your structured data is actually helping</h3>
-    <p>We'll run your brand through the same real-question, multi-engine audit — free, in 48 hours.</p>
+    <p>We'll run your brand through the same real-question, multi-engine audit: free, in 48 hours.</p>
     <a href="/#contact" class="btn-primary">Request your free AI Visibility audit</a>
     <p class="cta-note">No commitment. No tools to install. Just clarity on where you stand.</p>
   </div>
@@ -351,6 +400,14 @@
       <a href="/support.html">Support</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
     </div>
   </div>
 </footer>

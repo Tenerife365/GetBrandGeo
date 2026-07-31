@@ -1,21 +1,27 @@
 /**
- * SupportWidget.tsx — bottom-right floating "Need a hand?" button on every
+ * SupportWidget.tsx: bottom-right floating "Need a hand?" button on every
  * dashboard page. Opens a small panel; the message is POSTed to the
- * support-request Netlify function, which emails support@getbrandgeo.com.
+ * support-request Netlify function, which now SAVES IT AS A TICKET and then
+ * emails support@getbrandgeo.com as a notification.
  * Built so an AI assistant can slot in behind the same launcher later.
  * Degrades gracefully: on any send failure it offers a mailto: fallback.
+ *
+ * The panel stays the fast way in. /tickets is where a request is then
+ * tracked, so the confirmation links there rather than ending the thread.
  */
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { MessageCircle, X, Send, Loader2, Check } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 
 export default function SupportWidget() {
-  const { activeClient } = useClient()
+  const { activeClient, activeClientId } = useClient()
   const [open, setOpen]       = useState(false)
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [email, setEmail]     = useState('')
+  const [ticketId, setTicketId] = useState<number | null>(null)
   const [state, setState]     = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
   useEffect(() => {
@@ -37,10 +43,16 @@ export default function SupportWidget() {
           message: message.trim(),
           email,
           brand: activeClient?.name ?? '',
+          // Advisory only. support-request.js takes the tenant from the
+          // caller's own profile for anyone who is not an admin, so this
+          // cannot be used to file a ticket against another client.
+          client_id: activeClientId,
           page: window.location.pathname,
         }),
       })
       if (!res.ok) throw new Error(String(res.status))
+      const data = await res.json().catch(() => null)
+      setTicketId(typeof data?.ticket_id === 'number' ? data.ticket_id : null)
       setState('sent')
       setMessage(''); setSubject('')
     } catch {
@@ -54,7 +66,7 @@ export default function SupportWidget() {
 
   return (
     <>
-      {/* Launcher — clears the mobile bottom nav on small screens */}
+      {/* Launcher, clears the mobile bottom nav on small screens */}
       <button
         onClick={() => { setOpen(v => !v); if (state === 'sent') setState('idle') }}
         aria-label={open ? 'Close support' : 'Get help'}
@@ -67,15 +79,28 @@ export default function SupportWidget() {
         <div className="fixed z-50 bottom-36 right-4 md:bottom-24 md:right-6 w-[calc(100vw-2rem)] max-w-sm bg-dark-800 rounded-2xl shadow-2xl border border-dark-700 overflow-hidden">
           <div className="px-5 py-4 border-b border-dark-700/60 bg-brand-500/5">
             <div className="text-sm font-semibold text-white">Need a hand?</div>
-            <div className="text-xs text-slate-400 mt-0.5">Ask about a feature, report a problem, or make a request — we&apos;ll reply to your email.</div>
+            <div className="text-xs text-slate-400 mt-0.5">Ask about a feature, report a problem, or make a request, and we&apos;ll reply to your email.</div>
           </div>
 
           {state === 'sent' ? (
             <div className="px-5 py-8 text-center">
               <div className="w-11 h-11 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto mb-3"><Check size={20} /></div>
-              <div className="text-sm font-medium text-slate-200 mb-1">Message sent</div>
-              <p className="text-xs text-slate-500">Thanks — we&apos;ll get back to you at {email || 'your email'}.</p>
-              <button onClick={() => setState('idle')} className="mt-4 text-xs text-brand-400 hover:text-brand-300 font-medium">Send another</button>
+              <div className="text-sm font-medium text-slate-200 mb-1">
+                {ticketId !== null ? `Request #${ticketId} raised` : 'Message sent'}
+              </div>
+              <p className="text-xs text-slate-500">Thanks, we&apos;ll get back to you at {email || 'your email'}.</p>
+              {ticketId !== null && (
+                <Link
+                  to="/tickets"
+                  onClick={() => setOpen(false)}
+                  className="mt-3 inline-block text-xs text-brand-400 hover:text-brand-300 font-medium"
+                >
+                  Track it in Support
+                </Link>
+              )}
+              <div>
+                <button onClick={() => { setState('idle'); setTicketId(null) }} className="mt-4 text-xs text-brand-400 hover:text-brand-300 font-medium">Send another</button>
+              </div>
             </div>
           ) : (
             <div className="px-5 py-4 space-y-3">

@@ -3,31 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <meta name="msapplication-TileColor" content="#8b5cf6">
+  <meta name="msapplication-TileImage" content="mstile-150x150.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <!-- Privacy-friendly analytics by Plausible -->
   <script async src="https://plausible.io/js/pa-DuAkJnYJDpIpPatNKQR1A.js"></script>
   <script src="plausible-init.js"></script>
   <title>BrandGEO Research™: AI Visibility Intelligence Blog</title>
   <meta name="description" content="BrandGEO Research publishes original data, analysis, and frameworks on AI Visibility, Generative Engine Optimization (GEO), and how AI engines like ChatGPT, Gemini, Claude, and Perplexity surface brands.">
   <meta property="og:title" content="BrandGEO Research™: AI Visibility Intelligence">
-  <meta property="og:description" content="Original research on AI Visibility, GEO, and how brands show up in ChatGPT, Gemini, Claude, Perplexity, and Meta AI.">
+  <meta property="og:description" content="Original research on AI Visibility, GEO, and how brands show up in ChatGPT, Gemini, Claude, Perplexity, and Google AI Mode.">
   <link rel="canonical" href="https://getbrandgeo.com/blog.html">
   <meta property="og:type" content="blog">
   <meta property="og:url" content="https://getbrandgeo.com/blog.html">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
+      --bg: #0a0b0e;
+      --surface: #101116;
       --surface2: #1a1a25;
-      --border: #22223a;
-      --accent: #6c63ff;
-      --accent2: #00d4aa;
-      --text: #e8e8f0;
-      --muted: #8888aa;
+      --border: #23242b;
+      --accent: #8b5cf6; --accent-text: #a78bfa; --accent-strong: #7c3aed;
+      --accent2: #34d399;
+      --text: #e8e9ed;
+      --muted: #9ba1ac;
       --radius: 12px;
     }
     [data-theme="light"] {
@@ -36,17 +47,17 @@
       --surface2: #eeeef5;
       --border: #dddde8;
       --text: #0a0a1e;
-      --muted: #666688;
+      --muted: #666688;      --accent: #7c3aed; --accent-text: #6d28d9; --accent-strong: #6d28d9; --accent2: #047857;
     }
     [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
 
     /* NAV */
     nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.9); backdrop-filter: blur(12px); z-index: 100; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .logo-text .brand { color: var(--text); }
-    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
     nav a:hover, nav a.active { color: var(--text); }
     .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
@@ -118,11 +129,11 @@
 
     /* FOOTER */
     footer { border-top: 1px solid var(--border); padding: 56px 40px 32px; color: var(--muted); font-size: 0.88rem; }
-    .footer-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; gap: 32px; margin-bottom: 48px; }
+    .footer-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1fr; gap: 28px; margin-bottom: 48px; }
     .footer-brand .footer-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 800; line-height: 1; }
+    .footer-brand .footer-logo-text { font-size: 1.2rem; font-weight: 700; letter-spacing: -.032em; line-height: 1; }
     .footer-brand .footer-logo-text .brand { color: var(--text); }
-    .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-brand .footer-logo-text .geo { background: linear-gradient(135deg, #A78BFA 0%, #C4B5FD 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .footer-brand p { line-height: 1.6; margin-bottom: 16px; font-size: 0.85rem; }
     .footer-social { display: flex; gap: 10px; }
     .footer-social a { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); color: var(--muted); text-decoration: none; transition: border-color .2s, color .2s; font-size: 0.8rem; }
@@ -142,6 +153,11 @@
     }
     @media(max-width:640px) {
       nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing. This rule collapses the nav text links
+         so the site.js hamburger drawer can own them below 640px. The header
+         lockup is `<a class="logo">`, which is also `nav a`, so without the
+         guard the mark and the wordmark were hidden on every phone. site.js
+         injects a copy of this same rule, so both copies carry the guard. */
       nav a:not(.nav-cta):not(.logo) { display: none; }
       .page-hero, .featured-wrap, .posts-wrap { padding-left: 20px; padding-right: 20px; }
       .footer-grid { grid-template-columns: 1fr; }
@@ -168,10 +184,39 @@
     .latest-card p { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin: 0; }
     @media(max-width:820px) { .latest-grid { grid-template-columns: 1fr 1fr; } }
     @media(max-width:640px) { .latest-grid { grid-template-columns: 1fr; } }
+  
+    /* Social row, added 2026-07-29. Fallback chains because the site runs two
+       token families: --t3/--bd/--ac-text on most pages, --muted/--border/
+       --accent on the older ones. The final hex means this can never fall
+       through to an inherited colour. */
+    .f-social { display: flex; gap: 8px; align-items: center; }
+    .f-social.f-social-center { justify-content: center; margin-top: 16px; }
+    /* background and padding are reset explicitly, not left to inherit: at
+       least one page (thanks.html) carries a global `a { background: #8b5cf6;
+       padding: 12px 28px }` button rule that would otherwise turn every icon
+       into a purple slab. */
+    .f-social a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: none;
+      border-radius: 8px;
+      border: 1px solid var(--bd, var(--border, #2a2c35));
+      color: var(--t3, var(--muted, #7d838f));
+      text-decoration: none;
+      transition: color .15s, border-color .15s;
+    }
+    .f-social a:hover,
+    .f-social a:focus-visible {
+      color: var(--ac-text, var(--accent, #a78bfa));
+      border-color: var(--ac-text, var(--accent, #a78bfa));
+    }
+    .f-social svg { display: block; }
   </style>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9H6C2NSYPH"></script>
-  <script src="ga4-init.js"></script>
+  <script src="ga4-init.js?v=20260729d"></script>
 </head>
 <body>
 
@@ -184,7 +229,7 @@
     <a href="/#how">How it works</a>
     <a href="/#pricing">Pricing</a>
     <a href="/faq.html">FAQ</a>
-    <a href="/blog.html" class="active">Blog</a>
+    <a href="/blog.html" class="active">Research</a>
     <a href="/news/">News</a>
     <a href="/#contact" class="nav-cta">Get started</a>
     <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">🌙</button>
@@ -233,7 +278,7 @@
       <h5>What "Notifying Google" Actually Does (and Doesn't) for a New Page</h5>
       <p>A 200 response isn't a crawl-priority guarantee for most page types. The honest scope of our indexing pipeline.</p>
     </a>
-    <a href="/bg-021.html" class="latest-card">
+    <a href="/bg-026.html" class="latest-card">
       <div class="latest-card-top">
         <span class="latest-tag latest-tag-research">Research</span>
         <span class="latest-date">Jul 26, 2026</span>
@@ -241,29 +286,37 @@
       <h5>How the 6-Dimension AI Visibility Score Is Actually Weighted</h5>
       <p>Recognition, knowledge, sentiment, accuracy, reach, consistency — unequally weighted on purpose. The exact formula.</p>
     </a>
+    <a href="/bg-021-retrieval-not-engine-count.html" class="latest-card">
+      <div class="latest-card-top">
+        <span class="latest-tag latest-tag-research">Research</span>
+        <span class="latest-date">Jul 29, 2026</span>
+      </div>
+      <h5>We Shipped Two AI Engines Today. The More Useful Story Is the Two We Turned Down</h5>
+      <p>Engine count is the easiest number in this category to raise and the least informative. The question that separates the tools is whether the engine went and looked.</p>
+    </a>
   </div>
 </div>
 
-<!-- FEATURED: BG-025 -->
+<!-- FEATURED: BG-019 -->
 <div class="featured-wrap">
   <div class="featured-label">● Featured Research</div>
-  <a href="/bg-025.html" class="featured-card">
-    <div class="featured-visual" style="background-image: linear-gradient(180deg, rgba(10,10,15,.15) 0%, rgba(10,10,15,.55) 100%), url('/images/bg-025-hero.png'); background-size: cover; background-position: center top;"></div>
+  <a href="/bg-019.html" class="featured-card">
+    <div class="featured-visual" style="background-image: linear-gradient(180deg, rgba(10,10,15,.15) 0%, rgba(10,10,15,.55) 100%), url('/images/bg-019-hero.png'); background-size: cover; background-position: center top;"></div>
     <div class="featured-body">
       <div class="post-meta">
-        <span class="post-id">BG-025</span>
-        <span class="post-tag">Engineering</span>
-        <span class="post-tag">Cost Control</span>
+        <span class="post-id">BG-019</span>
+        <span class="post-tag">Methodology</span>
+        <span class="post-tag">Measurement Accuracy</span>
         <span class="post-date">July 2026</span>
       </div>
-      <h2>Why One Spend Limit Wasn't Enough</h2>
-      <p>A monthly euro budget can't see a fast burst coming until it's already spent the budget. Why our free audit tool runs two independent circuit breakers, not one.</p>
+      <h2>Why Our Scorer Returns Null Instead of a Rank It Can't Prove</h2>
+      <p>BrandGEO only reports a rank when an AI engine's answer makes one of three explicit claims. Everything else, including a plausible sentence position, returns null rather than a guess.</p>
       <div class="finding-pills">
-        <span class="finding-pill">2 independent circuit breakers</span>
-        <span class="finding-pill">€200 monthly budget, 100/hr burst breaker</span>
-        <span class="finding-pill">One source of truth, no drift</span>
+        <span class="finding-pill">3 signal types accepted as a real rank</span>
+        <span class="finding-pill">25 ordering phrases required to rank a bullet list</span>
+        <span class="finding-pill">Sentence-index fallback removed on purpose</span>
       </div>
-      <span class="read-link">Read BG-025</span>
+      <span class="read-link">Read BG-019</span>
     </div>
   </a>
 </div>
@@ -336,9 +389,9 @@
       </div>
     </a>
 
-    <a href="/bg-021.html" class="post-card">
-      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-021-hero.png');">
-        <span class="post-card-id">BG-021</span>
+    <a href="/bg-026.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-026-hero.png');">
+        <span class="post-card-id">BG-026</span>
         <span class="post-card-status status-published">Published</span>
       </div>
       <div class="post-card-body">
@@ -361,6 +414,21 @@
         <p>A failed API call and a real "never heard of you" used to score identically: zero. Four honest per-engine states — know, partial, missing, unavailable — replaced that binary read.</p>
         <div class="post-card-footer">
           <span class="post-card-tag">Methodology · Measurement Accuracy · July 2026</span>
+          <span class="post-card-link">Read →</span>
+        </div>
+      </div>
+    </a>
+
+    <a href="/bg-021-retrieval-not-engine-count.html" class="post-card">
+      <div class="post-card-visual has-image" style="background-image: linear-gradient(180deg, rgba(10,10,15,.2) 0%, rgba(10,10,15,.8) 100%), url('/images/bg-021-hero.png');">
+        <span class="post-card-id">BG-021</span>
+        <span class="post-card-status status-published">Published</span>
+      </div>
+      <div class="post-card-body">
+        <h4>We Shipped Two AI Engines Today. The More Useful Story Is the Two We Turned Down</h4>
+        <p>Grok and Google AI Overviews went live on 29 July. Meta AI was retired and DeepSeek stays out, both for the same reason: they answer from training data. The entry requirement is retrieval, not engine count.</p>
+        <div class="post-card-footer">
+          <span class="post-card-tag">Methodology · Engine Coverage · July 2026</span>
           <span class="post-card-link">Read →</span>
         </div>
       </div>
@@ -720,6 +788,26 @@
     <a href="/ai-visibility-for-paris.html" class="simple-card"><h5>Paris</h5><p>One bank swept every engine, in both languages. One category changed its entire competitive set by language.</p></a>
     <a href="/ai-visibility-for-rome.html" class="simple-card"><h5>Rome</h5><p>One engine repeated an identical ranked list word for word in two languages. No brand won cross-engine consensus.</p></a>
     <a href="/ai-visibility-for-dublin.html" class="simple-card"><h5>Dublin</h5><p>Two brands swept every engine unanimously, but one engine kept giving the same big-name answer regardless of the question.</p></a>
+    <a href="/ai-visibility-for-losangeles.html" class="simple-card"><h5>Los Angeles</h5><p>One entertainment-law firm swept 4 of 5 engines. Institutions beat star agents, again, just with a different leader.</p></a>
+    <a href="/ai-visibility-for-chicago.html" class="simple-card"><h5>Chicago</h5><p>One property manager hit 5 of 5 engines on presence, and all four structured engines agreed on the #1 corporate law firm.</p></a>
+    <a href="/ai-visibility-for-houston.html" class="simple-card"><h5>Houston</h5><p>One hospital system is unanimous #1 on every engine that ranked it, agreement on exact rank and not just presence.</p></a>
+    <a href="/ai-visibility-for-dallas.html" class="simple-card"><h5>Dallas-Fort Worth</h5><p>Real estate agents show zero cross-engine overlap, complete fragmentation.</p></a>
+    <a href="/ai-visibility-for-miami.html" class="simple-card"><h5>Miami</h5><p>Immigration law converges instead of fragmenting, against the pattern it shows in New York, Los Angeles, Houston and Dallas.</p></a>
+    <a href="/ai-visibility-for-philadelphia.html" class="simple-card"><h5>Philadelphia</h5><p>Two hospital systems both reached 5 of 5 at once, something matched only by Washington DC.</p></a>
+    <a href="/ai-visibility-for-atlanta.html" class="simple-card"><h5>Atlanta</h5><p>A real estate team breaks the usual fragmentation pattern, at 4 of 5 engines.</p></a>
+    <a href="/ai-visibility-for-phoenix.html" class="simple-card"><h5>Phoenix</h5><p>Immigration law converges again, one of the cities where it didn't fragment.</p></a>
+    <a href="/ai-visibility-for-washingtondc.html" class="simple-card"><h5>Washington DC</h5><p>Two lobbying firms sweep every engine, both near-unanimous on exact rank. DC's own economy, mirrored in AI.</p></a>
+    <a href="/ai-visibility-for-boston.html" class="simple-card"><h5>Boston</h5><p>Three categories hit full unanimous consensus at once, the most 5/5-dense city in the program as of 2026-07-30.</p></a>
+    <a href="/ai-visibility-for-sanfrancisco.html" class="simple-card"><h5>San Francisco</h5><p>One accounting firm is unanimous #1 on every engine, the only rank-unanimous 5/5 outside healthcare as of 2026-07-30.</p></a>
+    <a href="/ai-visibility-for-seattle.html" class="simple-card"><h5>Seattle</h5><p>One property manager sweeps the coast, the same brand that topped San Francisco's results too.</p></a>
+    <a href="/ai-visibility-for-sandiego.html" class="simple-card"><h5>San Diego</h5><p>Full unanimous consensus on property management, plus a third-city confirmation of a West Coast brand pattern.</p></a>
+    <a href="/ai-visibility-for-denver.html" class="simple-card"><h5>Denver</h5><p>Cannabis law and energy law both mirror Colorado's real economy, in the same dataset.</p></a>
+    <a href="/ai-visibility-for-minneapolis.html" class="simple-card"><h5>Minneapolis</h5><p>Five corporate law firms converge at once, second only to Detroit's seven.</p></a>
+    <a href="/ai-visibility-for-detroit.html" class="simple-card"><h5>Detroit</h5><p>Seven law firms converge on automotive law, the densest single category in the program as of 2026-07-30.</p></a>
+    <a href="/ai-visibility-for-tampa.html" class="simple-card"><h5>Tampa</h5><p>A real estate team breaks the fragmentation pattern again, in a category that fragments almost everywhere.</p></a>
+    <a href="/ai-visibility-for-baltimore.html" class="simple-card"><h5>Baltimore</h5><p>Four hospital systems converge at once, the densest single category in the Baltimore dataset.</p></a>
+    <a href="/ai-visibility-for-charlotte.html" class="simple-card"><h5>Charlotte</h5><p>A banking hub's AI consensus matches its real economy, plus two real estate teams converge at once.</p></a>
+    <a href="/ai-visibility-for-sanantonio.html" class="simple-card"><h5>San Antonio</h5><p>Property management converges yet again, and military law reflects a real "Military City USA" identity.</p></a>
   </div>
 </div>
 
@@ -783,13 +871,18 @@
         <li><a href="/ai-visibility-for-saas.html">AI Visibility for SaaS</a></li>
         <li><a href="/ai-visibility-for-ecommerce.html">AI Visibility for E-commerce</a></li>
         <li><a href="/ai-visibility-for-law-firms.html">AI Visibility for Law Firms</a></li>
-        <li><a href="/ai-visibility-for-london.html">AI Visibility in London</a></li>
-        <li><a href="/ai-visibility-for-berlin.html">AI Visibility in Berlin</a></li>
-        <li><a href="/ai-visibility-for-madrid.html">AI Visibility in Madrid</a></li>
-        <li><a href="/ai-visibility-for-newyork.html">AI Visibility in New York</a></li>
-        <li><a href="/ai-visibility-for-paris.html">AI Visibility in Paris</a></li>
-        <li><a href="/ai-visibility-for-rome.html">AI Visibility in Rome</a></li>
-        <li><a href="/ai-visibility-for-dublin.html">AI Visibility in Dublin</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>City Research</h4>
+      <ul>
+        <li><a href="/ai-visibility-for-sanantonio.html">AI Visibility in San Antonio</a></li>
+        <li><a href="/ai-visibility-for-charlotte.html">AI Visibility in Charlotte</a></li>
+        <li><a href="/ai-visibility-for-baltimore.html">AI Visibility in Baltimore</a></li>
+        <li><a href="/ai-visibility-for-tampa.html">AI Visibility in Tampa</a></li>
+        <li><a href="/ai-visibility-for-detroit.html">AI Visibility in Detroit</a></li>
+        <li><a href="/ai-visibility-for-minneapolis.html">AI Visibility in Minneapolis</a></li>
+        <li><a href="/blog.html#cities">See all city research &rarr;</a></li>
       </ul>
     </div>
     <div class="footer-col">
@@ -806,6 +899,14 @@
     <span>&copy; 2026 BrandGEO &nbsp;·&nbsp; <a href="/">getbrandgeo.com</a></span>
     <a href="/privacy.html">Privacy Policy</a>
     <a href="/cookies.html">Cookies</a>
+    <div class="f-social">
+      <a href="https://www.linkedin.com/company/79409681" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+      <a href="https://x.com/GetBrandGEO" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z"/></svg></a>
+      <a href="https://www.instagram.com/brandgeo_global/" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://www.facebook.com/profile.php?id=61592342861387" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://www.youtube.com/channel/UCc1EXJXm46-_R9qtHSARlWQ" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on YouTube"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@brandgeo03" target="_blank" rel="noopener noreferrer me" aria-label="BrandGEO on TikTok"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
   </div>
 </footer>
 

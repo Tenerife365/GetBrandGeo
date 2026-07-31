@@ -31,7 +31,16 @@ interface ClientCtx {
   activeClient:      Client | null
   setActiveClientId: (id: number) => void
   clients:           Client[]           // populated for admin only
+  // EFFECTIVE admin, not the real one. When an admin turns on "View as user"
+  // this reads false, so every existing `isAdmin` consumer hides its admin
+  // affordances with no change at the call site. This is PRESENTATION ONLY:
+  // it mints no token, changes no role, and every Netlify function still
+  // decides on the real JWT via requireAuth({ adminOnly: true }). A viewer
+  // gains nothing from this flag existing — it can only ever take away.
   isAdmin:           boolean
+  isRealAdmin:       boolean            // the true role; only the toggle + banner may read this
+  viewingAsUser:     boolean
+  setViewingAsUser:  (v: boolean) => void
   loading:           boolean
   needsOnboarding:   boolean            // authed but no profile yet -> /welcome onboarding
   // ── Engine gating ────────────────────────────────────────────────────────
@@ -51,6 +60,9 @@ const Ctx = createContext<ClientCtx>({
   setActiveClientId:       () => {},
   clients:                 [],
   isAdmin:                 false,
+  isRealAdmin:             false,
+  viewingAsUser:           false,
+  setViewingAsUser:        () => {},
   loading:                 true,
   needsOnboarding:         false,
   activeEngines:           DEFAULT_ENGINES,
@@ -68,6 +80,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [activeClient, setActiveClient]           = useState<Client | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
+  // Deliberately NOT persisted. A reload always returns a real admin to the
+  // admin view, so nobody can be left impersonating without knowing it.
+  const [viewingAsUser, setViewingAsUserState] = useState(false)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
@@ -203,10 +218,30 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  /**
+   * Switch the active client.
+   *
+   * Refuses an id that is not in the loaded list instead of switching to it.
+   * The old behaviour was `clients.find(...) ?? null` followed by
+   * setActiveClient(found), so an unknown id set activeClient to NULL while
+   * leaving activeClientId pointing at it, and every consumer that reads
+   * activeClient (Account, the engine derivations above) rendered an empty
+   * shell. It also persisted the bad id to localStorage, so the next reload
+   * started from it too.
+   *
+   * Unknown ids are reachable: AdminBell links a notification to its client_id,
+   * and that client may since have been deleted. Callers should check
+   * membership themselves where they can show a better message; this is the
+   * backstop that keeps a bad id from emptying the whole app.
+   */
   const setActiveClientId = (id: number) => {
+    const found = clients.find(c => c.id === id)
+    if (!found) {
+      console.warn(`[ClientCtx] ignoring switch to unknown client ${id}`)
+      return
+    }
     localStorage.setItem('brandgeo_client', String(id))
     setActiveClientIdState(id)
-    const found = clients.find(c => c.id === id) ?? null
     setActiveClient(found)
   }
 
@@ -273,7 +308,12 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       activeClient,
       setActiveClientId,
       clients,
-      isAdmin,
+      // The hide-only invariant. Non-admins can never set viewingAsUser to
+      // anything meaningful, so this expression can only ever remove access.
+      isAdmin: isAdmin && !viewingAsUser,
+      isRealAdmin: isAdmin,
+      viewingAsUser,
+      setViewingAsUser: (v: boolean) => setViewingAsUserState(isAdmin ? v : false),
       loading,
       needsOnboarding,
       activeEngines,
