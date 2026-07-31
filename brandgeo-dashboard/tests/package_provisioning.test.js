@@ -32,16 +32,31 @@ const {
   MAX_PACKAGE_MONTHS,
   PACKAGE_PLAN_SOURCE,
   resolvePackage,
+  checkPackageLineItem,
   addMonths,
   todayUtc,
   packageGrantUntil,
+  normaliseGrantDate,
+  stackedGrantUntil,
 } = require('../netlify/functions/_package_checkout')
 const { PLAN_ORDER, isValidPlan } = require('../netlify/functions/_plans')
+// Safe to require: expire-plan-grants.js builds its Supabase client INSIDE the
+// handler and reads no env var at module load, so the pure partition function
+// can be called here rather than asserted on as source text.
+const { partitionDueGrants } = require('../netlify/functions/expire-plan-grants')
 
 let passed = 0
 const ok = (n) => { passed++; console.log('  ok -', n) }
 const section = (n) => console.log(`\n${n}`)
 const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8')
+
+// Same, with whole-line // comments removed, for assertions that a statement is
+// EXECUTED rather than merely present. Found by mutation testing 2026-07-31:
+// `assert.match(src, /grantUntil = stacked/)` passes happily against
+// `// grantUntil = stacked`, so commenting a line out survived every source
+// assertion in the file. Only whole-line comments are dropped, so URLs like
+// https://app.getbrandgeo.com inside real code are left intact.
+const readCode = (p) => read(p).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 // Shaped like the real objects: a checkout.session as Stripe delivers it, and
@@ -181,7 +196,7 @@ section('4. subscription regression (arch §4.4)')
     subscription: 'sub_TEST456',
     amount_total: 29900,
   })
-  const src = read('netlify/functions/stripe-webhook.js')
+  const src = readCode('netlify/functions/stripe-webhook.js')
 
   // Mode routing, read off the source that actually runs.
   assert.match(src, /const mode = session\.mode \|\| 'subscription'/,
@@ -222,6 +237,28 @@ section('4. subscription regression (arch §4.4)')
   assert.match(src, /if \(!isPackage\) update\.stripe_subscription_id = subId/,
     'the package path must leave an existing subscription id alone rather than blanking it')
   ok('stripe_subscription_id: null for a new package, untouched for an existing client')
+
+  // ── S6: pin the one line the whole review had to adjudicate ──────────────
+  // docs/qa/package-provisioning-014.md §6 mutation M10: deleting plan_source
+  // and plan_grant_until from the existing-client UPDATE reduces it to
+  // `{ plan, stripe_customer_id: custId }` and ALL 43 CHECKS STILL PASSED. The
+  // most contested and most consequential line in A1 was pinned by nothing, so
+  // a future edit could revert the declared deviation with a green harness and
+  // silently reopen the leak: a package holder who converts to a monthly
+  // subscription keeps plan_source='package' and the old grant date, and
+  // expire-plan-grants.js reverts a PAYING SUBSCRIBER to Free.
+  //
+  // Asserted per PROPERTY rather than as one byte-exact line. A whole-line
+  // match would also fail the day someone legitimately ADDS a column to the
+  // update, which trains people to delete the assertion. These two kill M10 and
+  // either half of it, while tolerating growth.
+  const updateLiteral = /const update = \{([^}]*)\}/.exec(readCode('netlify/functions/stripe-webhook.js'))
+  assert.ok(updateLiteral, 'the existing-client update literal must still be recognisable')
+  assert.match(updateLiteral[1], /plan_source: planSource/,
+    'every paid checkout must state plan_source explicitly, or a converted package holder is reverted to Free by expire-plan-grants.js')
+  assert.match(updateLiteral[1], /plan_grant_until: grantUntil/,
+    'every paid checkout must state plan_grant_until explicitly, or a stale grant date outlives the package that set it')
+  ok('S6: the existing-client update states plan_source AND plan_grant_until (kills mutation M10)')
 }
 
 // ── 5. No fifth copy of the plan ladder (arch §4.5) ─────────────────────────
@@ -234,7 +271,7 @@ section('5. plan ladder integrity (arch §4.5)')
   }
   ok(`SELF_SERVE_PLANS is a subset of PLAN_ORDER (${SELF_SERVE_PLANS.length} of ${PLAN_ORDER.length})`)
 
-  const pkgSrc = read('netlify/functions/_package_checkout.js')
+  const pkgSrc = readCode('netlify/functions/_package_checkout.js')
   assert.match(pkgSrc, /require\('\.\/_plans'\)/, '_package_checkout.js must derive validity from _plans.js')
   for (const p of ['free', 'managed', 'pro', 'enterprise']) {
     assert.ok(!new RegExp(`'${p}'`).test(pkgSrc.replace(/\/\/[^\n]*/g, '')),
@@ -242,7 +279,7 @@ section('5. plan ladder integrity (arch §4.5)')
   }
   ok('_package_checkout.js hardcodes no plan beyond the pre-existing self-serve list')
 
-  const hookSrc = read('netlify/functions/stripe-webhook.js')
+  const hookSrc = readCode('netlify/functions/stripe-webhook.js')
   assert.ok(!/const SELF_SERVE_PLANS\s*=/.test(hookSrc),
     'SELF_SERVE_PLANS must be imported, not redeclared — one list, not two')
   assert.match(hookSrc, /require\('\.\/_package_checkout'\)/)
@@ -254,7 +291,7 @@ section('6. expiry filter (arch §4.3)')
 {
   // The trap in arch §2.1: provisioning without touching this file means a
   // customer who paid for twelve months keeps the plan forever.
-  const exp = read('netlify/functions/expire-plan-grants.js')
+  const exp = readCode('netlify/functions/expire-plan-grants.js')
   assert.match(exp, /\.in\('plan_source', \['trial', 'comp', 'package'\]\)/,
     "expire-plan-grants.js must revert 'package' or the grant never ends")
   ok("expire-plan-grants.js filters plan_source in (trial, comp, package)")
@@ -271,6 +308,195 @@ section('6. expiry filter (arch §4.3)')
     'a paying package customer must not be told their plan was complimentary')
   assert.match(exp, /Your \$\{planLabel\} package has ended/)
   ok('lapsed package gets paid-customer wording; notification kind is unchanged')
+}
+
+// ── 7. A paying subscriber is never auto-reverted (S1) ──────────────────────
+section('7. subscription-liveness guard (S1, HIGH)')
+{
+  // The state A1 made reachable: stripe-webhook.js writes plan_source='package'
+  // on an existing client's row while deliberately preserving their live
+  // stripe_subscription_id. On the day the package ends, expire-plan-grants.js
+  // matched every clause of its filter and reverted a customer to Free, emailed
+  // them a lapse notice, and Stripe kept charging the card.
+  const due = [
+    { id: 1, name: 'lapsed trial',        plan: 'growth',     plan_source: 'trial',   plan_grant_until: '2026-07-01', stripe_subscription_id: null },
+    { id: 2, name: 'package + live sub',  plan: 'growth_pro', plan_source: 'package', plan_grant_until: '2026-07-01', stripe_subscription_id: 'sub_LIVE' },
+    { id: 3, name: 'package, no sub',     plan: 'growth',     plan_source: 'package', plan_grant_until: '2026-07-01', stripe_subscription_id: null },
+    { id: 4, name: 'comp + live sub',     plan: 'growth',     plan_source: 'comp',    plan_grant_until: '2026-07-01', stripe_subscription_id: 'sub_OTHER' },
+  ]
+  const { held, toExpire } = partitionDueGrants(due)
+
+  assert.deepStrictEqual(held.map((c) => c.id), [2, 4],
+    'every client Stripe is still charging must be HELD, whatever their plan_source says')
+  assert.deepStrictEqual(toExpire.map((c) => c.id), [1, 3],
+    'a grant with no live subscription behind it must still expire normally')
+  ok('a due grant on a client with a live subscription is held, not reverted (ids 2 and 4)')
+
+  // The guard is on the subscription id, NOT on plan_source === 'package'.
+  // Client 4 is the case that proves it: a comp grant stamped onto a paying
+  // subscriber is the same harm with a different label, and set-client-plan.js
+  // can still create it.
+  assert.strictEqual(held.some((c) => c.plan_source === 'comp'), true,
+    "the guard must not be package-only — 'paying customers are never auto-downgraded' is the invariant")
+  ok("the guard keys on stripe_subscription_id, so a trial/comp grant on a subscriber is held too")
+
+  // Nothing may be lost or duplicated by the partition.
+  assert.strictEqual(held.length + toExpire.length, due.length, 'partition must not drop or duplicate a row')
+  assert.deepStrictEqual(partitionDueGrants([]), { held: [], toExpire: [] })
+  assert.deepStrictEqual(partitionDueGrants(null), { held: [], toExpire: [] })
+  assert.deepStrictEqual(partitionDueGrants(undefined), { held: [], toExpire: [] })
+  assert.doesNotThrow(() => partitionDueGrants([null, undefined]))
+  assert.strictEqual(partitionDueGrants([{ id: 9, stripe_subscription_id: '' }]).toExpire.length, 1,
+    'an empty-string id is not a live subscription and must not block expiry forever')
+  ok('partition is total, order-preserving, and never throws on a malformed row')
+
+  const exp = readCode('netlify/functions/expire-plan-grants.js')
+  assert.match(exp, /\.select\('id, name, plan, plan_source, plan_grant_until, stripe_subscription_id'\)/,
+    'the job cannot apply the guard to a column it never selects')
+  assert.match(exp, /const \{ held, toExpire \} = partitionDueGrants\(due\)/,
+    'the handler must actually partition rather than compute a guard it ignores')
+  assert.match(exp, /for \(const c of toExpire\)/,
+    'the revert loop must iterate the partitioned list')
+  assert.ok(!/for \(const c of due\)\s*\{[\s\S]{0,400}plan: 'free'/.test(exp),
+    'the revert loop must not iterate the unpartitioned due list — that is the defect')
+  ok('expire-plan-grants selects the column, partitions on it, and reverts only toExpire')
+
+  // Held clients are REPORTED, not silently skipped. A silent skip turns a
+  // customer-visible bug into an invisible one.
+  assert.match(exp, /type: 'plan_expiry_held'/, 'a held grant must raise an admin event')
+  assert.match(exp, /held: held\.length/, 'held count must reach job_runs so it is answerable in SQL')
+  ok('a held grant raises plan_expiry_held and is recorded in job_runs')
+
+  // COMPANION FIX. Without it the guard rots in the dangerous direction: a
+  // cancelled subscription leaves a stale id, which reads as "still paying" and
+  // exempts the client's grant from expiry forever — arch §2.1's permanent leak
+  // by another door.
+  const hook = readCode('netlify/functions/stripe-webhook.js')
+  assert.match(hook, /stripe_subscription_id: null/,
+    'handleSubscriptionDeleted must clear the id, or the liveness guard is permanently wrong')
+  assert.match(hook, /holdsLivePackage/,
+    'cancelling a subscription must not wipe a live paid package (plan: free would strand it below the expiry filter)')
+  assert.match(hook, /const update = holdsLivePackage\s*\n?\s*\? \{ stripe_subscription_id: null \}/,
+    'a client holding a live package keeps their plan when the subscription is cancelled')
+  ok('subscription.deleted nulls the id and leaves a live paid package standing')
+}
+
+// ── 8. Quantity is read, and refused unless it is 1 (S3) ────────────────────
+section('8. line-item quantity (S3, MEDIUM)')
+{
+  // Before this, `grep -n quantity` over netlify/functions returned nothing. A
+  // 6-month package bought at quantity 2 charged for twelve months and
+  // provisioned six, with NO error and NO admin event, because resolution
+  // succeeds — months come from metadata and quantity was simply never read.
+  assert.deepStrictEqual(checkPackageLineItem({ quantity: 1 }, false), { ok: true })
+  ok('quantity 1 provisions normally')
+
+  for (const q of [2, 3, 12, 0, -1, 1.5, '1', '2', true]) {
+    const r = checkPackageLineItem({ quantity: q }, false)
+    assert.strictEqual(r.ok, false, `quantity ${JSON.stringify(q)} must be refused`)
+    assert.strictEqual(r.reason, 'invalid_quantity')
+    assert.ok(r.detail && r.detail.length > 0, 'must carry a human detail for the admin event')
+  }
+  ok('any quantity that is not exactly 1 is refused, provisioning nothing (fail-closed, not months x quantity)')
+
+  // Absent quantity defaults to 1: a missing field must never block a real sale.
+  for (const line of [{}, { quantity: undefined }, { quantity: null }]) {
+    assert.deepStrictEqual(checkPackageLineItem(line, false), { ok: true },
+      'an absent quantity must default to 1 rather than refusing a legitimate sale')
+  }
+  assert.doesNotThrow(() => checkPackageLineItem(null, false))
+  assert.doesNotThrow(() => checkPackageLineItem(undefined, undefined))
+  ok('absent quantity defaults to 1; the guard never throws on a missing line item')
+
+  // Same hole one level up: the webhook lists with limit 1 and reads data[0], so
+  // a two-line package link would charge for both and provision the first.
+  const multi = checkPackageLineItem({ quantity: 1 }, true)
+  assert.strictEqual(multi.ok, false)
+  assert.strictEqual(multi.reason, 'multiple_line_items')
+  ok('a checkout with more than one line item is refused (has_more), not half-provisioned')
+
+  const hook = readCode('netlify/functions/stripe-webhook.js')
+  assert.match(hook, /const line = lineItems\.data\[0\]/,
+    'the webhook must keep the line item, not just its price, or quantity is unreachable')
+  assert.match(hook, /checkPackageLineItem\(line, lineItems\.has_more === true\)/,
+    'the guard must be wired to the real line item and the real has_more flag')
+  // Order matters: refusing the sale shape before resolving the price means a
+  // wrong-quantity sale can never reach a successful resolution.
+  assert.ok(hook.indexOf('checkPackageLineItem(') < hook.indexOf('const resolved = resolvePackage(price)'),
+    'the quantity guard must run BEFORE resolution, so a bad shape cannot resolve first')
+  assert.ok(!/months \* .*quantity|quantity \* /.test(hook),
+    'months must never be multiplied by quantity — that silently doubles an entitlement off a field nobody sets')
+  ok('the webhook checks the sale shape before the price, and never multiplies months by quantity')
+}
+
+// ── 9. Early renewal stacks the remainder (S2) ──────────────────────────────
+section('9. renewal stacking (S2, MEDIUM — Constantin ruled 2026-07-31)')
+{
+  // Ruling: a client renewing at month 9 of a 12-month package carries their
+  // unused 3 months over. Previously grantUntil was always today + N, so those
+  // months were deleted — and the lapse email explicitly invites early renewal
+  // ("reach out and we'll set up your next period"), so this is the expected
+  // motion rather than an edge case.
+  const now = new Date('2026-07-31T22:45:00Z')
+
+  assert.strictEqual(stackedGrantUntil(12, '2027-06-30', now), '2028-06-30')
+  ok('live grant to 2027-06-30 + a 12-month renewal → 2028-06-30 (11 unused months carried over)')
+
+  assert.strictEqual(stackedGrantUntil(12, '2026-01-01', now), '2027-07-31')
+  assert.strictEqual(stackedGrantUntil(12, '2026-07-30', now), '2027-07-31')
+  ok('a LAPSED grant extends nothing — the base falls back to today (yesterday counts as lapsed)')
+
+  // Boundary: expire-plan-grants selects `plan_grant_until < today`, so a grant
+  // dated exactly today is still live and must still stack.
+  assert.strictEqual(stackedGrantUntil(3, '2026-07-31', now), '2026-10-31')
+  ok('a grant ending exactly today is still live and stacks (same boundary the expiry job uses)')
+
+  // No grant at all must be byte-identical to the behaviour before this change.
+  for (const empty of [null, undefined, '', '   ', 'not-a-date', 0, 12, new Date()]) {
+    assert.strictEqual(stackedGrantUntil(12, empty, now), packageGrantUntil(12, now),
+      `an absent/unparseable grant (${JSON.stringify(empty)}) must behave exactly as before stacking existed`)
+  }
+  assert.strictEqual(packageGrantUntil(12, now), '2027-07-31')
+  ok('no grant, null, or an unparseable value degrades to today + N months, never throws')
+
+  // The month-end clamp must survive stacking: the base only changes WHICH date
+  // is clamped, never how.
+  assert.strictEqual(stackedGrantUntil(1, '2027-01-31', now), '2027-02-28')
+  assert.strictEqual(stackedGrantUntil(12, '2028-02-29', now), '2029-02-28')
+  assert.strictEqual(stackedGrantUntil(36, '2026-08-31', now), '2029-08-31')
+  ok('stacking preserves the month-end clamp (2027-01-31 + 1 → 2027-02-28, not March)')
+
+  // Stacking can only ever move the date forward.
+  for (const base of ['2026-07-31', '2027-06-30', '2026-01-01', null]) {
+    for (const m of [1, 6, 12, 36]) {
+      assert.ok(stackedGrantUntil(m, base, now) > todayUtc(now),
+        `stacking must never shorten a grant (base ${base}, ${m} months)`)
+    }
+  }
+  ok('the result is always in the future, for every base and every legal month count')
+
+  assert.strictEqual(normaliseGrantDate('2027-06-30'), '2027-06-30')
+  assert.strictEqual(normaliseGrantDate('2027-06-30T00:00:00+00:00'), '2027-06-30',
+    'must keep working if plan_grant_until is ever widened to a timestamp')
+  for (const junk of [null, undefined, '', 'tomorrow', 20270630, new Date(), {}]) {
+    assert.strictEqual(normaliseGrantDate(junk), null)
+  }
+  ok('normaliseGrantDate reads a stored date back safely and returns null for anything else')
+
+  const hook = readCode('netlify/functions/stripe-webhook.js')
+  assert.match(hook, /const stacked = stackedGrantUntil\(months, cur\?\.plan_grant_until\)/,
+    'the existing-client branch must read the current grant and stack onto it')
+  assert.match(hook, /\.select\('plan_grant_until, plan_source'\)/,
+    'the branch must actually read the column it stacks from')
+  assert.match(hook, /grantUntil = stacked/, 'the stacked date must reach the update')
+  // The admin event reports the date that was WRITTEN. Built as an object
+  // literal before the branch, it would freeze the pre-stack value and the feed
+  // would state a grant end the row does not have.
+  assert.match(hook, /const eventMeta = \(\) =>/,
+    'eventMeta must be evaluated after stacking, not snapshotted before it')
+  assert.ok(!/meta: eventMeta,/.test(hook),
+    'every admin event must call eventMeta() so it reports the date actually stored')
+  ok('the webhook stacks from the live grant and reports the stacked date, not the pre-stack one')
 }
 
 console.log(`\n${passed} checks passed.`)

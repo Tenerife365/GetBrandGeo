@@ -41,7 +41,10 @@ const {
   SELF_SERVE_PLANS,
   PACKAGE_PLAN_SOURCE,
   resolvePackage,
+  checkPackageLineItem,
   packageGrantUntil,
+  stackedGrantUntil,
+  todayUtc,
 } = require('./_package_checkout')
 
 const APP_URL = 'https://app.getbrandgeo.com'
@@ -191,9 +194,11 @@ async function handleCheckoutCompleted(session, log) {
     return
   }
 
-  // Resolve the purchased plan from the line item's price.
+  // Resolve the purchased plan from the line item's price. The line item itself
+  // is kept, not just its price: the package path checks quantity off it (S3).
   const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 })
-  const price = lineItems.data[0]?.price
+  const line = lineItems.data[0]
+  const price = line?.price
   const priceId = price?.id
 
   // Everything below branches on these four, and on nothing else. Both modes
@@ -201,6 +206,18 @@ async function handleCheckoutCompleted(session, log) {
   let plan, planSource, grantUntil, months
 
   if (isPackage) {
+    // Shape of the SALE before shape of the PRICE (S3). The months granted come
+    // from price.metadata.months and are never multiplied by quantity, so a
+    // quantity of 2 on a 6-month package charges for twelve and would provision
+    // six — resolution SUCCEEDS, so nothing downstream would ever notice.
+    // Refuse rather than multiply; see checkPackageLineItem's comment for why.
+    const shape = checkPackageLineItem(line, lineItems.has_more === true)
+    if (!shape.ok) {
+      log(`package NOT provisioned (${shape.reason}): ${shape.detail} [price=${priceId} email=${email}]`)
+      await reportUnprovisionedPackage({ session, log, reason: shape.reason, detail: shape.detail, email, priceId })
+      return
+    }
+
     const resolved = resolvePackage(price)
     if (!resolved.ok) {
       // Arch §3.2 step 2: provision NOTHING, but say so loudly. Deliberately not
@@ -236,11 +253,15 @@ async function handleCheckoutCompleted(session, log) {
   const planLabel = PLAN_LABELS[plan] || plan
   const what = isPackage ? `${months}-month ${planLabel} package` : `${planLabel} subscription`
   const eventType = isPackage ? 'package_purchased' : 'subscription_new'
-  const eventMeta = isPackage
+  // A FUNCTION, not an object literal, and that matters: the existing-client
+  // branch below can still move grantUntil (S2 stacking). An object built here
+  // would freeze the pre-stack date and the admin feed would report a grant end
+  // that is not the one written to the row.
+  const eventMeta = () => (isPackage
     ? { email, plan, months, plan_source: planSource, plan_grant_until: grantUntil, price: priceId }
-    : { email, plan }
+    : { email, plan })
 
-  log(`provisioning email=${email} plan=${plan} source=${planSource} grant_until=${grantUntil} cust=${custId} sub=${subId}`)
+  log(`provisioning email=${email} plan=${plan} source=${planSource} grant_until=${grantUntil} (before stacking) cust=${custId} sub=${subId}`)
 
   // Find an existing auth user by email (returning subscriber, re-subscribe, or
   // someone who already had a login from the Onboard wizard / an earlier buy).
@@ -257,6 +278,36 @@ async function handleCheckoutCompleted(session, log) {
     if (profErr) throw new Error(`user_profiles lookup failed: ${profErr.message}`)
 
     if (profile?.client_id) {
+      // S2 (docs/qa/package-provisioning-014.md), ruled by Constantin
+      // 2026-07-31: renewing a package early STACKS the unused remainder rather
+      // than forfeiting it. This is the only branch where that can apply — the
+      // other two provisioning branches create a brand new clients row, which
+      // by definition has no grant to stack on.
+      //
+      // This is a NEW READ on the provisioning path. It throws on failure
+      // rather than degrading to today, on purpose: nothing has been written
+      // yet, so the outer catch releases the idempotency lock and Stripe
+      // redelivers, which re-runs this cleanly. Silently forfeiting a paying
+      // customer's months because one SELECT blipped is the exact bug being
+      // fixed. A missing, null or unparseable plan_grant_until does NOT throw —
+      // stackedGrantUntil() treats it as "no existing grant" and falls back to
+      // today, i.e. the behaviour before this change.
+      if (isPackage) {
+        const { data: cur, error: curErr } = await supabase
+          .from('clients')
+          .select('plan_grant_until, plan_source')
+          .eq('id', profile.client_id)
+          .maybeSingle()
+        if (curErr) throw new Error(`clients grant lookup failed: ${curErr.message}`)
+
+        const stacked = stackedGrantUntil(months, cur?.plan_grant_until)
+        if (stacked !== grantUntil) {
+          log(`stacking ${months}mo onto live ${cur?.plan_source} grant ending ${cur?.plan_grant_until}: `
+            + `${grantUntil} → ${stacked}`)
+        }
+        grantUntil = stacked
+      }
+
       // plan_source and plan_grant_until are now written EXPLICITLY on every
       // paid checkout, not left at whatever the client already had.
       //
@@ -299,7 +350,7 @@ async function handleCheckoutCompleted(session, log) {
         body: isPackage
           ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
           : `${email} subscribed to ${planLabel}.`,
-        meta: eventMeta,
+        meta: eventMeta(),
       })
       return
     }
@@ -321,7 +372,7 @@ async function handleCheckoutCompleted(session, log) {
       body: isPackage
         ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
         : `${email} subscribed to ${planLabel}.`,
-      meta: eventMeta,
+      meta: eventMeta(),
     })
     return
   }
@@ -355,7 +406,7 @@ async function handleCheckoutCompleted(session, log) {
     body: isPackage
       ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
       : `${email} subscribed to the ${planLabel} plan.`,
-    meta: eventMeta,
+    meta: eventMeta(),
   })
 }
 
@@ -424,26 +475,74 @@ async function handleSubscriptionUpdated(sub, log) {
   }
 }
 
+// Cancellation. Two things changed here on 2026-07-31 for
+// docs/qa/package-provisioning-014.md S1, and both exist because a client can
+// now hold a package AND a subscription at the same time.
+//
+//   1. stripe_subscription_id is cleared. It used to be left behind, pointing at
+//      a subscription Stripe has deleted. That stale id is what would make
+//      expire-plan-grants.js's new liveness guard wrong in the dangerous
+//      direction: it would read as "still paying" and exempt the client's
+//      package from ever expiring — arch §2.1's permanent revenue leak by
+//      another route. Safe for get-subscription.js, which already returns
+//      { active: false } for a null id (get-subscription.js:30-32).
+//
+//   2. A LIVE package grant is no longer destroyed by the downgrade. The blind
+//      `update({ plan: 'free' })` set plan to Free for every row matching the
+//      customer, including one holding months of paid, unexpired package. That
+//      left plan='free' with plan_source='package' and a future
+//      plan_grant_until, which nothing restores: expire-plan-grants.js excludes
+//      it (.neq('plan','free')) and no other job reads it. The customer's paid
+//      months vanished silently. So the read now happens first and the plan is
+//      only reverted when there is no live package underneath.
+//
+// Downgrading rather than deleting is unchanged (spec §6.3: keeps their login
+// and history so they can re-subscribe).
 async function handleSubscriptionDeleted(sub, log) {
   const custId = sub.customer
-  // Downgrade to free rather than deleting — keeps their login + history so they
-  // can re-subscribe. (Business call per spec §6.3: free vs read-only → free.)
-  const { data, error } = await supabase
-    .from('clients')
-    .update({ plan: 'free' })
-    .eq('stripe_customer_id', custId)
-    .select('id')
-  if (error) throw new Error(`clients downgrade failed: ${error.message}`)
 
-  if (!data || data.length === 0) {
+  const { data: rows, error: selErr } = await supabase
+    .from('clients')
+    .select('id, plan, plan_source, plan_grant_until')
+    .eq('stripe_customer_id', custId)
+  if (selErr) throw new Error(`clients lookup failed: ${selErr.message}`)
+
+  if (!rows || rows.length === 0) {
     log(`subscription.deleted: no client for cust ${custId} — no-op`)
     return
   }
-  log(`subscription.deleted: cust ${custId} downgraded to free (${data.length} client row(s))`)
-  for (const row of data) {
+
+  const today = todayUtc()
+  for (const row of rows) {
+    // Held THROUGH plan_grant_until, same boundary expire-plan-grants.js uses.
+    const holdsLivePackage = row.plan_source === PACKAGE_PLAN_SOURCE
+      && !!row.plan_grant_until
+      && !(row.plan_grant_until < today)
+
+    const update = holdsLivePackage
+      ? { stripe_subscription_id: null }
+      : { plan: 'free', stripe_subscription_id: null }
+
+    const { error: updErr } = await supabase.from('clients').update(update).eq('id', row.id)
+    if (updErr) throw new Error(`clients downgrade failed: ${updErr.message}`)
+
+    if (holdsLivePackage) {
+      log(`subscription.deleted: client ${row.id} keeps ${row.plan} — paid package runs to ${row.plan_grant_until}`)
+      await recordAdminEvent(supabase, {
+        type: 'subscription_canceled', client_id: row.id,
+        title: 'Subscription canceled, paid package kept',
+        body: `A client canceled their subscription but holds a paid package on ${PLAN_LABELS[row.plan] || row.plan} `
+            + `until ${row.plan_grant_until}. They were NOT downgraded to Free; the package expires on its own date.`,
+        meta: { cust: custId, plan: row.plan, plan_grant_until: row.plan_grant_until, downgraded: false },
+      })
+      continue
+    }
+
+    log(`subscription.deleted: client ${row.id} downgraded to free`)
     await recordAdminEvent(supabase, {
       type: 'subscription_canceled', client_id: row.id,
-      title: 'Subscription canceled', body: 'A client canceled and was downgraded to Free.', meta: { cust: custId },
+      title: 'Subscription canceled', body: 'A client canceled and was downgraded to Free.',
+      meta: { cust: custId, downgraded: true },
     })
   }
 }

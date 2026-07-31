@@ -47,6 +47,57 @@ const ADMIN_ALERT_EMAIL = process.env.ADMIN_ALERT_EMAIL || 'support@getbrandgeo.
 // network layer. Catching just the throw would silently swallow the likeliest
 // failure of all — this code deployed before the migration that creates the
 // table — and the job would look healthy while recording nothing.
+// ---------------------------------------------------------------------------
+// The subscription-liveness guard (docs/qa/package-provisioning-014.md S1).
+//
+// A grant being due is NOT sufficient reason to revert a client. If the row
+// still carries a stripe_subscription_id, Stripe is still charging that card,
+// and reverting is a paying customer put on Free and emailed a lapse notice
+// while their money keeps arriving.
+//
+// A1 (commit 19449ad) is what made this reachable. stripe-webhook.js:287 writes
+// plan_source='package' on an EXISTING client's row while :288 deliberately
+// preserves their live stripe_subscription_id, so "package holder who is also a
+// subscriber" became a real state. The webhook's own comment reasons about "a
+// client who holds both" and then this job, which is the thing that reverts
+// them, had no idea the case existed.
+//
+// The guard is on the SUBSCRIPTION ID, not on plan_source === 'package'.
+// bg-verify's proposed fix checked both; checking only the id is strictly safer
+// and costs nothing:
+//
+//   - It holds a trial or comp grant stamped onto a paying subscriber too.
+//     set-client-plan.js can still write plan_source='trial' with a grant date
+//     onto a client with a live subscription (an admin comping an upgrade to an
+//     existing customer), and reverting THAT client to Free is the same harm
+//     with a different plan_source on it. "Paying customers are never
+//     auto-downgraded" is the invariant worth having; "packages are special" is
+//     not.
+//   - It cannot regress today's behaviour. Checked read-only against production
+//     2026-07-31: of 36 client rows, ZERO carry a stripe_subscription_id, so
+//     this partition holds nothing back today. It is a guard against the state
+//     A1 creates, not a change to any live client.
+//
+// The pairing that keeps it honest is in stripe-webhook.js's
+// handleSubscriptionDeleted, which now NULLs the id on cancellation. Without
+// that, a cancelled subscription would leave a stale id here and exempt the
+// client's grant from expiry forever — the leak arch §2.1 exists to prevent,
+// arriving by a different door. The two changes are one fix and neither is
+// correct alone.
+//
+// Exported so tests/package_provisioning.test.js can call it rather than assert
+// on the source text of a regex. This module is safe to require: it constructs
+// no client and reads no env var at load time.
+function partitionDueGrants(rows) {
+  const held = [];
+  const toExpire = [];
+  for (const c of rows || []) {
+    if (c && c.stripe_subscription_id) held.push(c);
+    else toExpire.push(c);
+  }
+  return { held, toExpire };
+}
+
 async function recordJobRun(supabase, ok, detail) {
   try {
     const { error } = await supabase.from('job_runs').insert({ job: 'expire-plan-grants', ok, detail });
@@ -54,6 +105,53 @@ async function recordJobRun(supabase, ok, detail) {
   } catch (err) {
     console.error('[expire-plan-grants] job_runs write threw:', err.message);
   }
+}
+
+// Raise the admin alert for a grant that was due but is being HELD because the
+// client is still being billed. Never reverts anything and never throws.
+//
+// Alerts once per (client, grant date), not once per run. This job runs daily
+// and nothing it does clears the held state, so an unconditional alert would
+// email the admin mailbox every morning forever and bury the bell feed — which
+// is how a real alert gets missed. Keying the dedupe on the grant date means a
+// genuinely new situation (an admin extends the grant, it lapses again) does
+// raise a fresh alert.
+//
+// If the dedupe read itself fails, we alert anyway: for an alert, duplicated is
+// a better failure than absent.
+async function reportHeldGrant(supabase, c) {
+  const planLabel = PLAN_LABELS[c.plan] || c.plan;
+
+  let alreadyAlerted = false;
+  try {
+    const { data, error } = await supabase
+      .from('admin_notifications')
+      .select('id')
+      .eq('type', 'plan_expiry_held')
+      .eq('client_id', c.id)
+      .eq('meta->>ended', c.plan_grant_until)
+      .limit(1);
+    if (error) console.error('[expire-plan-grants] held-alert dedupe check failed:', error.message);
+    else alreadyAlerted = !!(data && data.length);
+  } catch (err) {
+    console.error('[expire-plan-grants] held-alert dedupe check threw:', err.message);
+  }
+
+  console.log(`[expire-plan-grants] client ${c.id}: grant ended ${c.plan_grant_until} but subscription is live — HELD, not reverted`);
+  if (alreadyAlerted) return;
+
+  await recordAdminEvent(supabase, {
+    type: 'plan_expiry_held', client_id: c.id, email: true,
+    title: `Plan grant ended but the client is still being billed: ${c.name || `client ${c.id}`}`,
+    body: `Their ${planLabel} grant (${c.plan_source}) ended on ${c.plan_grant_until}, but the client still has an active `
+        + `Stripe subscription (${c.stripe_subscription_id}). They were NOT reverted to Free and were NOT emailed, because `
+        + `downgrading a customer whose card is still being charged is worse than leaving the plan up. Decide which `
+        + `entitlement should stand: cancel the subscription in Stripe, or clear the grant date from Account.`,
+    meta: {
+      from_plan: c.plan, was: c.plan_source, ended: c.plan_grant_until,
+      subscription: c.stripe_subscription_id, reverted: false,
+    },
+  });
 }
 
 exports.handler = async (event) => {
@@ -65,7 +163,10 @@ exports.handler = async (event) => {
 
   const { data: due, error } = await supabase
     .from('clients')
-    .select('id, name, plan, plan_source, plan_grant_until')
+    // stripe_subscription_id is selected for the liveness guard below, NOT
+    // filtered on in SQL. Filtering would hide held clients entirely; the whole
+    // point is that a held client is reported rather than silently skipped.
+    .select('id, name, plan, plan_source, plan_grant_until, stripe_subscription_id')
     .in('plan_source', ['trial', 'comp', 'package'])
     .not('plan_grant_until', 'is', null)
     .lt('plan_grant_until', today)
@@ -78,12 +179,16 @@ exports.handler = async (event) => {
   }
   if (!due || !due.length) {
     console.log('[expire-plan-grants] nothing to expire');
-    await recordJobRun(supabase, true, { expired: 0, due: 0 });
+    await recordJobRun(supabase, true, { expired: 0, due: 0, held: 0 });
     return { statusCode: 200, body: 'Nothing to expire' };
   }
 
+  // A due grant on a client Stripe is still charging is HELD, never reverted.
+  const { held, toExpire } = partitionDueGrants(due);
+  for (const c of held) await reportHeldGrant(supabase, c);
+
   const expired = [];
-  for (const c of due) {
+  for (const c of toExpire) {
     const fromPlan = c.plan;
     const { error: ue } = await supabase.from('clients').update({
       plan: 'free', plan_source: 'expired', plan_grant_until: null, plan_grant_note: null,
@@ -142,6 +247,16 @@ exports.handler = async (event) => {
     });
   }
 
-  await recordJobRun(supabase, true, { expired: expired.length, due: due.length, clients: expired });
-  return { statusCode: 200, body: `Expired ${expired.length} grant(s)` };
+  // held is recorded so "was anyone spared, and who" is answerable in SQL rather
+  // than only in a log line, per the observability the arch doc §6.4 asks for.
+  await recordJobRun(supabase, true, {
+    expired: expired.length, due: due.length, clients: expired,
+    held: held.length,
+    held_clients: held.map((c) => ({ id: c.id, plan: c.plan, source: c.plan_source, ended: c.plan_grant_until })),
+  });
+  return { statusCode: 200, body: `Expired ${expired.length} grant(s), held ${held.length}` };
 };
+
+// Exported for tests/package_provisioning.test.js. handler stays the entry point
+// Netlify invokes; adding a named export does not change the endpoint.
+exports.partitionDueGrants = partitionDueGrants;

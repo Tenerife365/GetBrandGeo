@@ -154,9 +154,23 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
 - **A4b. DECIDED 2026-07-31: `PLAN_PROMPTS` is enforced SERVER-SIDE and also
   displayed.** Constantin: "so we don't have issues in the future." This closes
   the long-open decision and unblocks A5's prompt half and A6.
-  Today it is display-only: read at `planConfig.ts:516` for the plan card and
-  enforced nowhere. So a Free client can create 500 prompts and every one of
-  them collects, against a EUR 0.30 monthly budget.
+  **CORRECTION 2026-07-31. The premise of this item was wrong and the ruling is
+  already half-satisfied.** I wrote, and told Constantin, that the cap was
+  enforced nowhere and that a Free client could create 500 prompts. False.
+  Production carries `trg_enforce_prompt_cap BEFORE INSERT OR UPDATE ON
+  public.prompts`, verified directly against `pg_trigger`, backed by a
+  `plan_prompt_caps` table that matches `planConfig.ts:427` value for value. It
+  counts per `client_id`, so it is already per-site and survives D1 unchanged.
+  The error came from grepping the TypeScript for enforcement and concluding
+  its absence there meant absence everywhere. **Enforcement in this product
+  lives in Postgres as often as in JavaScript; grep the database too.**
+  What is actually left, which is smaller and different:
+  - `plan_prompt_caps` is a FIFTH copy of the plan ladder, in a place no
+    TypeScript test can see. It matches today. Nothing keeps it matching.
+    A drift check between it and `planConfig.ts` is the real work here.
+  - The trigger refuses at the database. Nothing surfaces that refusal as a
+    usable message, so a client at their cap likely sees a raw error. That is
+    A6's job.
   Two things this must not become:
   - **Enforcement cannot be a frontend guard.** `Prompts.tsx` hiding the Add
     button is not enforcement; the insert path is what has to refuse. Same

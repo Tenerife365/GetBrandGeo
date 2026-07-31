@@ -132,6 +132,61 @@ function resolvePackage(price) {
 }
 
 /**
+ * Guard the SHAPE OF THE SALE, as distinct from resolvePackage()'s guard on the
+ * shape of the PRICE. Added 2026-07-31 for docs/qa/package-provisioning-014.md
+ * S3.
+ *
+ * The months a package grants come from price.metadata.months and from nothing
+ * else -- `grep -n quantity` over netlify/functions returned nothing before this
+ * change. So a 6-month package bought at quantity 2 charges the customer for
+ * twelve months and provisions six, with no error and no admin event, because
+ * resolution SUCCEEDS. The entitlement is silently half the money taken.
+ *
+ * FAIL CLOSED, deliberately, rather than multiplying months by quantity:
+ *
+ *   - Multiplying would double an entitlement off a field nobody currently
+ *     sets, on a livemode:true account with no test mode. The first time it
+ *     ever ran in anger would also be the first time it was exercised at all.
+ *   - Refusing produces a paid-but-unprovisioned admin alert, which is the
+ *     outcome A1 exists to make visible (arch §3.2 step 2), and the human fix
+ *     is one manual provision from Account.
+ *   - A quantity-2 package is not a shape anyone designed. Provisioning
+ *     ANYTHING for it is guessing about money.
+ *
+ * `hasMore` covers the same hole one level up: stripe-webhook.js lists line
+ * items with limit 1 and reads data[0], so a two-line package link would charge
+ * for both lines and provision the first. Stripe sets has_more on that list, so
+ * the second line is detectable without changing the fetch.
+ *
+ * An ABSENT quantity defaults to 1 and passes. Stripe always sets it; defaulting
+ * to allow means a missing field can never block a legitimate sale, while any
+ * value that is present and not exactly 1 is refused (including the string '1',
+ * which is not a shape Stripe produces).
+ *
+ * @param {object|null|undefined} line   lineItems.data[0]
+ * @param {boolean} hasMore              lineItems.has_more
+ * @returns {{ok: true}|{ok: false, reason: string, detail: string}}
+ */
+function checkPackageLineItem(line, hasMore) {
+  if (hasMore === true) {
+    return {
+      ok: false,
+      reason: 'multiple_line_items',
+      detail: 'the checkout has more than one line item; a package must be a single line so the money and the entitlement cannot disagree',
+    };
+  }
+  const quantity = line && line.quantity !== undefined && line.quantity !== null ? line.quantity : 1;
+  if (quantity !== 1) {
+    return {
+      ok: false,
+      reason: 'invalid_quantity',
+      detail: `line item quantity is ${JSON.stringify(quantity)}; a package must be sold at quantity 1 (the months granted come from price.metadata.months and are never multiplied by quantity)`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Add whole months to a YYYY-MM-DD date, clamping to the last day of the target
  * month. All arithmetic is in UTC.
  *
@@ -182,13 +237,81 @@ function packageGrantUntil(months, now) {
   return addMonths(todayUtc(now), months);
 }
 
+/**
+ * Read a stored plan_grant_until back into a 'YYYY-MM-DD' string, or null if it
+ * is not one.
+ *
+ * Anything that is not a parseable date -- null, undefined, '', a Date object, a
+ * number, junk -- returns null, which the caller treats as "no existing grant"
+ * and falls back to today. That degradation is the point: this runs on the
+ * provisioning path of a checkout whose money is already captured, so an
+ * unexpected column shape must cost the customer their stacked months at worst,
+ * never throw and leave them unprovisioned.
+ *
+ * Accepts a leading date inside a longer ISO timestamp so it keeps working if
+ * plan_grant_until is ever widened from `date` to `timestamptz`.
+ */
+function normaliseGrantDate(value) {
+  if (typeof value !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+/**
+ * The date a package grant lapses when the buyer ALREADY holds a live grant.
+ * Added 2026-07-31 for docs/qa/package-provisioning-014.md S2, per Constantin's
+ * ruling: renewing early STACKS the unused remainder, it does not forfeit it.
+ *
+ * Before this, grantUntil was always today + N months, so a client renewing at
+ * month 9 of a 12-month package silently lost 3 paid months -- and
+ * expire-plan-grants.js's lapse copy explicitly invites early renewal ("reach
+ * out and we'll set up your next period"), so that is the expected motion, not
+ * an edge case.
+ *
+ * Base date rules, all deliberate:
+ *
+ *   - LIVE grant  -> stack from it. The client keeps the plan THROUGH
+ *     plan_grant_until (expire-plan-grants.js selects `< today`), so a grant
+ *     dated exactly today is still live and still stacks.
+ *   - LAPSED grant (strictly before today) -> ignored, start from today. A date
+ *     in the past must never extend anything; that is the whole reason the base
+ *     is max(today, existing) and not simply `existing`.
+ *   - ABSENT or unparseable -> start from today, i.e. exactly the behaviour
+ *     before this change.
+ *
+ * SOURCE IS DELIBERATELY NOT CONSIDERED. A live 'trial' or 'comp' window stacks
+ * the same as a live 'package' one. Truncating a comp window because the client
+ * then paid would take back something already given, at the moment they hand
+ * over money -- the same class of error as forfeiting their remainder. What
+ * this function is NOT allowed to do is shorten anything, and it cannot: the
+ * result is always >= the base and the base is always >= today.
+ *
+ * The month-end clamp in addMonths() is preserved because the base only ever
+ * changes WHICH date is clamped, never how. 2026-01-31 + 1 month is 2026-02-28
+ * whether that base came from today or from a stacked grant.
+ *
+ * @param {number} months               validated whole months, 1..36
+ * @param {string|null} currentGrantUntil  clients.plan_grant_until as stored
+ * @param {Date} [now]                  injectable clock, for tests
+ * @returns {string} 'YYYY-MM-DD'
+ */
+function stackedGrantUntil(months, currentGrantUntil, now) {
+  const today = todayUtc(now);
+  const existing = normaliseGrantDate(currentGrantUntil);
+  const base = existing && !(existing < today) ? existing : today;
+  return addMonths(base, months);
+}
+
 module.exports = {
   SELF_SERVE_PLANS,
   MIN_PACKAGE_MONTHS,
   MAX_PACKAGE_MONTHS,
   PACKAGE_PLAN_SOURCE,
   resolvePackage,
+  checkPackageLineItem,
   addMonths,
   todayUtc,
   packageGrantUntil,
+  normaliseGrantDate,
+  stackedGrantUntil,
 };
