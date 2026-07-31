@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Building2, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
+import { readSignupDomain, clearSignupDomain } from '../lib/signupDomain'
 
 // Authenticated shell (wrapped in PrivateRoute in App.tsx), so unlike Login/
 // Signup/ResetPassword the wordmark can safely link to "/" — no bounce risk.
@@ -28,18 +29,36 @@ export default function Welcome() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Light prefill: if the user's email is at a company (non-personal) domain,
-  // default to the Company branch and pre-fill the website. A gmail/outlook user
-  // gets no default, so the influencer path is never nudged toward "company".
+  // Prefill, in priority order (ROADMAP Stream C, C2).
+  //
+  // 1. The domain the visitor audited on getbrandgeo.com, forwarded through
+  //    /signup?domain= and stored across the email round trip by signupDomain.ts.
+  //    This beats the email heuristic below because it is a statement of intent
+  //    rather than a guess: they typed that domain into the widget and watched a
+  //    score come back for it. A gmail user who audited acme.com used to land
+  //    here with an empty field.
+  // 2. Otherwise, the old heuristic: an email at a company (non-personal) domain
+  //    defaults to the Company branch. A gmail/outlook user still gets no
+  //    default, so the influencer path is never nudged toward "company".
+  //
+  // The order matters in TIME as well as priority: (1) is a synchronous
+  // localStorage read and (2) resolves later off an await, so (2) must not
+  // clobber a value (1) already set. It checks the current state before writing.
   useEffect(() => {
+    const carried = readSignupDomain()
+    if (carried) {
+      setAccountType('company')
+      setBrandWebsite(carried)
+    }
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       const email = user?.email || ''
       const at = email.lastIndexOf('@')
       if (at === -1) return
       const domain = email.slice(at + 1).toLowerCase()
       if (domain && !PERSONAL_EMAIL_DOMAINS.has(domain)) {
-        setAccountType('company')
-        setBrandWebsite(domain)
+        setAccountType((prev) => prev ?? 'company')
+        setBrandWebsite((prev) => prev || domain)
       }
     })
   }, [])
@@ -74,6 +93,13 @@ export default function Welcome() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Setup failed. Please try again.')
+
+      // The carried domain has done its job. Cleared here rather than left to
+      // expire, so it cannot prefill a different person's setup later on a
+      // shared machine (signupDomain.ts explains why it is in localStorage at
+      // all). Only on success: a failed provision returns the user to this form,
+      // which still needs the prefill.
+      clearSignupDomain()
 
       // Full reload so ClientProvider re-inits with the new profile/client, then
       // lands on the dashboard.

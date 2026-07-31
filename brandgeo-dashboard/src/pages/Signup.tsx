@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
+import { domainFromQuery, rememberSignupDomain } from '../lib/signupDomain'
 
 // Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
 // bounce straight back to sign-in, so the wordmark links to the marketing site.
@@ -20,6 +21,19 @@ export default function Signup() {
   const [done, setDone] = useState(false)
   // Honeypot (SECURITY-AUDIT.md F2): a hidden field a real user never fills.
   const [companyWebsite, setCompanyWebsite] = useState('')
+
+  // The domain the visitor typed into the audit widget on getbrandgeo.com, which
+  // site.js forwards as ?domain= (ROADMAP Stream C, C2). Until 2026-07-31 that
+  // parameter arrived and was thrown away, so someone who had just audited their
+  // own site was asked for it again two screens later.
+  //
+  // Stored immediately on arrival rather than at submit, because the two ways
+  // out of this page both leave it: Google SSO hands off to a provider and comes
+  // back on a different route, and the email path goes out through the user's
+  // inbox. Neither carries React state or the query string with it.
+  const [searchParams] = useSearchParams()
+  const signupDomain = domainFromQuery(searchParams.toString())
+  useEffect(() => { rememberSignupDomain(signupDomain) }, [signupDomain])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -83,8 +97,18 @@ export default function Signup() {
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
         <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
-          <h1 className="text-lg font-semibold text-white mb-1">Start for free</h1>
-          <p className="text-sm text-slate-400 mb-6">Track a company or your personal brand in AI answers. No credit card required.</p>
+          {/* Naming the domain is the whole point of carrying it: it tells a
+              visitor arriving from the audit that this is the same journey and
+              not a fresh form. Rendered as text by React, and validated as a
+              domain before it ever reaches here (signupDomain.ts). */}
+          <h1 className="text-lg font-semibold text-white mb-1">
+            {signupDomain ? <>Start tracking {signupDomain}</> : 'Start for free'}
+          </h1>
+          <p className="text-sm text-slate-400 mb-6">
+            {signupDomain
+              ? 'Free to start, no credit card required. We will keep watching how AI answers name you.'
+              : 'Track a company or your personal brand in AI answers. No credit card required.'}
+          </p>
 
           <SocialAuthButtons onError={setError} />
 
