@@ -72,15 +72,22 @@ touching authentication.
 Added to `_email.js` as an opt-in `signature` parameter (2026-07-31). Every
 existing caller omits it and their output is unchanged.
 
+**Final values, supplied by Constantin 2026-07-31:**
+
 ```js
 signature: {
-  name:     'Constantin Goane',
-  role:     'Founder, BrandGEO',
-  email:    'constantin@getbrandgeo.com',            // renders "Reply to me"
-  linkedin: 'https://www.linkedin.com/in/<slug>',    // renders "Connect on LinkedIn"
-  avatarUrl:'https://getbrandgeo.com/images/constantin.jpg',  // optional
+  name:      'Constantin Goane',
+  role:      'Founder, BrandGEO',
+  email:     'constantin@getbrandgeo.com',
+  linkedin:  'https://www.linkedin.com/in/daniel-geo/',
+  avatarUrl: 'https://getbrandgeo.com/images/constantin.jpg',
 }
 ```
+
+The LinkedIn URL is the PERSONAL profile, which is what "Connect on LinkedIn"
+promises. The company page (`linkedin.com/company/79409681`) is a different
+thing and belongs on the marketing site, not on a button that offers a personal
+connection.
 
 **Built for images off.** Outlook blocks remote images by default and so does
 any recipient who has not whitelisted us, so the name, the role, the address and
@@ -104,13 +111,22 @@ dimensions.
 picture works in testing and is a broken box a month later, in an email you
 cannot edit after sending. Host it ourselves.
 
-**The LinkedIn button needs the right URL.** The one on the marketing site is
-the COMPANY page, `linkedin.com/company/79409681`. If the intent is "connect
-with me", that has to be Constantin's personal profile URL, which is not
-recorded anywhere in this repo. Supply it, or the button should point at the
-company page and be labelled "Follow BrandGEO" instead. A button that says
-Connect and opens a company page is a small broken promise in an email whose
-whole point is a human connection.
+**The photo is the ONE step no agent can do.** The image arrives as an
+attachment in chat, and there is no tool that writes attachment bytes to disk,
+so Constantin saves the file. Everything downstream of that is automated: the
+file is committed, the cPanel webhook deploys it, and the URL above starts
+resolving.
+
+**Verify it before sending, not after.** An email is not editable once sent, so
+a 404 avatar is permanent for every recipient:
+
+```bash
+curl -sI https://getbrandgeo.com/images/constantin.jpg | head -3
+```
+
+Expect `HTTP/2 200` and an `image/jpeg` content type. **If it 404s, send with
+`avatarUrl` omitted** rather than delaying: the initials disc is a complete
+design, not a degraded one.
 
 ## 3. The email
 
