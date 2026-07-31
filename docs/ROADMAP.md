@@ -13,6 +13,32 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
+- **The sprint ladder ruling needs three signatures. S2, S7 and S14 are blocked
+  until they land.** `docs/strategy/sprint-ladder-ruling.md` (S1, 2026-07-31)
+  carries a recommendation and the euro arithmetic for each. Decision 4 is
+  already DECIDED (`67a3cf4`). The three open ones:
+  1. **Radar enters at EUR 39 list, EUR 29 launch**, ChatGPT plus Gemini, 7
+     prompts, weekly, 1 site, budget EUR 4.35. No SerpApi engine, because 100
+     Radar clients on `google_ai` would draw 700 credits against a 500 credit
+     platform pool.
+  2. **`PLAN_PROMPTS` becomes 5, 7, 18, 35, 56, 200, 200.** Lever A (allowances),
+     15 percent ceiling held, per site monotonicity preserved, nothing reduced
+     against what customers hold today.
+  3. **SUM the pools, MAX the site allowance** for the D1 shared limits.
+  Write the answers as `DECIDED <date>:` lines in that doc. Until then the
+  ruling is a recommendation, not a ruling.
+  `check: grep -c "^\*\*DECIDED 2026" docs/strategy/sprint-ladder-ruling.md` (4)
+
+- **LIVE DEFECT found while costing the ruling: a free signup cannot finish its
+  own first collection.** 5 prompts at EUR 0.108 of ChatGPT is **EUR 0.540
+  against a EUR 0.30 budget**, so `_auth.js:checkCollectionLimits` blocks after
+  prompt 3 and the visitor sees a raw budget error where the product promised 5.
+  Created when ChatGPT was repriced from EUR 0.056 to EUR 0.108 and
+  `PLAN_MONTHLY_API_BUDGET_EUR.free` was not moved with it. This is the top of
+  the funnel the whole 30 day sprint depends on. Fix is one constant, 0.30 to
+  0.60, and it rides with S2. Nobody has to decide anything for it to be true;
+  it is listed here so it is not lost behind the pricing question.
+
 - **When you create the package price, the Payment Link MUST set
   `customer_creation: 'always'`.** Stripe creates a Customer in `payment` mode
   only with that flag (confirmed in the vendored SDK types). Without it
@@ -477,8 +503,21 @@ Full context for each is in `CLAUDE.md`. Listed here so the loop can see them.
 
 - Growth PRO's ladder is thin: EUR 449 vs EUR 299 buys +25 prompts and a faster
   refresh, identical engines. **day-only**, pricing decision.
+  **ANSWERED, awaiting sign-off:** `docs/strategy/sprint-ladder-ruling.md`
+  decision 2 recommends Growth PRO 35 -> 56 prompts (18.67 per site against
+  Growth's 17.50, so the upgrade improves each site rather than diluting it) on
+  top of the 2 extra engines it already has. Not yet DECIDED by Constantin; the
+  entry closes when his `DECIDED` line lands in that doc.
 - Three conflicting Growth prompt counts: 35 shipped, 50 in a planConfig
   comment, 75 in the pricing doc. `night-safe` once the true number is chosen.
+  **ANSWERED, awaiting sign-off:** the ruling (decision 2) holds Growth at
+  **35** and reverses the handover's reading. The docs are the fossil, not the
+  code: the documented `5, 20, 50, 75, 250` was costed when ChatGPT billed EUR
+  0.056 a check and the top tier had 6 engines, and at today's metered prices it
+  breaches the 15 percent ceiling by EUR 5.63 on Growth PRO and EUR 18.25 on
+  Managed. Growth at 50 would additionally force Growth PRO to 76 prompts to
+  keep per site monotonic, which costs EUR 73.95 against a EUR 67.35 ceiling.
+  Closes when Constantin's `DECIDED` line lands.
 - `job_runs.ok` is true whenever a submitter was merely configured, even if
   every submission failed. Undercuts the observability work packet 012 built.
 - Two packets share id `006`.

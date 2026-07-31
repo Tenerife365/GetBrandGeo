@@ -52,7 +52,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 
 | id | Task | Owner | Window | State |
 |---|---|---|---|---|
-| S1 | Ladder ruling: Radar tier, prompt rebalance, inversion | bg-strategy + Constantin | day | **IN PROGRESS** (chat `S1 · Ladder ruling`, 2026-07-31); decision 4 already DECIDED in 67a3cf4 |
+| S1 | Ladder ruling: Radar tier, prompt rebalance, inversion | bg-strategy + Constantin | day | **IN PROGRESS**, brief complete. `docs/strategy/sprint-ladder-ruling.md` written 2026-07-31 with a recommendation and euro arithmetic for all four. Decision 4 DECIDED (`67a3cf4`). **Decisions 1, 2, 3 await Constantin's ruling; their `DECIDED` lines are blank.** S2, S7 and S14 stay blocked until they are filled. |
 | S2 | Build the ruled ladder end to end | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 |
 | S3 | Funnel accept path (roadmap C1, C2, C3) | optimizer, bg-copy, bg-app, bg-verify | day | **IN PROGRESS 2026-07-31**: C1 (eff8d9e), C1a (`ceb3596`, live), C1b, C1c and **C2 + C3 all built, both check scripts exit 0, migrations applied to production**. F1 is OPEN BY DECISION (on-screen delivery, no audit email this sprint). Remaining: deploy, then the one authorized live audit run |
 | S4 | First-run truth: zero-data states | bg-app | day | OPEN, narrowed; read 46b92fc first |

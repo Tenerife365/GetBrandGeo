@@ -26,6 +26,20 @@ Every claim in this section was checked against the live sites, the running
 bundle, or the working tree. Not remembered. If you change something here, check
 it the same way. This section takes precedence over §0 through §7 below.
 
+### 2026-07-31: the pricing ladder has one brief (S1), unsigned
+
+`docs/strategy/sprint-ladder-ruling.md` is the single place the ladder is argued
+with its arithmetic in euros: a Radar entry tier at EUR 39 list and EUR 29
+launch, `PLAN_PROMPTS` ruled to 5, 7, 18, 35, 56, 200, 200, and SUM pooling with
+a MAX site allowance for D1. **Decisions 1 to 3 are recommendations until
+Constantin writes their `DECIDED` lines; only decision 4 (a package sells a tier,
+not prompts, `67a3cf4`) is signed.** Two findings from the costing that stand on
+their own: the free tier's EUR 0.30 budget cannot pay for its own 5 prompts
+(EUR 0.540), and one Managed client at 200 prompts consumes the entire 500 credit
+monthly SerpApi pool. The ladder's headline numbers also depend on
+`MONTHLY_CAPPED_ENGINES` in `_cost.js:541`; delete that constant and Growth PRO
+and Managed breach their ceilings by EUR 8.61 and EUR 46.27.
+
 ### 2026-07-31: outbound sending infrastructure (S8), instructions written
 
 `docs/growth/outbound-infra.md` is the full build-out for the cold channel:
