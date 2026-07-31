@@ -636,3 +636,48 @@ Items land here only with a passing check command and the date it passed.
   ```
   **The connection is `livemode: true`.** Every Stripe write from here is real
   customer money in the live account. There is no test-mode safety net.
+
+---
+
+## A3-custom. Admin-built custom offers. DECIDED 2026-07-31 by Constantin.
+
+The flow he described, in his order. **This is a build, not a design question.**
+
+1. Admin opens the client's account in the dashboard, with that client selected.
+2. Admin composes an offer: a price and a term. His worked example is
+   **EUR 3,500 for 10 months of Growth PRO** (list is EUR 4,490, so a 22 percent
+   discount, EUR 350/month effective).
+3. Admin sees a **preview of the offer as the customer will see it**, before
+   anything is created or sent.
+4. On "Accept and send offer", and only then, a **one-time Stripe payment link**
+   is created for that amount, and the offer is emailed to the account owner.
+5. Payment grants the tier for the term, **counted from the day they pay**.
+
+**Three rulings that shape it:**
+
+- **Custom offers are handpicked by an admin and belong to no tier.** Nobody can
+  reach one by self-serve, at any plan level. It exists because a paying client
+  should feel they are getting something made for them.
+- **BpR moves to `growth_pro`**, not Managed. Already true in production.
+- **The offer sells the tier, not extra prompts** (his earlier ruling, unchanged).
+  EUR 3,500 buys Growth PRO's 56 prompts and 7 engines for 10 months.
+
+**Most of this already exists and should not be rebuilt.** `_package_checkout.js`
+handles exactly "N months of a tier bought outright" via `metadata.plan` plus
+`metadata.months` (1 to 36); `stripe-webhook.js` provisions it;
+`packageGrantUntil` counts from the payment date, which is step 5 verbatim;
+`expire-plan-grants.js` reverts it and will not revert a live subscriber.
+
+**What does not exist:** any Stripe write path in the product (roadmap A3, still
+open, `grep` for `prices.create` returns nothing), and any admin composer UI.
+
+**Two traps already on record that this must not hit.** The one-time link MUST
+set `customer_creation: 'always'`, or in payment mode `session.customer` is null
+and the sale cannot be linked to anyone; `scripts/stripe-create-catalogue.js`
+does not pass it and is the file someone will copy. And a lower-tier package
+must refuse to stack onto a higher live grant (decided, not built), which
+becomes reachable the moment custom terms are sold to existing customers, which
+is what this feature is for.
+
+**Sending stays Constantin's click.** Creating a wrong price is reversible; a
+customer paying against one is not.
