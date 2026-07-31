@@ -10,8 +10,18 @@
  *   - customer.subscription.updated → update clients.plan (upgrade/downgrade/swap).
  *   - customer.subscription.deleted → downgrade clients.plan to 'free'.
  *
- * SCOPE: Essentials & Growth only — the only self-serve tiers with Payment
- * Links. Managed/Pro/Enterprise stay sales-closed via the Onboard wizard.
+ * SCOPE: the self-serve tiers only (SELF_SERVE_PLANS in _package_checkout.js).
+ * Managed/Pro/Enterprise stay sales-closed via the Onboard wizard.
+ *
+ * PACKAGES, added 2026-07-31 (ROADMAP A1, docs/arch/custom-entitlements.md §3).
+ * A checkout with mode 'payment' is a package: N months of a tier bought
+ * outright, resolved from the price's metadata.plan + metadata.months. It
+ * provisions with plan_source 'package' and plan_grant_until = today + N
+ * months, so expire-plan-grants.js reverts it to Free when it runs out. Before
+ * this, such a checkout logged one line and provisioned nothing — the customer
+ * paid and the product did not react (arch §2). If you ever add another
+ * plan_source here, add it to expire-plan-grants.js's filter in the same
+ * change, or the grant never ends.
  *
  * AUTH MODEL — this function does NOT call requireAuth(event) (see spec §2).
  * Stripe calls it server-to-server with no JWT and not from the site's origin,
@@ -27,6 +37,12 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const { createClient } = require('@supabase/supabase-js')
 const { recordAdminEvent } = require('./_admin_notify')
 const { PLAN_LABELS } = require('./_plans')
+const {
+  SELF_SERVE_PLANS,
+  PACKAGE_PLAN_SOURCE,
+  resolvePackage,
+  packageGrantUntil,
+} = require('./_package_checkout')
 
 const APP_URL = 'https://app.getbrandgeo.com'
 
@@ -55,16 +71,9 @@ const PRICE_TO_PLAN = {
   price_1TrLR6Kh2GaZE2B4mYqOHBhQ: 'growth',     // old Growth €2,990/yr
 }
 
-// Only these self-serve tiers are ever provisioned by this webhook.
-//
-// growth_pro added 2026-07-28, deliberately BEFORE its Stripe prices exist.
-// Ordering matters here and it is the safe direction: with growth_pro absent
-// from this list, a paid €449 checkout would reach handleCheckoutCompleted,
-// fail the membership test, log "unresolved/non-self-serve plan", return 200,
-// and provision nothing — money taken, no entitlement, no error raised
-// anywhere. Adding it first is inert until a matching price exists, so the
-// gap can never open. Do not create the Stripe prices without this line.
-const SELF_SERVE_PLANS = ['essentials', 'growth', 'growth_pro']
+// SELF_SERVE_PLANS moved to _package_checkout.js on 2026-07-31 (imported above),
+// unchanged, so the package path and the subscription path share one list
+// instead of two. Its original comment moved with it.
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
@@ -138,33 +147,100 @@ exports.handler = async (event) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleCheckoutCompleted(session, log) {
-  // Only subscription checkouts provision a plan (ignore one-time payments).
-  if (session.mode && session.mode !== 'subscription') {
-    log('non-subscription checkout, skipping:', session.mode)
+  // Two checkout modes provision a plan:
+  //   'subscription' — recurring self-serve, the original behaviour.
+  //   'payment'      — a PACKAGE: N months of a tier bought outright, added
+  //                    2026-07-31 per docs/arch/custom-entitlements.md §3.
+  // A missing mode is treated as 'subscription', which is what the previous
+  // `session.mode && session.mode !== 'subscription'` guard did. Anything else
+  // Stripe may introduce (today: 'setup') is still skipped.
+  const mode = session.mode || 'subscription'
+  if (mode !== 'subscription' && mode !== 'payment') {
+    log('unhandled checkout mode, skipping:', mode)
     return
   }
+  const isPackage = mode === 'payment'
 
   const email = (session.customer_details?.email || session.customer_email || '').trim().toLowerCase()
   const custId = session.customer
   const subId = session.subscription
 
-  if (!email) { log('no customer email on session, skipping'); return }
-  if (!custId) { log('no customer id on session, skipping'); return }
+  // For a package the money is already captured, so a session we cannot act on
+  // is a paid-but-unprovisioned customer. Arch §3.2 requires those to be
+  // visible in the product rather than only in a log — the whole point of A1 is
+  // that "the money arrives and the product does not react" stops happening
+  // silently. The subscription path keeps its original log-and-return, so this
+  // cannot change its behaviour.
+  if (!email) {
+    log('no customer email on session, skipping')
+    if (isPackage) await reportUnprovisionedPackage({ session, log, reason: 'missing_email', detail: 'checkout session carries no customer email', email: null })
+    return
+  }
+  // ⚠️ READ THIS BEFORE CREATING A PACKAGE PAYMENT LINK. In `payment` mode
+  // Stripe does NOT create a Customer by default — customer_creation defaults
+  // to 'if_required', and a one-time charge does not require one — so
+  // session.customer is null and this branch fires. In `subscription` mode a
+  // Customer is always created, which is why this has never been hit.
+  // The package link MUST be created with customer_creation: 'always'.
+  // Getting it wrong does not lose the sale silently any more: the package
+  // path raises a package_unprovisioned admin event with the session id, so
+  // the fix is one link setting and a manual provision from Account.
+  if (!custId) {
+    log('no customer id on session, skipping')
+    if (isPackage) await reportUnprovisionedPackage({ session, log, reason: 'missing_customer', detail: 'checkout session carries no customer id (payment-mode link needs customer_creation: always)', email })
+    return
+  }
 
   // Resolve the purchased plan from the line item's price.
   const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 })
   const price = lineItems.data[0]?.price
   const priceId = price?.id
-  const plan = (price?.metadata?.plan) || PRICE_TO_PLAN[priceId]
 
-  if (!plan || !SELF_SERVE_PLANS.includes(plan)) {
-    // Not a self-serve tier this webhook provisions (or unknown price). Leave
-    // it to manual/sales provisioning — but this is a real gap to notice.
-    log(`unresolved/non-self-serve plan for price ${priceId} (plan=${plan}) — skipping provisioning`)
-    return
+  // Everything below branches on these four, and on nothing else. Both modes
+  // then run the SAME three provisioning branches (arch §3.2 step 3).
+  let plan, planSource, grantUntil, months
+
+  if (isPackage) {
+    const resolved = resolvePackage(price)
+    if (!resolved.ok) {
+      // Arch §3.2 step 2: provision NOTHING, but say so loudly. Deliberately not
+      // a throw — a throw releases the idempotency lock (see the handler above),
+      // so Stripe would redeliver this same unfixable session on its retry
+      // schedule and re-alert the admin every time. The money is already taken;
+      // the correct outcome is one alert and a human decision.
+      log(`package NOT provisioned (${resolved.reason}): ${resolved.detail} ` +
+          `[price=${priceId} plan=${JSON.stringify(resolved.raw.plan)} months=${JSON.stringify(resolved.raw.months)} email=${email}]`)
+      await reportUnprovisionedPackage({ session, log, reason: resolved.reason, detail: resolved.detail, email, priceId, raw: resolved.raw })
+      return
+    }
+    plan = resolved.plan
+    months = resolved.months
+    planSource = PACKAGE_PLAN_SOURCE
+    // Held THROUGH this date; expire-plan-grants.js reverts it the day after,
+    // because that job selects plan_grant_until < today.
+    grantUntil = packageGrantUntil(months)
+  } else {
+    plan = (price?.metadata?.plan) || PRICE_TO_PLAN[priceId]
+    if (!plan || !SELF_SERVE_PLANS.includes(plan)) {
+      // Not a self-serve tier this webhook provisions (or unknown price). Leave
+      // it to manual/sales provisioning — but this is a real gap to notice.
+      log(`unresolved/non-self-serve plan for price ${priceId} (plan=${plan}) — skipping provisioning`)
+      return
+    }
+    planSource = 'stripe'
+    grantUntil = null
   }
 
-  log(`provisioning email=${email} plan=${plan} cust=${custId} sub=${subId}`)
+  // Wording for the admin feed, so a package and a subscription are told apart
+  // at a glance in the bell and in the alert email.
+  const planLabel = PLAN_LABELS[plan] || plan
+  const what = isPackage ? `${months}-month ${planLabel} package` : `${planLabel} subscription`
+  const eventType = isPackage ? 'package_purchased' : 'subscription_new'
+  const eventMeta = isPackage
+    ? { email, plan, months, plan_source: planSource, plan_grant_until: grantUntil, price: priceId }
+    : { email, plan }
+
+  log(`provisioning email=${email} plan=${plan} source=${planSource} grant_until=${grantUntil} cust=${custId} sub=${subId}`)
 
   // Find an existing auth user by email (returning subscriber, re-subscribe, or
   // someone who already had a login from the Onboard wizard / an earlier buy).
@@ -181,23 +257,56 @@ async function handleCheckoutCompleted(session, log) {
     if (profErr) throw new Error(`user_profiles lookup failed: ${profErr.message}`)
 
     if (profile?.client_id) {
+      // plan_source and plan_grant_until are now written EXPLICITLY on every
+      // paid checkout, not left at whatever the client already had.
+      //
+      // This is the one place this change goes beyond arch §3.2, which only
+      // asks createClientRow() to state them. It is not optional, for two
+      // reasons, and bg-verify should judge it on these:
+      //
+      //   1. WITHOUT it, A1 introduces the exact leak §2.1 warns about, just
+      //      one step later. A founding client buys a 12-month package
+      //      (plan_source='package', plan_grant_until=+12m) and then converts
+      //      to a monthly subscription. This branch would set plan and leave
+      //      plan_source='package', so expire-plan-grants.js reverts a PAYING
+      //      subscriber to Free on the old package's end date.
+      //   2. It also closes a live bug that predates packages: a client on a
+      //      trial (plan_source='trial', plan_grant_until set) who then pays
+      //      keeps both, and the expiry job reverts their paid plan to Free.
+      //      Checked against production 2026-07-31: zero clients are currently
+      //      in that state (no row has plan_source in ('trial','comp') with a
+      //      stripe_subscription_id), so this is preventive, not a repair.
+      //
+      // stripe_subscription_id is deliberately NOT written on the package path.
+      // Arch §3.2 says a package has no subscription id and must not invent
+      // one, which is satisfied by leaving it alone: a package-only client
+      // already has null there, while a client with a genuine live
+      // subscription keeps it. Writing null would have blanked a real id and
+      // broken get-subscription.js's renewal panel and set-client-plan.js's
+      // "this client is Stripe-billed" warning.
+      const update = { plan, stripe_customer_id: custId, plan_source: planSource, plan_grant_until: grantUntil }
+      if (!isPackage) update.stripe_subscription_id = subId
+
       const { error: updErr } = await supabase
         .from('clients')
-        .update({ plan, stripe_customer_id: custId, stripe_subscription_id: subId })
+        .update(update)
         .eq('id', profile.client_id)
       if (updErr) throw new Error(`clients update failed: ${updErr.message}`)
-      log(`existing user ${existingUser.id} → client ${profile.client_id} set to ${plan}`)
+      log(`existing user ${existingUser.id} → client ${profile.client_id} set to ${plan} (${planSource}${grantUntil ? `, until ${grantUntil}` : ''})`)
       await recordAdminEvent(supabase, {
-        type: 'subscription_new', client_id: profile.client_id,
-        title: `Subscription: ${PLAN_LABELS[plan] || plan}`,
-        body: `${email} subscribed to ${PLAN_LABELS[plan] || plan}.`, meta: { email, plan },
+        type: eventType, client_id: profile.client_id,
+        title: isPackage ? `Package purchased: ${what}` : `Subscription: ${planLabel}`,
+        body: isPackage
+          ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
+          : `${email} subscribed to ${planLabel}.`,
+        meta: eventMeta,
       })
       return
     }
 
     // Auth user exists but has no client/profile (edge case). Create a client
     // and link it to them — no invite needed, they already have a login.
-    const client = await createClientRow({ email, plan, custId, subId, log })
+    const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log })
     const { error: linkErr } = await supabase
       .from('user_profiles')
       .insert({ id: existingUser.id, client_id: client.id, role: 'viewer' })
@@ -205,18 +314,21 @@ async function handleCheckoutCompleted(session, log) {
       await supabase.from('clients').delete().eq('id', client.id)
       throw new Error(`user_profiles insert failed: ${linkErr.message}`)
     }
-    log(`existing user ${existingUser.id} linked to new client ${client.id} (${plan})`)
+    log(`existing user ${existingUser.id} linked to new client ${client.id} (${plan}, ${planSource})`)
     await recordAdminEvent(supabase, {
-      type: 'subscription_new', client_id: client.id,
-      title: `New subscription: ${PLAN_LABELS[plan] || plan}`,
-      body: `${email} subscribed to ${PLAN_LABELS[plan] || plan}.`, meta: { email, plan },
+      type: eventType, client_id: client.id,
+      title: isPackage ? `New package: ${what}` : `New subscription: ${planLabel}`,
+      body: isPackage
+        ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
+        : `${email} subscribed to ${planLabel}.`,
+      meta: eventMeta,
     })
     return
   }
 
   // No existing user → provision new, mirroring onboard-client.js's atomic
   // create-client → invite → user_profiles chain with rollback.
-  const client = await createClientRow({ email, plan, custId, subId, log })
+  const client = await createClientRow({ email, plan, custId, subId, planSource, grantUntil, log })
 
   const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
     email,
@@ -236,12 +348,47 @@ async function handleCheckoutCompleted(session, log) {
     throw new Error(`user_profiles insert failed: ${profileErr.message}`)
   }
 
-  log(`new client ${client.id} provisioned + invite sent to ${email} (${plan})`)
+  log(`new client ${client.id} provisioned + invite sent to ${email} (${plan}, ${planSource})`)
   await recordAdminEvent(supabase, {
-    type: 'subscription_new', client_id: client.id,
-    title: `New paid signup: ${PLAN_LABELS[plan] || plan}`,
-    body: `${email} subscribed to the ${PLAN_LABELS[plan] || plan} plan.`, meta: { email, plan },
+    type: eventType, client_id: client.id,
+    title: isPackage ? `New paid package: ${what}` : `New paid signup: ${planLabel}`,
+    body: isPackage
+      ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
+      : `${email} subscribed to the ${planLabel} plan.`,
+    meta: eventMeta,
   })
+}
+
+// A package checkout that took money but could not be provisioned. Arch §3.2
+// step 2: "record an admin event so a paid-but-unprovisioned customer is
+// visible in the product rather than only in a log."
+//
+// recordAdminEvent is best-effort by construction (_admin_notify.js never
+// throws), which is what we want here: the alert must not be able to turn a
+// silent non-provisioning into a 500 that Stripe then retries forever.
+//
+// client_id is null on purpose. There is no client — that is the entire
+// problem. admin_notifications.client_id is nullable and ON DELETE SET NULL.
+async function reportUnprovisionedPackage({ session, log, reason, detail, email, priceId = null, raw = null }) {
+  const amount = typeof session.amount_total === 'number'
+    ? `${(session.amount_total / 100).toFixed(2)} ${String(session.currency || '').toUpperCase()}`
+    : 'unknown amount'
+  await recordAdminEvent(supabase, {
+    type: 'package_unprovisioned',
+    client_id: null,
+    title: 'Paid package could NOT be provisioned',
+    body: `A one-time checkout for ${amount}${email ? ` from ${email}` : ''} completed but provisioned nothing: ${detail}. `
+        + `The customer has paid and has no plan. Fix the price metadata (plan + months, 1-36) and provision by hand from Account.`,
+    meta: {
+      reason, detail, email: email || null, price: priceId,
+      metadata_plan: raw ? raw.plan : null,
+      metadata_months: raw ? raw.months : null,
+      checkout_session: session.id,
+      amount_total: session.amount_total ?? null,
+      currency: session.currency ?? null,
+    },
+  })
+  log(`admin event raised: package_unprovisioned (${reason})`)
 }
 
 async function handleSubscriptionUpdated(sub, log) {
@@ -305,12 +452,24 @@ async function handleSubscriptionDeleted(sub, log) {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Insert a clients row for a self-serve subscriber. Name defaults to the email
-// domain, slug is derived + made unique (retry once with a random suffix on a
-// unique-violation). Placeholder brand fields — the customer/admin can fill
-// these in later; market defaults to Worldwide, matching onboard-client's
-// nullable-market handling.
-async function createClientRow({ email, plan, custId, subId, log }) {
+// Insert a clients row for a self-serve subscriber or a package buyer. Name
+// defaults to the email domain, slug is derived + made unique (retry once with
+// a random suffix on a unique-violation). Placeholder brand fields — the
+// customer/admin can fill these in later; market defaults to Worldwide,
+// matching onboard-client's nullable-market handling.
+//
+// planSource / grantUntil are required, not defaulted, per arch §3.2. A default
+// would let a future call site provision a package as 'stripe' by omission, and
+// 'stripe' is not in expire-plan-grants.js's revert filter — the silent,
+// permanent revenue leak that arch §2.1 exists to prevent. Callers:
+//   subscription → ('stripe', null)   — today's behaviour, now stated. The row
+//                                        used to be written with plan_source
+//                                        NULL ("legacy/unknown"); neither NULL
+//                                        nor 'stripe' is in the revert filter,
+//                                        so no expiry behaviour changes.
+//   package      → ('package', 'YYYY-MM-DD')
+async function createClientRow({ email, plan, custId, subId, planSource, grantUntil, log }) {
+  if (!planSource) throw new Error('createClientRow: planSource is required')
   const domain = email.split('@')[1] || email
   const baseSlug = slugify(domain) || `client-${Date.now()}`
 
@@ -323,7 +482,10 @@ async function createClientRow({ email, plan, custId, subId, log }) {
         slug,
         plan,
         stripe_customer_id: custId,
-        stripe_subscription_id: subId,
+        // A package has no subscription; never fabricate an id for one.
+        stripe_subscription_id: subId ?? null,
+        plan_source: planSource,
+        plan_grant_until: grantUntil ?? null,
         default_market_id: 'WW',
       })
       .select()
