@@ -1465,3 +1465,60 @@ numbers this is infrastructure for demand we do not yet have.**
 
 **Do not build this before the council votes.** Constantin asked for
 confirmation and logging, not for a build.
+
+## D-6. MOTION. Scheduled collection destroys history. Referred by Constantin.
+
+Constantin, 2026-07-31, on being shown the finding: **"we need to push to
+council to see what the decision is on the scheduled collections, because
+history is very important for subscribed clients."**
+
+**Members owning this: CTO (the mechanism), CGO (what the tier can claim),
+Chief Research Officer (the 911 rows the city studies rest on).**
+
+### The fact
+
+`schedule-collections.js:120` enqueues `force: true`. `_enqueue.js:144-150` then
+runs `DELETE FROM ai_results WHERE client_id = ? AND prompt_id IN (?) AND llm IN
+(?)` **with no date filter**. Every prior row for those pairs is deleted and
+re-collected.
+
+It is documented in `_enqueue.js` as deliberate, under a "TREND-HISTORY NOTE",
+so this is a design decision someone made and not an accident. The consequence
+is that **weekly automatic collection erases last week.**
+
+### Why it is a business question and not a bug ticket
+
+Radar is sold on watching AI visibility change over time. `PLAN_BLURB.radar`
+now promises automatic weekly checks, and that claim is true. The value behind
+it is not there: a customer who runs for eight weeks has one week of data, eight
+times over.
+
+Every paid tier has the same shape, so this is not a Radar problem that Radar
+created. Radar is simply the first tier whose pitch depends on it.
+
+It is also why the research exclusion is guarded twice: those 27 city-research
+clients hold **911 `ai_results` rows**, the measured evidence every published
+city page is written from, and one scheduled run would rewrite them.
+
+### What the council must choose between
+
+1. **Append, do not replace.** Scheduled runs stop passing `force: true`, so a
+   run adds a new dated row per prompt and engine and the trend line becomes
+   real. Cost: `ai_results` grows every week per client, and every consumer that
+   assumes one row per prompt/engine has to be found and checked. That
+   assumption is likely load-bearing in the score, the dashboard and the audit.
+2. **Snapshot.** Keep the destructive refresh for the working set, and write a
+   periodic rollup to a separate table that only ever grows. Cheaper on the read
+   paths, adds a table and a job.
+3. **Do nothing, and change the copy.** Sell Radar on engines and prompt count
+   only, which is what today's email does. Honest, and it gives up the strongest
+   reason to stay subscribed.
+
+**Recommendation to the council, not a decision: option 2.** It gets the trend
+without auditing every consumer of `ai_results`, and the rollup is the thing a
+customer actually looks at. But the CTO should say whether the one-row-per-pair
+assumption is as widespread as it looks, because if it is not, option 1 is
+cleaner and cheaper.
+
+**Do not treat this as blocked on credits.** It is a decision first. The build
+that follows needs a Netlify deploy; the decision does not.
