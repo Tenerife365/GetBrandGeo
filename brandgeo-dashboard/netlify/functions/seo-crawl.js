@@ -13,7 +13,21 @@ const { requireAuth } = require('./_auth');
 
 // Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Essentials+
 // (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
-const CRAWL_PAGE_CAP = { free: 0, essentials: 1, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
+// SIXTH copy of the plan ladder. Source of truth is planConfig.ts
+// PLAN_SEO_PAGE_CAP; this exists because a Netlify function cannot import the
+// Vite-bundled .ts at runtime. Keep them equal, value for value.
+//
+// CORRECTED 2026-07-31. Two values disagreed with planConfig and both granted
+// MORE than the plan sells:
+//   radar       absent, so it fell through the `?? 1` below to a one-page crawl
+//               of a tier that is sold with no AI SEO at all.
+//   essentials  1 here against planConfig's 0 since 2026-07-29, so the
+//               Essentials gate was frontend-only.
+//
+// There is no hasFeature() gate in this file. The `maxPages <= 0` test IS the
+// gate, which is why a wrong number here is an entitlement leak rather than a
+// display bug.
+const CRAWL_PAGE_CAP = { free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
 // One crawl/audit cycle per week per client (the "max 1 audit / week" cap).
 const CRAWL_COOLDOWN_DAYS = 7;
 
@@ -40,7 +54,10 @@ exports.handler = async (event) => {
     if (!domain) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'This client has no website set, so there is nothing to crawl. Add a website to the client first.' }) };
     }
-    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 1;
+    // Fails CLOSED. Was `?? 1`, which handed a one-page crawl to every plan
+    // missing from the map above, so adding a tier without touching this file
+    // granted it AI SEO silently. That is exactly how radar got one.
+    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 0;
     if (maxPages <= 0) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Essentials or higher to audit your pages.' }) };
     }
