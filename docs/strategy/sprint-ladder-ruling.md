@@ -31,10 +31,18 @@ level, because today's per-client code would deliver SUM by accident and nobody
 would have chosen it. **Decision 4 is already yours from `67a3cf4` and is
 carried forward unchanged.**
 
-Two things need your attention beyond the four decisions, both flagged in bold
-below: the **free tier cannot finish one collection run inside its own budget**
-(EUR 0.54 of work against a EUR 0.30 budget), and **one Managed client at 200
-prompts consumes the entire 500 credit SerpApi pool for the whole platform**.
+Two things needed attention beyond the four decisions. The **free tier could not
+finish one collection run inside its own budget** (EUR 0.54 of work against a
+EUR 0.30 budget): **CLOSED by decision 1b**, which moves Free to Gemini and drops
+that to EUR 0.160, with no budget raise. And **one Managed client at 200 prompts
+consumes the entire 500 credit SerpApi pool for the whole platform**: still open,
+and not a pricing decision. It is on the roadmap as a vendor purchase.
+
+**What S2 ships, in one place:** `PLAN_ENGINES.free = ['gemini']`,
+`PLAN_ENGINES.radar = ['gemini', 'claude']`,
+`PLAN_PROMPTS = 5, 7, 18, 35, 56, 200, 200, sentinel`,
+`PLAN_MONTHLY_API_BUDGET_EUR.free = 0.30` (unchanged, do NOT raise to 0.60),
+`.radar = 4.35`, `pro` sites 20 to 10, SUM pooling enforced at account level.
 
 ---
 
@@ -59,7 +67,7 @@ Per prompt, per month, at 4.333 weekly runs:
 
 | Plan | Weekly engines | Weekly EUR/check | SerpApi engines | SerpApi EUR/month | **EUR per prompt per month** |
 |---|---|---|---|---|---|
-| free | chatgpt | 0.108 | none | 0.000 | **0.1080** (monthly cadence, 1 run) |
+| free | gemini | 0.032 | none | 0.000 | **0.0320** (monthly cadence, 1 run) |
 | radar | gemini, claude | 0.065 | none | 0.000 | **0.2817** (0.065 x 4.333) |
 | essentials | + claude | 0.173 | none | 0.000 | **0.7497** |
 | growth | + perplexity | 0.178 | google_ai | 0.046 | **0.8173** |
@@ -219,6 +227,7 @@ export type Plan = 'free' | 'radar' | 'essentials' | 'growth'
 
 PLAN_ORDER                    // ['free','radar','essentials','growth','growth_pro','managed','pro','enterprise']
 PLAN_LABELS.radar             = 'Radar'
+PLAN_ENGINES.free             = ['gemini']               // DECISION 1b, was ['chatgpt']
 PLAN_ENGINES.radar            = ['gemini', 'claude']     // AMENDED 2026-07-31
 PLAN_LIVE_ENGINES.radar       = ['gemini', 'claude']     // _cost.js
 PLAN_PROMPTS.radar            = 7
@@ -340,7 +349,30 @@ the entry tier. It costs a build: `MONTHLY_CAPPED_ENGINES` in `_cost.js` is
 global today and would have to become per plan. Not recommended inside a 30 day
 sprint, recorded so the option is not lost.
 
-**DECIDED 1b <date>:**
+**DECIDED 1b 2026-07-31 by Constantin. Yes. `PLAN_ENGINES.free = ['gemini']`.**
+Radar is now a strict superset of Free, nobody pays to lose an engine, and Free
+costs **EUR 0.160 a month against its existing EUR 0.30 budget**. The raise to
+EUR 0.60 that decision 2 drafted is **CANCELLED, not deferred**: S2 ships
+`free: 0.30` unchanged. Free's real cash out is close to zero, because Gemini is
+a `FIXED_FEE_ENGINE` under 1,500 grounded requests a day, which is the answer to
+the "1,000 free signups is EUR 600 a month" objection raised in decision 2.
+
+Constantin also declined the optional Radar increase to 8 prompts. **Radar ships
+at 7.**
+
+### Consequence of 1b that S2 owns: ChatGPT is now first sold at Essentials
+
+`getEngineStates()` renders an engine the plan does not carry as **locked**, and
+locked reads to a customer as "upgrade and you get this". After 1b, ChatGPT is
+locked on Free AND locked on Radar, because the first tier that carries it is
+**Essentials at EUR 99**. So the upgrade nudge shown to a Free user next to
+ChatGPT must point at Essentials, not at the next rung.
+
+**S2 must check this rather than assume it.** A generic "upgrade to unlock"
+string next to ChatGPT on the Free plan is now false for the very next tier, and
+it is the tier the sprint is built to sell. Same defect family as the one 1b just
+closed: a promise the ladder does not keep. It is a copy fix, not an
+architecture one.
 
 ---
 
@@ -432,9 +464,9 @@ the SerpApi monthly cap were ever lifted and all engines ran weekly.
 
 | Plan | Price EUR | Engines | **Prompts** | Sites | **Per site** | Modelled EUR/mo | Budget EUR | Headroom EUR | Cost % of price | Naive EUR/mo |
 |---|---|---|---|---|---|---|---|---|---|---|
-| free | 0 | 1 | **5** | 1 | **5.00** | 0.540 | 0.30 | **BREACH 0.240** | n/a | 0.540 |
-| radar | 29 launch | 2 | **7** | 1 | **7.00** | 4.247 | 4.35 | 0.103 | 14.6% | 4.247 |
-| radar | 39 list | 2 | **7** | 1 | **7.00** | 4.247 | 5.85 | 1.603 | 10.9% | 4.247 |
+| free | 0 | 1 (gemini) | **5** | 1 | **5.00** | **0.160** | 0.30 | 0.140 | n/a | 0.160 |
+| radar | 29 launch | 2 (gemini, claude) | **7** | 1 | **7.00** | **1.972** | 4.35 | 2.378 | **6.8%** | 1.972 |
+| radar | 39 list | 2 (gemini, claude) | **7** | 1 | **7.00** | **1.972** | 5.85 | 3.878 | **5.1%** | 1.972 |
 | essentials | 99 | 3 | **18** | 2 | **9.00** | 13.494 | 14.85 | 1.356 | 13.6% | 13.494 |
 | growth | 299 | 5 | **35** | 2 | **17.50** | 28.607 | 44.85 | 16.243 | 9.6% | 33.973 |
 | growth_pro | 449 | 7 | **56** | 3 | **18.67** | 54.488 | 67.35 | 12.862 | 12.1% | **75.955 BREACH 8.61** |
@@ -448,6 +480,13 @@ Per site: 5.00, 7.00, 9.00, 17.50, 18.67, 20.00. Strictly increasing across ever
 sellable boundary. **No inversion anywhere.**
 
 ## Breaches, printed rather than described
+
+> **BREACH 1 BELOW IS CLOSED by decision 1b, ruled 2026-07-31 after this section
+> was written.** Free runs Gemini, so its 5 prompts cost **EUR 0.160 against the
+> EUR 0.30 budget** and the budget is not raised. The analysis is kept because it
+> is how the defect was found and because the EUR 0.540 figure is what production
+> is doing right now, until S2 ships. **Ignore its RULING paragraph; 1b
+> supersedes it.**
 
 **1. The free tier cannot complete one collection run inside its own budget.**
 5 prompts x EUR 0.108 = **EUR 0.540 against a EUR 0.30 budget. Over by EUR
@@ -502,7 +541,10 @@ export const PLAN_PROMPTS: Record<Plan, number> = {
 }
 
 export const PLAN_MONTHLY_API_BUDGET_EUR: Record<Plan, number> = {
-  free:         0.60,   // RAISED from 0.30: 5 prompts x EUR 0.108 = 0.54
+  free:         0.30,   // UNCHANGED. Decision 1b moved free to gemini, so its
+                        // 5 prompts cost 5 x 0.032 = EUR 0.160, not 0.540. The
+                        // raise to 0.60 drafted here before 1b was ruled is
+                        // CANCELLED. Do not ship it.
   radar:        4.35,   // 15% of the EUR 29 launch price; 5.85 when list resumes
   essentials:  14.85,   // 15% of 99, unchanged
   growth:      44.85,   // 15% of 299, unchanged
@@ -579,12 +621,12 @@ not 20, so open question 2a is closed by taking the recommendation. Enterprise's
 site count stands at **25** provisionally (open question 2c), which is D-3c's to
 confirm and does not block S2.
 
-**One number in this decision is now conditional on decision 1b.** The raise of
-`PLAN_MONTHLY_API_BUDGET_EUR.free` from 0.30 to 0.60 exists only to cover 5
-ChatGPT checks at EUR 0.540. If 1b moves Free to Gemini, free costs EUR 0.160 and
-**the raise is not needed at all**. S2 must read 1b before shipping that
-constant, and must not ship 0.60 and a Gemini free tier together, which would
-leave a budget at four times the work it pays for.
+**One number in this decision was superseded within the hour. RESOLVED, no
+longer conditional.** The raise of `PLAN_MONTHLY_API_BUDGET_EUR.free` from 0.30
+to 0.60 existed only to cover 5 ChatGPT checks at EUR 0.540. **Decision 1b was
+ruled the same day and moves Free to Gemini, so free costs EUR 0.160 and the
+raise is CANCELLED.** S2 ships `free: 0.30` unchanged. The constants block above
+carries the corrected value.
 
 Radar's row is unchanged by the decision 1 amendment: still 7 prompts, still 1
 site, still 7.00 per site. Only its cost fell, from EUR 4.247 to EUR 1.972.

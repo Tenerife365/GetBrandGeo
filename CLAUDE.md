@@ -38,15 +38,20 @@ saves EUR 227.55 a month at 100 subscribers), 7 prompts, weekly, 1 site.
 the 15 percent ceiling, closes both inversions and reduces nothing. SUM the D1
 pools, MAX the site allowance, enforced at ACCOUNT level or it is decorative.
 
-**The amendment created decision 1b, which is unsigned and is the one thing S2
-must read before touching the free tier:** `PLAN_ENGINES.free` is `['chatgpt']`,
-so a Free client who pays EUR 29 for Radar now LOSES ChatGPT. Recommended fix is
-`PLAN_ENGINES.free = ['gemini']`, which also closes the free budget breach below
-without raising the budget.
+**The amendment created decision 1b, also ruled the same day:
+`PLAN_ENGINES.free = ['gemini']`, was `['chatgpt']`.** Otherwise a Free client
+paying EUR 29 for Radar would have LOST ChatGPT. Radar is now a strict superset
+of Free. **Consequence S2 owns: ChatGPT is first sold at Essentials, so the
+locked-engine "upgrade to unlock" nudge on Free must name Essentials and not the
+next rung.** Consequence for the constants: Free costs EUR 0.160 a month, so
+**`PLAN_MONTHLY_API_BUDGET_EUR.free` stays at 0.30 and the raise to 0.60 drafted
+in decision 2 is cancelled.** Radar ships at 7 prompts; the optional 8 was
+declined.
 
 Three findings from the costing that stand on their own. The free tier's EUR 0.30
 budget cannot pay for its own 5 ChatGPT prompts (EUR 0.540), so a free signup
-collects 3 and gets a billing error. One Managed client at 200 prompts consumes
+collects 3 and gets a billing error, and this is LIVE until S2 ships 1b. One
+Managed client at 200 prompts consumes
 the entire 500 credit monthly SerpApi pool, platform wide. And the ladder's
 headline numbers depend on `MONTHLY_CAPPED_ENGINES` in `_cost.js:541`: delete
 that constant and Growth PRO and Managed breach by EUR 8.61 and EUR 46.27, so S2

@@ -13,31 +13,32 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
-- **One line owed: decision 1b, what the Free tier's engine is.** All four S1
-  decisions are signed (`docs/strategy/sprint-ladder-ruling.md`, 2026-07-31), but
-  Constantin's amendment to decision 1 (Radar runs Gemini and Claude, not ChatGPT
-  and Gemini, because ChatGPT was 77 percent of Radar's cost) created a
-  consequence that needs one more ruling. **`PLAN_ENGINES.free` is `['chatgpt']`,
-  so a Free client who pays EUR 29 for Radar LOSES ChatGPT.** They pay to lose an
-  engine. Same failure recorded at `planConfig.ts:51` when a prospect saw Google
-  AI Mode in the free audit and lost it by paying EUR 299.
-  **Recommended: `PLAN_ENGINES.free = ['gemini']`.** Radar becomes a strict
-  superset of Free, Free costs EUR 0.160 a month instead of EUR 0.540, and the
-  free budget breach below closes with no budget raise at all.
-  **S2 is NOT blocked by this** for anything except the two free-tier constants.
-  `check: grep -q "DECIDED 1b 2026" docs/strategy/sprint-ladder-ruling.md`
+- ~~**Decision 1b, what the Free tier's engine is.**~~ **DECIDED 2026-07-31 by
+  Constantin: `PLAN_ENGINES.free = ['gemini']`.** S1 is fully closed, nothing in
+  the ladder is owed. Recorded here only because it changes a constant S2 would
+  otherwise get from the wrong place: **`PLAN_MONTHLY_API_BUDGET_EUR.free` stays
+  at 0.30. The raise to 0.60 drafted in decision 2 is CANCELLED**, because Free's
+  5 Gemini prompts cost EUR 0.160, not EUR 0.540.
 
-- **LIVE DEFECT found while costing the ruling: a free signup cannot finish its
-  own first collection.** 5 prompts at EUR 0.108 of ChatGPT is **EUR 0.540
-  against a EUR 0.30 budget**, so `_auth.js:checkCollectionLimits` blocks after
-  prompt 3 and the visitor sees a raw budget error where the product promised 5.
-  Created when ChatGPT was repriced from EUR 0.056 to EUR 0.108 and
-  `PLAN_MONTHLY_API_BUDGET_EUR.free` was not moved with it. This is the top of
-  the funnel the whole 30 day sprint depends on.
-  **Two fixes, and they are mutually exclusive. S2 must not ship both.** Either
-  raise the budget 0.30 to 0.60 (decision 2 as signed), or take decision 1b and
-  move Free to Gemini, which drops the cost to EUR 0.160 and leaves the budget at
-  0.30. 1b is cheaper and fixes the Radar regression at the same time.
+- ~~**LIVE DEFECT: a free signup cannot finish its own first collection.**~~
+  **CLOSED IN THE RULING 2026-07-31, ships with S2, still live in production
+  until it does.** 5 prompts at EUR 0.108 of ChatGPT is EUR 0.540 against a EUR
+  0.30 budget, so `_auth.js:checkCollectionLimits` blocks after prompt 3 and the
+  visitor sees a raw budget error where the product promised 5. Created when
+  ChatGPT was repriced from EUR 0.056 to EUR 0.108 and the free budget was not
+  moved with it. Decision 1b fixes it by moving Free to Gemini rather than by
+  raising the budget, which is cheaper and also stops a Radar buyer losing an
+  engine. **S2 must not ship both fixes**; the budget stays at 0.30.
+
+- **NEW, created by decision 1b and owned by S2: ChatGPT is now first sold at
+  Essentials, so "upgrade to unlock" is false on the next rung.**
+  `getEngineStates()` renders an engine the plan lacks as **locked**, which reads
+  as "upgrade and you get this". After 1b, ChatGPT is locked on Free and still
+  locked on Radar, because Essentials at EUR 99 is the first tier carrying it. A
+  generic upgrade nudge next to ChatGPT on Free now points at a tier that does
+  not deliver it. Copy fix, not architecture, but it sits on the entry rung the
+  whole sprint is built to sell.
+  `check: the Free-plan ChatGPT nudge names Essentials, not the next tier`
 
 - **The SerpApi pool is the ceiling on the top of the ladder, and it is a
   purchase decision, not a pricing one.** 500 credits a month supports either one
