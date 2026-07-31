@@ -13,7 +13,7 @@ import { useTimeFilter } from '../lib/timeFilterContext'
 import { useTheme } from '../lib/themeContext'
 import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import {
-  computeAiVisibilityScore, buildScoreResultMap,
+  computeAiVisibilityScore, buildScoreResultMap, isNoAnswerRow,
   type AiVisibilityDimensions, type ScoreInputRow,
 } from '../lib/aiVisibilityScore'
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
@@ -77,7 +77,15 @@ interface TopRec {
   priority: 'critical' | 'high' | 'medium'
 }
 
-function computeStats(rows: AIResultRow[]): OverviewStats {
+function computeStats(allRows: AIResultRow[]): OverviewStats {
+  // Drop rows where the engine ran but produced no answer at all (Google
+  // declining to render an AI Overview). They are not failures, so they arrive
+  // with status 'ok' and are indistinguishable from a real absence unless you
+  // check the marker. Counting them sank Mention Rate for something that was
+  // never winnable. Excluded from the denominator AND from Total Checks, so
+  // this card cannot disagree with the AI Visibility Score below it, which
+  // excludes them in buildScoreResultMap.
+  const rows = allRows.filter(r => !isNoAnswerRow(r))
   const mentionCount = rows.filter(r => r.brand_mentioned).length
   const posRows = rows.filter(r => r.brand_mentioned && r.brand_position != null)
   const avgPos = posRows.length > 0
@@ -205,7 +213,12 @@ export default function Dashboard() {
       // carrying checked_at/status, so buildScoreResultMap can enforce
       // newest-non-error-wins itself rather than trusting this query's shape.
       supabase.from('ai_results')
-        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status')
+        // response_snippet is selected ONLY so buildScoreResultMap can spot the
+        // `[no_ai_overview]` marker. Drop it and the exclusion silently stops
+        // working: every row arrives with response_snippet undefined, the
+        // predicate returns false for all of them, and the score quietly goes
+        // back to counting unanswerable queries as misses.
+        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status, response_snippet')
         .eq('client_id', activeClientId)
         .neq('status', 'error')
         .order('checked_at', { ascending: false }),
