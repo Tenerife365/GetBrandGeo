@@ -1246,8 +1246,31 @@ three options equally.
 
 ## D-3. MOTION. D1 pricing, referred by Constantin.
 
-Two decisions that block D1 (multi-site tenancy) and, through it, A6.
-Constantin has asked the council to decide before he signs.
+> **SUPERSEDED WITHIN THE HOUR, 2026-07-31. D-3a and D-3b are both DECIDED and
+> signed in `docs/strategy/sprint-ladder-ruling.md`** (S1), by a parallel
+> session, while this motion was being written. **Do not vote on them. Do not
+> re-open them.**
+>
+> - **D-3a is answered by Decision 2.** The authoritative ladder is
+>   `PLAN_PROMPTS = { free: 5, radar: 7, essentials: 18, growth: 35,
+>   growth_pro: 56, managed: 200, pro: 200 }`, with `free`'s budget raised
+>   0.30 to 0.60. Growth PRO now buys 56 against Growth's 35, so the
+>   "+0 prompts for EUR 150" inversion this motion was filed about is closed.
+> - **D-3b is answered by Decision 3: SUM the pools, MAX the site allowance**,
+>   enforced at account level. Same conclusion the architect reached, on the
+>   arithmetic reproduced below.
+> - **D-3c, enterprise's website count, is still OPEN.** The ruling puts 25 in
+>   provisionally and explicitly defers it here (its OPEN QUESTION 2c).
+>
+> The reasoning below is kept because it is the record of why the question was
+> asked, and because the arithmetic still constrains anyone who wants to reopen
+> it. **Only D-3c is live.**
+>
+> Worth naming, since this pack has now caught the same failure three times in a
+> day: this motion was stale eleven minutes after it was written. Parallel
+> sessions move faster than a document can describe them. **Before acting on
+> ANY item in PART D, re-read its source of truth first.** For pricing that is
+> `sprint-ladder-ruling.md`, not this file.
 
 **Members owning this: CFO (margin), CGO (ladder), Head of Sales (what can
 actually be sold).**
