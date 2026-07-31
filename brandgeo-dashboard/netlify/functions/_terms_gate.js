@@ -140,6 +140,48 @@ const PERIODS = ['monthly', 'annual'];
 // other.
 const SELF_SERVE_CHECKOUT_PLANS = ['essentials', 'growth', 'growth_pro', 'radar'];
 
+// Every Stripe payment link starts with this, so storing it seven times in the
+// env var is 161 bytes of pure repetition.
+const CHECKOUT_URL_BASE = 'https://buy.stripe.com/';
+
+/**
+ * Accept either a full payment-link URL or the bare Stripe slug, and return the
+ * full URL. Returns null for anything that is not one of those two.
+ *
+ * WHY THIS EXISTS. On 2026-07-31 adding a seventh link to STRIPE_CHECKOUT_LINKS
+ * pushed the Netlify project past **AWS Lambda's 4KB total environment limit**
+ * and EVERY function failed to deploy: "Your environment variables exceed the
+ * 4KB limit". Not this variable's own limit, the sum of all of them. This
+ * project has already lost an integration to that exact ceiling once
+ * (GOOGLE_JSON_KEY, see CLAUDE.md), so the ceiling is a known, recurring
+ * constraint and not a surprise.
+ *
+ * Storing slugs instead of URLs takes this variable from 462 bytes to about 301,
+ * which buys room for several more plans rather than just this one.
+ *
+ * DELIBERATELY ACCEPTS BOTH FORMS, and that is the load-bearing part. The env
+ * var and the deployed code are updated by two different people at two
+ * different moments. If this only accepted slugs, the window between deploying
+ * this code and saving the new value would be a checkout outage on every plan.
+ * Both shapes work, so the two changes can happen in either order, and the old
+ * full-URL value keeps working forever if nobody ever shortens it.
+ *
+ * The `https://buy.stripe.com/` prefix test is kept for the full-URL form: it is
+ * what stops a malformed or attacker-supplied value being handed to a customer
+ * as a payment page.
+ */
+function expandCheckoutUrl(raw) {
+  if (typeof raw !== 'string') return null;
+  const v = raw.trim();
+  if (!v) return null;
+  if (v.startsWith(CHECKOUT_URL_BASE)) return v;
+  // A bare slug: Stripe's are URL-safe base62. Anything with a slash, a scheme,
+  // a dot or whitespace is not a slug and is rejected rather than concatenated,
+  // so a half-edited value cannot become a link to somewhere else.
+  if (/^[A-Za-z0-9]+$/.test(v)) return CHECKOUT_URL_BASE + v;
+  return null;
+}
+
 /**
  * Decide whether a checkout may proceed, and to where.
  *
@@ -202,8 +244,9 @@ function resolveCheckout({ plan, period, accepted, acceptedVersion } = {}) {
   // unset env var would tell a would-be Growth customer that Growth is not a
   // plan.
   const forPlan = CHECKOUT_LINKS[planKey];
-  const url = forPlan && typeof forPlan === 'object' ? forPlan[periodKey] : null;
-  if (!url || typeof url !== 'string' || !/^https:\/\/buy\.stripe\.com\//.test(url)) {
+  const raw = forPlan && typeof forPlan === 'object' ? forPlan[periodKey] : null;
+  const url = expandCheckoutUrl(raw);
+  if (!url) {
     return fail('no_link', `no checkout link is configured for ${planKey}/${periodKey} (check STRIPE_CHECKOUT_LINKS)`);
   }
 
@@ -232,4 +275,10 @@ module.exports = {
   SELF_SERVE_CHECKOUT_PLANS,
   resolveCheckout,
   withReference,
+  // Exported so it can be tested directly. It decides what URL a paying
+  // customer is sent to, and it rejects hostile input, so it is worth pinning
+  // rather than exercising only through resolveCheckout, which needs the env
+  // var set to reach it at all.
+  expandCheckoutUrl,
+  CHECKOUT_URL_BASE,
 };
