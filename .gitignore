@@ -66,3 +66,4 @@ integration-guides_*/
 assets/voices/**/*.onnx
 assets/audio/*.wav
 assets/samples/*.wav
+email-preview.html

@@ -85,7 +85,7 @@ function renderSignature(sig) {
 // (escaped here). `cta` = { label, url } renders a violet button.
 // `signature` = see renderSignature above; omitted by every existing caller, so
 // their output is byte-identical to before this was added.
-function renderShell({ heading, paragraphs = [], bullets = [], cta = null, footerNote = null, signature = null }) {
+function renderShell({ heading, paragraphs = [], bullets = [], cta = null, secondaryCta = null, footerNote = null, signature = null }) {
   const body = [];
   body.push(
     `<h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;font-weight:700;">${esc(heading)}</h1>`,
@@ -101,8 +101,15 @@ function renderShell({ heading, paragraphs = [], bullets = [], cta = null, foote
     body.push('</ul>');
   }
   if (cta && cta.url) {
+    // secondaryCta renders beside the primary as an outlined button, for the
+    // case where one message legitimately offers two next steps (see the
+    // free-plan update: view your results, or upgrade). Optional, so every
+    // existing caller renders exactly as before.
+    const secondary = secondaryCta && secondaryCta.url
+      ? `<a href="${esc(secondaryCta.url)}" style="display:inline-block;background:#ffffff;color:#6d28d9;text-decoration:none;font-size:15px;font-weight:600;padding:10px 21px;border-radius:10px;border:1px solid #c4b5fd;margin-left:8px;">${esc(secondaryCta.label || 'See plans')}</a>`
+      : '';
     body.push(
-      `<p style="margin:22px 0 8px;"><a href="${esc(cta.url)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:11px 22px;border-radius:10px;">${esc(cta.label || 'Open BrandGEO')}</a></p>`,
+      `<p style="margin:22px 0 8px;"><a href="${esc(cta.url)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:11px 22px;border-radius:10px;">${esc(cta.label || 'Open BrandGEO')}</a>${secondary}</p>`,
     );
   }
   // Signature sits ABOVE the footer note: the sign-off is part of the message,
@@ -128,18 +135,21 @@ function renderShell({ heading, paragraphs = [], bullets = [], cta = null, foote
 }
 
 // Send a branded email. Returns { ok, skipped?, error? }; never throws.
-async function sendBrandedEmail({ to, subject, heading, paragraphs, bullets, cta, footerNote, replyTo, signature }) {
+async function sendBrandedEmail({ to, bcc, subject, heading, paragraphs, bullets, cta, secondaryCta, footerNote, replyTo, signature }) {
   const key = process.env.RESEND_API_KEY;
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
   if (!key) return { ok: false, skipped: true, error: 'RESEND_API_KEY not set' };
   if (!recipients.length) return { ok: false, skipped: true, error: 'no recipient' };
+  // bcc is optional and never blocks a send: a bad bcc must not stop the
+  // customer receiving their mail.
+  const bccList = (Array.isArray(bcc) ? bcc : [bcc]).filter(Boolean);
 
-  const html = renderShell({ heading, paragraphs, bullets, cta, footerNote, signature });
+  const html = renderShell({ heading, paragraphs, bullets, cta, secondaryCta, footerNote, signature });
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ from: FROM, to: recipients, reply_to: replyTo || undefined, subject, html }),
+      body: JSON.stringify({ from: FROM, to: recipients, bcc: bccList.length ? bccList : undefined, reply_to: replyTo || undefined, subject, html }),
     });
     if (!res.ok) {
       let msg = `Resend HTTP ${res.status}`;

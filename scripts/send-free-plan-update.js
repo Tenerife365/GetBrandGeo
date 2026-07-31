@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+/**
+ * send-free-plan-update.js
+ *
+ * Sends the free-plan Gemini update to one recipient, BCC Constantin.
+ * Copy deck and the evidence for every claim: docs/copy/free-plan-gemini-update.md
+ *
+ * RUNS LOCALLY. NO NETLIFY DEPLOY REQUIRED. That is the whole point of this
+ * file: `_email.js` is a plain CommonJS module that talks to Resend over HTTPS,
+ * so it works from a laptop exactly as it does from a Lambda. The bcc and
+ * secondaryCta support it uses is committed but undeployed, which does not
+ * matter here because this script requires the local file.
+ *
+ * WHY CONSTANTIN RUNS THIS AND NOT AN AGENT: it needs RESEND_API_KEY. Handling
+ * a secret is withheld from the loop by docs/AUTONOMY.md section 2, and no
+ * agent should ever hold that key.
+ *
+ *   DRY RUN (prints the HTML, sends nothing, needs no key):
+ *     node scripts/send-free-plan-update.js --dry-run
+ *
+ *   SEND FOR REAL:
+ *     set RESEND_API_KEY=re_xxx        (PowerShell: $env:RESEND_API_KEY="re_xxx")
+ *     node scripts/send-free-plan-update.js --send
+ *
+ * Sending twice sends twice. There is no idempotency here; check before re-running.
+ */
+
+const path = require('path');
+const { sendBrandedEmail, renderShell } = require(
+  path.join(__dirname, '..', 'brandgeo-dashboard', 'netlify', 'functions', '_email.js')
+);
+
+// ── Recipient ────────────────────────────────────────────────────────────────
+// Ai Fy, client 26, the only live free account. Verified 2026-07-31: 2 active
+// prompts, both collected on Gemini at 14:41 for EUR 0.064, so "we re-ran all
+// your prompts" is literally true rather than nearly true.
+const TO   = 'a.hoefelmeyer@gmail.com';
+const BCC  = 'constantin@getbrandgeo.com';   // project-domain rule, see memory
+const BRAND = 'Ai Fy';
+const PROMPT_COUNT = 'both';                 // they have exactly 2
+
+const EMAIL = {
+  to: TO,
+  bcc: BCC,
+  replyTo: 'constantin@getbrandgeo.com',
+  subject: 'Your free plan just got better, and we re-ran your results',
+  heading: 'Your free plan now runs on Gemini',
+  paragraphs: [
+    'Hi there,',
+    'Small update on your free BrandGEO account, and some good news attached to it.',
+    'We have moved the free plan from ChatGPT to Google Gemini. The reason is simple: on the free tier the old setup ran out of budget partway through a first collection, so some accounts never saw a complete result. Gemini fits comfortably, which means every free account now finishes every run.',
+    `We did not want you to wait for your weekly refresh to see the difference, so we have already re-run ${PROMPT_COUNT} of your prompts on Gemini, at no cost to you and without using your refresh. Your results are live in your dashboard now.`,
+    `What that shows you is where ${BRAND} does and does not come up when someone asks Gemini the questions your buyers actually ask. If you are missing from an answer, that is the gap worth closing, and it is the thing we are built to track.`,
+    'We would genuinely like your feedback. You are one of the first people using this, so what you find confusing or missing carries real weight right now. Reply to this email and it comes straight to me.',
+    // Radar is LIVE and buyable as of 2026-07-31, so this names it and prices
+    // it. Deliberately argued on the second engine and the prompt count, NOT on
+    // tracking change over time: scheduled collection currently overwrites the
+    // previous run rather than accumulating it, so a trend claim would not be
+    // true yet. See the council item on scheduled-collection history.
+    'One more thing, since you are early. We have just launched Radar, a small paid tier that sits between the free plan and Essentials. It adds Claude alongside Gemini, so you see where you stand on two engines rather than one, and it raises you from 5 prompts to 7. It is EUR 29 a month for the first 100 customers, then EUR 39.',
+  ],
+  cta:          { label: 'View your results', url: 'https://app.getbrandgeo.com' },
+  secondaryCta: { label: 'See Radar',         url: 'https://getbrandgeo.com/#pricing' },
+  signature: {
+    name:      'Constantin Goane',
+    role:      'Founder, BrandGEO',
+    email:     'constantin@getbrandgeo.com',
+    linkedin:  'https://www.linkedin.com/in/daniel-geo/',
+    avatarUrl: 'https://getbrandgeo.com/images/constantin.jpg',
+  },
+  footerNote: 'You are receiving this because you have a free BrandGEO account. Reply to this email if you would prefer not to receive product updates.',
+};
+
+async function main() {
+  const mode = process.argv.includes('--send') ? 'send'
+             : process.argv.includes('--dry-run') ? 'dry'
+             : null;
+
+  if (!mode) {
+    console.error('Refusing to run without an explicit mode.\n'
+      + '  node scripts/send-free-plan-update.js --dry-run\n'
+      + '  node scripts/send-free-plan-update.js --send');
+    process.exit(2);
+  }
+
+  console.log(`to:       ${EMAIL.to}`);
+  console.log(`bcc:      ${EMAIL.bcc}`);
+  console.log(`reply-to: ${EMAIL.replyTo}`);
+  console.log(`subject:  ${EMAIL.subject}\n`);
+
+  if (mode === 'dry') {
+    const html = renderShell(EMAIL);
+    const out = path.join(__dirname, '..', 'email-preview.html');
+    require('fs').writeFileSync(out, html);
+    console.log(`DRY RUN. Nothing sent. ${html.length} bytes of HTML written to:\n  ${out}\nOpen it in a browser to check it, then re-run with --send.`);
+    return;
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    console.error('RESEND_API_KEY is not set, so nothing was sent.');
+    process.exit(1);
+  }
+
+  const res = await sendBrandedEmail(EMAIL);
+  if (res.ok) {
+    console.log('SENT.');
+  } else {
+    console.error('NOT SENT:', res.error || 'unknown error', res.skipped ? '(skipped)' : '');
+    process.exit(1);
+  }
+}
+
+main().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
