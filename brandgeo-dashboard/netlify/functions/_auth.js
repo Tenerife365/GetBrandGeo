@@ -266,7 +266,7 @@ async function checkCollectionLimits(supabase, clientId) {
   // outright for a plan that is merely missing from a map, turning a config
   // omission into an outage for a paying customer. The free budget degrades
   // the tier loudly without breaking it, and the warn below names the plan.
-  const clientBudget = PLAN_MONTHLY_API_BUDGET_EUR[plan] ?? PLAN_MONTHLY_API_BUDGET_EUR.free ?? PLAN_MONTHLY_API_BUDGET_EUR.free
+  const clientBudget = PLAN_MONTHLY_API_BUDGET_EUR[plan] ?? PLAN_MONTHLY_API_BUDGET_EUR.free
 
   if (clientSpent >= clientBudget) {
     console.warn(`[Auth] Monthly budget hit: client ${clientId} (${plan}) spent EUR ${clientSpent.toFixed(4)} of EUR ${clientBudget}`)
