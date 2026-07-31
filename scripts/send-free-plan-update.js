@@ -26,9 +26,27 @@
  */
 
 const path = require('path');
+const fsx = require('fs');
 const { sendBrandedEmail, renderShell } = require(
   path.join(__dirname, '..', 'brandgeo-dashboard', 'netlify', 'functions', '_email.js')
 );
+
+// ── Load the key from the gitignored .env files, so it never has to be typed ──
+// A PowerShell $env: assignment lives only for that one window, which is how a
+// --send silently turned into "nothing was sent": the key was set in one shell
+// and the script was run in another. Put RESEND_API_KEY in
+// brandgeo-dashboard/.env once (matched by .gitignore line 12, verified) and
+// every run picks it up. Values are never printed by this script.
+for (const rel of ['brandgeo-dashboard/.env.local', 'brandgeo-dashboard/.env', '.env']) {
+  const p = path.join(__dirname, '..', rel);
+  if (!fsx.existsSync(p)) continue;
+  for (const line of fsx.readFileSync(p, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!m) continue;                                   // blank line or comment
+    if (process.env[m[1]] !== undefined) continue;      // a real env var always wins
+    process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+}
 
 // ── Recipient ────────────────────────────────────────────────────────────────
 // Ai Fy, client 26, the only live free account. Verified 2026-07-31: 2 active
@@ -87,6 +105,24 @@ async function main() {
     process.exit(2);
   }
 
+  // FAIL LOUDLY AND FIRST. This check used to sit below the "to: / bcc: /
+  // subject:" banner and print one quiet line before exiting 1, which read like
+  // a successful run to anyone skimming. A --send was reported as having "gone
+  // well" when in fact nothing left the machine and no customer was emailed.
+  // Missing credentials must never look like a send.
+  if (mode !== 'dry' && !process.env.RESEND_API_KEY) {
+    console.error('\n' + '='.repeat(68));
+    console.error('  NOTHING WAS SENT. RESEND_API_KEY is not set.');
+    console.error('='.repeat(68));
+    console.error('\nNo email left this machine. No customer was contacted.\n');
+    console.error('Put the key in the gitignored env file once and it is picked up');
+    console.error('by every future run, including from a fresh shell:\n');
+    console.error('  brandgeo-dashboard/.env      add a line:  RESEND_API_KEY=re_...\n');
+    console.error('The key lives in Netlify under Site settings, Environment variables.');
+    console.error('Do not commit it and do not paste it into a chat.\n');
+    process.exit(1);
+  }
+
   // Ask Resend for the fate of a message id. This is the only way to tell
   // "never sent" apart from "sent and filtered", which is the question a
   // missing BCC always raises.
@@ -99,6 +135,15 @@ async function main() {
     });
     const j = await r.json().catch(() => ({}));
     console.log(`HTTP ${r.status}`);
+    if (!r.ok) {
+      // Exit non-zero. A lookup that returns 400 or 401 and still exits 0 is the
+      // same silent-success shape that hid the unsent email in the first place.
+      console.error(`LOOKUP FAILED: ${j.message || j.name || 'no detail returned'}`);
+      console.error(r.status === 401 || r.status === 403
+        ? 'The key was rejected. Check RESEND_API_KEY.'
+        : 'Check the message id. Resend ids look like a UUID.');
+      process.exit(1);
+    }
     console.log(JSON.stringify({ id: j.id, to: j.to, bcc: j.bcc, from: j.from, subject: j.subject, last_event: j.last_event, created_at: j.created_at }, null, 2));
     return;
   }
