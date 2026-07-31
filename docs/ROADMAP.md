@@ -74,11 +74,13 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
 Scope: `brandgeo-dashboard/src/components/`, `brandgeo/web/*.html`,
 `brandgeo/web/site.js`. Owner `bg-app` + `bg-web`. Mostly **night-safe**.
 
-- **B1. Every logo returns to the right home.** Inside the dashboard the logo
-  goes to the dashboard home; on the marketing site it goes to the landing page.
-  Constantin found pages where the logo is not clickable at all while onboarding
-  a test client. Audit all 76 marketing pages and every dashboard shell.
-  `check: bash scripts/check-logo-links.sh`  (write this script as part of the item)
+- **B1a. AuditReport's logo points at `/audit`**, not at either home. Every
+  other call site resolves to the dashboard root or to getbrandgeo.com. Decide
+  which is correct: if a report is viewed by someone who has not entered the
+  dashboard, the rule says landing page, but `/audit` may be the intended
+  mother page of that funnel. A product call, not a bug fix.
+  Scope: `brandgeo-dashboard/src/pages/AuditReport.tsx:130`.
+  `check: grep -q 'BrandGeoMark[^/]*to="/audit"' brandgeo-dashboard/src/pages/AuditReport.tsx && exit 1 || exit 0`
 
 - **B2. Cross-surface links resolve.** No link from the dashboard lands on a
   marketing 404 or vice versa. Includes the footer, support, privacy and terms
@@ -139,6 +141,22 @@ Full context for each is in `CLAUDE.md`. Listed here so the loop can see them.
 ## Done
 
 Items land here only with a passing check command and the date it passed.
+
+- **B1. Every logo returns to the right home.** Passed 2026-07-31, `b130bf6`.
+  Four pre-login pages rendered `<BrandGeoMark>` with neither `to=` nor `href=`,
+  so the mark was inert. The fix already existed on disk and had never been
+  committed, so production still had dead logos and the check passed only
+  because it ran against the working tree. Same failure class as the
+  TalentWeLove build break an hour earlier, in a different repo, the same
+  morning: present locally, absent from git.
+  ```
+  bash scripts/check-logo-links.sh
+  OK: every logo on the marketing site and in the dashboard links somewhere
+  exit 0
+  ```
+  Checked beyond the script, because it only proves a logo links SOMEWHERE and
+  the item asks for the RIGHT somewhere: all 79 marketing logos resolve to `/`,
+  and every dashboard call site was read individually. That review produced B1a.
 
 - **Stripe connector points at BrandGEO.** Passed 2026-07-30. It had been
   authorized against TalentWeLove (`acct_1TxtkGQAKgm0Dugx`), so an agent
