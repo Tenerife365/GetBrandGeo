@@ -13,23 +13,26 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
-- **`main` has DIVERGED from `origin/main`, 7 ahead and 7 behind, and nothing is
-  reaching production.** Found 2026-08-01 by cycle 5, which stopped rather than
-  merging. Not a conflict yet, just two histories that have never met.
-  - **local only:** `e1557e7`, `a8c01a3`, `7d9ca14`, `eaef49a`, `3968508`,
-    `4d6e100`, `4dc8566` (email sender, AI SEO cap, dashboard keyboard nav)
-  - **origin only:** `c0a8d1e`, `e482f9c`, `fc01b8b`, `c763611`, `3a876dc`,
-    `9e390e1`, `8deecb5` (content articles BG-020 to BG-026)
-  They look like they touch disjoint files, so a merge is probably clean. **The
-  loop did not attempt it, deliberately.** A second session was committing to
-  `main` DURING this cycle (two commits appeared mid-run) and is holding
-  uncommitted work in `brandgeo/web/index.html` (the 5-engine to 7-engine copy
-  update). Merging a diverged branch against a dirty tree while another
-  committer is live is the exact situation that corrupted `.git/index` before
-  (CLAUDE.md §6.5). Git is meant to be serialized and currently is not.
-  **Your action, in this order:** confirm the other session is finished, let it
-  commit or stash `index.html`, then `git pull --rebase` and `git push`.
-  `check: git status --short --branch | head -1` shows neither ahead nor behind
+- ~~**`main` has DIVERGED from `origin/main`, 7 ahead and 7 behind.**~~
+  **STALE, checked 2026-08-01 22:50-23:00 by cycle 6.** Some session resolved
+  it between cycle 5 and now. First check read `0` behind, `1` ahead; by the
+  end of this cycle (the other session's commit `8bccdb3` landed and was
+  pushed) it read `0` ahead, `0` behind — fully caught up with origin, nothing
+  to merge. See the entry directly below for the live-editing session this
+  divergence-check overlapped with.
+
+- ~~**A second session was live-editing `brandgeo/web/` mid-cycle.**~~
+  **RESOLVED ITSELF within the same cycle, 2026-08-01 22:50-23:00.** 87 files
+  (CTA copy/link swap, `/#contact` → `/#free-audit`) were modified and unstaged
+  when first checked; the night cycle deliberately left them alone rather than
+  `git add`ing or pushing. Re-checked before this cycle's own commit: the other
+  session had committed them as `8bccdb3` ("the bilingual series, BG-027 to
+  BG-034, and one call to action on every page") and `main` now reads `0` ahead,
+  `0` behind `origin/main` — nothing diverged, nothing to merge. No action
+  needed. Recorded as a worked example of the caution paying off: touching
+  those files at 22:50 would have collided with a commit that landed minutes
+  later.
+  `check: git status --short | grep -c '^ M brandgeo/web/'` (0)
 
 - ~~**Decision 1b, what the Free tier's engine is.**~~ **DECIDED 2026-07-31 by
   Constantin: `PLAN_ENGINES.free = ['gemini']`.** S1 is fully closed, nothing in
@@ -276,6 +279,14 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   Sequence: `bg-architect`, then `bg-verify` on the auth boundary BEFORE any
   build, then backend, then app. Not a single cycle.
   `check: test -f docs/arch/multi-site-tenancy.md`
+  **The architecture stage is DONE, checked 2026-08-01 by cycle 6.** The file
+  exists, is committed (`08514dd`), and is 2,053 lines covering the current
+  state, the write path, and the shared-limits enforcement point. The check as
+  literally written now passes. **This does not close D1** — the sequence
+  above still requires `bg-verify` on the auth boundary before any build, and
+  the build itself (backend + app) is billing-and-auth-adjacent and therefore
+  day-only, not night-safe. Recording the architecture milestone so a future
+  cycle does not re-run `bg-architect` on a solved question.
 
 - **A6. A client can always see their own plan limits and consumption.**
   Constantin, 2026-07-31. Today they cannot see either: `/usage` is the admin
@@ -362,6 +373,13 @@ Scope: `brandgeo-dashboard/netlify/functions/` (stripe*, *plan*, promotions*),
   `PLAN_PROMPTS` is keyed by plan only, with no per-client override. Needs a
   design from `bg-architect` before any build.
   `check: test -f docs/arch/custom-entitlements.md`
+  **The architecture stage is DONE, checked 2026-08-01 by cycle 6.** The file
+  exists, is committed (`eee3f9a`), 141 lines, and inventories what already
+  exists (plan assignment, time-boxed grants, per-client engine mixing) versus
+  what is genuinely missing (per-client prompt limit, custom pricing, any
+  Stripe write path). **This does not close A2** — `bg-backend` on Opus still
+  has to build it and `bg-verify` review it before production, and this is
+  billing, so it stays day-only.
 
 - **A3. Admin cannot generate a payable offer.** No Stripe write path exists in
   the product at all: only the billing portal, a subscription read, and the
@@ -623,7 +641,15 @@ Full context for each is in `CLAUDE.md`. Listed here so the loop can see them.
   survives in the file that is meant to be the source of truth.
 - `job_runs.ok` is true whenever a submitter was merely configured, even if
   every submission failed. Undercuts the observability work packet 012 built.
-- Two packets share id `006`.
+- ~~Two packets share id `006`.~~ **DONE 2026-08-01 by cycle 6.**
+  `006-bg-orchestrator-to-bg-verify-deploy-cpanel.md` renumbered to `014`
+  (next free id; 013 was the highest in use), its `id:` frontmatter updated to
+  match. `006-bg-backend-to-bg-verify-plans-drift.md` keeps id 006, it was
+  written first (2026-07-26 vs the cpanel packet's same date but higher
+  sequence in context). The rule this was proving — ids are allocated when a
+  packet is written, never reserved in advance — is unchanged and already
+  recorded in `CLAUDE.md`.
+  `check: grep -h "^id:" .claude/handoffs/*.md | sort | uniq -d` (empty)
 - Retire the dashboard SupportWidget code entirely, and flip `JAMIE_RETIRED`
   in `brandgeo/web/site.js`. Both blocked on the askmywebsiteai publish above.
 

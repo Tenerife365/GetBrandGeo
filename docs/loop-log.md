@@ -219,3 +219,68 @@ CONSTANTIN with the exact sequence rather than attempted at 3am.
 
 **NEEDS CONSTANTIN:** resolve the `main`/`origin/main` divergence once the other
 session is finished; create the Sentry account so B4 can be wired.
+
+---
+
+## 2026-08-01 22:50-23:00 — cycle 6 (night window, unattended)
+
+**Attempted:** re-run of prior checks, B2/B3/B4 status re-check per the task
+brief, the packet-id-006 hygiene item from Carried Over. **Checks passed:** 7
+(5 script/test checks re-verified with no regression, plus the new dedup
+check, plus the resolved-divergence check). **Checks failed:** 0. **Commit:**
+this cycle's, pending below. **Not pushed** — see below.
+
+**No new build work this cycle.** Every candidate the task brief named was
+already closed by cycle 5 (B2, B3) or is genuinely blocked (B4: no Sentry
+account, no confirmation `VITE_SENTRY_DSN` exists in Netlify — the brief is
+explicit this must not be attempted without that confirmation). Everything
+else on the board is Stream A/C, tagged `day-only` because it is billing or
+customer-facing copy, so this cycle correctly found little to build and spent
+its time on verification and one piece of hygiene instead of manufacturing
+work.
+
+**Re-verified, no regressions:** `check-logo-links.sh`, `check-links.sh`,
+`check-greeting-clock.sh`, `check-funnel-accept-path.sh`,
+`check-contract-gate.sh`, `package_provisioning.test.js` (63 checks),
+`refresh_cadence.test.js` (17 assertions). All exit 0, same as claimed.
+
+**Found and closed: the packet-id-006 collision** flagged in `CLAUDE.md` and
+carried in ROADMAP's "Carried over" section with no check command. Wrote one
+(`grep -h "^id:" .claude/handoffs/*.md | sort | uniq -d`, empty means clean),
+confirmed it failed first (two files both read `id: 006`), then renamed
+`006-bg-orchestrator-to-bg-verify-deploy-cpanel.md` to `014-...md` (next free
+id) and updated its frontmatter. Mechanical, done directly, no agent spawned
+per AUTONOMY §7.6.
+
+**Found: two architecture docs the roadmap still listed as open already exist
+and are committed.** `docs/arch/multi-site-tenancy.md` (D1, `08514dd`, 2,053
+lines) and `docs/arch/custom-entitlements.md` (A2, `eee3f9a`, 141 lines) both
+satisfy their literal `test -f` checks. Recorded in ROADMAP with an explicit
+caveat: the check only covers the architecture stage, and both items' next
+phases (`bg-verify` on the auth boundary, then backend build) are billing or
+auth work and stay day-only. Not claiming D1/A2 closed, only that a future
+cycle should not re-run `bg-architect` on a question already answered.
+
+**A live collision was avoided, not caused.** 87 files under `brandgeo/web/`
+(a CTA copy/link swap across every city and industry page) were modified and
+unstaged when this cycle started, newest mtime 6 minutes old — an active
+second session, not an abandoned one. The cycle left every one of those files
+alone: no `git add`, no stash, no push, exactly the caution AUTONOMY §1 and
+CLAUDE.md §6.5 ask for. By the time this cycle went to commit its own work,
+the other session had committed and pushed them as `8bccdb3`, and
+`origin/main` was fully caught up (`0` ahead, `0` behind — the 7/7 divergence
+NEEDS CONSTANTIN had carried from cycle 5 is gone on its own). This cycle's
+own commit is scoped to exactly the two paths it touched
+(`.claude/handoffs/014-...md`, `docs/ROADMAP.md`) and nothing from the other
+session's working tree.
+
+**Not pushed.** Only docs and a handoff rename changed — zero
+`brandgeo-dashboard/` files — so this push would cost nothing against the
+Netlify build budget (AUTONOMY §7). Held anyway: the other session just
+pushed moments ago and a second push run back-to-back is exactly the kind of
+concurrent git activity the serialization rule exists to avoid, with no
+benefit to landing docs-only changes at 3am over the next work block. Queued
+for the next batch push.
+
+**NEEDS CONSTANTIN:** nothing new. Create the Sentry account so B4 can be
+wired (carried from cycle 5, unchanged).
