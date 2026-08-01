@@ -1,0 +1,2061 @@
+{
+  "checks": {
+    "A": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-violet.png",
+        "strict": 253,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-dark.png",
+        "strict": 2,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-1024-violet-master.png",
+        "strict": 1653,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-violet.png",
+        "strict": 820,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-white.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-violet.png",
+        "strict": 253,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-dark.png",
+        "strict": 2,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-violet.png",
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-dark.png",
+        "strict": 7,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      {
+        "ok": true,
+        "file": "tiktok/tiktok-profile-1080-violet.png",
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-violet.png",
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-dark.png",
+        "strict": 7,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-icon-800-violet.png",
+        "strict": 990,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-cover-4200x700.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-cover-1024x576.png",
+        "strict": 1,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      {
+        "ok": true,
+        "file": "x/x-header-1500x500.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-cover-1702x630.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-banner-2560x1440.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      }
+    ],
+    "A-neg": [
+      {
+        "ok": true,
+        "file": "gbp-logo-720-transparent.png",
+        "strict": 90524,
+        "over_v3_envelope": 89881,
+        "max_g_minus_r": 255
+      },
+      {
+        "ok": true,
+        "file": "gbp-logo-720-white.png",
+        "strict": 88630,
+        "over_v3_envelope": 87981,
+        "max_g_minus_r": 116
+      },
+      {
+        "ok": true,
+        "file": "linkedin-logo-400-canvas.png",
+        "strict": 30306,
+        "over_v3_envelope": 30084,
+        "max_g_minus_r": 117
+      },
+      {
+        "ok": true,
+        "file": "linkedin-logo-400-white.png",
+        "strict": 30286,
+        "over_v3_envelope": 30064,
+        "max_g_minus_r": 117
+      }
+    ],
+    "A-pos": [
+      {
+        "ok": true,
+        "file": "mark-512.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": -5
+      },
+      {
+        "ok": true,
+        "file": "icon-tile-512.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": -3
+      },
+      {
+        "ok": true,
+        "file": "icon-card-512.png",
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": -5
+      }
+    ],
+    "F": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-violet.png",
+        "iou": 0.9892
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-dark.png",
+        "iou": 0.9888
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-violet.png",
+        "iou": 0.9923
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-white.png",
+        "iou": 0.9957
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-violet.png",
+        "iou": 0.9892
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-dark.png",
+        "iou": 0.9888
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-icon-800-violet.png",
+        "iou": 0.9949
+      }
+    ],
+    "F-neg": [
+      {
+        "ok": true,
+        "file": "gbp-logo-720-transparent.png",
+        "iou": 0.6299
+      }
+    ],
+    "B": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-dark.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-1024-violet-master.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-white.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-dark.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-dark.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "tiktok/tiktok-profile-1080-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-violet.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-dark.png",
+        "retained": 1.0
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-icon-800-violet.png",
+        "retained": 1.0
+      }
+    ],
+    "B-neg": [
+      {
+        "ok": true,
+        "pad": 1.6,
+        "retained": 0.917092
+      }
+    ],
+    "C": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.946,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            144,
+            100,
+            244
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.954,
+          "openness": 0.681,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            253
+          ],
+          "counter": [
+            180,
+            151,
+            247
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-dark.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.983,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            21,
+            17,
+            36
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.092,
+          "openness": 0.797,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            91,
+            228
+          ],
+          "counter": [
+            63,
+            41,
+            109
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-1024-violet-master.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.197,
+          "openness": 0.941,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.958,
+          "openness": 0.671,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.94,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.958,
+          "openness": 0.671,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            248
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-white.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.309,
+          "openness": 0.788,
+          "bg": [
+            255,
+            255,
+            255
+          ],
+          "stroke": [
+            123,
+            98,
+            244
+          ],
+          "counter": [
+            238,
+            232,
+            253
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.021,
+          "openness": 0.38,
+          "bg": [
+            255,
+            255,
+            255
+          ],
+          "stroke": [
+            130,
+            103,
+            244
+          ],
+          "counter": [
+            201,
+            178,
+            249
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.946,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            144,
+            100,
+            244
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.954,
+          "openness": 0.681,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            253
+          ],
+          "counter": [
+            180,
+            151,
+            247
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-dark.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.983,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            21,
+            17,
+            36
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.092,
+          "openness": 0.797,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            91,
+            228
+          ],
+          "counter": [
+            63,
+            41,
+            109
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-dark.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.98,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            22,
+            18,
+            38
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.108,
+          "openness": 0.789,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            92,
+            228
+          ],
+          "counter": [
+            64,
+            42,
+            111
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "tiktok/tiktok-profile-1080-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-dark.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.98,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            22,
+            18,
+            38
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.108,
+          "openness": 0.789,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            92,
+            228
+          ],
+          "counter": [
+            64,
+            42,
+            111
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-icon-800-violet.png",
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.182,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.959,
+          "openness": 0.67,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            248
+          ]
+        }
+      }
+    ],
+    "C-neg": [
+      {
+        "ok": true,
+        "case": "hairline stroke 7u (shipped is 56u)",
+        "16": {
+          "size": 16,
+          "contrast_at_size": 1.369,
+          "openness": 0.15,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            147,
+            118,
+            245
+          ],
+          "counter": [
+            152,
+            110,
+            246
+          ]
+        }
+      },
+      {
+        "ok": true,
+        "case": "glyph #8257E0 on #7C5AD6",
+        "16": {
+          "size": 16,
+          "contrast_at_size": 1.021,
+          "openness": 0.797,
+          "bg": [
+            124,
+            90,
+            214
+          ],
+          "stroke": [
+            130,
+            87,
+            223
+          ],
+          "counter": [
+            126,
+            88,
+            218
+          ]
+        }
+      }
+    ],
+    "D": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-400-dark.png",
+        "contrast": 4.472,
+        "stroke": [
+          120,
+          97,
+          244
+        ],
+        "bg": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-logo-1024-violet-master.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-logo-720-white.png",
+        "contrast": 4.374,
+        "stroke": [
+          120,
+          97,
+          244
+        ],
+        "bg": [
+          255,
+          255,
+          255
+        ]
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "x/x-profile-400-dark.png",
+        "contrast": 4.472,
+        "stroke": [
+          120,
+          97,
+          244
+        ],
+        "bg": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "instagram/instagram-profile-1080-dark.png",
+        "contrast": 4.472,
+        "stroke": [
+          120,
+          97,
+          244
+        ],
+        "bg": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "ok": true,
+        "file": "tiktok/tiktok-profile-1080-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-profile-1080-dark.png",
+        "contrast": 4.472,
+        "stroke": [
+          120,
+          97,
+          244
+        ],
+        "bg": [
+          11,
+          12,
+          16
+        ]
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-icon-800-violet.png",
+        "contrast": 4.252,
+        "stroke": [
+          245,
+          243,
+          255
+        ],
+        "bg": [
+          124,
+          87,
+          243
+        ]
+      }
+    ],
+    "E": [
+      {
+        "ok": true,
+        "file": "linkedin/linkedin-cover-4200x700.png",
+        "safe": [
+          1400,
+          0,
+          2800,
+          700
+        ],
+        "bbox": [
+          1552,
+          94,
+          2648,
+          606
+        ],
+        "margins": [
+          152,
+          94,
+          152,
+          94
+        ]
+      },
+      {
+        "ok": true,
+        "file": "gbp/gbp-cover-1024x576.png",
+        "safe": [
+          0,
+          0,
+          1024,
+          576
+        ],
+        "bbox": [
+          193,
+          136,
+          827,
+          440
+        ],
+        "margins": [
+          193,
+          136,
+          197,
+          136
+        ]
+      },
+      {
+        "ok": true,
+        "file": "x/x-header-1500x500.png",
+        "safe": [
+          430,
+          30,
+          1470,
+          430
+        ],
+        "bbox": [
+          600,
+          93,
+          1157,
+          356
+        ],
+        "margins": [
+          170,
+          63,
+          313,
+          74
+        ]
+      },
+      {
+        "ok": true,
+        "file": "facebook/facebook-cover-1702x630.png",
+        "safe": [
+          291,
+          0,
+          1411,
+          630
+        ],
+        "bbox": [
+          532,
+          163,
+          1166,
+          467
+        ],
+        "margins": [
+          241,
+          163,
+          245,
+          163
+        ]
+      },
+      {
+        "ok": true,
+        "file": "youtube/youtube-banner-2560x1440.png",
+        "safe": [
+          662,
+          551,
+          1897,
+          889
+        ],
+        "bbox": [
+          987,
+          581,
+          1568,
+          858
+        ],
+        "margins": [
+          325,
+          30,
+          329,
+          31
+        ]
+      }
+    ],
+    "E-neg": [
+      {
+        "ok": true,
+        "file": "youtube/youtube-banner-2560x1440.png",
+        "box": [
+          1180,
+          680,
+          1380,
+          760
+        ],
+        "bbox": [
+          987,
+          581,
+          1568,
+          858
+        ]
+      }
+    ]
+  },
+  "assets": {
+    "linkedin/linkedin-logo-400-violet.png": {
+      "retired": {
+        "strict": 253,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "iou_vs_v3_mark": 0.9892,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.946,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            144,
+            100,
+            244
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.954,
+          "openness": 0.681,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            253
+          ],
+          "counter": [
+            180,
+            151,
+            247
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "linkedin/linkedin-logo-400-dark.png": {
+      "retired": {
+        "strict": 2,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      "iou_vs_v3_mark": 0.9888,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.983,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            21,
+            17,
+            36
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.092,
+          "openness": 0.797,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            91,
+            228
+          ],
+          "counter": [
+            63,
+            41,
+            109
+          ]
+        }
+      },
+      "contrast_native": 4.472
+    },
+    "linkedin/linkedin-logo-1024-violet-master.png": {
+      "retired": {
+        "strict": 1653,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.197,
+          "openness": 0.941,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.958,
+          "openness": 0.671,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "gbp/gbp-logo-720-violet.png": {
+      "retired": {
+        "strict": 820,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "iou_vs_v3_mark": 0.9923,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.94,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.958,
+          "openness": 0.671,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            248
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "gbp/gbp-logo-720-white.png": {
+      "retired": {
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      "iou_vs_v3_mark": 0.9957,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.309,
+          "openness": 0.788,
+          "bg": [
+            255,
+            255,
+            255
+          ],
+          "stroke": [
+            123,
+            98,
+            244
+          ],
+          "counter": [
+            238,
+            232,
+            253
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.021,
+          "openness": 0.38,
+          "bg": [
+            255,
+            255,
+            255
+          ],
+          "stroke": [
+            130,
+            103,
+            244
+          ],
+          "counter": [
+            201,
+            178,
+            249
+          ]
+        }
+      },
+      "contrast_native": 4.374
+    },
+    "x/x-profile-400-violet.png": {
+      "retired": {
+        "strict": 253,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "iou_vs_v3_mark": 0.9892,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.181,
+          "openness": 0.946,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            144,
+            100,
+            244
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.954,
+          "openness": 0.681,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            237,
+            234,
+            253
+          ],
+          "counter": [
+            180,
+            151,
+            247
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "x/x-profile-400-dark.png": {
+      "retired": {
+        "strict": 2,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      "iou_vs_v3_mark": 0.9888,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.983,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            21,
+            17,
+            36
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.092,
+          "openness": 0.797,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            91,
+            228
+          ],
+          "counter": [
+            63,
+            41,
+            109
+          ]
+        }
+      },
+      "contrast_native": 4.472
+    },
+    "instagram/instagram-profile-1080-violet.png": {
+      "retired": {
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "instagram/instagram-profile-1080-dark.png": {
+      "retired": {
+        "strict": 7,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.98,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            22,
+            18,
+            38
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.108,
+          "openness": 0.789,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            92,
+            228
+          ],
+          "counter": [
+            64,
+            42,
+            111
+          ]
+        }
+      },
+      "contrast_native": 4.472
+    },
+    "tiktok/tiktok-profile-1080-violet.png": {
+      "retired": {
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "facebook/facebook-profile-1080-violet.png": {
+      "retired": {
+        "strict": 1830,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.183,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            102,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.967,
+          "openness": 0.669,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            249
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "facebook/facebook-profile-1080-dark.png": {
+      "retired": {
+        "strict": 7,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.431,
+          "openness": 0.98,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            121,
+            96,
+            242
+          ],
+          "counter": [
+            22,
+            18,
+            38
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 4.108,
+          "openness": 0.789,
+          "bg": [
+            11,
+            12,
+            16
+          ],
+          "stroke": [
+            118,
+            92,
+            228
+          ],
+          "counter": [
+            64,
+            42,
+            111
+          ]
+        }
+      },
+      "contrast_native": 4.472
+    },
+    "youtube/youtube-icon-800-violet.png": {
+      "retired": {
+        "strict": 990,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 3
+      },
+      "iou_vs_v3_mark": 0.9949,
+      "circle_ink_retained": 1.0,
+      "legibility": {
+        "32": {
+          "size": 32,
+          "contrast_at_size": 4.182,
+          "openness": 0.939,
+          "bg": [
+            125,
+            87,
+            243
+          ],
+          "stroke": [
+            244,
+            242,
+            255
+          ],
+          "counter": [
+            145,
+            101,
+            245
+          ]
+        },
+        "16": {
+          "size": 16,
+          "contrast_at_size": 3.959,
+          "openness": 0.67,
+          "bg": [
+            124,
+            87,
+            243
+          ],
+          "stroke": [
+            238,
+            234,
+            254
+          ],
+          "counter": [
+            182,
+            153,
+            248
+          ]
+        }
+      },
+      "contrast_native": 4.252
+    },
+    "linkedin/linkedin-cover-4200x700.png": {
+      "retired": {
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      "safe_area": {
+        "safe": [
+          1400,
+          0,
+          2800,
+          700
+        ],
+        "content_bbox": [
+          1552,
+          94,
+          2648,
+          606
+        ],
+        "margins_lturb": [
+          152,
+          94,
+          152,
+          94
+        ]
+      }
+    },
+    "gbp/gbp-cover-1024x576.png": {
+      "retired": {
+        "strict": 1,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 1
+      },
+      "safe_area": {
+        "safe": [
+          0,
+          0,
+          1024,
+          576
+        ],
+        "content_bbox": [
+          193,
+          136,
+          827,
+          440
+        ],
+        "margins_lturb": [
+          193,
+          136,
+          197,
+          136
+        ]
+      }
+    },
+    "x/x-header-1500x500.png": {
+      "retired": {
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      "safe_area": {
+        "safe": [
+          430,
+          30,
+          1470,
+          430
+        ],
+        "content_bbox": [
+          600,
+          93,
+          1157,
+          356
+        ],
+        "margins_lturb": [
+          170,
+          63,
+          313,
+          74
+        ]
+      }
+    },
+    "facebook/facebook-cover-1702x630.png": {
+      "retired": {
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      "safe_area": {
+        "safe": [
+          291,
+          0,
+          1411,
+          630
+        ],
+        "content_bbox": [
+          532,
+          163,
+          1166,
+          467
+        ],
+        "margins_lturb": [
+          241,
+          163,
+          245,
+          163
+        ]
+      }
+    },
+    "youtube/youtube-banner-2560x1440.png": {
+      "retired": {
+        "strict": 0,
+        "over_v3_envelope": 0,
+        "max_g_minus_r": 0
+      },
+      "safe_area": {
+        "safe": [
+          662,
+          551,
+          1897,
+          889
+        ],
+        "content_bbox": [
+          987,
+          581,
+          1568,
+          858
+        ],
+        "margins_lturb": [
+          325,
+          30,
+          329,
+          31
+        ]
+      }
+    }
+  }
+}
