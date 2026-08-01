@@ -80,7 +80,8 @@ $(printf '%s\n' "$all_files" | grep '^brandgeo-dashboard/' | sed 's/^/    /' | s
       BATCH_PUSH=urgent git push
 
   To see what is queued first:
-      sh scripts/deploy-status.sh
+      .\scripts\deploy-status.ps1   (PowerShell)
+      sh scripts/deploy-status.sh    (git-bash)
 
 ======================================================================
 
