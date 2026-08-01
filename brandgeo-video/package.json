@@ -1,0 +1,21 @@
+{
+  "name": "brandgeo-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion project for BrandGEO motion graphics. Renders the four vertical pillar compositions written 2026-07-29 and is the pipeline for long-form data cards.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "compositions": "remotion compositions src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.503",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.503"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.7.2"
+  }
+}

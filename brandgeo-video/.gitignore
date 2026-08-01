@@ -1,0 +1,8 @@
+# The repo root .gitignore has NO node_modules rule, so this file is
+# load-bearing rather than boilerplate: without it, installing Remotion drops
+# several hundred megabytes of unignored files into a repo that another session
+# is actively committing to.
+node_modules/
+out/
+build/
+.remotion/
