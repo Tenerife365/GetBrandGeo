@@ -67,3 +67,20 @@ assets/voices/**/*.onnx
 assets/audio/*.wav
 assets/samples/*.wav
 email-preview.html
+
+# ── Rendered campaign media ─────────────────────────────────────────────────
+# 551 MB across 188 files as of 2026-08-01, and this repo is PUBLIC, so a commit
+# is permanent: removing it later needs a history rewrite, not a delete.
+#
+# All of it is OUTPUT and all of it is regenerable. The Remotion project at
+# brandgeo-video/ is tracked (and already gitignores its own out/), and the
+# music comes from scripts/compose_music.py. reel-campaign-ab/ in particular is
+# intermediate A/B renders across six timestamped runs of the same day.
+#
+# PNG is deliberately NOT ignored: 192 files at 26 MB total are the actual
+# publishable post images, small, and not trivially reproducible.
+docs/growth/CAMPAIGN-*/**/*.mp4
+docs/growth/CAMPAIGN-*/**/*.wav
+docs/growth/reel-campaign-ab/**/*.mp4
+docs/growth/reel-campaign-ab/**/*.wav
+assets/audio/music/*.wav

@@ -1,0 +1,338 @@
+[
+  {
+    "file": "stripe-free-1024x1024.png",
+    "plan": "free",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-free-1440x1440.png",
+    "plan": "free",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-free-1080x1080.png",
+    "plan": "free",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-free-1080x1350.png",
+    "plan": "free",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-free-1200x630.png",
+    "plan": "free",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-free-1600x900.png",
+    "plan": "free",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-radar-1024x1024.png",
+    "plan": "radar",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-radar-1440x1440.png",
+    "plan": "radar",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-radar-1080x1080.png",
+    "plan": "radar",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-radar-1080x1350.png",
+    "plan": "radar",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-radar-1200x630.png",
+    "plan": "radar",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-radar-1600x900.png",
+    "plan": "radar",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-essentials-1024x1024.png",
+    "plan": "essentials",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-essentials-1440x1440.png",
+    "plan": "essentials",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-essentials-1080x1080.png",
+    "plan": "essentials",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-essentials-1080x1350.png",
+    "plan": "essentials",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-essentials-1200x630.png",
+    "plan": "essentials",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-essentials-1600x900.png",
+    "plan": "essentials",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-growth-1024x1024.png",
+    "plan": "growth",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-growth-1440x1440.png",
+    "plan": "growth",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-growth-1080x1080.png",
+    "plan": "growth",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth-1080x1350.png",
+    "plan": "growth",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth-1200x630.png",
+    "plan": "growth",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth-1600x900.png",
+    "plan": "growth",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-growth_pro-1024x1024.png",
+    "plan": "growth_pro",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-growth_pro-1440x1440.png",
+    "plan": "growth_pro",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-growth_pro-1080x1080.png",
+    "plan": "growth_pro",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth_pro-1080x1350.png",
+    "plan": "growth_pro",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth_pro-1200x630.png",
+    "plan": "growth_pro",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-growth_pro-1600x900.png",
+    "plan": "growth_pro",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-managed-1024x1024.png",
+    "plan": "managed",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-managed-1440x1440.png",
+    "plan": "managed",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-managed-1080x1080.png",
+    "plan": "managed",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-managed-1080x1350.png",
+    "plan": "managed",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-managed-1200x630.png",
+    "plan": "managed",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-managed-1600x900.png",
+    "plan": "managed",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  },
+  {
+    "file": "stripe-enterprise-1024x1024.png",
+    "plan": "enterprise",
+    "surface": "stripe",
+    "w": 1024,
+    "h": 1024,
+    "brand": "mark"
+  },
+  {
+    "file": "gbp-enterprise-1440x1440.png",
+    "plan": "enterprise",
+    "surface": "gbp",
+    "w": 1440,
+    "h": 1440,
+    "brand": "mark"
+  },
+  {
+    "file": "promo-enterprise-1080x1080.png",
+    "plan": "enterprise",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1080,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-enterprise-1080x1350.png",
+    "plan": "enterprise",
+    "surface": "promo",
+    "w": 1080,
+    "h": 1350,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-enterprise-1200x630.png",
+    "plan": "enterprise",
+    "surface": "promo",
+    "w": 1200,
+    "h": 630,
+    "brand": "lockup"
+  },
+  {
+    "file": "promo-enterprise-1600x900.png",
+    "plan": "enterprise",
+    "surface": "promo",
+    "w": 1600,
+    "h": 900,
+    "brand": "lockup"
+  }
+]

@@ -1,0 +1,96 @@
+x-thread-a-firm-that-does-not-exist-1600x900.png	CHICAGO AND BOSTON, 24 JULY 2026
+x-thread-a-firm-that-does-not-exist-1600x900.png	Two of five engines
+x-thread-a-firm-that-does-not-exist-1600x900.png	named the same firm.
+x-thread-a-firm-that-does-not-exist-1600x900.png	That firm does not exist.
+x-thread-a-firm-that-does-not-exist-1600x900.png	Five engines fired in each run. Five returned
+x-thread-a-firm-that-does-not-exist-1600x900.png	usable data. No collection errors in either city.
+x-thread-a-firm-that-does-not-exist-1600x900.png	getbrandgeo.com
+x-thread-b-language-picked-the-shortlist-1600x900.png	PARIS, COLLECTED 10 JULY 2026
+x-thread-b-language-picked-the-shortlist-1600x900.png	One question, asked twice.
+x-thread-b-language-picked-the-shortlist-1600x900.png	Two different sets of firms.
+x-thread-b-language-picked-the-shortlist-1600x900.png	ASKED IN FRENCH
+x-thread-b-language-picked-the-shortlist-1600x900.png	Independent
+x-thread-b-language-picked-the-shortlist-1600x900.png	boutique French firms.
+x-thread-b-language-picked-the-shortlist-1600x900.png	ASKED IN ENGLISH
+x-thread-b-language-picked-the-shortlist-1600x900.png	Large international
+x-thread-b-language-picked-the-shortlist-1600x900.png	private banks.
+x-standalone-1-one-question-five-engines-1600x900.png	CHICAGO, 24 JULY 2026
+x-standalone-1-one-question-five-engines-1600x900.png	One question.
+x-standalone-1-one-question-five-engines-1600x900.png	Five engines.
+x-standalone-1-one-question-five-engines-1600x900.png	"Top-rated property
+x-standalone-1-one-question-five-engines-1600x900.png	management companies
+x-standalone-1-one-question-five-engines-1600x900.png	in Chicago"
+x-standalone-1-one-question-five-engines-1600x900.png	WHERE IT LANDED
+x-standalone-1-one-question-five-engines-1600x900.png	ChatGPT
+x-standalone-1-one-question-five-engines-1600x900.png	1st
+x-standalone-1-one-question-five-engines-1600x900.png	Claude
+x-standalone-1-one-question-five-engines-1600x900.png	1st
+x-standalone-1-one-question-five-engines-1600x900.png	Perplexity
+x-standalone-1-one-question-five-engines-1600x900.png	2nd
+x-standalone-1-one-question-five-engines-1600x900.png	Gemini
+x-standalone-1-one-question-five-engines-1600x900.png	4th
+x-standalone-1-one-question-five-engines-1600x900.png	Google AI Mode
+x-standalone-1-one-question-five-engines-1600x900.png	named
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	OUR OWN ROME RUN, 10 JULY 2026
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	Not five engines
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	agreeing.
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	Ask what the five counts
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	before you read it
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	as consensus.
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	WHAT THE 5 OF 5 COUNTS
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	5 restaurants
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	of 5
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	1 engine
+x-standalone-2-what-a-five-of-five-counts-1600x900.png	2 languages
+threads-1-companies-converge-1080x1350.png	BOSTON AND HOUSTON, 24 JULY 2026
+threads-1-companies-converge-1080x1350.png	Companies
+threads-1-companies-converge-1080x1350.png	converge.
+threads-1-companies-converge-1080x1350.png	Individuals
+threads-1-companies-converge-1080x1350.png	fragment.
+threads-1-companies-converge-1080x1350.png	ENGINES AGREEING
+threads-1-companies-converge-1080x1350.png	BOSTON
+threads-1-companies-converge-1080x1350.png	HOUSTON
+threads-1-companies-converge-1080x1350.png	Property management
+threads-1-companies-converge-1080x1350.png	5 of 5
+threads-1-companies-converge-1080x1350.png	4 of 5
+threads-1-companies-converge-1080x1350.png	Real estate agents
+threads-1-companies-converge-1080x1350.png	2 of 5
+threads-1-companies-converge-1080x1350.png	2 of 5
+threads-1-companies-converge-1080x1350.png	getbrandgeo.com
+threads-2-an-emoji-changed-the-score-1080x1350.png	A BUG IN OUR OWN SCORING
+threads-2-an-emoji-changed-the-score-1080x1350.png	Same answer.
+threads-2-an-emoji-changed-the-score-1080x1350.png	Same praise.
+threads-2-an-emoji-changed-the-score-1080x1350.png	Different score.
+threads-2-an-emoji-changed-the-score-1080x1350.png	HEADING WITH A MEDAL EMOJI
+threads-2-an-emoji-changed-the-score-1080x1350.png	Rank 1
+threads-2-an-emoji-changed-the-score-1080x1350.png	Positive
+threads-2-an-emoji-changed-the-score-1080x1350.png	THE SAME HEADING WITHOUT IT
+threads-2-an-emoji-changed-the-score-1080x1350.png	No rank
+threads-2-an-emoji-changed-the-score-1080x1350.png	Neutral
+threads-2-an-emoji-changed-the-score-1080x1350.png	getbrandgeo.com
+threads-3-the-near-miss-1080x1350.png	CHICAGO AND BOSTON, 24 JULY 2026
+threads-3-the-near-miss-1080x1350.png	An invented firm
+threads-3-the-near-miss-1080x1350.png	is the easy case.
+threads-3-the-near-miss-1080x1350.png	The near miss
+threads-3-the-near-miss-1080x1350.png	is not.
+threads-3-the-near-miss-1080x1350.png	HARDER TO CATCH THAN A FICTION
+threads-3-the-near-miss-1080x1350.png	Your name merged with another
+threads-3-the-near-miss-1080x1350.png	A trading name you dropped
+threads-3-the-near-miss-1080x1350.png	A wrong legal suffix
+threads-3-the-near-miss-1080x1350.png	getbrandgeo.com
+threads-4-an-empty-field-1080x1350.png	HOW OUR SCORER REPORTS A RANK
+threads-4-an-empty-field-1080x1350.png	A number only
+threads-4-an-empty-field-1080x1350.png	appears when the
+threads-4-an-empty-field-1080x1350.png	engine claimed one.
+threads-4-an-empty-field-1080x1350.png	Otherwise the field
+threads-4-an-empty-field-1080x1350.png	is empty.
+threads-4-an-empty-field-1080x1350.png	WHAT COUNTS AS A CLAIMED RANK
+threads-4-an-empty-field-1080x1350.png	A real numbered list
+threads-4-an-empty-field-1080x1350.png	rank
+threads-4-an-empty-field-1080x1350.png	A list with ordering words
+threads-4-an-empty-field-1080x1350.png	rank
+threads-4-an-empty-field-1080x1350.png	A superlative tied to the name
+threads-4-an-empty-field-1080x1350.png	rank
+threads-4-an-empty-field-1080x1350.png	A brand seen partway down
+threads-4-an-empty-field-1080x1350.png	null
+threads-4-an-empty-field-1080x1350.png	getbrandgeo.com

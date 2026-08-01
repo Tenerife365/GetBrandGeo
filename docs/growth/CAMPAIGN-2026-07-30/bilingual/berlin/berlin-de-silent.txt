@@ -1,0 +1,9 @@
+Am 10. Juli 2026 haben wir Berlin zweisprachig erhoben: vier Kategorien, jede zweimal gestellt, einmal auf Deutsch und einmal auf Englisch. Acht Fragen an vier KI-Systeme, Claude, Gemini, Meta AI und Perplexity. Meta AI lief an dem Tag mit und steht seit dem 16.07.2026 nicht mehr in unserem Set. ChatGPT fehlt in dieser Erhebung, weil die Abfrage an dem Tag technisch fehlschlug. Das ist eine Lücke in unseren Daten und keine Aussage über ChatGPT.
+
+Was zurückkam: In einer Kategorie nannten 4 von 4 Systemen auf Deutsch dieselbe Marke. In einer anderen gab es in beiden Sprachen keine Übereinstimmung. In einer dritten antworteten zwei Systeme auf Deutsch ausführlich und lieferten auf dieselbe Frage auf Englisch nichts Brauchbares.
+
+Das Muster darunter ist unspektakulär. Kategorien, die auf wenigen gut dokumentierten Produkten aufbauen, laufen auf eine kurze Liste zu. Kategorien aus tausenden kleinen Kanzleien und Praxen zerfallen. Wer Berlin auf Deutsch und auf Englisch bedient, deckt mit einer Messung genau eine dieser beiden Sprachen ab.
+
+Stand: 10.07.2026, erhoben mit unserer eigenen Pipeline. Die Auswertung steht auf getbrandgeo.com.
+
+#KISichtbarkeit #KISuche #Berlin #Startup #OnlineMarketing #GEO

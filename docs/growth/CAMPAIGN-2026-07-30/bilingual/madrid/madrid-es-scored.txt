@@ -1,0 +1,9 @@
+El 10 de julio de 2026 medimos Madrid en dos idiomas: 4 categorías, cada una preguntada una vez en español y una vez en inglés, en cuatro motores. Claude, Gemini, Meta AI y Perplexity. Meta AI corría ese día y desde el 16/07/2026 ya no forma parte de nuestro conjunto. ChatGPT no entró en esta recogida porque su consulta falló ese día, así que es un hueco en nuestros datos y no una lectura sobre ChatGPT.
+
+En la pregunta del hotel de aeropuerto, un motor respondió en inglés y se quedó en blanco en español. Otro hizo justo lo contrario. Lo que aparece al juntar las dos pasadas es lo que más nos llamó la atención: los 4 motores que devolvieron una respuesta utilizable nombraron el mismo hotel. La diferencia no estaba en qué hotel decían. Estaba en si contestaban o no, y eso dependía del idioma.
+
+En otra categoría el patrón cambió de forma: un motor repitió casi la misma lista corta en los dos idiomas mientras otros dos daban listas que apenas se solapaban entre sí. Eso ocurrió en esa pregunta concreta y no es un rasgo fijo de ese motor.
+
+Datos del 10/07/2026, recogidos con nuestra propia canalización. El desglose está en getbrandgeo.com.
+
+#VisibilidadIA #BusquedaIA #Madrid #MarketingDigital #SEO #GEO

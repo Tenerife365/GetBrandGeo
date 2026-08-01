@@ -1,0 +1,1 @@
+Two of the five AI engines we ran returned the same law firm name. That firm does not exist. Chicago, corporate law, collected 24 July 2026. All five engines returned usable data on every prompt, no collection errors.

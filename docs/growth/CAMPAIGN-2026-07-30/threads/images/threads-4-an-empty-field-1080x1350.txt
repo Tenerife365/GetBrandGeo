@@ -1,0 +1,3 @@
+We took a fallback out of our own scoring in July and the product got quieter on purpose.
+
+If an AI answer says "here are the top three, in order", that's a rank. If it says "here are a few good options" and then bullets them, it isn't one. To a parser counting bullet points those two look identical, and our older scorer treated them identically. It also treated a brand mentioned in the third sentence as rank 3, which isn't a rank at all, it's a position in a paragraph.

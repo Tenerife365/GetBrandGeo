@@ -1,0 +1,11 @@
+There is no analytics event for an answer you were left out of.
+
+A search engine sends a visit, so it leaves a row in your report. A generated answer is read on the engine's own screen. The buyer sees a short list of names, picks one, and the brands that were not named produce no session, no referrer, no bounce, nothing to look at later.
+
+That is the part worth sitting with. Not that traffic fell, but that the report was complete and the loss was still invisible inside it.
+
+We ask ChatGPT, Gemini, Claude, Perplexity and Google AI Mode the same buyer questions on a schedule and keep what comes back, so the thing that leaves no row has somewhere to be counted.
+
+Link in bio.
+
+#AIVisibility #GenerativeEngineOptimization #ZeroClickSearch #AISearch #AnswerEngineOptimization #MarketingAnalytics #AttributionGap #LLMSEO #BrandStrategy

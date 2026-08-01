@@ -1,0 +1,9 @@
+Analytics is built around arrivals. Someone lands, a session opens, a source gets attributed. Everything it reports starts at the moment a person reaches you.
+
+An AI answer happens before that. A buyer asks a question, reads a short reply with a few businesses named in it, and picks one. If you were not among them, nothing about that event reaches your reporting. There is no drop to investigate and no line that goes down, which is what makes it easy to miss for a long time.
+
+The useful thing about it is that the answer itself is readable. You can put the question your customers ask to an AI engine and see what comes back. What that gives you is one point in time, on one wording, from one engine.
+
+BrandGEO puts your buyers' questions to ChatGPT, Gemini, Claude, Perplexity and Google AI Mode on a schedule and keeps the record, so the comparison between this month and last is already there when you want it.
+
+https://getbrandgeo.com

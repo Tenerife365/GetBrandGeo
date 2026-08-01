@@ -1,0 +1,3 @@
+Here's a pattern that turned up in two cities on the same day, and it changes what AI visibility work is worth in a given category.
+
+We ran six buyer categories in Boston and six in Houston on 24 July 2026, five engines each: ChatGPT, Claude, Gemini, Perplexity and Google AI Mode. Property management converged hard. One company was named by all five engines in Boston, and two companies were named by four of the five in Houston.

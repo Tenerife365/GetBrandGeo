@@ -1,0 +1,3 @@
+Two of the five engines we ran returned a law firm name that does not exist. Chicago, corporate law, 24 July 2026. Then the identical invented name came back in Boston, in a different category, from the same two engines, on the same collection date.
+
+We left it in the published data. Two engines making the same mistake independently, in two cities, is more interesting than a tidy table.

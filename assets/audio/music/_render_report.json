@@ -1,0 +1,202 @@
+{
+  "tension-minor": {
+    "measured": {
+      "input_i": "-16.00",
+      "input_tp": "-3.60",
+      "input_lra": "6.80",
+      "input_thresh": "-26.00",
+      "output_i": "-15.34",
+      "output_tp": "-3.40",
+      "output_lra": "4.30",
+      "output_thresh": "-25.34",
+      "normalization_type": "dynamic",
+      "target_offset": "-0.66"
+    },
+    "analysis": {
+      "samples": 2880000,
+      "duration_s": 60.0,
+      "peak_dbfs": -3.6,
+      "rms_dbfs": -16.61,
+      "lr_correlation": 0.8593,
+      "lr_differing_samples": 2879996,
+      "lr_differing_pct": 100.0,
+      "side_to_mid_db": -11.2,
+      "seam_delta_L": 0.00114477,
+      "seam_delta_R": 0.01420259,
+      "seam_delta_dbfs": -36.95,
+      "seam_local_median_delta": 0.00575089,
+      "seam_local_p95_delta": 0.01547565,
+      "seam_local_max_delta": 0.02274191,
+      "seam_vs_local_p95": 0.9177,
+      "seam_vs_local_max": 0.6245,
+      "interior_delta_rms": 0.00761303,
+      "interior_delta_p999": 0.04943717,
+      "seam_vs_interior_p999": 0.2873
+    },
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "pcm_s24le",
+          "sample_rate": "48000",
+          "channels": 2,
+          "duration": "60.000000"
+        }
+      ],
+      "format": {
+        "duration": "60.000000"
+      }
+    }
+  },
+  "build-resolve": {
+    "measured": {
+      "input_i": "-16.00",
+      "input_tp": "-3.39",
+      "input_lra": "4.20",
+      "input_thresh": "-26.01",
+      "output_i": "-14.79",
+      "output_tp": "-2.63",
+      "output_lra": "2.20",
+      "output_thresh": "-24.79",
+      "normalization_type": "dynamic",
+      "target_offset": "-1.21"
+    },
+    "analysis": {
+      "samples": 2880000,
+      "duration_s": 60.0,
+      "peak_dbfs": -3.39,
+      "rms_dbfs": -15.52,
+      "lr_correlation": 0.8854,
+      "lr_differing_samples": 2879993,
+      "lr_differing_pct": 100.0,
+      "side_to_mid_db": -12.16,
+      "seam_delta_L": 0.00113189,
+      "seam_delta_R": 0.00070226,
+      "seam_delta_dbfs": -58.92,
+      "seam_local_median_delta": 0.00080949,
+      "seam_local_p95_delta": 0.00165306,
+      "seam_local_max_delta": 0.00260675,
+      "seam_vs_local_p95": 0.6847,
+      "seam_vs_local_max": 0.4342,
+      "interior_delta_rms": 0.00811939,
+      "interior_delta_p999": 0.06003538,
+      "seam_vs_interior_p999": 0.0189
+    },
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "pcm_s24le",
+          "sample_rate": "48000",
+          "channels": 2,
+          "duration": "60.000000"
+        }
+      ],
+      "format": {
+        "duration": "60.000000"
+      }
+    }
+  },
+  "clean-utility": {
+    "measured": {
+      "input_i": "-16.00",
+      "input_tp": "-3.65",
+      "input_lra": "4.00",
+      "input_thresh": "-26.02",
+      "output_i": "-15.48",
+      "output_tp": "-2.75",
+      "output_lra": "2.60",
+      "output_thresh": "-25.48",
+      "normalization_type": "dynamic",
+      "target_offset": "-0.52"
+    },
+    "analysis": {
+      "samples": 2880000,
+      "duration_s": 60.0,
+      "peak_dbfs": -3.65,
+      "rms_dbfs": -16.12,
+      "lr_correlation": 0.8183,
+      "lr_differing_samples": 2879996,
+      "lr_differing_pct": 100.0,
+      "side_to_mid_db": -10.0,
+      "seam_delta_L": 0.00046551,
+      "seam_delta_R": 0.00136185,
+      "seam_delta_dbfs": -57.32,
+      "seam_local_median_delta": 0.00095969,
+      "seam_local_p95_delta": 0.00656388,
+      "seam_local_max_delta": 0.0116384,
+      "seam_vs_local_p95": 0.2075,
+      "seam_vs_local_max": 0.117,
+      "interior_delta_rms": 0.00730313,
+      "interior_delta_p999": 0.05140913,
+      "seam_vs_interior_p999": 0.0265
+    },
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "pcm_s24le",
+          "sample_rate": "48000",
+          "channels": 2,
+          "duration": "60.000000"
+        }
+      ],
+      "format": {
+        "duration": "60.000000"
+      }
+    }
+  },
+  "contrarian-drive": {
+    "measured": {
+      "input_i": "-16.00",
+      "input_tp": "-4.35",
+      "input_lra": "4.30",
+      "input_thresh": "-26.00",
+      "output_i": "-15.54",
+      "output_tp": "-3.52",
+      "output_lra": "2.80",
+      "output_thresh": "-25.54",
+      "normalization_type": "dynamic",
+      "target_offset": "-0.46"
+    },
+    "analysis": {
+      "samples": 2880000,
+      "duration_s": 60.0,
+      "peak_dbfs": -4.45,
+      "rms_dbfs": -16.34,
+      "lr_correlation": 0.9093,
+      "lr_differing_samples": 2879993,
+      "lr_differing_pct": 100.0,
+      "side_to_mid_db": -13.23,
+      "seam_delta_L": 0.00067198,
+      "seam_delta_R": 0.00015688,
+      "seam_delta_dbfs": -63.45,
+      "seam_local_median_delta": 0.00186121,
+      "seam_local_p95_delta": 0.01007417,
+      "seam_local_max_delta": 0.02173519,
+      "seam_vs_local_p95": 0.0667,
+      "seam_vs_local_max": 0.0309,
+      "interior_delta_rms": 0.00718378,
+      "interior_delta_p999": 0.05208838,
+      "seam_vs_interior_p999": 0.0129
+    },
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "pcm_s24le",
+          "sample_rate": "48000",
+          "channels": 2,
+          "duration": "60.000000"
+        }
+      ],
+      "format": {
+        "duration": "60.000000"
+      }
+    }
+  }
+}

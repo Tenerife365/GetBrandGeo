@@ -1,0 +1,9 @@
+A search result is a list you can move up. An AI answer is not shaped like that. It names a few companies in a sentence or two, and whoever is in it is in it.
+
+That position is not awarded for spending. Engines assemble an answer from what they can read about each company across the sources they trust, so the name that keeps coming back tends to be the one described consistently in more than one place. That is a different kind of work from advertising, and it is why the answer often does not follow advertising spend.
+
+It also means the position is not permanent. It moves when the material the engines are reading changes.
+
+Knowing whose name comes back today is the part that has to be measured rather than assumed. BrandGEO puts your buyers' questions to ChatGPT, Gemini, Claude, Perplexity and Google AI Mode and records who gets named, where in the answer, and how it describes them.
+
+https://getbrandgeo.com

@@ -1,0 +1,11 @@
+Companies have documentation. Individuals have listings.
+
+That is the explanation we would offer for the split in this cut, and it is a hypothesis rather than a measured cause. A property management company has a site, a services page, reviews, coverage, and a stable name that resolves to one entity. An individual agent has a profile on a portal and a phone number, and many of them share overlapping names.
+
+An engine assembling an answer needs something it can be confident about. One of those two gives it far more to work with.
+
+The limit, stated plainly: two cities, six categories in each, one collection pass. That is a pattern worth testing, not a law. Both cities ran at ChatGPT, Gemini, Claude, Perplexity and Google AI Mode, and the tables are published category by category.
+
+Link in bio.
+
+#AIVisibility #AISearch #GenerativeEngineOptimization #LocalSEO #PropertyManagement #RealEstateMarketing #MarketResearch #AEO #CrossEngineConsensus
