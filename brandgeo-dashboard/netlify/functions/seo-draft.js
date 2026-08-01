@@ -14,6 +14,7 @@
 // ANTHROPIC_API_KEY (already set for social-generate / assistant).
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-5';
@@ -23,16 +24,17 @@ const TIMEOUT_MS = 22000;
 // in AI-SEO-SPEC.md). Admins bypass it -- they run the managed/done-for-you work
 // across many clients. A client below the AI SEO min plan never reaches here
 // (the page + nav are feature-gated), so free/essentials are 0 for completeness.
-// PRICING-STRATEGY-2026-07 §3. Keep in sync with planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH.
-// CORRECTED 2026-07-31, and it was about to go live. essentials read 2 here
-// against planConfig's 0, which was harmless only while FEATURE_MIN_PLAN.ai_seo
-// was 'growth' and the whole surface was shut to Essentials. That gate is now
-// 'radar', so this line would have started handing every Essentials customer two
-// free LLM drafts a month that the plan does not sell. radar is spelled out for
-// the same reason rather than left to the `?? 0` fallback below.
-const DRAFT_MONTHLY_CAP = {
-  free: 0, radar: 0, essentials: 0, growth: 10, growth_pro: 30, managed: 60, pro: 60, enterprise: 200,
-};
+// PRICING-STRATEGY-2026-07 §3. The numbers live in _plans.js
+// PLAN_LIMITS.seoDraftsPerMonth, mirroring planConfig.ts PLAN_SEO_DRAFTS_PER_MONTH.
+//
+// CORRECTED 2026-07-31, and it was about to go live: a local copy here read
+// `essentials: 2` against planConfig's 0, harmless only while
+// FEATURE_MIN_PLAN.ai_seo was 'growth' and the whole surface was shut to
+// Essentials. That gate is now 'radar', so it would have started handing every
+// Essentials customer two free LLM drafts a month the plan does not sell.
+// Reading from _plans.js removes the copy that made that possible: drafts stay
+// at 0 for radar and essentials while pages went to 1, and those two facts can
+// no longer drift apart in different files.
 
 function monthStartIso() {
   const d = new Date();
@@ -174,7 +176,7 @@ exports.handler = async (event) => {
     // ── Per-plan monthly draft cap (cost control). Admins bypass it. ──
     if (profile.role !== 'admin') {
       const plan = client?.plan || 'free';
-      const cap = DRAFT_MONTHLY_CAP[plan] ?? 0;
+      const cap = planLimit('seoDraftsPerMonth', plan);
       const { count } = await supabase
         .from('seo_briefs')
         .select('*', { count: 'exact', head: true })

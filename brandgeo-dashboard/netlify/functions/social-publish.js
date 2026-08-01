@@ -16,24 +16,33 @@
 // API directly. Writes are via the service-key client (bypasses RLS).
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planRank, planLimit } = require('./_plans');
 const { getProvider } = require('./_publishing');
 const { ensureSocialProfile, requireBoundProfile, mediaUrlsFrom, rollupPostStatus } = require('./_social');
 
-// ── Plan fair-use (PRICING-STRATEGY-2026-07 §3-4). Keep in sync with planConfig.ts.
-// AI Social is Growth+ (rank 2). Growth = 1 channel, Growth PRO = 3, from the
-// INCLUDED set (LinkedIn/GBP/Facebook). Instagram/TikTok are a Growth PRO add-on
-// and are not yet purchasable, so self-serve is limited to the included set;
-// Managed+ get every channel. Posts/channel/month cap on top.
-const PLAN_RANK = { free: 0, essentials: 1, growth: 2, growth_pro: 3, managed: 4, pro: 5, enterprise: 6 };
-const AI_SOCIAL_MIN_RANK = PLAN_RANK.growth;
+// ── Plan fair-use (PRICING-STRATEGY-2026-07 §3-4) ────────────────────────────
+// AI Social is Growth+. Growth = 1 channel, Growth PRO = 3, from the INCLUDED
+// set (LinkedIn/GBP/Facebook). Instagram/TikTok are a Growth PRO add-on and are
+// not yet purchasable, so self-serve is limited to the included set; Managed+
+// get every channel. Posts/channel/month cap on top.
+//
+// Rank and both caps come from _plans.js, never from a local table. All three
+// used to be hand-written here and all three were stale: `radar` was inserted at
+// index 1 of PLAN_ORDER on 2026-07-31 and none of them learned about it, so
+// every rank in the local literal was off by one against the real ladder and
+// radar resolved to 0. It denied AI Social correctly by accident, not by intent,
+// and an accident does not survive the next insertion. Nothing about who is
+// allowed to publish changes here: the handler below is adminOnly, and this
+// block is the dormant second line of defence described there. Correct dormant
+// logic is the point of keeping it.
+const AI_SOCIAL_MIN_RANK = planRank('growth');
+const MANAGED_RANK = planRank('managed');
 const INCLUDED_CHANNELS = ['linkedin', 'gbp', 'facebook'];
-const PLAN_SOCIAL_CHANNEL_LIMIT = { free: 0, essentials: 0, growth: 1, growth_pro: 3, managed: 13, pro: 13, enterprise: 13 };
-const PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH = { free: 0, essentials: 0, growth: 12, growth_pro: 30, managed: 100, pro: 100, enterprise: 100 };
 
 function channelAllowedForPlan(plan, channel) {
-  const rank = PLAN_RANK[plan] ?? 0;
-  if (rank >= PLAN_RANK.managed) return true;                      // done-for-you: all channels
-  if (rank >= PLAN_RANK.growth) return INCLUDED_CHANNELS.includes(channel); // self-serve: included only
+  const rank = planRank(plan);
+  if (rank >= MANAGED_RANK) return true;                            // done-for-you: all channels
+  if (rank >= AI_SOCIAL_MIN_RANK) return INCLUDED_CHANNELS.includes(channel); // self-serve: included only
   return false;
 }
 function monthStartIso() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString(); }
@@ -43,7 +52,7 @@ function monthStartIso() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 
 async function enforceSocialLimits(supabase, clientId, targets) {
   const { data: client } = await supabase.from('clients').select('plan').eq('id', clientId).single();
   const plan = client?.plan || 'free';
-  if ((PLAN_RANK[plan] ?? 0) < AI_SOCIAL_MIN_RANK) {
+  if (planRank(plan) < AI_SOCIAL_MIN_RANK) {
     return { error: 'AI Social is not included on this plan. Upgrade to Growth or higher.', reason: 'plan' };
   }
   const platforms = [...new Set(targets.map((t) => t && t.platform).filter(Boolean))];
@@ -52,11 +61,11 @@ async function enforceSocialLimits(supabase, clientId, targets) {
   if (blocked.length) {
     return { error: `These channels are not available on your plan: ${blocked.join(', ')}. Instagram and TikTok are a Growth PRO add-on.`, reason: 'channel' };
   }
-  const limit = PLAN_SOCIAL_CHANNEL_LIMIT[plan] ?? 0;
+  const limit = planLimit('socialChannels', plan);
   if (platforms.length > limit) {
     return { error: `Your plan allows ${limit} social channel${limit === 1 ? '' : 's'} per post; you selected ${platforms.length}.`, reason: 'channel_count' };
   }
-  const cap = PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH[plan] ?? 0;
+  const cap = planLimit('socialPostsPerChannel', plan);
   const { data: rows } = await supabase
     .from('social_post_targets').select('platform, status')
     .eq('client_id', clientId).in('platform', platforms).gte('created_at', monthStartIso());

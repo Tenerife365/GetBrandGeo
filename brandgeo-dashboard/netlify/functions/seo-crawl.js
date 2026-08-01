@@ -10,31 +10,28 @@
 //   -> { crawl_id, status:'running', max_pages } | { error } (HTTP 200)
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 
 // Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Radar+
-// (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
-// SIXTH copy of the plan ladder. Source of truth is planConfig.ts
-// PLAN_SEO_PAGE_CAP; this exists because a Netlify function cannot import the
-// Vite-bundled .ts at runtime. Keep them equal, value for value.
+// (free = 0 → locked). The numbers live in _plans.js PLAN_LIMITS.seoPages, the
+// one CommonJS mirror of planConfig.ts PLAN_SEO_PAGE_CAP, because a Netlify
+// function cannot import the Vite-bundled .ts at runtime.
 //
-// CORRECTED 2026-07-31. Two values disagreed with planConfig and both granted
-// MORE than the plan sells:
-//   radar       absent, so it fell through the `?? 1` below to a one-page crawl
-//               of a tier that is sold with no AI SEO at all.
-//   essentials  1 here against planConfig's 0 since 2026-07-29, so the
-//               Essentials gate was frontend-only.
+// THIS USED TO BE A SIXTH HAND-WRITTEN COPY OF THE LADDER, and on 2026-07-31 it
+// was wrong in both directions at once: `essentials` disagreed with planConfig,
+// and `radar` was absent so it fell through a `?? 1` fallback and GRANTED a
+// one-page crawl to a tier nobody had priced. The values were corrected in
+// place; reading them from _plans.js is what stops the next plan insertion
+// repeating it, since the assertion there refuses to leave any plan unpriced.
 //
 // There is no hasFeature() gate in this file. The `maxPages <= 0` test IS the
 // gate, which is why a wrong number here is an entitlement leak rather than a
 // display bug.
 //
-// UPDATED 2026-07-31: radar and essentials go to 1, the landing page only.
-// Constantin's ruling. See planConfig.ts PLAN_SEO_PAGE_CAP for the full reason
-// essentials moved too (it is a ladder inversion otherwise: Radar is EUR 29 and
-// Essentials is EUR 99). The "landing page" part is delivered by _seo_crawl.js,
-// which now seeds the crawl queue with the homepage; a bare cap of 1 would
-// otherwise audit whatever the client's sitemap lists first.
-const CRAWL_PAGE_CAP = { free: 0, radar: 1, essentials: 1, growth: 10, growth_pro: 30, managed: 100, pro: 100, enterprise: 500 };
+// Radar and Essentials are 1: the landing page only, Constantin's ruling
+// 2026-07-31. The "landing page" part is delivered by _seo_crawl.js, which
+// seeds the crawl queue with the homepage; a bare cap of 1 would otherwise
+// audit whatever the client's sitemap happens to list first.
 // One crawl/audit cycle per week per client (the "max 1 audit / week" cap).
 const CRAWL_COOLDOWN_DAYS = 7;
 
@@ -61,10 +58,11 @@ exports.handler = async (event) => {
     if (!domain) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'This client has no website set, so there is nothing to crawl. Add a website to the client first.' }) };
     }
-    // Fails CLOSED. Was `?? 1`, which handed a one-page crawl to every plan
-    // missing from the map above, so adding a tier without touching this file
-    // granted it AI SEO silently. That is exactly how radar got one.
-    const maxPages = CRAWL_PAGE_CAP[client?.plan] ?? 0;
+    // Fails CLOSED. Was `?? 1` against a local map, which handed a one-page
+    // crawl to every plan missing from it, so adding a tier without touching
+    // this file granted it AI SEO silently. That is exactly how radar got one.
+    // planLimit() returns 0 for any plan it does not recognise.
+    const maxPages = planLimit('seoPages', client?.plan);
     if (maxPages <= 0) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Radar or higher to audit your landing page.' }) };
     }
