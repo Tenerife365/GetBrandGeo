@@ -75,6 +75,70 @@ Unchanged from the original and still right. The short version:
 - **Every clean-up feature off.** No noise reduction, no EQ, no compression, no
   "voice enhancement", no "voice isolation". Each one makes the clone worse.
 
+## 3b. If you have a real microphone, use it. Windows setup.
+
+Added 2026-08-01. Section 3 assumes a phone because that is the floor. A studio
+condenser with a pop filter beats it, and it is what Constantin has, so this
+section supersedes section 3 for him.
+
+**Audio only. There is no video in this pipeline at any point.**
+
+### The trap that will silently ruin the take
+
+**Disconnect the Jabra headphones entirely, and turn Bluetooth off for the
+session.**
+
+This is not fussiness. When a Bluetooth headset is connected, Windows can switch
+it into the hands-free profile, which drops BOTH input and output to 8 to 16 kHz
+mono for the whole system. It can grab the input even when a USB microphone is
+selected, and the recording will look fine in the meter while being telephone
+quality. A clone trained on that inherits it permanently.
+
+If you want to hear yourself, use WIRED headphones in the microphone's own
+headphone jack if it has one. That is zero-latency monitoring and costs nothing.
+Never monitor over Bluetooth, the delay makes you slow down mid-sentence.
+
+### The microphone
+
+- **Pop filter on, two to three finger widths from the capsule.** That is what it
+  is for and it is the difference between usable and re-recording.
+- **20 cm from your mouth, angled slightly off axis.** Closer than 10 cm and
+  proximity effect adds bass the clone bakes in permanently.
+- **Cardioid**, if the mic has a pattern selector. Omni picks up the room.
+- **Every built-in effect OFF.** Many USB mics ship with a gain knob plus some
+  combination of noise gate, compressor, EQ presets, or a "voice" mode. Turn all
+  of it off. The clone trains on whatever processing you apply and it cannot be
+  removed afterwards. Raw is the goal, not clean.
+
+### Windows, three settings that are on by default and should not be
+
+1. `Settings > System > Sound`, click the microphone, set **Audio enhancements:
+   Off**.
+2. `More sound settings > Recording` tab, select the mic, `Properties >
+   Advanced`, untick **Enable audio enhancements**.
+3. Same dialog, `Levels` tab: if there is a **Microphone Boost**, set it to 0.
+   It amplifies the noise floor along with you. Use the mic's own gain knob.
+
+### The software: Audacity
+
+Free, writes real WAV, and shows you a level meter, which the built-in Windows
+Voice Recorder does not. Get it from `audacityteam.org`.
+
+- **Audio Setup > Host: Windows WASAPI**
+- **Audio Setup > Recording Device:** your microphone by name. Check this. If it
+  says Jabra anything, stop and fix it.
+- **Audio Setup > Recording Channels: 1 (Mono)**
+- **Project Rate, bottom left: 48000 Hz**
+- Record, and set the mic's gain so your **loudest peaks land around -6 dB and
+  never touch 0**. Speech sits roughly 15 dB below its peaks, which puts you in
+  the -23 to -18 dB RMS the vendor requires.
+- Export with `File > Export Audio`, format **WAV**, encoding **Signed 16-bit
+  PCM**, and leave the rate at 48000.
+
+Do a ten-second test, export it, and run the ffmpeg check in section 7 BEFORE
+reading the whole script. Two minutes spent there is the difference between one
+session and two.
+
 ## 4. Delivery
 
 This is the part that sets the tone of every video, so it matters more than the
