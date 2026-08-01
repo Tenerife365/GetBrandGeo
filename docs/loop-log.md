@@ -160,3 +160,62 @@ Four things worth carrying, because the interesting part is not the type error.
 
 **NEEDS CONSTANTIN:** nothing new from this cycle. The preventive worth adding
 is a clean-checkout build check; filed in ROADMAP Stream B.
+
+---
+
+## 2026-08-01 07:4x-08:5x — cycle 5 (night window, unattended)
+
+**Attempted:** prior-cycle re-checks, B2, B3. B4 not attempted (blocked on a
+Sentry account, per the task brief). B1/B1a not attempted (closed and verified).
+**Checks passed:** 6. **Checks failed:** 0. **Commits:** `80cd484`, `22e38af`.
+**Not pushed, deliberately. See below.**
+
+Prior claims all still hold: `check-logo-links.sh` 0, `check-funnel-accept-path.sh`
+0, `check-contract-gate.sh` 0, `package_provisioning.test.js` 63 checks 0, and
+`refresh_cadence.test.js` 17 assertions 0 (that last one is untracked, worth
+committing by whoever owns it).
+
+**B2 found nothing broken, and that is a real result rather than a weak one,**
+because the check was made to fail first. `scripts/check-links.sh` did not
+exist, so under the ground-truth rule B2 was unstartable; written first, then
+run. It resolves three directions, not the one the item names: marketing to
+dashboard routes against `App.tsx`'s Route table, dashboard to marketing against
+files on disk, and internal `.html` links across all 84 marketing pages. Each
+direction was deliberately broken and each break was caught by name.
+
+**B3's premise was false, and the item's own check was the defect.** The
+greeting reads `new Date().getHours()`, which is local, and it is the only
+greeting in the repo. No UTC path exists, and no offset produces "Good evening"
+at 11:30 anyway. Nothing was fixed. The roadmap's check grepped for
+`getTimezoneOffset|toLocaleTimeString`, asserting an implementation rather than
+behaviour, so the only way to make it pass was to add code that does nothing.
+Replaced with a behavioural check and mutation-tested.
+
+Carried forward:
+
+11. **A check can be wrong in the other direction: it can demand a fix that is
+   not needed.** Cycle 1 recorded checks weaker than their claim. B3 is the
+   mirror: a check strong enough to pass only if you write dead code. Both come
+   from writing the check against an imagined implementation instead of the
+   behaviour the item actually asks for. When a check fails, first ask whether
+   the check or the code is wrong.
+12. **Two matches in B2 were false positives and were fixed in the matcher, not
+   filed as findings.** A URL ending an English sentence carried the full stop
+   into the match; `site.js` builds function endpoints from a base URL ending in
+   a slash. A cycle that had reported those as broken links would have spent the
+   next cycle "fixing" working code.
+13. **Git was not serialized and the loop was not the only writer.** A second
+   session committed to `main` twice DURING this cycle and is holding
+   uncommitted work in `brandgeo/web/index.html`. That edit was inspected before
+   anything was staged, and left alone. Every commit here was path-scoped to the
+   exact files written.
+
+**Nothing was pushed.** `main` is 7 ahead and 7 behind `origin/main` (local:
+email sender, AI SEO cap, keyboard nav; origin: content articles BG-020 to
+BG-026). The two sets look disjoint and would probably merge cleanly, but
+merging a diverged branch against a dirty tree while another committer is live
+is what corrupted `.git/index` before (CLAUDE.md §6.5). Filed under NEEDS
+CONSTANTIN with the exact sequence rather than attempted at 3am.
+
+**NEEDS CONSTANTIN:** resolve the `main`/`origin/main` divergence once the other
+session is finished; create the Sentry account so B4 can be wired.

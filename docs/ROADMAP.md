@@ -13,6 +13,24 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
+- **`main` has DIVERGED from `origin/main`, 7 ahead and 7 behind, and nothing is
+  reaching production.** Found 2026-08-01 by cycle 5, which stopped rather than
+  merging. Not a conflict yet, just two histories that have never met.
+  - **local only:** `e1557e7`, `a8c01a3`, `7d9ca14`, `eaef49a`, `3968508`,
+    `4d6e100`, `4dc8566` (email sender, AI SEO cap, dashboard keyboard nav)
+  - **origin only:** `c0a8d1e`, `e482f9c`, `fc01b8b`, `c763611`, `3a876dc`,
+    `9e390e1`, `8deecb5` (content articles BG-020 to BG-026)
+  They look like they touch disjoint files, so a merge is probably clean. **The
+  loop did not attempt it, deliberately.** A second session was committing to
+  `main` DURING this cycle (two commits appeared mid-run) and is holding
+  uncommitted work in `brandgeo/web/index.html` (the 5-engine to 7-engine copy
+  update). Merging a diverged branch against a dirty tree while another
+  committer is live is the exact situation that corrupted `.git/index` before
+  (CLAUDE.md §6.5). Git is meant to be serialized and currently is not.
+  **Your action, in this order:** confirm the other session is finished, let it
+  commit or stash `index.html`, then `git pull --rebase` and `git push`.
+  `check: git status --short --branch | head -1` shows neither ahead nor behind
+
 - ~~**Decision 1b, what the Free tier's engine is.**~~ **DECIDED 2026-07-31 by
   Constantin: `PLAN_ENGINES.free = ['gemini']`.** S1 is fully closed, nothing in
   the ladder is owed. Recorded here only because it changes a constant S2 would
@@ -375,10 +393,22 @@ Scope: `brandgeo-dashboard/src/components/`, `brandgeo/web/*.html`,
   Scope: `brandgeo-dashboard/src/pages/AuditReport.tsx:130`.
   `check: grep -q 'BrandGeoMark[^/]*to="/audit"' brandgeo-dashboard/src/pages/AuditReport.tsx && exit 1 || exit 0`
 
-- **B2. Cross-surface links resolve.** No link from the dashboard lands on a
-  marketing 404 or vice versa. Includes the footer, support, privacy and terms
-  links that the retiring Jamie widget points at.
-  `check: bash scripts/check-links.sh`
+- **B2. DONE 2026-08-01**, `80cd484`. The check script did not exist, so the
+  item was unstartable; written first, then run. Covers three directions:
+  marketing to dashboard routes (resolved against `App.tsx`'s Route table),
+  dashboard to marketing pages (resolved against files on disk), and internal
+  `.html` links across all 84 marketing pages, which is where footer, support,
+  privacy and terms live. **Nothing was broken.** Proven by breaking each of the
+  three directions deliberately and confirming each was caught by name.
+  Two matches were false positives and were fixed in the MATCHER, not filed as
+  findings: a URL ending an English sentence carried the full stop into the
+  match, and `site.js` builds its function endpoints by concatenating a base
+  URL that ends in a slash.
+  `check: bash scripts/check-links.sh` -> exit 0
+  ```
+  OK: every checked link (marketing->dashboard, dashboard->marketing,
+  internal marketing) resolves
+  ```
 
 - **B4. Error monitor. AUTHORIZED 2026-07-31.** Split so the loop does the part
   it can and Constantin does only the part no agent can: wire `@sentry/react`
@@ -392,10 +422,27 @@ Scope: `brandgeo-dashboard/src/components/`, `brandgeo/web/*.html`,
   Scope: `brandgeo-dashboard/src/main.tsx`, `package.json`.
   `check: grep -q "VITE_SENTRY_DSN" brandgeo-dashboard/src/main.tsx`
 
-- **B3. Verify the greeting clock.** The dashboard rendered "Good evening" at
-  roughly 11:30 local on 2026-07-30. Either the greeting uses UTC while claiming
-  local, or the observation was wrong. Confirm before fixing; do not assume.
-  `check: grep -rq "getTimezoneOffset\|toLocaleTimeString" brandgeo-dashboard/src/pages/Dashboard.tsx`
+- **B3. DONE 2026-08-01**, `22e38af`. **The observation was wrong and no fix
+  shipped.** The item asked to confirm before fixing, and that is what saved the
+  work. `Dashboard.tsx:154` reads `new Date().getHours()`, the viewer's local
+  clock, and it is the ONLY greeting in the repo (the three greeting strings
+  return exactly one hit across `src`, `netlify` and `brandgeo/web`). No UTC
+  path exists that could render "Good evening" at 11:30, and no offset explains
+  it either: 11:30 is "Good morning" under both local and UTC on this machine.
+  **The roadmap's own B3 check was the actual defect.** `grep -rq
+  "getTimezoneOffset\|toLocaleTimeString"` exits 1, but it asserts an
+  IMPLEMENTATION rather than correct behaviour, and the greeting is already
+  correct without either symbol. The only way to satisfy it was to add code that
+  does nothing. Replaced with a behavioural check, mutation-tested: switching to
+  `getUTCHours` fails on the clock source, and moving the afternoon boundary
+  fails 2 of 6 boundary cases.
+  `check: bash scripts/check-greeting-clock.sh` -> exit 0
+  ```
+  ok - 00:00/11:00 -> Good morning, 12:00/17:00 -> Good afternoon,
+       18:00/23:00 -> Good evening
+  OK: the dashboard greeting reads the viewer local clock and labels every
+  boundary correctly
+  ```
 
 ---
 
