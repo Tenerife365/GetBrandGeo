@@ -1701,6 +1701,19 @@
       letter-spacing: .08em;
       margin-bottom: 8px;
     }
+    /* Announcement link under a plan's feature list. Only Radar carries one
+       today. It sits AFTER `.pricing-features`, which is `flex: 1`, so the
+       list absorbs the height difference and the card bottoms stay aligned
+       with the four cards that have no link. */
+    .plan-news-link {
+      display: block;
+      margin-top: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--ac-text, #a78bfa);
+      text-decoration: none;
+    }
+    .plan-news-link:hover { text-decoration: underline; }
     .pricing-features { list-style: none; flex: 1; }
     .pricing-features li {
       padding: 5px 0;
@@ -2872,6 +2885,7 @@
         <li>Gemini &amp; Claude</li>
         <li>Weekly refresh + dashboard</li>
       </ul>
+      <a href="/news/radar-plan-launch/" class="plan-news-link">Read the launch announcement &rarr;</a>
     </div>
 
     <!-- Essentials -->
