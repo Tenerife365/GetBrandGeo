@@ -1,0 +1,88 @@
+#!/bin/sh
+# ============================================================================
+# pre-push  --  enforces AUTONOMY section 7, the batching rule, mechanically.
+#
+# The rule was already written down and still got broken, because "did this
+# push cost a Netlify build" is invisible at the moment you type `git push`.
+# This makes it visible and blocks it by default.
+#
+# WHAT IT DOES
+#   Counts the files being pushed that live under brandgeo-dashboard/. That is
+#   the ONLY path that triggers a Netlify build; brandgeo/web/ goes to cPanel by
+#   webhook and docs go nowhere. If the count is zero the push is free and runs
+#   with no comment. If it is above zero it refuses, unless the push is a
+#   deliberate batch.
+#
+# HOW TO PUSH A BATCH ON PURPOSE
+#   BATCH_PUSH=1 git push                      (bash / git-bash)
+#   $env:BATCH_PUSH=1; git push                (PowerShell)
+#
+# HOW TO SHIP A LIVE DEFECT ALONE (rule 4: billing, auth or signup only)
+#   BATCH_PUSH=urgent git push
+#   Same effect, different word, so the reason survives in shell history.
+#
+# INSTALL (once per clone; hooks in .git/hooks are not shared, this dir is)
+#   git config core.hooksPath .githooks
+# ============================================================================
+
+ZERO=0000000000000000000000000000000000000000
+dash_total=0
+all_files=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue          # branch deletion, nothing to build
+
+  if [ "$remote_sha" = "$ZERO" ]; then
+    # New branch on the remote. Compare against origin/main, not against
+    # nothing, or every file in the repo counts as "changed".
+    base=$(git merge-base origin/main "$local_sha" 2>/dev/null) || base=""
+    [ -n "$base" ] && range="$base..$local_sha" || range="$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+
+  files=$(git diff --name-only $range 2>/dev/null)
+  [ -z "$files" ] && continue
+  all_files="$all_files
+$files"
+  n=$(printf '%s\n' "$files" | grep -c '^brandgeo-dashboard/')
+  dash_total=$((dash_total + n))
+done
+
+[ "$dash_total" -eq 0 ] && exit 0                 # free push, say nothing
+
+case "$BATCH_PUSH" in
+  1|urgent|yes|true)
+    echo "BATCH_PUSH=$BATCH_PUSH: allowing a push of $dash_total dashboard file(s). One Netlify build."
+    exit 0
+    ;;
+esac
+
+cat >&2 <<MSG
+
+======================================================================
+  PUSH BLOCKED. This would spend a Netlify build.
+======================================================================
+
+  $dash_total file(s) under brandgeo-dashboard/ are in this push:
+
+$(printf '%s\n' "$all_files" | grep '^brandgeo-dashboard/' | sed 's/^/    /' | sort -u)
+
+  AUTONOMY section 7: dashboard work is COMMITTED per task and pushed
+  ONCE per work block, target 2 builds per day across all sessions.
+  Your commits are safe and lose nothing by waiting.
+
+  To send the batch deliberately:
+      BATCH_PUSH=1 git push              (bash)
+      \$env:BATCH_PUSH=1; git push        (PowerShell)
+
+  Live billing / auth / signup defect only:
+      BATCH_PUSH=urgent git push
+
+  To see what is queued first:
+      sh scripts/deploy-status.sh
+
+======================================================================
+
+MSG
+exit 1
