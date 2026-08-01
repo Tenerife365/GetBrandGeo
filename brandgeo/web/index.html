@@ -2339,7 +2339,13 @@
 </nav>
 
 <!-- HERO -->
-<section class="hero">
+<!-- `id="free-audit"` is the site-wide CTA target. Every "test your website for
+     free" button on every other page points at /#free-audit, so this id is load
+     bearing: renaming it breaks the call to action on 90+ pages at once. It sits
+     on the hero because the instant audit input lives here, NOT on #contact,
+     which is the 48-hour manual request form and a much weaker promise.
+     site.js focuses #brandInput when the page is opened on this hash. -->
+<section class="hero" id="free-audit">
   <div class="hero-bg">
     <div class="hero-grid"></div>
     <div class="hero-orb"></div>

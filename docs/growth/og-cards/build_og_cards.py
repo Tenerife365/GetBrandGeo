@@ -120,6 +120,16 @@ def parse(name, title, rel=""):
     if rel.startswith("news/") and len(parts) > 1 and parts[-1] == "BrandGEO Newsroom":
         tok = re.sub(r"^BrandGEO\s+", "", parts[0]).strip()
         return ("NEWS", tok) if tok else (None, None)
+    # A research article. Its title is "BG-0NN: <headline> | BrandGEO Research".
+    # Splitting on ":" and taking the first part, which is what the generic
+    # branch below does, yielded a card whose entire hero was the string
+    # "BG-027" -- the one token on the card that distinguishes nothing and
+    # earns no click. The headline is the distinguishing token, so the id is
+    # dropped from the hero and returned as the eyebrow instead.
+    m = re.match(r"^(BG-\d{3})\s*:\s*(.+)$", parts[0])
+    if m:
+        return m.group(1), m.group(2).strip()
+
     if name.startswith("brandgeo-vs-"):
         m = re.search(r"BrandGEO vs ([^:|]+)", title)
         return ("COMPARISON", "vs " + m.group(1).strip()) if m else (None, None)

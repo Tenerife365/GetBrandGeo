@@ -458,6 +458,20 @@
     brandInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') startAudit();
     });
+
+    // Arriving from a "test your website for free" button on any other page.
+    // The browser has already scrolled to #free-audit by the time this runs;
+    // all that is left is to put the caret in the field, so the visitor can
+    // type instead of hunting for it. focus() is deliberately deferred: on
+    // iOS Safari, focusing during the hash jump cancels the scroll.
+    function focusAuditFromHash() {
+      if (window.location.hash !== '#free-audit') return;
+      setTimeout(function() {
+        try { brandInput.focus({ preventScroll: true }); } catch (err) { brandInput.focus(); }
+      }, 400);
+    }
+    focusAuditFromHash();
+    window.addEventListener('hashchange', focusAuditFromHash);
   }
 
   // Scroll-reveal: fade + rise as sections enter the viewport (index.html + similar pages)
