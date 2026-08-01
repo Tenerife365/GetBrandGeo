@@ -1,9 +1,0 @@
-On 10 July 2026 we measured Madrid in two languages: 4 categories, each asked once in Spanish and once in English, across four engines. Claude, Gemini, Meta AI and Perplexity. Meta AI ran that day and left our set on 2026-07-16. ChatGPT was excluded from this collection because its query failed that day, so that is a gap in our data rather than a reading about ChatGPT.
-
-On the airport hotel prompt, one engine answered in English and went blank in Spanish. Another did the reverse. The part worth sitting with shows up when you combine the two runs: the 4 engines that returned a usable answer named the same hotel. The disagreement was not about which hotel. It was about whether the engine answered at all, and that turned on the language of the question.
-
-A second category showed a different shape. One engine repeated nearly the same shortlist in both languages while two others produced lists that barely overlapped. That held on that one prompt and is not a fixed trait of that engine, which is worth saying because it would be easy to read it as one.
-
-Collected 2026-07-10 with our own pipeline. The breakdown is on getbrandgeo.com.
-
-#AIVisibility #AISearch #Madrid #GEO #SEO #BrandVisibility

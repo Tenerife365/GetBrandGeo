@@ -1,1 +1,0 @@
-After the fifth false positive in six weeks, adding a sixth rule stopped feeling like the right instinct. So we wrote all five up instead, and put a regression suite behind them.

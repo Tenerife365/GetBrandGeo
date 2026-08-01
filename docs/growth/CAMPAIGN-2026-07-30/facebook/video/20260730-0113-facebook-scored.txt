@@ -1,9 +1,0 @@
-What makes that audit worth reading is not the gap itself. It is that the business had no way to notice it. Their rankings were fine, so their reporting said everything was fine.
-
-A rank tracker measures a position in a list of links. It has no view of whether a company gets named inside a generated answer, because that answer is a different artefact built by a different system from different signals.
-
-So the two have to be watched separately. Neither replaces the other, and a good result in one is not evidence about the other. That is the whole argument, and it is smaller and more boring than "search is finished", which is why it holds up.
-
-The full audit is published, including the exact questions we put to each engine:
-
-https://getbrandgeo.com/bg-004.html

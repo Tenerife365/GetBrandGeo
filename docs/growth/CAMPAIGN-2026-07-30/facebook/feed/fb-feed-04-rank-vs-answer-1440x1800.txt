@@ -1,9 +1,0 @@
-A brand sitting on page one of Google appeared zero times in one AI engine's answers.
-
-We audited it in July 2026 against twenty real customer questions, identical across every engine we put them to. It came back as the number one recommendation on three of them, consistently across the majority of the twenty though not on every single one. On one engine it did not appear at all.
-
-The part worth reading is that the business had no way to notice. The rankings were fine, so the reporting said everything was fine.
-
-A rank tracker measures a position in a list of links. It has no view of whether a company gets named inside a generated answer at all.
-
-https://getbrandgeo.com/bg-004.html

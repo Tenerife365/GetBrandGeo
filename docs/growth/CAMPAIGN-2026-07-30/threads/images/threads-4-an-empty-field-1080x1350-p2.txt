@@ -1,3 +1,0 @@
-Now a number only appears when the engine actually claimed one. Otherwise the field is empty.
-
-An empty field is uncomfortable to put in front of a customer. It's still better than a number that can't be traced back to anything.

@@ -68,19 +68,26 @@ assets/audio/*.wav
 assets/samples/*.wav
 email-preview.html
 
-# ── Rendered campaign media ─────────────────────────────────────────────────
-# 551 MB across 188 files as of 2026-08-01, and this repo is PUBLIC, so a commit
-# is permanent: removing it later needs a history rewrite, not a delete.
+# -- Social and campaign output: LOCAL ONLY, ruled by Constantin 2026-08-01 ---
+# Nothing under these paths belongs in git or in Netlify. It is social media
+# output: it is never served by the site, never imported by the app, and it is
+# large. 581 MB of it was one command away from entering a PUBLIC repo whose
+# history is permanent, where removing it later needs a rewrite rather than a
+# delete.
 #
-# All of it is OUTPUT and all of it is regenerable. The Remotion project at
-# brandgeo-video/ is tracked (and already gitignores its own out/), and the
-# music comes from scripts/compose_music.py. reel-campaign-ab/ in particular is
-# intermediate A/B renders across six timestamped runs of the same day.
+# WHERE IT GOES INSTEAD: a shared drive, so the other cofounders can reach it.
+# That drive does not exist yet. Until it does, the ONLY copy is the machine
+# that rendered it, so treat these folders as unbacked-up.
 #
-# PNG is deliberately NOT ignored: 192 files at 26 MB total are the actual
-# publishable post images, small, and not trivially reproducible.
-docs/growth/CAMPAIGN-*/**/*.mp4
-docs/growth/CAMPAIGN-*/**/*.wav
-docs/growth/reel-campaign-ab/**/*.mp4
-docs/growth/reel-campaign-ab/**/*.wav
-assets/audio/music/*.wav
+# THE LINE THAT MATTERS, because it is easy to get backwards: articles under
+# brandgeo/web/ MUST stay tracked. cPanel does not receive files directly; the
+# publish path is a GitHub webhook into deploy.php, so an uncommitted article
+# is an unpublished article. Git is the marketing site's deploy mechanism and
+# the social pipeline's storage medium is not git at all.
+#
+# Everything else in docs/growth/ stays tracked on purpose: the sprint registry,
+# outbound-infra, the voice kit, brand identity and data templates are decisions
+# and specs, not renders.
+docs/growth/CAMPAIGN-*/
+docs/growth/reel-campaign-ab/
+assets/audio/music/

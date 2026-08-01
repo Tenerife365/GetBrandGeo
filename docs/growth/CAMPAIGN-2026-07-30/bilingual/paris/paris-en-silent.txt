@@ -1,9 +1,0 @@
-Paris, collected 10 July 2026. Four categories, each asked once in French and once in English, across four engines: Claude, Gemini, Meta AI and Perplexity. Meta AI ran that day and left our set on 2026-07-16. ChatGPT was not in this collection because its retrieval failed that day, so that is a hole in our data rather than a reading about ChatGPT.
-
-Wealth management was one of four categories, and the other three came back in three different shapes. On hotels, two engines held the same top picks across both languages while two others changed their minds. On fine dining, no name carried from one engine to another. On online banking, the 4 engines put the same provider at the top in both languages.
-
-That last result deserves its caveat and we are publishing it. On the English version of that prompt, two engines returned an empty competitor list even though the prose of one of them named the provider. That is an extraction miss on our side rather than an absence of opinion. One engine also lost a full response on the English fine dining prompt.
-
-Collected 2026-07-10 with our own pipeline. The detail is on getbrandgeo.com.
-
-#AIVisibility #AISearch #Paris #GEO #MultilingualSEO #BrandVisibility

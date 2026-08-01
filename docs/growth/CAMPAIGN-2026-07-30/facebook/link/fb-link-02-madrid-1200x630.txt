@@ -1,9 +1,0 @@
-Two languages, one prompt, and the answers pointed in opposite directions.
-
-Madrid, hotels near the airport, collected 10 July 2026. One engine answered fully in English and returned nothing usable in Spanish. Another engine did the exact reverse on the identical question.
-
-We are not attaching an engine count to that. A further engine failed to collect on every Madrid prompt in that run, and the page calls it a data gap rather than quietly reporting on what was left.
-
-If your buyers ask in more than one language, those are closer to two separate markets than to one market with a translation layer.
-
-https://getbrandgeo.com/ai-visibility-for-madrid.html

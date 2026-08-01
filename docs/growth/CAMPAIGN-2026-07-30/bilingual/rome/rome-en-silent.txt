@@ -1,9 +1,0 @@
-Rome, 10 July 2026. Four categories, each asked once in Italian and once in English, across four engines: Claude, Gemini, Meta AI and Perplexity. Meta AI ran that day and left our set on 2026-07-16. ChatGPT was not in the run, its collection failed that cycle, so that is a gap in our data rather than a reading about ChatGPT.
-
-About the 5 of 5, so it cannot be misread: that is 5 restaurants out of 5, from 1 engine, across 2 languages. It is not five engines agreeing with each other. With four engines in the run, a five engine agreement is not arithmetically available on this data.
-
-The rest of the collection points the same way. A second engine returned essentially the same set of 9 real estate agencies in both languages. No brand reached 3 or 4 engine agreement in this collection at all. And one engine extracted zero structured competitors on 5 of the 8 prompts, while still discussing brands in the prose of its answers.
-
-A dated measurement stays readable after the engine that produced it is gone. That is much of the argument for writing the date on the result. Collected 2026-07-10 with our own pipeline. The detail is on getbrandgeo.com.
-
-#AIVisibility #AISearch #Rome #GEO #SEO #BrandVisibility
