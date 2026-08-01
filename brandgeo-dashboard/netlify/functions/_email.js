@@ -14,6 +14,25 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const FROM = 'BrandGEO <noreply@mail.getbrandgeo.com>';
 const APP_URL = 'https://app.getbrandgeo.com';
 
+// Two marks, because one asset cannot serve both grounds. The header is violet
+// so it needs the white mark; the outer footer is the page background so it
+// needs the gradient one. Both are the v3 geometry rendered straight from
+// docs/growth/brand-identity-2026-07-29/v3/icon-mark.svg, NOT the retired eye
+// mark in brand-kit-2026-07-29/. Both are 102x128 with a transparent ground.
+//
+// Absolute HTTPS, on the marketing docroot: an email client will not load a
+// relative path, a data: URI, or a CID unless it is a real attachment. These
+// two files ship via the cPanel webhook, which costs no Netlify build.
+const MARK_WHITE  = 'https://getbrandgeo.com/images/brandgeo-mark-white.png';
+const MARK_VIOLET = 'https://getbrandgeo.com/images/brandgeo-mark-violet.png';
+
+// Where an opt-out lands. A mailto costs no endpoint and no deploy, and it is a
+// valid List-Unsubscribe target under RFC 2369. It is deliberately an address we
+// have PROVEN receives mail (the 2026-08-01 self-test landed there) rather than
+// a tidier unsubscribe@ that may not exist as an alias: an opt-out that bounces
+// is worse than no button, because the recipient believes they opted out.
+const UNSUBSCRIBE_MAILTO = 'constantin@getbrandgeo.com';
+
 // Minimal HTML escaper (same behaviour as the copies in support-request.js /
 // assistant-lead.js). Escape every value interpolated into the HTML shell.
 function esc(s) {
@@ -81,11 +100,53 @@ function renderSignature(sig) {
 </div>`;
 }
 
+/**
+ * Opt-out block, rendered below the outer footer line.
+ *
+ * WHY THIS IS A `kind` FLAG AND NOT A PER-CALLER OPTION. Every marketing send
+ * must carry an opt-out; no transactional send should. Leaving that to each
+ * caller means the one that forgets is the one that gets the complaint, and the
+ * complaint lands on the sending domain, not on the caller. So the decision is
+ * made once here, from a single field, and a caller cannot ship marketing mail
+ * without it. New marketing email = pass `kind: 'marketing'`, nothing else.
+ *
+ * The button is a mailto for the same reason the header images are absolute
+ * URLs: it has to work with zero infrastructure. When the unsubscribe endpoint
+ * exists, add its https URL to `unsubscribeHeaders` below and the RFC 8058
+ * one-click header turns on with it. Do NOT send List-Unsubscribe-Post before
+ * then: one-click is defined only over https, and a Post header pointing at a
+ * mailto is malformed.
+ */
+function renderUnsubscribe(kind) {
+  if (kind !== 'marketing') return '';
+  const href = `mailto:${UNSUBSCRIBE_MAILTO}?subject=${encodeURIComponent('Unsubscribe')}`
+    + `&body=${encodeURIComponent('Please stop sending me BrandGEO product and pricing updates.')}`;
+  return `<p style="margin:12px 4px 0;font-size:11px;line-height:1.6;color:#94a3b8;">
+      You are receiving this because you have a BrandGEO account. Product and pricing updates are optional and you can stop them at any time.
+    </p>
+    <p style="margin:9px 4px 0;">
+      <a href="${href}" style="display:inline-block;font-size:11px;font-weight:600;color:#64748b;text-decoration:none;padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;">Unsubscribe</a>
+    </p>`;
+}
+
+/**
+ * The headers that make an opt-out machine-readable.
+ *
+ * Gmail and Yahoo's bulk-sender rules read List-Unsubscribe, not the button.
+ * Without it they surface their own "report spam" instead, and a spam report
+ * costs the sending domain reputation in a way an unsubscribe does not.
+ */
+function unsubscribeHeaders(kind) {
+  if (kind !== 'marketing') return undefined;
+  return { 'List-Unsubscribe': `<mailto:${UNSUBSCRIBE_MAILTO}?subject=Unsubscribe>` };
+}
+
 // Build the branded HTML shell. `paragraphs` and `bullets` are plain strings
 // (escaped here). `cta` = { label, url } renders a violet button.
 // `signature` = see renderSignature above; omitted by every existing caller, so
 // their output is byte-identical to before this was added.
-function renderShell({ heading, paragraphs = [], bullets = [], cta = null, secondaryCta = null, footerNote = null, signature = null }) {
+// `kind` = 'transactional' (default) | 'marketing'; see renderUnsubscribe.
+function renderShell({ heading, paragraphs = [], bullets = [], cta = null, secondaryCta = null, footerNote = null, signature = null, kind = 'transactional' }) {
   const body = [];
   body.push(
     `<h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;font-weight:700;">${esc(heading)}</h1>`,
@@ -122,20 +183,33 @@ function renderShell({ heading, paragraphs = [], bullets = [], cta = null, secon
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f1f5f9;">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
     <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
-      <div style="background:#8b5cf6;padding:18px 24px;">
-        <span style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">BrandGEO</span>
+      <div style="background:#8b5cf6;padding:16px 24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="padding-right:10px;vertical-align:middle;line-height:0;">
+            <img src="${MARK_WHITE}" alt="" width="21" height="26" style="display:block;width:21px;height:26px;border:0;outline:none;text-decoration:none;">
+          </td>
+          <td style="vertical-align:middle;">
+            <span style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">BrandGEO</span>
+          </td>
+        </tr></table>
       </div>
       <div style="padding:26px 24px 28px;">${body.join('')}</div>
     </div>
-    <p style="margin:16px 4px 0;font-size:11px;line-height:1.5;color:#94a3b8;">
-      BrandGEO. AI visibility &amp; brand perception. <a href="${APP_URL}" style="color:#8b5cf6;text-decoration:none;">app.getbrandgeo.com</a>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;"><tr>
+      <td style="padding:0 8px 0 4px;vertical-align:middle;line-height:0;">
+        <img src="${MARK_VIOLET}" alt="" width="14" height="18" style="display:block;width:14px;height:18px;border:0;outline:none;text-decoration:none;">
+      </td>
+      <td style="vertical-align:middle;font-size:11px;line-height:1.5;color:#94a3b8;">
+        BrandGEO. AI visibility &amp; brand perception. <a href="${APP_URL}" style="color:#8b5cf6;text-decoration:none;">app.getbrandgeo.com</a>
+      </td>
+    </tr></table>
+    ${renderUnsubscribe(kind)}
   </div>
 </body></html>`;
 }
 
 // Send a branded email. Returns { ok, skipped?, error? }; never throws.
-async function sendBrandedEmail({ to, bcc, subject, heading, paragraphs, bullets, cta, secondaryCta, footerNote, replyTo, signature }) {
+async function sendBrandedEmail({ to, bcc, subject, heading, paragraphs, bullets, cta, secondaryCta, footerNote, replyTo, signature, kind = 'transactional' }) {
   const key = process.env.RESEND_API_KEY;
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
   if (!key) return { ok: false, skipped: true, error: 'RESEND_API_KEY not set' };
@@ -144,12 +218,12 @@ async function sendBrandedEmail({ to, bcc, subject, heading, paragraphs, bullets
   // customer receiving their mail.
   const bccList = (Array.isArray(bcc) ? bcc : [bcc]).filter(Boolean);
 
-  const html = renderShell({ heading, paragraphs, bullets, cta, secondaryCta, footerNote, signature });
+  const html = renderShell({ heading, paragraphs, bullets, cta, secondaryCta, footerNote, signature, kind });
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ from: FROM, to: recipients, bcc: bccList.length ? bccList : undefined, reply_to: replyTo || undefined, subject, html }),
+      body: JSON.stringify({ from: FROM, to: recipients, bcc: bccList.length ? bccList : undefined, reply_to: replyTo || undefined, subject, html, headers: unsubscribeHeaders(kind) }),
     });
     if (!res.ok) {
       let msg = `Resend HTTP ${res.status}`;

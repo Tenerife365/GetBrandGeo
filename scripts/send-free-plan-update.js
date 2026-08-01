@@ -86,7 +86,13 @@ const EMAIL = {
     linkedin:  'https://www.linkedin.com/in/daniel-geo/',
     avatarUrl: 'https://getbrandgeo.com/images/constantin.jpg',
   },
-  footerNote: 'You are receiving this because you have a free BrandGEO account. Reply to this email if you would prefer not to receive product updates.',
+  // This message names a price and pitches an upgrade, so it is marketing mail
+  // and not transactional. `kind` is what attaches the opt-out: the footer block
+  // and the List-Unsubscribe header both come from it, so there is nothing else
+  // to remember on a future marketing send. The old footerNote ("reply if you
+  // would prefer not to receive product updates") is gone because the shell now
+  // renders a real Unsubscribe button and two competing opt-outs read as none.
+  kind: 'marketing',
 };
 
 async function main() {
