@@ -7,6 +7,7 @@
 //   -> { error } (HTTP 200) on any failure -- the row stays 'crawled'.
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const TIMEOUT_MS = 20000;
@@ -96,8 +97,23 @@ exports.handler = async (event) => {
     if (!page) return { statusCode: 200, headers, body: JSON.stringify({ error: 'Page not found for this client.' }) };
 
     const { data: client } = await supabase
-      .from('clients').select('name').eq('id', client_id).single();
+      .from('clients').select('name, plan').eq('id', client_id).single();
     const brand = client?.name || 'this brand';
+
+    // ── Entitlement gate. Checked BEFORE the LLM call, which is what this
+    // function spends. Until 2026-08-01 there was no plan check here at all:
+    // the only guards were "are you logged in" and "is this your own client",
+    // so AI SEO was gated on the crawl endpoint and on the UI, and this one was
+    // reachable by any authenticated tenant. Not exploitable in practice,
+    // because a plan with no crawl allowance has no seo_pages rows to name, but
+    // that is an accident of another function's correctness, not a gate.
+    //
+    // 0 means the plan does not sell AI SEO. planLimit() returns 0 for a plan it
+    // does not recognise, so an unpriced tier is refused rather than defaulted.
+    // Admins bypass: they run the managed/done-for-you work across clients.
+    if (profile.role !== 'admin' && planLimit('seoAuditsPerWeek', client?.plan) <= 0) {
+      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Radar or higher to audit your landing page.' }) };
+    }
 
     const raw = await callHaiku(buildPrompt(brand, page));
     if (!raw) return { statusCode: 200, headers, body: JSON.stringify({ error: 'The auditor is unavailable right now. Please try again.' }) };

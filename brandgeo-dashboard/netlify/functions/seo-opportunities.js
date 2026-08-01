@@ -16,6 +16,7 @@
 //   -> { briefs: [], has_data:false, hint } when there is nothing to work from.
 // ============================================================================
 const { requireAuth } = require('./_auth');
+const { planLimit } = require('./_plans');
 const { gatherGeoSignals } = require('./_geo_signals');
 
 const MAX_GAP_BRIEFS = 6;
@@ -38,6 +39,23 @@ exports.handler = async (event) => {
   }
 
   try {
+    // ── Entitlement gate. Added 2026-08-01; there was no plan check here at
+    // all, so any authenticated tenant could populate seo_briefs for a feature
+    // their plan does not sell. Cheaper to abuse than the other AI SEO doors
+    // (this step is deterministic and spends no LLM call, unlike seo-draft.js),
+    // which is exactly why it was overlooked.
+    //
+    // Gated on the SEO SURFACE (seoPages), not on drafts: Radar and Essentials
+    // are sold the one-page audit and should see their opportunities, while
+    // PLAN_LIMITS.seoDraftsPerMonth keeps both at 0 for the expensive step that
+    // turns an idea into a draft. Only `free`, and any plan nobody has priced,
+    // is refused here. Admins bypass, as on every other AI SEO endpoint.
+    const { data: gateClient } = await supabase
+      .from('clients').select('plan').eq('id', client_id).single();
+    if (profile.role !== 'admin' && planLimit('seoPages', gateClient?.plan) <= 0) {
+      return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI SEO is not included on this plan. Upgrade to Radar or higher to see your content opportunities.' }) };
+    }
+
     const { brand, competitors, gaps, recommendations } = await gatherGeoSignals(supabase, client_id);
     const compList = competitors.slice(0, 6);
     const compHint = compList.length

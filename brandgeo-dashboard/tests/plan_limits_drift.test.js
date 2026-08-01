@@ -155,7 +155,12 @@ console.log('\n4. No function hand-writes the ladder any more')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
 
-  for (const f of ['seo-crawl.js', 'seo-draft.js', 'social-publish.js']) {
+  // All five AI SEO / AI Social doors. seo-audit-page.js and seo-opportunities.js
+  // joined the list on 2026-08-01: both had NO plan check at all, so the feature
+  // was gated on the crawl endpoint and the UI while these two were reachable by
+  // any authenticated tenant.
+  for (const f of ['seo-crawl.js', 'seo-draft.js', 'social-publish.js',
+                   'seo-audit-page.js', 'seo-opportunities.js']) {
     const code = codeOf(f)
     assert.ok(
       !/\bgrowth_pro\s*:/.test(code),
