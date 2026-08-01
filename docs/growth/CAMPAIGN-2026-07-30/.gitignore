@@ -1,0 +1,46 @@
+# Video and audio stay out of git. Copy, renderers, checkers and the static
+# post images go in.
+#
+# This file DOES NOT introduce a policy. It writes down the one already chosen
+# in 833ca45, "commit the working tree, and stop 551 MB of renders from
+# entering a public repo", so the next session does not have to re-derive it
+# from what happens to be tracked.
+#
+# Measured 2026-08-01, package is 330 MB on disk:
+#
+#   tracked    20 MB   144 png + 9 ttf + about 2.6 MB of md, py, txt, json
+#   ignored   325 MB   mp4 and wav
+#
+# WHY THE LINE SITS THERE
+#
+#   The static images ARE the deliverable. They are what gets attached to a
+#   post, they are small, and they are reproducible from the _build renderers
+#   which are themselves tracked. Keeping them tracked means a logo change is
+#   reviewable as a diff of what shipped.
+#
+#   Video and audio are 325 MB of the 330. Git history is permanent, so a
+#   blob is in every clone forever even after a later delete, and neither
+#   diffs nor reviews. THIS REPO IS PUBLIC (github.com/Tenerife365/GetBrandGeo,
+#   confirmed 2026-08-01), so committing the cuts would also publish the
+#   campaign before it is posted.
+#
+# A .gitignore DOES NOT UNTRACK anything already committed. The 144 png stay
+# tracked and their future edits keep showing in git status, which is the
+# intended behaviour, not an oversight.
+#
+# THE VIDEO HAS NO BACKUP HERE and never did, since the package was untracked
+# from creation on 2026-07-30 until 833ca45. Nothing is lost by this file, but
+# the masters need somewhere built for binaries.
+
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.mp3
+*.m4a
+*.aac
+
+# Build junk, never wanted
+__pycache__/
+*.pyc
