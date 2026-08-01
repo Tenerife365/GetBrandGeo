@@ -82,7 +82,8 @@ council chats, and the chats are the instrument:
    past rows. Append one revision-log entry per change: date, measured
    trigger, change, council seat whose rule drove it (CGO for channel EV,
    CRO for offer, COO for cadence, CFO for cost, CMO for message, CTO for
-   product blockers).
+   product blockers, CSA for infrastructure and capacity breakpoints, seat
+   defined in registry Part C-0).
 5. **Update the registry status board** only where a re-run check proves a
    state change, quoting the check output.
 6. **Write the morning brief.** Append to `SPRINT-100-BRIEFS.md` a dated

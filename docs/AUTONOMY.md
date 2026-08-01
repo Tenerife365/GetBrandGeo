@@ -73,6 +73,13 @@ Two standing constraints that are not authority questions:
 - **Builds and agents are metered.** Deploys and agent spawns are batched per
   §7. Committing is free and stays granular; pushing dashboard work and
   spawning agents are the two things that burn credits, and both are grouped.
+- **Every build carries a scale note (ruled 2026-08-01).** Before a feature,
+  function, or schema change ships, its brief or review states in one short
+  block what the change does at 10,000 subscribers under the current plan
+  mix: reads, writes, function invocations, external API credits. "No scale
+  impact" is a valid note; silence is not. The load model and its owner (the
+  CSA seat, on `bg-architect`) are defined in the sprint registry Part C-0;
+  the model itself is `docs/arch/scale-audit-10k.md` once S19 writes it.
 
 ---
 

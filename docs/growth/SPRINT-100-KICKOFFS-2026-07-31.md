@@ -34,7 +34,15 @@ server-side by `trg_enforce_prompt_cap` in Postgres. Do not re-file those.
 6. No em dashes, no en dashes, no AI buzzwords in anything customer-facing.
 7. Every chat ends with the RECORD step done, plus a status block for
    Constantin: Completed / Requires your action / Still pending.
-8. **Credit economy, ruled 2026-08-01, full rule `docs/AUTONOMY.md` §7.**
+8. **Scale gate, ruled 2026-08-01: every build carries a CSA scale note.**
+   The council has a new seat, the Chief Scale Architect (CSA, runs on
+   `bg-architect`), see Part C-0. Before any feature, function, or schema
+   change ships, its brief or review states in one short block what the
+   change does at 10,000 subscribers under the current plan mix: reads,
+   writes, function invocations, external API credits. "No scale impact" is
+   a valid note; silence is not. The load model is
+   `docs/arch/scale-audit-10k.md` (S19 builds it).
+9. **Credit economy, ruled 2026-08-01, full rule `docs/AUTONOMY.md` §7.**
    Netlify builds and agent spawns are the two credit burns. Dashboard work is
    committed per task but NEVER pushed per task: mark the board row
    "COMMITTED, awaiting batch push" and one batch push per work block carries
@@ -81,6 +89,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 | S13 | Error monitor goes live | this session + Constantin | day | OPEN, needs account |
 | S14 | Founding prepay offer machinery | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 and S10 |
 | S15 | Referral loop operations | bg-copy + this session | day | OPEN, blocked by S7 |
+| S19 | CSA scale audit: will it hold at 10,000 subscribers | bg-architect Opus, CSA seat | day | OPEN, kickoff below Part C; seat and baseline in Part C-0 |
 
 ---
 
@@ -739,6 +748,34 @@ council's honest outcome estimate under Path 1 effort rises from about 30
 percent to 45 to 55 percent, expected landing 75 to 110 paying. The mechanism
 that earns the 9 is overdetermination, defined under criterion 5.
 
+## C-0. New seat, added by Constantin 2026-08-01: Chief Scale Architect (CSA)
+
+Mandate: architecture, infrastructure, and the growth path from today's
+handful of tenants to 10,000 subscribers. The CSA runs on the `bg-architect`
+agent and holds two standing powers, both mandatory, neither optional:
+
+1. **The scale note on every build** (binding rule 8 above). The CSA's
+   contribution to any kickoff, brief, or review is the answer to one
+   question: at 10,000 subscribers under the current plan mix, what does this
+   change do to the database, the functions, and the external API bills?
+2. **The load model.** The CSA owns `docs/arch/scale-audit-10k.md` (S19) and
+   keeps it current. The method is Constantin's, stated 2026-08-01: take the
+   existing subscribers divided by plan type, scale the mix to 10,000, and
+   multiply by the actions each plan takes at the same time. Then answer:
+   will the database hold, will the platform hold, what do we have, what is
+   missing, and what is the plan.
+
+Seat attribution in the daily council: infrastructure limits, capacity
+breakpoints, and any product blocker whose root cause is load belong to the
+CSA; the CTO seat keeps product defects that are not load-driven.
+
+Baseline measured 2026-08-01 (Supabase, read-only): 36 client rows total, of
+which 27 are legacy `pro` internal research tenants; paying-shaped mix is 1
+essentials, 2 growth, 1 growth_pro, 3 managed, 2 free. 206 active prompts,
+1,082 `ai_results` rows (all inside 30 days), database 20 MB, and every
+client on `manual` refresh cadence. The platform has never yet experienced
+concurrent scheduled load. Every number the audit projects starts from these.
+
 ## C-1. Market relevance: 9, hold and harden
 
 - **Chief Research Officer.** Judgment: the wedge (evidence for the omitted
@@ -1127,6 +1164,91 @@ VERIFY:
 
 RECORD: mark S15 DONE in the registry. One line in CLAUDE.md CURRENT STATE.
 Commit. End with Completed / Requires your action / Still pending.
+```
+
+---
+
+## S19. Scale audit: will it hold at 10,000 subscribers
+
+Session setup: Opus minimum, Fable if available, extended thinking, HIGH
+effort. This is an audit and a load model, no code is touched. Wrong numbers
+here mislead every scale note that cites them, so every claim carries its
+arithmetic or its source line.
+
+```text
+Connect folder C:\Users\const\Constantin Daniel Goane\BrandGEO, then continue
+BrandGEO, sprint task S19: the CSA scale audit. Registry:
+docs/growth/SPRINT-100-KICKOFFS-2026-07-31.md, read the status board and
+Part C-0 first, mark S19 IN PROGRESS.
+
+CONTEXT, read in this order:
+1. Part C-0 of the registry: the seat, the method, and the measured baseline
+   (36 client rows, 27 of them internal research tenants, 206 active
+   prompts, 1,082 ai_results rows, 20 MB database, all cadence manual).
+2. docs/strategy/sprint-ladder-ruling.md: the ruled ladder. PLAN_PROMPTS =
+   5, 7, 18, 35, 56, 200, 200; Radar is weekly on Gemini + Claude; budgets
+   are 15 percent of price. The sprint sells Radar hardest, so the 10,000
+   mix is Radar-heavy: model 70/15/10/4/1 percent across
+   radar/free/essentials/growth/managed unless bg-strategy has published a
+   different mix; state the mix you used.
+3. The collection path in code: netlify/functions/schedule-collections.js,
+   _enqueue.js, collection-worker-background.js, collect-prompt.js,
+   collect-claude.js, collect-chatgpt.js, _cost.js, _auth.js (the 150
+   rows/hr/client rate limit). Run git log -- <file> before citing any line.
+4. Known constraints already on record: the 26s function timeout, the AWS
+   Lambda 4KB total env ceiling (bitten twice), the SerpApi 500-credit
+   monthly pool that ONE 200-prompt client exhausts platform-wide, OpenRouter
+   as single point of failure for Perplexity, force:true history deletion in
+   the queue (registry D-6), and the Supabase project tier and its limits
+   (measure, do not assume).
+
+ACTION: spawn bg-architect on Opus to write docs/arch/scale-audit-10k.md
+with exactly these sections:
+1. THE LOAD MODEL. Constantin's method: subscribers by plan scaled to
+   10,000, times the actions each plan performs concurrently. Produce one
+   table: per plan tier, subscribers at 10k, prompts, engines, refresh
+   cadence, engine calls per week, ai_results rows per month, function
+   invocations per day, external API spend per month in euros. Sum each
+   column. Model the worst hour, not the average hour: scheduled collection
+   fires on a cron, so load arrives in spikes.
+2. WHAT WE HAVE. Each layer with its measured current capacity and source:
+   Supabase (tier, row counts, connection limits, RLS query cost on the
+   hottest queries), Netlify functions (invocation pricing, timeout budget,
+   background worker limits), the queue design, external API rate limits
+   and credit pools, cPanel static (state why it scales flat).
+3. WHAT BREAKS, AND AT WHAT COUNT. For each layer, the subscriber count
+   where it fails under section 1's model, ranked soonest first. Name the
+   exact constant, query, or quota that snaps. Two candidates the council
+   already suspects, verify or refute with arithmetic: the SerpApi pool
+   dies at the FIRST heavy client, and weekly Radar at 10k means roughly
+   140,000 engine calls per week hitting a queue that deletes history as
+   it goes.
+4. WHAT IS MISSING. The gaps between here and 10k: caching and semantic
+   deduplication across identical prompt+market pairs, queue backpressure,
+   per-tenant concurrency fairness, connection pooling, result partitioning
+   or archival, observability at load, budget circuit breakers.
+5. THE PLAN. Three phases with triggers, not dates: what must change before
+   100 subscribers, before 1,000, before 10,000. Each item gets an owner
+   agent, a rough effort size, and a check command. Nothing in the plan is
+   built in this session.
+Then present the phase-1 items (before 100 subscribers) to Constantin in
+this chat as a numbered list: these become sprint tasks or roadmap items.
+
+DO NOT: touch code, run collections (spends money, authority withheld),
+write to any table, or assume a Supabase tier without measuring. Read-only
+SQL is allowed.
+
+VERIFY: test -f docs/arch/scale-audit-10k.md AND it contains all five
+section headers AND section 3's table has a numeric subscriber count per
+row. Claims without arithmetic or a source line fail review.
+
+RECORD: mark S19 DONE on the registry board with the date and the top three
+breakpoints in one line. Add phase-1 items to docs/ROADMAP.md with check
+commands. One line in CLAUDE.md CURRENT STATE. Update memory
+(sprint-100-kickoff-pack): S19 done, where the load model lives. Docs-only
+commit, batched per binding rule 9, message
+"docs(arch): CSA scale audit to 10k subscribers (S19)". End with
+Completed / Requires your action / Still pending.
 ```
 
 ---
