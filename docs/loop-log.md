@@ -274,13 +274,13 @@ own commit is scoped to exactly the two paths it touched
 (`.claude/handoffs/014-...md`, `docs/ROADMAP.md`) and nothing from the other
 session's working tree.
 
-**Not pushed.** Only docs and a handoff rename changed — zero
-`brandgeo-dashboard/` files — so this push would cost nothing against the
-Netlify build budget (AUTONOMY §7). Held anyway: the other session just
-pushed moments ago and a second push run back-to-back is exactly the kind of
-concurrent git activity the serialization rule exists to avoid, with no
-benefit to landing docs-only changes at 3am over the next work block. Queued
-for the next batch push.
+**Pushed**, `e0e1127`. Re-fetched `origin/main` immediately before pushing to
+confirm the other session's push had actually landed and nothing had moved
+since (`0` behind, `1` ahead both before and after the fetch) — no concurrent
+git activity at the moment of the push. Zero `brandgeo-dashboard/` files in
+the diff (`git diff --name-only 8bccdb3..e0e1127 | grep -c
+"^brandgeo-dashboard/"` → 0), so this cost nothing against the Netlify build
+budget in AUTONOMY §7.
 
 **NEEDS CONSTANTIN:** nothing new. Create the Sentry account so B4 can be
 wired (carried from cycle 5, unchanged).
