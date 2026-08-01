@@ -34,6 +34,17 @@ server-side by `trg_enforce_prompt_cap` in Postgres. Do not re-file those.
 6. No em dashes, no en dashes, no AI buzzwords in anything customer-facing.
 7. Every chat ends with the RECORD step done, plus a status block for
    Constantin: Completed / Requires your action / Still pending.
+8. **Credit economy, ruled 2026-08-01, full rule `docs/AUTONOMY.md` §7.**
+   Netlify builds and agent spawns are the two credit burns. Dashboard work is
+   committed per task but NEVER pushed per task: mark the board row
+   "COMMITTED, awaiting batch push" and one batch push per work block carries
+   every session's work (target 2 builds a day platform-wide; only a live
+   billing/auth/signup defect ships alone). Docs and `brandgeo/web/` pushes
+   are free but still grouped, one per session. Agents: one agent per
+   department per block briefed with the full change list, never one per
+   finding, and no agent for a mechanical one-line edit. `bg-verify` reviews
+   the batch before its push, not each commit. Memory and registry update once
+   per batch.
 
 ## Sprint status board
 

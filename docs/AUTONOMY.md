@@ -70,6 +70,9 @@ Two standing constraints that are not authority questions:
   `rules/parallel-task-scoping.md`. Parallel agents must have disjoint write
   scopes AND must not run git; the orchestrator commits.
 - **Every migration ships a down path**, or it is not night-safe.
+- **Builds and agents are metered.** Deploys and agent spawns are batched per
+  §7. Committing is free and stays granular; pushing dashboard work and
+  spawning agents are the two things that burn credits, and both are grouped.
 
 ---
 
@@ -159,3 +162,51 @@ briefly, it did too many things at once.
 
 Report failures plainly and keep the evidence. A cycle that reports only
 successes is not a good cycle, it is an unverified one.
+
+---
+
+## 7. The credit economy: batch deploys, batch agents
+
+Ruled by Constantin 2026-08-01, after two to three thousand credits burned in
+one day on per-change deploys and per-finding agent spawns. Binding on every
+session, every agent, and both windows.
+
+**What costs and what is free.** Only a push that touches
+`brandgeo-dashboard/` fires a Netlify build. Marketing (`brandgeo/web/`, the
+cPanel webhook), docs, and Supabase migrations cost nothing. Before ANY push,
+measure what it carries:
+
+```
+git diff --name-only origin/main...HEAD | grep -c "^brandgeo-dashboard/"
+```
+
+(Three dots, not two. Two dots counts files where origin moved and lies.)
+
+**Deploy rules:**
+
+1. Dashboard-touching work is COMMITTED per task but NOT pushed per task.
+   Commits are free and stay small and traceable; the push is what is batched.
+2. Target at most 2 Netlify builds per day across ALL sessions combined, not
+   per session. One batch push per work block carries every session's
+   committed dashboard work at once.
+3. A session that finishes dashboard work marks its registry board row
+   "COMMITTED, awaiting batch push" and does not push. The batch push is made
+   once, by whichever session Constantin tells to close the block, or by the
+   day's last working session.
+4. The only work that ships alone, immediately: a live defect in billing,
+   auth, or signup that is costing money or customers right now.
+5. Docs-only and `brandgeo/web/`-only pushes are free but still grouped: one
+   push at the end of a session, not one per file.
+
+**Agent rules:**
+
+6. One agent per department per work block, briefed with the FULL list of its
+   scope's changes. Three open bg-backend items means ONE bg-backend brief
+   with three sections, not three spawns.
+7. Mechanical edits (a constant, a copy line, a config key) are made directly
+   by the session that found them. No agent is spawned for a change smaller
+   than its own briefing.
+8. `bg-verify` reviews the batch, not each commit: one review scoped to
+   everything in a batch push, run before that push.
+9. Memory and registry updates happen once per batch, after the checks pass,
+   not once per change.
