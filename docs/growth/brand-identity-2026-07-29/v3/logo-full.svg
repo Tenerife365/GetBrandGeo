@@ -3,10 +3,26 @@
   <desc>Horizontal combination mark. Mark left, wordmark right, separated by one
   stem-width of clear space.
 
-  NOT PRODUCTION READY: the wordmark below is live text, not outlined paths, so
-  it renders in a fallback face anywhere Geist is missing. Outlining needs a
-  Geist TTF or OTF, which is not in the repo and not installed. fontTools is
-  installed, so the font file is the only missing input.</desc>
+  UNBLOCKED 2026-07-31. Geist is now in the repo, so the only missing input this
+  note described is supplied:
+
+    docs/growth/CAMPAIGN-2026-07-30/_shared/fonts/Geist-Bold.ttf
+    (also Medium, Regular, SemiBold, plus Geist-LICENSE.txt)
+
+  From the official geist@1.7.2 npm package, Vercel, SIL OFL 1.1, so commercial
+  use is unrestricted. Verified on install: usWeightClass 700, PIL reports the
+  family as ('Geist','Bold'), 8 distinct advances across the 8 letters of
+  BrandGEO, ink coverage 0.134. fontTools 4.63.0 is installed under `python`
+  (C:\Python314), NOT under `python3`, which has neither fontTools nor PIL.
+
+  STILL TRUE, and still the reason to be careful: the wordmark below is live
+  text, not outlined paths. It renders in a fallback face anywhere Geist is
+  absent, and it does so SILENTLY. That is not hypothetical; it already happened
+  once and shipped an Inter wordmark across the campaign package. Anything
+  rasterising this file must load Geist from an explicit path so a miss raises,
+  and must assert the result: glyph coverage in that file's own cmap, weight
+  700, more than one distinct advance (tofu and monospaced fallbacks collapse to
+  one), and an ink-coverage band (0 is blank, about 0.88 is tofu boxes).</desc>
   <defs>
     <linearGradient id="lockGrad" gradientUnits="userSpaceOnUse"
                     x1="34" y1="22" x2="159" y2="182">

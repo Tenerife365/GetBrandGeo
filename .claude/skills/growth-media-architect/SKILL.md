@@ -152,7 +152,7 @@ funnel stage, a hook driver, a visual brief, and a CTA.
 | 2 | LinkedIn | Thought leadership post | MOFU | 180 to 260 words |
 | 3 | X | Thread | TOFU | 5 to 7 posts |
 | 4 | X | Standalone quote post | TOFU | under 280 chars |
-| 5 | Threads | Conversational post | TOFU | 100 to 150 words |
+| 5 | Threads | Conversational post | TOFU | under 500 characters, target 300 to 450 |
 | 6 | Facebook | Post with link preview | MOFU | 80 to 120 words |
 | 7 | Instagram | Carousel, 6 to 8 slides | MOFU | 12 words per slide max |
 | 8 | Instagram | Reel script | TOFU | 20 to 35 seconds |
@@ -160,6 +160,16 @@ funnel stage, a hook driver, a visual brief, and a CTA.
 | 10 | YouTube | Shorts script | TOFU | under 60 seconds |
 | 11 | YouTube | Long-form outline + hook script | MOFU | 6 to 10 minutes |
 | 12 | Google Business Profile | Update post | BOFU | 80 to 120 words, 1 CTA |
+
+**Length targets are the PLATFORM's limit, not a word count.** Corrected
+2026-07-31 after this file produced four unpostable Threads posts: the old
+"100 to 150 words" target was arithmetically impossible against Threads' 500
+character cap, since 100 words of English runs 600 to 700 characters. Nobody
+noticed because the verification table counted words, which is what the brief
+asked for, against a limit the brief never named. Count the unit the platform
+counts, print the count under every post, and check it against the cap before
+calling anything done. Threads counts UTF-8 bytes, so a curly apostrophe costs
+three; stay ASCII and the count is auditable in any editor.
 
 **Adaptation rules.** Do not paste the same sentences across channels. Each
 channel gets a native opening. The X thread leads with the sharpest number. The

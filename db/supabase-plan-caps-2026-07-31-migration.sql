@@ -5,9 +5,17 @@
 -- Source of truth: docs/strategy/sprint-ladder-ruling.md decisions 1, 2 and 3,
 -- all signed by Constantin 2026-07-31.
 --
--- ⚠️ NOT YET APPLIED. Run in the Supabase SQL editor for project
--- duiyifepitvugyulobqm, then run section 4 (verification) and check it against
--- the stated expectations. Safe to re-run: ADD COLUMN IF NOT EXISTS + ON CONFLICT.
+-- ✅ APPLIED. Confirmed against production 2026-07-31 by querying
+-- public.plan_prompt_caps directly on project duiyifepitvugyulobqm, which
+-- returned the full ruled ladder: free 5, radar 7, essentials 18, growth 35,
+-- growth_pro 56, managed 200, pro 200, enterprise 100000.
+--
+-- This header said "NOT YET APPLIED" until 2026-07-31 while the migration had
+-- in fact already run. That is worse than it sounds: this is the file someone
+-- opens to answer "are Radar customers silently capped at 5 prompts", and the
+-- stale header answers yes when production says seven. Corrected after two
+-- independent reads of the live table. Safe to re-run either way:
+-- ADD COLUMN IF NOT EXISTS + ON CONFLICT.
 --
 -- ── WHY THIS MUST LAND IN THE SAME DEPLOY AS THE CONSTANTS ───────────────────
 -- plan_prompt_caps backs trg_enforce_prompt_cap, a BEFORE INSERT OR UPDATE
