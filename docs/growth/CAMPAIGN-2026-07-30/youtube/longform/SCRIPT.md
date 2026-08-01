@@ -102,7 +102,7 @@ Every claim above survives the removal.
 | 5:50 | The three cards line up together. | Every number we do publish carries its date, its denominator and its scope, on the page it lives on. You can check them. |
 | **7. Close.** | | |
 | 5:58 | Screen recording, brief: the audit form again, domain typed, submit. | Run the free audit on your own domain. It costs nothing and it does not need a card. |
-| 6:06 | Full-frame card: `getbrandgeo.com` in Inter ExtraBold, logo lockup below. Small line beneath: `Free tier available. Paid plans from EUR 29 per month.` | There is a free tier. Paid plans start at twenty nine euros a month. |
+| 6:06 | Full-frame card: `getbrandgeo.com` in Inter ExtraBold, logo lockup below. Small line beneath: `Free tier available.` | There is a free tier. |
 | 6:14 | Logo lockup holds alone on canvas. End screen elements appear at 6:12 per the plan in `ASSETS.md`. | If your buyers are asking an engine about your category this week, something is already being said. This is how you read it. |
 | 6:20 | End. | |
 
@@ -200,7 +200,7 @@ video needs. Full stops are real stops.
 > the page it lives on. You can check them.
 >
 > Run the free audit on your own domain. It costs nothing and it does not need a
-> card. There is a free tier. Paid plans start at twenty nine euros a month.
+> card. There is a free tier.
 >
 > If your buyers are asking an engine about your category this week, something is
 > already being said. This is how you read it.

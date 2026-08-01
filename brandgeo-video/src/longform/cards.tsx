@@ -1252,13 +1252,42 @@ export const EnginesNew: React.FC = () => {
  * DO NOT PUBLISH THIS CARD UNTIL THAT CALL IS MADE. The rest of the video does
  * not depend on it: every other card is settled and can be cut against.
  */
-const PRICE_LINE = 'Free tier available. Paid plans from EUR 29 per month.';
+/* RESOLVED 2026-08-01. The card carries NO price.
+ *
+ * The question was framed as EUR 29 versus EUR 39. The answer is neither,
+ * because both expire and the card does not:
+ *
+ *   EUR 29 stops being true the moment the 100th launch customer signs up.
+ *   EUR 39 is not true while the launch is running.
+ *
+ * A YouTube long-form brand introduction is evergreen. It is uploaded once and
+ * carries a URL for years, so a promotional price baked into frame 1 of a
+ * 14-second end card is a dated asset the day the cohort fills. Fixing it then
+ * costs a re-render AND a re-recorded narration line, because SCRIPT.md speaks
+ * the number aloud.
+ *
+ * getbrandgeo.com already frames this correctly and can change for free: the
+ * live pricing card carries the eyebrow "Launch price" and the tag "List
+ * EUR 39/mo after launch". The web page is the right place for a price that
+ * moves. The video's job is to send people there.
+ *
+ * "Free tier available" is the part that does not expire, and it is the part
+ * that actually removes an objection. The domain is already the hero of this
+ * card, so the line does not need to repeat it.
+ *
+ * Narration changes with it, SCRIPT.md 6:06: "There is a free tier. Paid plans
+ * start at twenty nine euros a month." becomes "There is a free tier." That is
+ * one fewer sentence to re-record, forever.
+ */
+const PRICE_LINE = 'Free tier available.';
 
-/** The line to swap to if the launch cohort fills, or if list is what should be
- *  advertised. SCRIPT.md's narration changes with it, to "from thirty nine
- *  euros a month", so the voice take is affected too. */
+/* The two dated candidates, kept so this decision is not silently re-opened by
+ * someone who only sees the line above. Both are TRUE at the right moment, and
+ * both are wrong at the other one. If a price ever goes back on this card, it
+ * needs an owner and an expiry date, not just a constant. */
+const PRICE_LINE_LAUNCH = 'Free tier available. Paid plans from EUR 29 per month.';
 const PRICE_LINE_LIST = 'Free tier available. Paid plans from EUR 39 per month.';
-// Referenced so the alternative cannot be dropped by a linter or forgotten.
+void PRICE_LINE_LAUNCH;
 void PRICE_LINE_LIST;
 
 export const EndCard: React.FC = () => {

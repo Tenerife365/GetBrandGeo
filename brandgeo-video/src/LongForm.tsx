@@ -25,10 +25,13 @@
  * two beats of one shot (LF-24 covers 5:38 and the 5:50 line-up) the duration
  * spans both, and the internal beat sits where the storyboard puts it.
  *
- * ONE CARD WILL GO STALE ON A KNOWN DATE. `LF-25-end-card` renders "Paid plans
- * from EUR 29 per month", which is `radar`'s launch price for the first 100
- * customers against a EUR 39 list. Re-render it the day that launch price is
- * deactivated.
+ * NO CARD NOW GOES STALE ON A DATE. `LF-25-end-card` used to render "Paid plans
+ * from EUR 29 per month", `radar`'s launch price for the first 100 customers
+ * against a EUR 39 list, and would have needed a re-render plus a re-recorded
+ * narration line the day that cohort filled. Resolved 2026-08-01: the card
+ * carries no price at all, only "Free tier available.". A price that moves
+ * belongs on getbrandgeo.com, which already frames launch against list and can
+ * change for free. Reasoning is at PRICE_LINE in longform/cards.tsx.
  */
 
 import React from 'react';
