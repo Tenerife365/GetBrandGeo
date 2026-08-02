@@ -90,7 +90,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 | S14 | Founding prepay offer machinery | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 and S10 |
 | S15 | Referral loop operations | bg-copy + this session | day | OPEN, blocked by S7 |
 | S19 | CSA scale audit: will it hold at 10,000 subscribers | bg-architect Opus, CSA seat | day | OPEN, kickoff below Part C; seat and baseline in Part C-0 |
-| S20 | Partner and affiliate program (50+ warm partners waiting) | Constantin decides, then bg-copy + this session | day | **URGENT, OPEN**, blocked only by the D-7 DECIDED lines; recommendation is buy-not-build, so no Netlify deploy needed |
+| S20 | Partner and affiliate program (50+ warm partners waiting) | Constantin + bg-copy | day | **DECIDED + STRIPE SIDE LIVE 2026-08-02** (D-7): option 3, PromoteKit free plan, BpR is affiliate 1. Coupon `XKfymWe7` + code `BPRFREE` live, monthly links accept codes, yearly links deliberately do not. NEXT: Constantin creates the PromoteKit account, then copy + script tag |
 
 ---
 
@@ -1716,14 +1716,33 @@ arithmetic):**
    price cut; they earn 20 percent of real revenue. There is no 40 percent
    stacking conversation to have.
 
-**DECIDED lines owed (Constantin, day window):**
-- DECIDED ___ : option (1 / 2 / 3), commission percent and duration, free
-  month cap at Growth yes/no.
-- DECIDED ___ : tool (Rewardful / Tolt / other) and monthly budget.
-- DECIDED ___ : enroll BpR as affiliate number one under these terms yes/no.
+**DECIDED 2026-08-02 (Constantin, in chat):**
+- **DECIDED 2026-08-02: option 3.** 20 percent recurring for 12 months, free
+  month capped at Growth.
+- **DECIDED 2026-08-02: tool is PromoteKit on its free plan** (zero cost
+  until affiliates generate 3 referrals, so revenue arrives before the first
+  bill; Constantin's constraint was no upfront spend). Revisit the paid tier
+  when the first commissions accrue.
+- **DECIDED 2026-08-02: BpR enrolls as affiliate number one.**
 
-Once decided, S20 executes. Constantin's hands: create the tool account and
-connect it to the Spanish Stripe (agents cannot log in or accept vendor
-terms); a chat then writes the partner one-pager, the coupon spec, the
-enrollment email drafts for the 50-partner list, and the tracking snippet
-placement for brandgeo/web (one script tag, cPanel deploy, free).
+**BUILT the same day, live on the Spanish account (this session, within
+standing Stripe authority):**
+- Coupon `XKfymWe7` "Partner free month": 100 percent off, duration once,
+  product-scoped to Radar, Essentials and Growth ONLY (the cap is enforced
+  by Stripe, not by promise).
+- Promotion code **`BPRFREE`** (`promo_1U06XY63lspobjfOcXNBKaSI`),
+  first-time customers only, `metadata.affiliate = bpr`. Redemption count
+  per code is the per-affiliate attribution fallback; more codes on the
+  same coupon = one per future affiliate.
+- `allow_promotion_codes` enabled on the three MONTHLY payment links
+  (radar, essentials, growth). **Deliberately NOT enabled on any yearly
+  link and never enable it there: a 100-percent-once coupon on a yearly
+  link zeroes the entire first-year invoice, not one month.** Growth PRO
+  links untouched (above the cap).
+
+Remaining for S20, in order: (1) Constantin creates the PromoteKit account
+and connects the Spanish Stripe (no agent can accept vendor terms); (2) a
+chat adds the PromoteKit script tag to brandgeo/web (cPanel, free) and
+drafts the partner one-pager plus enrollment emails for the 50-partner
+list, BpR first; (3) commission terms in PromoteKit set to 20 percent
+recurring, 12 months, Net-30 payout.
