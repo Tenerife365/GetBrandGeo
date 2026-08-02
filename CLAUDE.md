@@ -20,11 +20,72 @@
 
 ---
 
-## CURRENT STATE (verified 2026-07-26)
+## CURRENT STATE (newest entry 2026-08-02)
 
 Every claim in this section was checked against the live sites, the running
 bundle, or the working tree. Not remembered. If you change something here, check
 it the same way. This section takes precedence over §0 through §7 below.
+
+**Entries are dated individually and newest first. Read the date on the entry,
+not the date on this header.** The header used to read "verified 2026-07-26"
+while carrying entries a week newer, which is the same drift this section exists
+to prevent.
+
+### 2026-08-02: `/#free-audit` is the site-wide CTA target, and it is load bearing
+
+**`brandgeo/web/index.html`'s hero carries `id="free-audit"`. Ninety plus pages
+link to it. Renaming or removing that id breaks the call to action on the whole
+site at once.** `site.js` focuses `#brandInput` when a visitor arrives on the
+hash. Verified live: 92 of 98 pages carry a CTA, and **zero** still point their
+primary button at `/#contact`.
+
+Why it moved: `/#contact` is the **48-hour manual request form**. The instant
+audit lives in the hero and, until this change, nothing on the site linked to it.
+The weaker promise was the one on 77 pages. The six pages with no CTA are legal
+and terminal pages, by decision, and `article-builder.html` is excluded as an
+internal tool.
+
+**Articles are generated, not hand-copied.** `scripts/build_articles.py` plus
+`scripts/articles_content.py` render every `bg-*.html` from one template. This
+exists because six pages (`bg-020`, `bg-022` to `bg-026`) were found loading
+**Google Analytics before consent**: they were written after `399723c` swept that
+tag off the other 79 pages, by copying a page that predated the sweep. A page
+copied from a page inherits the state of that page, not the state of the site.
+Removed on all six. **Do not hand-copy an article template again.**
+
+**BG-027 to BG-034 are live**, the bilingual series, off `ai_results` data
+collected 2026-07-10 that had sat unpublished. 34 articles now exist. The dataset
+and its query traps are in memory as `bilingual-research-dataset`; full method
+in `scripts/articles_content.py`'s header. `news/radar-plan-launch/` is live and
+is the first announcement of Radar and of the free tier moving to Gemini.
+
+**Indexing reality, unchanged but now load bearing for content work.**
+`ping-sitemap` (pg_cron job 5, `10 5 * * *`) submits to **IndexNow only**;
+`google_skipped: "NO_CREDENTIALS"` on every run is the intended 2026-07-28
+ruling, not a fault. Google gets nothing automatically. New URLs reach Google
+only via the sitemap being crawled, or by Constantin submitting them by hand in
+Search Console. `job_runs.ok` is `true` whenever a submitter was merely
+configured, so **read `pinged` against `indexnowOk` in `detail`, never `ok`**.
+
+**Two measurement rules that cost time this session, both now in memory.**
+
+1. **The Browser pane cannot measure layout.** Undisplayed it does not
+   composite, so `document.documentElement.clientWidth` reads **0** and every
+   geometry number from it is meaningless; `resize_window` does not fix it and
+   screenshots fail outright. Use headless Chrome over CDP (Node 24 has a global
+   `WebSocket`, no dependency). Memory: `preview-pane-cannot-measure-layout`.
+2. **`scrollWidth` is not evidence of a horizontal scroll.** Attempt a real
+   `window.scrollTo(600, 0)` and read `scrollX` back. To prove a change is not
+   the cause of an overflow, delete that element in the live page and re-measure.
+
+**Live defect that measurement found, NOT fixed, do not re-derive it.** The site
+scrolls sideways on a phone. Measured at 375 CSS px with a real scroll:
+**`bg-026` 146px, `bg-019` 428px, the homepage 123px** from `.mode-switch` (two
+buttons of 221px and 233px inside a 320px wrapper carrying `flex-wrap: nowrap`),
+and 53px at 768px from `.footer-grid` never collapsing. BG-027 to BG-034 are the
+only articles measuring **zero**; the four-line media query that got them there
+is in `build_articles.py`. The mode-switch fix carries a design choice (stack,
+shrink or wrap) and is owed a decision, not a patch.
 
 ### 2026-07-31: the pricing ladder is ruled (S1). One follow-on unsigned.
 
@@ -677,6 +738,15 @@ Netlify 2026-07-28).
 
 #### Decisions owed
 
+- [ ] **Decide how the pricing mode switch behaves below 640px.** It is the cause
+      of 123px of real horizontal scroll on the homepage at 375 CSS px, measured
+      2026-08-02 with an actual scroll attempt, not a `scrollWidth` comparison.
+      `.mode-switch` is `flex-wrap: nowrap` around two `.mode-btn` of 221px and
+      233px inside a 320px wrapper. Three fixes and each reads differently:
+      stack them vertically, shrink the type, or drop `white-space: nowrap` and
+      let each button wrap internally. Owner `bg-design`, then `bg-web`. The
+      same pass should take `.footer-grid`, which does not collapse at 768px and
+      adds 53px there.
 - [ ] Decide whether `PLAN_PROMPTS` is enforced server-side or stays display-only
       (`activation-path.md` §5.4).
 - [ ] Decide whether `free` clients get a non-manual `refresh_cadence`, a spend
