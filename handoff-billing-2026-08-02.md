@@ -13,6 +13,70 @@ otherwise.
 
 ---
 
+## READ THIS FIRST: state at end of session, 2026-08-02
+
+**The Stripe account migration is DONE and PROVEN. BrandGEO now bills from a
+Spanish account, `acct_1Tzui063lspobjfO`.** The old Romanian account
+`acct_1LHjKrKh2GaZE2B4` is superseded and awaiting close-out. Every claim below
+was closed by a command, never by a report.
+
+| Thing | State | Proven by |
+|---|---|---|
+| ES account | LIVE, ES, charges + payouts enabled, bank intact | `GET /v1/account`, external_accounts |
+| Catalogue | 4 products, 7 prices, 7 links, all livemode | created and read back |
+| Env vars + deploy | WORKING | live `POST accept-terms` returned the new account's link |
+| Webhook under `dahlia` | WORKING | EUR 1 payment: plan provisioned, `client_events` 15 written |
+| Client binding | HOLDS on the new account | payer `monica@talentwelove.com` mapped to no client, **no stray client created**, 37 total / 1 created |
+| Radar yearly defect | FIXED and pushed | `node --check` + 6/6 period cases |
+
+**Nothing in the code changed for the migration.** `STRIPE_CHECKOUT_LINKS`,
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` were swapped and the site
+redeployed once. That is the entire Netlify cost.
+
+### What is left, in order
+
+1. **Invoice template on the new account. Constantin was doing this at session
+   end.** Read off the first real invoice `in_1TzwKk63lspobjfOYJxbTmhZ`, so this
+   list is measured and not guessed:
+   - `account_name` prints **`BrandGEO`**, must be **`Constantin Daniel Goane`**
+   - `account_tax_ids` is **null**, the VAT id must be added and set default
+   - `footer` is **null**, needs step 2's wording
+   - `total_taxes` is **`[]`**, no tax line at all; 0% must be stated
+   - `number` is **`JVRPVBYV-0001`**, a random prefix
+   - **`rendering.pdf.page_size` is `letter`**, a European invoice on US paper.
+     NEW finding, not in section 4.
+2. **The accountant's footer wording. THE ONLY REAL BLOCKER**, unchanged all
+   session. Citations in section 6B step 1.
+3. **BpR Customer and invoice.** Section 6A step 7. Set `tax_exempt: 'reverse'`
+   and put the footer on `invoice_settings.footer` so it inherits. Grant runs to
+   **2027-06-02**. **Sending is Constantin's click.**
+4. **Provision BpR by hand once paid**, `invoice.paid` is still unhandled.
+
+### Cleanup owed
+
+- **Old account:** deactivate its 7 payment links (**the CLI's DEFAULT profile
+  still points there**, so this needs no repointing), refund the EUR 1
+  (`cus_UztEDNeNwTyFmh`), let EUR 0.97 settle to Wise, disable webhook
+  `we_1TrYG7Kh2GaZE2B4EVZuVHD3`, then close. Do NOT deactivate the links until
+  the new checkout has been seen working, or there is no checkout at all.
+- **New account:** client **51** (`ZZ E2E TEST ES`) and its EUR 1 are disposable
+  after 2026-08-03. Its link already self-deactivated at 1/1.
+- `.gitignore` for the skills install: `.agents/`, `.claude/skills/`,
+  `.commandcode/`, `.continue/`, `.cortex/`, `.qwen/`, `skills-lock.json`.
+
+### Two working rules this session earned
+
+- **The Stripe CLI defaults to TEST mode.** `--live` is required on every
+  command. An empty product list in test mode is indistinguishable from a new
+  account and nearly caused a whole catalogue to be built in test mode with
+  every call returning success.
+- **Diagnose the layer before spending a build.** "Contact us, no link" looked
+  exactly like a failed env var. One live POST proved the env was fine and the
+  fault was a period the product does not sell, in a file that deploys free via
+  cPanel. Guessing would have spent a Netlify build on a correct configuration.
+
+---
+
 ## 0) SUPERSEDING RULING, 2026-08-02 later the same day
 
 **Constantin ruled: move to a Spanish Stripe account.** This changes the

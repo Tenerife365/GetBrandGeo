@@ -31,6 +31,56 @@ not the date on this header.** The header used to read "verified 2026-07-26"
 while carrying entries a week newer, which is the same drift this section exists
 to prevent.
 
+### 2026-08-02: BrandGEO bills from a SPANISH Stripe account now
+
+**`acct_1Tzui063lspobjfO` (ES) is the live billing account. The Romanian
+`acct_1LHjKrKh2GaZE2B4` is superseded** and awaiting close-out. Full record and
+the remaining steps: `handoff-billing-2026-08-02.md`, read its top block first.
+
+**Why it had to be a new account: `account.country` cannot be changed after
+activation.** Stripe's documented remedy is a new account in the correct
+country. So "fix the country" is never a task, it is a migration. The old
+account was `country: RO` carrying a Tenerife address, which made a sale to a
+Romanian buyer look DOMESTIC and put 19% Romanian VAT on the BpR EUR 3,500
+instead of Art. 44 / Art. 196 reverse charge. That is what forced the move, and
+it is why the BpR invoice was deliberately NOT issued from the old account.
+
+It cost almost nothing because it was done before the first real customer: the
+old account's entire lifetime was 2 customers, both Constantin's own tests, 2
+charges totalling EUR 1.50, and 1 canceled subscription.
+
+**Verified end to end, not reported:** the catalogue is 4 products / 7 prices /
+7 links, all livemode; a live `POST accept-terms` returned the new account's
+link, proving the env vars reached the functions; and a EUR 1 payment
+provisioned a client through `checkout.session.completed` with a `client_events`
+row, proving the webhook still parses under API version `2026-07-29.dahlia`
+where the old endpoint ran `2020-08-27`.
+
+**No code changed for the migration.** The links live in `STRIPE_CHECKOUT_LINKS`
+on Netlify with no fallback, so it was three env vars and one redeploy.
+
+**Rules earned, do not relearn:**
+- **The Stripe CLI defaults to TEST mode.** `--live` on every command. An empty
+  product list in test mode looks identical to a fresh account, and nearly got a
+  whole catalogue built in test mode with every call returning success.
+- **`scripts/stripe-create-catalogue.js` now REQUIRES `--project-name`.** Without
+  it, it targeted whatever profile the CLI was logged into, which was the account
+  being abandoned.
+- **Diagnose the layer before spending a Netlify build.** "Contact us, no link"
+  on the Radar CTA looked exactly like a failed env var. One live POST proved the
+  env was fine and the real fault was `site.js` sending `period: 'annual'` for a
+  plan that has never had an annual price, fixed for free via cPanel. The billing
+  toggle is global and applies to cards that show no yearly price; see
+  `MONTHLY_ONLY_PLANS` in `brandgeo/web/site.js`.
+- The old account's payment links are still ACTIVE and are permanent bearer URLs
+  in public git history. Deactivating them is owed, and only AFTER the new
+  checkout is confirmed working.
+
+**Still open:** the invoice template on the new account is not compliant yet
+(legal name, VAT id, footer, 0% tax line, invoice prefix, and `page_size` is
+`letter` on a European invoice), and the accountant's reverse-charge footer
+wording is the one true blocker on the BpR sale.
+
 ### 2026-08-02: `/#free-audit` is the site-wide CTA target, and it is load bearing
 
 **`brandgeo/web/index.html`'s hero carries `id="free-audit"`. Ninety plus pages
