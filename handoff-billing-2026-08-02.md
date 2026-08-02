@@ -502,6 +502,62 @@ are live side by side, the 2026-07-09 set with no `metadata.plan` and the
 own content rule on documents customers receive. Recreating is the cleanup, not
 a loss. Build one correct set matching `planConfig.ts`.
 
+### The API version jump is unavoidable, and here is exactly what it touches
+
+**The webhook endpoint on the OLD account, read live:**
+
+```
+we_1TrYG7Kh2GaZE2B4EVZuVHD3
+api_version : 2020-08-27
+events      : checkout.session.completed
+              customer.subscription.updated
+              customer.subscription.deleted
+url         : https://app.getbrandgeo.com/.netlify/functions/stripe-webhook
+```
+
+Those three events are the only ones `stripe-webhook.js` handles. Subscribe to
+exactly those on the new endpoint, scope **"Your account"**, never "Connected
+accounts": there are no connected accounts (`GET /v1/accounts` returns an empty
+list) and an organisation does NOT create them, so that scope would receive
+nothing forever while every payment silently failed to provision.
+
+**A new account offers only its current version or a preview.** The dropdown gave
+`2026-07-29.dahlia` (current) and `2026-06-24.preview`. `2020-08-27` is not
+available. **Take `dahlia`, never the preview** on a money path. So the migration
+carries the version jump whether or not anyone wants it, and the job is to verify
+against it rather than avoid it.
+
+**Measured, and it shrinks the exposure a long way.** The code pins no API
+version anywhere (every function is a bare `require('stripe')(key)`), but the
+installed SDK does:
+
+```
+brandgeo-dashboard/node_modules/stripe   17.7.0
+exports.ApiVersion = '2025-02-24.acacia'
+```
+
+stripe-node sends that as `Stripe-Version` on every outbound request, so
+**outbound calls are unaffected by the new account's default version.** In
+particular `get-subscription.js:40` reads `sub.current_period_end` off the
+subscription top level, which moved onto the subscription ITEM in
+`2025-03-31.basil`; `acacia` predates basil, so that line keeps working. An
+earlier draft of this handoff flagged it as a likely breakage. It is not one.
+
+**What remains is only the INBOUND payload shape**, on those three events.
+`constructEvent` verifies the signature and returns the payload as Stripe sent
+it; it does not reshape to the SDK version. So `stripe-webhook.js` will parse
+`dahlia` objects having only ever seen `2020-08-27` ones. The fields it actually
+reads are the stable ones (`session.id`, `customer`, `customer_details.email`,
+`mode`, `metadata`, and the customer id on subscription events) and it reads no
+`current_period_*` inbound, so this is expected to be fine.
+
+**Expected is not checked. CHECK BEFORE BPR PAYS:** make one small real payment
+on the new account and confirm the whole chain, event received, signature
+verified, `clients` row updated, `client_events` row written.
+`scripts/check-package-client-binding.js` cannot cover this: it feeds synthetic
+payloads, so it exercises the logic and never the wire format. Refund that test
+together with the EUR 1 at close-out.
+
 **Then an agent can run, in this order.**
 
 6. **Recreate products, prices and the seven payment links** on the new account,
