@@ -262,7 +262,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // this is reachable on mobile through the same sidebar, via the
         // hamburger menu.
         { to: '/tickets', icon: LifeBuoy, label: isAdmin ? 'Tickets' : 'Support' },
-        ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Usage & Costs' }] : []),
+        ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Revenue' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],
     },

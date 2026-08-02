@@ -21,7 +21,7 @@ import AIVisibility from './pages/AIVisibility'
 import BrandSentiment from './pages/BrandSentiment'
 import Recommendations from './pages/Recommendations'
 import Onboard from './pages/Onboard'
-import Usage from './pages/Usage'
+import Revenue from './pages/Revenue'
 import Social from './pages/Social'
 import SEO from './pages/SEO'
 import Account from './pages/Account'
@@ -114,7 +114,7 @@ export default function App() {
               <Route path="/onboard" element={<PrivateRoute><OnboardGate><Layout><Onboard /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/social" element={<PrivateRoute><OnboardGate><Layout><Social /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Usage /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Revenue /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
               {/* One route, two views. Admins get the triage queue (customer
                   requests plus BrandGEO's own internal work); everyone else
