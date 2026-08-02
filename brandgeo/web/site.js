@@ -626,9 +626,14 @@
 
     var hideTooltip = function() {
       engineTooltip.classList.remove('is-visible');
+      // Back out of the accessibility tree. It is about to be emptied, and a
+      // role="tooltip" with no accessible name is an audit failure as well as
+      // a genuinely useless node for a screen reader.
+      engineTooltip.setAttribute('aria-hidden', 'true');
       if (activeChip) {
         activeChip.classList.remove('is-active');
         activeChip.setAttribute('aria-expanded', 'false');
+        activeChip.removeAttribute('aria-describedby');
       }
       activeChip = null;
     };
@@ -642,10 +647,17 @@
         '<span class="tip-quote">' + quote + '</span>';
       engineTooltip.style.setProperty('--chip-accent', chip.getAttribute('data-accent') || '');
       engineTooltip.classList.add('is-visible');
-      if (activeChip && activeChip !== chip) activeChip.classList.remove('is-active');
+      // Now that it carries text it has an accessible name, so it can join the
+      // accessibility tree and be pointed at as the chip's description.
+      engineTooltip.setAttribute('aria-hidden', 'false');
+      if (activeChip && activeChip !== chip) {
+        activeChip.classList.remove('is-active');
+        activeChip.removeAttribute('aria-describedby');
+      }
       activeChip = chip;
       chip.classList.add('is-active');
       chip.setAttribute('aria-expanded', 'true');
+      chip.setAttribute('aria-describedby', 'engineTooltip');
       // getBoundingClientRect() forces a synchronous layout, so the size we
       // read back here already reflects the innerHTML set just above —
       // no need to wait a frame (and waiting was actually fragile: rAF is

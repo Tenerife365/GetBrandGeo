@@ -130,6 +130,70 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── METRIC MATCHED FALLBACKS ──
+       These exist to hold CLS at zero while display=swap does its job.
+
+       Measured 2026-08-02 over CDP, not recalled. This page scored CLS 0.189
+       on PageSpeed Insights desktop, and it was ONE shift at 1019ms, the font
+       swap. Blocking fonts.gstatic.com took the same page to 0.0000, which is
+       what proves the cause rather than suggesting it.
+
+       Two effects were in that one shift. The headline set in Instrument
+       Serif wrapped to 3 lines, but to 2 in the fallback, and since the hero
+       is vertically centred that 60px of height moved the whole block by 31px
+       the instant the real face arrived. Inter, which is on everything else,
+       is the smaller offender and is what moved the nav and the pay chip
+       sideways.
+
+       Both line-heights involved are UNITLESS (1.08 on the headline, 1.6 on
+       body), so the line box is font-size times that number and does not
+       depend on ascent or descent at all. Wrapping width is the whole game,
+       which makes size-adjust the load-bearing value here and the ascent and
+       descent overrides close to cosmetic. They are set anyway for anything
+       that inherits line-height: normal.
+
+       size-adjust was solved against THE STRINGS THIS PAGE ACTUALLY SETS,
+       measured 2026-08-02: the real 59-character headline for the serif, and
+       40 real nav, button and paragraph strings for Inter, each rendered
+       nowrap and measured. An earlier pass calibrated against a
+       frequency-weighted alphabet instead and was wrong by 3.4 points on the
+       serif, which is the difference between the headline wrapping to 2 lines
+       and to 3. A display serif's proportions do not track an average.
+
+       The overrides are resolved against the size-adjusted em, which is why
+       each is the raw ratio divided by its own size-adjust.
+
+       Georgia and Times New Roman need separate faces because their metrics
+       differ, and a single face cannot carry two sets of numbers. They are
+       listed in the same order as the stack they are standing in for.
+
+       Mobile and the article pages already measured 0.0000, so this is
+       deliberately scoped to the one page that failed. */
+    @font-face {
+      font-family: 'Inter Fallback';
+      src: local('Arial');
+      size-adjust: 106.82%;
+      ascent-override: 90.71%;
+      descent-override: 22.56%;
+      line-gap-override: 0%;
+    }
+    @font-face {
+      font-family: 'Instrument Serif Fallback Georgia';
+      src: local('Georgia');
+      size-adjust: 75.64%;
+      ascent-override: 130.89%;
+      descent-override: 40.98%;
+      line-gap-override: 0%;
+    }
+    @font-face {
+      font-family: 'Instrument Serif Fallback Times';
+      src: local('Times New Roman');
+      size-adjust: 83.19%;
+      ascent-override: 119.00%;
+      descent-override: 37.26%;
+      line-gap-override: 0%;
+    }
+
     /* ═══════════════════════════════════════════════════════════════════════
        DESIGN TOKENS — rebuilt 2026-07-28 from measurement, not preference.
 
@@ -246,7 +310,7 @@
     body {
       background: var(--bg);
       color: var(--t);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Inter', 'Inter Fallback', system-ui, sans-serif;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       transition: background .3s, color .3s;
@@ -573,7 +637,7 @@
          characters in a 553px split-hero column it is not reachable by type
          alone. Shortening the headline is the only lever left, and that is a
          copy decision, not a CSS one. Do not chase it by shrinking type. */
-      font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+      font-family: 'Instrument Serif', 'Instrument Serif Fallback Georgia', 'Instrument Serif Fallback Times', Georgia, 'Times New Roman', serif;
       font-size: clamp(2.2rem, 6.4vw, 3.5rem);
       font-weight: 400;
       line-height: 1.08;
@@ -2566,7 +2630,14 @@
      hovered/focused/tapped. Deliberately kept OUTSIDE .hero — a direct
      child of .hero would get caught by the ".hero > *" content-layer rule
      above, which forces position:relative and breaks fixed positioning. -->
-<div class="engine-tooltip" id="engineTooltip" role="tooltip"></div>
+<!-- Starts aria-hidden because it starts EMPTY. A role="tooltip" node with no
+     accessible name is what failed the PSI "Accessibility tree is not
+     well-formed" audit on 2026-08-02: the audit sees the page at load, when
+     site.js has not written any text into this yet. It is hidden from the
+     tree until showTooltip() fills it, which is also just true, there is
+     nothing to announce before then. site.js flips both this and the
+     aria-describedby on the chip. -->
+<div class="engine-tooltip" id="engineTooltip" role="tooltip" aria-hidden="true"></div>
 
 <!-- =============================================================
      PROOF ORDER. The sequence below is hook-thesis-web.md §5, applied in
