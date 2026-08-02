@@ -502,6 +502,55 @@ are live side by side, the 2026-07-09 set with no `metadata.plan` and the
 own content rule on documents customers receive. Recreating is the cleanup, not
 a loss. Build one correct set matching `planConfig.ts`.
 
+### The new account is BUILT. Catalogue ids, 2026-08-02
+
+**`acct_1Tzui063lspobjfO`**, country **ES**, `charges_enabled` and
+`payouts_enabled` both true, `details_submitted` true, Wise bank copied intact
+(`ba_1Tzui763lspobjfOMdgEgpwN`, TRANSFERWISE EUROPE SA/NV, BE, EUR, last4 9560).
+Verification passed on creation, so the `verification_failed_keyed_identity` that
+dogged the old account did not follow.
+
+Created through the MCP connector, every object read back, all `livemode: true`:
+
+| Plan | Product | Price monthly | Price annual |
+|---|---|---|---|
+| essentials | `prod_UzvlFTnW6bABSk` | `price_1TzvuS63lspobjfO0O9hq776` 9900 | `price_1TzvuW63lspobjfOpF7bl6Qa` 99000 |
+| growth | `prod_UzvlxjmdB6Idcq` | `price_1Tzvua63lspobjfOxHUMZHxX` 29900 | `price_1Tzvue63lspobjfOY9KGPFhi` 299000 |
+| growth_pro | `prod_UzvlfrHiEwNF5V` | `price_1Tzvuh63lspobjfOlYPtHpHZ` 44900 | `price_1Tzvul63lspobjfOOxAJjHPM` 449000 |
+| radar | `prod_UzvlUFXpVdx5gH` | `price_1Tzvuo63lspobjfOmBR8DARu` 2900 | none, by design |
+
+**The seven payment link URLs are deliberately NOT in this file.** They are
+payable bearer URLs and this repository is public. They live only in
+`STRIPE_CHECKOUT_LINKS` on Netlify. The link IDs, which are not payable, are
+`plink_1Tzvv7`, `1TzvvA`, `1TzvvD`, `1TzvvG`, `1TzvvK`, `1TzvvO`, `1TzvvR`.
+
+**All seven links carry uniform `metadata.migration = "2026-08-02-es"`**, plus
+`plan` and `interval`. Deliberate: on the old account six carried `rotation` and
+Radar carried `created`, so a cleanup rule of "deactivate anything without
+`rotation`" would have killed the live Radar checkout. Uniform metadata removes
+that trap. Keep it uniform on any future rotation.
+
+**Verified by running the shipped gate, not by inspection.** The new catalogue
+was fed to the real `_terms_gate.js` with the env value set: **11/11 pass, exit
+0**. Seven tiers each resolved to a payable URL, and all four refusal paths still
+refused: acceptance absent, stale contract version, a plan nobody may self-serve
+(`managed`), and `radar/annual`, which must refuse because that price does not
+exist. The env value is **301 bytes** in slug form, well inside the 4KB Lambda
+ceiling that broke every function on 2026-07-31.
+
+**Not carried across, deliberately:** the five add-on products, the duplicate
+second `Essentials Annual`, and `Launch` from July 2022. Nothing sells them.
+16 active products became 4.
+
+**Still open on the new account at the time of writing:** branding is empty
+(`icon: ""`, `logo: null`, no colours), `card_payments.statement_descriptor_prefix`
+is `null`, and `settings.invoices.default_account_tax_ids` is `null`. The
+statement descriptor reads `BRANDGEO GLOBAL`, NOT `TALENTWELOVE`, so the
+inherited-descriptor risk flagged earlier did not materialise. **The public
+business details could not be verified from here**: the dahlia account object no
+longer exposes `business_profile`, so whether the DBA name, URL and industry
+inherited from TalentWeLove is unknown and must be checked in the Dashboard.
+
 ### The API version jump is unavoidable, and here is exactly what it touches
 
 **The webhook endpoint on the OLD account, read live:**
