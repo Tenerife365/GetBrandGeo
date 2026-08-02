@@ -11,7 +11,7 @@ import { PageTitle } from '../components/Typography'
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
 export default function Onboard() {
-  const { isAdmin } = useClient()
+  const { isAdmin, refreshClients } = useClient()
   const { collecting, progress: collectionProgress, runCollection } = useCollection()
   const navigate = useNavigate()
 
@@ -153,6 +153,16 @@ export default function Onboard() {
       if (!res.ok) throw new Error(data.error ?? 'Onboarding failed')
       setNewClientId(data.client_id)
       setStep(6)
+
+      // Pull the new client into the switcher and make it active. Without this
+      // the row exists in Supabase but is invisible for the rest of the tab's
+      // life: ClientProvider loads its list once per mount, this page finishes
+      // with navigate('/') which does not remount it, and patchClient can only
+      // update a row already loaded. Found 2026-08-02, client 52.
+      // Deliberately NOT awaited: the wizard's step 6 does not depend on it,
+      // and OnboardGate's settledOnce guard means the `loading` flip it causes
+      // cannot unmount this page mid-collection.
+      refreshClients(data.client_id)
 
       // Fire the same 3-parallel-function collection every other page uses
       // (collectionContext.tsx), gated to this client's actual plan — not

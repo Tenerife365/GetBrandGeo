@@ -53,6 +53,9 @@ interface ClientCtx {
   setClientEngineOverride: (engineId: EngineId, enabled: boolean) => Promise<void>
   updateClientCategory: (clientId: number, category: string) => Promise<void>  // admin: switcher grouping
   patchClient: (clientId: number, patch: Partial<Client>) => void  // sync local state after an admin mutation
+  // Re-fetch the client list. Call after CREATING a client (patchClient only
+  // covers rows already loaded). `selectId` lands on the new client.
+  refreshClients: (selectId?: number) => Promise<void>
 }
 
 const DEFAULT_ENGINES = getActiveEngines('free', null)
@@ -74,6 +77,7 @@ const Ctx = createContext<ClientCtx>({
   setClientEngineOverride: async () => {},
   updateClientCategory:    async () => {},
   patchClient:             () => {},
+  refreshClients:          async () => {},
 })
 
 const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category, brand_website, created_at, subscription_started_at, paid_until, plan_source, plan_grant_until, plan_grant_note, social_channel_limit'
@@ -107,15 +111,44 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     ? getEngineStates(activeClient.plan, activeClient.engines_enabled)
     : DEFAULT_STATES
 
-  useEffect(() => {
+  /**
+   * Load (or re-load) the client list for the signed-in user.
+   *
+   * EXPOSED ON THE CONTEXT since 2026-08-02, because nothing could add a client
+   * to the loaded list. This function used to be an `init()` closure inside the
+   * effect below, reachable only on mount and on a SIGNED_IN/SIGNED_OUT
+   * transition. An admin who onboarded a client therefore could not see it:
+   * Onboard.tsx finishes with navigate('/'), a client-side route change, and
+   * this Provider sits above the router so it never remounts. The new client
+   * stayed invisible in the switcher for the rest of the tab's life, and only a
+   * full browser reload brought it back. Found 2026-08-02 with client 52, which
+   * was correctly written to Supabase (row, profile and 3 prompts all present)
+   * while the sidebar showed 37 clients.
+   *
+   * This is the same failure the listener below was added to fix in #107, for a
+   * different trigger. `patchClient` covers mutating a row already loaded; this
+   * covers a row appearing.
+   *
+   * `selectId` lands on a specific client after the reload and persists it, so
+   * a caller that just CREATED a client can drop the admin straight into it.
+   * Omitted, the existing precedence is unchanged.
+   */
+  const refreshClients = useCallback(async (selectId?: number) => {
     if (isDemoMode) { setLoading(false); return }
 
     async function init() {
       setLoading(true)
-      // Prefer the user's CURRENT in-session selection (survives re-inits fired
-      // on tab-focus/token-refresh), then the freshly-persisted value, then the
-      // default. Do NOT use the stale mount-time `saved` closure here.
-      const desired = activeClientIdRef.current
+      // A caller that just created a client wins outright: it knows an id the
+      // ref and localStorage cannot know yet. Persisted so a later reload keeps
+      // it, matching setActiveClientId rather than the load-time setters.
+      if (typeof selectId === 'number') {
+        localStorage.setItem('brandgeo_client', String(selectId))
+      }
+      // Then prefer the user's CURRENT in-session selection (survives re-inits
+      // fired on tab-focus/token-refresh), then the freshly-persisted value,
+      // then the default. Do NOT use the stale mount-time `saved` closure here.
+      const desired = selectId
+        || activeClientIdRef.current
         || parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -199,7 +232,13 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
 
-    init()
+    await init()
+  }, [])
+
+  useEffect(() => {
+    if (isDemoMode) { setLoading(false); return }
+
+    refreshClients()
 
     // Re-run on real sign-in/sign-out transitions. Without this listener,
     // isAdmin/clients only ever populate from the very first time this
@@ -209,7 +248,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     // life. Found + fixed 2026-07-09 (task #107).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        init()
+        refreshClients()
       } else if (event === 'SIGNED_OUT') {
         setIsAdmin(false)
         setClients([])
@@ -220,7 +259,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+    // refreshClients is useCallback([]) and therefore stable, so this still
+    // runs exactly once per mount, as it did when init() was inlined here.
+  }, [refreshClients])
 
   /**
    * Switch the active client.
@@ -325,6 +366,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setClientEngineOverride,
       updateClientCategory,
       patchClient,
+      refreshClients,
     }}>
       {children}
     </Ctx.Provider>
