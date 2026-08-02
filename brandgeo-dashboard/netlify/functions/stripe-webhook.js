@@ -307,6 +307,9 @@ async function handleCheckoutCompleted(session, log) {
   // Everything below branches on these four, and on nothing else. Both modes
   // then run the SAME three provisioning branches (arch §3.2 step 3).
   let plan, planSource, grantUntil, months
+  // Set only on the package path, and only when the price names a client. null
+  // means "resolve the buyer from the payer's email", which is every other case.
+  let boundClientId = null
 
   if (isPackage) {
     // Shape of the SALE before shape of the PRICE (S3). The months granted come
@@ -339,6 +342,18 @@ async function handleCheckoutCompleted(session, log) {
     // Held THROUGH this date; expire-plan-grants.js reverts it the day after,
     // because that job selects plan_grant_until < today.
     grantUntil = packageGrantUntil(months)
+
+    // Who is this package FOR? Only packages may name a client: a self-serve
+    // subscription has no admin behind it to name one, and letting a public
+    // price carry a client_id would let anyone who guessed a price id provision
+    // against an account they do not own.
+    const bound = await resolveBoundClient(price, log)
+    if (!bound.ok) {
+      log(`package NOT provisioned (${bound.reason}): ${bound.detail} [price=${priceId} email=${email}]`)
+      await reportUnprovisionedPackage({ session, log, reason: bound.reason, detail: bound.detail, email, priceId })
+      return
+    }
+    boundClientId = bound.clientId
   } else {
     plan = (price?.metadata?.plan) || PRICE_TO_PLAN[priceId]
     if (!plan || !SELF_SERVE_PLANS.includes(plan)) {
@@ -414,19 +429,31 @@ async function handleCheckoutCompleted(session, log) {
 
   // Find an existing auth user by email (returning subscriber, re-subscribe, or
   // someone who already had a login from the Onboard wizard / an earlier buy).
-  const existingUser = await findUserByEmail(email)
+  //
+  // SKIPPED ENTIRELY when the package named its client: the whole point of the
+  // binding is that the payer's mailbox is not consulted, so looking it up and
+  // then ignoring the answer would leave a lookup whose result silently does
+  // nothing — the shape that invites someone to "simplify" it back into a bug.
+  const existingUser = boundClientId ? null : await findUserByEmail(email)
 
-  if (existingUser) {
-    // Link/refresh the plan on their existing client. Their client is via
-    // user_profiles.client_id.
-    const { data: profile, error: profErr } = await supabase
-      .from('user_profiles')
-      .select('client_id')
-      .eq('id', existingUser.id)
-      .maybeSingle()
-    if (profErr) throw new Error(`user_profiles lookup failed: ${profErr.message}`)
+  if (boundClientId || existingUser) {
+    // Which client this checkout provisions. From the price when the package
+    // named one, otherwise from the payer's profile.
+    let targetClientId = boundClientId
 
-    if (profile?.client_id) {
+    if (!targetClientId) {
+      // Link/refresh the plan on their existing client. Their client is via
+      // user_profiles.client_id.
+      const { data: profile, error: profErr } = await supabase
+        .from('user_profiles')
+        .select('client_id')
+        .eq('id', existingUser.id)
+        .maybeSingle()
+      if (profErr) throw new Error(`user_profiles lookup failed: ${profErr.message}`)
+      targetClientId = profile?.client_id
+    }
+
+    if (targetClientId) {
       // The plan this client is on BEFORE the update below overwrites it — the
       // value whose absence made the 2026-07-31 incident unanswerable. Read on
       // BOTH paths: a subscription checkout changes a plan just as much as a
@@ -439,10 +466,11 @@ async function handleCheckoutCompleted(session, log) {
       // customer's months and MUST throw, while an audit read must never be
       // able to fail a checkout. Audit machinery does not get to sit on the
       // critical path, not even in its error handling.
-      const prior = await readCurrentPlan(profile.client_id, log)
+      const prior = await readCurrentPlan(targetClientId, log)
       const fromPlan = prior.plan
       let priorSource = null
       let priorGrantUntil = null
+      let priorCustomerId = null
 
       // S2 (docs/qa/package-provisioning-014.md), ruled by Constantin
       // 2026-07-31: renewing a package early STACKS the unused remainder rather
@@ -461,12 +489,13 @@ async function handleCheckoutCompleted(session, log) {
       if (isPackage) {
         const { data: cur, error: curErr } = await supabase
           .from('clients')
-          .select('plan_grant_until, plan_source')
-          .eq('id', profile.client_id)
+          .select('plan_grant_until, plan_source, stripe_customer_id')
+          .eq('id', targetClientId)
           .maybeSingle()
         if (curErr) throw new Error(`clients grant lookup failed: ${curErr.message}`)
         priorSource = cur?.plan_source ?? null
         priorGrantUntil = cur?.plan_grant_until ?? null
+        priorCustomerId = cur?.stripe_customer_id ?? null
 
         const stacked = stackedGrantUntil(months, cur?.plan_grant_until)
         if (stacked !== grantUntil) {
@@ -506,6 +535,25 @@ async function handleCheckoutCompleted(session, log) {
       const update = { plan, stripe_customer_id: custId, plan_source: planSource, plan_grant_until: grantUntil }
       if (!isPackage) update.stripe_subscription_id = subId
 
+      // DO NOT repoint an existing stripe_customer_id on the bound path.
+      //
+      // Binding exists so a third party can pay: accounts payable, a parent
+      // company, a reseller. That payer is a DIFFERENT Stripe Customer from the
+      // client's own. Writing it here would silently repoint the client's
+      // stripe_customer_id at someone else's customer record, and
+      // get-subscription.js reads exactly that field to find the renewal panel
+      // and set-client-plan.js to decide whether a client is Stripe-billed. A
+      // client with a live subscription would lose both to a one-off package
+      // paid by their finance team.
+      //
+      // Only on the bound path, and only when a value already exists: an
+      // unbound checkout is the payer's own, and a bound client with no
+      // customer id yet has nothing to lose.
+      if (boundClientId && priorCustomerId && priorCustomerId !== custId) {
+        delete update.stripe_customer_id
+        log(`bound package: keeping client ${targetClientId} stripe_customer_id ${priorCustomerId}, NOT repointing to payer ${custId}`)
+      }
+
       // Automatic refresh cadence follows the tier the customer just bought
       // (2026-07-31). Written here rather than anywhere else because this is one
       // of the moments a plan is established, and cadence that does not follow
@@ -520,18 +568,27 @@ async function handleCheckoutCompleted(session, log) {
       // a cycle already in flight.
       const cadence = prior.read ? refreshCadenceFor(plan, prior.category) : null
       if (cadence) update.refresh_cadence = cadence
-      else log(`refresh_cadence NOT written for client ${profile.client_id}: category unknown (prior read failed)`)
+      else log(`refresh_cadence NOT written for client ${targetClientId}: category unknown (prior read failed)`)
 
       const { error: updErr } = await supabase
         .from('clients')
         .update(update)
-        .eq('id', profile.client_id)
+        .eq('id', targetClientId)
       if (updErr) throw new Error(`clients update failed: ${updErr.message}`)
-      log(`existing user ${existingUser.id} → client ${profile.client_id} set to ${plan} (${planSource}${grantUntil ? `, until ${grantUntil}` : ''})`)
+      // Two hazards closed in one line, both invisible to `node --check`:
+      //   - `profile` is now block-scoped to the email branch above, so naming
+      //     it here was a ReferenceError on EVERY checkout, not just bound ones.
+      //   - `existingUser` is null on the bound path, so dereferencing it threw
+      //     a TypeError AFTER the clients row had already been updated. The
+      //     outer catch deletes the idempotency row, so Stripe would redeliver,
+      //     re-apply the update and throw again: a provisioned customer that
+      //     looks like a permanently failing webhook.
+      log(`${boundClientId ? `bound price → client ${targetClientId}` : `existing user ${existingUser.id} → client ${targetClientId}`}`
+        + ` set to ${plan} (${planSource}${grantUntil ? `, until ${grantUntil}` : ''})`)
       // Audit row for the plan write immediately above. Runs after the update,
       // so it only ever claims a change that actually landed.
       await recordPlanEvent({
-        client_id: profile.client_id,
+        client_id: targetClientId,
         type: 'stripe_change',
         from_plan: fromPlan,
         to_plan: plan,
@@ -550,7 +607,7 @@ async function handleCheckoutCompleted(session, log) {
         },
       })
       await recordAdminEvent(supabase, {
-        type: eventType, client_id: profile.client_id,
+        type: eventType, client_id: targetClientId,
         title: isPackage ? `Package purchased: ${what}` : `Subscription: ${planLabel}`,
         body: isPackage
           ? `${email} bought a ${what}. Access runs to ${grantUntil}, then reverts to Free.`
@@ -558,6 +615,14 @@ async function handleCheckoutCompleted(session, log) {
         meta: eventMeta(),
       })
       return
+    }
+
+    // Defensive, and it should never fire: a bound package always resolves a
+    // targetClientId (resolveBoundClient rejects an id with no row) and returns
+    // above. Stated rather than assumed, because everything below this point
+    // dereferences existingUser, which is null on the bound path.
+    if (!existingUser) {
+      throw new Error(`bound package (client_id=${boundClientId}) reached the user-creation branch; this is a bug`)
     }
 
     // Auth user exists but has no client/profile (edge case). Create a client
@@ -1058,6 +1123,63 @@ async function createClientRow({ email, plan, custId, subId, planSource, grantUn
 // Find an auth user by email via the admin API. @supabase/supabase-js v2 has no
 // getUserByEmail, so paginate listUsers and match. Capped at 20 pages (20k
 // users) — far beyond the current base, and each page is a single admin call.
+/**
+ * Resolve the client a package is BOUND to, from price.metadata.client_id.
+ *
+ * WHY THIS EXISTS. Everything else on this path identifies the buyer from the
+ * PAYER'S EMAIL: email -> auth user -> user_profiles.client_id. That is correct
+ * for self-serve, where the person paying is the person signing up. It is wrong
+ * for a hand-sold package, where an admin agrees terms with a named client and
+ * emails them a link. The moment that mail is forwarded to accounts payable, the
+ * payer's address is not the account's address, and the email path provisions a
+ * BRAND NEW client for the AP mailbox while the client who agreed the deal is
+ * never upgraded. They have paid and nothing changed.
+ *
+ * So a package may name its client explicitly, and when it does, the payer's
+ * identity stops mattering entirely: any card, any mailbox, any device.
+ *
+ * OPTIONAL BY DESIGN. Absent metadata returns {ok:true, clientId:null} and the
+ * caller falls back to the email path unchanged, so every existing price keeps
+ * its current behaviour. PRESENT BUT BAD fails closed: a typo'd or deleted
+ * client id must not silently degrade into "create a new client from the payer's
+ * email", because that is the exact failure this was built to stop, and it would
+ * be indistinguishable from success in the admin feed.
+ *
+ * @returns {{ok:true, clientId:number|null}|{ok:false, reason:string, detail:string}}
+ */
+async function resolveBoundClient(price, log) {
+  const raw = price && price.metadata ? price.metadata.client_id : undefined
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return { ok: true, clientId: null }
+  }
+
+  const text = String(raw).trim()
+  // Strict, for the same reason resolvePackage parses months strictly: Number('')
+  // is 0 and parseInt('1 BpR') is 1, and provisioning the wrong client silently
+  // is worse than refusing and alerting.
+  if (!/^\d+$/.test(text)) {
+    return { ok: false, reason: 'invalid_client_id', detail: `price.metadata.client_id "${text}" is not a whole number` }
+  }
+  const clientId = Number(text)
+
+  // The row must exist NOW, not when the link was made. A link can outlive the
+  // client it names, and provisioning a deleted id would write nothing while
+  // reporting success.
+  const { data, error } = await supabase.from('clients').select('id, name').eq('id', clientId).maybeSingle()
+  if (error) {
+    // Throw, do not report: nothing has been written yet, so the outer catch
+    // releases the idempotency lock and Stripe redelivers, which retries cleanly.
+    // Reporting here would burn the one delivery on a transient database blip.
+    throw new Error(`bound client lookup failed: ${error.message}`)
+  }
+  if (!data) {
+    return { ok: false, reason: 'unknown_client_id', detail: `price.metadata.client_id ${clientId} matches no clients row` }
+  }
+
+  log(`package is BOUND to client ${clientId} (${data.name}); payer email is not used for resolution`)
+  return { ok: true, clientId }
+}
+
 async function findUserByEmail(email) {
   const target = email.trim().toLowerCase()
   const perPage = 1000
@@ -1083,3 +1205,12 @@ function slugify(s) {
 function randomSuffix() {
   return Math.random().toString(36).slice(2, 6)
 }
+
+// Test-only surface. Netlify routes on exports.handler and ignores everything
+// else, so this adds no endpoint and changes no behaviour. It exists because
+// the client-binding change shipped two runtime-only defects that `node --check`
+// and a careful diff read both missed: a `profile` reference left outside its
+// new block scope, and an `existingUser` dereference on the path where it is
+// null. Neither is reachable without calling the function.
+// Harness: scripts/check-package-client-binding.js
+exports.__test__ = { handleCheckoutCompleted, resolveBoundClient }
