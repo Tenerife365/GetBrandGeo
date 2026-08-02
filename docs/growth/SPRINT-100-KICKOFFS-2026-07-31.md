@@ -91,6 +91,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 | S15 | Referral loop operations | bg-copy + this session | day | OPEN, blocked by S7 |
 | S19 | CSA scale audit: will it hold at 10,000 subscribers | bg-architect Opus, CSA seat | day | OPEN, kickoff below Part C; seat and baseline in Part C-0 |
 | S20 | Partner and affiliate program (50+ warm partners waiting) | Constantin + bg-copy | day | **DECIDED + STRIPE SIDE LIVE 2026-08-02** (D-7): option 3, PromoteKit free plan, BpR is affiliate 1. Coupon `XKfymWe7` + code `BPRFREE` live, monthly links accept codes, yearly links deliberately do not. NEXT: Constantin creates the PromoteKit account, then copy + script tag |
+| S21 | Admin Revenue page: Usage tab becomes Revenue with Usage / Cost / Revenue tabs | bg-architect spec, then bg-app + bg-backend Opus | day | OPEN, requested by Constantin 2026-08-02, kickoff below S19. Needs a Netlify build: ships INSIDE a batch push (rule 9), ideally S16's wave, never alone |
 
 ---
 
@@ -1251,6 +1252,51 @@ commit, batched per binding rule 9, message
 "docs(arch): CSA scale audit to 10k subscribers (S19)". End with
 Completed / Requires your action / Still pending.
 ```
+
+---
+
+## S21. Admin Revenue page: net revenue per plan, per client, global
+
+Session setup: Sonnet for the build, bg-backend part on Opus (it holds a
+Stripe key path). Moderate effort. NEEDS A NETLIFY BUILD: ships inside a
+batch push per binding rule 9, never alone.
+
+Requested by Constantin 2026-08-02, verbatim intent: the admin Usage tab
+becomes Revenue; opening it shows three tabs, Usage, Cost, and Revenue;
+under Revenue, the sources: which plans are selling, how much was invoiced,
+how much came from affiliates, what discounts and free months cost, so net
+revenue is understood properly per plan, per client, and global.
+
+Architecture facts the builder inherits, verified 2026-08-02:
+- Stripe (Spanish account acct_1Tzui063lspobjfO) is the single source of
+  truth for money. PromoteKit never touches Supabase; it attributes and
+  computes commissions against Stripe only. Affiliate management stays in
+  PromoteKit's own panel; this page is the money REPORT, not affiliate admin.
+- Revenue tab data comes from a NEW admin-only Netlify function
+  (requireAuth adminOnly, Stripe secret stays server-side): paid invoices
+  and MRR per plan and per client, discounts applied (coupon XKfymWe7 and
+  promo codes; BPRFREE metadata.affiliate = bpr is the attribution key),
+  affiliate commission accrued at 20 percent of attributed paid invoices,
+  refunds netted out.
+- Net revenue = paid minus refunds minus commission accrued minus estimated
+  API cost per client from the existing cost model (the same source
+  Usage.tsx already uses). Show per plan, per client, global.
+- VERIFY, do not assume: the join key between a Stripe customer and a
+  clients row (stripe-webhook.js provisioning path shows what is stored
+  where). If no durable key exists, storing stripe_customer_id on clients
+  is part of this task, with a migration and a down path.
+- CSA scale note (rule 8): paging all invoices per page load dies well
+  before 10,000 subscribers. Acceptable for v1 at today's client count with
+  caching; the load model upgrade path is a monthly revenue_snapshots table
+  written by a scheduled job, noted in the spec now, built later.
+
+VERIFY: page renders for an admin with the three tabs; Revenue figures for
+the current month match the Stripe Dashboard's gross and net for the same
+period (spot check, numbers pasted into the QA note); non-admin gets 401
+from the function.
+
+RECORD: board row, ROADMAP if follow-ups emerge, one line in CLAUDE.md
+CURRENT STATE, docs commit; the build itself waits for the batch push.
 
 ---
 
