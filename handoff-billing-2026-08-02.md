@@ -13,6 +13,123 @@ otherwise.
 
 ---
 
+## 0) SUPERSEDING RULING, 2026-08-02 later the same day
+
+**Constantin ruled: move to a Spanish Stripe account.** This changes the
+sequence in section 6 and makes parts of section 4 moot. Read this section
+before acting on anything below it.
+
+### The measurement that made the ruling cheap
+
+Lifetime, live mode, `acct_1LHjKrKh2GaZE2B4`, read from the API not recalled:
+
+- **2 customers**, both Constantin's own tests: `cus_UztEDNeNwTyFmh`
+  ("Monica Goane", the EUR 1) and `cus_UzFUoUqjgjwolg` ("Constantin Goane",
+  the EUR 0.50).
+- **2 charges, EUR 1.50 total.**
+- **1 subscription, `sub_1TzGzx`, status `canceled`**, the 2026-07-31 e2e test.
+- **Balance EUR 0.97 pending, EUR -0.04 available.**
+
+**There is not one real customer on this Stripe account.** BpR has not paid,
+Ai Fy is free, nobody is subscribed. So the migration costs nothing today and
+this is the cheapest it will ever be. The moment BpR pays EUR 3,500 the old
+account acquires a real invoice and a settled transaction that has to be
+reconciled across two accounts permanently.
+
+### `account.country` cannot be changed, so "switch to ES" means a new account
+
+Stripe fixes the country at activation. The documented remedy is a new account
+in the correct country, onboarded again. There is no field to correct.
+
+Consequence that governs section 6: **the BpR invoice must NOT be issued from
+`acct_1LHjKr`.** A RO-established seller invoicing a RO-established buyer
+(Bucateperoate SRL, RO15565836) is a DOMESTIC supply. Art. 44 and Art. 196
+reverse charge do not apply between two establishments in the same member
+state, and the honest treatment becomes 19% Romanian VAT on EUR 3,500. That is
+the exposure section 4 suspected, made concrete. The ES to RO supply is what
+makes reverse charge correct and the accountant's footer true.
+
+### Section 4's account-field gaps are moot, and one theory in it was wrong
+
+`individual.address` and `company.address` cannot be moved to ES on a RO-country
+account: Stripe constrains the representative and business country to the
+account country. On the new account they are simply typed correctly once.
+
+**Correction to section 6 step 2's causal theory.** The past due
+`verification_failed_keyed_identity` is attached to the **`individual`** person,
+whose address is a THIRD address this handoff never recorded:
+**George Enescu 30J, Vila 2, Otopeni, 075100, RO**. That person's address is
+internally consistent RO, so `company.address.country = RO` is not the obvious
+cause. The likelier cause is that Otopeni does not match the identity document.
+**Carry this to the new account:** onboard with the Tenerife address AND a
+document showing Constantin's name at Calle Adriatico 64, or the same failure
+repeats on day one.
+
+Also, precision on section 4's table: `company.address.line1` DOES carry the
+"64". It is `business_profile.support_address.line1` that is missing it, and
+that is the field that prints.
+
+### The connector cannot write to the account at all
+
+The Stripe MCP exposes no account-write operation (`PostAccountsAccount` does
+not exist) and no `/v1/tax_ids` operation. Account fields, the VAT id behind
+`default_account_tax_ids`, bank details, the invoice number prefix and the
+verification documents are Dashboard-only. **Section 6 step 2 was never an agent
+task.** It is entirely Constantin's clicks, and always was.
+
+### Preserved evidence, because the cleanup destroys it
+
+`client_events.client_id` is **ON DELETE CASCADE**. Deleting client 50 cascades
+away event id 14, the only durable proof that the client binding (`13bb92d`)
+provisioned correctly against real money, on a feature `bg-verify` has still
+never reviewed (open item 7). The row, recorded here before deletion:
+
+```json
+{ "id": 14, "client_id": 50, "type": "stripe_change",
+  "from_plan": "free", "to_plan": "growth_pro",
+  "created_at": "2026-08-02 07:05:29.960989+00",
+  "meta": { "mode": "payment", "reason": "package_purchase",
+    "source": "stripe-webhook", "email": "constantin@workfully.com",
+    "price": "price_1TzsndKh2GaZE2B47jsC2IKU", "months": 1,
+    "plan_source": "package", "refresh_cadence": "weekly",
+    "plan_grant_until": "2026-09-02",
+    "stripe_customer_id": "cus_UztEDNeNwTyFmh",
+    "checkout_session": "cs_live_a1HNalxdm7kzNZc9sxHx6tWFDymMTzzC1Rn07b0933lU96QUhTj2nhL9fe",
+    "previous_plan_source": null, "previous_grant_until": null,
+    "stripe_subscription_id": null } }
+```
+
+The load bearing facts in it: `plan_source` became `package`, the grant landed
+at `2026-09-02`, the payer's email belonged to no client, and **no new client
+was created**. Under the pre-`13bb92d` code that payment would have created one.
+
+**The EUR 1 refund is deliberately NOT taken.** The account is being abandoned
+and the available balance is EUR -0.04 against EUR 0.97 pending, so a EUR 1.00
+refund either fails for insufficient funds or debits the Wise account. Fold it
+into the RO account close-out instead.
+
+### Verified unchanged from the rest of this handoff
+
+Checked by API and SQL this pass, not taken from the text above: exactly 7
+active payment links and they are the correct 7 (the six `rotation=2026-07-31`
+plus Radar `plink_1TzJXb`); the test link `plink_1Tzsno` self-deactivated at
+`completed_sessions 1/1`; BpR is client 1, `growth_pro`, `plan_source` and
+`plan_grant_until` both NULL, `stripe_customer_id` NULL, which is the silent
+admin plan change defect still live; `stackedGrantUntil(10, null)` returns
+**2027-06-02** and 10 is inside `MIN 1 / MAX 36`;
+`settings.invoices.default_account_tax_ids` is `null` while
+`company.vat_id_provided` is `true`; git is 0 ahead and 0 behind with only the
+content session's `index.html` and `site.js` in the tree.
+
+### One lever found this pass that section 4 did not have
+
+`customer.tax_exempt = 'reverse'` makes Stripe render reverse-charge treatment
+natively, and `customer.invoice_settings.footer` sits on the Customer. So the
+accountant's footer is typed ONCE on the BpR Customer and every future BpR
+invoice inherits it, rather than being retyped per invoice.
+
+---
+
 ## 1) Goal
 
 Three threads, in this order:
@@ -235,6 +352,54 @@ every commit here used explicit paths.
 ---
 
 ## 6) Next steps
+
+> ⚠️ **Steps 1 to 6 below are SUPERSEDED by section 0's ES ruling.** Step 2 is
+> not doable at all (the country is immutable and the connector cannot write to
+> the account), and steps 3 and 4 must not run against `acct_1LHjKr`. The live
+> sequence is section 6A. The text below is kept because the citations in step 1
+> and the grant arithmetic in step 3 are still correct and still needed.
+
+### 6A) The live sequence, after the ES ruling
+
+**Constantin's, and no agent can do any of it.** Creating accounts, completing
+identity verification and moving API keys are all withheld under AUTONOMY §2.
+
+1. **Create the new Stripe account registered in SPAIN.** Business address,
+   individual address and support address all
+   **Calle Adriatico 64, El Rosario, 38109, Santa Cruz de Tenerife, ES**.
+   Legal name `Constantin Daniel Goane`, not the `GetBrandGEO` trade name,
+   because `business_profile.name` is what prints and `company.name` never does.
+2. **Complete verification with a document showing that address.** See section
+   0: the RO account failed on exactly this and the cause travels.
+3. **Add the VAT id under invoice settings and set it as default**, so
+   `default_account_tax_ids` stops being `null`. Also set the bank details and
+   an invoice number prefix while on that page.
+4. **Put the new `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` into Netlify**
+   and recreate the webhook endpoint at the same URL. An agent must never see
+   or move these.
+5. **Reconnect the Stripe MCP connector to the new account**, or the next
+   session is still pointed at `acct_1LHjKr` and will silently write to the
+   wrong one.
+
+**Then an agent can run, in this order.**
+
+6. **Recreate products, prices and the seven payment links** on the new account,
+   and update `_terms_gate.js` to the new URLs. Dashboard-touching, so it
+   COMMITS per task and batches per AUTONOMY §7. Keep
+   `restrictions.completed_sessions.limit = 1` on every test link, which is what
+   made `plink_1Tzsno` deactivate itself.
+7. **Then the BpR Customer and invoice**, per the old step 3 below, which is
+   still correct in every detail except which account it runs against. Add
+   `tax_exempt: 'reverse'` and put the footer on
+   `invoice_settings.footer` so it inherits (section 0).
+8. **Close out `acct_1LHjKr`**: refund the EUR 1, let the balance settle to
+   Wise, then close. Not before, see section 0 on the balance.
+
+**Still blocking step 7, unchanged.** The accountant's footer wording. It is no
+longer the front of the queue, the ES account is, but it is the long pole so it
+should be started now.
+
+### 6B) Superseded text, kept for its citations and arithmetic
 
 **Blocking, and it needs Constantin, not an agent.**
 
