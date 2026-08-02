@@ -735,6 +735,27 @@
   // purpose, while there was nothing to sell.
   var PLAN_LABELS = { radar: 'Radar', essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO' };
 
+  // Plans sold on ONE period only, so the billing toggle must not be applied to
+  // them. Found live 2026-08-02: with the toggle on yearly, clicking Radar's
+  // Subscribe sent period 'annual' to accept-terms, and Radar has no annual
+  // price on any account and never has. The gate correctly refused with
+  // `no_link` and the visitor was told to contact us, on the cheapest tier and
+  // therefore the likeliest first purchase anyone makes.
+  //
+  // It looked like a broken checkout and it was a period the product does not
+  // sell. Not caused by the Stripe account migration: the same click failed the
+  // same way on the old account.
+  //
+  // Sending 'monthly' regardless is honest rather than a papering-over: Radar's
+  // pricing card carries no .billing-yearly element at all, so it displays
+  // EUR 29/mo whatever the toggle says. The visitor is sent to a checkout for
+  // exactly the price they were shown.
+  //
+  // If Radar ever gets an annual price, delete its entry here IN THE SAME
+  // COMMIT that adds the price and the payment link, or this silently caps it
+  // at monthly forever.
+  var MONTHLY_ONLY_PLANS = ['radar'];
+
   // Hoisted out of the billing toggle below, where it used to be a local. The
   // gate has to know which period the visitor is looking at at the moment they
   // click Subscribe, and the toggle is the only thing that knows.
@@ -871,7 +892,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plan: pendingPlan,
-          period: billingYearly ? 'annual' : 'monthly',
+          // See MONTHLY_ONLY_PLANS. The toggle is global, so it applies to a
+          // card that never offered a yearly price unless it is excluded here.
+          period: (MONTHLY_ONLY_PLANS.indexOf(pendingPlan) > -1 || !billingYearly) ? 'monthly' : 'annual',
           accepted: true,
           accepted_version: TERMS_VERSION,
           honeypot: ''
