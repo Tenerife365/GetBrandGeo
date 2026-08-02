@@ -758,7 +758,21 @@ function aggregateRevenue({
     if (!c || c.id === undefined || c.id === null) continue
     clientsById.set(Number(c.id), c)
     const scid = metaString(c.stripe_customer_id)
-    if (scid) clientsByStripeCustomerId.set(scid, c)
+    if (scid) {
+      // CQO review F7, 2026-08-02: two clients rows sharing one
+      // stripe_customer_id used to resolve silently to whichever was seen
+      // last -- money attributed to a SPECIFIC WRONG client, the exact
+      // failure mode contract §3 calls worse than unattributed. There is no
+      // unique constraint on the column, so this is a real (if unlikely)
+      // data-anomaly path, not a hypothetical. Now warned rather than silent;
+      // resolution still keeps the last-seen row (changing THAT behaviour --
+      // e.g. refusing to resolve either -- is a bigger call than this fix).
+      const existing = clientsByStripeCustomerId.get(scid)
+      if (existing && Number(existing.id) !== Number(c.id)) {
+        warn(`clients.stripe_customer_id "${scid}" is shared by client ${existing.id} and client ${c.id}; Stripe money is being attributed to client ${c.id} only.`)
+      }
+      clientsByStripeCustomerId.set(scid, c)
+    }
   }
 
   const customersById = new Map()
@@ -920,14 +934,48 @@ function aggregateRevenue({
           pb.commissionCents += commissionCents
           affiliateBucket(attribution.affiliateCode).commissionCents += commissionCents
         }
+
+        // CQO review F9, 2026-08-02: attribution is first-touch by design
+        // (contract §4, "the earliest occurrence of the tagged code"), which
+        // is a legitimate model but was previously SILENT about it — a
+        // second partner whose code a customer later redeems accrues nothing
+        // and never appears in `affiliates[]`, with nothing on the page
+        // saying why. Warned, not changed: re-attributing to the later code
+        // would be a different policy, not a bug fix.
+        if (invoice.id !== attribution.invoiceId) {
+          for (const key of promotionKeysOnInvoice(invoice)) {
+            const promo = lookup(promotionCodes, key)
+            const otherAffiliate = promo && promo.metadata ? metaString(promo.metadata.affiliate) : null
+            if (otherAffiliate && otherAffiliate !== attribution.affiliateCode) {
+              warn(`Invoice ${invoice.id || '(no id)'} carries promotion code for affiliate "${otherAffiliate}", but this customer was already attributed to "${attribution.affiliateCode}" on an earlier invoice; first-touch attribution is kept and "${otherAffiliate}" accrues nothing here.`)
+              break
+            }
+          }
+        }
       }
     }
   }
 
   // ── Refunds (§2: refund -> charge -> invoice/customer) ────────────────────
+  // CQO review F2, 2026-08-02: a Stripe refund is a REQUEST, not a completed
+  // transfer. Its `status` is one of pending/requires_action/succeeded/
+  // failed/canceled. Netting a failed or canceled one means the customer was
+  // never repaid but the report shows the platform as if it were -- overstating
+  // BOTH how much money left and how little net revenue there is, silently.
+  // Absent `status` (older API shapes / the fixture harness) is treated as
+  // succeeded, matching the account's behaviour before this field existed.
   for (const refund of refunds || []) {
     if (!refund) continue
     if (!inPeriod(toMs(refund.created), period)) continue
+
+    const status = refund.status !== undefined && refund.status !== null
+      ? String(refund.status) : null
+    if (status && status !== 'succeeded') {
+      if (status === 'pending' || status === 'requires_action') {
+        warn(`Refund ${refund.id || '(no id)'} (${centsToEur(Math.round(num(refund.amount)))} EUR) is still ${status}; not netted until it succeeds.`)
+      }
+      continue
+    }
 
     const amountCents = Math.round(num(refund.amount))
     if (amountCents === 0) continue

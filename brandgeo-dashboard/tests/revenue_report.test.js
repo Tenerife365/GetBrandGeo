@@ -899,6 +899,93 @@ section('13. engagement pipeline (contract §9)')
   ok('computeEngagementPipeline never throws on empty or malformed input')
 }
 
+// ── 14. CQO review fixes, 2026-08-02 (docs/qa/s21-revenue-report-cqo-review-2026-08-02.md) ──
+// Each of F2, F7 and F9 was demonstrated live by the review with a constructed
+// scenario the original 93 checks did not cover. Reproduced here so the fix is
+// pinned, not just argued in a code comment.
+section('14. CQO review fixes, 2026-08-02 (F2, F7, F9)')
+{
+  // F2: a refund whose status is present and NOT 'succeeded' must not be netted.
+  {
+    const invoice = {
+      id: 'in_f2', object: 'invoice', customer: 'cus_F2', currency: 'eur',
+      status: 'paid', created: unix('2026-08-06T10:00:00Z'),
+      subtotal: 9900, total: 9900, amount_due: 9900, amount_paid: 9900,
+      status_transitions: { paid_at: unix('2026-08-06T10:00:05Z') },
+      lines: { data: [line('essentials')], has_more: false },
+    }
+    const failedRefund = {
+      id: 're_f2_failed', object: 'refund', amount: 9900, currency: 'eur', status: 'failed',
+      created: unix('2026-08-07T10:00:00Z'),
+      charge: { id: 'ch_f2', object: 'charge', invoice: 'in_f2', customer: 'cus_F2' },
+    }
+    const client = { id: 900, name: 'F2 Client', plan: 'essentials', stripe_customer_id: 'cus_F2', category: 'active' }
+    const customer = { id: 'cus_F2', name: 'F2 Client', email: 'f2@example.com', metadata: {} }
+
+    const r = aggregateRevenue({
+      invoices: [invoice], refunds: [failedRefund], customers: [customer], clients: [client],
+      costByClientId: {}, period: PERIOD, priceToPlanFallback: PRICE_TO_PLAN, promotionCodes: {},
+    })
+    assert.strictEqual(r.global.paidRevenueEur, 99)
+    assert.strictEqual(r.global.refundsEur, 0)
+    ok("a 'failed' refund of 9900 cents is NOT netted: paid stays EUR 99.00, refunds stay EUR 0.00")
+
+    const pendingRefund = { ...failedRefund, id: 're_f2_pending', status: 'pending' }
+    const r2 = aggregateRevenue({
+      invoices: [invoice], refunds: [pendingRefund], customers: [customer], clients: [client],
+      costByClientId: {}, period: PERIOD, priceToPlanFallback: PRICE_TO_PLAN, promotionCodes: {},
+    })
+    assert.strictEqual(r2.global.refundsEur, 0)
+    assert.ok(r2.warnings.some((w) => w.includes('re_f2_pending') && w.includes('pending')))
+    ok("a 'pending' refund is also not netted, and raises a warning naming it")
+  }
+
+  // F7: two clients rows sharing one stripe_customer_id must warn, not resolve silently.
+  {
+    const dupA = { id: 7, name: 'Dup A', plan: 'essentials', stripe_customer_id: 'cus_dup', category: 'active' }
+    const dupB = { id: 8, name: 'Dup B', plan: 'essentials', stripe_customer_id: 'cus_dup', category: 'active' }
+    const customer = { id: 'cus_dup', name: 'Whoever', email: 'dup@example.com', metadata: {} }
+    const invoice = {
+      id: 'in_f7', object: 'invoice', customer: 'cus_dup', currency: 'eur',
+      status: 'paid', created: unix('2026-08-06T10:00:00Z'),
+      subtotal: 9900, total: 9900, amount_due: 9900, amount_paid: 9900,
+      status_transitions: { paid_at: unix('2026-08-06T10:00:05Z') },
+      lines: { data: [line('essentials')], has_more: false },
+    }
+    const r = aggregateRevenue({
+      invoices: [invoice], refunds: [], customers: [customer], clients: [dupA, dupB],
+      costByClientId: {}, period: PERIOD, priceToPlanFallback: PRICE_TO_PLAN, promotionCodes: {},
+    })
+    assert.strictEqual(r.byClient.length, 1)
+    assert.strictEqual(r.byClient[0].clientId, 8)
+    assert.ok(r.warnings.some((w) => w.includes('shared by client 7 and client 8')))
+    ok('a stripe_customer_id shared by clients 7 and 8 resolves to 8 (last-seen) AND raises a named warning')
+  }
+
+  // F9: a second affiliate's code on a later invoice must not silently vanish.
+  {
+    const partner2 = {
+      id: 'promo_PARTNER2', code: 'PARTNER2', metadata: { affiliate: 'partner2' },
+      coupon: { id: 'cpn_partner2', percent_off: 15, duration: 'once' },
+    }
+    const codes = { ...PROMOTION_CODES, [partner2.id]: partner2, [partner2.code]: partner2, [partner2.coupon.id]: partner2 }
+    const laterInvoice = {
+      ...IN_REF2, // month-2 invoice for cus_REF, already attributed to 'bpr' via IN_REF1
+      id: 'in_f9_partner2',
+      discounts: [{ id: 'di_f9', promotion_code: { id: partner2.id, code: 'PARTNER2' }, coupon: partner2.coupon }],
+    }
+    const r = aggregateRevenue({
+      invoices: [IN_REF1, laterInvoice], refunds: [], customers: CUSTOMERS, clients: CLIENTS,
+      costByClientId: {}, period: PERIOD, priceToPlanFallback: PRICE_TO_PLAN, promotionCodes: codes,
+    })
+    assert.strictEqual(r.affiliates.length, 1)
+    assert.strictEqual(r.affiliates[0].affiliateCode, 'bpr')
+    assert.strictEqual(r.affiliates[0].commissionAccruedEur, 19.8)   // unchanged: first-touch attribution kept
+    assert.ok(r.warnings.some((w) => w.includes('partner2') && w.includes('bpr') && w.includes('accrues nothing')))
+    ok("a later invoice tagged for 'partner2' does not create a partner2 row (first-touch is kept) but raises a named warning explaining why")
+  }
+}
+
 console.log(`\n${passed} checks passed.`)
 console.log('NOT covered here (no Stripe test mode, no DB): that revenue-report.js')
 console.log('fetches the right Stripe objects, pages them correctly, or that')

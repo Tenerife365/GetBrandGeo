@@ -310,3 +310,75 @@ per-request cap, so the Cost tab can silently under-report on "All time"
 while the Revenue tab (same rows, paged) reports correctly — the exact
 disagreement §5 says must never happen. Filed as its own task rather than
 folded into S21's diff.
+
+## 11. Blocking CQO review, findings applied (2026-08-02)
+
+Full report: `docs/qa/s21-revenue-report-cqo-review-2026-08-02.md`. Verdict
+**PASS WITH FINDINGS**. The harness and SIMULATE arithmetic were both
+independently reproduced by the reviewer, byte-for-byte, before any finding
+was written. 14 findings (F1-F14); disposition below.
+
+**Fixed in this push**, each with new harness coverage (`revenue_report.test.js`
+§14, 4 new checks, 97 total):
+
+- **F1 (the one item the review called blocking).** `Revenue.tsx`'s "Same
+  figure as the Cost tab" hint under Est. API cost was false: the Cost tab
+  reads the global time filter (default 7 days) while Revenue reads the
+  calendar month, and until `_cost.js` and `planConfig.ts`'s legacy
+  per-engine fallback tables are reconciled they can also disagree on the
+  euro figure itself for `chatgpt` (0.014 vs 0.108). Copy changed to state
+  the period instead of claiming an equivalence that does not hold.
+- **F2.** A refund with `status: 'failed'` or `'canceled'` was netted as if
+  the money came back. Now skipped; a `'pending'`/`'requires_action'` refund
+  is also skipped and raises a warning naming it.
+- **F7.** Two `clients` rows sharing one `stripe_customer_id` resolved
+  silently to whichever was seen last. Now raises a named warning; the
+  resolution itself (last-seen wins) is unchanged — refusing to resolve
+  either is a bigger behavioural call than this fix.
+- **F9.** A customer's second affiliate code (redeemed after first-touch
+  attribution already applies) accrued nothing with no explanation. Now
+  raises a named warning; first-touch attribution itself is unchanged
+  (contract §4 already specifies "the earliest occurrence").
+- **F10.** The three paged Supabase reads in `revenue-report.js` had no
+  `ORDER BY`, so pages could overlap or skip rows once a month exceeds 1,000
+  `ai_results` rows (not reachable today — the table already holds 1,088
+  rows in total). Added `.order('id')` to all three.
+- **F11.** A comment claimed the Revenue tab's fetch only fires "on first
+  visit... so opening Usage/Cost never pays for a Stripe round trip" — true
+  of the guard itself, but Revenue is the default tab (`useState<Tab>
+  ('revenue')`), so every `/usage` visit pays that cost immediately anyway.
+  Comment corrected to say so.
+- **F12.** `meta.stripeAccountId` / `meta.liveMode` can be `null` (the
+  backend returns null when the account can't be read); the TS types said
+  otherwise. `RevenueByClient` was also missing `invoiceCount`, which the
+  backend already returns (this section's item 3). Both typed correctly now.
+
+**Surfaced as open decisions, NOT fixed — these are policy calls, not bugs,
+per the reviewer's own framing:**
+
+- **F3.** A refund on an already-commissioned invoice does not reduce the
+  accrued affiliate commission. Contract §4 is silent on this. Needs a
+  ruling: claw back the commission, or accrue-and-keep with a warning.
+- **F4.** `draft` and `void` Stripe invoices count toward gross invoiced
+  with no warning, because §5 says "any status" and the code follows it
+  exactly. The reviewer would exclude `void` and warn on `draft`; that is a
+  change to what "how much was invoiced" means, which is Constantin's
+  question to answer, not an inference to make unilaterally.
+- **Item 4 revisited (Radar €39 vs €29).** The reviewer would value the
+  pipeline's upgrade opportunity at €29 (what a campaign run today would
+  actually sell at, while the first-100 launch window is open) rather than
+  €39 list, on the grounds that "at risk of never being campaigned to"
+  should price what the campaign would really close at. Not acted on —
+  changes nothing today (zero engaged free clients) and is the same class
+  of pricing-strategy call as F3/F4.
+
+**Left exactly as documented, not fixed (low severity / informational, per
+the reviewer's own recommendation to note rather than patch):** F5 (per-row
+rounding can miss the sum-back invariant by fractions of a cent — bounded,
+invisible at real invoice sizes), F6 (an untraceable refund intentionally
+reaches global but not any client row), F8 (a client's Supabase `plan` and
+its invoice's resolved plan can name different `byPlan` buckets if they ever
+disagree — they don't today), F13 (the Cost tab's "×1.5 overhead" claim is
+false, but pre-existing and not introduced by S21), F14 (a paid-in-August
+invoice created in July shows `invoiceCount: 0` for that August row, reading
+as a contradiction — cosmetic).

@@ -177,6 +177,9 @@ interface RevenueByClient extends RevenueTotals {
   plan: string | null
   attribution: Attribution
   stripeCustomerId: string | null
+  // Additive beyond contract §6b's worked example (§10 item 3) -- the
+  // backend returns it (aggregateRevenue's byClient rows), matching byPlan.
+  invoiceCount: number
 }
 interface PipelineClient {
   clientId: number
@@ -206,7 +209,9 @@ interface RevenueReport {
   byClient: RevenueByClient[]
   pipeline: { windowDays: number; engagedThresholdWeeks: number; clients: PipelineClient[] }
   affiliates: AffiliateRow[]
-  meta: { generatedAt: string; stripeAccountId: string; liveMode: boolean; warnings: string[] }
+  // stripeAccountId / liveMode are null when the account could not be read
+  // (revenue-report.js:321-334) -- not always present, per the CQO review.
+  meta: { generatedAt: string; stripeAccountId: string | null; liveMode: boolean | null; warnings: string[] }
 }
 
 /** Same authenticated-POST pattern PromotionsPanel.tsx already uses against
@@ -266,8 +271,13 @@ export default function Revenue() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('revenue')
 
-  // ── Revenue tab state — fetched on first visit to the tab, not on mount,
-  // so opening Usage/Cost never pays for a Stripe round trip nobody asked for.
+  // ── Revenue tab state — the effect below fires on `tab` becoming
+  // 'revenue', not unconditionally on mount, so switching to Usage or Cost
+  // instead never pays for a Stripe round trip. That guard does NOT save the
+  // round trip on a normal page load, though (CQO review F11): `tab` above
+  // defaults to 'revenue' itself, which is the intended landing view per
+  // Constantin's ask ("so net revenue is understood properly"), so opening
+  // /usage still pages the full Stripe invoice history immediately.
   const [revenue, setRevenue] = useState<RevenueReport | null>(null)
   const [revenueLoading, setRevenueLoading] = useState(false)
   const [revenueUnavailable, setRevenueUnavailable] = useState(false)
@@ -694,7 +704,15 @@ export default function Revenue() {
                     ['Refunds', -revenue.global.refundsEur, 'Netted out'],
                     ['Discounts / free months', -revenue.global.discountsEur, 'What the ladder gave up'],
                     ['Affiliate commission (est.)', -revenue.global.affiliateCommissionEstEur, 'Provisional — PromoteKit is system of record'],
-                    ['Est. API cost', -revenue.global.estimatedApiCostEur, 'Same figure as the Cost tab'],
+                    // CQO review F1: this used to say "Same figure as the Cost
+                    // tab", which is false -- the Cost tab reads the global
+                    // 7d/30d/90d/All time filter (default 7 days) while this
+                    // is the calendar month, and until _cost.js and
+                    // planConfig.ts's legacy per-engine fallback tables are
+                    // reconciled (spawned as its own task) they can disagree
+                    // on rows with no metered cost_eur. Same ROWS, not
+                    // necessarily the same NUMBER -- say what this actually is.
+                    ['Est. API cost', -revenue.global.estimatedApiCostEur, `${revenue.period.label}, metered`],
                   ] as [string, number, string][]).map(([label, value, hint]) => (
                     <div key={label}>
                       <div className="text-xs text-slate-500">{label}</div>

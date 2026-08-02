@@ -196,8 +196,12 @@ exports.handler = async (event) => {
     }
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
+    // .order('id'): CQO review F10 -- Postgres does not guarantee stable row
+    // order across LIMIT/OFFSET without an ORDER BY, so a paged read with none
+    // can skip or repeat rows across pages. Not reachable at today's row
+    // counts, but ai_results already holds more rows than one page.
     const clients = await selectAll('clients', () =>
-      supabase.from('clients').select('id, name, plan, category, stripe_customer_id'), warn)
+      supabase.from('clients').select('id, name, plan, category, stripe_customer_id').order('id'), warn)
 
     // ── Stripe ──────────────────────────────────────────────────────────────
     // Constructed HERE, not at module load, so a missing key produces a
@@ -276,7 +280,8 @@ exports.handler = async (event) => {
       supabase.from('ai_results')
         .select('client_id, llm, cost_eur')
         .gte('checked_at', periodStartIso)
-        .lt('checked_at', periodEndIso), warn)
+        .lt('checked_at', periodEndIso)
+        .order('id'), warn)
 
     const { costByClientId, totalEstimatedRows } = sumApiCostByClient(costRows, ENGINE_COST_EUR)
     if (totalEstimatedRows > 0) {
@@ -292,7 +297,8 @@ exports.handler = async (event) => {
       supabase.from('ai_results')
         .select('client_id, checked_at')
         .in('client_id', pipelineClients.map((c) => c.id))
-        .gte('checked_at', windowStartIso), warn)
+        .gte('checked_at', windowStartIso)
+        .order('id'), warn)
 
     const pipeline = computeEngagementPipeline({
       freeClients: pipelineClients,
