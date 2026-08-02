@@ -96,7 +96,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 | S15 | Referral loop operations | bg-copy + this session | day | OPEN, blocked by S7 |
 | S19 | CSA scale audit: will it hold at 10,000 subscribers | bg-architect Opus, CSA seat | day | OPEN, kickoff below Part C; seat and baseline in Part C-0 |
 | S20 | Partner and affiliate program (50+ warm partners waiting) | Constantin + bg-copy | day | **DECIDED + STRIPE SIDE LIVE 2026-08-02** (D-7): option 3, PromoteKit free plan, BpR is affiliate 1. Coupon `XKfymWe7` + code `BPRFREE` live, monthly links accept codes, yearly links deliberately do not. NEXT: Constantin creates the PromoteKit account, then copy + script tag |
-| S21 | Admin Revenue page: Usage tab becomes Revenue with Usage / Cost / Revenue tabs | bg-architect spec, then bg-app + bg-backend Opus | day | OPEN, requested by Constantin 2026-08-02, kickoff below S19. Needs a Netlify build: ships INSIDE a batch push (rule 9), ideally S16's wave, never alone |
+| S21 | Admin Revenue page: Usage tab becomes Revenue with Usage / Cost / Revenue tabs | bg-architect spec, then bg-app + bg-backend Opus | day | **IN PROGRESS 2026-08-02** (chat `#S21 · Admin Revenue page`). RESEARCH stage: writing the data contract (Stripe objects, join key, cost model) before any component. Needs a Netlify build: ships INSIDE a batch push (rule 9), ideally S16's wave, never alone |
 
 ---
 
