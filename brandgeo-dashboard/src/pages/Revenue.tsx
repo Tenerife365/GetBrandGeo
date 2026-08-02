@@ -164,7 +164,13 @@ interface RevenueTotals {
   netRevenueEur: number
 }
 interface RevenueByPlan extends RevenueTotals { plan: string; invoiceCount: number }
-type Attribution = 'metadata' | 'stripe_customer_id' | 'unattributed'
+// A 4th value beyond contract §6b's stated enum (backend handoff item 1):
+// `null` is a client with API spend and no Stripe customer to even ask the
+// attribution question about (a research study, a free signup) — NOT the
+// same as `unattributed`, which means Stripe money that could not be
+// matched to a client. Conflating the two would raise a false alarm on
+// every cost-only row.
+type Attribution = 'metadata' | 'stripe_customer_id' | 'unattributed' | null
 interface RevenueByClient extends RevenueTotals {
   clientId: number | null
   clientName: string
@@ -178,8 +184,14 @@ interface PipelineClient {
   plan: string
   distinctActiveWeeks: number
   lastActiveAt: string | null
-  opportunityMonthlyEur: number
-  nextPlan: string
+  opportunityMonthlyEur: number | null
+  nextPlan: string | null
+  // Additive beyond contract §6b (backend handoff item 7): the >= threshold
+  // the pipeline itself applies, precomputed so the UI can never apply a
+  // different bar than the report does. computeEngagementPipeline() returns
+  // every free client with ANY activity in the window, not just the engaged
+  // ones — filter on this before showing anything as a campaign target.
+  engaged: boolean
 }
 interface AffiliateRow {
   affiliateCode: string
@@ -215,10 +227,16 @@ async function authedPost<T>(fn: string, body: unknown): Promise<{ status: numbe
 const eur = (n: number) => `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const planLabel = (p: string | null) => (p && p in PLAN_LABELS ? PLAN_LABELS[p as Plan] : (p ?? 'Unknown'))
 
-const ATTRIBUTION_LABEL: Record<Attribution, string> = {
-  metadata: 'Matched (Stripe metadata)',
-  stripe_customer_id: 'Matched (client record)',
-  unattributed: 'Unattributed',
+/** Function, not an object keyed by Attribution — `null` is a real member of
+ *  that union and cannot be an object key, so a lookup table would render a
+ *  blank pill for the "cost only, no Stripe customer" case. */
+function attributionLabel(a: Attribution): string {
+  switch (a) {
+    case 'metadata': return 'Matched (Stripe metadata)'
+    case 'stripe_customer_id': return 'Matched (client record)'
+    case 'unattributed': return 'Unattributed'
+    case null: return 'No Stripe activity'
+  }
 }
 
 function AttributionBadge({ attribution }: { attribution: Attribution }) {
@@ -233,7 +251,7 @@ function AttributionBadge({ attribution }: { attribution: Attribution }) {
       ].join(' ')}
       title={warn ? 'This Stripe money could not be matched to a client row — shown in totals but not attributed to anyone.' : undefined}
     >
-      {ATTRIBUTION_LABEL[attribution]}
+      {attributionLabel(attribution)}
     </span>
   )
 }
@@ -794,46 +812,57 @@ export default function Revenue() {
                   {Math.round(revenue.pipeline.windowDays / 7)} weeks — using the product, not paying for it. A one-time
                   signup that never returned is excluded on purpose (contract §9). Heuristic, expect it to be tuned.
                 </p>
-                {revenue.pipeline.clients.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-4">No free clients meet the engagement bar this period.</p>
-                ) : (
-                  <>
-                    <div className="mb-3 text-sm text-slate-300">
-                      <span className="font-semibold text-emerald-400 tabular-nums">
-                        {eur(revenue.pipeline.clients.reduce((s, c) => s + c.opportunityMonthlyEur, 0))}
-                      </span>{' '}
-                      / month at risk of never being campaigned to, across {revenue.pipeline.clients.length} client{revenue.pipeline.clients.length === 1 ? '' : 's'}
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-dark-700/50">
-                            <th className="px-3 py-2 text-left text-xs text-slate-500 font-medium">Client</th>
-                            <th className="px-3 py-2 text-center text-xs text-slate-500 font-medium">Active weeks</th>
-                            <th className="px-3 py-2 text-left text-xs text-slate-500 font-medium">Next tier</th>
-                            <th className="px-3 py-2 text-right text-xs text-slate-500 font-medium">Opportunity</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {revenue.pipeline.clients
-                            .slice()
-                            .sort((a, b) => b.distinctActiveWeeks - a.distinctActiveWeeks)
-                            .map(c => (
-                              <tr key={c.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
-                                <td className="px-3 py-2 font-medium text-slate-200 flex items-center gap-1.5">
-                                  <Users size={12} className="text-slate-500" />
-                                  {c.clientName}
-                                </td>
-                                <td className="px-3 py-2 text-center tabular-nums text-slate-400">{c.distinctActiveWeeks}</td>
-                                <td className="px-3 py-2 text-slate-400">{planLabel(c.nextPlan)}</td>
-                                <td className="px-3 py-2 text-right font-semibold text-emerald-400 tabular-nums">{eur(c.opportunityMonthlyEur)}/mo</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                )}
+                {(() => {
+                  // The report returns every free client with ANY activity in
+                  // the window (so "used it once, never again" is still
+                  // visible for debugging), not just the engaged ones. This
+                  // page's job — Constantin's own framing — is to surface the
+                  // ones worth campaigning to, so it filters on the
+                  // precomputed `engaged` flag rather than showing everyone.
+                  const engaged = revenue.pipeline.clients.filter(c => c.engaged)
+                  if (engaged.length === 0) {
+                    return <p className="text-sm text-slate-500 py-4">No free clients meet the engagement bar this period.</p>
+                  }
+                  const totalOpportunity = engaged.reduce((s, c) => s + (c.opportunityMonthlyEur ?? 0), 0)
+                  return (
+                    <>
+                      <div className="mb-3 text-sm text-slate-300">
+                        <span className="font-semibold text-emerald-400 tabular-nums">{eur(totalOpportunity)}</span>{' '}
+                        / month at risk of never being campaigned to, across {engaged.length} client{engaged.length === 1 ? '' : 's'}
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-dark-700/50">
+                              <th className="px-3 py-2 text-left text-xs text-slate-500 font-medium">Client</th>
+                              <th className="px-3 py-2 text-center text-xs text-slate-500 font-medium">Active weeks</th>
+                              <th className="px-3 py-2 text-left text-xs text-slate-500 font-medium">Next tier</th>
+                              <th className="px-3 py-2 text-right text-xs text-slate-500 font-medium">Opportunity</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {engaged
+                              .slice()
+                              .sort((a, b) => b.distinctActiveWeeks - a.distinctActiveWeeks)
+                              .map(c => (
+                                <tr key={c.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
+                                  <td className="px-3 py-2 font-medium text-slate-200 flex items-center gap-1.5">
+                                    <Users size={12} className="text-slate-500" />
+                                    {c.clientName}
+                                  </td>
+                                  <td className="px-3 py-2 text-center tabular-nums text-slate-400">{c.distinctActiveWeeks}</td>
+                                  <td className="px-3 py-2 text-slate-400">{planLabel(c.nextPlan)}</td>
+                                  <td className="px-3 py-2 text-right font-semibold text-emerald-400 tabular-nums">
+                                    {c.opportunityMonthlyEur !== null ? `${eur(c.opportunityMonthlyEur)}/mo` : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </>
           )}

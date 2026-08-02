@@ -21,7 +21,13 @@ render a plan's display name, never its price.
 | `Charges` | resolving `refund.charge -> invoice/customer` when an invoice's own refund isn't directly enumerable | only fetched for charges referenced by a refund; not listed wholesale. |
 | `Coupons` + `PromotionCodes` | discount/free-month cost, affiliate attribution | `promotion_code.metadata.affiliate` is the attribution key (confirmed live: `BPRFREE` -> `promo_1U06XY63lspobjfOcXNBKaSI`, `metadata.affiliate = "bpr"`, coupon `XKfymWe7` 100% off once). |
 | `Customers` | per-client join fallback (§3) | `metadata.client_id` when present. |
-| `Subscriptions` | MRR | zero live subscriptions on the account today (checkout has been link/invoice-based so far); code path is built and covered by fixtures, not provable against real data yet. |
+
+~~`Subscriptions` for MRR~~ — **dropped 2026-08-02, resolved during BUILD.**
+§6b (the binding response shape) never carried an MRR field, and there are 0
+live subscriptions on the account either way. Fetching a list to compute a
+number the shape has nowhere to put would be inventing a field the UI is not
+built against. MRR is deferred to whenever real subscriptions exist to make
+it meaningful — likely alongside the Phase 2 `revenue_snapshots` table (§6).
 
 Nothing is written to Stripe. `revenue-report.js` is read-only.
 
@@ -257,3 +263,50 @@ This is a Supabase-only signal — no Stripe call needed, no new migration:
   Constantin's own words, "later we will learn more things" — expect this
   metric to be revisited once there is real usage distribution to tune
   against.
+
+## 10. Resolved during BUILD (2026-08-02)
+
+`_revenue.js` / `revenue-report.js` (bg-backend, Opus) surfaced five places
+this contract was ambiguous or silent. Resolved here rather than left as
+inline code comments only, so this file stays the one source of truth for
+what shipped:
+
+1. **§6b's `attribution` enum gains a 4th value: `null`.** A client with API
+   spend (a research study, a free signup) but no Stripe customer at all is
+   NOT the same as `unattributed` — `unattributed` means Stripe money that
+   could not be matched to a client, which is worth a warning; a cost-only
+   row with `attribution: null` never had a Stripe customer to match in the
+   first place, and is not an error. Conflating the two would raise a false
+   alarm on every research row. The UI (`Revenue.tsx`) renders it as
+   "No Stripe activity", styled neutral, not amber.
+2. **`pipeline.clients[]` gains an additive `engaged: boolean`** — the
+   `distinct_weeks >= engagedThresholdWeeks` test, precomputed server-side.
+   The array itself returns every free client with ANY activity in the
+   window (including "used it once"), so the pipeline table is not by
+   itself the campaign list — **the UI must filter on `engaged` before
+   showing or summing anything**, per §9's own "the ones who ran it once are
+   not" instruction. (Caught and fixed in `Revenue.tsx` during its own
+   build — the first draft summed the unfiltered array.)
+3. **`byClient[]` gains an additive `invoiceCount`**, matching the field
+   already specified on `byPlan[]`.
+4. **Radar's opportunity value is EUR 39 (list), not EUR 29 (launch
+   price).** `docs/strategy/sprint-ladder-ruling.md` decision 1: EUR 39 list,
+   EUR 29 for the first 100 subscribers only. §9 asks for "list price" and
+   §6b's own worked example already showed 39, so the code follows the
+   contract as written. `Account.tsx`'s `PLAN_TIERS` shows the 29 a buyer is
+   actually charged today — both are correct for their own purpose. No
+   change needed; recorded so the divergence is never mistaken for a bug.
+5. **`netlify.toml` gained a `[functions."revenue-report"]` block, `timeout
+   = 26`**, added after BUILD (this function makes 5 Stripe list calls plus
+   `accounts.retrieve` plus 2 paged Supabase reads, on the inherited 10s
+   default otherwise) — same fix already applied to `audit-domain`.
+
+**Not resolved, flagged as a separate pre-existing defect, NOT fixed under
+S21 (out of scope, predates this task):** the Cost tab's `ai_results` query
+(`Revenue.tsx`, ported unchanged from the old `Usage.tsx`) is a single
+unpaged `select`, while `revenue-report.js`'s equivalent query pages with
+`.range()`. `ai_results` already holds more rows than PostgREST's default
+per-request cap, so the Cost tab can silently under-report on "All time"
+while the Revenue tab (same rows, paged) reports correctly — the exact
+disagreement §5 says must never happen. Filed as its own task rather than
+folded into S21's diff.
