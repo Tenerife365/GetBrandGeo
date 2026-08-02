@@ -381,11 +381,18 @@ every commit here used explicit paths.
 **Constantin's, and no agent can do any of it.** Creating accounts, completing
 identity verification and moving API keys are all withheld under AUTONOMY §2.
 
-1. **Create the new Stripe account registered in SPAIN.** Business address,
+0. **Create the ORGANISATION first.** Account picker, Create, Create
+   organization. Add TalentWeLove and BrandGEO RO. Not Mercor. See the corrected
+   note below: doing this first is what unlocks the copy step in the next
+   step, and it cannot be obtained afterwards.
+1. **Then create the new account INSIDE the organisation, registered in SPAIN.**
+   Account picker, Create new account, "Create a new account in your
+   organization". **Copy the payout bank account only.** Business address,
    individual address and support address all
-   **Calle Adriatico 64, El Rosario, 38109, Santa Cruz de Tenerife, ES**.
-   Legal name `Constantin Daniel Goane`, not the `GetBrandGEO` trade name,
-   because `business_profile.name` is what prints and `company.name` never does.
+   **Calle Adriatico 64, El Rosario, 38109, Santa Cruz de Tenerife, ES**, typed
+   fresh. Legal name `Constantin Daniel Goane`, not the `GetBrandGEO` trade
+   name, because `business_profile.name` is what prints and `company.name`
+   never does.
 2. **Complete verification with a document showing that address.** See section
    0: the RO account failed on exactly this and the cause travels.
 3. **Add the VAT id under invoice settings and set it as default**, so
@@ -398,17 +405,69 @@ identity verification and moving API keys are all withheld under AUTONOMY §2.
    session is still pointed at `acct_1LHjKr` and will silently write to the
    wrong one.
 
-**How the new account is created, confirmed against Stripe's docs.** It is NOT a
-sub-account. Stripe's *Multiple separate accounts* page: click the account name
-in the upper-left corner, select **New account**. Same login and email, a
-separate account with its own country and its own keys. **Connect is the wrong
-tool** and must not be used: it would make BrandGEO a payments platform with
-itself as a connected merchant, for no gain. On top of the second account,
-create a Stripe **Organization**, which the same doc names for exactly this case
-("multiple accounts related to the same business, such as for local acquiring")
-and which gives centralized reporting across both. The doc is also blunt on why
-this is mandatory rather than optional: "You can only associate each account
-with the tax ID and legal entity of one business."
+**How the new account is created. CORRECTED 2026-08-02: the ORGANISATION comes
+first, and the order is load bearing.**
+
+An earlier version of this runbook said "account switcher, New account". That
+works and it is the worse route. Stripe's *Build an organization* page documents
+two non-equivalent creation flows:
+
+- **Create an account OUTSIDE an organization:** name, country, done. Every
+  business field is typed by hand.
+- **Create a new account IN your organization:** name, country, and then an
+  extra step, *"Select a legal entity, business details, or payout bank account
+  information you want to copy from existing accounts within your
+  organization."*
+
+**That copy step exists only inside an org and cannot be obtained
+retroactively.** So: create the organisation first, then create the ES account
+inside it. Constantin's case is the first example in Stripe's own use-case
+table, "Global expansion: create separate Stripe accounts for each country or
+region to take advantage of local acquiring."
+
+**TRAP in the copy step. Copy the payout bank account ONLY.** Copying the legal
+entity or business details forward imports the Otopeni representative address,
+the Tenerife street labelled RO, and the support address missing the "64", which
+are the exact defects this migration exists to leave behind, including the one
+currently failing verification. The Wise details (`TRWIBEB1`, last4 `9560`) are
+unambiguously correct and the most tedious to retype, so copy those and type
+every address fresh.
+
+**Target structure:**
+
+```
+Organization
+├── BrandGEO ES     <- create INSIDE the org, copy bank only
+├── TalentWeLove    <- add as existing
+└── BrandGEO RO     <- add, remove after close-out
+Mercor              <- stays OUTSIDE
+```
+
+The Mercor account is a contractor payout account from a job application, not a
+business line. An organisation's whole value is clean consolidated reporting and
+folding unrelated personal income into it defeats that. Check it for balance and
+history before anyone considers closing it.
+
+**Connect is the wrong tool** and must not be used: it would make BrandGEO a
+payments platform with itself as a connected merchant, for no gain. Stripe's own
+comparison is that a Connect platform IS an account that processes payments,
+while an organisation conducts no business and is a container only.
+
+**Two things the org does NOT change.** Organisation API keys (`sk_org`, with a
+`Stripe-Context` header per request) exist, but Stripe's guidance is explicit:
+"Don't use an organization API key if you need to access only one account." The
+Netlify functions touch one account, so this stays an account-level key and no
+integration changes, only the value. And the org creator must be Super
+Administrator on every account added, which Constantin is automatically on all
+three because he created them.
+
+Other constraints read from the docs: up to 75 accounts per org; an account
+belongs to only one org; removing every account from an org permanently closes
+it; India accounts are ineligible.
+
+The doc is also blunt on why a second account is mandatory rather than optional:
+"You can only associate each account with the tax ID and legal entity of one
+business."
 
 **Values to re-enter by hand, all read off `acct_1LHjKr` this session:**
 
