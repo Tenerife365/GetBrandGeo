@@ -55,6 +55,23 @@ makes reverse charge correct and the accountant's footer true.
 account: Stripe constrains the representative and business country to the
 account country. On the new account they are simply typed correctly once.
 
+**CONFIRMED IN THE UI 2026-08-02, do not re-test.** Constantin opened Edit on
+the account representative under Management and ownership. Every address field
+is editable and **the country dropdown is greyed out**. That is the account
+country doing it. **Do NOT edit the street to Calle Adriatico while the country
+stays RO**: it produces a Spanish street labelled Romania, which is the same
+broken shape `company.address` already carries and is the most likely cause of
+`verification_failed_keyed_identity` in the first place, since Stripe cannot
+resolve a keyed address in the country it was told to search. Spreading it to a
+second object makes verification less likely to clear, not more.
+
+**And do not bother fixing verification on the old account.** Measured:
+`charges_enabled: true`, `payouts_enabled: true`,
+`requirements.disabled_reason: null`, `requirements.current_deadline: null`,
+`future_requirements.currently_due: []`. The items are past due but nothing is
+disabled and no clock is running. The only exposure is a future enforcement
+trapping the balance, and the balance is EUR 0.97.
+
 **Correction to section 6 step 2's causal theory.** The past due
 `verification_failed_keyed_identity` is attached to the **`individual`** person,
 whose address is a THIRD address this handoff never recorded:
