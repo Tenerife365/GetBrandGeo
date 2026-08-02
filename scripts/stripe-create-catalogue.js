@@ -32,6 +32,30 @@ const { execFileSync } = require('node:child_process')
 
 const COMMIT = process.argv.includes('--commit')
 
+// Which Stripe CLI profile to target. REQUIRED, with no default, added
+// 2026-08-02 for the RO -> ES account migration.
+//
+// Without it every command runs against the CLI's DEFAULT profile. On the day
+// this was added that profile was still the OLD Romanian account, so a --commit
+// run would have built a complete duplicate catalogue on the account being
+// abandoned, reported success for every object, and been discovered only when
+// the new account turned out to be empty. Defaulting to "whatever the CLI
+// happens to be logged into" is not a safe default on a live money path, so
+// there is no default: the flag is mandatory and its absence is a hard exit.
+const PROFILE = (() => {
+  const i = process.argv.indexOf('--project-name')
+  const v = i > -1 ? process.argv[i + 1] : null
+  if (!v || v.startsWith('--')) {
+    console.error('ERROR: --project-name <profile> is required.\n'
+      + '  This script writes LIVE Stripe objects and will not guess which account.\n'
+      + '  Confirm the profile first:\n'
+      + '    stripe get /v1/account --live --project-name <profile>\n'
+      + '  and check the returned id and country before passing it here.')
+    process.exit(1)
+  }
+  return v
+})()
+
 /* ── Catalogue definition ──────────────────────────────────────────────────
  * Annual is 10x monthly across every tier, matching the two that already
  * exist (99 -> 990, 299 -> 2990). Growth PRO's 4490 was confirmed by the
@@ -56,7 +80,17 @@ const CATALOGUE = [
   {
     plan: 'growth',
     name: 'BrandGEO Growth',
-    description: 'AI visibility monitoring across four engines, with competitor tracking.',
+    // CORRECTED 2026-08-02. This read "across four engines" and was wrong from
+    // 2026-07-28, when Growth gained google_ai (planConfig.ts, commit 9b6bbe3)
+    // and went to five. The old account is still serving the wrong claim on a
+    // description customers read at checkout. Not carried across.
+    //
+    // NOTE, and it is a strategy question rather than a copy one: this now
+    // reads almost identically to Growth PRO, because the two tiers DO have
+    // identical engine coverage. EUR 449 over EUR 299 buys prompts and a faster
+    // refresh, nothing else. That is open decision 1 in CLAUDE.md and is not
+    // settled here; this line only stops the catalogue stating a falsehood.
+    description: 'AI visibility monitoring across all five engines, including Google AI Mode, with competitor tracking.',
     monthly: 29900,
     annual: 299000,
   },
@@ -66,6 +100,25 @@ const CATALOGUE = [
     description: 'AI visibility monitoring across all five engines, including Google AI Mode.',
     monthly: 44900,
     annual: 449000,
+  },
+  // Radar, added to this script 2026-08-02. It was created by hand on
+  // 2026-07-29, AFTER this script last ran, so the script built three products
+  // where the ladder now sells four and would have silently under-built the new
+  // account. Mirrors the live price exactly: a migration is the wrong moment to
+  // reprice anything.
+  //
+  // MONTHLY ONLY, deliberately. There is no annual Radar price or link on the
+  // old account, and inventing one here would put a tier on sale that has never
+  // been ruled on.
+  {
+    plan: 'radar',
+    name: 'BrandGEO Radar',
+    description: 'AI visibility monitoring on Gemini and Claude across 7 buyer prompts for one website, with a fresh check available every week.',
+    monthly: 2900,
+    annual: null,
+    // Carried from the live price so the EUR 29 is not later mistaken for the
+    // list price. Ruled 2026-07-31: list EUR 39, EUR 29 for the first 100.
+    priceMetadata: { note: 'launch price, first 100 customers; list is EUR 39' },
   },
 ]
 
@@ -86,7 +139,12 @@ const STRIPE_BIN = IS_WIN ? 'stripe.cmd' : 'stripe'
 const quote = (a) => (IS_WIN && /[\s"]/.test(a) ? `"${String(a).replace(/"/g, '\\"')}"` : a)
 
 function stripe(args) {
-  const out = execFileSync(STRIPE_BIN, IS_WIN ? args.map(quote) : args, {
+  // Appended to EVERY invocation, reads and writes alike. The existence check
+  // in main() must interrogate the same account it is about to write to, or it
+  // would find the old catalogue, skip every tier, and report a no-op success
+  // against an account that is actually empty.
+  const withProfile = [...args, '--project-name', PROFILE]
+  const out = execFileSync(STRIPE_BIN, IS_WIN ? withProfile.map(quote) : withProfile, {
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
     shell: IS_WIN,
@@ -122,11 +180,20 @@ function main() {
 
     console.log(`\n--- ${tier.name} (plan=${tier.plan}) ---`)
 
+    // A tier with annual === null is monthly only (Radar). Building this list
+    // once, above both branches, is what keeps the dry run honest: when the two
+    // were written out separately the preview claimed two prices and two links
+    // for every tier regardless, so a monthly-only tier would have been
+    // reported wrongly by the very output meant to catch that.
+    const intervals = [['month', tier.monthly]]
+    if (tier.annual) intervals.push(['year', tier.annual])
+
     if (!COMMIT) {
       console.log(`  would create product  ${tier.name}`)
-      console.log(`  would create price    EUR ${tier.monthly / 100}/month  metadata.plan=${tier.plan}`)
-      console.log(`  would create price    EUR ${tier.annual / 100}/year   metadata.plan=${tier.plan}`)
-      console.log(`  would create 2 payment links (automatic_tax=${AUTOMATIC_TAX})`)
+      for (const [interval, amount] of intervals) {
+        console.log(`  would create price    EUR ${amount / 100}/${interval}  metadata.plan=${tier.plan}`)
+      }
+      console.log(`  would create ${intervals.length} payment link(s) (automatic_tax=${AUTOMATIC_TAX})`)
       continue
     }
 
@@ -139,7 +206,7 @@ function main() {
     console.log(`  product  ${product.id}`)
     created.products.push(product)
 
-    for (const [interval, amount] of [['month', tier.monthly], ['year', tier.annual]]) {
+    for (const [interval, amount] of intervals) {
       const price = stripe([
         'prices', 'create', '--live',
         '--product', product.id,
@@ -149,6 +216,11 @@ function main() {
         // The load-bearing line. stripe-webhook.js reads price.metadata.plan
         // before falling back to its hardcoded PRICE_TO_PLAN map.
         '-d', `metadata[plan]=${tier.plan}`,
+        // Mirrors the live prices, which carry the interval in price metadata
+        // as well as on the link. Cheap, and it makes a price self-describing
+        // in a list view where the recurring block is not shown.
+        '-d', `metadata[interval]=${interval}`,
+        ...Object.entries(tier.priceMetadata || {}).flatMap(([k, v]) => ['-d', `metadata[${k}]=${v}`]),
         '--tax-behavior', 'exclusive',
       ])
       console.log(`  price    ${price.id}  EUR ${amount / 100}/${interval}  plan=${price.metadata.plan}`)
