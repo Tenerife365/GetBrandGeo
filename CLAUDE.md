@@ -31,6 +31,40 @@ not the date on this header.** The header used to read "verified 2026-07-26"
 while carrying entries a week newer, which is the same drift this section exists
 to prevent.
 
+### 2026-08-02: S21 admin Revenue page — COMMITTED, awaiting batch push
+
+The Usage & Costs admin page is now Revenue, with Usage / Cost / Revenue
+tabs (`brandgeo-dashboard/src/pages/Revenue.tsx`, replacing `Usage.tsx`) plus
+a new admin-only `netlify/functions/revenue-report.js` (Stripe invoices,
+refunds, customers, promotion codes — read-only) and its pure logic in
+`_revenue.js`. Full CQO four-stage gate run: data contract
+(`docs/arch/revenue-report-data-contract.md`), a 97-check fixture harness
+(`brandgeo-dashboard/tests/revenue_report.test.js`), SIMULATE against real
+live Stripe/Supabase data (zero mismatched cents,
+`docs/qa/s21-revenue-report-simulate-2026-08-02.md`), and a blocking CQO
+review (`docs/qa/s21-revenue-report-cqo-review-2026-08-02.md`, verdict PASS
+WITH FINDINGS, independently reproduced). 10 commits, none pushed yet — rides
+in the next batch push per the credit-economy rule
+(`docs/growth/SPRINT-100-KICKOFFS-2026-07-31.md` binding rule 9).
+
+**Real finding worth knowing before touching this page again:**
+`clients.stripe_customer_id` exists as a column but is populated for only 1
+of 38 clients (a test row scheduled for deletion) — every real paying client
+was provisioned outside the Stripe webhook. The join resolves per Stripe
+Customer instead: `metadata.client_id` first (the hand-invoiced path,
+verified live on BpR's own Customer), then `clients.stripe_customer_id`,
+then an explicit `unattributed` row rather than a guess. A cost-only client
+with no Stripe customer at all gets a fourth value, `attribution: null`,
+distinct from `unattributed` — conflating the two would false-alarm on every
+research client's row.
+
+**Three policy decisions are open, not made unilaterally** (contract §11):
+whether a refund on an already-commissioned affiliate invoice claws back the
+commission (F3); whether `draft`/`void` Stripe invoices should count toward
+"gross invoiced" (F4); and whether the pipeline's upgrade-opportunity value
+should price Radar at its €39 list price (as built, per the contract) or its
+€29 launch price (what a campaign run today would actually sell at).
+
 ### 2026-08-02: BrandGEO bills from a SPANISH Stripe account now
 
 **`acct_1Tzui063lspobjfO` (ES) is the live billing account. The Romanian
