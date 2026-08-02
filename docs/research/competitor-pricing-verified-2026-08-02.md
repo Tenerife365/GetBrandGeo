@@ -98,6 +98,64 @@ because Radar was priced against our own cost model and not against this.
 against competitors' 15, 50, 100, 400. Our per-prompt cost is real and documented,
 but a buyer comparing spec sheets does not see cost, they see the smaller number.
 
+## 4b. AthenaHQ, VERIFIED at athenahq.ai/pricing
+
+Sells in credits, and states "1 credit = 1 AI response".
+
+| tier | price | engines | allowance | brands |
+|---|---|---|---|---|
+| Essential | free, $25 credit | 5: ChatGPT, Perplexity, AI Overviews, Gemini, Claude | 300 credits | unlimited |
+| Starter | $295/mo | 8: adds AI Mode, Copilot, Grok | 3,600 credits | unlimited |
+| Enterprise | contact sales | full access | custom | custom |
+
+---
+
+## 5b. The comparison nobody on our side has made: responses per month
+
+Profound and AthenaHQ both publish their allowance as **AI responses per month**,
+not prompts. That is the honest apples-to-apples unit, because a prompt checked
+against 7 engines every day is 210 responses and a prompt checked against 2
+engines every week is 8.7. Converting everything to that unit is the single most
+uncomfortable table in this document.
+
+BrandGEO derivation: `prompts x engines x 4.33 weekly runs`. Cadence is weekly on
+every paid tier (`PLAN_REFRESH_CADENCE`, and `PLAN_COLLECTION_COOLDOWN_HOURS` =
+168). Competitor figures are their own published numbers where stated, otherwise
+`prompts x engines x 30` at their stated daily cadence.
+
+| product | price | responses/month | basis |
+|---|---|---|---|
+| BrandGEO Radar | EUR 29 | **61** | 7 x 2 x 4.33, derived |
+| Otterly Lite | $29 | **1,800** | 15 x 4 x 30, derived |
+| BrandGEO Essentials | EUR 99 | **234** | 18 x 3 x 4.33, derived |
+| Profound Starter | $99 | **1,500** | published by Profound |
+| BrandGEO Growth | EUR 299 | **758** | 35 x 5 x 4.33, derived |
+| AthenaHQ Starter | $295 | **3,600** | published by AthenaHQ |
+| BrandGEO Growth PRO | EUR 449 | **1,697** | 56 x 7 x 4.33, derived |
+| Profound Growth | $399 | **9,000** | published by Profound |
+| BrandGEO Managed | EUR 1500 | **6,062** | 200 x 7 x 4.33, derived |
+
+At every comparable price point we deliver between **6x and 29x fewer AI
+responses per month** than the verified competitor at that price. Radar against
+Otterly Lite is the widest gap: 61 against 1,800.
+
+**This is not presented as a mistake.** The allowances follow directly from the
+ruled 15%-of-price API budget ceiling in `planConfig.ts`, and the per-engine costs
+behind that are measured and documented in `_cost.js`. The gap is a consequence of
+a deliberate margin decision, and competitors funded by venture rounds (Peec EUR
+7M seed then $21M Series A, Profound $35M Series B, both third-party figures) can
+run a thinner margin or a loss.
+
+**But three things follow whether or not the pricing changes.**
+
+1. A published comparison table is now a liability at the volume column, not just
+   at cadence. Any Cluster A roundup makes this visible to every prospect.
+2. Prospects are already able to run this arithmetic, because competitors publish
+   response counts and we publish prompt counts. Nothing here is secret.
+3. If the answer is that BrandGEO competes on measurement quality rather than
+   volume, that argument has to be made explicitly in the copy, and it is not
+   currently made anywhere on the site.
+
 ---
 
 ## 6. Consequences for the article plan
