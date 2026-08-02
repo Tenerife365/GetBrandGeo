@@ -90,6 +90,7 @@ other. States: OPEN, IN PROGRESS (chat title), DONE (date, check output).
 | S14 | Founding prepay offer machinery | bg-backend Opus, bg-verify | day | OPEN, blocked by S1 and S10 |
 | S15 | Referral loop operations | bg-copy + this session | day | OPEN, blocked by S7 |
 | S19 | CSA scale audit: will it hold at 10,000 subscribers | bg-architect Opus, CSA seat | day | OPEN, kickoff below Part C; seat and baseline in Part C-0 |
+| S20 | Partner and affiliate program (50+ warm partners waiting) | Constantin decides, then bg-copy + this session | day | **URGENT, OPEN**, blocked only by the D-7 DECIDED lines; recommendation is buy-not-build, so no Netlify deploy needed |
 
 ---
 
@@ -1655,3 +1656,74 @@ cleaner and cheaper.
 
 **Do not treat this as blocked on credits.** It is a decision first. The build
 that follows needs a Netlify deploy; the decision does not.
+
+## D-7. MOTION. The partner and affiliate program. Referred by Constantin 2026-08-02.
+
+Constantin has 50+ potential partners with networks that can recommend the
+product, and the first candidate is also the first paying client (the BpR
+relationship, INV-35, which already carries a negotiated discount). He put two
+options to the council and asked for a researched third.
+
+**Option 1 (Constantin's, for the record): 20 percent discount to the referred
+client, 20 percent commission to the affiliate.** Rejected by the council. The
+stacking problem is real and Constantin named it himself: an affiliate who is
+also a customer sees 40 percent given away and re-opens their own price. It
+also permanently discounts every referred customer: a Growth referral nets
+2,296 EUR in year 1 (12 x 239.20 minus 574.08 commission) and the discount
+never expires.
+
+**Option 2 (Constantin's lean): no discount, one FREE MONTH for the referred
+client on any plan up to Growth (the EUR 299 hero plan, deliberately
+promoted; above Growth is a custom deal, no free month). Affiliate gets 15 to
+20 percent of what the client actually pays, automated against Stripe.**
+
+**Option 3 (council recommendation, option 2 refined by research and
+arithmetic):**
+
+1. **Referred client: one free month, capped at Growth.** Implemented as a
+   100 percent off first-invoice Stripe coupon on the NEW Spanish account
+   (acct_1Tzui063lspobjfO), not a trial: card on file from day one, converts
+   automatically. Free month = EUR 0 invoice = zero commission accrues, so
+   affiliates only earn on retention, which aligns them with us.
+2. **Affiliate: 20 percent recurring for 12 months, not lifetime.** The 2025
+   benchmark for SaaS is 20 to 30 percent recurring; below 20 percent
+   recruitment measurably suffers (Rewardful benchmark report), so 15 is a
+   false economy against 50 warm partners. Year-1 arithmetic on a Growth
+   referral: 11 paid months x 299 = 3,289 revenue, commission 657.80, net
+   2,631. Option 3 nets MORE than option 1 (2,296) and the giveaway ends at
+   month 12 instead of never.
+3. **Payout: monthly, Net-30 hold, automatic clawback on refund. NOT
+   per-payment instant transfer.** Instant Stripe transfers make us a payout
+   platform: KYC on every affiliate, negative balances when a refund lands
+   after the commission left, and self-billing VAT invoices per transfer.
+   Trust comes from the affiliate seeing accrual in real time in their own
+   portal plus a payout that never misses, which is the industry mechanism.
+4. **Buy, do not build (CSA scale note).** Use a Stripe-native affiliate tool
+   (Rewardful at ~49 USD/mo, or Tolt as the startup-priced alternative; both
+   give every affiliate a separate hosted portal, tracking links, automatic
+   commission adjustment on refunds, and mass payouts). An in-house build is
+   a new role in user_profiles, RLS, attribution webhooks, a payout ledger
+   and tax paperwork: a multi-week Opus build competing with the sprint. The
+   tool is live in a day, the 50-partner list enrolls the same week, and we
+   in-house it only when fees pass ~200 EUR/mo or custom logic is needed.
+5. **The dashboard question answers itself: the affiliate section is fully
+   separate from the viewer section, and for now it is not even in our app.**
+   Affiliates live in the tool's hosted portal; admin sees everything in the
+   tool's admin panel. No schema change, no new role, no Netlify deploy. The
+   in-app affiliate role becomes a Phase 2 item ONLY if we later in-house.
+6. **The BpR conflict dissolves under option 3.** Their own price stays
+   whatever was invoiced; their referrals get a time-boxed free month, not a
+   price cut; they earn 20 percent of real revenue. There is no 40 percent
+   stacking conversation to have.
+
+**DECIDED lines owed (Constantin, day window):**
+- DECIDED ___ : option (1 / 2 / 3), commission percent and duration, free
+  month cap at Growth yes/no.
+- DECIDED ___ : tool (Rewardful / Tolt / other) and monthly budget.
+- DECIDED ___ : enroll BpR as affiliate number one under these terms yes/no.
+
+Once decided, S20 executes. Constantin's hands: create the tool account and
+connect it to the Spanish Stripe (agents cannot log in or accept vendor
+terms); a chat then writes the partner one-pager, the coupon spec, the
+enrollment email drafts for the 50-partner list, and the tracking snippet
+placement for brandgeo/web (one script tag, cPanel deploy, free).
