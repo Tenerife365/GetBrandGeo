@@ -30,6 +30,14 @@ const INCLUDED_CHANNELS = ['linkedin', 'gbp', 'facebook'];
 const PLAN_SOCIAL_CHANNEL_LIMIT = { free: 0, essentials: 0, growth: 1, growth_pro: 3, managed: 13, pro: 13, enterprise: 13 };
 const PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH = { free: 0, essentials: 0, growth: 12, growth_pro: 30, managed: 100, pro: 100, enterprise: 100 };
 
+/** Mirror of socialChannelLimit() in src/lib/planConfig.ts. A per-client
+ *  override on clients.social_channel_limit wins; NULL means "no override",
+ *  never zero, so an un-overridden client reads the plan constant exactly as
+ *  before the column existed. Both copies must move together. */
+function socialChannelLimit(plan, override) {
+  if (typeof override === 'number' && override >= 0) return override;
+  return PLAN_SOCIAL_CHANNEL_LIMIT[plan] ?? 0;
+}
 function channelAllowedForPlan(plan, channel) {
   const rank = PLAN_RANK[plan] ?? 0;
   if (rank >= PLAN_RANK.managed) return true;                      // done-for-you: all channels
@@ -41,7 +49,7 @@ function monthStartIso() { const d = new Date(); d.setDate(1); d.setHours(0, 0, 
 /** Enforce plan gate + channel entitlement + channel-count + monthly post cap for a
  *  NEW compose. Returns { error, reason } to block, or { ok: true }. */
 async function enforceSocialLimits(supabase, clientId, targets) {
-  const { data: client } = await supabase.from('clients').select('plan').eq('id', clientId).single();
+  const { data: client } = await supabase.from('clients').select('plan, social_channel_limit').eq('id', clientId).single();
   const plan = client?.plan || 'free';
   if ((PLAN_RANK[plan] ?? 0) < AI_SOCIAL_MIN_RANK) {
     return { error: 'AI Social is not included on this plan. Upgrade to Growth or higher.', reason: 'plan' };
@@ -52,7 +60,7 @@ async function enforceSocialLimits(supabase, clientId, targets) {
   if (blocked.length) {
     return { error: `These channels are not available on your plan: ${blocked.join(', ')}. Instagram and TikTok are a Growth PRO add-on.`, reason: 'channel' };
   }
-  const limit = PLAN_SOCIAL_CHANNEL_LIMIT[plan] ?? 0;
+  const limit = socialChannelLimit(plan, client?.social_channel_limit);
   if (platforms.length > limit) {
     return { error: `Your plan allows ${limit} social channel${limit === 1 ? '' : 's'} per post; you selected ${platforms.length}.`, reason: 'channel_count' };
   }
@@ -218,3 +226,10 @@ exports.handler = async (event) => {
     body: JSON.stringify({ post_id: post.id, status: rollup, targets: result.statuses }),
   };
 };
+
+// Test-only surface. Netlify routes on exports.handler and ignores everything
+// else, so this adds no endpoint and changes no behaviour. socialChannelLimit
+// is a hand-kept mirror of the same function in src/lib/planConfig.ts, and the
+// _plans.js C1-C4 defects are what a drifted mirror costs.
+// Harness: scripts/check-social-channel-override.js
+exports.__test__ = { socialChannelLimit, channelAllowedForPlan, PLAN_SOCIAL_CHANNEL_LIMIT }

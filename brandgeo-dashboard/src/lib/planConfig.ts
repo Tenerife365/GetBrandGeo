@@ -754,7 +754,32 @@ export function channelBaseAvailable(plan: string, channel: string): boolean {
   return false   // addon + managed_only require an add-on / higher plan
 }
 
-/** Convenience: all self-serve limits for a plan, for UI display + gating. */
+/**
+ * Social channel allowance for a client, honouring a per-client override.
+ *
+ * `clients.social_channel_limit` is NULL for every client except one sold a
+ * different allowance in a negotiated package (db/supabase-social-channel-
+ * override-migration.sql). NULL means "no override", NEVER zero, so the plan
+ * constant is the fallback and a client without the column set behaves exactly
+ * as before this function existed.
+ *
+ * Mirrored in netlify/functions/social-publish.js. Both copies must move
+ * together; the drift between planConfig.ts and its function-side mirrors is
+ * what produced the _plans.js C1-C4 defects.
+ */
+export function socialChannelLimit(plan: string, override?: number | null): number {
+  if (typeof override === 'number' && override >= 0) return override
+  const p = (PLAN_ORDER.includes(plan as Plan) ? plan : 'free') as Plan
+  return PLAN_SOCIAL_CHANNEL_LIMIT[p]
+}
+
+/**
+ * Convenience: all self-serve limits for a plan, for UI display + gating.
+ *
+ * Plan-only by contract. `socialChannels` here is the LADDER value and ignores
+ * any per-client override; a caller holding a client should use
+ * socialChannelLimit(plan, client.social_channel_limit) instead.
+ */
 export function getPlanLimits(plan: string) {
   const p = (PLAN_ORDER.includes(plan as Plan) ? plan : 'free') as Plan
   return {

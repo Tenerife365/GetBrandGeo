@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { hasFeature, getPlanLimits, channelBaseAvailable, channelTier } from '../lib/planConfig'
+import { hasFeature, getPlanLimits, channelBaseAvailable, channelTier, socialChannelLimit } from '../lib/planConfig'
 import { PageTitle } from '../components/Typography'
 import FeatureLocked from '../components/FeatureLocked'
 import AllowanceMeter from '../components/AllowanceMeter'
@@ -1382,7 +1382,7 @@ export default function Social() {
               <AllowanceMeter
                 label="Channels selected"
                 used={selected.length}
-                cap={getPlanLimits(activeClient?.plan ?? 'free').socialChannels}
+                cap={socialChannelLimit(activeClient?.plan ?? 'free', activeClient?.social_channel_limit)}
               />
             </div>
             <div className="flex flex-wrap gap-2 mb-5">
