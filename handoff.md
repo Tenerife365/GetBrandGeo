@@ -1,88 +1,66 @@
-# Handoff — 2026-08-01
+# Handoff, 2026-08-02
 
-Written at the end of a long session. Everything below was verified against the
-repo, the live Drive, or DNS at the time of writing, not recalled. Where a claim
-could not be checked, it says so.
+Written at the end of the content and acquisition session. Everything below was
+verified against the repo, the live site or Supabase at the time of writing, not
+recalled. Where a claim could not be checked, it says so.
+
+**This supersedes the 2026-08-01 handoff.** That document described three
+parallel tracks (articles, the Ai Fy email, the Drive migration) plus a Track B
+(dashboard audit, campaign rebuild, video pipeline). Everything from it that is
+still open has been carried forward into section 6 and re-checked. Everything
+that closed is recorded in section 4. The old file is in git history at
+`388f42d` if the detail is needed.
 
 ---
 
 ## 1) Goal
 
-Three threads ran in this session, in this order of priority:
+One thread this session, arrived at in three steps:
 
-1. **Publish six content articles** (BG-020 and BG-022 through BG-025) to
-   getbrandgeo.com via the free cPanel pipeline.
-2. **Send the free-plan update email** to Ai Fy (client 26, the only live free
-   account), BCC Constantin, telling them the free tier moved from ChatGPT to
-   Gemini and introducing the new Radar tier at EUR 29.
-3. **Get social and campaign media out of the git repo and onto a shared Google
-   Drive**, in a structure that cofounders can browse and a future auto-poster
-   can read.
-
-A binding constraint landed mid-session and now governs everything:
-**AUTONOMY section 7, the credit economy.** Dashboard work is committed per task
-but pushed once per work block, target 2 Netlify builds per day across all
-sessions. Per-change deploys had burned 2-3k credits in a day.
-
-### Track B, a second session ran in parallel
-
-Everything below marked **Track B** is a different workstream that shared the
-repo and the same day. Its three goals:
-
-1. **Close the dashboard UI/UX audit** (`docs/qa/dashboard-uiux-audit-2026-07-30.md`),
-   then run a discovery pass for what that audit missed.
-2. **Make the campaign package postable.** Constantin had already posted the
-   first item on each channel and found they carried the **retired logo**, so
-   everything from that point on had to be correct.
-3. **Unblock the long-form YouTube video**, which had a script but no pipeline.
-
-The two tracks touched almost disjoint paths. Where they collided it is recorded
-in section 5.
+1. Answer whether anything built was sitting unpublished. It was not, but the
+   **newsroom had stopped**: Radar shipped in code on 2026-07-31, reached the
+   pricing table, and no announcement was ever written.
+2. Publish the Radar launch, and explain the free tier moving off ChatGPT in the
+   same piece, because a price change with no stated reason reads as a downgrade.
+3. **Restart the content engine on a traffic and conversion footing.** Eight
+   articles off the unpublished bilingual dataset, keyword-targeted, plus one
+   call to action pointing at the free audit on every page of the site.
 
 ---
 
 ## 2) Current state
 
-- `origin/main` is `a988fec`. Local `main` is **0 ahead, 0 behind**. Nothing is
-  waiting to push.
-- **Netlify builds spent today: 2 of 2.** The second was the batch push
-  `d99b722`, which carried four commits including a held dashboard test.
-- **Uncommitted:** `docs/growth/voice/RECORDING-KIT.md` (modified, another
-  session's) and `scripts/migrate_social_to_drive.py` (untracked, mine, see
-  Next steps).
+- `origin/main` and local `main` are identical, **0 ahead, 0 behind**, working
+  tree clean. Checked after `git fetch`.
+- HEAD is not one of my commits. Two other sessions committed on top
+  (`12cfb5f` sprint council, `13bb92d` billing package naming). My two commits
+  are ancestors of `origin/main`, confirmed with `git merge-base --is-ancestor`.
+- **Netlify builds: one spent 2026-08-01**, carrying the other session's
+  `_email.js` change that sat between my commits. Constantin approved it
+  ("for this push we have credits").
 
-**Articles: DONE.** BG-020 and BG-022 through BG-026 are on `origin/main` and in
-`brandgeo/web/`. cPanel picks them up from the GitHub webhook.
+**Content: LIVE and verified by content, not status codes.** All 94 HTML pages
+the series commit touched were fetched and compared against disk with line
+endings normalised: **94 of 94 match**. 34 articles now exist, all 200. The
+Radar press release, the 8 OG cards and the live sitemap (96 URLs, parses) all
+confirmed.
 
-**Email: NOT SENT.** Blocked on one thing only, see Next steps. Ai Fy has not
-been contacted.
+**Call to action: LIVE on 92 of 98 pages.** Zero pages still point their primary
+CTA at `/#contact`. The six without one are legal and terminal pages, by
+decision.
 
-**Drive: DONE for the July 30 batch.** `G:\My Drive\BrandGEO Social Media`
-holds 77 posts, 294 files, 146 MB, in `1-Pending\July-30-2026-launch-week\`.
+**Indexing: submitted everywhere it can be automatically.** The 05:10 UTC run on
+2026-08-02 pinged 11 URLs with `indexnowOk: 11`, covering all 8 articles and the
+Radar release. **Google receives nothing automatically and this is by design**
+(`google_skipped: "NO_CREDENTIALS"`, the 2026-07-28 ruling). Constantin
+submitted the 9 URLs by hand in Search Console and Google crawled and re-read
+the sitemap in response.
 
-**Radar landing-page audit: BUILT AND DEPLOYED.** Radar and Essentials now get a
-1-page AI SEO crawl of the landing page specifically.
-
-### Track B
-
-**Dashboard: DONE.** Every audit finding closed. Final sweep across 11 routes x 2
-themes x 3 widths (320, 375, 1440): **0 contrast failures, 0 rendered dashes, 0
-overflow measured on `<main>`**. `tsc` 0, build 0. A separate discovery pass
-found three HIGH defects, all fixed: the skip link shifted the whole shell 137px
-the moment it was focused (first Tab stop on every route), the closed off-canvas
-sidebar kept **17 controls in the tab order** below 768px, and a route change was
-announced to assistive technology by nothing at all.
-
-**Campaign: POSTABLE.** Correct v3 logo on every asset, wordmark now in real
-Geist. All 226 assets have a `.txt` sidecar under the same filename holding only
-the copy to paste. Ready now: X, LinkedIn, GBP, Instagram feed/reels/stories,
-Facebook feed/video/link, TikTok, YouTube Shorts, bilingual.
-
-**Video: PIPELINE EXISTS.** Remotion installed and rendering. 29 compositions
-render clean, 4 vertical pillars plus 25 long-form cards covering 26 of 34 shots.
-
-**Blocked on Constantin only:** 8 screen recordings, one voice take, Threads
-account setup, 18 profile and banner uploads.
+**What that crawl does and does not mean.** It proves the sitemap is valid and
+fetchable, the pages return 200 to Googlebot and nothing in `robots.txt`, the
+CSP headers or cPanel is blocking a crawler. It is **not** evidence of authority:
+re-reading the sitemap is what URL Inspection causes. See section 6 item 1 for
+the test that would be.
 
 ---
 
@@ -90,299 +68,172 @@ account setup, 18 profile and banner uploads.
 
 | File | Why it matters |
 |---|---|
-| `scripts/send-free-plan-update.js` | Sends the Ai Fy email. Runs LOCALLY, needs no deploy. Reads `RESEND_API_KEY` from `brandgeo-dashboard/.env`. |
-| `brandgeo-dashboard/netlify/functions/_email.js` | Shared Resend wrapper. Now supports `bcc`, `secondaryCta`, a signature block, and returns Resend's message id. |
-| `brandgeo-dashboard/.env` | **Gitignored.** Where `RESEND_API_KEY` must go. |
-| `.githooks/pre-push` | Blocks any push containing `brandgeo-dashboard/` files unless `BATCH_PUSH=1`. Mode 100755, armed. |
-| `scripts/deploy-status.ps1` | Answers "does pushing now cost a build?" Use this one, not the `.sh`. |
-| `scripts/migrate_social_to_drive.py` | Copies finished posts from the repo to the Drive. **Untracked.** |
-| `brandgeo-dashboard/src/lib/planConfig.ts` | Source of truth for the plan ladder. `PLAN_SEO_PAGE_CAP` and `FEATURE_MIN_PLAN` changed here. |
-| `brandgeo-dashboard/netlify/functions/_seo_crawl.js` | Crawl queue now seeds the homepage first. |
-| `.gitignore` | Now excludes `docs/growth/CAMPAIGN-*/`, `docs/growth/reel-campaign-ab/`, `assets/audio/music/`. |
-
-### Track B
-
-**Read these first**
-
-| File | Why it matters |
-|---|---|
-| `docs/growth/CAMPAIGN-2026-07-30/youtube/longform/CONSTANTIN-CAPTURE-AND-VOICE.md` | The two things only he can do. OBS setup, all 8 captures, what is fixable in post, and the voice session. |
-| `docs/growth/voice/RECORDING-KIT.md` | The clone script, sections A to E. **§3b added 2026-08-01** for his studio mic and the Windows setup. Currently the one uncommitted file. |
-| `docs/qa/dashboard-discovery-2026-07-31.md` | D1 to D10. D6 and D8 are still open and need a decision, not a patch. |
-| `docs/qa/dashboard-uiux-audit-2026-07-30.md` | The original audit, plus four corrections to my own measurements. |
-
-**Built this session**
-
-- `brandgeo-video/` — Remotion project. `src/longform/cards.tsx` holds the 25
-  long-form cards, `tools/` holds four checkers with their negative controls.
-- `docs/growth/brand-assets-v3-2026-07-31/` — 18 profile and banner files, README
-  gives the exact upload target per platform.
-- `docs/growth/CAMPAIGN-2026-07-30/threads/SETUP.md` — 17 numbered steps.
+| `scripts/build_articles.py` | Renders every article from ONE template. Never hand-copy a `bg-*.html` again: six pages got a pre-consent GA tag that way. |
+| `scripts/articles_content.py` | The 8 articles' content, plus a header documenting every SQL figure and where it came from. |
+| `scripts/cta_sweep.py` | Site-wide CTA repoint, gtag strip, CTA injection. Idempotent, safe to re-run. |
+| `scripts/wire_series.py` | Inserts blog cards and sitemap entries at a known anchor rather than hand-editing an interleaved list. |
+| `docs/growth/og-cards/build_og_cards.py` | Patched: a `BG-0NN:` title now yields the headline as the card hero, not the id. |
+| `brandgeo/web/index.html` | Carries `id="free-audit"` on the hero. **Load bearing: 90+ pages link to it.** |
+| `brandgeo/web/site.js` | Focuses `#brandInput` on arrival at `#free-audit`. |
+| `brandgeo-dashboard/src/lib/planConfig.ts` | Still the only source for plans, prices and engines. |
 
 **Do not touch**
 
-- `docs/growth/brand-kit-2026-07-29/` — holds the RETIRED mark. Kept
-  deliberately as the "before" record of the rebrand.
-- `docs/growth/reel-campaign-ab/bilingual/` — 24 originals with the retired logo
-  burned into their pixels, filenames identical to the corrected copies. See
-  `RETIRED-LOGO-WARNING.md` in that folder before copying anything out of it.
+- `brandgeo/web/article-builder.html`, the one JSON-LD failure site-wide, known,
+  and excluded from the cPanel upload. Not a defect to fix.
+- The 34 city and industry research pages' engine lists. They are dated
+  measurements. Rewriting them to today's lineup falsifies the record.
 
 ---
 
 ## 4) Changes made
 
-**Articles (`c0a8d1e`, pushed).** `bg-025-publish` was 226 commits behind and its
-push was correctly rejected: the branch predated `bg-018.html`, so pushing its
-tip would have **deleted a live article**. Merged instead. Found a hard
-collision: `BG-021` was already taken by `bg-021-retrieval-not-engine-count.html`
-(the Grok launch piece) with its own `bg-021-hero.png`. The branch's BG-021 was a
-different article with a same-named hero. **Renumbered to BG-026** throughout.
-`blog.html` and `sitemap.xml` were rebuilt from main's copies plus the six new
-entries rather than hand-merged, because a mis-resolved hunk in an interleaved
-card list silently drops live articles.
+**Radar press release (`f899804`, live).** `news/radar-plan-launch/`. States the
+EUR 29 launch price and the free tier moving to Gemini as one decision, with the
+production figures: 152 ChatGPT rows averaging EUR 0.0615, five of them EUR
+0.307 against a EUR 0.30 budget, so a free signup was stopped on its last prompt.
+Linked from the news hub, sitemap, homepage Radar card, and bg-021/023/025.
+Deliberately does **not** quote the modelled EUR 0.108 per check: `_cost.js:384`
+records that it is not what this account bills.
 
-**Radar landing-page audit (`7d9ca14`, deployed).** `PLAN_SEO_PAGE_CAP` radar and
-essentials to 1, `FEATURE_MIN_PLAN.ai_seo` from `growth` to `radar`. Essentials
-moved too because radar 1 with essentials 0 is a ladder inversion (EUR 29 gets
-what EUR 99 does not). **The number alone would not have delivered the ruling:**
-`_seo_crawl.js` reads the client's sitemap and takes the first N URLs, so
-`max_pages = 1` meant "whatever the sitemap lists first". The queue now seeds the
-homepage. Also caught one commit from going live: `seo-draft.js` had
-`essentials: 2` drafts against planConfig's 0, harmless only while the feature
-gate was shut. Lowering the gate would have shipped two free LLM drafts a month.
+**The bilingual series, BG-027 to BG-034 (`8bccdb3`, live).** Eight articles off
+`ai_results` data collected 2026-07-10 that had never been published. 486
+companies named across Berlin, Madrid, Paris and Rome, **82.1% appearing in only
+one of the two languages**, per-pair overlap 15.9%, 13 of 46 pairs sharing
+nothing. Full method and every figure's provenance is in the header of
+`scripts/articles_content.py`. The reusable finding is in memory as
+`bilingual-research-dataset`.
 
-**Email plumbing (`3968508`, `a8c01a3`, deployed).** `bcc`, `secondaryCta`, a
-signature with photo and two buttons, and a local sender script. Then hardened:
-the key check runs first and prints a boxed `NOTHING WAS SENT`, the key is read
-from `.env`, and `--status <id>` traces a send.
+**The call to action, which was the larger defect.** 77 pages ended with a button
+pointing at `/#contact`, the 48-hour manual form, while the instant audit sat in
+the hero with nothing linking to it. All repointed. 14 pages had no CTA at all,
+including all five newsroom pages.
 
-**Batching enforcement (`9b935b0`, `7b65dca`, pushed).** `.githooks/pre-push`
-plus `deploy-status.ps1`.
+**Six pages were loading Google Analytics before consent** (`bg-020`, `bg-022`
+to `bg-026`). `399723c` removed exactly that from the other 79 pages on
+2026-07-29; these were written afterwards from a pre-sweep copy. Removed.
 
-**Media out of the repo (`833ca45`, `d99b722`, pushed).** 616 files untracked,
-all kept on disk. 551 MB of renders plus the 192 PNGs and briefs. Scanned first:
-no credential-shaped strings in any of the 836 files, `.mcp.json` carries no key.
+**One stale schema claim corrected:** `bg-021`'s FAQPage still told Google the
+free plan includes ChatGPT.
 
-**Drive migration (run, not yet committed).** 77 posts. Silent variants dropped,
-carousels collapsed to one post, threads collapsed to one post with
-`thread_parts`, YouTube thumbnails attached to their shorts, GBP
-name/category/price became `fields{}`. 314 build-system files skipped.
-
-### Track B
-
-**Dashboard, 3 commits, pushed.** AI Social made admin-only on the server: seven
-of eleven `social-*.js` functions had no admin check at all, so any authenticated
-viewer could call them for any client they could authenticate for. `social-image`
-wrote arbitrary PNGs into a **public** bucket unmetered, `social-delete` removed
-an already-published post from a live network. Then keyboard navigation, focus
-management, 320px overflow, and text nobody could read.
-
-**Marketing site (`49a13f4`).** `index.html` claimed five AI engines in four
-places, two meta tags and two JSON-LD blocks. The product monitors seven.
-Corrected to "up to seven", JSON-LD re-validated. The 34 city research pages were
-deliberately left alone: their engine lists are dated MEASUREMENTS, and rewriting
-them to today's lineup would falsify the record.
-
-**Logo, root cause found.** `_shared/BRIEF.md` told every renderer to take the
-logo from `brand-kit-2026-07-29`, a folder dated inside rebrand week that holds
-the RETIRED art (its own source file is named `mark-eye.png`, and the eye is the
-retired mark's defining feature). 104 files re-rendered. The package had been
-internally inconsistent and nobody had noticed: TikTok and Instagram Reels
-already carried the correct mark while the bilingual cuts did not.
-
-**Geist installed (`1593ae7`).** From the official `geist@1.7.2` package, Vercel,
-SIL OFL 1.1. The wordmark had been silently falling back to Inter everywhere.
-
-**Remotion installed.** The first render immediately exposed a stale plan ladder:
-Free showed ChatGPT (now Gemini) and Radar was missing entirely. Four
-compositions had been written 2026-07-29 and never rendered, because Remotion was
-never installed. They were specs pretending to be assets.
-
-**End card (`771e816`).** The EUR 29 versus EUR 39 question resolved as
-**neither**. Both expire, the video does not. It reads "Free tier available." and
-the narration loses one sentence, permanently.
-
-**Four false notices corrected (`9590584`)**, each of which had already misled
-someone: the growth skill's arithmetically impossible Threads word target, a
-migration header saying NOT YET APPLIED when it had been applied, the v3 SVG
-saying Geist was missing, and a new warning on the contaminated bilingual
-originals.
+**Closed from the previous handoff:** the Ai Fy email is done. `686ace9` landed
+and Constantin confirmed the send worked; the free account was informed of the
+Gemini switch and offered Radar at the promotional price. `scripts/migrate_social_to_drive.py`
+was committed in `388f42d`.
 
 ---
 
 ## 5) Failed attempts
 
-**`git reset --hard` destroyed another session's work.** Trying to reorder two
-commits so a free push would not drag a dashboard test along, I reset to an
-absolute sha. In the seconds between reading the log and running it, another
-session committed `a21064c` and `771e816`. **The reset destroyed both and deleted
-615 files from disk.** Recovered from reflog and
-`git checkout <sha> -- <path>` + `git restore --staged`. The saving at stake was
-one Netlify build. **Never use `reset --hard` or reorder commits in this repo.**
-Push a specific sha instead: `git push origin <sha>:main`. Recorded in memory as
-`never-reset-hard-parallel-sessions`.
+**I could not measure layout in the Browser pane, and nearly reported an
+unverified claim as verified.** The pane does not composite when it is not
+displayed, so `document.documentElement.clientWidth` reads **0** and every
+geometry number from it is meaningless. `resize_window` does not fix it and
+screenshots fail outright. Recorded in memory as
+`preview-pane-cannot-measure-layout`, with the working alternative: headless
+Chrome over CDP, which Node 24 can drive with its global `WebSocket` and no
+dependency.
 
-**An hour was spent diagnosing an email that was never sent.** `--send` printed
-"RESEND_API_KEY is not set" quietly, below its own to/bcc/subject banner, and
-exited 1. That read like success. I then built DNS theories about spam filtering
-and BCC misrouting for a message that never left the machine. **Never treat "the
-command returned well" as evidence; ask for the last line of output.** The script
-now fails loudly.
+**That harness immediately caught a regression I had introduced.** Putting "Test
+my website free" in the nav overflowed 375px by 46px, because below 640px the
+text links hide but the lockup, the CTA and the theme toggle still have to fit.
+Fixed by shortening the nav label to "Free test" and shrinking all three.
 
-**Checking for my own commits by sha after a rebase gave a false negative.**
-`pull --rebase` rewrites every sha, so `git merge-base --is-ancestor <old-sha>`
-returned false for work that was fully present. It read as seven lost commits.
-Verify by content: `git show origin/main:<path> | grep -q "<marker>"`.
+**`scrollWidth` is not evidence of a horizontal scroll.** Always attempt a real
+`window.scrollTo(600, 0)` and read `scrollX` back. To prove a change is not the
+cause, remove that element in the live page and re-measure rather than reasoning
+about it. Both of those turned an assumption into a fact this session.
 
-**Two structural claims I made about the campaign content were wrong**, and
-Constantin agreed to a plan built on them before the data was checked:
-- I said the nine timestamped reel runs were variants. **They are nine different
-  posts** with nine distinct arguments. Keeping only the last would have
-  destroyed eight.
-- I said the campaign split into four topic campaigns. **The channels do not
-  share topics at all** (Instagram has four, Facebook four completely different,
-  Threads four more). It migrated as one legacy campaign instead.
+**A basename keyed exemption list silently skipped five pages.** `NO_CTA`
+matched on `os.path.basename`, and every newsroom page is called `index.html`, so
+all five were exempted from the CTA injection without a word. Keyed on the
+relative path now.
 
-**The pre-push hook shipped disarmed.** `chmod +x` does not reach the git index
-on Windows; the blob went in at 100644 and git skips a hook it cannot execute,
-silently. The first push after install appeared to pass the check and never ran
-it. Fixed with `git update-index --chmod=+x`.
-
-**`deploy-status.sh` could not run where it was needed.** Written as POSIX sh for
-a machine whose shell is PowerShell, where `sh` is not a command. Hence the
-`.ps1`.
-
-### Track B
-
-Recorded because every one of these looked like a pass.
-
-**My overflow checker measured the wrong element.** It read
-`documentElement.scrollWidth`. The scroll container is `<main>`, which carries
-`overflow-x: auto`. The negative control injected a 3000px child into `body`, so
-it went red and green exactly on cue while being structurally incapable of
-seeing the real case. **A negative control only proves a checker catches the
-defect you thought to inject.** Re-measured on `<main>`, it then found a real
-375px overflow on `/recommendations` that this session had itself introduced.
-
-**My contrast census scored `sr-only` text.** It flagged 1.03:1 on text clipped
-to `rect(0,0,0,0)` that is never painted. The size test rejected anything under
-1px, and `1 < 1` is false.
-
-**A skip-link test that proved nothing.** Focused and unfocused geometry came
-back byte-identical, which reads as "no shift, fixed". In fact
-`document.hasFocus()` is false in this browser pane, so `:focus` never matched
-and neither competing rule ever applied. Proven at the cascade level instead.
-
-**I gave three agents a wrong discriminator.** "The v3 violet ramp has R>=G"
-fails on v3's own `#6366F1` stop, which gives G-R of +3. Corrected to a +3
-envelope: worst v3 pixel +3, mildest retired blue +34.
-
-**I told an agent Radar was not in the code.** It had shipped in `f71a9b1`
-earlier the same day, a commit I had read in the log and failed to connect. The
-agent checked source rather than trusting the brief, and caught it.
-
-**Same failure class inside the agents' own work:** a checker exempting 19
-sidecars from the only limit that applied to them, a bare JSX comment rendering
-as eight lines of visible source code with `tsc` clean and exit 0, and a
-negative-control injection pointing at a font file commented "does not exist"
-until I installed Geist and silently turned it into a no-op. Its words: *"It had
-not started passing, it had stopped testing."*
-
-**Cross-track collision.** Track A's `git reset --hard` destroyed `a21064c` and
-`771e816` seconds after they were committed here. Both recovered from reflog.
-See Track A's account above; the rule is in memory as
-`never-reset-hard-parallel-sessions`.
+**The push carried another session's commit and I did not try to avoid it.**
+`686ace9` touched `brandgeo-dashboard/` and sat between my two commits.
+Reordering to dodge one Netlify build is exactly what destroyed 615 files on
+2026-08-01, so I used `BATCH_PUSH=1`, spent the build, and said so. The safe
+push sequence is now written into the `never-reset-hard-parallel-sessions`
+memory.
 
 ---
 
 ## 6) Next steps
 
-**BLOCKING, and it is one line.**
+**Verification owed, and it is cheap.**
 
-1. Copy `RESEND_API_KEY` from Netlify (Site configuration, Environment
-   variables) into `brandgeo-dashboard/.env`:
-   ```
-   RESEND_API_KEY=re_your_value_here
-   ```
-   That file is gitignored, verified. Then:
-   ```
-   node scripts/send-free-plan-update.js --self-test
-   ```
-   If it lands, run again with `--send`. Neither costs a build.
+1. **Test whether the crawl was authority or just obedience.** Publish the next
+   article and **do not submit it**. If Google crawls it within a couple of days
+   unprompted, that is crawl demand and the real signal. Then check Search
+   Console → Crawl stats for a rising trend, and the Pages report for the ratio
+   of Indexed to `Discovered - currently not indexed`. About seven days from
+   2026-08-02.
+2. **Check the 2026-08-03 05:10 UTC `ping-sitemap` run.** `job_runs.ok` is
+   `true` whenever a submitter was merely configured, even if every submission
+   failed, so read `pinged` against `indexnowOk` in `detail`, not `ok`.
 
-**Decisions owed by Constantin.**
+**Live defect, measured, not mine, not fixed.**
 
-2. **Where `product/` lives.** 21 listings across `gbp-`, `promo-` and `stripe-`
-   families for all 7 plans. It is a reusable asset library, not campaign
-   content, so it was deliberately NOT migrated. Suggestion: a sibling top-level
-   `Product Assets\` folder on the Drive, outside the campaign tree.
-3. **Council item D-6**, scheduled collection destroys history.
-   `_enqueue.js:144-150` deletes prior `ai_results` with no date filter, so
-   weekly automatic collection erases last week. This is the Radar business case,
-   not an abstract bug.
+3. **The site scrolls sideways on a phone.** Measured over CDP at 375 CSS px with
+   a real scroll attempt: **`bg-026` 146px, `bg-019` 428px, the homepage 123px**
+   from `.mode-switch` (two buttons of 221px and 233px in a 320px wrapper, with
+   `flex-wrap: nowrap`), and 53px at 768px from `.footer-grid` never collapsing.
+   BG-027 to BG-034 are the only articles on the site that measure **zero**; the
+   fix that got them there is in `build_articles.py`'s media query and is four
+   lines. The mode-switch fix carries a design choice (stack, shrink, or wrap),
+   which is why I did not make it.
 
-**Work queued.**
+**Carried forward from 2026-08-01, re-checked and still open.**
 
-4. **Commit `scripts/migrate_social_to_drive.py`.** Untracked, and it is the only
-   record of the migration rules. Free push.
-5. **The 486 MB of mp4 renders are still only on this machine.** The finished
-   posts (146 MB) are on Drive now; the raw renders are not backed up anywhere.
-6. **Deactivate the six old Stripe payment links** (those without
+4. **Deactivate the six old Stripe payment links** (those without
    `metadata.rotation = 2026-07-31`). Stripe UI, no deploy. Until then the
    exposure the rotation was meant to close stays open.
-7. **Fix the DMARC `rua`.** `_dmarc.getbrandgeo.com` points at
+5. **Fix the DMARC `rua`.** `_dmarc.getbrandgeo.com` points at
    `constantin@talentwelove.com` with no cross-domain authorization record, so
-   BrandGEO has **never received a single aggregate report**. Change to
+   BrandGEO has never received a single aggregate report. Change to
    `constantin@getbrandgeo.com`. One DNS record at CyberFolks.
-8. **Auto-post function.** Explicitly deferred by Constantin ("auto-post later,
-   I am just organizing now"). When it starts, it needs OAuth apps for Meta,
-   LinkedIn, TikTok, YouTube and X, none of which an agent can create. Meta's
-   review takes longest, so start there. The Drive structure already supports it:
-   read `2-Posted` for history, `1-Pending` for the queue, `post.json` for the
-   payload, `caption.txt` for the words.
+6. **The 486 MB of mp4 renders are still only on this machine.** The finished
+   posts (146 MB) are on Drive; the raw renders are not backed up anywhere.
+7. **Where `product/` lives on the Drive.** 21 listings, a reusable asset library
+   rather than campaign content, deliberately not migrated. Suggested a sibling
+   top-level `Product Assets\` folder.
+8. **Council item D-6**, scheduled collection destroys history.
+   `_enqueue.js:144-150` deletes prior `ai_results` with no date filter, so
+   weekly automatic collection erases last week. This is the Radar business case.
 
-### Track B
+**Blocked on Constantin, unchanged.**
 
-**Constantin, blocking. Nothing downstream can move without these.**
+9. The voice take (about 3 minutes of reading, sections A to E of
+   `docs/growth/voice/RECORDING-KIT.md`), and saying "GEO" and "BrandGEO" aloud
+   on it. Open since 2026-07-29.
+10. The 8 screen recordings
+    (`docs/growth/CAMPAIGN-2026-07-30/youtube/longform/CONSTANTIN-CAPTURE-AND-VOICE.md`),
+    Threads setup, and the 18 profile and banner uploads. **The avatars are still
+    the retired mark on every account.**
+11. Decisions owed: **D6** the time filter, **D8** the muted-text ladder, the
+    **Remotion licence** (free to 3 employees, paid above), and whether the
+    long-form video specs should be force-added to git. They are on disk only and
+    in no backup.
 
-9. **Record the voice kit.** About **3 minutes of reading**, not 45. Sections A
-   to E of `RECORDING-KIT.md`. The 45 minutes is setup and retakes. Recording
-   MORE makes the clone worse: past 3 minutes the vendor's own docs say it "can
-   be detrimental". Send the raw file before buying anything; measuring it is
-   free and decides whether a clone is worth USD 6.
-10. **Say "GEO" and "BrandGEO" aloud, both ways, on that recording.** Open since
-    2026-07-29. Nothing can be synthesised correctly until it is settled.
-11. **The 8 screen recordings.** Full spec in
-    `CONSTANTIN-CAPTURE-AND-VOICE.md`. C7 needs a tenant with real collection
-    history and C8 may have to be skipped; both have written fallbacks, so send
-    what you get rather than staging data.
-12. **Threads setup** (`threads/SETUP.md`), then the 18 profile and banner
-    uploads. The avatars are still the retired mark on every account.
+**Social posting is still manual and still deferred.** The 226-asset package is
+postable. Auto-posting needs OAuth apps for Meta, LinkedIn, TikTok, YouTube and
+X, none of which an agent can create; Meta's review takes longest.
 
-**Decisions owed, no work possible until they land.**
+---
 
-13. **D6:** the global time filter renders on 10 routes and only 3 files import
-    `useTimeFilter`. Wire it up, or scope the bar to the routes that honour it.
-14. **D8:** the muted-text ladder has collapsed. In dark, `text-slate-400`,
-    `-500` and `-600` resolve to one identical colour across 547 elements. Needs
-    new values, not new names.
-15. **Remotion licence.** Free for individuals and companies up to 3 employees,
-    paid above. Unlike Geist's OFL this is a commercial condition. Confirm, or
-    it should come back out.
+## Rules in force, do not relearn them
 
-**Open, unassigned.**
-
-16. 36 reel cuts carry no logo mark at all. That is their original state, not a
-    regression introduced here.
-17. `add_lockup.py`'s drawn-type fallback is unexercised: no pre-lockup file
-    exists to test it against, so it cannot be claimed to work.
-
-**Rules now in force, do not relearn them.**
-
-- Commit per task; do not push if it touches `brandgeo-dashboard/`. One batch
-  push per block, target 2 builds/day. Only a live billing/auth/signup defect
-  ships alone.
-- Social and campaign media never enters git or Netlify. **But articles under
-  `brandgeo/web/` MUST be committed: git IS the cPanel deploy mechanism.**
-- One agent per department per block, briefed with the full change list.
-  Mechanical edits are done in-session, never delegated.
+- **Commit per task. Do not push anything touching `brandgeo-dashboard/`** unless
+  it is the block's batch push; target 2 Netlify builds/day across all sessions.
+  A pre-push hook enforces it and needs `BATCH_PUSH=1` to override.
+- **Never `git reset --hard` and never reorder commits.** Another session commits
+  concurrently. The safe push sequence, including verifying the deploy by
+  content rather than status code, is in the
+  `never-reset-hard-parallel-sessions` memory.
+- **Social and campaign media never enters git or Netlify.** Articles under
+  `brandgeo/web/` MUST be committed: git IS the cPanel deploy mechanism.
+- `planConfig.ts` is the only source for plans, prices and engine lineups.
+  CLAUDE.md and the growth skill are stale on both.
+- No em dashes, no en dashes, no AI-tell vocabulary in anything a user reads.
+- **Do not measure layout in the Browser pane.** It reports `clientWidth` 0.
+- No agent-created admin. Admin surfaces are source-verified only.
