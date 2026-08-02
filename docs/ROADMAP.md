@@ -13,6 +13,44 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
+- **Old Stripe account close-out. Every step is a Dashboard click, PROVEN, not
+  assumed: the CLI's restricted key returned "does not have the required
+  permissions" on a real `payment_links update` attempt, 2026-08-02.** Account
+  `acct_1LHjKrKh2GaZE2B4`, use the CLI's `default` profile to READ it.
+  1. **Deactivate its 7 active payment links.** They are permanent bearer URLs
+     in this repository's public git history. Ids: `plink_1TzJXbKh2GaZE2B42TIutgM0`
+     (radar), `1TzGZm` / `1TzGZe` (growth_pro yr/mo), `1TzGZR` / `1TzGZK`
+     (growth yr/mo), `1TzGZE` / `1TzGZ2` (essentials yr/mo).
+     **Sharper than the handoff recorded:** `we_1TrYG7Kh2GaZE2B4EVZuVHD3` is
+     still `enabled` and still points at the LIVE
+     `app.getbrandgeo.com/.netlify/functions/stripe-webhook`, but Netlify now
+     holds the NEW account's `STRIPE_WEBHOOK_SECRET`, so an old-link payment
+     would fail signature verification. Reasoned from the secret swap, not
+     measured. That means a stranger paying an old link today has their money
+     captured into an abandoned account and is provisioned NOTHING. Worst of
+     both. Deactivating the links is the fix; disabling the webhook is tidiness.
+  2. **Refund the EUR 1.** `pi_3TztSRKh2GaZE2B40R9592q6`, charge
+     `py_3TztSRKh2GaZE2B40WKTPtnW`, status `succeeded`, `cus_UztEDNeNwTyFmh`.
+     Balance is EUR 0.97 pending and EUR 0 available, so this either fails for
+     insufficient funds or debits Wise. Let the 0.97 settle first.
+     **No agent may execute this**: it is a transfer of funds.
+  3. Disable `we_1TrYG7Kh2GaZE2B4EVZuVHD3`, then close the account.
+  `check: stripe payment_links list --project-name default --live --limit 100 | grep -c '"active": true'` (0)
+
+- **INV-35 is UNPAID as of 2026-08-02.** `in_1Tzx9q63lspobjfO3JPde2Do`, status
+  `open`, `amount_paid` 0, due 4 August, `auto_advance: true`. **The moment it
+  is paid, client 1 must be provisioned BY HAND** — `stripe-webhook.js` handles
+  `checkout.session.completed` only, never `invoice.paid`. Set
+  `plan='growth_pro'`, `plan_source='package'`, `plan_grant_until='2027-06-02'`,
+  and write a `client_events` row or a EUR 3,500 sale leaves no audit trail.
+  `check: node -e "process.exit(0)"` (placeholder; the real check is the invoice status)
+
+- **Client 51 and `prod_Uzw7U7kt29wlqW` are disposable AFTER 2026-08-03**, not
+  today. `ZZ E2E TEST ES`, `cus_UzwDgjcv3giVq3`, EUR 1. Client 50 is already
+  deleted and `client_events` id 14 cascaded away with it, exactly as predicted;
+  the JSON preserved in `handoff-billing-2026-08-02.md` is now its only record.
+  `check: test $(date +%Y-%m-%d) \> 2026-08-03`
+
 - ~~**`main` has DIVERGED from `origin/main`, 7 ahead and 7 behind.**~~
   **STALE, checked 2026-08-01 22:50-23:00 by cycle 6.** Some session resolved
   it between cycle 5 and now. First check read `0` behind, `1` ahead; by the

@@ -13,6 +13,65 @@ otherwise.
 
 ---
 
+## UPDATE, 2026-08-02 later: what a follow-on session re-measured
+
+Read this before the block below it. Everything here was closed by a command.
+
+**INV-35 is NOT paid.** `status: open`, `amount_paid: 0`, `paid_at: null`,
+`auto_advance: true`, due 4 August. The "provision by hand" step has no trigger
+yet. Two details this file never recorded, both on a SENT invoice so both are
+next-invoice items, not fixable now: `cus_UzwgTPWQfZtXOY` carries
+`tax_exempt: "none"`, so section 0's "type the footer once on the Customer"
+lever was never applied; and `rendering.pdf.page_size` is `letter`.
+
+**Item 3 is DONE.** `prod_UzvlfrHiEwNF5V` now reads "all seven engines:
+ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Grok and AI Overviews."
+The other three products were checked against `planConfig.ts` before touching
+anything and were already correct: Growth genuinely has 5, Essentials 3, Radar
+is Gemini + Claude at 7 prompts. Only one product was ever wrong.
+
+**Item 2 was materially wrong, and the correction matters more than the fix.**
+This file said "the 4th social channel will not connect". Nothing refuses it:
+
+- `enforceSocialLimits` is unreachable dead code. The handler is
+  `requireAuth({ adminOnly: true })` and its call site at `social-publish.js:114`
+  is additionally guarded by `profile.role !== 'admin'`.
+- The constant gates per-POST platform count, not connected accounts. Nothing
+  in any of the 12 social functions caps how many accounts a client links.
+- `Social.tsx` feeds it to `AllowanceMeter`, which is display only.
+- **The constant lived in TWO files**, not the one cited: `planConfig.ts:713`
+  and a hardcoded mirror at `social-publish.js:30`.
+
+So Monday was never blocked. Fixed anyway, because the stated entitlement
+contradicted a sold commitment: `29bee89` adds `clients.social_channel_limit`
+(nullable, NULL means "no override", never zero), sets client 1 to 4, and
+routes both mirrors through one `socialChannelLimit()` per side. Constantin
+ruled per-client override over raising the ladder, so no other Growth PRO
+subscriber silently gains a channel. Migration applied and verified (1 override
+row, constraint present). Harness `scripts/check-social-channel-override.js`
+prints 25/25 exit 0, and was **observed to fail** at 20/25 exit 1 with the
+mirror reverted to a truthiness test. **Committed, NOT pushed** (AUTONOMY §7).
+
+**Old account close-out is entirely Constantin's, and this is now PROVEN
+rather than inferred.** A real `stripe payment_links update ... -d active=false`
+returned `does not have the required permissions` on `acct_1LHjKr`. The 7
+active links, the still-`enabled` webhook and the EUR 1 are all itemised under
+NEEDS CONSTANTIN in `docs/ROADMAP.md`, including one thing this file missed:
+the old webhook still points at the live app URL while Netlify holds the NEW
+account's signing secret, so an old-link payment captures money and provisions
+nothing.
+
+**Client 50 is already deleted**, and `client_events` id 14 cascaded away with
+it. The JSON preserved in section 0 is now its only record. Client 51 and
+`prod_Uzw7U7kt29wlqW` are disposable after 2026-08-03, which is tomorrow.
+
+**Not a defect after all:** `db/supabase-prompt-cap-migration.sql` on disk
+shows `growth_pro: 35`, which would have contradicted INV-35's promise of 56
+monitored prompts. The LIVE table reads 56, with a `radar` row at 7. The file
+is stale, the database is right, BpR is not capped below what was sold.
+
+---
+
 ## READ THIS FIRST: state at end of session, 2026-08-02
 
 **The Stripe account migration is DONE and PROVEN. BrandGEO now bills from a
