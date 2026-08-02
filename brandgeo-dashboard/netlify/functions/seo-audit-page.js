@@ -27,6 +27,11 @@ ${String(page.content_md || '').slice(0, 12000)}
 
 Write in the SAME language as the page. Never use em dashes or en dashes.
 
+BUDGET, and staying inside it matters more than being exhaustive: AT MOST 6
+issues and AT MOST 6 suggestions, each UNDER 220 characters, and the summary
+under 200. Pick the highest-impact ones and stop. A reply that runs long gets
+cut off in transit and is then worth nothing, so prefer fewer, sharper items.
+
 Reply with ONLY a JSON object, no markdown fences:
 {"geo_score": <0-100 int>,
  "summary": "one sentence on the single biggest gap",
@@ -57,12 +62,26 @@ async function callHaiku(prompt) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: HAIKU, max_tokens: 1500, messages: [{ role: 'user', content: prompt }] }),
+      // 1500 was the ceiling until 2026-08-02 and is the prime suspect for the
+      // silent "Could not read the audit result" failures: the schema above was
+      // unbounded (the 10-item slice happens AFTER parsing, in this file, where
+      // the model cannot see it), so a content-rich page in a language that
+      // tokenizes poorly could run past the ceiling and arrive as truncated
+      // JSON. extractJson then returns null and every trace was discarded.
+      // The prompt now bounds the output; this is the belt to that braces.
+      // Still well inside the 20s internal timeout and the 26s function budget.
+      body: JSON.stringify({ model: HAIKU, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
       signal: controller.signal,
     });
     if (!res.ok) { console.error(`[SeoAuditPage] Haiku non-200: ${res.status}`); return null; }
     const data = await res.json();
-    return data?.content?.[0]?.text || null;
+    const text = data?.content?.[0]?.text || null;
+    if (!text) { console.error('[SeoAuditPage] empty content in reply'); return null; }
+    // stop_reason travels with the text so the caller can tell a TRUNCATED
+    // reply from a malformed one. Without it both arrive as "extractJson
+    // returned null" and are indistinguishable, which is what made the
+    // 2026-08-02 failure on client 52 undiagnosable after the fact.
+    return { text, stopReason: data?.stop_reason || null };
   } catch (e) { console.error(`[SeoAuditPage] call failed: ${e.message}`); return null; }
   finally { clearTimeout(timer); }
 }
@@ -99,11 +118,30 @@ exports.handler = async (event) => {
       .from('clients').select('name').eq('id', client_id).single();
     const brand = client?.name || 'this brand';
 
-    const raw = await callHaiku(buildPrompt(brand, page));
-    if (!raw) return { statusCode: 200, headers, body: JSON.stringify({ error: 'The auditor is unavailable right now. Please try again.' }) };
+    const call = await callHaiku(buildPrompt(brand, page));
+    if (!call) return { statusCode: 200, headers, body: JSON.stringify({ error: 'The auditor is unavailable right now. Please try again.' }) };
 
-    const parsed = extractJson(raw);
-    if (!parsed) return { statusCode: 200, headers, body: JSON.stringify({ error: 'Could not read the audit result. Please try again.' }) };
+    const parsed = extractJson(call.text);
+    if (!parsed) {
+      // THIS PATH USED TO BE COMPLETELY SILENT. It returned the error string and
+      // discarded call.text, so a real failure on a real client left nothing in
+      // the Netlify logs and the only way to learn anything was to spend another
+      // LLM call. Log enough to diagnose without re-running: why generation
+      // stopped, how much came back, and the tail, which is where a truncated
+      // reply visibly stops mid-token.
+      const truncated = call.stopReason === 'max_tokens';
+      console.error(
+        `[SeoAuditPage] unparseable reply page=${page_id} client=${client_id} ` +
+        `stop_reason=${call.stopReason} chars=${call.text.length} truncated=${truncated} ` +
+        `tail=${JSON.stringify(call.text.slice(-300))}`
+      );
+      return { statusCode: 200, headers, body: JSON.stringify({
+        error: truncated
+          ? 'The audit ran long and was cut off before it finished. Please try again.'
+          : 'Could not read the audit result. Please try again.',
+        reason: truncated ? 'truncated' : 'unparseable',
+      }) };
+    }
 
     const clampScore = (n) => { const v = Math.round(Number(n)); return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null; };
     const audit = {

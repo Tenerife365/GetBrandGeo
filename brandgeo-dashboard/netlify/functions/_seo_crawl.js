@@ -35,6 +35,25 @@ async function sitemapCrawl(host, maxPages) {
   let urls = await collectSitemapUrls(base, maxPages * 4);
   if (!urls.length) urls = await homepageLinks(base, host, maxPages * 4);
 
+  const picked = pickCrawlUrls({ base, urls, host, robots, maxPages });
+
+  const pages = [];
+  for (const url of picked) {
+    const page = await fetchAndExtract(url);
+    if (page) pages.push(page);
+  }
+  return pages;
+}
+
+/**
+ * Choose which URLs to crawl. PURE: no network, no clock, no I/O, so the page
+ * cap can be tested without crawling anything. Extracted from sitemapCrawl
+ * 2026-08-02 for exactly that reason, after an off-by-one shipped here and was
+ * only caught by counting rows in Supabase.
+ *
+ * `robots` needs only an `allowed(path)` method.
+ */
+function pickCrawlUrls({ base, urls, host, robots, maxPages }) {
   // Same host, allowed by robots, deduped, capped.
   const seen = new Set();
   const picked = [];
@@ -60,22 +79,34 @@ async function sitemapCrawl(host, maxPages) {
   }
 
   for (const u of urls) {
+    // THE CAP IS CHECKED BEFORE THE PUSH, NOT AFTER. It used to be the last
+    // statement in the body, so the loop always performed one push before its
+    // first check. The homepage is pushed unconditionally ABOVE, outside this
+    // loop, and never meets a cap check at all.
+    //
+    // THE BLAST RADIUS IS EXACTLY maxPages === 1, and no other tier. For any
+    // cap of 2 or more the post-check still compares the TOTAL (homepage
+    // included) and stops on the right number, so Growth (10) and Growth PRO
+    // (30) were never over. At cap 1 the homepage already fills the budget, the
+    // loop pushes a second page and only then breaks. So the plans that were
+    // sold "your landing page, singular", radar and essentials, are precisely
+    // the ones that got two. Measured 2026-08-02 on client 52: cap 1,
+    // seo_crawls.pages = 2, the extra page a 2018 blog post.
+    //
+    // An earlier draft of this comment claimed every tier overran by one. The
+    // harness disproved it: with the bug reinstated the cap-10 and cap-30
+    // assertions still passed and only the cap-1 ones went red.
+    if (picked.length >= maxPages) break;
     const norm = stripHash(u);
     if (seen.has(norm)) continue;
     seen.add(norm);
     if (!sameHost(norm, host)) continue;
     if (!robots.allowed(pathOf(norm))) continue;
     picked.push(norm);
-    if (picked.length >= maxPages) break;
   }
   if (!picked.length && robots.allowed('/')) picked.push(base);
 
-  const pages = [];
-  for (const url of picked) {
-    const page = await fetchAndExtract(url);
-    if (page) pages.push(page);
-  }
-  return pages;
+  return picked;
 }
 
 // ── robots.txt (minimal: User-agent * Disallow prefixes) ─────────────────────
@@ -319,4 +350,4 @@ async function safeText(url) {
   finally { clearTimeout(timer); }
 }
 
-module.exports = { crawlSite, fetchAndExtract, htmlToText, extractTitle, detectSignals };
+module.exports = { crawlSite, fetchAndExtract, htmlToText, extractTitle, detectSignals, pickCrawlUrls };
