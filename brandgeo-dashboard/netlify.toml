@@ -125,6 +125,15 @@
 [functions."promotions-admin"]
   timeout = 15
 
+# S21 admin Revenue page. Pages every Stripe invoice on the account (affiliate
+# attribution needs a customer's full history, not just the requested month —
+# docs/arch/revenue-report-data-contract.md §4) plus refunds, customers,
+# promotion codes and coupons, and two paged Supabase reads. The inherited 10s
+# default is not enough (backlog: "three functions call external APIs on the
+# inherited 10s timeout").
+[functions."revenue-report"]
+  timeout = 26
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26
