@@ -154,6 +154,59 @@ already-registered `operating_costs` table. Not built in this task.
 - No `operating_costs` table / true net margin (registered as Phase 2 in the
   kickoff, separate board entry).
 
+## 6b. API response shape (binding for both the function and the UI)
+
+`POST /.netlify/functions/revenue-report`, `requireAuth({ adminOnly: true })`.
+Body: `{ period?: 'YYYY-MM' }`, defaults to the current UTC month.
+
+```jsonc
+{
+  "period": { "start": "2026-08-01", "end": "2026-08-31", "label": "August 2026" },
+  "global": {
+    "grossInvoicedEur": 0, "paidRevenueEur": 0, "refundsEur": 0,
+    "discountsEur": 0, "affiliateCommissionEstEur": 0,
+    "estimatedApiCostEur": 0, "netRevenueEur": 0
+  },
+  "byPlan": [
+    { "plan": "growth_pro", "grossInvoicedEur": 0, "paidRevenueEur": 0,
+      "refundsEur": 0, "discountsEur": 0, "affiliateCommissionEstEur": 0,
+      "estimatedApiCostEur": 0, "netRevenueEur": 0, "invoiceCount": 0 }
+  ],
+  "byClient": [
+    { "clientId": 1, "clientName": "Bucate pe Roate", "plan": "growth_pro",
+      "grossInvoicedEur": 3500, "paidRevenueEur": 0, "refundsEur": 0,
+      "discountsEur": 0, "affiliateCommissionEstEur": 0,
+      "estimatedApiCostEur": 0, "netRevenueEur": 0,
+      "attribution": "metadata", "stripeCustomerId": "cus_UzwgTPWQfZtXOY" }
+  ],
+  "pipeline": {
+    "windowDays": 60, "engagedThresholdWeeks": 3,
+    "clients": [
+      { "clientId": 52, "clientName": "Doctor Mihail", "plan": "free",
+        "distinctActiveWeeks": 4, "lastActiveAt": "2026-08-01T00:00:00Z",
+        "opportunityMonthlyEur": 39, "nextPlan": "radar" }
+    ]
+  },
+  "affiliates": [
+    { "affiliateCode": "bpr", "redemptions": 0, "attributedClients": 0,
+      "commissionAccruedEur": 0 }
+  ],
+  "meta": {
+    "generatedAt": "2026-08-02T21:00:00Z",
+    "stripeAccountId": "acct_1Tzui063lspobjfO", "liveMode": true,
+    "warnings": []
+  }
+}
+```
+
+`attribution` is one of `metadata` (customer.metadata.client_id resolved it),
+`stripe_customer_id` (clients.stripe_customer_id resolved it), or
+`unattributed` (no client resolved — the row still carries plan/amount, just
+`clientId: null`). `meta.warnings` carries human-readable notes for anything
+odd found while building the report (e.g. an invoice whose plan could not be
+resolved), so an admin reading the page sees why a number might look off
+without digging into logs.
+
 ## 8. Decisions (Constantin, 2026-08-02)
 
 1. **DECIDED 2026-08-02.** Gross/net split confirmed as framed: gross =
