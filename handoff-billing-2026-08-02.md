@@ -398,6 +398,51 @@ identity verification and moving API keys are all withheld under AUTONOMY §2.
    session is still pointed at `acct_1LHjKr` and will silently write to the
    wrong one.
 
+**How the new account is created, confirmed against Stripe's docs.** It is NOT a
+sub-account. Stripe's *Multiple separate accounts* page: click the account name
+in the upper-left corner, select **New account**. Same login and email, a
+separate account with its own country and its own keys. **Connect is the wrong
+tool** and must not be used: it would make BrandGEO a payments platform with
+itself as a connected merchant, for no gain. On top of the second account,
+create a Stripe **Organization**, which the same doc names for exactly this case
+("multiple accounts related to the same business, such as for local acquiring")
+and which gives centralized reporting across both. The doc is also blunt on why
+this is mandatory rather than optional: "You can only associate each account
+with the tax ID and legal entity of one business."
+
+**Values to re-enter by hand, all read off `acct_1LHjKr` this session:**
+
+| Setting | Value |
+|---|---|
+| Country at creation | **Spain**, one shot, no undo |
+| Legal name | `Constantin Daniel Goane`, NOT the `GetBrandGEO` trade name |
+| All three addresses | Calle Adriatico 64, El Rosario, 38109, Santa Cruz de Tenerife |
+| Support email / phone | `support@getbrandgeo.com` / `+34647732414` |
+| Business URL | `https://www.getbrandgeo.com` |
+| Product description | `AI Visibility platform` |
+| MCC | `5734` |
+| Statement descriptor | `WWW.GETBRANDGEO.COM` |
+| Card descriptor prefix | `BRANDGEO` |
+| Payout descriptor | `BrandGEO` |
+| Payout schedule | daily, `delay_days 7` |
+| Bank | Wise, `TRWIBEB1`, last4 `9560` |
+| Dashboard display name | `BrandGEO` |
+| Logo / icon | re-upload from `docs/growth/brand-identity-2026-07-29/v3/png/`: `icon-tile-512.png` for the icon, `logo-full.svg` or `mark-1024-on-dark.png` for the logo. **NOT** `brand-kit-2026-07-29/`, which holds the retired eye mark. File ids do not transfer between accounts. |
+| VAT id | add under invoice settings and **set as default** |
+
+**Fix while retyping:** branding colour on the old account is `#7a60f4`, which
+matches neither the site accent `#8b5cf6` nor the button fill `#7c3aed`. Use
+`#7c3aed` so hosted checkout matches the button the visitor clicked.
+
+**The product catalogue is NOT worth migrating faithfully.** 16 active products,
+audited this session: two are both literally named `Essentials Annual`
+(`prod_Ur3ZwGg4E1uxD9` and `prod_Ur3Xe8o6s2iBqu`); `Launch`
+(`prod_LzizqMCmBWfyGv`) dates from July 2022; two generations of the same ladder
+are live side by side, the 2026-07-09 set with no `metadata.plan` and the
+2026-07-26 set with it; and six names carry em dashes, breaking the project's
+own content rule on documents customers receive. Recreating is the cleanup, not
+a loss. Build one correct set matching `planConfig.ts`.
+
 **Then an agent can run, in this order.**
 
 6. **Recreate products, prices and the seven payment links** on the new account,
