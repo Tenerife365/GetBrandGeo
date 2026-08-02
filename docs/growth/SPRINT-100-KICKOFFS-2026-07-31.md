@@ -53,6 +53,11 @@ server-side by `trg_enforce_prompt_cap` in Postgres. Do not re-file those.
    finding, and no agent for a mechanical one-line edit. `bg-verify` reviews
    the batch before its push, not each commit. Memory and registry update once
    per batch.
+10. **Quality gate, ruled 2026-08-02, seat in Part C-0b.** The CQO batch
+    review is BLOCKING for any push touching `brandgeo-dashboard/` or a
+    decision-making surface, and decision-critical pages get the four-stage
+    gate: research the data contract, test with a fixture harness, debug to
+    root cause, simulate and reconcile against the external source of truth.
 
 ## Sprint status board
 
@@ -778,6 +783,40 @@ essentials, 2 growth, 1 growth_pro, 3 managed, 2 free. 206 active prompts,
 client on `manual` refresh cadence. The platform has never yet experienced
 concurrent scheduled load. Every number the audit projects starts from these.
 
+## C-0b. New seat, added by Constantin 2026-08-02: CQO, Chief Quality Officer
+
+Master code reviewer, QA, and debugger, expert in SaaS dashboards. Added
+because the preceding two weeks were fix-patch-fix: defects were found after
+shipping, by use, instead of before shipping, by review. The seat exists to
+spot it BEFORE.
+
+The CQO is one seat with four duties, not four teams (the credit economy,
+rule 9, forbids standing up four separate agent teams). It runs on the
+existing machinery: `bg-verify` for review, `dashboard-auditor` for
+periodic dashboard audits, `Explore` for research sweeps, and the loaded
+skills `code-reviewer`, `react-best-practices`, and `dataviz` when the
+surface is a dashboard. Standing powers:
+
+1. **The blocking batch review.** No batch push that touches
+   `brandgeo-dashboard/` or any decision-making surface goes out before one
+   CQO review of the WHOLE batch. Rule 9 already says bg-verify reviews the
+   batch; this seat makes it blocking, not advisory, for those surfaces.
+2. **The four-stage gate on decision-critical pages** (any page Constantin
+   reads to make money decisions, S21 first): RESEARCH the data contract
+   before building, TEST with a harness that fails before the fix and
+   passes after, DEBUG to root cause and never to symptom, SIMULATE with
+   realistic seeded data and reconcile the numbers against the external
+   source of truth (for money pages: the figures must match the Stripe
+   Dashboard for the same period before the page is called done).
+3. **The periodic audit.** From time to time, unprompted by a defect, the
+   CQO runs `dashboard-auditor` against the live app and files the ledger
+   in docs/audit/. A finding filed by audit is cheaper than the same
+   finding filed by a customer.
+
+Seat attribution in the daily council: shipped-defect regressions, review
+debt, and test coverage belong to the CQO; the CSA keeps load and capacity;
+the CTO keeps product blockers that are neither.
+
 ## C-1. Market relevance: 9, hold and harden
 
 - **Chief Research Officer.** Judgment: the wedge (evidence for the omitted
@@ -1290,10 +1329,32 @@ Architecture facts the builder inherits, verified 2026-08-02:
   caching; the load model upgrade path is a monthly revenue_snapshots table
   written by a scheduled job, noted in the spec now, built later.
 
+QUALITY GATE (added 2026-08-02, Constantin's ruling: this is a crucial
+decision-making page, so the CQO four-stage gate applies, seat C-0b):
+- Load skills before building: code-reviewer, react-best-practices, dataviz
+  (the Revenue tab is charts and tiles; dataviz rules apply to every one).
+- RESEARCH: the data contract (Stripe objects used, the client join key,
+  the cost model inputs) is written and reviewed BEFORE the first component.
+- TEST: a harness that computes net revenue from a fixed fixture of fake
+  invoices, discounts, refunds and commissions, with hand-calculated
+  expected numbers. It fails on a wrong formula, not just on a crash.
+- SIMULATE: seed realistic data (a BPRFREE redemption, a refund, a yearly
+  sub, a discounted invoice) and reconcile the page's totals against the
+  Stripe Dashboard for the same period. Mismatched cents fail the gate.
+- The CQO batch review is BLOCKING before this ships.
+
+PHASE 2, registered now, built after v1 (Constantin 2026-08-02): operating
+costs. A simple `operating_costs` table (vendor, amount EUR, cadence,
+started_at, ended_at; admin CRUD) for the monthly bills that are not
+per-client API spend: Netlify, Supabase, Google Workspace, CyberFolks,
+Instantly, PromoteKit when it starts billing, and the rest. The Revenue tab
+then shows true net margin: net revenue minus operating costs. Phase 2 is
+its own board entry when v1 ships; do not fold it into v1's scope.
+
 VERIFY: page renders for an admin with the three tabs; Revenue figures for
 the current month match the Stripe Dashboard's gross and net for the same
 period (spot check, numbers pasted into the QA note); non-admin gets 401
-from the function.
+from the function; the fixture harness exits 0.
 
 RECORD: board row, ROADMAP if follow-ups emerge, one line in CLAUDE.md
 CURRENT STATE, docs commit; the build itself waits for the batch push.
