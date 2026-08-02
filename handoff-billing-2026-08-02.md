@@ -33,36 +33,83 @@ was closed by a command, never by a report.
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` were swapped and the site
 redeployed once. That is the entire Netlify cost.
 
+### THE BPR INVOICE IS SENT. 2026-08-02.
+
+**`in_1Tzx9q63lspobjfO3JPde2Do`, number `INV-35`, EUR 3.500,00, due 4 August
+2026.** Constantin reviewed and sent it himself. Customer
+`cus_UzwgTPWQfZtXOY` (Bucateperoate SRL, VAT RO15565836, `preferred_locales`
+`['ro']`). The invoice is in Romanian throughout.
+
+**The commercial terms, which are now a commitment because they are printed on
+the document the client pays against:**
+
+- 10 months of Growth PRO, 2 August 2026 to **2 June 2027**
+- EUR 500 a month, **7 months billed (EUR 3,500), 3 months free**
+- **Administration of 4 social media accounts, at 5 posts per week**
+- Activation on payment confirmation
+- Does NOT auto-renew; continuation is a standard subscription at list price
+
+Seller block, TVA basis (Directiva 2006/112/CE art. 6 and art. 44), both parties'
+bank accounts and the totals are in the footer and custom fields. Constantin's
+NIE/NIF is **Y8060061R** and his **EU-VAT is genuinely N/A**, so
+`default_account_tax_ids` being `null` is CORRECT and is not an outstanding item.
+Account branding (logo, icon, `#875df5`) was uploaded and is live.
+
 ### What is left, in order
 
-1. **Invoice template on the new account. Constantin was doing this at session
-   end.** Read off the first real invoice `in_1TzwKk63lspobjfOYJxbTmhZ`, so this
-   list is measured and not guessed:
-   - `account_name` prints **`BrandGEO`**, must be **`Constantin Daniel Goane`**
-   - `account_tax_ids` is **null**, the VAT id must be added and set default
-   - `footer` is **null**, needs step 2's wording
-   - `total_taxes` is **`[]`**, no tax line at all; 0% must be stated
-   - `number` is **`JVRPVBYV-0001`**, a random prefix
-   - **`rendering.pdf.page_size` is `letter`**, a European invoice on US paper.
-     NEW finding, not in section 4.
-2. **The accountant's footer wording. THE ONLY REAL BLOCKER**, unchanged all
-   session. Citations in section 6B step 1.
-3. **BpR Customer and invoice.** Section 6A step 7. Set `tax_exempt: 'reverse'`
-   and put the footer on `invoice_settings.footer` so it inherits. Grant runs to
-   **2027-06-02**. **Sending is Constantin's click.**
-4. **Provision BpR by hand once paid**, `invoice.paid` is still unhandled.
+1. **PROVISION BPR BY HAND THE MOMENT IT IS PAID. Nothing does this
+   automatically.** `invoice.paid` is not handled by `stripe-webhook.js`, which
+   only handles `checkout.session.completed`, `customer.subscription.updated`
+   and `customer.subscription.deleted`. On client **1**, set
+   `plan = 'growth_pro'`, `plan_source = 'package'`,
+   `plan_grant_until = '2027-06-02'`. Write a `client_events` row by hand too,
+   or the audit trail has a EUR 3,500 hole in it.
+2. **The 4th social channel will not connect.**
+   `PLAN_SOCIAL_CHANNEL_LIMIT.growth_pro = 3` (`planConfig.ts:713`) and the
+   invoice promises **4**. Work starts Monday. This is a sold commitment the
+   platform currently refuses, so it needs a per-client override or a limit
+   change BEFORE delivery, not after. Posts are fine: 5 a week is about 22 a
+   month against `PLAN_SOCIAL_POSTS_PER_CHANNEL_MONTH.growth_pro = 30`.
+3. **The catalogue's product descriptions say "five engines". Growth PRO has
+   SEVEN** (`planConfig.ts:97`: chatgpt, gemini, claude, perplexity, google_ai,
+   grok, ai_overview; the last two went live 2026-07-29). The descriptions
+   created on the new account this morning inherited the stale claim from the
+   old account. The INV-35 line item is correct and says 7; the products are not.
+4. **A real 0% TVA row in the totals** is still only a custom field and a footer
+   paragraph. No tax-rate operation is exposed to the connector, so this needs a
+   0% tax rate created in the Dashboard and then the invoice rebuilt. Declined
+   for INV-35, may matter for the next one.
+5. **`card_payments.statement_descriptor_prefix` is `null`.** Set it to
+   `BRANDGEO` before self-serve customers pay by card.
 
 ### Cleanup owed
 
-- **Old account:** deactivate its 7 payment links (**the CLI's DEFAULT profile
-  still points there**, so this needs no repointing), refund the EUR 1
-  (`cus_UztEDNeNwTyFmh`), let EUR 0.97 settle to Wise, disable webhook
-  `we_1TrYG7Kh2GaZE2B4EVZuVHD3`, then close. Do NOT deactivate the links until
-  the new checkout has been seen working, or there is no checkout at all.
-- **New account:** client **51** (`ZZ E2E TEST ES`) and its EUR 1 are disposable
-  after 2026-08-03. Its link already self-deactivated at 1/1.
+- **Old account, and the checkout precondition is now MET so this is unblocked:**
+  deactivate its 7 payment links (**the CLI's DEFAULT profile still points at the
+  old account**, so this needs no repointing), refund the EUR 1
+  (`cus_UztEDNeNwTyFmh`, `pi_3TztSRKh2GaZE2B40R9592q6`), let EUR 0.97 settle to
+  Wise, disable webhook `we_1TrYG7Kh2GaZE2B4EVZuVHD3`, then close. Those links
+  are permanent bearer URLs sitting in this repository's public git history, so
+  until they are dead anyone can still pay into the abandoned account.
+- **New account:** client **51** (`ZZ E2E TEST ES`), its EUR 1
+  (`cus_UzwDgjcv3giVq3`), and the test product `prod_Uzw7U7kt29wlqW` are
+  disposable after 2026-08-03. Its link self-deactivated at 1/1.
 - `.gitignore` for the skills install: `.agents/`, `.claude/skills/`,
   `.commandcode/`, `.continue/`, `.cortex/`, `.qwen/`, `skills-lock.json`.
+
+### Two tool constraints the next session will hit
+
+- **The Stripe MCP connector points at the NEW account
+  (`acct_1Tzui063lspobjfO`). The Stripe CLI's DEFAULT profile still points at
+  the OLD one, and profile `brandgeo-es` points at the new one.** That split is
+  useful, it is how the old catalogue was read while the new one was written,
+  but it means every CLI command needs `--project-name` AND `--live` or it
+  silently hits the wrong account in the wrong mode.
+- **The connector exposes no delete, no invoice update, no tax-rate create, and
+  no account write.** The CLI's restricted key has no write on products, prices,
+  payment links or invoices either. So deletions, invoice edits, tax rates and
+  every account-level setting are Constantin's Dashboard clicks. An invoice
+  cannot be patched after creation: build it complete or rebuild it.
 
 ### Two working rules this session earned
 
