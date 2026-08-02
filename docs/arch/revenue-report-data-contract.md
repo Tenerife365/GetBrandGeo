@@ -154,12 +154,53 @@ already-registered `operating_costs` table. Not built in this task.
 - No `operating_costs` table / true net margin (registered as Phase 2 in the
   kickoff, separate board entry).
 
-## 8. Open items for Constantin (one-line OK requested on the whole contract)
+## 8. Decisions (Constantin, 2026-08-02)
 
-1. §5's `gross_invoiced` vs `paid_revenue` split — confirm this matches what
-   "how much was invoiced" meant, versus wanting invoiced to mean paid-only.
-2. §4's commission approximation is the report's own estimate pending a real
-   `BPRFREE` redemption to check it against; PromoteKit remains the system of
-   record for actual affiliate payout.
-3. The stray, metadata-less `cus_UzwQPxA4H5r3IA` BpR customer (§3) is left
-   alone — flag if it should be archived/deleted in Stripe.
+1. **DECIDED 2026-08-02.** Gross/net split confirmed as framed: gross =
+   everything invoiced to clients, net = built from what has actually been
+   paid. Ships as written in §5.
+2. **DECIDED 2026-08-02.** Commission framing (§4) approved as a provisional
+   Stripe-side estimate. Constantin: "we don't know the cost and everything
+   else... we'll come back to this later" — PromoteKit's real terms/cost
+   aren't settled yet, so this number is explicitly labelled as an estimate
+   in the UI, not presented as the affiliate payout of record.
+3. **DECIDED 2026-08-02.** Clean up the stray, metadata-less duplicate BpR
+   Stripe Customer (`cus_UzwQPxA4H5r3IA`). Verified zero invoices, charges or
+   subscriptions attached, so deletion is safe. **Attempted and blocked**:
+   Claude Code's auto-mode classifier refused the live-mode `DELETE
+   /v1/customers` call as a destructive action requiring direct human
+   action. Left in place; Constantin can delete it from the Stripe
+   Dashboard (Customers -> `cus_UzwQPxA4H5r3IA` -> Delete customer) whenever
+   convenient. Zero impact on this task either way (§3's join resolution
+   never reaches it — no invoices means no revenue and no client to attribute).
+
+## 9. Pipeline / conversion opportunity estimator (added 2026-08-02, Constantin)
+
+New requirement, folded into the Revenue tab rather than a fourth top-level
+tab: alongside gross/net, surface **which non-paying (or low-tier) clients
+are actively using the product and therefore represent revenue at risk of
+being left uncampaigned**, versus a signup who tried it once and never came
+back. Constantin's own example: 50 free-plan clients using it constantly are
+a target list for a campaign; the ones who ran it once are not.
+
+This is a Supabase-only signal — no Stripe call needed, no new migration:
+
+- **Population**: `clients` where `plan = 'free'` (extendable to `radar`
+  later if useful), excluding `category = 'research'`.
+- **Engagement signal**: count of DISTINCT ISO weeks with at least one
+  `ai_results` row in the trailing 60 days, per client. Chosen over a raw
+  row count so a single burst (e.g. the day they signed up) does not read as
+  "constant use" — the same distinction Constantin drew between "used it
+  once" and "using it constantly". A client is **engaged** at
+  `distinct_weeks >= 3` (a threshold to revisit once real distribution is
+  visible — v1, stated as a heuristic, not a tuned model).
+- **Opportunity value**: the next paid tier's list price above the client's
+  current plan (`PLAN_ORDER` / `PLAN_TIERS` in `planConfig.ts` — free's next
+  rung is Radar today), shown as EUR/month "at risk" per engaged client and
+  summed for the list.
+- **Output**: a ranked table (most engaged first) of free clients with their
+  weekly-activity count and the monthly opportunity value, so it can feed
+  directly into S8/S11's outbound campaign list. Explicitly a v1 heuristic:
+  Constantin's own words, "later we will learn more things" — expect this
+  metric to be revisited once there is real usage distribution to tune
+  against.
