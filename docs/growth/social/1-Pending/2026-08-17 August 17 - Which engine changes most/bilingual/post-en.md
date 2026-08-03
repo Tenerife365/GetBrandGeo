@@ -1,0 +1,20 @@
+---
+channel: bilingual
+format: video
+asset: berlin-en-silent.mp4
+cover: berlin-en-cover.png
+link: https://getbrandgeo.com/?utm_source=bilingual&utm_medium=video&utm_campaign=berlin#free-audit
+alt: "[NEEDS ALT]"
+scheduled: 2026-08-17T08:00:00Z
+posted_at:
+posted_url:
+---
+On 10 July 2026 we collected Berlin bilingually: four categories, each asked twice, once in German and once in English. Eight prompts across four engines, Claude, Gemini, Meta AI and Perplexity. Meta AI ran that day and left our lineup on 2026-07-16. ChatGPT is missing from this run because its collection failed that day, which is a hole in our data rather than a reading about ChatGPT.
+
+What came back: in one category, 4 of 4 engines named the same brand in German. In another there was no agreement in either language. In a third, two engines answered at length in German and returned nothing usable for the identical question in English.
+
+The mechanism underneath is ordinary. Categories built on a handful of well documented products converge on a short list, because there is one consistent signal for each engine to land on. Categories made of thousands of small firms fragment. If you serve Berlin in German and in English, one measurement tells you about one of those two languages.
+
+As measured 2026-07-10 with our own collection pipeline. The write up is on https://getbrandgeo.com/?utm_source=bilingual&utm_medium=video&utm_campaign=berlin#free-audit.
+
+#AIVisibility #AISearch #Berlin #GEO #MultilingualSEO #BrandVisibility

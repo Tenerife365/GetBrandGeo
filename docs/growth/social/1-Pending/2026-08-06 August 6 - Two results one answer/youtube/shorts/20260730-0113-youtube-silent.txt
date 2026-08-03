@@ -1,0 +1,11 @@
+This is not an argument that search stopped working. A page one position is real, it is measurable, and it is worth having. The claim is narrower than that: a rank tells you where you sit in a list of links, and it tells you nothing about whether an engine names you when a buyer asks it a buying question. Two measurements, and one does not predict the other.
+
+We ran an AI Visibility audit for a brand that sits on page one of Google in its category without working hard at it. Twenty real customer questions, the kind a prospect actually types, put to each engine identically. On Gemini, that brand appeared zero times across all twenty.
+
+The uncomfortable part is that a gap like that stays invisible until somebody looks for it. It leaves no mark in a rank tracker, because the event happens somewhere a rank tracker was not built to look.
+
+BrandGEO puts your buyers' questions to the engines on your plan and records who gets named, where in the answer, and how it describes them. The Growth plan covers ChatGPT, Gemini, Claude, Perplexity and Google AI Mode.
+
+https://getbrandgeo.com?utm_source=youtube&utm_medium=shorts&utm_campaign=campaign2607#free-audit
+
+The research this is drawn from: https://getbrandgeo.com/bg-004.html?utm_source=youtube&utm_medium=shorts&utm_campaign=campaign2607 https://getbrandgeo.com/bg-001.html?utm_source=youtube&utm_medium=shorts&utm_campaign=campaign2607

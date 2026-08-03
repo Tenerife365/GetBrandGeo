@@ -23,7 +23,7 @@ bottom of this file before you upload it.
 
 ## Article body
 
-A few weeks ago, running a study across seven cities, we noticed something odd in Paris.
+Last month I wrote here about something odd we found in Paris.
 
 We had asked four AI engines which wealth management advisor a client should use, once in French and once in English. Ask in French, and the engines named independent French boutiques. Ask the identical question in English, and they named large international private banks. Not a different ranking of the same firms. A different kind of business entirely.
 
@@ -104,10 +104,13 @@ If you would rather check your own brand than take my word for it, the test is f
 
 ## Posting notes (not part of the Article itself)
 
-**Opening line.** It refers to the seven-city study, not to a previous LinkedIn
-post, so it is safe whether or not the 2026-07-16 Article was ever published. If
-you did publish that one, you can strengthen the opening to "Last month I wrote
-here about something odd we found in Paris", which links the two.
+**Opening line.** Confirmed by Constantin 2026-08-02 that the 2026-07-16 Article
+WAS published, so the opening now references it directly ("Last month I wrote
+here about..."). That article covered the seven-city paper and raised the Paris
+wealth-management finding without measuring it, which is exactly what this study
+went back and did. If for any reason that article is taken down, revert the first
+line to "A few weeks ago, running a study across seven cities, we noticed
+something odd in Paris."
 
 **Banner.** `og-bg-027.png` is **1200 x 630**, ratio 1.905. LinkedIn's Article
 cover target is **1920 x 1080**, ratio 1.778. It will upload and it will look

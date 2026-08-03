@@ -90,4 +90,24 @@ email-preview.html
 # and specs, not renders.
 docs/growth/CAMPAIGN-*/
 docs/growth/reel-campaign-ab/
+docs/growth/grok-launch/video/
+docs/growth/grok-launch/images/
+
+# -- docs/growth/social/ : the content pipeline, adopted 2026-08-03 --------
+# Mirrors the TalentWeLove convention. The split here is NOT "ignore the whole
+# folder", and getting it wrong in either direction costs something:
+#
+#   post.md and campaign.md ARE TRACKED. They are client-facing copy, they are
+#   small, and a change to a caption should be visible as a diff. They are also
+#   the only record of what was posted and when, via posted_at / posted_url.
+#
+#   The media is NOT tracked. Rendered video and images are large, regenerable,
+#   and this repo is public.
+docs/growth/social/**/*.mp4
+docs/growth/social/**/*.png
+docs/growth/social/**/*.jpg
+docs/growth/social/**/*.jpeg
+docs/growth/social/**/*.wav
+docs/growth/social/_scored/
+docs/growth/social/0-Voice-samples/
 assets/audio/music/

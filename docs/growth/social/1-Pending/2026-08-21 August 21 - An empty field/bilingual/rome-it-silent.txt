@@ -1,0 +1,9 @@
+Roma, 10 luglio 2026. Quattro categorie, ognuna chiesta una volta in italiano e una volta in inglese, su quattro motori: Claude, Gemini, Meta AI e Perplexity. Meta AI girava quel giorno e dal 16/07/2026 è fuori dal nostro set. ChatGPT non era nella raccolta perché la sua interrogazione fallì quel giorno, quindi è un buco nei nostri dati e non una lettura su ChatGPT.
+
+Sul 5 su 5, perché non venga letto male: sono 5 ristoranti su 5, da 1 motore, in 2 lingue. Non sono cinque motori d'accordo fra loro. Con quattro motori nella raccolta, un accordo a cinque non è nemmeno aritmeticamente disponibile.
+
+Il resto della raccolta va nella stessa direzione. Un secondo motore ha restituito quasi lo stesso gruppo di 9 agenzie immobiliari nelle due lingue. Nessun marchio ha raggiunto l'accordo di 3 o 4 motori in questa raccolta. E un motore non ha estratto alcun concorrente strutturato in 5 degli 8 prompt, pur parlando di marchi nel testo della risposta.
+
+Una misura datata resta leggibile anche quando il motore che l'ha prodotta non c'è più. Dati del 10/07/2026, raccolti con la nostra pipeline. Il dettaglio è su https://getbrandgeo.com/?utm_source=bilingual&utm_medium=video&utm_campaign=rome#free-audit.
+
+#VisibilitaIA #RicercaIA #Roma #MarketingDigitale #SEO #GEO

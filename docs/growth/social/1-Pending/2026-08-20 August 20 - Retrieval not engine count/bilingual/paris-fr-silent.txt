@@ -1,0 +1,9 @@
+Paris, collecte du 10 juillet 2026. Quatre catégories, chacune posée une fois en français et une fois en anglais, sur quatre moteurs : Claude, Gemini, Meta AI et Perplexity. Meta AI tournait ce jour-là et a été retiré de notre dispositif le 16/07/2026. ChatGPT ne figurait pas dans cette collecte, sa récupération ayant échoué ce jour-là. C'est un trou dans nos données et pas une lecture sur ChatGPT.
+
+La gestion de patrimoine n'était qu'une des quatre catégories, et les trois autres ont donné trois formes différentes. Sur les hôtels, deux moteurs ont gardé les mêmes têtes de liste dans les deux langues pendant que les deux autres changeaient d'avis. Sur la restauration gastronomique, aucun nom ne s'est imposé d'un moteur à l'autre. Sur la banque en ligne, les 4 moteurs ont placé le même établissement en tête, dans les deux langues.
+
+Ce dernier résultat mérite sa nuance et nous la publions. Sur la version anglaise de cette question, deux moteurs ont renvoyé une liste de concurrents vide alors que le texte de l'un d'eux citait bien l'établissement. C'est un défaut d'extraction de notre côté et pas une absence d'opinion. Un moteur a également perdu une réponse entière sur la question restauration en anglais.
+
+Données du 10/07/2026, collectées avec notre propre chaîne. Le détail est sur https://getbrandgeo.com/?utm_source=bilingual&utm_medium=video&utm_campaign=paris#free-audit.
+
+#VisibiliteIA #RechercheIA #Paris #MarketingDigital #SEO #GEO

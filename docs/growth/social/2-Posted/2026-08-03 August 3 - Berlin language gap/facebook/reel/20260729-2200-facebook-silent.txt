@@ -1,0 +1,7 @@
+Your analytics reports the people who arrived. It has nothing to say about the ones who asked an AI, read a short answer with two or three businesses named in it, and went with one of them. There is no bounce to look at and no session to attribute. The decision was made before your website was involved at all.
+
+That is a reporting gap rather than a traffic problem, which is why it can sit there for months without anything looking wrong.
+
+The useful part is that the answer itself is readable. You can put the question your customers ask to an AI engine yourself and see what comes back. BrandGEO does it on a schedule and keeps the record, so you can tell whether anything moved. The Growth plan covers ChatGPT, Gemini, Claude, Perplexity and Google AI Mode.
+
+https://getbrandgeo.com/?utm_source=facebook&utm_medium=video&utm_campaign=campaign2607#free-audit

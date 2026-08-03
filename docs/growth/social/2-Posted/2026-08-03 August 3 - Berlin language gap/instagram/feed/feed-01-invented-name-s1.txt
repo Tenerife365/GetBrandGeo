@@ -1,0 +1,13 @@
+Two AI engines returned the same firm name for a firm that does not exist.
+
+It happened in Chicago corporate law on 24 July 2026. Then the identical invented name came back in Boston, in a different category, from the same two engines. Both runs fired five engines. All five returned usable data. Neither run had a collection error.
+
+Fair reading of it: two of the five produced the name and the other three did not. So this is a property of some engines on thin, fragmented categories rather than a property of engines in general, and a lot of professional services sit in exactly those categories.
+
+The part worth taking away is not the invented name. It is the near miss. An engine that will assemble a firm which does not exist will also assemble a merged version of two real companies, a slightly wrong legal suffix, or a trading name you dropped years ago. Those look correct at a glance, which is what makes them expensive.
+
+We ask the same buyer questions on a schedule and keep what comes back, so a wrong name has somewhere to be counted. The Growth plan covers ChatGPT, Claude, Gemini, Perplexity and Google AI Mode.
+
+Link in bio.
+
+#AIVisibility #AIHallucination #GenerativeEngineOptimization #AISearch #BrandMonitoring #LegalMarketing #ProfessionalServices #AEO #DataQuality
