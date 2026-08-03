@@ -261,7 +261,97 @@ function AttributionBadge({ attribution }: { attribution: Attribution }) {
   )
 }
 
-type Tab = 'usage' | 'cost' | 'revenue'
+type Tab = 'clients' | 'research' | 'usage' | 'cost' | 'revenue'
+
+/**
+ * Shared table for the Clients and Research tabs (2026-08-03, Constantin):
+ * responses AND cost together, one row per client, scoped to one audience.
+ * Usage.tsx used to split those two into separate tabs and mix client rows
+ * with the collapsed research row in both; this is the opposite split —
+ * same two numbers, but by AUDIENCE instead of by METRIC. Usage/Cost/Revenue
+ * are untouched and still show everyone combined, so their own totals are
+ * exactly what they were before this existed.
+ */
+function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsage[]; chart: ReturnType<typeof useChartTheme> }) {
+  const totalResponses = rows.reduce((s, r) => s + r.totalResponses, 0)
+  const totalCost = rows.reduce((s, r) => s + r.totalCost, 0)
+
+  return (
+    <section>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu size={15} className="text-blue-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
+          </div>
+          <div className="text-2xl font-bold text-white tabular-nums">{totalResponses.toLocaleString()}</div>
+          <p className="text-xs text-slate-500 mt-1">{title}</p>
+        </div>
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign size={15} className="text-emerald-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">API Cost (metered)</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 tabular-nums">€{totalCost.toFixed(2)}</div>
+          <p className="text-xs text-slate-500 mt-1">{title}</p>
+        </div>
+      </div>
+
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
+          {title}
+        </div>
+        {rows.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-dark-700/50">
+                  <th className="px-4 py-3 text-left text-xs text-slate-500 font-medium">Client</th>
+                  {Object.keys(ENGINE_COST).map(e => (
+                    <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />
+                        {e}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="px-3 py-3 text-right text-xs text-slate-500 font-medium">Responses</th>
+                  <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Est. Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-200">{r.clientName}</td>
+                    {Object.keys(ENGINE_COST).map(e => (
+                      <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">{r.byEngine[e] ?? 0}</td>
+                    ))}
+                    <td className="px-3 py-3 text-right text-slate-400 tabular-nums">{r.totalResponses}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-400 tabular-nums">€{r.totalCost.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-dark-700 bg-dark-700/20">
+                  <td className="px-4 py-3 font-semibold text-slate-300">Total</td>
+                  {Object.keys(ENGINE_COST).map(e => (
+                    <td key={e} className="px-3 py-3 text-center text-slate-400 tabular-nums">
+                      {rows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
+                    </td>
+                  ))}
+                  <td className="px-3 py-3 text-right font-semibold text-slate-300 tabular-nums">{totalResponses}</td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">€{totalCost.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
 
 export default function Revenue() {
   const { isAdmin, clients } = useClient()
@@ -381,6 +471,8 @@ export default function Revenue() {
   const researchTotal     = displayRows.filter(r => r.internal).reduce((s, r) => s + r.totalCost, 0)
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: 'clients', label: 'Clients' },
+    { id: 'research', label: 'Research' },
     { id: 'usage', label: 'Usage' },
     { id: 'cost', label: 'Cost' },
     { id: 'revenue', label: 'Revenue' },
@@ -415,6 +507,20 @@ export default function Revenue() {
           </button>
         ))}
       </div>
+
+      {/* ── CLIENTS ───────────────────────────────────────────────────────── */}
+      {tab === 'clients' && (
+        <AudienceTable title="Real clients only — research excluded" rows={customerRows} chart={chart} />
+      )}
+
+      {/* ── RESEARCH ──────────────────────────────────────────────────────── */}
+      {tab === 'research' && (
+        <AudienceTable
+          title="Internal research only — our own city studies, not a customer"
+          rows={displayRows.filter(r => r.internal)}
+          chart={chart}
+        />
+      )}
 
       {/* ── USAGE ─────────────────────────────────────────────────────────── */}
       {tab === 'usage' && (
