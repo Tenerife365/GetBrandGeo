@@ -35,11 +35,20 @@ its own tagged URL so Plausible can tell them apart:
 
 | Platform | Bio link to set |
 |---|---|
-| Instagram | `https://getbrandgeo.com/?utm_source=instagram&utm_medium=bio` |
-| TikTok | `https://getbrandgeo.com/?utm_source=tiktok&utm_medium=bio` |
-| Threads | `https://getbrandgeo.com/?utm_source=threads&utm_medium=bio` |
-| YouTube channel | `https://getbrandgeo.com/?utm_source=youtube&utm_medium=channel` |
-| X profile | `https://getbrandgeo.com/?utm_source=x&utm_medium=bio` |
+| Instagram | `https://getbrandgeo.com/?utm_source=instagram&utm_medium=bio#free-audit` |
+| TikTok | `https://getbrandgeo.com/?utm_source=tiktok&utm_medium=bio#free-audit` |
+| Threads | `https://getbrandgeo.com/?utm_source=threads&utm_medium=bio#free-audit` |
+| YouTube channel | `https://getbrandgeo.com/?utm_source=youtube&utm_medium=channel#free-audit` |
+| X profile | `https://getbrandgeo.com/?utm_source=x&utm_medium=bio#free-audit` |
+
+**These override `threads/PROFILE.md`, which argues for a bare bio link with no
+parameters on the grounds that a profile link is read for years and a query
+string is visible clutter.** That reasoning is sound for a permanent link and
+wrong for these four weeks: Instagram feed, Reels, TikTok and Threads carry no
+link in any caption, so the bio is their only attribution path. Untagged, those
+platforms report nothing on 31 August regardless of how they perform, and you
+cannot cut what you cannot read. **Strip the parameters back out on 1 September**
+once the test has answered the question.
 
 The query string sits before any `#` fragment, never after, or the link breaks
 silently.
@@ -82,58 +91,114 @@ Repost with commentary, never a bare reshare.
 
 ---
 
+# The daily pulse layer (S22), ruled 2026-08-03
+
+The runway above is a fixed queue and stays untouched. On top of it,
+**every platform gets at least one unit every weekday** for the full 30-day
+sprint. Where the tables below leave a platform silent on a weekday, a
+daily pulse chat generates an adaptive unit for it: sprint progress
+(numbers only after Constantin approves them that day), one industry trend
+scan per day with the source cited in the sidecar, or an opportunity hook.
+Full protocol and the kickoff: registry S22 in
+`SPRINT-100-KICKOFFS-2026-07-31.md`.
+
+Three rules that protect the measurement this file exists for:
+
+1. Pulse links carry `utm_campaign=pulse` beside the platform's
+   `utm_source`. Runway posts keep their tags. On 08-24 the layers read
+   separately; the cut rule applies to each platform's combined number.
+2. The pulse never displaces or reorders a runway unit. If both exist for a
+   platform on a day, the runway posts first.
+3. **The X gap is closed by ruling:** the 8 LinkedIn research posts get
+   X-length trims from the pulse session. The "decision owed before week 2"
+   above is settled.
+
+Constantin posts everything; the pulse chat only generates and stages into
+`social/1-Pending/pulse/YYYY-MM-DD/` with sidecars, paste-ready.
+
+---
+
 # The four weeks
 
 Research lane is LinkedIn. Market lane is everything else. Video cut N means
 upload that cut to Instagram Reels, TikTok, YouTube Shorts and Facebook, four
 uploads, same silent master, each with its own sidecar text.
 
+## Inventory against 15 weekdays, counted 2026-08-03
+
+Every channel runs from day one. A video "cut" is one silent master posted to
+four platforms, so 9 cuts is 9 posting days per video platform, not 36.
+
+| Channel | Units | Per weekday | Verdict |
+|---|---|---|---|
+| LinkedIn research | 8 posts + 8 Articles | 0.5 + 0.5 | fine |
+| Facebook | 4 feed + 4 link + 9 video = 17 | 1.1 | fine |
+| Instagram | 4 feed + 4 stories + 9 reels = 17 | 1.1 | fine |
+| TikTok | 9 + 8 bilingual = 17 | 1.1 | fine |
+| YouTube Shorts | 9 + 8 bilingual = 17 | 1.1 | fine |
+| Threads | 14 (P1 to P4 chained, P5 to P14) | 0.9 | fine |
+| GBP | 4 | 0.27 | fine, see note |
+| X | **4** (2 threads, 2 standalones) | **0.27** | **UNDER-SUPPLIED** |
+
+**GBP is fine at four.** A GBP post expires after 7 days, so one or two a week is
+the native cadence. Four covers three weeks.
+
+**X is the one real gap.** Four units across 15 weekdays is one post every four
+days, which is below the cadence X rewards, so a weak result there would be
+ambiguous between "the channel does not work" and "we barely showed up." The
+cheap fill is to trim the 8 LinkedIn research posts to X length. That is editing
+existing copy, not new research. Decision owed before week 2.
+
+**YouTube long-form is not in the runway.** `youtube/longform/` holds a script, a
+storyboard and an `OPEN-QUESTIONS.md`, and zero video. It needs Constantin on
+camera. Treat it as a production task, not a posting task.
+
 ## Week 1, 08-03 to 08-07
 
-| Day | Research | Market |
-|---|---|---|
-| Mon 08-03 | BG-028 post + Article + announce + repost | Set the five bio links |
-| Tue 08-04 | BG-029 post + first comment | Video cut 1 |
-| Wed 08-05 | BG-029 Article + announce + repost | Video cut 2 |
-| Thu 08-06 | | Video cut 3, X thread 1 |
-| Fri 08-07 | | GBP update 1, Threads post 1 |
+| Day | LinkedIn | Video (IG/TikTok/YT/FB) | Static |
+|---|---|---|---|
+| Mon 08-03 | BG-028 post, Article, announce, repost | | Bio links, GBP 1, FB link 1, IG feed 1, Threads P5, X standalone 1 |
+| Tue 08-04 | BG-029 post | Cut 1 | IG stories 1 |
+| Wed 08-05 | BG-029 Article, announce, repost | Cut 2 | FB feed 1, Threads P6 |
+| Thu 08-06 | | Cut 3 | FB link 2, Threads P7 |
+| Fri 08-07 | | Cut 4 | GBP 2, IG feed 2, Threads P8 |
 
 ## Week 2, 08-10 to 08-14
 
-| Day | Research | Market |
-|---|---|---|
-| Mon 08-10 | BG-030 post + first comment | Video cut 4 |
-| Tue 08-11 | BG-031 post + first comment | Video cut 5 |
-| Wed 08-12 | BG-030 Article + announce + repost | Video cut 6 |
-| Thu 08-13 | BG-031 Article + announce + repost | X thread 2, Threads post 2 |
-| Fri 08-14 | | LinkedIn carousel, GBP update 2 |
+| Day | LinkedIn | Video (IG/TikTok/YT/FB) | Static |
+|---|---|---|---|
+| Mon 08-10 | BG-030 post | Cut 5 | FB feed 2, Threads P9 |
+| Tue 08-11 | BG-031 post | Cut 6 | IG stories 2, X thread A |
+| Wed 08-12 | BG-030 Article, announce, repost | Cut 7 | GBP 3, Threads P10 |
+| Thu 08-13 | BG-031 Article, announce, repost | Cut 8 | FB link 3, IG feed 3 |
+| Fri 08-14 | | Cut 9 | LinkedIn carousel, Threads P11 |
 
 The carousel needs assembling into a PDF first. LinkedIn document posts take PDF
 only, and whether it renders correctly cannot be checked from here.
 
 ## Week 3, 08-17 to 08-21
 
-| Day | Research | Market |
-|---|---|---|
-| Mon 08-17 | BG-032 post + first comment | Video cut 7 |
-| Tue 08-18 | BG-033 post + first comment | Video cut 8 |
-| Wed 08-19 | BG-032 Article + announce + repost | Video cut 9 |
-| Thu 08-20 | BG-033 Article + announce + repost | Bilingual Berlin, both languages |
-| Fri 08-21 | | Bilingual Madrid, both languages. Instagram feed set |
+| Day | LinkedIn | Video (IG/TikTok/YT/FB) | Static |
+|---|---|---|---|
+| Mon 08-17 | BG-032 post | Bilingual Berlin, DE + EN | FB feed 3, Threads P12 |
+| Tue 08-18 | BG-033 post | Bilingual Madrid, ES + EN | IG stories 3, X thread B |
+| Wed 08-19 | BG-032 Article, announce, repost | Bilingual Paris, FR + EN | GBP 4, Threads P13 |
+| Thu 08-20 | BG-033 Article, announce, repost | Bilingual Rome, IT + EN | IG feed 4 |
+| Fri 08-21 | BG-034 post | | IG stories 4, Threads P14, X standalone 2 |
 
-## Week 4, 08-24 to 08-28
+## Monday 2026-08-24: the measurement day
 
-| Day | Research | Market |
-|---|---|---|
-| Mon 08-24 | BG-034 post + first comment | Bilingual Paris, both languages |
-| Tue 08-25 | BG-021 post + first comment | Bilingual Rome, both languages |
-| Wed 08-26 | BG-034 Article + announce + repost | Facebook feed set |
-| Thu 08-27 | BG-021 Article + announce + repost | Facebook link cards, X thread 3 |
-| Fri 08-28 | | Instagram stories set, GBP update 3 |
+No posting. Read the numbers and cut.
 
-## Monday 2026-08-31: the measurement day
+**Two things spill past the measurement point, deliberately.** BG-034's Article
+and the whole of BG-021 fall outside the three weeks, because 8 research topics
+at 2 posts and 2 Articles a week needs four. That is fine: the measurement is
+about which CHANNELS earn their keep, not about finishing the research queue.
+Carry both into week 4 whatever the numbers say.
 
-Runway is empty. No posting. Read the numbers and cut.
+**`fb-link-04` and `fb-feed-04` are excluded from every week above.** Both point
+at `/bg-004.html`, which the campaign README calls unusable for any engine count.
+That is why Facebook shows 15 scheduled units rather than 17.
 
 ---
 

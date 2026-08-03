@@ -24,8 +24,9 @@ against the scoreboard. Rules of adaptation:
 ## Standing daily blocks (Path 1 cadence)
 
 Morning: send block (cold email batch fires, DMs by hand). Midday: replies
-within 2 hours, calls. Afternoon: onboarding, agent supervision, one
-evidence post. Evening: tell the open council chat to **close the day**; the
+within 2 hours, calls. Afternoon: onboarding, agent supervision, the S22
+daily pulse checklist (every platform posts every weekday, see
+PUBLISHING-PLAN.md, "The daily pulse layer"). Evening: tell the open council chat to **close the day**; the
 chat pulls Stripe and Supabase numbers, asks one line for sends and replies,
 writes the scoreboard row and commits. Constantin edits no files. Weekends:
 reduced sends (deliverability and reply rates drop), content and prep
@@ -86,3 +87,4 @@ Append-only. Format: date | trigger (measured fact) | change | council seat.
 - 2026-07-31 | baseline | plan created | Master Council synthesis
 - 2026-08-02 | Day 1's plan named "S9 scoreboard live" as a Day 1 deliverable; test -f docs/growth/SPRINT-100-SCOREBOARD.md fails at the start of Day 2, so it did not land and no baseline paying/MRR number was ever captured | Day 2's row gains "S9 scoreboard + baseline capture, carried from Day 1, overdue" ahead of S10/S6/S3/S12, so the sprint's own instrument exists before Gate 1 on Day 5 needs it | COO (instrumentation and cadence, Part C-5: "feasibility dies quietly through unmeasured days")
 - 2026-08-03 | test -f docs/growth/SPRINT-100-SCOREBOARD.md still fails at the start of Day 3, the file's third consecutive missing day; per the daily council's own failure-mode rule (2+ days missing = the instrument is down, do not adapt cadence on guesswork) | Day 3's row leads with "S9 scoreboard + baseline capture, STILL overdue" ahead of S2/S4/S12; cadence (sends/DMs) held at the plan's existing 0/0 for Day 3, not touched, since there is still no measured trigger to change it | COO (instrumentation and cadence)
+- 2026-08-03 | Constantin ruled daily posts on all platforms for the full sprint, adapted to progress, trends and opportunities; the publishing runway leaves platforms silent on some weekdays and X at 0.27 units per weekday | S22 Daily Content Pulse created (registry board + kickoff, protocol in PUBLISHING-PLAN.md): a daily pulse chat generates gap-filling adaptive units tagged utm_campaign=pulse, Constantin posts, X filled with LinkedIn-post trims; the standing afternoon block's "one evidence post" becomes "run the S22 pulse checklist" | CMO (message and channel presence), ruled by Constantin
