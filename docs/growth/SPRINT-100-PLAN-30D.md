@@ -37,7 +37,7 @@ instead.
 |---|---|---|---|---|---|
 | 1 | Sat 08-01 | Foundation | S1 ruling session; S8 domain + warmup ON; S9 scoreboard live; S13 account created | 0/0 | warmup clock started |
 | 2 | Sun 08-02 | Foundation | S9 scoreboard + baseline capture (carried from Day 1, overdue, do this first); S10 revert gate; S6 Evidence Machine built + dry run; S3 stage 1 funnel audit; draft 7 evidence posts (S12) | 0/0 | |
-| 3 | Mon 08-03 | Foundation | S2 ladder build (after S1); S4 first-run states; S12 placement table; first evidence post live | 0/0 | |
+| 3 | Mon 08-03 | Foundation | S9 scoreboard + baseline capture, STILL overdue (missing for the 3rd day running, carried from Day 1 and Day 2); S2 ladder build (after S1); S4 first-run states; S12 placement table; first evidence post live | 0/0 | |
 | 4 | Tue 08-04 | Foundation | S3 stages 2 to 4 (copy + accept path); S7 LAUNCH30; S11 scripts + profile | 0/0 | |
 | 5 | Wed 08-05 | Foundation | S5 research CTAs; S14 founding link; S15 referral ops; full real-card dress rehearsal | 0/0 | GATE 1: all foundation checks green; baseline recorded; ~4 |
 | 6 | Thu 08-06 | Warm start | Batch 400 one-pagers; founding offer to warm network begins (10 personal sends by Constantin); first cold at warmup-safe volume | 20/10 | |
@@ -85,3 +85,4 @@ Append-only. Format: date | trigger (measured fact) | change | council seat.
 
 - 2026-07-31 | baseline | plan created | Master Council synthesis
 - 2026-08-02 | Day 1's plan named "S9 scoreboard live" as a Day 1 deliverable; test -f docs/growth/SPRINT-100-SCOREBOARD.md fails at the start of Day 2, so it did not land and no baseline paying/MRR number was ever captured | Day 2's row gains "S9 scoreboard + baseline capture, carried from Day 1, overdue" ahead of S10/S6/S3/S12, so the sprint's own instrument exists before Gate 1 on Day 5 needs it | COO (instrumentation and cadence, Part C-5: "feasibility dies quietly through unmeasured days")
+- 2026-08-03 | test -f docs/growth/SPRINT-100-SCOREBOARD.md still fails at the start of Day 3, the file's third consecutive missing day; per the daily council's own failure-mode rule (2+ days missing = the instrument is down, do not adapt cadence on guesswork) | Day 3's row leads with "S9 scoreboard + baseline capture, STILL overdue" ahead of S2/S4/S12; cadence (sends/DMs) held at the plan's existing 0/0 for Day 3, not touched, since there is still no measured trigger to change it | COO (instrumentation and cadence)
