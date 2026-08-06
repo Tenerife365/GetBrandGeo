@@ -237,3 +237,90 @@ Day 2 and Day 3. Logged in `SPRINT-100-PLAN-30D.md`'s revision log.
 Gate 1. Live checkout, mail-tester/DNS, GBP, and actual Netlify deploy
 success all stay UNVERIFIABLE HERE (no network egress). S10's harness still
 cannot prove its own closed items stay closed, now for a second night.
+
+---
+
+## 2026-08-05, Day 5 of 30
+
+**Cumulative paying vs glidepath: UNVERIFIABLE HERE. Verdict: YELLOW.** Today
+is GATE 1 (all foundation checks green, baseline recorded, glidepath ~4) and
+it cannot be scored: no baseline and no daily number exists anywhere in the
+repo, for any of the 5 elapsed days.
+
+**What was measured:**
+- `docs/growth/SPRINT-100-SCOREBOARD.md` failed `test -f` for the 5th
+  consecutive morning (Day 1 through Day 5). S9 had been re-flagged as the top
+  action every night since Day 2 and never built, because "any session,
+  night-safe" kept being read as a diagnosis to repeat rather than a file to
+  write. This cycle built it (see "What the council changed").
+- Re-ran every check behind a DONE/shipped claim in the last 3 days, after
+  installing `brandgeo-dashboard/node_modules` fresh (absent again, as every
+  prior night). All clean, no regression: `sprint-ladder-ruling.md` (S1) 5
+  `DECIDED 2026` + 1 `DECIDED 1b`; `check-funnel-accept-path.sh` and
+  `check-contract-gate.sh` (S3) both exit 0 (yesterday's in-sandbox failure on
+  the latter was again just missing `node_modules`, not a real fault, same as
+  Day 3's note); `check-seo-audit-path.js` 23/23; `check-social-channel-override.js`
+  25/25; `check-package-client-binding.js` 9/9; `revenue_report.test.js` (S21)
+  97/97.
+- **`package_provisioning.test.js` (S10) is STILL broken, unchanged for a 3rd
+  consecutive night: 62/63, same crash on the stale
+  `.select('plan_grant_until, plan_source')` regex** against
+  `stripe-webhook.js:492`'s real 3-column select. `git log --since="2026-08-03"`
+  on both files confirms neither has been touched since Day 3's brief first
+  flagged it.
+- No network route to `getbrandgeo.com` or `app.getbrandgeo.com` (curl exit
+  56 on both) and no Stripe or Supabase MCP connector anywhere in this
+  session's tool list, so live checkout, mail-tester/DNS, GBP, and any
+  Stripe/Supabase read stay UNVERIFIABLE HERE, same as every prior night. This
+  is also why the scoreboard built tonight carries no numbers: the data half
+  of S9 was never reachable from a night session regardless of which night
+  ran it.
+- S3's registry row still reads "checkout is DOWN" (the Romanian-account
+  `STRIPE_CHECKOUT_LINKS` failure, written 2026-07-31), while `CLAUDE.md`'s
+  2026-08-02 entry states checkout was verified working end to end on the NEW
+  Spanish Stripe account, three env vars and one redeploy, no code changed.
+  The S3 row predates the account migration entirely and was never revisited
+  against it. Unresolved for 5 consecutive nights; this cycle again left the
+  row untouched since neither claim is this cycle's own check output.
+- Day 4's commits (`d39ab2e`, `6c8d84e`) were a social content pipeline (day
+  one posted across 8 platforms, TWL-style folder convention adopted under
+  `docs/growth/social/`) and the S23 registry entry (directory and
+  launch-platform registrations, opened by Constantin). No sends, DMs,
+  replies, or signups have any source in the repo; those only exist once a
+  chat is told to close the day.
+
+**What the council changed:** built `docs/growth/SPRINT-100-SCOREBOARD.md`
+rather than reporting its absence a 5th time. It has the 30 dated rows, the
+three gates, the channel EV table, and the capture rule exactly as S9
+specifies; every data cell reads `TBD`, never a guess, because this
+environment cannot reach Stripe or Supabase. Registry board marked S9
+"STRUCTURE DONE," explicitly not fully done. Day 5's plan row now carries a
+note that Gate 1 is unscorable until a day-side capture pass runs. No cadence
+or channel change: nothing has been measured yet, so no pre-agreed trigger
+applies. Logged in `SPRINT-100-PLAN-30D.md`'s revision log, COO seat.
+
+**ACTIONS FOR CONSTANTIN TODAY:**
+1. Tell any open council chat "close the day," but for all five elapsed days
+   at once: 2026-08-01 through 2026-08-05. The scoreboard skeleton now
+   exists and needs its first real numbers before Gate 1 can be scored at
+   all. Fifth morning this has topped the list.
+2. Resolve the S3 checkout conflict directly, today: confirm live whether
+   `getbrandgeo.com` checkout actually works end to end (per `CLAUDE.md`'s
+   2026-08-02 claim, new Spanish account) and update the S3 row in
+   `docs/growth/SPRINT-100-KICKOFFS-2026-07-31.md` (line 84) to say so either
+   way. Unresolved 5 nights running. If self-serve payment is actually down
+   right now, it outranks everything else in this sprint, gate or no gate.
+3. Have a day session fix `package_provisioning.test.js`'s stale
+   `.select('plan_grant_until, plan_source')` regex (now 3 columns) and get a
+   clean 63/63. Unfixed for 3 consecutive nights; S10's revert-gate proof
+   stays unverifiable until it is.
+4. `docs/ROADMAP.md` NEEDS CONSTANTIN: INV-35 (BpR, EUR 3,500) was due
+   2026-08-04; confirm whether it has been paid, since payment requires
+   BY-HAND provisioning of client 1 that nothing automatic will do.
+5. From prior days, still open: the Sentry account for S13.
+
+**Risks and unverifiables:** Gate 1 falls today and is unscorable, zero
+acquisition data exists for any of the first 5 days. Live checkout,
+mail-tester/DNS, GBP, and Netlify deploy success all stay UNVERIFIABLE HERE
+(no network egress, no Stripe/Supabase connector). S10's harness still cannot
+prove its own closed items stay closed, now for a 3rd night.
