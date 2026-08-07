@@ -1,0 +1,1 @@
+Two. Counting a blank or errored answer as a zero. In our own four city study, ChatGPT errored on all 32 prompts on the collection day. We excluded it entirely rather than record it as a dramatic result, because a missing measurement is not the same thing as an absence.
