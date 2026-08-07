@@ -1,0 +1,1 @@
+Three. Structured data in the language of the page it sits on. We found three of our own FAQPage blocks silently invalid for weeks over one missing brace.

@@ -1,0 +1,1 @@
+One. Your second language pages have to be real, fetchable URLs. Not a JavaScript switcher rewriting the same page. Two. Reciprocal hreflang tags, each language pointing at the others and at itself.

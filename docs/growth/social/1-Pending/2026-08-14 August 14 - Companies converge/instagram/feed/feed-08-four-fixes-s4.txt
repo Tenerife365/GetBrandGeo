@@ -1,0 +1,1 @@
+Four. One spelling of your own name, everywhere. Our study returned "Only You Boutique Hotel" and "Only YOU Boutique Hotel Madrid" as two separate strings from the same run.
