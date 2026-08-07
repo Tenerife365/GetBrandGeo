@@ -20,7 +20,38 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-08-02)
+## CURRENT STATE (newest entry 2026-08-07)
+
+### 2026-08-07: the homepage IS the Live Instrument page now (founder-approved swap)
+
+Full rebuild via a three-seat Fable waterfall (research, design spec, build),
+all artifacts in `docs/design/landing-rebuild-research-2026-08-07/` and
+`docs/design/landing-instrument-spec-2026-08-07.md`. Live and verified over
+HTTP at `4e698cf`. Load-bearing facts for anyone touching the homepage now:
+
+- **The hero prints REAL client data** (BpR anonymized, per Constantin's
+  ruling): 70.8% mention rate, 46/65 answers, window 2026-07-21 to
+  2026-08-07, per-engine rates pulled from `ai_results` by the orchestrator
+  and recomputed at build. Refresh procedure is in the HTML comment above
+  the card. NEVER relabel it as sample, never name the client, never show
+  the client domain.
+- `hero.js` (canvas mesh) is NO LONGER LOADED on the homepage; the new
+  interaction file is `instrument.js`. `site.js` is loaded unmodified.
+- Type system is exactly six sizes {56,32,18,15,14,12}, weight cap 600, one
+  1200px container; the fold budget is 0 red/orange, 1 green, ~6 violet.
+  Contrast verified 4.5:1+ both themes on 28 pairs.
+- Pricing CTAs are structurally pinned to one baseline (measured [5055 x5]);
+  Growth holds the section's ONLY solid violet CTA, others are ghost.
+- `index-new.html` remains on disk and live as a noindex preview alias
+  (cPanel never deletes); the pre-swap homepage is in git history at
+  `c612b02`.
+- Mode-switch and footer-grid mobile overflows are FIXED (scrollX 0 at
+  320/375/768/1440, real-scroll measured); the backlog "decision owed" entry
+  below is CLOSED by the stacked-button design.
+- Footer carries all 8 platforms incl. GBP share link (supplied 2026-08-07,
+  exists nowhere else in the repo) and Threads (@brandgeo_global).
+- Product stage (real workspace showcase) is DEFERRED by Constantin until
+  traction provides SaaS-grade data; anonymized competitors only when built.
 
 Every claim in this section was checked against the live sites, the running
 bundle, or the working tree. Not remembered. If you change something here, check
