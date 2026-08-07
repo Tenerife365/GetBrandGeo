@@ -324,3 +324,116 @@ acquisition data exists for any of the first 5 days. Live checkout,
 mail-tester/DNS, GBP, and Netlify deploy success all stay UNVERIFIABLE HERE
 (no network egress, no Stripe/Supabase connector). S10's harness still cannot
 prove its own closed items stay closed, now for a 3rd night.
+
+---
+
+## 2026-08-07, Content pipeline: Aug 10-14 pulse backfill
+
+**Not a nightly council entry.** This is a separate scheduled session (the
+daily social content pulse) recording its own work in the same file the
+brief asked it to, since no dedicated log exists for this pipeline. It makes
+no claim about the 30-day sprint's gates, glidepath, or scoreboard above and
+should not be read as one.
+
+**Task:** fill the gaps in the already-built Mon 08-10 through Fri 08-14
+runway (`docs/growth/social/1-Pending/`) across 8 platforms, per a stored
+brief. The brief cited several paths that turned out not to exist any more
+(`docs/growth/CAMPAIGN-2026-07-30/`, entirely; the claim that BG-030's
+LinkedIn bundle was already copied into the Aug 5 folder, which it was not).
+Per the brief's own instruction to trust the live filesystem over its own
+claims, the gap list was re-derived from what is actually on disk before any
+writing started, and it matched the brief's table for all five days once
+re-checked against ground truth.
+
+**What was staged, per day:**
+
+- **Mon 08-10:** instagram/feed, linkedin/feed, gbp/post (`gbp-5`, Radar),
+  x/feed. Sourced from the existing utility Reel and the unused Paris wealth
+  management finding in `bg-027.html`.
+- **Tue 08-11:** facebook/feed, instagram/feed, threads/feed (explicit
+  same-day follow-up to the Instagram post), linkedin/feed, gbp/post
+  (`gbp-6`, Growth). Sourced from the Rome restaurant finding in
+  `bg-027.html`, which is also this folder's own title.
+- **Wed 08-12:** facebook/feed, instagram/feed, x/feed, plus BG-033's full
+  four-asset LinkedIn bundle copied verbatim from
+  `docs/growth/linkedin-series-2026-08/BG-033/`.
+- **Thu 08-13:** linkedin/feed, gbp/post (`gbp-7`, Managed), x/feed.
+  facebook/feed was left out on purpose, since facebook/link already covers
+  a feed-adjacent format for this day.
+- **Fri 08-14:** the thinnest day, built out almost entirely: facebook/feed,
+  facebook/reel, instagram/feed, instagram/reel, tiktok/video,
+  youtube/shorts, BG-034's full LinkedIn bundle, gbp/post (`gbp-8`, Free,
+  closing the evergreen GBP series at 8 of 8), x/feed.
+
+**What was skipped, and why:**
+
+- **No video was actually rendered, for any of the four new video slots on
+  Aug 14.** `ffmpeg` and Pillow are both present in this container, but a
+  verified four-cut render at this runway's own established fidelity was
+  judged out of scope for one pass covering five days across eight
+  platforms. Each slot got a full `post.md` and `NOTES.md` instead (hook,
+  beat-by-beat on-screen text, sourcing, target technical spec), explicitly
+  marked not rendered, per this pipeline's own permitted fallback path. All
+  four share one script with only the hook line varied; a future render pass
+  should write an independent script per platform, matching how the rest of
+  this runway does it.
+- **The Aug 14 German bilingual video was not repurposed across the four new
+  platforms**, despite the brief offering that as an option. Its `.mp4` is
+  not present in this container: video and image files under
+  `docs/growth/social/` are gitignored, and a file rendered in an earlier
+  session that was never committed does not survive into a fresh one. This
+  session judged that repurposing an asset it cannot open or verify would be
+  asserting something unverifiable, and built new English assets aligned
+  with the day's LinkedIn bundle instead. The German caption is untouched.
+- **No static images were rendered either**, for the same gitignore and
+  ephemeral-container reason: a PNG produced this session would not survive
+  past it regardless. Every new `post.md` carries a full alt-text
+  description a render would follow, matching how this repo already treats
+  every other campaign in this pipeline, including the ones already posted
+  live (`git ls-files` on the Aug 3 Berlin folder shows only `.md`/`.txt`
+  ever committed, no image, in the folder that is already live).
+- **X thread material cited in the brief (`CAMPAIGN-2026-07-30/x/POSTS.md`,
+  "Thread B") does not exist in this repository.** All five days' X content
+  is fresh copy, sourced from `bg-027.html` and `bg-034.html`, distinct city
+  examples used across the week (Paris, Rome, Berlin, Madrid, Rome again by
+  a different finding) so no two days repeat the same named companies.
+
+**Verification run on every new file:** a small scanner
+(`scripts/social_house_style_check.js`, added this pass) checked every new
+`.md`/`.txt` for em dashes, en dashes outside digit ranges, and the banned
+word list. All new copy passed clean. The only em dashes found anywhere in
+this pass's diff are inside the internal title line of the copied BG-033 and
+BG-034 LinkedIn source files (`# BG-033 / Asset 01 — Feed post`), which is
+pre-existing content copied verbatim per the brief's own instruction and
+matches the identical pattern already live in the Aug 3 Berlin folder's own
+copied BG-028 bundle. No em dash appears in any client-facing "Post" or
+"Article body" section.
+
+**UTM convention:** every new link this pass added carries
+`utm_campaign=pulse`, kept separate from the pre-existing runway's
+`campaign2607` tag, per the brief's own instruction that this backfill layer
+should attribute separately from the runway it is filling gaps in. The
+copied LinkedIn bundles keep BG-033's and BG-034's own `utm_campaign=bg-033`
+/ `utm_campaign=bg-034` tags unchanged, since that series has its own
+established attribution scheme that predates this pass.
+
+**Still open:**
+
+1. All four Aug 14 video slots need an actual render, or a decision that
+   script-only is acceptable to post as-is (it is not, on its own, a postable
+   video asset).
+2. `gbp-8` closes the evergreen GBP series at one post per plan (`gbp-1`
+   through `gbp-8` now cover the free audit, Essentials, Growth PRO, the
+   full ladder, Radar, Growth, Managed and Free). No further plan needs a
+   first GBP post; any new GBP content from here is a second pass per plan
+   or a non-plan angle.
+3. This session made a policy call (do not repurpose an unverifiable asset)
+   rather than a factual correction. Worth a look from whoever reviews this:
+   confirm the Berlin bilingual video genuinely does not exist anywhere
+   retrievable (a prior session's local machine, if this pipeline is ever
+   moved off a purely ephemeral container) before assuming it needs a full
+   re-render from scratch.
+4. Every commit for this pass landed directly on `main` (five commits, one
+   per day, plus this entry), per the task's own instruction to commit after
+   each day rather than batch at the end. Nothing is staged unpushed as of
+   this entry; push is the next step.
