@@ -1,0 +1,13 @@
+We asked AI for a restaurant for a business dinner in Rome, once in Italian and once in English.
+
+The Italian answer: Trapizzino, Supplizio, Osteria Fratelli Mori, Glass Hostaria, Alla Bottega. Local spots, some of them casual.
+
+The English answer: La Pergola, Salumeria Roscioli, Pierluigi, Dal Bolognese, Enoteca la Torre. La Pergola alone carries three Michelin stars.
+
+Same city, same question, same day. Two different restaurants entirely, because the language you type in already picked the shortlist for you.
+
+Across the whole Rome data set, 133 companies were named and 81.2% of them showed up in only one of the two languages.
+
+If you run a business that lives or dies on which of those two lists it appears in, this is worth checking for yourself.
+
+https://getbrandgeo.com/bg-027.html?utm_source=facebook&utm_medium=feed&utm_campaign=pulse
