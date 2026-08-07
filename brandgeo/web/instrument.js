@@ -46,19 +46,27 @@
 
   /* ── Shared helpers ────────────────────────────────────────────────── */
   // Count-up ids land in the caller's bucket so one feature's cancel can
-  // never abort another feature's numerals mid-count.
+  // never abort another feature's numerals mid-count. Decimal places come
+  // from the element's data-dec attribute (the client measurement rates
+  // carry one decimal, e.g. 78.6).
   function countUp(el, target, duration, bucket) {
     if (!el) return;
+    var dec = parseInt(el.getAttribute('data-dec') || '0', 10) || 0;
     var start = null;
     var id;
     function step(ts) {
       if (!start) start = ts;
       var p = Math.min((ts - start) / duration, 1);
-      el.textContent = Math.round(p * target);
+      el.textContent = (p * target).toFixed(dec);
       if (p < 1) { id = requestAnimationFrame(step); if (bucket) bucket.push(id); }
     }
     id = requestAnimationFrame(step);
     if (bucket) bucket.push(id);
+  }
+  function finalNum(el) { return parseFloat(el.getAttribute('data-final')) || 0; }
+  function zeroText(el) {
+    var dec = parseInt(el.getAttribute('data-dec') || '0', 10) || 0;
+    return (0).toFixed(dec);
   }
   function toArray(list) { return Array.prototype.slice.call(list); }
 
@@ -80,9 +88,12 @@
     var auditBtn = document.getElementById('auditBtn');
     var bars = toArray(card.querySelectorAll('.ibar span[data-final]'));
     var pcts = toArray(card.querySelectorAll('.epn[data-final]'));
-    var DOMAIN = 'yourcompany.com';
-    var STAMP_REST = 'Illustrative figures';
-    var STAMP_RUN = 'running sample replay';
+    // The replay narrates a recorded client measurement (founder revision
+    // 2026-08-07). The typewriter must never suggest the demo input produced
+    // this card, so it types the measurement's name, not a domain.
+    var DOMAIN = 'client measurement';
+    var STAMP_REST = '2026-07-21 to 2026-08-07';
+    var STAMP_RUN = 'running replay';
     var RING_FINAL = parseFloat(ring ? ring.getAttribute('data-final-offset') : '0') || 0;
     var RING_ZERO = 213.63;
     var timers = [];
@@ -177,9 +188,9 @@
         // restore the working transitions and zeroed numerals
         bars.forEach(function (b) { b.style.transition = ''; });
         if (ring) ring.style.transition = '';
-        pcts.forEach(function (n) { n.textContent = '0'; n.style.opacity = ''; });
-        if (score) { score.textContent = '0'; score.style.opacity = ''; }
-        if (rateN) rateN.textContent = '0';
+        pcts.forEach(function (n) { n.textContent = zeroText(n); n.style.opacity = ''; });
+        if (score) { score.textContent = zeroText(score); score.style.opacity = ''; }
+        if (rateN) rateN.textContent = zeroText(rateN);
       }, 180);
 
       // Beat 0.30 to 1.00s: the run line typewrites the domain (~45ms/char,
@@ -202,7 +213,7 @@
       bars.forEach(function (b, i) {
         later(function () {
           b.style.width = b.getAttribute('data-final') + '%';
-          if (pcts[i]) countUp(pcts[i], parseInt(pcts[i].getAttribute('data-final'), 10) || 0, 800, rafIds);
+          if (pcts[i]) countUp(pcts[i], finalNum(pcts[i]), 800, rafIds);
         }, 1000 + i * 120);
       });
 
@@ -210,8 +221,8 @@
       // band pill fades in at 3.4s.
       later(function () {
         if (ring) ring.style.strokeDashoffset = RING_FINAL;
-        if (score) countUp(score, parseInt(score.getAttribute('data-final'), 10) || 0, 900, rafIds);
-        if (rateN) countUp(rateN, parseInt(rateN.getAttribute('data-final'), 10) || 0, 900, rafIds);
+        if (score) countUp(score, finalNum(score), 900, rafIds);
+        if (rateN) countUp(rateN, finalNum(rateN), 900, rafIds);
       }, 2400);
       later(function () {
         if (band) { band.style.transition = 'opacity .3s ease'; band.style.opacity = '1'; }
@@ -282,7 +293,7 @@
         b.style.transition = 'none';
         b.style.width = '0%';
       });
-      nums.forEach(function (n) { n.textContent = '0'; });
+      nums.forEach(function (n) { n.textContent = zeroText(n); });
       // force a reflow so the zero state is committed before transitions return
       void group.offsetWidth;
       bars.forEach(function (b) { b.style.transition = ''; });
@@ -294,7 +305,7 @@
             setTimeout(function () { b.style.width = b.getAttribute('data-final') + '%'; }, i * 120);
           });
           nums.forEach(function (n, i) {
-            setTimeout(function () { countUp(n, parseInt(n.getAttribute('data-final'), 10) || 0, 900, null); }, i * 120);
+            setTimeout(function () { countUp(n, finalNum(n), 900, null); }, i * 120);
           });
         });
       }, { threshold: 0.3 });
