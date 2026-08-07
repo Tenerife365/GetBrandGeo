@@ -192,7 +192,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-       DESIGN TOKENS — rebuilt 2026-07-28 from measurement, not preference.
+       DESIGN TOKENS - rebuilt 2026-07-28 from measurement, not preference.
 
        These tokens are consumed by all 79 pages in this folder, so every ratio
        below is site-wide.
@@ -207,7 +207,7 @@
 
        1. PURE WHITE ON NEAR-BLACK BLOOMS. #ffffff on #050508 is 20.9:1. Linear
           ships #e4e5e9 175 times and #ffffff 27 times. Past roughly 16:1, light
-          text haloes against a dark field — worst for the ~30% of readers with
+          text haloes against a dark field - worst for the ~30% of readers with
           astigmatism. --t is now #E8E9ED, 16.2:1, still well past AAA's 7:1.
 
        2. THE SURFACES WERE VIOLET AND THAT MUTED THE ACCENT. Old --s #0e0e17 is
@@ -242,11 +242,11 @@
           --ac2 can mean nothing but "good".
        ═══════════════════════════════════════════════════════════════════════ */
     :root {
-      /* Surfaces — near-neutral by design; see note 2 */
+      /* Surfaces - near-neutral by design; see note 2 */
       --bg:   #0a0b0e;         /* OKLCH L15.0 C0.007 */
       --s:    #101116;         /* OKLCH L17.9 C0.010 */
       --s2:   #16171e;         /* OKLCH L20.7 C0.014 */
-      /* Borders — solid, so a hairline reads the same on every layer */
+      /* Borders - solid, so a hairline reads the same on every layer */
       --bd:   #23242b;         /* 1.27:1 vs --bg */
       --bd2:  #32333c;         /* 1.57:1 vs --bg */
       /* Brand. Two values on purpose: --ac is 4.65:1 and is a FILL behind white
@@ -258,14 +258,14 @@
       --warn: #fbbf24;         /* risk / loss. 11.79:1 */
       /* Status colours for the sample report card. These were hardcoded hexes
          chosen against the dark canvas, so in light mode they measured 1.7 to
-         2.6:1 across 25 elements — every rank number, every KNOW/PARTIAL/
+         2.6:1 across 25 elements - every rank number, every KNOW/PARTIAL/
          MISSING badge and every percentage was effectively unreadable. Tokens
          now, with a light counterpart that clears AA on #f7f7fc. */
       --ok:   #34d399;         /* 10.24:1 */
       --part: #fb923c;         /*  8.70:1 */
       --bad:  #f87171;         /*  7.11:1 */
       --info: #c4b5fd;         /* 10.66:1 */
-      /* Text — solid values, measured against --bg */
+      /* Text - solid values, measured against --bg */
       --t:    #e8e9ed;         /* 16.22:1 */
       --t2:   #9ba1ac;         /*  7.58:1 */
       --t3:   #7d838f;         /*  5.17:1 on --bg, 4.69:1 on --s2, so it clears
@@ -491,7 +491,7 @@
       inset: 0;
       background-image: radial-gradient(var(--dot) 1.3px, transparent 1.3px);
       background-size: 30px 30px;
-      /* Wide, gradual vignette — fades in gently over most of its own
+      /* Wide, gradual vignette - fades in gently over most of its own
          radius instead of staying solid then cutting off, so it reads as
          atmosphere rather than a visible rectangle. */
       -webkit-mask-image: radial-gradient(ellipse 78% 72% at 50% 22%, #000 0%, transparent 92%);
@@ -546,7 +546,7 @@
     @media (prefers-reduced-motion: reduce) {
       .hero-orb, .hero-orb-2 { animation: none; }
     }
-    /* AI Knowledge Graph canvas — sits above the atmospheric orbs but below all
+    /* AI Knowledge Graph canvas - sits above the atmospheric orbs but below all
        hero content. Fades in on init so a slow first paint never flashes. */
     .hero-graph {
       position: absolute;
@@ -601,10 +601,10 @@
 
          This was tried on 2026-07-28 and reverted the same day, for two
          reasons, BOTH of which are now void:
-           1. "read as disconnected from the Geist UI around it" — the UI face
+           1. "read as disconnected from the Geist UI around it" - the UI face
               is Inter now, and a display serif over Inter is a conventional,
               well-tested pairing in a way it never was over Geist.
-           2. "the italic lockup broke across a line" — already fixed
+           2. "the italic lockup broke across a line" - already fixed
               independently; .hero h1 em is upright, see the rule below.
          If it is reverted a second time, record the reason here and stop
          re-litigating it.
@@ -1064,7 +1064,7 @@
       .preview-card { transition: none; }
     }
 
-    /* "Live" activity ticker — small floating pill, cross-fades through
+    /* "Live" activity ticker - small floating pill, cross-fades through
        illustrative example signals to reinforce this is a running system,
        not a static screenshot. */
     .live-ticker {
@@ -1539,7 +1539,7 @@
      * ──────────────────────────────────────────────────────────────────────
      */
 
-    /* Row 1 — Eyebrow (empty placeholder on non-featured cards) */
+    /* Row 1 - Eyebrow (empty placeholder on non-featured cards) */
     .plan-eyebrow {
       height: 1.3rem;           /* same height whether empty or "Most Popular" */
       display: flex;
@@ -1554,7 +1554,7 @@
       flex-shrink: 0;
     }
 
-    /* Row 2 — Plan name (min 2 lines so short names don't pull price up) */
+    /* Row 2 - Plan name (min 2 lines so short names don't pull price up) */
     .plan-name {
       font-size: 0.95rem;
       font-weight: 700;
@@ -1565,7 +1565,7 @@
       flex-shrink: 0;
     }
 
-    /* Row 3 — Price number */
+    /* Row 3 - Price number */
     .plan-price-row {
       min-height: 3.4rem;       /* matches 2.2rem font with line-height 1 + /mo */
       display: flex;
@@ -1613,7 +1613,7 @@
       margin-top: 4px;
     }
 
-    /* Row 4 — Sub-text (min 2 lines for setup-fee notes) */
+    /* Row 4 - Sub-text (min 2 lines for setup-fee notes) */
     .plan-sub-row {
       min-height: 2.8rem;       /* 0.73 × 1.45 × 2 lines = 2.12rem → round up */
       display: flex;
@@ -1629,7 +1629,7 @@
     }
     .plan-sub strong { color: var(--t); font-weight: 600; }
 
-    /* Row 5 — CTA button (consistent padding → consistent height) */
+    /* Row 5 - CTA button (consistent padding → consistent height) */
     .btn-plan {
       display: block;
       text-align: center;
@@ -1753,7 +1753,7 @@
       flex-shrink: 0;
     }
 
-    /* Row 6 — Feature section (grows to fill remaining card height) */
+    /* Row 6 - Feature section (grows to fill remaining card height) */
     .plan-features-label {
       font-size: 0.67rem;
       font-weight: 600;
@@ -1830,7 +1830,12 @@
        .section is untouched. */
     #pricing { max-width: 1300px; }
     .pricing-head { text-align: center; max-width: 640px; margin: 0 auto; }
-    #pricing h2 em { font-style: normal; background: linear-gradient(135deg, var(--ac), var(--ac2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    /* Violet to indigo, 2026-08-07, matching the hero's A2b fix. This was the
+       last gradient still running --ac into --ac2 (#34d399), the exact clash
+       the hero pass removed from the largest type on the page; the A2b note
+       explicitly recorded this rule as having "the identical problem" and left
+       it for a later pass. --ac2 keeps meaning POSITIVE and nothing else. */
+    #pricing h2 em { font-style: normal; background: linear-gradient(135deg, var(--ac), #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .hook-sub { color: var(--t2); font-size: 0.95rem; max-width: 600px; margin: 12px auto 0; line-height: 1.65; }
     .mode-switch-row { display: flex; justify-content: center; margin: 28px 0 16px; }
     .mode-switch { display: inline-flex; background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 4px; gap: 4px; max-width: 100%; }
@@ -1839,6 +1844,30 @@
     .mode-btn.active { background: var(--ac-strong); color: #fff; box-shadow: 0 3px 10px rgba(139,92,246,.32); }
     .mode-btn.active .m-sub { color: rgba(255,255,255,.8); }
     .mode-caption { text-align: center; font-size: 0.8rem; color: var(--t3); max-width: 520px; margin: 0 auto 24px; }
+    /* Below 560px the two mode buttons (measured 221px and 233px, both
+       white-space:nowrap) cannot share a row inside a 335px content column:
+       this was the cause of 123px of REAL horizontal scroll on the homepage at
+       375 CSS px (measured 2026-08-02 with an actual scroll attempt, recorded
+       in CLAUDE.md as a decision owed). Decision, 2026-08-07: STACK inside
+       each button rather than stacking the buttons. The control stays a
+       side-by-side segmented pair, which is what makes it read as a choice,
+       and each button goes column-flow (icon over label over price) with
+       wrapping allowed, so the pair fills the row edge to edge and nothing
+       can clip at any width down to 320px. Tap targets get taller, not
+       smaller, so WCAG 2.5.8 headroom improves rather than trades away. */
+    @media (max-width: 560px) {
+      .mode-switch { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+      .mode-btn {
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        white-space: normal;
+        text-align: center;
+        padding: 12px 8px;
+        min-height: 44px;
+      }
+      .mode-btn .mode-ic { margin-right: 0; }
+    }
     .pricing-grid.pricing-grid-modes { max-width: 1000px; margin: 0 auto; }
     .pricing-grid[hidden] { display: none; }
     /* Mode grids (2026-07 ladder, Radar added 2026-07-31): self-serve = 5
@@ -1850,7 +1879,7 @@
     #grid-self    { grid-template-columns: repeat(5, 1fr); max-width: 1220px; }
     #grid-managed { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
     /* the generic `.featured { grid-column: span 2 }` further down is for the old
-       3-up layout — neutralise it inside the mode grids so cards keep their column */
+       3-up layout - neutralise it inside the mode grids so cards keep their column */
     #grid-self .pricing-box.featured,
     #grid-managed .pricing-box.featured { grid-column: auto; }
     @media (max-width: 940px) {
@@ -1972,7 +2001,15 @@
       padding: 3px 10px;
       border-radius: 20px;
     }
-    @media(max-width: 720px) { .footer-grid { grid-template-columns: 1fr 1fr; } .footer-bottom { flex-direction: column; text-align: center; } }
+    /* 900px, not 720px, and the difference was 53px of real horizontal scroll
+       at 768 (measured 2026-08-02, recorded in CLAUDE.md). The five-column
+       grid's minimum content width is driven by contact@getbrandgeo.com,
+       which cannot wrap, so below roughly 900px the grid is wider than the
+       footer's content box and the whole page scrolls sideways. Collapse to
+       two columns while there is still room for five to ALMOST fit, never
+       after they have stopped fitting. */
+    @media(max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 36px 40px; } }
+    @media(max-width: 720px) { .footer-bottom { flex-direction: column; text-align: center; } }
     @media(max-width: 480px) { .footer-grid { grid-template-columns: 1fr; } }
 
     /* ── RESPONSIVE ── */
@@ -2013,7 +2050,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-       HERO REVAMP — 2026-07-28
+       HERO REVAMP - 2026-07-28
        Appended deliberately at the end of the block so these rules win on
        specificity ties without rewriting the originals above. Every change is
        scoped to the hero; nothing here touches the other 78 pages.
@@ -2174,7 +2211,7 @@
       background-clip: text;
     }
 
-    /* A3. Trust row — icons instead of middots, and it now carries the three
+    /* A3. Trust row - icons instead of middots, and it now carries the three
        friction-killers rather than a mix of proof and cost. */
     .hero-trust { gap: 10px 18px; }
     .hero-trust .ht-item { display: inline-flex; align-items: center; gap: 7px; }
@@ -2295,7 +2332,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-       MOTION SYSTEM — 2026-07-28.
+       MOTION SYSTEM - 2026-07-28.
 
        Values taken from the shipped CSS of linear.app and cursor.com, which
        were downloaded and counted, not looked at. What the count showed:
@@ -2411,7 +2448,7 @@
     <div class="hero-grid"></div>
     <div class="hero-orb"></div>
     <div class="hero-orb-2"></div>
-    <!-- Showpiece: "AI Knowledge Graph" — the 5 engines routing citation
+    <!-- Showpiece: "AI Knowledge Graph" - the 5 engines routing citation
          pulses into your brand node. Self-contained 2D canvas (no libraries,
          no build step), cursor-reactive, comfort-tuned, honours reduced-motion
          and pauses off-screen/hidden. Falls back silently to orbs+grid. -->
@@ -2624,7 +2661,7 @@
 </section>
 
 <!-- Positioned via JS (position:fixed) relative to whichever engine chip is
-     hovered/focused/tapped. Deliberately kept OUTSIDE .hero — a direct
+     hovered/focused/tapped. Deliberately kept OUTSIDE .hero - a direct
      child of .hero would get caught by the ".hero > *" content-layer rule
      above, which forces position:relative and breaks fixed positioning. -->
 <!-- Starts aria-hidden because it starts EMPTY. A role="tooltip" node with no
@@ -2726,7 +2763,7 @@
       <h2>It's not just if AI mentions you. It's how.</h2>
       <p>A brand mention isn't automatically good news. BrandGEO reads every AI response for tone (positive, neutral, or negative) so you know whether ChatGPT is recommending you or quietly warning people off.</p>
       <ul class="sentiment-points">
-        <li>Every response, across all 5 engines, is scored for sentiment, not just presence.</li>
+        <li>Every response, on every engine your plan tracks, is scored for sentiment, not just presence.</li>
         <li>See the actual language AI models use when they describe your brand.</li>
         <li>Catch a negative shift in tone before it shows up in lost customers.</li>
         <li>Compare sentiment engine-by-engine, since ChatGPT and Perplexity don't always agree.</li>
@@ -3083,8 +3120,12 @@
   </div>
 
   <!-- Trust / risk-reversal -->
+  <!-- "50+ brands audited" was removed 2026-08-07: hook-thesis-web.md §5 ruled
+       it untraceable, and the hero dropped it for that reason on 2026-07-26
+       while this copy of it survived. Replaced with a claim the page can
+       prove one scroll up: the published, citable methodology. -->
   <div class="trust-strip">
-    <span>50+ brands audited</span>
+    <span>Published methodology (DOI)</span>
     <span>No credit card to start</span>
     <span>Cancel anytime</span>
     <span>Free audit first</span>
@@ -3092,7 +3133,7 @@
 
   <!-- Fallback for the undecided -->
   <div class="fallback">
-    <p>Not sure which plan fits?<span>Get a free, no-commitment snapshot of where you stand across all 5 engines.</span></p>
+    <p>Not sure which plan fits?<span>Get a free, no-commitment snapshot of where you stand across the AI engines your customers actually ask.</span></p>
     <a href="#contact" class="btn-snapshot">Get my free AI Visibility Snapshot &rarr;</a>
   </div>
 
@@ -3394,7 +3435,10 @@
     </div>
   </div>
 </div>
-<script src="site.js?v=2026-07-31a"></script>
+<!-- Bumped to 2026-08-07a: Jamie's greeting no longer names retired Meta AI.
+     Without the bump a returning visitor keeps the cached script and the stale
+     engine claim through launch day. -->
+<script src="site.js?v=2026-08-07a"></script>
 <!-- Hero canvas + card tilt. External on purpose: the CSP in .htaccess has no
      'unsafe-inline' in script-src, so an inline block here is silently refused
      and the hero renders motionless. See the header of hero.js. -->

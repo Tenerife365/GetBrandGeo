@@ -573,7 +573,7 @@
 
   // Mouse-reactive parallax tilt on the "what you get" preview card.
   // Desktop pointer devices only (hover + fine pointer), and only if the
-  // user hasn't asked for reduced motion — touch devices and reduced-motion
+  // user hasn't asked for reduced motion - touch devices and reduced-motion
   // users keep the static CSS tilt (perspective(1000px) rotateX(3deg)).
   var tiltCard = document.querySelector('.preview-card');
   var tiltWrap = document.querySelector('.preview-wrap');
@@ -599,11 +599,11 @@
   // happened to the visitor reading them, and it was a tenth competing element
   // in a three-second window. docs/design/homepage-hook.md §3.5.
 
-  // Engine chip tooltips (hero, index.html only) — hover (desktop) or tap
+  // Engine chip tooltips (hero, index.html only) - hover (desktop) or tap
   // (touch/keyboard) reveals a short, clearly-labelled illustrative example
   // of how that engine's mentions read. This is representative example
   // content, the same convention already used by the sentiment quotes and
-  // the "live" ticker elsewhere on this page — not a live claim about the
+  // the "live" ticker elsewhere on this page - not a live claim about the
   // visitor's own brand, which is why every tooltip is prefixed "Example ...
   // mention style".
   var engineChips = document.querySelectorAll('.engine-chip');
@@ -659,7 +659,7 @@
       chip.setAttribute('aria-expanded', 'true');
       chip.setAttribute('aria-describedby', 'engineTooltip');
       // getBoundingClientRect() forces a synchronous layout, so the size we
-      // read back here already reflects the innerHTML set just above —
+      // read back here already reflects the innerHTML set just above -
       // no need to wait a frame (and waiting was actually fragile: rAF is
       // throttled/paused in backgrounded or non-visible tabs).
       positionTooltip(chip);
@@ -983,7 +983,7 @@
   // Shows one 3-card grid at a time so the pricing section isn't a wall of 6
   // cards. Reuses the existing billing toggle above (which sets display on
   // ALL .billing-monthly/.billing-yearly globally), so the newly-shown grid
-  // already reflects the current monthly/yearly state — no extra wiring.
+  // already reflects the current monthly/yearly state - no extra wiring.
   var modeBtns = document.querySelectorAll('.mode-btn[data-mode]');
   var gridSelf = document.getElementById('grid-self');
   var gridManaged = document.getElementById('grid-managed');
@@ -1015,7 +1015,7 @@
   // ~59 static HTML files, we progressively enhance the shared nav here:
   // wrap the text links in a drawer, inject a toggle button + scoped CSS,
   // then reveal the drawer as a dropdown on mobile. Desktop layout is
-  // untouched — the drawer uses display:contents, so it has no box of its
+  // untouched - the drawer uses display:contents, so it has no box of its
   // own and its links keep behaving as direct flex children of the nav row.
   (function() {
     var nav = document.querySelector('nav');
@@ -1163,7 +1163,11 @@ var JAMIE_RETIRED = false;
   var TIMEOUT_MS = 22000;
   var SESSION_MSG_CAP = 30; // soft client-side cap; the server enforces the real one
 
-  var WELCOME = "Hi, I'm Jamie, BrandGEO's assistant. I can show you how your brand appears across ChatGPT, Gemini, Claude, Perplexity and Meta AI, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
+  // Engine list corrected 2026-08-07: this greeting still named Meta AI, which
+  // planConfig.ts records as RETIRED 2026-07-16, and omitted Google AI Mode,
+  // Google AI Overviews and Grok, all live. Named engines here must track
+  // LIVE_ENGINES in brandgeo-dashboard/src/lib/planConfig.ts, never memory.
+  var WELCOME = "Hi, I'm Jamie, BrandGEO's assistant. I can show you how your brand appears across up to seven AI engines, from ChatGPT, Gemini and Claude to Grok and Google AI Overviews, walk you through pricing, run a free audit, or connect you with our team. What can I help with?";
   var OPENING_CHIPS = [
     { label: '💶 See pricing',       send: 'What does BrandGEO cost?' },
     { label: '🔍 Run a free audit',  send: 'I want to run a free audit.' },
@@ -1185,7 +1189,7 @@ var JAMIE_RETIRED = false;
   function scrollDown(){ if (msgs) msgs.scrollTop = msgs.scrollHeight; }
 
   // Strip the markdown the model can still emit (bold, inline code, headings,
-  // bullet markers) — the chat bubble renders plain text (white-space:pre-wrap),
+  // bullet markers) - the chat bubble renders plain text (white-space:pre-wrap),
   // so raw ** / # / - would otherwise show as literal symbols. Line breaks are
   // preserved; bullets collapse to a clean "• ".
   function tidyMarkdown(text){
@@ -1301,7 +1305,7 @@ var JAMIE_RETIRED = false;
   }
 
   // Supportive, actionable fallback when the assistant can't answer (offline,
-  // timeout, error). Never dead-ends the visitor — offers the core paths right
+  // timeout, error). Never dead-ends the visitor - offers the core paths right
   // in the widget so they can still run the free audit, see pricing, or reach a
   // human without leaving the page.
   function fallbackHelp(){
