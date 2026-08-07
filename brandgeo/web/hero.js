@@ -3,7 +3,7 @@
 
    WHY THIS IS AN EXTERNAL FILE AND MUST STAY ONE:
    brandgeo/web/.htaccess sends
-     script-src 'self' https://plausible.io https://www.googletagmanager.com
+     script-src 'self' https://www.googletagmanager.com https://app.askmywebsiteai.com
    with NO 'unsafe-inline'. Any <script> written inline in index.html is
    silently refused by the browser. It does not throw, it does not reach
    window.onerror, and devtools shows nothing, so the page renders its full

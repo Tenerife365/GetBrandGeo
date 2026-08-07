@@ -17,7 +17,10 @@
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 
   # Content Security Policy
-  # - Plausible analytics (plausible.io)
+  # - Plausible was removed 2026-08-02 (subscription lapsed) and plausible.io is
+  #   deliberately NOT in script-src or connect-src any more. Re-adding the
+  #   allowlist entry without re-adding the tag buys nothing and widens the
+  #   policy; if Plausible ever comes back, both change together.
   # - Google Analytics / GA4 (googletagmanager.com loader; google-analytics.com
   #   and its regional subdomains for the actual hit-collection endpoint —
   #   without these, gtag.js loads but every hit is silently blocked)
@@ -36,7 +39,7 @@
   # back to the same origin it was served from, and can open an iframe, hence
   # the entry in five directives. No wss: needed, it uses plain fetch. Note a
   # wildcard would NOT cover the apex, so the host is listed literally.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io https://www.googletagmanager.com https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://app.getbrandgeo.com https://plausible.io https://formsubmit.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://app.askmywebsiteai.com; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://app.getbrandgeo.com https://formsubmit.co https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://app.askmywebsiteai.com; form-action https://formsubmit.co 'self'; frame-ancestors 'none'"
 </IfModule>
 
 # ─── Force HTTPS ───────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@
  * you get is the four lines above.
  *
  * CSP NOTE, load-bearing. getbrandgeo.com serves
- *   script-src 'self' https://plausible.io https://www.googletagmanager.com
+ *   script-src 'self' https://www.googletagmanager.com https://app.askmywebsiteai.com
  * with NO 'unsafe-inline', so every line of this has to live in an external file
  * and an inline script tag would fail silently. style-src does carry
  * 'unsafe-inline', which is why the injected style element below works.
