@@ -13,6 +13,31 @@ Tags: `night-safe` (see AUTONOMY §3 for the four conditions), `day-only`,
 
 Nothing here blocks the loop. It works around these.
 
+- **THE cPANEL DEPLOY NEVER DELETES, and this is the general finding, not the
+  one file.** `plausible-init.js` was removed from git in `1b9bd24` and still
+  returns **HTTP 200** at `https://getbrandgeo.com/plausible-init.js`.
+  `brandgeo/web/deploy.php` copies changed files out of the webhook payload; it
+  has no removal path, so **every file ever deleted from `brandgeo/web/` is
+  still being served.** Nothing references this one any more so it is inert, but
+  the class is not: a page or asset that was deliberately withdrawn is still
+  publicly fetchable, which is the same shape as the "files never meant to be
+  public are live in the docroot" item under Live exposure.
+  1. Delete `plausible-init.js` from the cPanel docroot by hand (File Manager,
+     `public_html/plausible-init.js`).
+  2. Worth a sweep: compare the docroot listing against `git ls-files
+     brandgeo/web` and see what else outlived its deletion.
+  `check: test "$(curl -s -o /dev/null -w '%{http_code}' https://getbrandgeo.com/plausible-init.js)" = "404"`
+
+- **Plausible is gone as of 2026-08-02 (subscription lapsed), so Google
+  Analytics is the only analytics and it is consent-gated.** Consequence worth
+  pricing before it surprises anyone: every visitor who declines the banner is
+  now counted **nowhere**. Plausible was the cookieless tool that measured them
+  regardless, so total traffic figures will drop by whatever share declines,
+  and that drop is measurement, not demand. `privacy.html` and `cookies.html`
+  were corrected in the same commit and no longer describe a processor that
+  does not run.
+  `check: test "$(curl -s https://getbrandgeo.com/ | grep -c plausible.io)" = "0"`
+
 - **Old Stripe account close-out. Every step is a Dashboard click, PROVEN, not
   assumed: the CLI's restricted key returned "does not have the required
   permissions" on a real `payment_links update` attempt, 2026-08-02.** Account
