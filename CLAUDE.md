@@ -20,7 +20,94 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-08-07)
+## CURRENT STATE (newest entry 2026-08-13)
+
+### 2026-08-13: INV-35 PAID, GTM team created, five rulings made
+
+**BpR's EUR 3,500 invoice is PAID** (confirmed by Constantin 2026-08-13). The
+hand-provisioning runbook had NOT run at the time of writing: client 1 is
+`growth_pro` but `plan_source` and `plan_grant_until` are still null. Exact SQL
+is in `docs/growth/sprint17/PLAN-2026-08-13.md` section 6. Still owed from the
+same handoff: the invoice promises 4 social channels against
+`PLAN_SOCIAL_CHANNEL_LIMIT.growth_pro = 3`; catalogue descriptions still say
+"five engines" for a 7-engine tier; `statement_descriptor_prefix` is null.
+
+**Constantin's rulings on the audit's five open decisions:**
+1. Homepage motion: delegated to a new GTM team. Sprint working assumption is
+   self-serve owns the homepage for 17 days, with `get-found-online.html` given
+   a nav route; reversible after day 17 (PLAN section 8).
+2. ChatGPT in the free audit: **NO**, on cost. Note recorded for a future
+   revisit: the ruling used EUR 0.108/check, production has since measured
+   EUR 0.0615/check (`_cost.js:383-391`), so the real cost is ~EUR 0.25/audit.
+3. Auto-refresh: **weekly, ruled better for delivered value.** SEQUENCING TRAP,
+   do not reverse: `_enqueue.js:138-152` force-deletes on scheduled runs, so the
+   history fix must ship BEFORE the cadence backfill or every client's trend is
+   wiped weekly. Order and the research-row exclusion are in PLAN section 7.
+4. Analytics: Plausible stays OFF, its history to be synced in a dedicated
+   growth session; GA4 `G-9H6C2NSYPH` is the live (consent-gated) instrument.
+5. Pricing surface: recommendation issued, awaiting sign-off. Show 3 cards
+   (Free, Radar EUR 29, Growth EUR 299), hide Essentials EUR 99 (worst
+   positioned, loses to Peec EUR 85), fix Radar with honest engine naming and
+   outcome-worded cards rather than a price change. PLAN section 5.
+
+**New GTM strike team**, constitution `docs/growth/GTM-TEAM.md`, seats
+`.claude/agents/gtm-{lead,analyst,demand,outbound,content,conversion,verify}.md`.
+Governing rule: a seat is judged only on whether it reduced the steps between an
+asset and it being live; nothing is "done" until `gtm-verify` confirms it
+externally. Agents may never create accounts, post, send, or submit; the last
+mile is Constantin or the auto-poster.
+
+**The 17-day goal was restated after arithmetic** (`PLAN` section 1): 100 PAID
+self-serve subs needs roughly 100,000 visitors against a measured baseline of 8
+audits in 38 days, a 30x to 100x gap. Committed instead: G1 revenue EUR 2,900
+MRR-equivalent (same money, via the founder-led motion that actually closes),
+G2 100 activated free accounts (stretch), G3 three channels firing daily by day
+7 and still firing on day 17 (non-negotiable, the thing that has never been true).
+
+### 2026-08-13: five-seat product-status audit (why it went quiet), read-only
+
+Five parallel audit seats measured the funnel, landing page, positioning and
+pricing, activation, and GTM against production. Master synthesis:
+`docs/audit/product-status-audit-2026-08-13.md`. Seat evidence:
+`docs/audit/funnel-data-2026-08-13.md`,
+`docs/audit/landing-page-audit-2026-08-13.md`,
+`docs/strategy/positioning-pricing-audit-2026-08-13.md`,
+`docs/audit/activation-audit-2026-08-13.md`,
+`docs/audit/gtm-channel-audit-2026-08-13.md`. All uncommitted; nothing else
+was written or changed.
+
+**Diagnosis: the inputs stopped, the market never said no.** All-time measured:
+8 real public audits (the week-2 spike of 54 was an internal batch), ~5
+self-serve signups, 1 customer-triggered collection ever, 0 organic checkout
+intents, EUR 1.00 collected (founder test) vs EUR 37.12 API cost. Early
+"interest" = founder pushes + hand onboarding; every input stopped Aug 2-7
+(last signup 08-02, last social post 08-03, last commit 08-07, Plausible
+removed 08-07). No always-on channel has ever run: outbound domain
+trybrandgeo.com NXDOMAIN (never registered), 2 of 10 directories live, 9
+staged social day-folders expired unposted, no X account.
+
+**Refuted stale beliefs (stop re-deriving):** Growth PRO HAS self-serve
+checkout (`_terms_gate.js:141`, backlog entry stale); Radar IS on the homepage
+pricing section; the free-tier billing error never hit a real customer and the
+Free=Gemini fix is deployed; the mobile horizontal scroll is fixed; Otterly no
+longer 403s; live dashboard bundle = repo (nothing newer than 4b67a8d to
+deploy); site analytics is not fully dark, GA4 `G-9H6C2NSYPH` runs consent
+gated but Plausible's removal broke the everyone-measured design.
+
+**Live delivery gaps found:** refresh_cadence backfill never ran (36 of 38
+clients manual, the weekly refresh paid tiers advertise is not delivered,
+monthly free refresh has fired 0 times); scheduled refreshes FORCE-DELETE
+prior ai_results (proven on client 52), so no trend ever accumulates; enqueue
+blocks are console-only, invisible to users; no lifecycle email exists; BpR
+INV-35 (EUR 3,500) payment state unknowable from the DB (webhook lacks
+invoice.paid), needs a Stripe Dashboard check + the provisioning runbook.
+
+**Decisions owed (only Constantin):** which motion owns the homepage (the
+2026-07-18 GTM ruling made done-for-you primary, homepage sells self-serve and
+links get-found-online.html 0 times); ChatGPT in the free screening audit at
+~EUR 0.43/audit; cadence backfill vs pulling the weekly claim; analytics stack
+(reactivate Plausible or GA4+consoles); collapse visible pricing to 3 cards.
+Full ranked plan in the synthesis §5.
 
 ### 2026-08-07: the homepage IS the Live Instrument page now (founder-approved swap)
 
