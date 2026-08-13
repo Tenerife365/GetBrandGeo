@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-041: How Many AI Engines Does a GEO Tool Actually Need to Cover? | BrandGEO Research&trade;</title>
+  <meta name="description" content="Rankscale claims 17+ AI engines, Evertune names 9, AthenaHQ includes all 8 of its engines at every tier. A comparison of named engine coverage across GEO vendors, and why the count alone is a poor buying signal.">
+  <meta name="keywords" content="how many AI engines to track, GEO tool engine coverage, which AI platforms to monitor, AthenaHQ vs Rankscale, GEO vendor engine comparison, AI visibility engine count">
+  <meta property="og:title" content="How Many AI Engines Does a GEO Tool Actually Need to Cover?: BrandGEO Research&trade;">
+  <meta property="og:description" content="A bigger engine count is not more useful if half of it sits behind an upsell tier. Rankscale's 17+, Evertune's 9, AthenaHQ's 8-with-no-paywall, and what actually decides which of them matters for your prompts.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/og/og-bg-041.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-041.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-041.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/og/og-bg-041.png">
+  <meta property="article:published_time" content="2026-08-13">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "How Many AI Engines Does a GEO Tool Actually Need to Cover?",
+  "description": "A comparison of named AI-engine coverage across GEO monitoring vendors, arguing that engine count should be matched to a buyer's actual prompt mix rather than treated as a standalone quality signal.",
+  "datePublished": "2026-08-13",
+  "dateModified": "2026-08-13",
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://getbrandgeo.com/bg-041.html"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "BrandGEO Research"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "BrandGEO",
+    "url": "https://getbrandgeo.com"
+  },
+  "about": [
+    "Generative Engine Optimization",
+    "AI Visibility Monitoring",
+    "SaaS Buying Guide",
+    "Competitive Analysis"
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does a GEO tool with more named engines give better coverage?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not automatically. Rankscale names 17 or more engines, the broadest count found in this research pass, but engine coverage only matters for the engines your actual buyers use. A tool naming fewer engines, all genuinely included at your price tier, can be more useful in practice than a tool naming many with half of them gated behind an upsell."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which AI engines should a small business actually prioritize tracking?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The ones your buyers actually ask questions in, which is a smaller list than any vendor's full named count. Start with the two or three engines that dominate your category's search behavior, then check whether the tool you are considering includes those specific engines at the tier you can afford, rather than counting the vendor's total."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Claude worth tracking in a GEO tool?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It depends on your goals. Claude cites a source in only 55% of its responses, well below ChatGPT's 96%, per Muck Rack's citation study covered in full in BG-035. That does not mean Claude is worthless to track, it means the ceiling on how often you can even appear cited there is structurally lower, which should factor into how much weight you put on a Claude-specific gap."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the difference between AthenaHQ's approach and Rankscale's to engine coverage?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AthenaHQ includes all 8 of its named engines at every price tier, including its entry tier, and leads with that as its core pitch. Rankscale names a much broader 17-plus but prices per engine on a credit system, so its effective coverage at any given budget depends on how the credits are spent, not on the headline number."
+      }
+    }
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://getbrandgeo.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Research",
+      "item": "https://getbrandgeo.com/blog.html"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "BG-041",
+      "item": "https://getbrandgeo.com/bg-041.html"
+    }
+  ]
+}
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #0a0a0f; --surface: #13131a; --border: #22223a; --accent: #6c63ff; --accent2: #00d4aa; --text: #e8e8f0; --muted: #8888aa; --radius: 12px; }
+    [data-theme="light"] { --bg: #f5f5fa; --surface: #ffffff; --border: #dddde8; --text: #0a0a1e; --muted: #666688; }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; flex-wrap: wrap; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    [data-theme="light"] .article-body p, [data-theme="light"] .article-body li { color: #33334d; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+    .article-body a { color: var(--accent2); text-decoration: none; border-bottom: 1px solid rgba(0,212,170,.35); }
+    .article-body a:hover { border-bottom-color: var(--accent2); }
+    .article-body code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; font-family: 'Cascadia Code', Consolas, monospace; color: var(--accent2); }
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p + p { margin-top: 12px; }
+    .callout a { color: var(--accent2); }
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    [data-theme="light"] .compare-table td { color: #33334d; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing: the header lockup is also `nav a`, so
+         without the guard the mark and wordmark vanish on every phone. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      /* Measured at 375 CSS px: hiding the text links is not enough on its
+         own. The lockup alone is 177px and the CTA group 167px, which is
+         384px of content in a 360px viewport, so the page scrolls sideways.
+         Every existing article on this site does exactly that (bg-026 scrolls
+         146px, bg-019 scrolls 428px). Shrinking the three surviving elements
+         is what takes it to zero. */
+      .logo img { height: 28px !important; }
+      .logo-text { font-size: 1.05rem; }
+      .nav-cta { margin-left: 12px; padding: 7px 14px; font-size: 0.88rem; white-space: nowrap; }
+      .theme-toggle { margin-left: 8px; width: 32px; height: 32px; }
+      .article-header, .article-body, .findings-bar { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- GA4 loads from ga4-init.js ONLY after consent. Do not add a raw
+       googletagmanager gtag tag here; that is what 399723c removed site wide. -->
+  <script src="/ga4-init.js?v=20260801"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/news/">News</a>
+    <!-- "Free test", not "Test my website free". The long label was measured
+         overflowing the nav by 46px at 375 CSS px: below 640 the other nav
+         links are hidden, but the logo, the CTA and the theme toggle still
+         have to fit, and the long label does not. The in-body CTA buttons
+         keep the full wording, where there is room for it. -->
+    <a href="/#free-audit" class="nav-cta">Free test</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-041</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research&trade;</span>
+    <span class="badge-id">BG-041</span>
+    <span class="badge-tag">Competitive Landscape</span>
+    <span class="badge-tag">Engine Coverage</span>
+    <span class="badge-tag">Buyer Guide</span>
+  </div>
+  <h1>How Many AI Engines Does a GEO Tool <em>Actually Need</em> to Cover?</h1>
+  <p class="article-subtitle">Rankscale names 17 or more. Evertune names 9. AthenaHQ includes 8 with no upsell. A bigger number on a pricing page is not automatically more useful once you check which of those engines are actually included at the tier you would buy.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">August 13, 2026</span>
+    <span class="meta-item">6 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-041</strong></span>
+  </div>
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">&#9679; Key findings: BG-041</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">17+</div>
+        <div class="finding-desc">the broadest named engine count in the category, claimed by Rankscale</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">8</div>
+        <div class="finding-desc">engines AthenaHQ includes at every price tier with no paywalling, its central pricing argument</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">55%</div>
+        <div class="finding-desc">of responses in which Claude cites a source at all, per Muck Rack's study, versus ChatGPT's 96%</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">4</div>
+        <div class="finding-desc">core engines actually included in Otterly.AI's headline-priced Standard plan, with 3 more sold as add-ons</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+  <p>Every GEO vendor's homepage leads with a number: how many AI engines it tracks. Rankscale says 17 or more. Evertune names 9. AthenaHQ says 8. Peec AI says 6, at every tier. Otterly.AI says 4, with three more available separately. Treated as a single ranking criterion, that number is close to useless, because it tells you nothing about whether the engines that matter to your business are actually among them, or whether they are included in the plan you would actually buy.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was researched</div>
+    <p>Live research pass, <strong>13 August 2026</strong>. Engine counts and tier structures are drawn from each vendor's own current pricing and feature pages. Where a vendor's named count is a marketing claim rather than an independently verifiable figure, such as Rankscale's "17+", that is noted as the vendor's own claim rather than confirmed here directly.</p>
+  </div>
+
+  <h2>The named-engine count, compared</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Vendor</th><th>Named engines</th><th>Gating at entry tier</th></tr></thead>
+    <tbody>
+      <tr><td>Rankscale</td><td>17+ claimed, the broadest in this pass</td><td>Credit-based, cost per engine varies (AI Mode checks run 0.25 credits each)</td></tr>
+      <tr><td>Evertune</td><td>9 named: ChatGPT, AI Overview, AI Mode, Gemini, Claude, Perplexity, Meta, DeepSeek, Copilot</td><td>Prices by prompt volume rather than by engine, enterprise-only</td></tr>
+      <tr><td>AthenaHQ</td><td>8, from day one</td><td>All 8 included at every tier, including the $95/month intro rate, no engine paywalling</td></tr>
+      <tr><td>Scrunch AI</td><td>7: ChatGPT, Gemini, Perplexity, Claude, Meta AI, Google AI Mode, Google AI Overviews</td><td>Core tier at $250/month includes 4; full 7 requires a higher tier</td></tr>
+      <tr><td>Waikay</td><td>6, across 47 languages</td><td>Included from its $19.95/month entry price</td></tr>
+      <tr><td>Peec AI</td><td>6, at every tier per its own pricing page</td><td>All 6 listed at the $95/month Starter tier</td></tr>
+      <tr><td>Otterly.AI</td><td>4 core engines included; Gemini, Google AI Mode and Claude are separate paid add-ons</td><td>Add-ons range $9 to $439/month depending on plan</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>A bigger number can be a smaller number wearing a bigger number's clothes</h2>
+
+  <p>The clearest contrast in this table is AthenaHQ against Rankscale. AthenaHQ names fewer engines, 8 against Rankscale's 17-plus, but leads its entire pricing argument on the fact that all 8 are included at every tier with no paywalling, down to its $95 introductory rate. Rankscale's broader count is real on paper, but its credit-based pricing means the engines you can actually afford to check depends on how your credits are spent that month, not on the number printed on the homepage. Whether that trade favors you depends entirely on whether you would rather have narrower guaranteed coverage or broader theoretical coverage you have to budget carefully to use.</p>
+
+  <p>Otterly.AI is the sharpest version of this pattern. Its headline plans include 4 core engines: ChatGPT, Google AI Overviews, Perplexity and Microsoft Copilot. Gemini, Google AI Mode and Claude, three engines most buyers assume are simply part of "AI visibility monitoring" in 2026, are each separate paid add-ons. <a href="/bg-036.html">Our full pricing breakdown</a> covers what that does to the real monthly cost. The relevant point here is narrower: the "4" in Otterly's own coverage table is the number that actually matters when you are deciding whether a tool covers your prompt mix, not whatever total gets implied by the category.</p>
+
+  <h2>What each vendor's pitch reveals about its own bet</h2>
+
+  <p>The way a vendor structures its gating is itself a signal worth reading. Scrunch AI's Core tier, at $250 a month, includes 4 of its 7 named engines; the remaining 3, including its full Claude tracking, sit behind a higher tier that also unlocks its Agent Experience Platform. That is a deliberate upsell ladder, not an oversight, and it means the marketing page's "7 engines" is really "4 engines, plus 3 more if you pay for a different product entirely." Evertune takes a different approach again: it prices by prompt volume, 100,000 prompts a month on its published Pro tier, rather than by engine count at all, so its 9 named engines are effectively "however many of the 9 your prompt budget touches" rather than a fixed included set.</p>
+
+  <p>AthenaHQ's decision to include all 8 of its engines at every tier, with no separate unlock, is the outlier in this group precisely because it removes that ladder entirely. It is also the smallest of the venture-backed names by funding, which suggests the no-paywall structure is a deliberate positioning choice against the rest of the field's gating, not simply a smaller company doing less. Whether that trade makes sense for you depends on whether you would rather pay one flat price for guaranteed access to everything, or pay less up front and add engines only as you confirm you need them.</p>
+
+  <h2>Match the count to your actual prompt mix, not the vendor's</h2>
+
+  <p>The engines are not interchangeable once you are inside them, either. Claude cites a source in only 55% of its responses, against ChatGPT's 96% and Gemini's 82%, per Muck Rack's 25-million-link study covered in full in <a href="/bg-035.html">our map of disclosed AI citation research</a>. That is not a reason to skip tracking Claude. It is a reason to weight what you find there differently: a low Claude citation count for your brand may simply reflect that Claude rarely cites anyone, not that you have a specific visibility gap to fix. A tool that tracks Claude without telling you this context is handing you a number without the frame you need to read it.</p>
+
+  <p>The practical version of this advice is unglamorous but does the actual work: before comparing vendors on their named engine count, write down which two or three engines your own buyers are most likely to be asking questions in, based on what you know about your customer base and industry. Check whether each candidate vendor includes those specific engines, at the specific tier you would pay for, before the total count enters the decision at all. A tool with 6 engines that includes the 3 that matter to you beats a tool with 17 where those 3 sit behind an upsell you have not budgeted for.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">The rule this gives you</div>
+    <p>Engine count is a headline, not a spec. Check three things before it: which specific engines are included at the tier you can afford, whether any of them are metered differently than the rest (Claude checks running up to 8 times the base credit rate on some platforms), and whether the engines your actual buyers use are among them at all. A smaller, fully included set beats a bigger, partially gated one almost every time.</p>
+  </div>
+
+  <div class="findings-label" style="margin:48px 0 16px;">&#9679; Related research</div>
+  <div class="related-grid">
+    <a href="/bg-035.html" class="related-card">
+      <div class="related-id">BG-035</div>
+      <div class="related-title">The Complete Map of AI Citation Research in 2026</div>
+      <div class="related-hook">Five disclosed studies, side by side, and the one myth-bust clean enough to build a rule around.</div>
+    </a>
+    <a href="/bg-036.html" class="related-card">
+      <div class="related-id">BG-036</div>
+      <div class="related-title">The Real GEO Tool Buyer's Guide: 13 Vendors, Actual Pricing, and the Costs Nobody Puts in the Headline</div>
+      <div class="related-hook">Where the SparkToro consistency finding first showed up in this batch, as one data point among several.</div>
+    </a>
+    <a href="/bg-040.html" class="related-card">
+      <div class="related-id">BG-040</div>
+      <div class="related-title">Is GEO Just SEO With a New Name?</div>
+      <div class="related-hook">What nine legacy SEO platforms actually built on top of the keyword and rank-tracking infrastructure they already had.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>See your own number, not someone else's case study</h3>
+    <p>Run your domain through the same engines this research covers. You get the answer on screen, with the method disclosed, in about a minute. No signup and no card.</p>
+    <a href="/#free-audit" class="btn-primary">Test my website free</a>
+    <a href="/#pricing" class="btn-secondary">See plans from &euro;0</a>
+    <p class="cta-note">No signup and no card for the test. The free plan stays free after it.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO &nbsp;&middot;&nbsp; <a href="/">getbrandgeo.com</a></span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">Research</a>
+      <a href="/news/">News</a>
+      <a href="/privacy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/site.js"></script>
+</body>
+</html>

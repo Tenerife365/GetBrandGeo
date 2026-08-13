@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BG-053: How to Read Your Own Brand's AI Answers Like an Auditor | BrandGEO Research&trade;</title>
+  <meta name="description" content="A step-by-step method for auditing your own brand's AI visibility by hand: which prompts to run, what to check for accuracy and sentiment, and why a single run is close to meaningless.">
+  <meta name="keywords" content="how to check AI visibility, audit my brand in ChatGPT, AI visibility self-check, how to check if AI mentions my brand, AI brand audit method, check brand accuracy in AI answers">
+  <meta property="og:title" content="How to Read Your Own Brand's AI Answers Like an Auditor: BrandGEO Research&trade;">
+  <meta property="og:description" content="Ask the category question, not your brand name. Check whether you're cited or just named. Check whether the facts are right. Then do it again tomorrow, because one run tells you almost nothing.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="https://getbrandgeo.com/images/og/og-bg-053.png">
+  <meta property="og:url" content="https://getbrandgeo.com/bg-053.html">
+  <link rel="canonical" href="https://getbrandgeo.com/bg-053.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getbrandgeo.com/images/og/og-bg-053.png">
+  <meta property="article:published_time" content="2026-08-13">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0b0e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7fc">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "How to Read Your Own Brand's AI Answers Like an Auditor",
+  "description": "A practical, tool-free methodology for manually auditing a brand's presence in AI engine answers, covering prompt construction, accuracy checking, and run-to-run consistency.",
+  "datePublished": "2026-08-13",
+  "dateModified": "2026-08-13",
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://getbrandgeo.com/bg-053.html"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "BrandGEO Research"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "BrandGEO",
+    "url": "https://getbrandgeo.com"
+  },
+  "about": [
+    "AI Visibility Measurement",
+    "Practical Methodology",
+    "Brand Risk",
+    "Generative Engine Optimization"
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How many times should I run the same prompt before I trust the result?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "More than once, ideally spread across two or three separate days rather than run back to back. SparkToro's study found less than a 1-in-100 chance an AI platform returns the same brand list twice for an identical question, covered in full in BG-037, so a single run is closer to one roll of a die than a measurement."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Should I ask the AI about my brand by name?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, but not only that. Asking about your brand by name tests recognition, which almost anything with a website clears. Asking the category question a real buyer would type, with no brand name in it, tests recommendation, which is the harder and more useful bar. Run both and compare what each one actually shows you."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What if the AI mentions me but the facts are wrong?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Treat that as a real finding, not a minor detail. The BBC's own testing found 45 to 51% of AI answers about its news content had significant issues, including altered or fabricated quotes, covered in BG-046. A brand mentioned with a wrong fact attached is a different and often more damaging outcome than a brand that isn't mentioned at all, and two live lawsuits covered in BG-047 show what an uncaught version of this can cost."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How often should I repeat this audit?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On a regular schedule rather than once and never again. The value of this method comes from tracking direction over time, not from a single snapshot. Repeating it monthly, or whenever you publish something you'd expect to change your visibility, is enough to tell whether things are actually moving."
+      }
+    }
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://getbrandgeo.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Research",
+      "item": "https://getbrandgeo.com/blog.html"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "BG-053",
+      "item": "https://getbrandgeo.com/bg-053.html"
+    }
+  ]
+}
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #0a0a0f; --surface: #13131a; --border: #22223a; --accent: #6c63ff; --accent2: #00d4aa; --text: #e8e8f0; --muted: #8888aa; --radius: 12px; }
+    [data-theme="light"] { --bg: #f5f5fa; --surface: #ffffff; --border: #dddde8; --text: #0a0a1e; --muted: #666688; }
+    [data-theme="light"] nav { background: rgba(245,245,250,0.92); }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; transition: background .3s, color .3s; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+    .logo-text .brand { color: var(--text); }
+    .logo-text .geo { background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; margin-left: 32px; transition: color .2s; }
+    nav a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 20px; border-radius: 8px; font-weight: 600; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; transition: border-color .2s, color .2s; margin-left: 16px; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .article-header { max-width: 820px; margin: 0 auto; padding: 64px 40px 48px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 32px; flex-wrap: wrap; }
+    .breadcrumb a { color: var(--muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb-sep { color: var(--border); }
+    .article-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .badge-research { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--accent); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .badge-id { font-size: 0.78rem; font-weight: 700; color: var(--accent2); border: 1px solid rgba(0,212,170,.25); padding: 5px 14px; border-radius: 20px; }
+    .badge-tag { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; }
+    .article-header h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.15; letter-spacing: -1px; margin-bottom: 20px; }
+    .article-header h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .article-subtitle { font-size: 1.2rem; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+    .article-meta { display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .meta-item { font-size: 0.85rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+    .findings-bar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 32px 40px; }
+    .findings-inner { max-width: 820px; margin: 0 auto; }
+    .findings-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent2); margin-bottom: 20px; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; }
+    .finding-number { font-size: 2rem; font-weight: 900; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 6px; }
+    .finding-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+    .article-body { max-width: 820px; margin: 0 auto; padding: 56px 40px 80px; }
+    .article-body h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin: 48px 0 16px; line-height: 1.25; }
+    .article-body h2:first-child { margin-top: 0; }
+    .article-body h3 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px; color: var(--text); }
+    .article-body p { color: #c8c8d8; font-size: 1.02rem; line-height: 1.75; margin-bottom: 20px; }
+    [data-theme="light"] .article-body p, [data-theme="light"] .article-body li { color: #33334d; }
+    .article-body strong { color: var(--text); font-weight: 700; }
+    .article-body em { color: var(--accent2); font-style: normal; }
+    .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
+    .article-body li { color: #c8c8d8; font-size: 1.02rem; line-height: 1.7; margin-bottom: 8px; }
+    .article-body li strong { color: var(--text); }
+    .article-body a { color: var(--accent2); text-decoration: none; border-bottom: 1px solid rgba(0,212,170,.35); }
+    .article-body a:hover { border-bottom-color: var(--accent2); }
+    .article-body code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; font-family: 'Cascadia Code', Consolas, monospace; color: var(--accent2); }
+    .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 24px 28px; margin: 32px 0; }
+    .callout.teal { border-left-color: var(--accent2); }
+    .callout-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+    .callout.teal .callout-label { color: var(--accent2); }
+    .callout p { color: var(--text); font-size: 0.95rem; margin: 0; }
+    .callout p + p { margin-top: 12px; }
+    .callout a { color: var(--accent2); }
+    .compare-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 0.92rem; }
+    .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .compare-table td { color: #c8c8d8; line-height: 1.5; }
+    [data-theme="light"] .compare-table td { color: #33334d; }
+    .compare-table td:first-child { color: var(--text); font-weight: 700; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table-wrap { overflow-x: auto; }
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 8px; }
+    .related-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-decoration: none; display: block; transition: border-color .2s, transform .2s; }
+    .related-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .related-id { font-size: 0.72rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .related-title { font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .related-hook { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+    .cta-box { background: linear-gradient(135deg, rgba(108,99,255,.15) 0%, rgba(0,212,170,.08) 100%); border: 1px solid rgba(108,99,255,.3); border-radius: 20px; padding: 48px; text-align: center; margin-top: 64px; }
+    .cta-box h3 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    .cta-box p { color: var(--muted); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-primary { display: inline-block; background: var(--accent); color: #fff; padding: 14px 32px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 4px 20px rgba(108,99,255,.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(108,99,255,.5); }
+    .btn-secondary { display: inline-block; background: transparent; color: var(--text); padding: 13px 30px; border-radius: var(--radius); font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: border-color .2s; margin-left: 12px; }
+    .btn-secondary:hover { border-color: var(--accent2); }
+    .cta-note { font-size: 0.82rem; color: var(--muted); margin-top: 16px; }
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; color: var(--muted); font-size: 0.88rem; }
+    .footer-bottom { max-width: 820px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+    @media(max-width:640px) {
+      nav { padding: 16px 20px; }
+      /* `:not(.logo)` is load bearing: the header lockup is also `nav a`, so
+         without the guard the mark and wordmark vanish on every phone. */
+      nav a:not(.nav-cta):not(.logo) { display: none; }
+      /* Measured at 375 CSS px: hiding the text links is not enough on its
+         own. The lockup alone is 177px and the CTA group 167px, which is
+         384px of content in a 360px viewport, so the page scrolls sideways.
+         Every existing article on this site does exactly that (bg-026 scrolls
+         146px, bg-019 scrolls 428px). Shrinking the three surviving elements
+         is what takes it to zero. */
+      .logo img { height: 28px !important; }
+      .logo-text { font-size: 1.05rem; }
+      .nav-cta { margin-left: 12px; padding: 7px 14px; font-size: 0.88rem; white-space: nowrap; }
+      .theme-toggle { margin-left: 8px; width: 32px; height: 32px; }
+      .article-header, .article-body, .findings-bar { padding-left: 20px; padding-right: 20px; }
+      .cta-box { padding: 32px 24px; }
+      .btn-secondary { margin-left: 0; margin-top: 12px; }
+      .compare-table { font-size: 0.85rem; }
+      .compare-table th, .compare-table td { padding: 10px; }
+    }
+  </style>
+  <!-- GA4 loads from ga4-init.js ONLY after consent. Do not add a raw
+       googletagmanager gtag tag here; that is what 399723c removed site wide. -->
+  <script src="/ga4-init.js?v=20260801"></script>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">
+    <img src="/logo-nav.png" alt="BrandGEO icon" style="height:36px;width:auto;display:block;">
+    <div class="logo-text"><span class="brand">Brand</span><span class="geo">GEO</span></div>
+  </a>
+  <div style="display:flex;align-items:center;">
+    <a href="/#how">How it works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/faq.html">FAQ</a>
+    <a href="/blog.html">Research</a>
+    <a href="/news/">News</a>
+    <!-- "Free test", not "Test my website free". The long label was measured
+         overflowing the nav by 46px at 375 CSS px: below 640 the other nav
+         links are hidden, but the logo, the CTA and the theme toggle still
+         have to fit, and the long label does not. The in-body CTA buttons
+         keep the full wording, where there is room for it. -->
+    <a href="/#free-audit" class="nav-cta">Free test</a>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle light/dark mode">&#x1F319;</button>
+  </div>
+</nav>
+
+<div class="article-header">
+  <div class="breadcrumb">
+    <a href="/">getbrandgeo.com</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog.html">Research</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>BG-053</span>
+  </div>
+  <div class="article-badges">
+    <span class="badge-research">BrandGEO Research&trade;</span>
+    <span class="badge-id">BG-053</span>
+    <span class="badge-tag">How To</span>
+    <span class="badge-tag">Practical</span>
+    <span class="badge-tag">AI Visibility Measurement</span>
+  </div>
+  <h1>How to Read Your Own Brand's AI Answers <em>Like an Auditor</em></h1>
+  <p class="article-subtitle">No tool, no budget, about twenty minutes. What prompts to run, what to check for in each answer, and why running any one of them only once tells you close to nothing.</p>
+  <div class="article-meta">
+    <span class="meta-item"><strong>BrandGEO Research</strong></span>
+    <span class="meta-item">August 13, 2026</span>
+    <span class="meta-item">6 min read</span>
+    <span class="meta-item">Research ID: <strong>BG-053</strong></span>
+  </div>
+</div>
+
+<div class="findings-bar">
+  <div class="findings-inner">
+    <div class="findings-label">&#9679; Key findings: BG-053</div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="finding-number">2</div>
+        <div class="finding-desc">prompt types every self-audit needs: a direct-brand question and a category best-X-for-Y question</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number"><1 in 100</div>
+        <div class="finding-desc">chance an AI platform returns the same brand list twice for an identical question, the reason a single run is not a measurement</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">4</div>
+        <div class="finding-desc">things to check in every answer: whether you're mentioned, whether you're cited with a real source, the sentiment, and whether the specific facts are correct</div>
+      </div>
+      <div class="finding">
+        <div class="finding-number">45-51%</div>
+        <div class="finding-desc">the measured issue rate on AI news answers even from one of the best-documented sources in the world, the reason accuracy is worth checking and not assuming</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-body">
+  <p>You don't need a subscription to find out what AI engines currently say about your brand. You need about twenty minutes, a short list of prompts, and a habit of writing down what you see instead of trusting your memory of it. This is the method, reduced to something you can actually run today, built entirely on findings this site has already measured and published.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was researched</div>
+    <p>This is a synthesis piece, not new research. The consistency reasoning behind Step 3 is drawn from <a href="/bg-037.html">BG-037's coverage of SparkToro's consistency study</a>. The accuracy-checking reasoning behind Step 2 is drawn from <a href="/bg-046.html">BG-046's BBC and EBU news-accuracy findings</a> and <a href="/bg-047.html">BG-047's coverage of two live lawsuits over false AI claims</a>. This piece assembles those findings into a method rather than re-deriving any of them, dated <strong>13 August 2026</strong> for this synthesis pass.</p>
+  </div>
+
+  <h2>Step 1: run two kinds of prompts, not one</h2>
+
+  <p>Ask the AI about your brand by name, and separately, ask it the category question a buyer who has never heard of you would actually type. Both are worth running, but they test different things, and conflating them is the single most common mistake in a self-audit.</p>
+
+  <p>Asking "What do you know about Acme Consulting?" tests recognition: whether the engine has heard of you at all. Almost anything with a website clears that bar. Asking "best project management consultants for a mid-size manufacturer" tests something much harder: whether the engine recommends you to somebody who never typed your name. The gap between the two is not small. A study of 175 brands across eight platforms found 96% were described accurately when asked about directly, but 89% never appeared at all in category-research answers. Recognition and citation are different skills, and most brands have one without the other. Run both prompts and you'll know immediately which one you actually have.</p>
+
+  <h2>Step 2: read each answer for four separate things</h2>
+
+  <p>Once you have an answer, don't just skim it for your name. Check four things, in order.</p>
+
+  <ul>
+    <li><strong>Are you mentioned at all?</strong> The baseline question, and the only one most people check.</li>
+    <li><strong>Are you cited with a real source, or just named?</strong> A brand appearing in a numbered list with a citation attached is a different result from a brand mentioned in passing prose with nothing backing it. Click through the citation if one exists and confirm the source actually says what the answer claims it says.</li>
+    <li><strong>What's the sentiment?</strong> Positive, neutral, or negative, read plainly rather than assumed. A mention is not automatically a good outcome.</li>
+    <li><strong>Are the specific facts correct?</strong> This is the step most self-audits skip entirely, and it shouldn't be skipped. The BBC's own testing of AI news accuracy against its own reporting found 51% of answers had significant issues, improving to 45% in a larger follow-up study, with 31% still showing sourcing deficiencies, <a href="/bg-046.html">detailed fully in BG-046</a>. That's the error rate on one of the best-documented, most heavily resourced news sources in the world. A smaller brand with thinner public information about it should reasonably assume its own baseline risk is at least as high. And the stakes are not abstract: <a href="/bg-047.html">two live lawsuits</a> exist right now over exactly this failure mode, a real claim attached to the wrong company or person, with a canceled contract and a canceled concert as the documented consequences.</li>
+  </ul>
+
+  <h2>Step 3: never trust a single run</h2>
+
+  <p>This is the step that changes everything else on this list. SparkToro's study of 2,961 individual queries across three major AI platforms found less than a 1-in-100 chance that the same platform, asked the identical question twice, returns the same list of brand recommendations, and roughly a 1-in-1,000 chance the list comes back in the same order, <a href="/bg-037.html">covered in full in BG-037</a>. That means one answer, on one day, is closer to a single roll of a die than a measurement. A gap that appears once might be noise. A gap that appears across several runs, spread across a few days, is not.</p>
+
+  <p>The practical version of this: run each prompt more than once, ideally across two or three separate days rather than back to back in the same sitting, using a fresh conversation each time. Write down what changes and what stays the same. You are not looking for one number. You are looking for a direction: are you showing up more consistently over the runs, less consistently, or is nothing changing at all. That direction is the actual finding. A single answer, however good or bad it looks, is not.</p>
+
+  <h2>What to do with what you find</h2>
+
+  <p>If you're missing from the category question but present in the brand-name one, you have a recognition-without-citation gap, and third-party coverage is the more direct lever than anything on your own site. If you're cited but the facts are wrong, the specific claim and its source are worth checking directly against whatever the citation actually points to, since a wrong fact tied to a real-looking source is harder for a casual reader to catch than an obvious fabrication. If the answer changes substantially run to run, you don't have a fixed position to defend, you have a range to track, and the range itself is the number worth revisiting on a schedule rather than any single reading of it.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">The takeaway</div>
+    <p>Twenty minutes, two prompt types, four things to check per answer, and never fewer than two or three runs before drawing a conclusion. None of that requires a tool. It requires treating one AI answer the way you'd treat one data point anywhere else: interesting, not yet a finding.</p>
+  </div>
+
+  <div class="findings-label" style="margin:48px 0 16px;">&#9679; Related research</div>
+  <div class="related-grid">
+    <a href="/bg-037.html" class="related-card">
+      <div class="related-id">BG-037</div>
+      <div class="related-title">Why No Two AI Visibility Scores Ever Agree, and How to Read One Anyway</div>
+      <div class="related-hook">The SparkToro consistency finding behind why a single self-audit run is close to meaningless on its own.</div>
+    </a>
+    <a href="/bg-046.html" class="related-card">
+      <div class="related-id">BG-046</div>
+      <div class="related-title">The BBC Tested AI News Accuracy Twice. It's Still Wrong on Sourcing Three Times Out of Ten</div>
+      <div class="related-hook">The measured accuracy issue rate behind why a self-audit needs to check facts, not just check for a mention.</div>
+    </a>
+    <a href="/bg-047.html" class="related-card">
+      <div class="related-id">BG-047</div>
+      <div class="related-title">What Happens When an AI Overview Accuses Your Company of Something It Never Did</div>
+      <div class="related-hook">Two live lawsuits showing what an uncaught false claim can actually cost.</div>
+    </a>
+  </div>
+
+  <div class="cta-box">
+    <h3>Skip the stopwatch</h3>
+    <p>Our free test runs the direct and category prompts across the engines automatically and shows you the answer on screen. Then use the method below to read what it gives you.</p>
+    <a href="/#free-audit" class="btn-primary">Test my website free</a>
+    <a href="/#pricing" class="btn-secondary">See plans from &euro;0</a>
+    <p class="cta-note">No signup and no card for the test. The free plan stays free after it.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>&copy; 2026 BrandGEO &nbsp;&middot;&nbsp; <a href="/">getbrandgeo.com</a></span>
+    <div style="display:flex;gap:16px;">
+      <a href="/blog.html">Research</a>
+      <a href="/news/">News</a>
+      <a href="/privacy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/site.js"></script>
+</body>
+</html>
