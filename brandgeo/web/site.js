@@ -43,9 +43,27 @@
   //
   //   GET  /.netlify/functions/get-audit-report?token=...
   //   200 OK:  { "status": "ready", "unlocked": false, "domain", "category",
-  //              "ai_score", "low_confidence", "gap_count" }
-  //   Called once after the score lands, only to build the gap sentence. Its
-  //   failure is non-fatal: the score still renders without it.
+  //              "ai_score", "low_confidence", "gap_count", "engine_states",
+  //              "competitor_names": string[], "competitor_count" }
+  //   Called once after the score lands. It carries the EVIDENCE, so its
+  //   failure is degrading rather than fatal: the score still renders without
+  //   it, just without the engine chips and the competitor names.
+  //
+  //   2026-08-14: engine_states, competitor_names and competitor_count are new.
+  //   The email gate now splits by GRANULARITY, not by field name - the free
+  //   view gets the deduplicated competitor NAMES and the per-engine verdict,
+  //   the gated report keeps the per-prompt attribution and the answer
+  //   snippets. Full ruling and its reasoning: the header comment of
+  //   brandgeo-dashboard/netlify/functions/get-audit-report.js. Two things
+  //   follow for anything rendered here, and both are load-bearing:
+  //     - Never print "named INSTEAD OF you" against a free-view name. That is
+  //       a per-prompt claim and the free payload has no per-prompt data. What
+  //       IS true of every name, by construction, is that it came from an
+  //       answer where the brand was not mentioned (_score.js:150), so "named
+  //       in answers where you were not" holds even on a high-scoring audit.
+  //     - Never render a per-engine competitor count. With two screening
+  //       engines a count plus the name list often reconstructs the pairing by
+  //       arithmetic, which is the gated asset leaking through a sum.
   //
   //   POST /.netlify/functions/unlock-audit-report
   //   Body:    { "token": ..., "email": ..., "honeypot": "" }
@@ -225,18 +243,126 @@
       requestAnimationFrame(step);
     }
 
-    // Replaces the gap sentence once the locked report lands. Only three fields
-    // are readable before the email step: ai_score, category and gap_count.
-    function setAuditGap(rep) {
+    // Engine ids as a visitor should read them. Same map as the app-side report
+    // (AuditReport.tsx:57-59), extended with google_ai, which the FULL depth can
+    // return. An unknown id falls through to the raw id rather than being
+    // dropped, so a new engine is ugly rather than invisible.
+    var ENGINE_LABEL = {
+      chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude',
+      perplexity: 'Perplexity', meta: 'Meta AI', google_ai: 'Google AI Mode'
+    };
+
+    // The four states _score.js:124-139 can produce, in plain words.
+    //
+    // The state names themselves are jargon and MISSING in particular reads as
+    // a tool failure, which is the exact misreading this whole change exists to
+    // stop. The raw state is kept on data-state so the wording can change
+    // without breaking a verifier that greps for it.
+    //
+    // 'unavailable' must keep the meaning it has everywhere else in the
+    // product: BrandGEO could not reach that engine, and it is NOT a result
+    // about the visitor's brand (_score.js:128-133, AuditReport.tsx:252-257).
+    // It is excluded from the score, so it is never counted against them.
+    var STATE_PHRASE = {
+      know: 'names you',
+      partial: 'names you sometimes',
+      missing: 'did not name you',
+      unavailable: 'could not be reached'
+    };
+
+    function engineChip(engine, state) {
+      var phrase = STATE_PHRASE[state] || state;
+      var muted = (state === 'unavailable');
+      return '<span data-state="' + escapeHtml(state) + '"' +
+        (muted ? ' title="We could not reach this engine during your audit. This is not a result about your brand."' : '') +
+        ' style="font-family:var(--mono);font-size:var(--m);line-height:1.5;' +
+        'color:var(--' + (muted ? 't3' : 't2') + ');border:1px solid var(--bd2);' +
+        'border-radius:999px;padding:3px 9px;white-space:nowrap">' +
+        escapeHtml(ENGINE_LABEL[engine] || engine) + ': ' + escapeHtml(phrase) +
+        '</span>';
+    }
+
+    // The painkiller, rendered. Runs once the locked report lands and fills the
+    // evidence block that renderAuditResult() left empty.
+    //
+    // Before 2026-08-14 this function existed only to write one sentence, because
+    // only three fields were readable before the email step. The measured
+    // consequence: 8 public audits ever, all scoring 0 with both engines
+    // missing, all carrying 2 to 6 named competitors, and not one visitor was
+    // ever shown a single name. A bare 0 with no evidence reads as a broken
+    // tool. The same 0 next to the brands the engines named instead is a
+    // diagnosis, and it is the only part of the output that differs from one
+    // visitor to the next.
+    function setAuditEvidence(rep) {
+      var names = Array.isArray(rep.competitor_names) ? rep.competitor_names : [];
+      var total = typeof rep.competitor_count === 'number' ? rep.competitor_count : names.length;
+      var states = (rep.engine_states && typeof rep.engine_states === 'object') ? rep.engine_states : null;
+      var wrap = document.getElementById('auditEvidence');
+      var enginesEl = document.getElementById('auditEngines');
+      var namesEl = document.getElementById('auditNames');
+
+      if (enginesEl && states) {
+        var ids = Object.keys(states);
+        if (ids.length) {
+          var chips = '';
+          for (var i = 0; i < ids.length; i++) chips += engineChip(ids[i], states[ids[i]]);
+          // The footnote is what keeps an outage on our side from being read as
+          // a finding about the visitor. Never render the chips without it.
+          var anyUnavailable = false;
+          for (var j = 0; j < ids.length; j++) { if (states[ids[j]] === 'unavailable') anyUnavailable = true; }
+          enginesEl.innerHTML =
+            '<div style="display:flex;flex-wrap:wrap;gap:6px">' + chips + '</div>' +
+            (anyUnavailable
+              ? '<div style="font-family:var(--mono);font-size:var(--m);color:var(--t3);margin-top:6px;line-height:1.45">' +
+                'An engine we could not reach is left out of the score, so it is not counted against you.</div>'
+              : '');
+          enginesEl.hidden = false;
+        }
+      }
+
+      if (namesEl && names.length) {
+        var shown = [];
+        for (var k = 0; k < names.length; k++) shown.push(escapeHtml(names[k]));
+        var more = total > names.length ? ', and ' + (total - names.length) + ' more' : '';
+        namesEl.innerHTML =
+          '<div style="font-family:var(--mono);font-size:var(--m);color:var(--t3);' +
+            'text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">' +
+            (total === 1 ? 'Named in an answer where you were not' : 'Named in answers where you were not') +
+          '</div>' +
+          '<div style="font-size:var(--b);font-weight:600;color:var(--ac-text);line-height:1.5">' +
+            shown.join(', ') + more +
+          '</div>';
+        namesEl.hidden = false;
+      }
+
+      if (wrap && ((states && Object.keys(states).length) || names.length)) wrap.hidden = false;
+      setAuditGap(rep, names.length);
+    }
+
+    // The one line that says what the email actually buys. It had to be
+    // rewritten: the old wording promised that the full report would be where
+    // the competitor names are, and that became false the moment the names
+    // moved in front of the gate. A promise the next screen does not keep is
+    // worse than no promise. What the gated report genuinely adds is the join
+    // (which buyer question, on which engine) plus the answer text, which exists
+    // on no other surface in the funnel.
+    function setAuditGap(rep, nameCount) {
       var el = document.getElementById('auditGap');
       if (!el) return;
       var n = typeof rep.gap_count === 'number' ? rep.gap_count : null;
       var where = rep.category ? ' in ' + rep.category : '';
       var msg;
-      if (n === null)   msg = 'Scored across the engines your customers ask' + where + '.';
-      else if (n === 0) msg = 'No blocking gaps found' + where + '. The full report shows what is holding the score back.';
-      else if (n === 1) msg = 'One gap is holding this score down' + where + '. The full report names it.';
-      else              msg = n + ' gaps are holding this score down' + where + '. The full report names them.';
+      if (nameCount > 0) {
+        msg = 'The full breakdown shows which buyer question produced each name, which engine answered it, and the wording the engine used.';
+      } else if (n === null) {
+        msg = 'Scored across the engines your customers ask' + where + '.';
+      } else if (n === 0) {
+        msg = 'No blocking gaps found' + where + '. The full breakdown shows what is holding the score back.';
+      } else if (n === 1) {
+        msg = 'One gap is holding this score down' + where + '. The full breakdown names the question and the engine behind it.';
+      } else {
+        msg = n + ' gaps are holding this score down' + where + '. The full breakdown names the question and the engine behind each one.';
+      }
       if (rep.low_confidence) msg += ' Confidence is low on this one, the engines returned little to read.';
       el.textContent = msg;
     }
@@ -244,6 +370,30 @@
     function renderAuditResult(domain, score, token, category) {
       score = Math.max(0, Math.min(100, Math.round(score)));
       showSlot('result');
+
+      // A true zero has to read as a FINDING, not as a failure.
+      //
+      // Measured 2026-08-14: all 8 public audits ever run scored 0, and the
+      // zeros are truthful (the brand strings appear nowhere in the stored
+      // engine_results). The screening audit asks generic category questions
+      // and a small brand is essentially never named in the answer to one, so
+      // "0" is the normal result for the whole segment this funnel is aimed at.
+      // Printing "You're at 0/100 AI Visibility" and nothing else made the
+      // correct answer look like a broken instrument.
+      //
+      // The claim below is derivable from the score alone, so it can be made on
+      // this first render, before get-audit-report answers. computeAuditScore
+      // (_score.js:85-92) is a positively-weighted sum of six non-negative
+      // dimensions, so aiScore === 0 forces reach === 0, and reach is the share
+      // of ANSWERING engines that mentioned the brand (_score.js:70-74).
+      // audit-domain.js:241-250 refuses to publish an audit where no engine
+      // answered, so the denominator is never zero on a published row.
+      // Therefore ai_score 0 means: every engine that answered, answered
+      // without naming you. No softening, no encouragement, and nothing
+      // asserted that the number does not already prove.
+      var headline = score === 0
+        ? '<span id="auditScoreInline">0</span>/100. You were not named in any answer we collected.'
+        : 'You&#39;re at <span id="auditScoreInline">0</span>/100 AI Visibility';
       // The email row inside the result is now the next step, so the hero
       // button steps down to "check another domain".
       auditBtn.classList.add('is-secondary');
@@ -262,9 +412,25 @@
             '<div class="audit-ring-num" id="auditRingNum">0</div>' +
           '</div>' +
           '<div>' +
-            '<div class="audit-headline">You&#39;re at <span id="auditScoreInline">0</span>/100 AI Visibility</div>' +
+            '<div class="audit-headline">' + headline + '</div>' +
             '<div class="audit-domain">' + escapeHtml(domain) + '</div>' +
           '</div>' +
+        '</div>' +
+        // Filled in by setAuditEvidence() once get-audit-report answers: the
+        // per-engine verdict chips and the deduplicated competitor names.
+        //
+        // Styled inline, deliberately. Every class this card uses is defined in
+        // index.html's inline stylesheet, which this file does not own and which
+        // another change is editing in parallel; a new class name here would be
+        // a rule that does not exist yet on the live page. These elements
+        // therefore style themselves from the existing custom properties
+        // (--mono, --m, --b, --t2, --t3, --bd2, --ac-text) and introduce no new
+        // font size and no status colour, so the six-size type system and the
+        // fold colour budget both hold. If a later pass moves these into
+        // index.html as real classes, delete the style attributes here.
+        '<div id="auditEvidence" style="margin:12px 0 0" hidden>' +
+          '<div id="auditEngines" style="margin-bottom:10px" hidden></div>' +
+          '<div id="auditNames" style="border:1px solid var(--bd2);border-radius:10px;padding:10px 12px" hidden></div>' +
         '</div>' +
         // Filled in by setAuditGap() once get-audit-report answers. Starts with
         // the category the audit classified the domain into, which is already
@@ -421,14 +587,17 @@
         }
         setButtonScanning(false);
         renderAuditResult(val, score, data.token, teaser.category);
-        // Second, non-fatal call: the gap sentence. The score is already on
-        // screen, so a failure here changes nothing the visitor can see.
+        // Second call: the evidence. The score and the domain are already on
+        // screen, so a failure here degrades to the card as it looked before
+        // 2026-08-14 rather than breaking anything. It is not retried: this
+        // endpoint is a plain read of a row that has already been written, and
+        // a retry loop on the public path is a rate-limit surface for no gain.
         fetchWithTimeout(AUDIT_REPORT_ENDPOINT + '?token=' + encodeURIComponent(data.token || ''), {
           method: 'GET'
         }, AUDIT_REPORT_TIMEOUT_MS).then(function(r) {
           return r.ok ? r.json() : null;
         }).then(function(rep) {
-          if (rep && rep.status === 'ready') setAuditGap(rep);
+          if (rep && rep.status === 'ready') setAuditEvidence(rep);
         }).catch(function() { /* score stands on its own */ });
       }).catch(function(err) {
         if (err && err.handled) {
