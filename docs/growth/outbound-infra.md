@@ -13,6 +13,47 @@ Step 6 (GBP) is independent and can be done any time today.
 
 ---
 
+## STATUS 2026-08-14: domain REGISTERED and the root redirect is LIVE
+
+Steps 1 and 4 are DONE. Verified from outside the network, not reported:
+
+```
+nslookup -type=NS trybrandgeo.com    -> ns1..ns4.cyberfolks.ro (all four)
+nslookup -type=A  trybrandgeo.com    -> 91.200.121.45
+curl -sI https://trybrandgeo.com     -> HTTP/1.1 301, Location: https://getbrandgeo.com/
+curl -sI https://www.trybrandgeo.com -> HTTP/1.1 301, Location: https://getbrandgeo.com/
+```
+
+HTTPS answers on both hosts, so AutoSSL already issued. Server reports LiteSpeed,
+the same cPanel box as `getbrandgeo.com`.
+
+**THE WARMUP CLOCK STARTS 2026-08-14.** Every downstream date derives from this
+one, so it is recorded here rather than in a chat. Floor for the first real cold
+send is 2026-08-19 (registration plus 5), planned 2026-08-21 (plus 7), and the
+mail-tester gate must pass before either. Sprint 17 ends 2026-08-29, so there
+are 6 to 8 sending days inside the sprint if the gate passes on schedule.
+
+**DEFECT FOUND IN THE SAME CHECK, blocks step 2 and step 3.** The zone answers
+MX today:
+
+```
+nslookup -type=MX trybrandgeo.com 8.8.8.8
+  -> MX preference = 0, mail exchanger = trybrandgeo.com
+```
+
+That is a default self-pointing MX, created when the domain was added. It sends
+mail for this domain to `91.200.121.45`, the cPanel box, not to Google
+Workspace. **Delete it in the CyberFolks zone editor before adding record 1 in
+section 3**, or Google Workspace will never receive mail for this domain and the
+DKIM and mail-tester steps cannot pass. Setting cPanel's Email Routing to Remote
+Mail Exchanger does not fix this: the public MX record is what the outside world
+reads, and it is the record above.
+
+Pass condition after the fix: `nslookup -type=MX trybrandgeo.com 8.8.8.8`
+returns `smtp.google.com` priority 1 and nothing else.
+
+---
+
 ## 0. What was measured before writing this
 
 Read from live DNS and from source on 2026-07-31, so no step below rests on
