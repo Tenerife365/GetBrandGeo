@@ -1469,7 +1469,10 @@
   </symbol>
 </svg>
 
-<!-- NAV (spec 2.1): four text links, News dropped from the homepage nav. -->
+<!-- NAV (spec 2.1): text links, News dropped from the homepage nav.
+     "Done for you" route added 2026-08-14 per PLAN-2026-08-13 section 8:
+     get-found-online.html was linked from the homepage 0 times. Nav links hide
+     below 640px, so the mobile route lives in section 10's lead. -->
 <nav>
   <a href="/" class="logo">
     <img src="logo-nav.png" alt="BrandGEO" style="height:32px;width:auto;display:block;">
@@ -1478,6 +1481,7 @@
   <div style="display:flex;align-items:center;">
     <a href="#how">How it works</a>
     <a href="#pricing">Pricing</a>
+    <a href="/get-found-online.html">Done for you</a>
     <a href="/blog.html">Research</a>
     <a href="/faq.html">FAQ</a>
     <a href="https://app.getbrandgeo.com/signup" class="nav-cta">Get started</a>
@@ -1503,11 +1507,21 @@
     <!-- LEFT: the control panel. The connector now lives inside .hero-visual
          as an input port anchored to the card (see .port-line). -->
     <div class="hero-copy">
-      <div class="eyebrow">01 &middot; AI Visibility Platform</div>
+      <!-- ICP naming 2026-08-14: eyebrow carries the buyer, not the category.
+           Segment evidence: docs/growth/outbound/icp-evidence-machine-and-sequence-2026-08-14.md
+           section 1.2 (C1 primary: niche B2B, 2-50 people) and the measured
+           brand-size split (small/niche brands score 0, large 50-61;
+           legal practice mgmt n=5 mean 19.6 vs email marketing n=11 mean 53.5).
+           Eyebrow hard cap: one line at 375px, mono 12px, .14em tracking. -->
+      <div class="eyebrow">01 &middot; For niche B2B brands</div>
       <h1>Are AI models recommending <em>your brand</em>, or your competitors?</h1>
       <!-- "under a minute" re-verified at build: one real screening audit
-           measured 17.6s end to end over the public endpoint, 2026-08-07. -->
-      <p class="hero-sub">See what the top AI engines tell your customers when they ask about your category. Type your domain and get a scored answer in under a minute.</p>
+           measured 17.6s end to end over the public endpoint, 2026-08-07.
+           "most often invisible" is measured: 31 of 63 audited domains scored
+           exactly 0, every large brand audited scored 33-61, every small brand
+           scored 0; all 31 zero-score audits carry at least one named
+           competitor (same doc, section 1.2). -->
+      <p class="hero-sub">See what the top AI engines tell your buyers when they ask about your category. Small and niche brands are most often invisible in those answers while a competitor gets named. Type your domain and get a scored answer in under a minute.</p>
       <div class="search-wrap">
         <div class="search-inner">
           <input type="text" id="brandInput" placeholder="yourcompany.com" aria-label="Enter your brand or domain">
@@ -1517,7 +1531,7 @@
       </div>
       <div class="audit-status" id="auditStatus" aria-live="polite"></div>
       <div class="hero-trust">
-        <span class="ht-item">Free audit</span>
+        <span class="ht-item">Free instant check</span>
         <span class="ht-item">Results in under a minute</span>
         <span class="ht-item">No credit card required</span>
       </div>
@@ -2003,7 +2017,7 @@
           <div class="savings-tag">List &#x20AC;39/mo after launch</div>
         </div>
         <div class="plan-sub-row">
-          <div class="plan-sub">For our first 100 customers. Then &#x20AC;39/mo list price.</div>
+          <div class="plan-sub">For our first 100 customers. Monthly billing only.</div>
         </div>
         <a href="https://app.getbrandgeo.com/signup" class="btn-plan" data-checkout="radar">Subscribe</a>
         <div class="plan-checkout-note">Secure Stripe checkout</div>
@@ -2113,6 +2127,7 @@
           <li>Monthly executive report + strategy call</li>
           <li>Priority support &middot; all channels managed</li>
         </ul>
+        <a href="/get-found-online.html" class="plan-news-link">See how the done-for-you service works &rarr;</a>
       </div>
 
       <div class="pricing-box">
@@ -2129,7 +2144,7 @@
         <div class="plan-features-label">Everything in Managed, plus</div>
         <ul class="pricing-features">
           <li>Multiple brands &amp; markets</li>
-          <li>More engines: Copilot and DeepSeek</li>
+          <li>More engines: Copilot and DeepSeek &middot; <span class="pc-muted">coming soon</span></li>
           <li>White-label + dedicated support</li>
           <li>Custom integrations &amp; SLAs</li>
         </ul>
@@ -2158,8 +2173,8 @@
     </div>
 
     <div class="fallback">
-      <p>Not sure which plan fits?<span>Get a free, no-commitment snapshot of where you stand across the AI engines your customers actually ask.</span></p>
-      <a href="#contact" class="btn-snapshot">Get my free AI Visibility Snapshot &rarr;</a>
+      <p>Not sure which plan fits?<span>Get a free, no-commitment audit of where you stand across the AI engines your customers actually ask. Reviewed by us, delivered within 48 hours.</span></p>
+      <a href="#contact" class="btn-snapshot">Request the free 48 hour audit &rarr;</a>
     </div>
 
   </div>
@@ -2214,7 +2229,7 @@
   <div class="contact-inner">
     <div class="eyebrow">10 &middot; The 48 hour audit</div>
     <h2 class="h-display">Request the deeper, done-for-you audit.</h2>
-    <p class="lead">The instant check up top takes a minute. This one takes us up to 48 hours: more prompts, more engines, reviewed and delivered as a report with a fix list.</p>
+    <p class="lead">The instant check up top takes a minute. This one takes us up to 48 hours: more prompts, more engines, reviewed and delivered as a report with a fix list. And if you run a small business and would rather have the whole thing handled for you, <a href="/get-found-online.html" style="color:var(--ac-text);text-decoration:underline;">see how the done-for-you service works</a>.</p>
     <form class="audit-form" action="https://formsubmit.co/contact@getbrandgeo.com" method="POST">
       <input type="hidden" name="_subject" value="New BrandGEO Audit Request">
       <input type="hidden" name="_captcha" value="false">
