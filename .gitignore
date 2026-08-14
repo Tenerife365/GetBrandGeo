@@ -111,3 +111,10 @@ docs/growth/social/**/*.wav
 docs/growth/social/_scored/
 docs/growth/social/0-Voice-samples/
 assets/audio/music/
+
+# Prospect target lists: named companies we are actively selling to.
+# This repo is PUBLIC (Tenerife365/GetBrandGeo), so a target list here is
+# competitor recon. Keep these on the shared drive, never in git.
+# Ruled 2026-08-14.
+docs/growth/outbound/target-list*
+docs/growth/outbound/contacted.md
