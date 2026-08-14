@@ -1,5 +1,7 @@
 # SaaSHub submission pack
 
+**LIVE 2026-08-04**: https://www.saashub.com/brandgeo-global-alternatives
+
 Lane: 1, static listing. Target: live this week.
 
 Source note: SaaSHub's public pages (`saashub.com/services/submit`,
@@ -101,7 +103,7 @@ submitting from.
 
 | Asset | Path | Notes |
 |---|---|---|
-| Logo | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-transparent-512.png` | square, transparent |
+| Logo | `docs/growth/brand-identity-2026-07-29/v3/png/mark-512.png` | square, transparent |
 | Screenshot 1 | **NEEDS CAPTURE**, a real (non-demo) `/ai-visibility` dashboard view | |
 | Screenshot 2 | **NEEDS CAPTURE**, a real `/sentiment` dashboard view | |
 

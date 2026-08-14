@@ -1,6 +1,19 @@
 # Product Hunt pack and launch-day runbook
 
-Lane: 2, launch-mechanics. Target launch: Day 10, 2026-08-10.
+Lane: 2, launch-mechanics. **LIVE 2026-08-04** (Constantin launched today,
+not the originally staged Day 10/2026-08-10, confirmed via
+`producthunt.com/products/brandgeo-2?launch=brandgeo-2` showing "Live now").
+The runbook below applies starting now, not on 08-10.
+
+**Two live corrections still needed on the page as of 2026-08-04, flagged
+urgent because the launch is running:**
+- **Topic is set to "Social Media", wrong category.** Replace with
+  Artificial Intelligence / Marketing / SaaS / Analytics per the picker
+  below. A launch ranks partly by topic-relevant traffic, so a wrong topic
+  actively hurts today's placement, fix this first.
+- **Gallery still has only 1 image.** PH lets images be edited during a live
+  launch; add the 2-4 more listed below as soon as they can be captured,
+  every hour live without them is lost gallery-driven engagement.
 
 ## Current state, confirmed live 2026-08-04
 
@@ -53,7 +66,7 @@ Analytics
 | 2 | **NEEDS CAPTURE**, `/ai-visibility` dashboard, real data |
 | 3 | **NEEDS CAPTURE**, `/sentiment` dashboard, real data |
 | 4 | **NEEDS CAPTURE**, `/competitors` dashboard, real data |
-| 5 (optional) | logo/wordmark card, `docs/growth/brand-kit-2026-07-29/png/lockup/brandgeo-lockup-light-transparent-w1024.png` |
+| 5 (optional) | logo/wordmark card, `docs/growth/CAMPAIGN-2026-07-30/_shared/logo/brandgeo-lockup-dark-transparent-w512.png` |
 
 ## First comment (already delivered live this session, reproduced here for
 the record)

@@ -237,6 +237,40 @@ Day 2 and Day 3. Logged in `SPRINT-100-PLAN-30D.md`'s revision log.
 Gate 1. Live checkout, mail-tester/DNS, GBP, and actual Netlify deploy
 success all stay UNVERIFIABLE HERE (no network egress). S10's harness still
 cannot prove its own closed items stay closed, now for a second night.
+---
+
+## 2026-08-04, Day 4 of 30 — S22 pulse staged
+
+Runway for today (Tue 08-04, `PUBLISHING-PLAN.md` Week 1 table): LinkedIn
+BG-029 post, Video Cut 1 to Facebook/Instagram Reels/TikTok/YouTube Shorts,
+Instagram Stories 1. That leaves Threads, GBP and X silent today, so the S22
+pulse layer staged one unit for each in
+`docs/growth/social/1-Pending/pulse/2026-08-04/`:
+
+- `threads/feed/post.md` — opportunity piece off today's BG-029 finding
+  (Madrid airport-hotel language split), restated for Threads, not copied.
+- `gbp/post/post.md` — same source, restated for a local-business audience,
+  text only (no new asset rendered, per S22 rule 5).
+- `x/feed/post.md` — the ruled X fill, a 2-part X-length trim of the BG-029
+  LinkedIn post, text only.
+
+All three carry `utm_campaign=pulse` alongside their platform's
+`utm_source`, per S22 rule 4. Verified zero em/en dashes (checked with a
+Unicode-aware scan since this shell's grep does not support `\x{}` PCRE
+syntax). No sprint-progress numbers used, so nothing needs same-day approval
+before posting.
+
+**Flagged, not resolved:** `BG-029/01-post.md`'s own header still reads
+"When: Monday 2026-08-17, morning slot," inherited from the original
+one-per-week `linkedin-series-2026-08/README-SCHEDULE.md` /
+`SCHEDULING-SHEET.md` cadence. That schedule predates the 2026-08-02
+runway-compression decision in `PUBLISHING-PLAN.md` and was never updated
+after it, so the two documents now disagree on BG-029's date by two weeks.
+`PUBLISHING-PLAN.md` is treated as authoritative here (it is the explicitly
+"ruled," newer document, and the S22 registry entry names it as the
+baseline), but the stale header in the asset file itself is a live source of
+confusion for anyone opening that file cold and should be corrected or
+annotated.
 
 ---
 
@@ -437,3 +471,56 @@ established attribution scheme that predates this pass.
    per day, plus this entry), per the task's own instruction to commit after
    each day rather than batch at the end. Nothing is staged unpushed as of
    this entry; push is the next step.
+## 2026-08-05, LinkedIn bundle backfill (BG-030/031/032) + pulse for Aug 5, 6, 7
+
+Constantin caught, by inspection, that every dated folder in
+`docs/growth/social/1-Pending/` from 08-05 onward held only the video
+runway (Facebook/Instagram/TikTok/YouTube). GBP, Threads and X were present
+on some later dates (08-07, 08-10 through 08-21) but LinkedIn was present on
+**none** of them, even though the full BG-030/031/032 article-day bundles
+(feed post, article, announcement, founder repost) already existed, fully
+written, in `docs/growth/linkedin-series-2026-08/BG-0{30,31,32}/`. Only
+BG-028's bundle (08-03) had ever actually been copied into a dated pending
+folder, by hand, at the time. This is the same "content exists but never
+got assembled into the day's folder" gap the Day 4 brief's pulse note was
+already circling, just on the LinkedIn side instead of GBP/Threads/X.
+
+**Fixed today, mechanically, no new copy written:**
+- `linkedin/{feed,article,announcement,founder-repost}/` assembled into the
+  08-05, 08-06 and 08-07 dated folders from the BG-030/031/032 source files
+  plus their `og-bg-0XX.png` cover, mirroring the exact structure BG-028
+  used for 08-03.
+- **Flagged, not fixed:** all three source files' own "When" headers are
+  stale (BG-030 says "Wednesday 2026-08-26," BG-031 "Monday 2026-08-31,"
+  BG-032 "Monday 2026-09-07"), inherited from the same pre-compression
+  schedule that made BG-029's header wrong on Day 4. The prose itself is
+  dateless and safe to use; only the metadata line is wrong.
+
+**New pulse staged, per S22's coverage rule** (every platform gets at least
+one unit every weekday; never duplicate what the runway already covers
+that day):
+- `pulse/2026-08-05/{gbp,threads,x}/` — runway is silent on all three
+  today, so all three filled. Source: BG-030's verified Paris bilingual
+  wealth-management finding (15.3% overlap, 81.1% of 127 companies
+  single-language).
+- `pulse/2026-08-06/{gbp,threads,x}/` — same gap, all three filled. Source:
+  BG-031's verified Rome bilingual restaurant/hotel finding (18.0%
+  overlap, 81.2% of 133 companies single-language).
+- `pulse/2026-08-07/{threads,x}/` only — **gbp deliberately skipped**,
+  since 08-07's runway already carries a real, unrelated GBP asset
+  (`gbp-2-essentials-1200x900`); filling it again would be double posting.
+  Source: BG-032's verified cross-engine consistency finding (12.1% to
+  18.7% overlap range, 5 of 16 comparisons with zero shared companies).
+
+All 8 new files carry `utm_campaign=pulse` alongside their platform's
+`utm_source`, per S22 rule 4. Verified zero em/en dashes (Unicode-aware
+scan) and all three X posts under 280 characters counting URLs as 23 per
+X's own transform rule (233, 222, 244 respectively). No sprint-progress
+numbers used, so nothing needs same-day approval before posting.
+
+**Still open, worth a deliberate decision rather than another silent gap:**
+whether GBP/Threads/X should keep getting filled by fresh pulse content on
+article days going forward, or whether the CAMPAIGN-2026-07-30 queue items
+still sitting unclaimed for 08-10 through 08-21 should instead be
+reassigned to land on article days specifically. Both mechanisms are now
+live at once and nobody has reconciled them.

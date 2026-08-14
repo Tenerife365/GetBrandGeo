@@ -17,19 +17,61 @@ card for the exact gap). Everything else is INFERRED and marked as such.
 
 ---
 
+## Corrections applied 2026-08-13, after Constantin's channel-state review
+
+This file was revised in place after the first draft. Two corrections came
+in, both changing the ranking and the shape of several cards below.
+
+**1. Several channels already exist and were wrongly scoped as
+"create from scratch."** Constantin reports: the AlternativeTo account
+already exists (`https://alternativeto.net/user/constanting/`), the
+LinkedIn company page exists (already known, unchanged), Uneed's listing
+exists, GBP exists, and a G2 seller profile exists at
+`https://www.g2.com/sellers/brandgeo-global`. Every one of those cards below
+changed from "submit new" to "audit the live page and fix only what is
+wrong." Re-fetching each live URL today (2026-08-13) produced, honestly:
+
+| Channel | URL tried | Result | What it means |
+|---|---|---|---|
+| AlternativeTo profile | `alternativeto.net/user/constanting/` | HTTP 404 to this session's anonymous fetch | Expected, per Constantin's own note; account pages there likely need a session. Does not contradict the account existing. |
+| AlternativeTo listing | `alternativeto.net/software/brandgeo/` | HTTP 404 | Still genuinely not submitted; this part of the card stays a first submission, not an audit. |
+| LinkedIn company page | `linkedin.com/company/79409681/` | Returned a login wall, not the public page | Could not audit content externally this session. Card rewritten so Constantin checks the current live text himself before editing. |
+| Uneed listing | `uneed.best/tool/brandgeo` (the URL this file and the original audit assumed) | HTTP 404 | Wrong URL, not a missing listing, see next row. |
+| Uneed listing, corrected slug | `uneed.best/tool/brandgeo-global` | LIVE. Rendered: product name "BrandGEO-global", tagline "Track your brand visibility across AI engines like ChatGPT and Gemini" | The listing exists and is public. The original audit's "404, not executed" finding is now stale; the URL it checked was simply wrong. |
+| G2 seller profile | `g2.com/sellers/brandgeo-global` | HTTP 403 Forbidden | A 403 is G2's bot protection blocking this session's fetch, not a 404. It is not evidence against the page existing; it is only evidence this session could not read it. |
+| GBP | no stable public URL known | not attempted | Google Business Profiles are not reliably fetchable by a plain URL; unchanged from the first draft, this card was already written as an owner-login audit. |
+
+**2. The indexation gap the original audit named is refuted.** Constantin
+supplied a Google Search Console export (MEASURED, coverage window
+2026-06-29 to 2026-08-07, pulled 2026-08-13): **91 pages indexed, 6 not
+indexed.** 739 impressions across the 40-day window, 289 of them in the
+final 7 days, roughly 35 a day. The 6 not-indexed pages break down as: 1
+alternate page with a proper canonical, 1 duplicate where Google chose a
+different canonical, 2 excluded by noindex, 1 duplicate with no
+user-selected canonical, 1 discovered but not yet indexed. **Google already
+has essentially the whole site.** None of the cards in this file were
+justified on "this gets us indexed," so nothing below needed to be dropped
+for that reason, but this is recorded here because it directly contradicts
+the audit's gap #4 ("Google cannot see the BOFU content") that this file's
+first draft cited for background. Where a card's value rests on referral
+traffic or buyer-intent placement, that reasoning stands unchanged; where a
+card would have leaned on "and it also helps indexing," that upside no
+longer exists and should not be claimed elsewhere in the sprint.
+
+---
+
 ## Today's fire order (quick reference, detail below)
 
 | # | Action | Minutes | Deadline | Why this position |
 |---|---|---|---|---|
-| 1 | Create the AlternativeTo account (do this even though the listing fires later) | 2 | Today, 2026-08-13 | 7 day account age clock; every day this waits pushes the listing back a day |
-| 2 | Fire LinkedIn company page card | 8 | This week | Only owned audience in the list; edit is live the moment you save it |
-| 3 | Fire Uneed redo card | 9 | This week | Was mid-submission once already; lowest redo cost |
+| 1 | Fix the two wrong Uneed fields (already live) | 5 | Today | Already public, cheapest fix in the file, two fields, not a resubmission |
+| 2 | Audit and fix LinkedIn company page | 8 | This week | Only owned audience in the list; edit is live the moment you save it |
+| 3 | Check the AlternativeTo join date, then fire the listing (today if eligible, else Day 8) | 2 to check + 10 to submit | Today for the check; submission as soon as eligible | Might fire today instead of 2026-08-20, one check away |
 | 4 | Fix GBP (Products entries + the two stale images) | 12 | This week | Actively publishing a false claim right now, independent of traffic upside |
 | 5 | Reply to the one Product Hunt comment thread | 5 | This week | Gallery appears already fixed (see finding below); this is the only real gap left |
-| 6 | Start G2 | 10 | This week, early | 3 to 5 day approval clock; free profile carries no link so start it for the clock, not for near term traffic |
-| 7 | Indie Hackers | 10 | This week | Community traffic, moderate |
+| 6 | Audit the existing G2 seller profile | 10 | This week, early | Profile already exists; confirm claim status and fix field text, no new submission needed |
+| 7 | Indie Hackers | 10 | This week | Community traffic, moderate; the one channel in this list still a genuine first submission |
 | 8 | Record the Fazier demo video (separate toolchain), then fire the Fazier card | 10 (card only) | As soon as the video exists | Full card below, only blocker is the video |
-| 9 | AlternativeTo actual submission | 10 | Earliest 2026-08-20 (Day 8) | Gated by #1's clock, not by effort |
 | - | DevHunt | 0 | Do not fire | Blocked on a fit decision, escalated below, not decided in this file |
 
 ---
@@ -267,27 +309,100 @@ trial language, any countdown or deadline framing on the Radar price.
 # PRIORITY 2: the other unexecuted directories, ranked
 
 Ranked by expected qualified traffic per minute of founder effort, given
-what is actually true today, not the packs' original assumptions. Product
-Hunt and SaaSHub are excluded here, they are already live (see Priority 3
-for Product Hunt; SaaSHub needs no action).
+what is actually true today, not the packs' original assumptions, and not
+the first draft of this file. Product Hunt and SaaSHub are excluded here,
+they are already live (see Priority 3 for Product Hunt; SaaSHub needs no
+action). Four of the six cards below changed from "submit new" to "audit
+the live page," per the correction above.
 
-## 1. LinkedIn company page (highest ratio: owned audience, edit is live
-instantly)
+## 1. Uneed (re-ranked to first: already live, only two fields are wrong)
+
+**This card changed completely.** The original audit's "404, not executed"
+finding checked the wrong URL. The real listing is live at a different
+slug and was never actually lost mid-submission the way it looked.
+
+**Current live state, MEASURED by fetching
+`https://www.uneed.best/tool/brandgeo-global` today, 2026-08-13:**
+- Product name shown: **"BrandGEO-global"**
+- Tagline shown: **"Track your brand visibility across AI engines like
+  ChatGPT and Gemini"**
+- Full description, category, pricing model, and the website URL's UTM tag
+  did not render through this session's fetch (the page is JS-heavy and
+  the tool only captured the header). These need Constantin's own eyes,
+  see the checklist below.
+
+**Fire-by:** today. **Cost: 5 minutes**, this is two field edits on an
+existing listing, not a resubmission.
+
+**Prerequisites:** Uneed account and listing both exist, YES, confirmed
+live today at the URL above.
+
+**Click path:** Log into `uneed.best`, go to **My Products** (or the
+account's product management screen), open the BrandGEO-global listing's
+**Edit** view.
+
+**The diff:**
+
+| Field | Current (MEASURED today) | Replace with |
+|---|---|---|
+| Product name | `BrandGEO-global` | `BrandGEO` (drop the "-global" suffix to match every other listing's entity name; flag to Constantin as a choice, not an error, since "-global" is not false) |
+| Tagline | `Track your brand visibility across AI engines like ChatGPT and Gemini` | Optional polish, not a defect: `See how AI engines rank your brand`. The live tagline is factually fine (names two real engines, no superlative, no false claim); only change it if Constantin wants kit-wide consistency. |
+
+**Fields to check yourself, not visible to this session's fetch:**
+
+Detailed description, should read exactly as originally delivered and
+preserved in `docs/growth/launch-directories/uneed.md` under "Detailed
+Description." Open the live listing and confirm it still matches; if it
+does not, paste that file's text back in verbatim, do not rewrite it.
+
+Website URL, should be exactly:
+```
+https://getbrandgeo.com/?utm_source=uneed&utm_campaign=launch#free-audit
+```
+If the live field holds a bare `getbrandgeo.com` with no `utm_source` tag,
+replace it with the tagged version above so Uneed traffic is attributable
+per `channel-attribution-spec.md`. This is the one field on this card most
+likely to be wrong and easiest to miss, since it renders the same to a
+visitor either way.
+
+**Submit:** Click **Save** on the edited fields. Constantin does this.
+
+**External check:** fetch `https://www.uneed.best/tool/brandgeo-global`
+(note the corrected slug, not `/tool/brandgeo`), string to look for:
+`BrandGEO`. Already passing today. Once the name/tagline edit is made,
+re-fetch and confirm the string `BrandGEO-global` is gone from the visible
+title. Flag to `gtm-verify`: the prior audit's 404 finding for this channel
+is stale and should be corrected at its source in the next audit pass.
+
+## 2. LinkedIn company page (owned audience, edit is live instantly, could
+not be externally audited this session)
 
 The page already exists and already carries the only channel with any
 measured pull this whole run (MEASURED, audit: "LinkedIn (founder profile)
-is the only surface with any evidence of pull"). This is not a new
-directory, it is a fast edit to something with a real, if quiet, audience.
+is the only surface with any evidence of pull").
 
-**Fire-by:** this week. **Cost: 8 minutes.**
+**Current state: NOT independently verifiable this session.** Fetching
+`https://www.linkedin.com/company/79409681/` today returned a login wall,
+not the public page content, so this session cannot report what the CTA,
+About text, or Featured section currently say. This is a fetch-tool limit,
+not evidence anything is wrong.
+
+**Fire-by:** this week. **Cost: 8 minutes**, plus a minute to look before
+editing.
 
 **Prerequisites:** page exists and is admin-accessible, YES
 (`https://www.linkedin.com/company/79409681`, MEASURED live, referenced in
 `index.html`'s own JSON-LD).
 
-**Click path:** Log in as page admin, open **Edit page**.
+**Click path:**
+1. First, open `https://www.linkedin.com/company/79409681/` in a private or
+   logged-out browser tab and read what is actually there today. This is
+   the audit step this session could not do.
+2. Log in as page admin, open **Edit page**.
+3. Change only the fields that differ from the target text below; leave
+   anything already correct alone.
 
-**Fields:**
+**Target text, edit to match if the live page differs:**
 
 CTA button
 ```
@@ -322,80 +437,200 @@ flag to design rather than stretch a mismatched image.
 does this.
 
 **External check:** fetch `https://www.linkedin.com/company/79409681/`
-(logged out view). LinkedIn heavily restricts what an unauthenticated fetch
-can see, so this check is best effort; look for the string "Visit website"
-near a CTA button. Earliest pass: same day, LinkedIn page edits publish
-immediately.
+(logged out view). MEASURED today: this returns a login wall, not content,
+so the check is best effort at any date; if the wall persists, verification
+has to happen from a logged-in view instead, which `gtm-verify` does not
+have either. Earliest pass: same day, LinkedIn page edits publish
+immediately, but confirmation may require Constantin's own screenshot
+rather than an external fetch.
 
-## 2. Uneed (second: submission was already mid-flow once, lowest redo cost)
+## 3. AlternativeTo (the account exists; one check decides if it fires
+today or on Day 8)
 
-**Fire-by:** this week. **Cost: 9 minutes.**
+**This card changed from "create the account, wait a week" to "confirm the
+account is already old enough, then submit."** Constantin's account is at
+`https://alternativeto.net/user/constanting/`. Fetching that URL today
+returned HTTP 404 to this session, which is expected and does not
+contradict the account existing (profile pages there likely require a
+logged-in session to render, same as the note Constantin gave). The
+listing itself, `alternativeto.net/software/brandgeo/`, is still HTTP 404,
+MEASURED today, so the actual submission has not happened yet regardless of
+the account's age.
 
-**Prerequisites:** Uneed account exists (Constantin was mid-submission
-2026-08-04), YES per the pack; current listing is a 404 (MEASURED,
-`uneed.best/tool/brandgeo`, audit 2026-08-13), so this is a redo, not a
-first attempt.
+**Fire-by, step 0 (the check): today, 2026-08-13. Cost: 2 minutes.**
+**Fire-by, the listing: today if the account predates 2026-08-06, otherwise
+exactly 7 days after the account's join date. Cost: 10 minutes**, this
+remains a genuine first submission with a screenshot still to capture.
 
-**Click path:** Log into `uneed.best`, find **Submit a Product** (account
-menu or a "+" New Product control). Exact live button label was not
-independently re-verified this session, since it sits behind login; confirm
-against what the account menu actually shows before proceeding.
+**Prerequisites:**
 
-**Fields:** unchanged from the existing pack, reproduced for convenience.
+| Prerequisite | Status |
+|---|---|
+| AlternativeTo account exists | YES, `alternativeto.net/user/constanting/` |
+| Account is at least 7 days old | UNKNOWN, this is step 0 below |
+| Listing already exists | NO, confirmed 404 today |
 
-Product name
+**Click path, step 0:** Log into `alternativeto.net`, go to your own
+profile at `alternativeto.net/user/constanting/`, and find the join date or
+"member since" text on that page. Compare it to 2026-08-06:
+- **If the account was created on or before 2026-08-06**, the 7-day wait
+  has already passed. Go straight to the submission below, today.
+- **If the account was created after 2026-08-06**, wait until exactly 7
+  days after that date, then submit.
+
+**Click path, the listing (once eligible):** User icon (top right) →
+**Suggest new application** → fill the fields below → **Submit the
+application**.
+
+**Fields:**
+
+App name
 ```
 BrandGEO
 ```
 
-Tagline
+Platforms
 ```
-See how AI engines rank your brand
-```
-
-Detailed description: the long-form copy already delivered and pasted once
-mid-submission on 2026-08-04, preserved verbatim in
-`docs/growth/launch-directories/uneed.md` under "Detailed Description."
-Reuse it exactly, do not rewrite it.
-
-Website URL
-```
-https://getbrandgeo.com/?utm_source=uneed&utm_campaign=launch#free-audit
+Web
 ```
 
-Pricing model
+License
 ```
-Freemium
+Free with Limited Functionality
 ```
 
-Twitter/X handle
+Description
 ```
-LEAVE BLANK
+BrandGEO tracks how your brand appears across up to seven AI engines (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Google AI Overviews, and Grok): mention rate, sentiment, ranking against named competitors. Free tier available; paid tiers from EUR 29/month. Based in Spain, built for brands worldwide.
 ```
-No confirmed BrandGEO X account exists.
+268 characters. No published cap found; this matches AlternativeTo's typical
+listing length.
 
-Maker field
+Tags
 ```
-Constantin Daniel
+AI Visibility, GEO monitoring, Generative Engine Optimization, AI search tracking, brand mention tracking
+```
+
+Website
+```
+https://getbrandgeo.com/?utm_source=alternativeto&utm_campaign=launch#free-audit
 ```
 
 **Assets:**
 
 | Asset | Absolute path |
 |---|---|
-| Square logo | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\brand-identity-2026-07-29\v3\png\mark-512.png` |
-| Wordmark | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\CAMPAIGN-2026-07-30\_shared\logo\brandgeo-wordmark-dark-transparent-w512.png` |
-| Screenshot | `C:\Users\const\Constantin Daniel Goane\BrandGEO\marketing\Product Publish\1.avif` (a real dashboard-style asset already on disk; if Uneed's gallery wants a literal in-app screenshot rather than this marketing asset, that still needs live capture) |
+| Logo | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\brand-identity-2026-07-29\v3\png\mark-256.png` |
+| Screenshot | not on disk, needs a real capture of `/ai-visibility` before submitting |
 
-**Submit:** Click **Submit** on Uneed's form. Constantin does this.
+**Submit:** Click **Submit the application**. Constantin does this, either
+today or on whatever date step 0 resolves to.
 
-**External check:** fetch `https://www.uneed.best/tool/brandgeo`, string to
-look for: `BrandGEO`. Earliest pass: same day, Uneed does not require a
-scheduled launch date per the pack. Re-check within 24 hours given the prior
-attempt died mid-flow; if still 404 after a day, that is a finding, not a
-retry-forever situation.
+**Follow-on (after approval, separate from the listing itself):** visit each
+of Profound, peec.ai, AthenaHQ, Semrush AI Toolkit, and Ahrefs Brand Radar's
+AlternativeTo pages (if they exist, check live first), **Contribute to this
+page → Suggest Alternatives**, add BrandGEO, link to the matching
+`brandgeo-vs-*.html` page. Do not claim any of the five are inferior;
+AlternativeTo can mark an overclaiming suggestion as non-genuine.
 
-## 3. Indie Hackers (community traffic, moderate)
+**External check:** fetch `https://alternativeto.net/software/brandgeo/`,
+string to look for: `BrandGEO`. Currently 404 (MEASURED again today,
+2026-08-13). Earliest pass: same day as submission if step 0 clears the
+account today, plus AlternativeTo's own review window of "a couple of days
+to up to a week," so earliest realistic pass is 2 to 7 days after
+whichever date the submission actually happens.
+
+## 4. G2 (a seller profile already exists; audit it, do not resubmit)
+
+**This card changed from "submit a fresh profile via
+`learn.g2.com/claim-free-g2-profile`" to "open the existing profile and fix
+what's wrong."** The live URL is
+`https://www.g2.com/sellers/brandgeo-global`. Fetching it today returned
+**HTTP 403 Forbidden**, which is G2's bot protection blocking this
+session's automated fetch, not a 404. A 403 does not contradict the page
+existing; it only means this session could not read it. A restricted
+`site:g2.com` search for `brandgeo-global` also returned no hit, consistent
+with a profile that exists but is not yet indexed by search, which is
+common for a newly claimed or still-pending listing (INFERRED).
+
+**Fire-by:** this week, early if still pending approval. **Cost: 10
+minutes**, pure text audit if the profile is already claimed; otherwise
+nothing to do but check status.
+
+**Prerequisites:** seller profile exists, YES, per Constantin;
+claim/approval status UNKNOWN, first thing to check below.
+
+**Click path:** Log into the G2 seller/vendor account tied to
+`constantin@getbrandgeo.com` (or whichever address the profile was created
+with), open `https://www.g2.com/sellers/brandgeo-global` directly, and
+check whether it shows as claimed and live, or still pending review.
+
+**If claimed and live, audit against this target text and fix anything
+that differs:**
+
+Category (check the live picker; G2's AI-specific taxonomy has changed
+through 2026)
+```
+AI Search Optimization
+```
+or
+```
+Marketing Analytics Software
+```
+whichever the current picker treats as the closer match.
+
+Short description
+```
+See how visible your brand is across up to seven AI engines, from ChatGPT and Gemini to Grok and Google AI Overviews. BrandGEO scores your AI presence.
+```
+
+Full description
+```
+BrandGEO is an AI Visibility and Generative Engine Optimization (GEO) platform. It runs a brand's real, commercial buyer-intent prompts against up to seven AI engines (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Google AI Overviews, and Grok), reports whether the brand is mentioned, how it ranks against named competitors, and what sentiment the answer carries, and surfaces specific recommendations for closing the gaps.
+
+Self-serve plans start with a free tier and Radar (EUR 29/month at launch, EUR 39/month list). Managed and Enterprise tiers are done-for-you, for teams that want the monitoring and remediation work handled directly.
+```
+
+Pricing table
+```
+Free: EUR 0/month
+Radar: EUR 29/month (launch), EUR 39/month (list)
+Essentials: EUR 99/month
+Growth: EUR 299/month
+Growth PRO: EUR 449/month
+Managed: from EUR 1,500/month
+Enterprise: custom
+```
+
+**Remember: an unclaimed or free-tier profile carries no clickable website
+link by G2's own design** (MEASURED in the original pack from
+`learn.g2.com`). If the profile shows as unclaimed, claiming it is the real
+task here, not editing description text that a visitor cannot act on
+anyway.
+
+**Assets:**
+
+| Asset | Absolute path |
+|---|---|
+| Logo | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\brand-identity-2026-07-29\v3\png\mark-512.png` |
+| Screenshot | not on disk, needs a real dashboard capture |
+
+**Do not solicit reviews.** No real customer base exists yet to invite
+(GTM-TEAM.md section 5 bans customer counts and testimonials outright, and
+G2's own review-generation rules require real users). This step stays closed
+until there are real users to invite.
+
+**Submit:** Click **Save** on any edited fields, or complete the claim flow
+if unclaimed. Constantin does this.
+
+**External check:** fetch `https://www.g2.com/sellers/brandgeo-global`,
+string to look for: `BrandGEO`. MEASURED today: HTTP 403 to this session's
+fetch, so this check could not be completed externally today; retry, and if
+403 persists, `gtm-verify` will need a logged-in or manual screenshot check
+instead of a plain fetch. Do not read a 403 here as "not live."
+
+## 5. Indie Hackers (community traffic, moderate; the one channel below
+still a genuine first submission)
 
 **Fire-by:** this week. **Cost: 10 minutes.**
 
@@ -453,175 +688,6 @@ submitting, and pass it to `gtm-verify`. String to look for once known:
 are not known to sit behind a review queue, not directly confirmed this
 session).
 
-## 4. AlternativeTo (highest long-run ceiling, delayed by the account-age
-clock, start the clock today regardless)
-
-**This is why the account creation sits at the top of today's fire order
-above, separately from this ranked position.** The listing itself cannot
-happen until the account is seven days old, so its traffic contribution
-today is zero no matter how good the eventual placement is. Its long-run
-value is real: once live, it supports "suggest as an alternative" links on
-Profound, peec.ai, and AthenaHQ's own pages, which is BrandGEO's exact ICP
-browsing for exactly this kind of comparison.
-
-**Fire-by (account creation): today, 2026-08-13. Cost: 2 minutes.**
-**Fire-by (the actual listing): no earlier than 2026-08-20 (Day 8). Cost: 10
-minutes.**
-
-**Prerequisites:** AlternativeTo account, INFERRED not yet created or not
-yet seven days old (audit: "the account-age clock was likely never
-started"), Constantin to confirm.
-
-**Click path (today, account only):** Go to `alternativeto.net`, create an
-account. Nothing else today.
-
-**Click path (Day 8, the listing):** User icon (top right) → **Suggest new
-application** → fill the fields below → **Submit the application**.
-
-**Fields (for Day 8):**
-
-App name
-```
-BrandGEO
-```
-
-Platforms
-```
-Web
-```
-
-License
-```
-Free with Limited Functionality
-```
-
-Description
-```
-BrandGEO tracks how your brand appears across up to seven AI engines (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Google AI Overviews, and Grok): mention rate, sentiment, ranking against named competitors. Free tier available; paid tiers from EUR 29/month. Based in Spain, built for brands worldwide.
-```
-268 characters. No published cap found; this matches AlternativeTo's typical
-listing length.
-
-Tags
-```
-AI Visibility, GEO monitoring, Generative Engine Optimization, AI search tracking, brand mention tracking
-```
-
-Website
-```
-https://getbrandgeo.com/?utm_source=alternativeto&utm_campaign=launch#free-audit
-```
-
-**Assets:**
-
-| Asset | Absolute path |
-|---|---|
-| Logo | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\brand-identity-2026-07-29\v3\png\mark-256.png` |
-| Screenshot | not on disk, needs a real capture of `/ai-visibility` before Day 8 |
-
-**Submit:** Click **Submit the application**. Constantin does this, on or
-after 2026-08-20.
-
-**Follow-on (after approval, separate from the listing itself):** visit each
-of Profound, peec.ai, AthenaHQ, Semrush AI Toolkit, and Ahrefs Brand Radar's
-AlternativeTo pages (if they exist, check live first), **Contribute to this
-page → Suggest Alternatives**, add BrandGEO, link to the matching
-`brandgeo-vs-*.html` page. Do not claim any of the five are inferior;
-AlternativeTo can mark an overclaiming suggestion as non-genuine.
-
-**External check:** fetch `https://alternativeto.net/software/brandgeo/`,
-string to look for: `BrandGEO`. Currently 404 (MEASURED, audit 2026-08-13).
-Earliest pass: submission no earlier than 2026-08-20, plus AlternativeTo's
-own review window of "a couple of days to up to a week," so earliest
-realistic pass is 2026-08-22, possibly as late as 2026-08-27.
-
-## 5. G2 (start the clock today, but the free profile carries no link, so
-near-term traffic is close to zero)
-
-**This ranks below AlternativeTo and Indie Hackers on near-term traffic
-specifically because G2's own pack states free profiles get no clickable
-website link or CTA button** (MEASURED, `g2.md`: "Free G2 profiles do NOT
-get a direct website link or CTA button"). The reason to start it today
-regardless is the 3 to 5 business day approval clock; PLAN section 3 puts it
-first in the Days 4-9 lane for exactly this reason.
-
-**Fire-by:** as early as possible, ideally today or tomorrow. **Cost: 10
-minutes.**
-
-**Prerequisites:** a `getbrandgeo.com` work email for verification, YES,
-`constantin@getbrandgeo.com` or `support@getbrandgeo.com` both exist per the
-pack.
-
-**Click path:** `learn.g2.com/claim-free-g2-profile` or G2's current "Get
-Listed" flow.
-
-**Fields:**
-
-Company name
-```
-BrandGEO
-```
-
-Category (check the live picker; G2's AI-specific taxonomy has changed
-through 2026)
-```
-AI Search Optimization
-```
-or
-```
-Marketing Analytics Software
-```
-whichever the current picker treats as the closer match.
-
-Short description
-```
-See how visible your brand is across up to seven AI engines, from ChatGPT and Gemini to Grok and Google AI Overviews. BrandGEO scores your AI presence.
-```
-
-Full description
-```
-BrandGEO is an AI Visibility and Generative Engine Optimization (GEO) platform. It runs a brand's real, commercial buyer-intent prompts against up to seven AI engines (ChatGPT, Gemini, Claude, Perplexity, Google AI Mode, Google AI Overviews, and Grok), reports whether the brand is mentioned, how it ranks against named competitors, and what sentiment the answer carries, and surfaces specific recommendations for closing the gaps.
-
-Self-serve plans start with a free tier and Radar (EUR 29/month at launch, EUR 39/month list). Managed and Enterprise tiers are done-for-you, for teams that want the monitoring and remediation work handled directly.
-```
-
-Work email for verification
-```
-constantin@getbrandgeo.com
-```
-
-Pricing table
-```
-Free: EUR 0/month
-Radar: EUR 29/month (launch), EUR 39/month (list)
-Essentials: EUR 99/month
-Growth: EUR 299/month
-Growth PRO: EUR 449/month
-Managed: from EUR 1,500/month
-Enterprise: custom
-```
-
-**Assets:**
-
-| Asset | Absolute path |
-|---|---|
-| Logo | `C:\Users\const\Constantin Daniel Goane\BrandGEO\docs\growth\brand-identity-2026-07-29\v3\png\mark-512.png` |
-| Screenshot | not on disk, needs a real dashboard capture |
-
-**Do not solicit reviews.** No real customer base exists yet to invite
-(GTM-TEAM.md section 5 bans customer counts and testimonials outright, and
-G2's own review-generation rules require real users). This step stays closed
-until there are real users to invite.
-
-**Submit:** Click **Submit** / **Get Listed**. Constantin does this.
-
-**External check:** search `g2.com` for a BrandGEO profile; no stable direct
-URL is known in advance. String to look for: `BrandGEO`, plus the short
-description text (the free profile will not carry a clickable outbound
-link, so do not treat a missing link as a failure). Earliest pass: 3 to 5
-business days from submission, plus 1 to 3 more to claim; if submitted
-2026-08-13, earliest live-and-claimed is roughly 2026-08-20 to 2026-08-21.
-
 ## 6. DevHunt: BLOCKED, not fired, not decided here
 
 DevHunt's own pack flags the fit question itself: BrandGEO is a
@@ -677,11 +743,13 @@ an active falsehood
 
 **Reasoning:** this is not ranked against other channels on
 traffic-per-minute, because it is not really a growth investment, it is
-stopping something that is actively wrong right now. The profile is
-advertising a retired engine (Meta AI) and a stale engine count
-(`gbp-live-assets-stale` memory; last known state, not independently
-re-verifiable here since GBP requires owner login this session does not
-have). A free, public, currently-live surface publishing a false claim
+stopping something that is actively wrong right now. Constantin confirms the
+profile exists (it was never in question that it exists, only whether its
+content is still correct). The profile is advertising a retired engine
+(Meta AI) and a stale engine count (`gbp-live-assets-stale` memory; last
+known state, not independently re-verifiable here since GBP requires owner
+login this session does not have and no stable public GBP URL exists to
+fetch anonymously). A free, public, currently-live surface publishing a false claim
 about what the product does is a reputational risk regardless of how much
 traffic GBP itself sends, and it is cheap to fix: the corrected images
 already exist and are already rendered at

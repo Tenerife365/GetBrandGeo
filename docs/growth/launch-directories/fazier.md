@@ -94,7 +94,7 @@ chosen launch date opens up, submit early enough to still land on 08-10.
 
 | Asset | Path | Notes |
 |---|---|---|
-| Logo | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-transparent-512.png` | square |
+| Logo | `docs/growth/brand-identity-2026-07-29/v3/png/mark-512.png` | square |
 | Gallery screenshot(s) | **NEEDS CAPTURE**, 1-3 real (non-demo) dashboard views | ready by Day 7 |
 | Cover/banner (if Fazier has a wide-format banner slot) | **NEEDS CAPTURE/DESIGN**, no ready asset at a banner ratio in the brand kit | flag to design if required |
 

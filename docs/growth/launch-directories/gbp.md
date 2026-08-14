@@ -79,7 +79,7 @@ GBP requires a square image per product. Use:
 
 | Product | Image |
 |---|---|
-| Free / Radar / Essentials (shared, or pick per product if GBP allows only one image reused) | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-canvas-512.png` |
+| Free / Radar / Essentials (shared, or pick per product if GBP allows only one image reused) | `docs/growth/brand-assets-v3-2026-07-31/png/gbp/gbp-logo-720-violet.png` |
 
 If a more specific per-tier image is wanted, none exists in the brand kit yet
 , flag for design rather than reuse a mismatched asset.

@@ -64,7 +64,7 @@ guessing a number.
 
 | Asset | Path |
 |---|---|
-| Logo | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-transparent-256.png` |
+| Logo | `docs/growth/brand-identity-2026-07-29/v3/png/mark-256.png` |
 
 ---
 

@@ -37,7 +37,7 @@ Title: Check your brand's AI visibility, free
 Description: See how visible your brand is across up to seven AI engines,
 from ChatGPT and Gemini to Grok and Google AI Overviews. BrandGEO scores your
 AI presence.
-Thumbnail: docs/growth/brand-kit-2026-07-29/png/social/linkedin-logo-400-white.png
+Thumbnail: docs/growth/brand-assets-v3-2026-07-31/png/linkedin/linkedin-logo-400-violet.png
 (or a live audit-flow screenshot, if Constantin prefers a product shot over
 the logo tile: flagged as a choice, not decided here)
 ```
@@ -64,7 +64,7 @@ https://getbrandgeo.com/?utm_source=linkedin&utm_campaign=launch#free-audit
 
 | Asset | Path |
 |---|---|
-| Logo (if the page logo needs refreshing) | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-canvas-512.png` |
+| Logo (if the page logo needs refreshing) | `docs/growth/brand-assets-v3-2026-07-31/png/gbp/gbp-logo-720-violet.png` |
 | Cover image (1128x191, LinkedIn's banner spec) | **NEEDS CAPTURE/DESIGN**, no asset in the brand kit is sized for LinkedIn's banner ratio; flag for a design pass if the current banner is stale or generic |
 
 ---

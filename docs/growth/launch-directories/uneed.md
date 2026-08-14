@@ -116,10 +116,10 @@ Constantin Daniel
 
 | Asset | Path | Notes |
 |---|---|---|
-| Square logo | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-transparent-512.png` | 512x512, transparent, safest default for a square logo slot |
-| Wordmark (if a separate wordmark field exists) | `docs/growth/brand-kit-2026-07-29/png/wordmark/brandgeo-wordmark-dark-transparent-w1024.png` | dark-on-transparent, 1024w |
+| Square logo | `docs/growth/brand-identity-2026-07-29/v3/png/mark-512.png` | 512x512, transparent, safest default for a square logo slot |
+| Wordmark (if a separate wordmark field exists) | `docs/growth/CAMPAIGN-2026-07-30/_shared/logo/brandgeo-wordmark-dark-transparent-w512.png` | dark-on-transparent, 1024w |
 | Gallery / screenshot | **NEEDS CAPTURE**, Constantin to capture: a live dashboard screenshot of `/ai-visibility` or `/sentiment` showing real (not demo) data, desktop width | Uneed's gallery typically wants 1-3 product screenshots |
-| Favicon (if requested separately) | `docs/growth/brand-kit-2026-07-29/favicon/favicon-512.png` | |
+| Favicon (if requested separately) | `docs/growth/brand-identity-2026-07-29/v3/png/mark-512.png` | |
 
 ## Alternative-to positioning (if Uneed has a "similar tools" or comparison
 field)

@@ -74,7 +74,7 @@ https://getbrandgeo.com/?utm_source=devhunt&utm_campaign=launch#free-audit
 
 | Asset | Path |
 |---|---|
-| Logo | `docs/growth/brand-kit-2026-07-29/png/mark-square/brandgeo-mark-transparent-512.png` |
+| Logo | `docs/growth/brand-identity-2026-07-29/v3/png/mark-512.png` |
 | Screenshot | **NEEDS CAPTURE**, 1-2 real dashboard views |
 
 ---
