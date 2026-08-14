@@ -20,6 +20,65 @@
 
 ---
 
+## CURRENT STATE (newest entry 2026-08-14)
+
+### 2026-08-14: Sprint 17 day 2, four GTM seats delivered, three live defects closed
+
+The other subscription hit its limit mid-session on day 1; this session picked
+the sprint up. Recovered `gtm-demand`'s uncommitted day-1 work first
+(`2f61220`), then ran the four seats that had never produced a file.
+
+**Three live defects found and fixed, verified over HTTP or by test:**
+
+1. **50 articles were invisible to every search engine.** `sitemap.xml` stopped
+   at `bg-054.html` while `bg-055` to `bg-104` served 200. `ping-sitemap` only
+   reads the live sitemap, so those pages reached neither Google nor IndexNow.
+   50 entries appended, live sitemap now ends at bg-104 (`36ad6e1`).
+2. **The industry pages cited other companies' research as ours.** 31 claim
+   sites across 9 pages (`3c7a8ac`). Worst item: home services claimed SOCi's
+   98.8% as "the most AI-invisible category BrandGEO has measured". Siftly, ALM
+   Corp, SOCi and Digital Bloom reattributed per `bg-008`'s own record; 5WPR
+   and FlyDragon verified first-party and linked; 3 unverifiable claims
+   deleted. The 27 city pages share the `ai-visibility-for-*` prefix and were
+   deliberately NOT touched.
+3. **Scheduled refresh erased history instead of accumulating it.** Committed
+   `ac263ca`, **NOT PUSHED**, held by the batch-push hook. One `force` flag
+   controlled two decisions; `replaceExisting` splits them, defaulting to
+   `force && trigger === 'manual'`. `tests/enqueue_history.test.js` (23
+   assertions) fails pre-fix, passes post-fix. Cost per run unchanged.
+
+**BpR (client 1) is allocated Growth PRO to 2027-06-02**, `plan_source =
+'package'` (one of the three values `expire-plan-grants` acts on), plus a
+`client_events` row. Cadence deliberately left `manual`: `last_refresh_at` is
+null so `isDue()` is true immediately and the hourly cron fires at :10, so
+flipping cadence before the fix deploys destroys their 277 rows within the
+hour. **Order is not negotiable: deploy, THEN `update clients set
+refresh_cadence='weekly' where id=1`.** Client 52 already lost its history to
+this bug (1 day, 6 rows) and cannot get it back.
+
+**Finding that reframes the funnel, verified rather than inherited:** the
+8-of-8 zero-score audits are TRUTHFUL, not a detection bug (the brand strings
+appear nowhere in the stored `engine_results`). But the real split is brand
+SIZE: HubSpot 61, Mailchimp 54, CaretLegal 56, GetResponse 33, and every small
+brand since scores 0. The screening audit asks generic category questions, so
+it returns a near-constant result for the whole SMB segment, while the only
+visitor-specific output (which competitors were named instead of them) sits
+behind the email gate. Also found: `top_gaps` IS the first three
+`competitor_flags` re-keyed (`_score.js:167-170`), so the planned "names in
+front, gaps behind" split is not implementable as written; `bg-architect` owes
+a granularity ruling.
+
+**The Evidence Machine already exists in production**, contradicting the plan's
+day-9 schedule: `audit-domain.js` with `X-Internal-Key` writes `unlocked:true`
+and `app.getbrandgeo.com/audit/<token>` renders it publicly with no gate. 55
+internal audits across 41 domains, EUR 15.31 lifetime. Founder-led sales needs
+no build and no sending domain.
+
+**Left uncommitted deliberately, not this session's to sweep in:** ~805 lines
+of pending-invoices work in `_revenue.js`, `revenue-report.js` and
+`Revenue.tsx` from another session, carrying 65 em dashes that must be
+stripped before it ships.
+
 ## CURRENT STATE (newest entry 2026-08-13)
 
 ### 2026-08-13: INV-35 PAID, GTM team created, five rulings made
