@@ -1,29 +1,49 @@
 /**
- * _enqueue.js — shared "build a collection run + its jobs for one client"
+ * _enqueue.js - shared "build a collection run + its jobs for one client"
  * helper (SCALE-SPEC.md §3). Used by BOTH enqueue-collection.js (manual "Run
  * collection" from the browser) and schedule-collections.js (the hourly cron),
  * so the job-building rules live in exactly one place.
  *
  * A run = one collection_runs row + N collection_jobs rows (one job per active
  * prompt, each carrying the engine set to run for that prompt). The worker then
- * drains the jobs. Nothing here calls an engine — it only reads state and writes
+ * drains the jobs. Nothing here calls an engine - it only reads state and writes
  * the queue.
  *
- * force / skip semantics, matching the old browser loop exactly:
- *   - force = true  (manual "Force Refresh", and every scheduled refresh):
- *       delete existing ai_results for (client, prompts, engines), then enqueue
- *       every active prompt across all active engines. This is the automated
- *       equivalent of a human clicking Force Refresh — which is precisely the
- *       button SCALE-SPEC §3 says the scheduler replaces.
- *   - force = false (manual "Run collection"):
- *       enqueue only the engines NOT already collected OK this calendar month,
- *       per prompt; skip prompts that are already complete. No delete.
+ * TWO INDEPENDENT DECISIONS, AND CONFLATING THEM WAS A DEFECT. Until 2026-08-14
+ * a single `force` flag controlled both of the following, so there was no way to
+ * ask for one without the other:
  *
- * TREND-HISTORY NOTE (flagged, deliberate): scheduled runs delete+recollect like
- * a Force Refresh, so they do not accumulate a per-cycle trend history yet.
- * Preserving history across refresh cycles is a follow-up tied to fixing §14.6's
- * cross-run aggregation (some dashboard reads aggregate ALL rows, not
- * newest-per-(prompt,engine)); doing it now would inflate those aggregates.
+ *   (a) WHAT TO COLLECT   is `force`
+ *         true  : every active prompt across every active engine.
+ *         false : only the (prompt, engine) pairs NOT already collected OK this
+ *                 calendar month; a prompt with nothing left is skipped.
+ *
+ *   (b) WHAT TO DO WITH THE ROWS ALREADY THERE is `replaceExisting`
+ *         true  : DELETE existing ai_results for (client, prompts, engines)
+ *                 before enqueueing. Destructive, and the correct meaning of a
+ *                 human clicking "Force Refresh": redo today's collection and
+ *                 get rid of the stale rows I am replacing.
+ *         false : leave prior rows alone. The new run writes alongside them
+ *                 under its own run_id, so history accumulates.
+ *
+ * WHY THEY HAD TO BE SPLIT. A scheduled weekly refresh needs (a) true. It has to
+ * recollect inside the same calendar month, or the month-skip makes weekly a
+ * no-op from the second run of the month onward. But it must NOT have (b), because the
+ * delete carried no date filter and therefore erased ALL prior history for those
+ * prompts and engines, every cycle, forever. Trend over time is the thing the
+ * paid tiers sell, so the scheduler was deleting the product's core value on a
+ * timer. Measured 2026-08-14: client 1 held 277 rows over 8 distinct collection
+ * days across 5 runs; client 52, already on weekly, held 6 rows over 1 day.
+ * That second number is what this bug looks like from the outside.
+ *
+ * The default below is deliberately derived from `trigger`, not left to the
+ * caller: an automated run replaces nothing unless someone asks for it in so
+ * many words. A future scheduled caller that forgets the flag still accumulates.
+ *
+ * ACCUMULATION IS SAFE AT THE SCHEMA LEVEL, no migration needed. The only
+ * uniqueness on ai_results is uq_ai_results_run_prompt_llm (run_id, prompt_id,
+ * llm), and every run mints a fresh run_id, so week N+1's rows never collide
+ * with week N's. Verified against production 2026-08-14.
  */
 
 const { activeEnginesFor, MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS, PLAN_COLLECTION_COOLDOWN_HOURS } = require('./_cost')
@@ -49,17 +69,27 @@ function monthStartIso() {
  * enqueueClientCollection(supabase, opts) -> { runId, totalJobs, skipped, reason? }
  *
  * opts:
- *   clientId      (int, required)
- *   force         (bool)                       — see force/skip semantics above
- *   trigger       ('manual' | 'scheduled')
- *   createdBy     (uuid | null)                — auth.users.id for manual; null for cron
- *   market        ({ market_id, market_label, region_label } | null)
- *                                              — explicit geo (manual); null → resolve from client default
- *   activeEngines (string[] | null)            — explicit engine set (manual); null → derive from plan
+ *   clientId        (int, required)
+ *   force           (bool)                     WHAT to collect; see (a) above
+ *   replaceExisting (bool | null)              whether to DELETE prior rows first; see (b) above.
+ *                                                null (default) → force && trigger === 'manual',
+ *                                                i.e. only a human Force Refresh is destructive.
+ *   trigger         ('manual' | 'scheduled')
+ *   createdBy       (uuid | null)              - auth.users.id for manual; null for cron
+ *   market          ({ market_id, market_label, region_label } | null)
+ *                                              - explicit geo (manual); null → resolve from client default
+ *   activeEngines   (string[] | null)          - explicit engine set (manual); null → derive from plan
  */
 async function enqueueClientCollection(supabase, {
   clientId, force = false, trigger = 'manual', createdBy = null, market = null, activeEngines = null,
+  replaceExisting = null,
 }) {
+  // Fail safe toward keeping data: anything that is not an explicit request to
+  // replace, from a manual trigger, accumulates.
+  const replace = replaceExisting === null
+    ? (force && trigger === 'manual')
+    : !!replaceExisting
+
   // 1. Client
   const { data: client } = await supabase
     .from('clients')
@@ -68,7 +98,7 @@ async function enqueueClientCollection(supabase, {
     .single()
   if (!client) return { runId: null, totalJobs: 0, skipped: true, reason: 'client not found' }
 
-  // 2. Engines — the browser passes its plan-active set, but re-gate server-side
+  // 2. Engines - the browser passes its plan-active set, but re-gate server-side
   // against the plan's live engines so a stale/forged request can't run an engine
   // the plan doesn't include (e.g. Google AI Mode is Growth PRO and up only).
   const allowed = new Set(activeEnginesFor(client.plan, client.engines_enabled))
@@ -101,7 +131,7 @@ async function enqueueClientCollection(supabase, {
     plan:              client.plan ?? null,
   }
 
-  // 4. Geo — explicit (manual) or resolved from the client default (scheduled)
+  // 4. Geo - explicit (manual) or resolved from the client default (scheduled)
   let market_id, market_label, region_label
   if (market) {
     market_id    = market.market_id ?? null
@@ -118,8 +148,9 @@ async function enqueueClientCollection(supabase, {
 
   // Monthly cap (MONTHLY_CAPPED_ENGINES, e.g. google_ai/SerpApi): find the
   // (prompt, engine) pairs that already ran within MONTHLY_CAP_DAYS. Computed
-  // BEFORE the force-delete below, so a force refresh can't erase the evidence
-  // and bypass the cap. Applies to force AND non-force alike.
+  // BEFORE the replace-delete below, so a force refresh can't erase the evidence
+  // and bypass the cap. Applies to force AND non-force alike. KEEP THIS QUERY
+  // ABOVE THE DELETE. The ordering is the whole reason the cap is force-proof.
   let cappedSet = new Set()
   if (MONTHLY_CAPPED_ENGINES.some(e => engines.includes(e))) {
     const capWindow = new Date(Date.now() - MONTHLY_CAP_DAYS * 86400000).toISOString()
@@ -135,9 +166,12 @@ async function enqueueClientCollection(supabase, {
 
   let perPromptEngines  // Map<prompt_id, string[]>
 
-  if (force) {
-    // Delete existing rows for the engines we're about to re-run — but NEVER
-    // delete a weekly-capped engine (that would wipe the row the cap relies on,
+  // (b) Replace: destructive, manual Force Refresh only. Note this is a separate
+  // `if` from the force branch below, not an else-arm of it. The two decisions
+  // are independent now and a scheduled run takes the force branch WITHOUT this.
+  if (replace) {
+    // Delete existing rows for the engines we're about to re-run - but NEVER
+    // delete a monthly-capped engine (that would wipe the row the cap relies on,
     // and its cadence is managed by the cap, not by force).
     const enginesForDelete = engines.filter(e => !MONTHLY_CAPPED_ENGINES.includes(e))
     if (enginesForDelete.length > 0) {
@@ -149,6 +183,10 @@ async function enqueueClientCollection(supabase, {
         .in('llm', enginesForDelete)
       if (delErr) console.error('[Enqueue] force-delete failed:', delErr.message)
     }
+  }
+
+  // (a) What to collect.
+  if (force) {
     perPromptEngines = new Map(prompts.map(p => [p.id, engines.slice()]))
   } else {
     // Skip (prompt, engine) pairs already collected OK this month.
@@ -183,6 +221,12 @@ async function enqueueClientCollection(supabase, {
     return { runId: null, totalJobs: 0, skipped: true, reason: 'nothing to collect (already up to date)' }
 
   // 6. Create the run
+  // collection_runs.force records decision (a), WHAT was collected, which is what
+  // the column has always meant. Decision (b), whether prior rows were replaced,
+  // is not stored: `trigger` already separates the only two cases that exist
+  // (manual force replaces, scheduled never does), and adding a column would be
+  // a migration for something derivable. If a third caller ever needs a
+  // different combination, add `replaced boolean` then, not now.
   const { data: run, error: runErr } = await supabase
     .from('collection_runs')
     .insert([{ client_id: clientId, trigger, force, total_jobs: jobPrompts.length, created_by: createdBy }])
@@ -210,11 +254,11 @@ async function enqueueClientCollection(supabase, {
     return { runId: null, totalJobs: 0, skipped: true, reason: `jobs insert failed: ${jobsErr.message}` }
   }
 
-  return { runId: run.id, totalJobs: jobRows.length, skipped: false }
+  return { runId: run.id, totalJobs: jobRows.length, skipped: false, replaced: replace }
 }
 
 /**
- * triggerWorker() — fire-and-forget kick of collection-worker-background.js so a
+ * triggerWorker() - fire-and-forget kick of collection-worker-background.js so a
  * freshly-enqueued run starts draining immediately instead of waiting for the
  * next hourly cron. Safe to over-call: SKIP LOCKED means a redundant invocation
  * just claims nothing and exits. Uses the shared internal key.
@@ -236,7 +280,7 @@ async function triggerWorker() {
  * checkCollectionCooldown(supabase, clientId) ->
  *   { blocked, hoursRemaining?, nextAvailableAt?, message? }
  *
- * PRICING-STRATEGY-2026-07 §6 — blocks a MANUAL "Run collection" if the client
+ * PRICING-STRATEGY-2026-07 §6 - blocks a MANUAL "Run collection" if the client
  * ran one within its plan's cooldown window (72/48/36h; free monthly; managed+
  * = 0 = no cooldown). Only manual runs count (trigger='manual'); scheduled
  * refresh is bounded by cadence + budget, not this. Callers apply admin bypass.
