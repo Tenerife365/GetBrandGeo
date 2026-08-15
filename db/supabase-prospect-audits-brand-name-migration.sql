@@ -1,0 +1,68 @@
+-- supabase-prospect-audits-brand-name-migration.sql
+--
+-- Adds ONE nullable column, brand_name, to prospect_audits. Additive only, same
+-- pattern as CLAUDE.md #95 (ai_results status/error_code): existing rows get
+-- NULL, no existing reader breaks, no column is dropped or retyped.
+--
+-- WHY THIS IS NEEDED (docs/qa/audit-scoring-investigation-2026-08-14.md R4):
+-- audit-domain.js:79 used to call generateAuditPrompts(domain) on every single
+-- audit, which calls gpt-4o-mini at temperature 0.4 and regenerates BOTH the
+-- prompt set AND the extracted brand name every time. That produced two live
+-- prospects seeing two different scores for the same domain minutes apart
+-- (revenuehunt.com: 54 then 0, sharing only 1 of 6 prompts) and blocked five
+-- qualified prospects from being contacted.
+--
+-- The fix makes the prompt set stable per domain by reusing the earliest prior
+-- prospect_audits row for that domain instead of regenerating (see
+-- getOrGenerateAuditPrompts() in _prospect_prompts.js). generated_prompts and
+-- category were already columns and already reusable. brand_name was NOT
+-- persisted anywhere. It lived only in an in-memory `generated.brandName`
+-- that buildProspectAliases() consumed once and discarded. Without this
+-- column, reusing the prompt set would silently drop the brand name used to
+-- build the match aliases (_prospect_prompts.js buildProspectAliases()),
+-- which would make alias matching (and therefore brand_mentioned) inconsistent
+-- across runs even after the prompts themselves were stabilised, the exact
+-- defect this migration exists to close, one layer down.
+--
+-- Run this once in the Supabase SQL Editor for the `brandgeo-dashboard` project
+-- (duiyifepitvugyulobqm, per CLAUDE.md §6.4 step 7). Per this project's
+-- execution-delegation rule, Constantin runs this himself; bg-backend never
+-- runs a mutating statement.
+--
+-- SEQUENCING: safe to run before OR after the code deploy, but the deploy
+-- does not get the reproducibility fix until THIS migration has run.
+-- getOrGenerateAuditPrompts() in _prospect_prompts.js selects brand_name in
+-- the same query as the reused generated_prompts lookup, so if this column is
+-- missing the whole lookup errors and falls back to the OLD behaviour
+-- (always regenerate through gpt-4o-mini) rather than throwing. That keeps
+-- the audit endpoint working either order, but the fix for defect 1 (same
+-- domain, different score) is inert until this migration is applied. NOTE:
+-- this "either order is safe" property depends on the SELECT continuing to
+-- name brand_name. If a future edit ever drops brand_name from that select
+-- list, prompt-set reuse would start working pre-migration while brand-name
+-- reuse silently would not, which is exactly the null-passthrough class of
+-- bug this migration exists to prevent (docs/qa/scoring-fixes-review-2026-08-14.md
+-- F1). Do not remove brand_name from that select list without re-checking this.
+-- audit-domain.js's insert of a new prospect_audits row separately catches
+-- the equivalent write-side error and retries once without brand_name, so
+-- inserts never fail either way. Run this migration BEFORE relying on
+-- reproducibility, even though nothing breaks if the deploy lands first.
+--
+-- ROLLBACK: ALTER TABLE prospect_audits DROP COLUMN IF EXISTS brand_name;
+-- Safe at any time in the sense that nothing errors: the SELECT simply stops
+-- naming a real column and every subsequent lookup fails open exactly like
+-- the pre-migration case above (always regenerate). It is NOT equivalent to
+-- "brand name reuse degrades gracefully to null" any more: as of the F1 fix
+-- (2026-08-14), a reused row with no recoverable brand_name is never returned
+-- with brandName: null. getOrGenerateAuditPrompts() either recovers one from
+-- the domain's live og:site_name meta tag or abandons reuse entirely and
+-- regenerates fresh, specifically so a null brand name is never silently
+-- passed through to buildProspectAliases(). Dropping the column does not
+-- error anything; it just removes the ability to persist a brand name across
+-- audits, which is a smaller and different thing than what this note used to
+-- claim.
+
+ALTER TABLE prospect_audits ADD COLUMN IF NOT EXISTS brand_name text;
+
+COMMENT ON COLUMN prospect_audits.brand_name IS
+  'Extracted canonical brand/company name for this domain (see _prospect_prompts.js generateAuditPrompts()). Persisted so a later audit of the same domain can reuse it via getOrGenerateAuditPrompts() instead of re-deriving it from a fresh, non-deterministic LLM call.';

@@ -148,11 +148,28 @@ export function computeAiVisibilityScore(
   })
   const accuracy = mentionedTotal > 0 ? Math.round((topThree / mentionedTotal) * 100) : 0
 
-  // Reach — % of active engines that mention the brand in at least one prompt
-  const enginesWithMention = activeLLMIds.filter(llmId =>
+  // Reach: % of engines we actually heard from (excludes an engine that never
+  // returned a usable result for any prompt) that mention the brand in at
+  // least one prompt.
+  //
+  // FIXED 2026-08-14 (docs/qa/audit-scoring-investigation-2026-08-14.md F1):
+  // this used to divide by activeLLMIds.length, i.e. every engine the client's
+  // plan requests, including one that failed on every prompt. That silently
+  // deflated a paying client's reach whenever OUR engine call failed, not
+  // theirs, the exact defect #109 removed from _score.js's audit-path reach
+  // calculation (_score.js:70-74) but never brought over here. Kept in sync
+  // with _score.js's `enginesWithResults` denominator: an engine with zero
+  // surviving rows (buildScoreResultMap already drops 'error'-status and
+  // no-answer rows above) is an engine we failed to reach, not an engine that
+  // reached the client and found nothing, so it must drop out of the
+  // denominator along with the numerator.
+  const enginesHeardFrom = activeLLMIds.filter(llmId =>
+    promptIds.some(pid => results.get(pid)?.has(llmId))
+  )
+  const enginesWithMention = enginesHeardFrom.filter(llmId =>
     promptIds.some(pid => results.get(pid)?.get(llmId)?.brand_mentioned)
   ).length
-  const reach = activeLLMIds.length > 0 ? Math.round((enginesWithMention / activeLLMIds.length) * 100) : 0
+  const reach = enginesHeardFrom.length > 0 ? Math.round((enginesWithMention / enginesHeardFrom.length) * 100) : 0
 
   // Consistency — % of prompts where >=60% of checked active engines mention the brand
   const consistentPrompts = promptIds.filter(pid => {

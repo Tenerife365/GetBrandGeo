@@ -25,7 +25,7 @@ const { classifyCompetitors } = require('./_competitor_filter')
 const {
   buildAuditContext, withTimeout, ALL_CALLERS, SCREENING_ENGINES, FULL_ENGINES, estimateAuditCost,
 } = require('./_prospect_engines')
-const { generateAuditPrompts, buildProspectAliases } = require('./_prospect_prompts')
+const { getOrGenerateAuditPrompts, buildProspectAliases } = require('./_prospect_prompts')
 const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFlags, enginesWithResults } = require('./_score')
 const {
   guardPublicRequest, checkMonthlyBudget, checkGlobalHourlyLimit, generateToken, isPlausibleDomain, normalizeDomain, isInternalCaller,
@@ -75,8 +75,20 @@ exports.handler = async (event) => {
   const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
   console.log(`[Audit/${invId}] domain:${domain} depth:${depth} internal:${internal}`)
 
-  // ── 1. Generate prompts (one LLM call, ~2-5s) ──────────────────────────────
-  const generated = await generateAuditPrompts(domain)
+  // ── 1. Get or generate prompts ──────────────────────────────────────────────
+  // FIX 2026-08-14 (docs/qa/audit-scoring-investigation-2026-08-14.md §4): this
+  // used to call generateAuditPrompts(domain) unconditionally, regenerating the
+  // whole prompt set through gpt-4o-mini at temperature 0.4 on every audit, so
+  // the same domain audited twice was not the same measurement (revenuehunt.com
+  // scored 54 then 0 three minutes apart, sharing only 1 of 6 prompts).
+  // getOrGenerateAuditPrompts() reuses the domain's prior prompt set when one
+  // exists, so a repeat audit of the same domain is now reproducible. The one
+  // deliberate way to force a fresh set (category changed, a bad generation) is
+  // `regeneratePrompts: true` in the POST body, and it is gated to internal
+  // callers only. A public visitor must never be able to trigger a regeneration,
+  // since that would reopen exactly this defect for anyone who found the flag.
+  const forceRegeneratePrompts = internal && body.regeneratePrompts === true
+  const generated = await getOrGenerateAuditPrompts(supabase, domain, { forceRegenerate: forceRegeneratePrompts })
   const promptsAll = generated.prompts.map((text, id) => ({ id, text }))
   const engines = depth === 'screening' ? SCREENING_ENGINES : FULL_ENGINES
   const promptsToRun = depth === 'screening' ? promptsAll.slice(0, SCREENING_PROMPT_COUNT) : promptsAll
@@ -96,7 +108,7 @@ exports.handler = async (event) => {
   // Falls back to [domain-root] alone if no brand name was extracted, same
   // as before. See _prospect_prompts.js for the full rationale.
   const prospectAliases = buildProspectAliases(domain, generated.brandName)
-  console.log(`[Audit/${invId}] brand_name:${generated.brandName || '(none)'} aliases:[${prospectAliases.join(', ')}]`)
+  console.log(`[Audit/${invId}] brand_name:${generated.brandName || '(none)'} aliases:[${prospectAliases.join(', ')}] prompts:${generated.reused ? 'reused' : 'generated'}`)
 
   const token = generateToken()
   const nowIso = new Date().toISOString()
@@ -107,6 +119,7 @@ exports.handler = async (event) => {
     status: depth === 'screening' ? 'collecting' : 'generating_prompts',
     created_via: internal ? 'internal' : 'public',
     low_confidence: generated.lowConfidence,
+    brand_name: generated.brandName || null,
     unlocked: internal || !!body.email,
     email: body.email || null,
     email_captured_at: body.email ? nowIso : null,
@@ -118,8 +131,21 @@ exports.handler = async (event) => {
     updated_at: nowIso,
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  let { data: inserted, error: insErr } = await supabase
     .from('prospect_audits').insert([baseRow]).select('id, token').single()
+
+  // brand_name is a new column (db/supabase-prospect-audits-brand-name-migration.sql)
+  // that this environment may not have migrated yet. Fail open rather than
+  // breaking every audit request until Constantin runs it: retry once without
+  // the field. This only degrades to "no brand-name reuse yet", it does not
+  // block the audit itself.
+  if (insErr && /brand_name/i.test(insErr.message || '')) {
+    console.warn(`[Audit/${invId}] insert referenced brand_name, retrying without it (migration not yet applied?):`, insErr.message)
+    const { brand_name, ...rowWithoutBrandName } = baseRow
+    ;({ data: inserted, error: insErr } = await supabase
+      .from('prospect_audits').insert([rowWithoutBrandName]).select('id, token').single())
+  }
+
   if (insErr || !inserted) {
     console.error(`[Audit/${invId}] insert failed:`, insErr?.message)
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Could not start audit. Please try again.' }) }
