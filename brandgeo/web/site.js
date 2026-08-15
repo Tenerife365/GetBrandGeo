@@ -111,6 +111,12 @@
     var AUDIT_RATE_KEY = 'bgAuditAttempts';
     var AUDIT_RATE_MAX = 3;
     var AUDIT_RATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+    // Public callers are always forced to screening depth (audit-domain.js:74),
+    // which always requests exactly this many prompts (SCREENING_PROMPT_COUNT,
+    // audit-domain.js:34). A request count, not an answered count -- safe to
+    // state even when fewer cells actually returned an answer, per
+    // docs/copy/audit-score-presentation-2026-08-14.md section 2.1.
+    var SCREENING_PROMPT_COUNT = 4;
 
     function escapeHtml(str) {
       return String(str).replace(/[&<>"']/g, function(c) {
@@ -191,7 +197,7 @@
       stopSkeletonProgress();
       var el = document.getElementById('skLabel');
       if (!el) return;
-      el.textContent = 'Asking the engines about your brand';
+      el.textContent = 'Asking AI engines the questions a buyer asks before they know you exist';
       skTimers.push(setTimeout(function() { el.textContent = 'Reading what each engine came back with'; }, 7000));
       skTimers.push(setTimeout(function() { el.textContent = 'Scoring the answers, nearly there'; }, 16000));
     }
@@ -301,6 +307,38 @@
       var enginesEl = document.getElementById('auditEngines');
       var namesEl = document.getElementById('auditNames');
 
+      // Phase 2 of the two-phase headline and pre-empt (copy deck
+      // audit-score-presentation-2026-08-14.md section 2.1's sequencing note,
+      // and section 2.4). engine_states is the field that makes both true;
+      // before it lands, renderAuditResult() left phase 1 text in place.
+      // Gated on stateIds.length so a missing or empty engine_states (this
+      // endpoint degrades rather than fails, see the catch below) never
+      // swaps in an "undefined of undefined" headline.
+      if (states) {
+        var stateIds = Object.keys(states);
+        if (stateIds.length) {
+          var namedCount = 0;
+          for (var si = 0; si < stateIds.length; si++) {
+            var st = states[stateIds[si]];
+            if (st === 'know' || st === 'partial') namedCount++;
+          }
+          var headlineBlock = document.getElementById('auditHeadlineBlock');
+          if (headlineBlock) {
+            headlineBlock.innerHTML =
+              '<div class="audit-headline" id="auditHeadline">' + namedCount + ' of ' + stateIds.length +
+                ' AI engines named you, at least once, across ' + SCREENING_PROMPT_COUNT + ' buyer questions.</div>' +
+              '<div id="auditHeadlineSub" style="font-family:var(--mono);font-size:var(--da);color:var(--t2);' +
+                'line-height:1.45;margin-top:3px">See the exact questions below.</div>';
+          }
+          var preemptEl = document.getElementById('auditPreempt');
+          if (preemptEl) {
+            preemptEl.textContent = "Search your own name and you already show up. That's not what we tested here. " +
+              "We asked " + stateIds.length + " AI engines the kind of question a buyer types before they've ever " +
+              "heard of you, not your name, and checked who got named back.";
+          }
+        }
+      }
+
       if (enginesEl && states) {
         var ids = Object.keys(states);
         if (ids.length) {
@@ -371,29 +409,26 @@
       score = Math.max(0, Math.min(100, Math.round(score)));
       showSlot('result');
 
-      // A true zero has to read as a FINDING, not as a failure.
+      // Two-phase headline and pre-empt (copy deck
+      // audit-score-presentation-2026-08-14.md section 2.1's sequencing note
+      // and section 2.4). This first render only has score and category, not
+      // engine_states, so it cannot yet state a fraction of engines.
+      // setAuditEvidence() swaps #auditHeadlineBlock and #auditPreempt for
+      // the real fraction once get-audit-report answers (phase 2). Both
+      // swaps are gated there on engine_states actually existing, so this
+      // phase 1 text is the only thing a visitor sees if that call never
+      // lands -- never "undefined of undefined".
       //
       // Measured 2026-08-14: all 8 public audits ever run scored 0, and the
       // zeros are truthful (the brand strings appear nowhere in the stored
       // engine_results). The screening audit asks generic category questions
       // and a small brand is essentially never named in the answer to one, so
-      // "0" is the normal result for the whole segment this funnel is aimed at.
-      // Printing "You're at 0/100 AI Visibility" and nothing else made the
-      // correct answer look like a broken instrument.
-      //
-      // The claim below is derivable from the score alone, so it can be made on
-      // this first render, before get-audit-report answers. computeAuditScore
-      // (_score.js:85-92) is a positively-weighted sum of six non-negative
-      // dimensions, so aiScore === 0 forces reach === 0, and reach is the share
-      // of ANSWERING engines that mentioned the brand (_score.js:70-74).
-      // audit-domain.js:241-250 refuses to publish an audit where no engine
-      // answered, so the denominator is never zero on a published row.
-      // Therefore ai_score 0 means: every engine that answered, answered
-      // without naming you. No softening, no encouragement, and nothing
-      // asserted that the number does not already prove.
-      var headline = score === 0
-        ? '<span id="auditScoreInline">0</span>/100. You were not named in any answer we collected.'
-        : 'You&#39;re at <span id="auditScoreInline">0</span>/100 AI Visibility';
+      // 0 is the normal result for the segment this funnel is aimed at -- a
+      // finding, not a broken instrument. No softening, no encouragement, and
+      // nothing asserted that the data does not already prove.
+      var phase1Headline = category
+        ? 'Scored against ' + escapeHtml(category) + ' buyer questions.'
+        : 'Scored against buyer-question answers.';
       // The email row inside the result is now the next step, so the hero
       // button steps down to "check another domain".
       auditBtn.classList.add('is-secondary');
@@ -412,10 +447,26 @@
             '<div class="audit-ring-num" id="auditRingNum">0</div>' +
           '</div>' +
           '<div>' +
-            '<div class="audit-headline">' + headline + '</div>' +
+            '<div id="auditHeadlineBlock"><div class="audit-headline" id="auditHeadline">' + phase1Headline + '</div></div>' +
             '<div class="audit-domain">' + escapeHtml(domain) + '</div>' +
+            // Names the ring honestly without dropping the brand term (copy
+            // deck section 3, direction C): the score itself is unchanged,
+            // just labelled as what it is, a 4-question, 2-engine screening
+            // sample, not a smooth 0-100 percentile. Static from first
+            // render -- the score and the ring are already known before
+            // engine_states lands, so this needs no phase 2 swap.
+            '<div style="font-family:var(--mono);font-size:var(--m);color:var(--t3);' +
+              'line-height:1.4;margin-top:3px">AI Visibility Score (screening sample)</div>' +
           '</div>' +
         '</div>' +
+        // The pre-empt (copy deck section 2.4). The objection it answers
+        // ("but I searched my own name and I show up") is the same at any
+        // score, so it renders unconditionally, before any evidence or gap
+        // detail. This is the phase 1 fallback, no engine_count yet;
+        // setAuditEvidence() swaps in the full two-sentence version with the
+        // count once engine_states lands.
+        '<div class="audit-gap" id="auditPreempt">We asked AI engines the kind of question a buyer types before ' +
+          'they&#39;ve ever heard of you, not your name, and checked who got named back.</div>' +
         // Filled in by setAuditEvidence() once get-audit-report answers: the
         // per-engine verdict chips and the deduplicated competitor names.
         //
