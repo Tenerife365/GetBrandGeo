@@ -125,6 +125,11 @@
 [functions."promotions-admin"]
   timeout = 15
 
+# Admin-only: BrandGEO's own prospect CRM (list / update). One DB op per call,
+# same shape and same reasoning as promotions-admin above.
+[functions."prospects-admin"]
+  timeout = 15
+
 # S21 admin Revenue page. Pages every Stripe invoice on the account (affiliate
 # attribution needs a customer's full history, not just the requested month —
 # docs/arch/revenue-report-data-contract.md §4) plus refunds, customers,

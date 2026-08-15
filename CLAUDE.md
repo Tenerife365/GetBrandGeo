@@ -20,7 +20,48 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-08-14)
+## CURRENT STATE (newest entry 2026-08-15)
+
+### 2026-08-15: prospect CRM data half built, migration applied, 71 rows backfilled
+
+`bg-backend` built the data half of BrandGEO's own prospect CRM
+(`public.prospects`) while `bg-app` built `src/pages/Prospects.tsx` in
+parallel against the same fixed contract. Migration
+`db/supabase-prospects-migration.sql` is applied to production
+(duiyifepitvugyulobqm): admin only RLS on all four verbs via the existing
+`public.is_admin()`, a `stage` CHECK constraint, an `updated_at` trigger.
+Backfill `db/supabase-prospects-backfill-2026-08-15.sql` is run: 71 rows,
+merged from all 70 `prospect_audits` domains with `status='ready'` plus one
+Drive only domain (`getglossa.com`, never audited). 9 `audited`, 19
+`disqualified`, 43 `new`. `netlify/functions/prospects-admin.js` is new
+(list/update, admin gated, a hard reject on any non whitelisted patch key,
+not a silent drop). Envelope matches `promotions-admin.js`'s precedent
+exactly, confirmed against what `bg-app` actually built, not just agreed in
+chat: `POST {action:'list'} -> {prospects}`, `POST {action:'update', id,
+patch} -> {prospect}`.
+
+**One real, unresolved finding, not silently picked either way:**
+`revenuehunt.com` has two conflicting 2026-08-14 measurements 3 minutes
+apart (54, disqualifying, then 0, which would qualify). Stored disqualified
+as the Drive record decided, with the conflict spelled out in
+`disqualified_reason`. Needs Constantin's call.
+
+**One inference beyond direct transcription, evidenced not guessed:** the 9
+tier 2 domains in `51-qualification-recheck-2026-08-14.md` are documented as
+"check 4 open," but `prospect_audits` already holds a fresh ready row for
+all 9 from the same 2026-08-14 batch window the Drive doc reports for tier
+1, undocumented there. Applied the qualification bar's own D4 formula to
+that real data: 4 of 9 qualify, 5 fail. Full reasoning and the domain by
+domain breakdown: `.claude/handoffs/015-bg-backend-to-bg-verify-prospects-crm.md`.
+
+**One interop note for whoever next touches `src/types/index.ts`:** `tier`
+is typed `string | null` but the column is `smallint`; PostgREST returns it
+as a JSON number. Harmless today, worth fixing so the type is honest.
+
+Handoff `015` to `bg-verify` is READY (mandatory, this touches RLS and a new
+admin endpoint). Not yet run. Nothing committed; the migration and backfill
+are the one authorized exception to "never run a mutating statement," per
+the packet that commissioned this work.
 
 ### 2026-08-14: Sprint 17 day 2, four GTM seats delivered, three live defects closed
 

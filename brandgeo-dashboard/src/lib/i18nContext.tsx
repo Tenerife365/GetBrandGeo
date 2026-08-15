@@ -24,6 +24,7 @@ interface Strings {
   nav_aiVisibility:     string
   nav_sentiment:        string
   nav_recommendations:  string
+  nav_prospects:        string
   // Sidebar
   sidebar_client:       string
   sidebar_market:       string
@@ -172,6 +173,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'AI Visibility',
     nav_sentiment:       'Brand Sentiment',
     nav_recommendations: 'Recommendations',
+    nav_prospects:       'Prospects',
     sidebar_client:      'CLIENT',
     sidebar_market:      'MARKET',
     sidebar_selectClient:'Select client',
@@ -310,6 +312,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'Visibilidad IA',
     nav_sentiment:       'Sentimiento de Marca',
     nav_recommendations: 'Recomendaciones',
+    nav_prospects:       'Prospectos',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCADO',
     sidebar_selectClient:'Seleccionar cliente',
@@ -448,6 +451,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'KI-Sichtbarkeit',
     nav_sentiment:       'Marken-Sentiment',
     nav_recommendations: 'Empfehlungen',
+    nav_prospects:       'Interessenten',
     sidebar_client:      'KUNDE',
     sidebar_market:      'MARKT',
     sidebar_selectClient:'Kunde auswahlen',
@@ -586,6 +590,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'Visibilite IA',
     nav_sentiment:       'Sentiment de Marque',
     nav_recommendations: 'Recommandations',
+    nav_prospects:       'Prospects',
     sidebar_client:      'CLIENT',
     sidebar_market:      'MARCHE',
     sidebar_selectClient:'Selectionner un client',
@@ -724,6 +729,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'AI-zichtbaarheid',
     nav_sentiment:       'Merksentiment',
     nav_recommendations: 'Aanbevelingen',
+    nav_prospects:       'Prospects',
     sidebar_client:      'KLANT',
     sidebar_market:      'MARKT',
     sidebar_selectClient:'Klant selecteren',
@@ -862,6 +868,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'Vizibilitate AI',
     nav_sentiment:       'Sentiment Brand',
     nav_recommendations: 'Recomandari',
+    nav_prospects:       'Prospecti',
     sidebar_client:      'CLIENT',
     sidebar_market:      'PIATA',
     sidebar_selectClient:'Selecteaza client',
@@ -1000,6 +1007,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'Visibilidade IA',
     nav_sentiment:       'Sentimento da Marca',
     nav_recommendations: 'Recomendacoes',
+    nav_prospects:       'Prospectos',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCADO',
     sidebar_selectClient:'Selecionar cliente',
@@ -1138,6 +1146,7 @@ const STRINGS: Record<LangId, Strings> = {
     nav_aiVisibility:    'Visibilita IA',
     nav_sentiment:       'Sentiment del Brand',
     nav_recommendations: 'Raccomandazioni',
+    nav_prospects:       'Prospect',
     sidebar_client:      'CLIENTE',
     sidebar_market:      'MERCATO',
     sidebar_selectClient:'Seleziona cliente',

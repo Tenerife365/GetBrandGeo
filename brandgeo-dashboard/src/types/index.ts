@@ -91,6 +91,47 @@ export interface AIResult {
   error_code?: string | null
 }
 
+// ── Prospects (sales CRM, replaces HubSpot) ────────────────────────────────
+// Row shape and writable-field list are the fixed contract with
+// netlify/functions/prospects-admin.js (bg-backend, built in parallel).
+// See src/pages/Prospects.tsx header comment for the full contract.
+export type ProspectStage =
+  | 'new' | 'qualified' | 'audited' | 'contacted' | 'replied'
+  | 'meeting' | 'won' | 'lost' | 'disqualified'
+
+export interface Prospect {
+  id:                  number
+  domain:              string
+  company:             string | null
+  contact_name:        string | null
+  contact_role:        string | null
+  contact_url:         string | null
+  linkedin_url:        string | null
+  segment:             string | null
+  tier:                number | null
+  stage:               ProspectStage
+  disqualified_reason: string | null
+  audit_token:         string | null
+  ai_score:            number | null
+  competitor_count:    number | null
+  source:              string | null
+  owner:               string | null
+  last_contacted_at:   string | null
+  next_action_at:      string | null
+  replied_at:          string | null
+  reply_note:          string | null
+  notes:               string | null
+  created_at:          string
+  updated_at:          string
+}
+
+// The only fields the UI is allowed to write. Kept as a const tuple (not just
+// a comment) so ProspectPatch below is derived from it, not hand-typed twice.
+export const PROSPECT_WRITABLE_FIELDS = [
+  'stage', 'notes', 'owner', 'next_action_at', 'last_contacted_at', 'replied_at', 'reply_note',
+] as const
+export type ProspectPatch = Partial<Pick<Prospect, typeof PROSPECT_WRITABLE_FIELDS[number]>>
+
 export interface DashboardStats {
   totalAnalyzed: number
   avgGeoScore: number

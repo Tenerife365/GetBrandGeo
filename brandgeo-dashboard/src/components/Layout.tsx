@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, LifeBuoy,
+  Eye, EyeOff, LifeBuoy, Target,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -262,6 +262,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // this is reachable on mobile through the same sidebar, via the
         // hamburger menu.
         { to: '/tickets', icon: LifeBuoy, label: isAdmin ? 'Tickets' : 'Support' },
+        // Admin-only sales CRM (replaces HubSpot). Same reasoning as Revenue
+        // and Onboard Client just below: not added to the mobile bottom bar
+        // (nav array above), which is a fixed 7-icon strip reserved for every
+        // client's core pages — every other admin-only route already follows
+        // this split, and it stays reachable on mobile through the sidebar
+        // drawer via the hamburger menu.
+        ...(isAdmin ? [{ to: '/prospects', icon: Target, label: t.nav_prospects }] : []),
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Revenue' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],
