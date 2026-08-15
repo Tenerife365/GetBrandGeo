@@ -998,6 +998,57 @@ the other 32. Recommended as a fast follow rather than a gate.
 
 ## T2 — MEDIUM, PRE-EXISTING. The false-positive class R5 named is still open one layer down
 
+> ⚠️ **CLOSED 2026-08-15 by `4db937f`, and this section is WRONG in two places.**
+> Corrected in place rather than rewritten, per CLAUDE.md's mark-stale-where-it-
+> occurs convention. Read this box before believing anything below it.
+>
+> **Correction 1. `financial-cents.com` is NOT a false positive.** The block
+> below asserts a response "naming only Karbon/Canopy/Jetpack". Its actual stored
+> `engine_results` (audit 33) say the opposite: all three of its mentions name the
+> brand in full, for example "**Financial Cents** is a user-friendly, cloud-based
+> system" and "**Karbon**, **TaxDome**, **Financial Cents**, and **Canopy**".
+> Those mentions are TRUE and they survive the fix via the full-name alias. This
+> finding appears to have been reasoned from a constructed response rather than
+> read off the stored one.
+>
+> **Correction 2. The worst case was missed, and the sampling frame is why.**
+> `unittrac.com` (self-storage software, LLM-derived name "Unit Trac") carried
+> **6** false positives on the bare word "unit", in "per unit per month" and
+> "unit availability", against `casetempo.com`'s 6. It never appeared here
+> because it has no `og:site_name` and so sat outside the 38 values this review
+> sampled. The name is established, not guessed: a one-word `UnitTrac` alias set
+> reproduces 0 of its 7 stored matches, `Unit Trac` reproduces 7 of 7. Its public
+> audit (row 95) published `ai_score` **85**; `casetempo.com` (row 70) published
+> **68**. Both are `unlocked: true, created_via: 'internal'`, so both are
+> publicly renderable sales assets.
+>
+> **The measurement that settled it**, replaying all 165 stored results carrying
+> `brand_mentioned = true` with the alias set rebuilt before and after:
+>
+> ```
+> guard is a no-op (alias set identical) ........... 101
+> mention rests on the domain root, name irrelevant . 48
+> guard changed the alias set ......................  16
+>    still counts as a mention ......................  4   <- all 4 name the brand
+>    STOPS counting ................................. 12   <- 0 name the brand
+> ```
+>
+> **12 false positives removed, 0 true mentions broken.**
+>
+> **The suggested fix below was not taken, and should not be.** "At least 5
+> characters and absent from a small generic list" fails on its own examples:
+> "Financial" is 9 characters, and `Rebuy` (5) and `CARET` (5) are legitimate and
+> must survive, so no length threshold separates the cases. A nine-word hand list
+> is also the wrong shape for an unbounded problem that never self-reports.
+> `4db937f` uses a commonness test instead (`isDistinctiveLeadWord` plus
+> `GENERIC_LEAD_WORDS`), on the reasoning that a lead-word alias's value and its
+> risk move in opposite directions with commonness: an engine calls Rebuy Engine
+> "Rebuy" precisely because that identifies it, and never calls Case Tempo "Case".
+> A word absent from the list is treated as distinctive, so an incomplete list
+> degrades to today's behaviour on that one word and never to a false zero.
+> Guarded by `tests/prospect_alias_lead_word.test.js` (43 assertions), which
+> asserts against verbatim stored snippets from rows 70 and 95.
+
 **What.** `sanitizeRecoveredBrandName` cleans the *input*. It does not change
 `buildProspectAliases`, which still splits a multi-word name and emits the lead
 word as a standalone alias, filtered only by `LEADING_WORD_STOPWORDS`
@@ -1011,13 +1062,22 @@ casetempo.com       og="Case Tempo"       aliases=["casetempo","Case Tempo","Cas
    response naming only Clio/MyCase/Smokeball -> brand_mentioned=true   *** FALSE POSITIVE ***
 financial-cents.com og="Financial Cents"  aliases=["financial-cents","Financial Cents","Financial"]
    response naming only Karbon/Canopy/Jetpack -> brand_mentioned=true   *** FALSE POSITIVE ***
+   ^^ WRONG, see the correction box above. Its stored responses DO name
+      "Financial Cents" in full. All 3 mentions are true and they survive.
 caretlegal.com      og="CARET Legal"      aliases=["caretlegal","CARET Legal","CARET"]
    same shape of response                     -> brand_mentioned=false  ok
+MISSING FROM THIS TABLE, and the worst case:
+unittrac.com        og=none, LLM="Unit Trac"  aliases=["unittrac","Unit Trac","Unit"]
+   6 stored responses naming only competitors -> brand_mentioned=true   *** FALSE POSITIVE ***
 ```
 
 `casetempo.com` is legal-practice software, so "case" appears in essentially every
 relevant engine answer. Rate among the 38 accepted values: **2 demonstrably
-inflate (5.3%)**. Inflation is the more dangerous direction, since a rejection
+inflate (5.3%)**. [Corrected 2026-08-15: 1 of those 2 inflates, not 2, and the
+38-value frame excludes the 32 domains with no `og:site_name`, one of which
+carried the largest count of all. Measured on stored mentions rather than on
+sampled names, the answer is 12 inflated results across 2 domains.] Inflation is
+the more dangerous direction, since a rejection
 merely costs an LLM call while a false acceptance puts a wrong number on a public
 sales asset.
 
