@@ -1,11 +1,11 @@
 /**
- * AuditReport.tsx — public, unauthenticated report page for the Instant Audit
+ * AuditReport.tsx, public, unauthenticated report page for the Instant Audit
  * Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A). Route: /audit/:token,
  * outside PrivateRoute in App.tsx.
  *
  * Polls get-audit-report.js while the audit is still running (screening
  * audits are usually already 'ready' by the time this page loads, since
- * audit-domain.js runs them synchronously before returning a token — full
+ * audit-domain.js runs them synchronously before returning a token, full
  * audits run in the background and this page will show a live "generating"
  * state for those). Shows a free teaser (score only) until the visitor
  * submits an email via unlock-audit-report.js, then shows the full
@@ -23,6 +23,12 @@ type ReportStatus = 'pending' | 'generating_prompts' | 'collecting' | 'ready' | 
 interface TeaserReport {
   status: 'ready'; unlocked: false
   domain: string; category: string | null; ai_score: number; low_confidence: boolean; gap_count: number
+  // Already returned by get-audit-report.js's `shared` object (the granularity
+  // ruling documented there: the gate protects the JOIN, not the VALUES), but
+  // never typed on this interface until now. No backend change.
+  engine_states: Record<string, 'know' | 'partial' | 'missing' | 'unavailable'>
+  competitor_names: string[]
+  competitor_count: number
 }
 
 interface EngineResult {
@@ -66,6 +72,48 @@ const STATE_STYLE: Record<string, string> = {
   // engine (§1.8 "Temporarily unavailable"), so it never reads as a finding
   // about the brand.
   unavailable: 'bg-slate-700/60 text-slate-500 border-slate-600/40',
+}
+
+// Plain-English reading of the four states _score.js:124-139 can produce.
+// Ported verbatim from brandgeo/web/site.js's STATE_PHRASE (site.js:266-271)
+// per docs/copy/audit-score-presentation-2026-08-14.md section 2.3, so both
+// surfaces say the same thing about the same data.
+const STATE_PHRASE: Record<string, string> = {
+  know: 'names you',
+  partial: 'names you sometimes',
+  missing: 'did not name you',
+  unavailable: 'could not be reached',
+}
+
+// SCREENING_PROMPT_COUNT (audit-domain.js:34). Safe to hardcode here: this is
+// a request count, not an answered count, and the public audit is always
+// forced to screening depth (audit-domain.js:74). Per copy deck section 2.1,
+// reused identically in section 2.2's teaser fraction.
+const SCREENING_PROMPT_COUNT = 4
+
+// How many of the checked engines named the brand at least once. 'know' and
+// 'partial' both count as named, matching STATE_PHRASE above. Works on both
+// the teaser and full payloads, since engine_states is shared by both.
+function engineNamedFraction(engineStates: Record<string, string>) {
+  const ids = Object.keys(engineStates)
+  const named = ids.filter(id => engineStates[id] === 'know' || engineStates[id] === 'partial').length
+  return { named, total: ids.length }
+}
+
+// Copy deck section 2.4, the shared pre-empt block, verbatim. The single
+// highest-impact string in the deck: it has to land before the visitor forms
+// the "but I searched my own name" objection, not after, and it runs
+// unconditionally regardless of score. Text only; callers own the wrapper
+// styling so it can sit inside a boxed note on the teaser and a plain card on
+// the full view without duplicating the copy.
+function PreemptText({ engineCount }: { engineCount: number }) {
+  return (
+    <>
+      Search your own name and you already show up. That's not what we tested here.
+      {' '}We asked {engineCount} AI engines the kind of question a buyer types before
+      they've ever heard of you, not your name, and checked who got named back.
+    </>
+  )
 }
 
 function scoreColor(score: number) {
@@ -147,12 +195,12 @@ export default function AuditReport() {
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 text-center">
             <Loader2 size={28} className="animate-spin text-brand-400 mx-auto mb-4" />
             <h1 className="text-lg font-semibold text-white mb-1">
-              {report.status === 'error' ? 'Something went wrong' : `Auditing ${report.domain}…`}
+              {report.status === 'error' ? "We couldn't finish this audit" : `Auditing ${report.domain}…`}
             </h1>
             <p className="text-sm text-slate-400">
               {report.status === 'error'
-                ? (report as PendingReport).error_message || 'Please try running a new audit.'
-                : 'Asking AI assistants what they know about your business. This usually takes under a minute.'}
+                ? (report as PendingReport).error_message || `Something interrupted the check before we could score ${report.domain}. Run it again, it usually finishes in under a minute.`
+                : 'Asking AI engines the questions a buyer asks before they know you exist. This usually takes under a minute.'}
             </p>
           </div>
         )}
@@ -163,7 +211,43 @@ export default function AuditReport() {
             <div className={`text-6xl font-bold tabular-nums my-4 ${scoreColor(report.ai_score)}`}>
               {report.ai_score}<span className="text-2xl text-slate-500 font-normal">/100</span>
             </div>
-            <h1 className="text-lg font-semibold text-white mb-1">AI Visibility Score</h1>
+            <h1 className="text-lg font-semibold text-white mb-1">AI Visibility Score (screening sample)</h1>
+            <p className="text-sm text-slate-300 mb-4">
+              {engineNamedFraction(report.engine_states).named} of {engineNamedFraction(report.engine_states).total} AI engines named you, at least once, across {SCREENING_PROMPT_COUNT} buyer questions.
+            </p>
+            <p className="text-sm text-slate-400 text-left bg-dark-700/60 border border-dark-600 rounded-lg p-4 mb-4">
+              <PreemptText engineCount={engineNamedFraction(report.engine_states).total} />
+            </p>
+            {Object.keys(report.engine_states).length > 0 && (
+              <div className="text-left bg-dark-700/60 border border-dark-600 rounded-lg p-4 mb-4">
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(report.engine_states).map(([engine, state]) => (
+                    <span
+                      key={engine}
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATE_STYLE[state] ?? STATE_STYLE.unavailable}`}
+                      title={state === 'unavailable'
+                        ? 'We could not reach this engine during your audit. This is not a result about your brand.'
+                        : undefined}
+                    >
+                      {ENGINE_LABEL[engine] ?? engine}: {STATE_PHRASE[state] ?? state}
+                    </span>
+                  ))}
+                </div>
+                {report.competitor_count > 0 && (
+                  <div className="mt-3">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                      {report.competitor_count === 1 ? 'Named in an answer where you were not' : 'Named in answers where you were not'}
+                    </div>
+                    <p className="text-sm font-semibold text-brand-400">
+                      {report.competitor_names.join(', ')}
+                      {report.competitor_count > report.competitor_names.length
+                        ? `, and ${report.competitor_count - report.competitor_names.length} more`
+                        : ''}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-sm text-slate-400 mb-6">
               {report.gap_count > 0
                 ? `We found ${report.gap_count} visibility gap${report.gap_count === 1 ? '' : 's'}. See exactly where AI assistants aren't finding you.`
@@ -208,6 +292,9 @@ export default function AuditReport() {
 }
 
 function FullReportView({ report }: { report: FullReport }) {
+  const mentionedCount = report.engine_results.filter(r => r.brand_mentioned).length
+  const cellsChecked = report.engine_results.length
+  const promptCount = new Set(report.engine_results.map(r => r.prompt_id)).size
   return (
     <div className="space-y-4">
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center">
@@ -216,7 +303,18 @@ function FullReportView({ report }: { report: FullReport }) {
           {report.ai_score}<span className="text-xl text-slate-500 font-normal">/100</span>
         </div>
         <p className="text-xs text-slate-500">
-          AI Visibility Score · {report.depth === 'full' ? 'Full audit' : 'Screening audit'} · {report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'} checked
+          AI Visibility Score (screening sample) · {mentionedCount} of {cellsChecked} answers named you · {report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'} checked
+        </p>
+        {cellsChecked < 8 && (
+          <p className="text-xs text-slate-500 mt-1">{cellsChecked} of 8 questions returned an answer.</p>
+        )}
+      </div>
+
+      {/* Copy deck section 2.4, the shared pre-empt block. Placed directly
+          under the score card, above Breakdown, unconditional on score. */}
+      <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
+        <p className="text-sm text-slate-400">
+          <PreemptText engineCount={Object.keys(report.engine_states).length} />
         </p>
       </div>
 
@@ -245,7 +343,7 @@ function FullReportView({ report }: { report: FullReport }) {
                 ? 'We could not reach this engine during your audit. This is not a result about your brand.'
                 : undefined}
             >
-              {ENGINE_LABEL[engine] ?? engine}: {state.toUpperCase()}
+              {ENGINE_LABEL[engine] ?? engine}: {STATE_PHRASE[state] ?? state}
             </span>
           ))}
         </div>
@@ -279,7 +377,10 @@ function FullReportView({ report }: { report: FullReport }) {
 
       {/* Full per-prompt results */}
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-slate-300 mb-3">All checks</h2>
+        <h2 className="text-sm font-semibold text-slate-300 mb-1">The exact questions we asked</h2>
+        <p className="text-xs text-slate-500 mb-3">
+          We asked {report.domain} {promptCount} questions a buyer types before they've heard of you. Here is what each AI engine said back.
+        </p>
         <div className="space-y-2">
           {report.engine_results.map((r, i) => (
             <div key={i} className="bg-dark-700 rounded-lg p-3 text-sm">
