@@ -228,10 +228,135 @@ async function generateAuditPrompts(domain, preFetchedHomepage) {
   }
 }
 
-// Leading words in a multi-word brand name that aren't worth extracting as
-// their own alias entry (too generic / not a distinguishing token an AI
-// response would use in isolation to refer to the brand).
-const LEADING_WORD_STOPWORDS = new Set(['the', 'get', 'my', 'your', 'a', 'an', 'go', 'try'])
+/**
+ * GENERIC_LEAD_WORDS / isDistinctiveLeadWord(word)
+ *
+ * T2 (docs/qa/scoring-fixes-review-2026-08-14.md). buildProspectAliases() emits
+ * the lead word of a multi-word brand name as a standalone alias. That alias is
+ * compiled by buildAliasRegex() (_analysis.js:397) into a boundary-anchored
+ * whole-word matcher, so a lead word that is an ordinary English word matches
+ * that word ANYWHERE in an engine response, whether or not the brand is named.
+ *
+ * Reproduced on real production og:site_name values, not invented ones:
+ *
+ *   casetempo.com        "Case Tempo"      -> alias "Case"      -> /\bcase\b/
+ *   financial-cents.com  "Financial Cents" -> alias "Financial" -> /\bfinancial\b/
+ *
+ * casetempo.com sells legal practice software, so "case" appears in essentially
+ * every relevant answer; both domains scored brand_mentioned = true on responses
+ * that named only competitors. That is a false POSITIVE, the mirror of the false
+ * ZEROS the 2026-08-14 work removed, and worse in one respect: nobody reports a
+ * score that flatters them, so it does not self-correct.
+ *
+ * WHY A COMMONNESS TEST RATHER THAN A LENGTH TEST OR A HAND LIST.
+ *   - Length does not separate the cases. "Financial" is 9 characters and wrong;
+ *     "Rebuy" is 5 and right; "CARET" is 5 and right. Any threshold that rejects
+ *     "Case" (4) also rejects legitimate short coined names.
+ *   - The value of a lead-word alias and its risk move in OPPOSITE directions
+ *     with commonness. An engine refers to Rebuy Engine as "Rebuy" precisely
+ *     because "Rebuy" identifies it; no engine refers to Case Tempo as "Case",
+ *     because that would not identify it to a human reader either. So the alias
+ *     is worth most exactly where it is safest, and worth ~nothing exactly where
+ *     it is dangerous. Commonness is the discriminator; the list below is a
+ *     frequency-motivated approximation of it, covering high-frequency general
+ *     English plus the category nouns that saturate B2B software answers.
+ *
+ * DELIBERATELY NOT an exhaustive dictionary. A word absent here is TREATED AS
+ * DISTINCTIVE, so the failure mode of an incomplete list is the pre-existing
+ * behaviour on that one word, never a new false zero. Adding a word can only
+ * ever remove a lead-word alias; it can never remove the full-name alias or the
+ * domain-root alias, both of which are emitted unconditionally.
+ *
+ * Subsumes the previous LEADING_WORD_STOPWORDS (the, get, my, your, a, an, go,
+ * try), which was aimed at prefix noise rather than at this failure.
+ */
+const GENERIC_LEAD_WORDS = new Set([
+  // Previous LEADING_WORD_STOPWORDS, kept verbatim
+  'the', 'get', 'my', 'your', 'a', 'an', 'go', 'try',
+
+  // Function words, determiners, pronouns, prepositions. "it" is load bearing:
+  // a real product ships as "IT Glue", and a bare "IT" alias matches the pronoun
+  // "it" in every response ever written.
+  'all', 'and', 'any', 'are', 'as', 'at', 'be', 'by', 'each', 'every', 'for',
+  'from', 'how', 'in', 'is', 'it', 'its', 'no', 'of', 'on', 'or', 'our', 'out',
+  'so', 'that', 'their', 'them', 'there', 'these', 'this', 'those', 'to', 'up',
+  'us', 'we', 'what', 'when', 'where', 'which', 'who', 'why', 'with', 'you',
+
+  // High-frequency adjectives and quantifiers
+  'best', 'better', 'big', 'clear', 'easy', 'fast', 'first', 'free', 'full',
+  'good', 'great', 'high', 'large', 'last', 'light', 'little', 'long', 'low',
+  'main', 'major', 'more', 'most', 'new', 'next', 'one', 'only', 'open',
+  'other', 'own', 'prime', 'pure', 'quick', 'ready', 'real', 'right', 'same',
+  'simple', 'small', 'strong', 'sure', 'top', 'total', 'true', 'whole',
+
+  // Time and place
+  'city', 'daily', 'day', 'east', 'global', 'here', 'home', 'hour', 'local',
+  'month', 'national', 'north', 'now', 'place', 'south', 'state', 'time',
+  'today', 'west', 'world', 'year',
+
+  // High-frequency concrete nouns in the same band as "case" and "unit". Added
+  // 2026-08-15 after measuring the corpus: unittrac.com's LLM-derived name is
+  // "Unit Trac", and 6 of its 7 stored mentions were the bare word "unit" in
+  // "per unit per month" / "unit availability", on a self-storage category
+  // where that word is unavoidable. T2 never found this one; the measurement
+  // did. The rest of this group is the same frequency band, added together
+  // rather than one incident at a time.
+  'area', 'item', 'items', 'number', 'part', 'parts', 'room', 'size', 'type',
+  'unit', 'units',
+
+  // Business, product and category nouns. These are the ones that actually bite:
+  // a "best <category> software" answer is dense with them by construction, and
+  // the audit's own prompts are generated to be exactly such questions.
+  'account', 'accounting', 'ad', 'ads', 'advance', 'advanced', 'agency',
+  'agent', 'ai', 'alert', 'analytics', 'api', 'app', 'apps', 'asset', 'audit',
+  'auto', 'base', 'basic', 'bill', 'billing', 'board', 'book', 'box', 'brand',
+  'budget', 'build', 'business', 'buy', 'call', 'capital', 'care', 'career',
+  'case', 'cash', 'center', 'central', 'chain', 'channel', 'chat', 'check',
+  'choice', 'class', 'clean', 'click', 'client', 'close', 'cloud', 'code',
+  'commerce', 'community', 'company', 'compare', 'complete', 'connect',
+  'contact', 'content', 'control', 'core', 'corp', 'cost', 'count', 'credit',
+  'crm', 'custom', 'customer', 'cyber', 'data', 'deal', 'deliver', 'design',
+  'desk', 'digital', 'direct', 'doc', 'docs', 'drive', 'edge', 'engine',
+  'enterprise', 'event', 'expert', 'file', 'files', 'finance', 'financial',
+  'firm', 'flow', 'focus', 'form', 'forms', 'fund', 'future', 'goal', 'grid',
+  'group', 'growth', 'guard', 'guide', 'health', 'help', 'hub', 'human',
+  'idea', 'impact', 'info', 'insight', 'insurance', 'invoice', 'job', 'jobs',
+  'key', 'kit', 'lab', 'labs', 'launch', 'lead', 'leads', 'learn', 'legal',
+  'level', 'life', 'line', 'link', 'list', 'live', 'logic', 'mail', 'manage',
+  'market', 'marketing', 'media', 'medical', 'meet', 'mind', 'mobile', 'money',
+  'monitor', 'net', 'network', 'note', 'notes', 'office', 'online', 'order',
+  'page', 'pay', 'payment', 'people', 'pipeline', 'plan', 'platform', 'play',
+  'point', 'portal', 'post', 'power', 'practice', 'price', 'pro', 'process',
+  'product', 'project', 'property', 'quote', 'rate', 'reach', 'record',
+  'report', 'research', 'resource', 'retail', 'revenue', 'review', 'risk',
+  'sale', 'sales', 'scale', 'school', 'score', 'search', 'secure', 'security',
+  'sell', 'send', 'service', 'services', 'share', 'ship', 'shop', 'sign',
+  'site', 'smart', 'social', 'soft', 'software', 'solution', 'solutions',
+  'source', 'space', 'spend', 'staff', 'stack', 'start', 'stock', 'store',
+  'storage', 'stream', 'studio', 'study', 'supply', 'support', 'sync', 'system',
+  'systems', 'table', 'talent', 'task', 'tax', 'team', 'teams', 'tech', 'test',
+  'text', 'tool', 'tools', 'track', 'trade', 'train', 'travel', 'trend',
+  'trust', 'value', 'view', 'virtual', 'vision', 'voice', 'web', 'work',
+  'works', 'zone',
+])
+
+/**
+ * True when `word` is worth emitting as a standalone alias on its own.
+ *
+ * Rejects, in order: anything under 2 characters once punctuation is stripped
+ * (a single letter matches constantly), a purely numeric token ("360 Learning"
+ * must not contribute a bare "360", which matches any figure of 360), and any
+ * member of GENERIC_LEAD_WORDS above.
+ *
+ * Exported so the guard can be tested directly as a table rather than only
+ * through buildProspectAliases(), the same way sanitizeRecoveredBrandName() is.
+ */
+function isDistinctiveLeadWord(word) {
+  const cleaned = String(word || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+  if (cleaned.length < 2) return false
+  if (/^\p{N}+$/u.test(cleaned)) return false
+  return !GENERIC_LEAD_WORDS.has(cleaned)
+}
 
 /**
  * buildProspectAliases(domain, brandName) -> string[]
@@ -254,6 +379,15 @@ const LEADING_WORD_STOPWORDS = new Set(['the', 'get', 'my', 'your', 'a', 'an', '
  * "Rebuy" alias also matches "Rebuy" wherever it appears inside "Rebuy
  * Engine"/"Rebuy Smart Personalization", this one extra entry alone tends to
  * catch every variant of a multi-word brand name).
+ *
+ * T2 (docs/qa/scoring-fixes-review-2026-08-14.md): that lead-word entry is now
+ * emitted only when isDistinctiveLeadWord() accepts it. A lead word that is an
+ * ordinary English or category word ("Case Tempo" -> "Case",
+ * "Financial Cents" -> "Financial") scored brand_mentioned = true on stored
+ * responses naming only competitors. See that function for the full rationale,
+ * and for why this cannot introduce a false zero: the full name and the domain
+ * root are still emitted unconditionally, so the only matches it can remove are
+ * ones that rested on the bare generic word alone.
  */
 function buildProspectAliases(domain, brandName) {
   const aliases = []
@@ -266,7 +400,7 @@ function buildProspectAliases(domain, brandName) {
     const words = name.split(/\s+/).filter(Boolean)
     if (words.length > 1) {
       const lead = words[0]
-      if (lead.length >= 2 && !LEADING_WORD_STOPWORDS.has(lead.toLowerCase())) {
+      if (isDistinctiveLeadWord(lead)) {
         aliases.push(lead)
       }
     }
@@ -563,5 +697,5 @@ async function getOrGenerateAuditPrompts(supabase, domain, opts = {}) {
 
 module.exports = {
   generateAuditPrompts, getOrGenerateAuditPrompts, fetchHomepageSignal, buildProspectAliases,
-  sanitizeRecoveredBrandName, PROMPT_COUNT,
+  sanitizeRecoveredBrandName, isDistinctiveLeadWord, GENERIC_LEAD_WORDS, PROMPT_COUNT,
 }
