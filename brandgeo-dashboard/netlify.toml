@@ -125,10 +125,22 @@
 [functions."promotions-admin"]
   timeout = 15
 
-# Admin-only: BrandGEO's own prospect CRM (list / update). One DB op per call,
-# same shape and same reasoning as promotions-admin above.
+# Admin-only: BrandGEO's own prospect CRM (list / update / touch / promote).
+# A couple of DB ops per call, same shape and reasoning as promotions-admin.
 [functions."prospects-admin"]
   timeout = 15
+
+# Admin-only contact route resolver (packet 019). Fetches up to a dozen of the
+# prospect's own pages, and where the site links no address, a Play Store name
+# search plus up to six listing fetches to find the verified developer contact
+# block. That is real network time against third-party sites, not DB time, so
+# the inherited 10s default would kill it mid-crawl and return nothing for a
+# prospect whose address was about to be found. Its own internal budgets are
+# set BELOW this ceiling (18s per prospect, 22s per invocation) so it always
+# returns a real answer, including a named list of anything it had to skip,
+# rather than being cut off by the platform with no report.
+[functions."resolve-contact-routes"]
+  timeout = 26
 
 # S21 admin Revenue page. Pages every Stripe invoice on the account (affiliate
 # attribution needs a customer's full history, not just the requested month —

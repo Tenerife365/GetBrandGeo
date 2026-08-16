@@ -99,6 +99,12 @@ export type ProspectStage =
   | 'new' | 'qualified' | 'audited' | 'contacted' | 'replied'
   | 'meeting' | 'won' | 'lost' | 'disqualified'
 
+// contact_email_kind distinguishes a mailbox that reaches one named person
+// from one that reaches a queue (info@, hello@, sales@) — the difference
+// changes how a cold touch should be written and who is actually going to
+// read it.
+export type ContactEmailKind = 'individual' | 'role'
+
 export interface Prospect {
   id:                  number
   domain:              string
@@ -123,14 +129,104 @@ export interface Prospect {
   notes:               string | null
   created_at:          string
   updated_at:          string
+  // Research-derived, read only from prospects-admin.js — never offer an
+  // edit control for any of the six fields below.
+  contact_email:        string | null
+  contact_email_source: string | null
+  contact_email_kind:   ContactEmailKind | null
+  x_url:                string | null
+  // NOT NULL / default false on the column, and false is DELIBERATELY
+  // ambiguous: it means "never researched" AND "checked and could not be
+  // confirmed" (LinkedIn returns HTTP 999 to automated clients, so a
+  // LinkedIn URL can never be positively denied, only positively confirmed
+  // or left unconfirmed). Never render false as "unverified" or "invalid" —
+  // that claims more than the data knows. See ScoreChip-style honesty rule
+  // already established on this page for ai_score === 0.
+  x_verified:           boolean
+  linkedin_verified:    boolean
+  // Nested on the row by prospects-admin.js's 'list' action, most recent
+  // first. Populated on every row it returns; absent (undefined) only on the
+  // partial Prospect a 'touch'/'update' response returns, which is why
+  // callers merge rather than trust that response's touches key.
+  touches:              Touch[]
+  // Staged contact routes the resolver found but nobody has chosen yet
+  // (public.prospect_contact_candidates), strongest evidence first. Nested by
+  // every prospects-admin.js action, same uniform-shape rule as `touches`.
+  candidates:           ContactCandidate[]
 }
 
-// The only fields the UI is allowed to write. Kept as a const tuple (not just
-// a comment) so ProspectPatch below is derived from it, not hand-typed twice.
+// ── Contact route candidates (resolve-contact-routes.js, packet 019) ────────
+// The resolver stages what it found here instead of writing the prospect row,
+// because it can prove a string appeared at a URL but cannot prove the string
+// belongs to the person you mean. Promotion is a human click, and it goes
+// through prospects-admin.js's 'promote' action, which accepts only a
+// candidate id.
+export type ContactCandidateKind = 'email' | 'linkedin' | 'x'
+
+// How well SOURCED the string is. Never how likely it is to be the right
+// person -- those are different questions and only the first is mechanisable.
+export type ContactConfidence = 'high' | 'medium' | 'low'
+
+export interface ContactCandidate {
+  id:          number
+  prospect_id: number
+  kind:        ContactCandidateKind
+  value:       string
+  // NOT NULL by design: the exact URL the literal string was seen at. A
+  // candidate with no source is a guess wearing a database column.
+  source_url:  string
+  email_kind:  ContactEmailKind | null
+  confidence:  ContactConfidence
+  // "Has been promoted at some point", not "is the one currently live" --
+  // the live one is derived by comparing value against the prospect field,
+  // which cannot drift out of sync the way a second flag would.
+  promoted:    boolean
+  created_at:  string
+}
+
+// The only fields the UI is allowed to write via `update`. Kept as a const
+// tuple (not just a comment) so ProspectPatch below is derived from it, not
+// hand-typed twice. The six research-derived fields above and `touches` are
+// deliberately absent — they come from research/backfill/re-audit jobs and
+// from the `touch` action, never from an `update` patch.
 export const PROSPECT_WRITABLE_FIELDS = [
   'stage', 'notes', 'owner', 'next_action_at', 'last_contacted_at', 'replied_at', 'reply_note',
 ] as const
 export type ProspectPatch = Partial<Pick<Prospect, typeof PROSPECT_WRITABLE_FIELDS[number]>>
+
+// ── Prospect touches (channel-aware contact history) ────────────────────────
+// public.prospect_touches, db/supabase-prospect-channels-migration.sql.
+// One row per real outreach event. A `touch` NEVER carries a stage — it
+// records that contact happened, nothing about pipeline progress, and it
+// server-side stamps last_contacted_at (direction 'out') or replied_at
+// (direction 'in') on the parent prospect in the same request.
+export type TouchChannel = 'email' | 'linkedin' | 'x'
+export type TouchDirection = 'out' | 'in'
+
+export interface Touch {
+  id:          number
+  prospect_id: number
+  channel:     TouchChannel
+  direction:   TouchDirection
+  occurred_at: string
+  subject:     string | null
+  body:        string | null
+  note:        string | null
+  created_at:  string
+}
+
+// Input shape for the `touch` action. channel and direction are required;
+// occurred_at defaults server-side to now() when omitted; subject/body/note
+// are optional free text.
+export interface TouchLogInput {
+  prospect_id: number
+  channel:     TouchChannel
+  direction:   TouchDirection
+  occurred_at?: string
+  subject?:    string | null
+  body?:       string | null
+  note?:       string | null
+}
 
 export interface DashboardStats {
   totalAnalyzed: number

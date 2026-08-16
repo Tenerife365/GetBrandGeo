@@ -9,35 +9,76 @@
  * touch. That is the pitch and the qualification in one field, so it is the
  * spine of the row, not a column buried on the right.
  *
- * DATA CONTRACT (fixed, do not deviate — see the packet this page shipped
- * against, and src/types/index.ts for the shared shape):
+ * DATA CONTRACT (fixed, confirmed live against production by bg-backend — see
+ * src/types/index.ts for the shared shape):
  *
  *   POST /.netlify/functions/prospects-admin   { action: 'list' }
- *     -> { prospects: Prospect[] }
+ *     -> { prospects: Prospect[] }   each row carries `touches: Touch[]`
+ *        nested, most recent first — one extra query server-side, not N+1.
  *   POST /.netlify/functions/prospects-admin   { action: 'update', id, patch }
  *     -> { prospect: Prospect } | { error: string }
+ *   POST /.netlify/functions/prospects-admin   { action: 'touch', prospect_id,
+ *        channel: 'email'|'linkedin'|'x', direction: 'out'|'in',
+ *        occurred_at?, subject?, body?, note? }
+ *     -> { touch: Touch, prospect: Prospect } | { error: string } (404 if the
+ *        prospect_id does not exist). The returned `prospect` is the row
+ *        AFTER the server-side stamp (see below) and carries no `touches`
+ *        key of its own — callers must merge, not replace.
+ *   POST /.netlify/functions/prospects-admin   { action: 'promote', candidate_id }
+ *     -> { prospect: Prospect, candidate: ContactCandidate, warning?: string }
+ *   POST /.netlify/functions/resolve-contact-routes   { prospect_id }
+ *     -> { results: [...], totals: {...} }. The candidates in THAT response
+ *        are pre-insert shapes with no database id, so this page re-lists
+ *        after a successful resolve rather than merging them directly. A
+ *        candidate without an id cannot be promoted.
+ *
+ * CONTACT ROUTES ARE STAGED, NEVER AUTO-APPLIED (packet 019). Measured
+ * 2026-08-16: all 43 prospects at stage='new' had zero contact routes while
+ * 43 of 43 already had an audit token and a score: the expensive half of the
+ * work was paid for and the cheap half was missing, so there was nobody to
+ * write to. resolve-contact-routes.js closes that, but it deliberately never
+ * writes public.prospects: it can prove a string appeared at a URL and cannot
+ * prove the string belongs to the person you mean (2026-08-15 produced three
+ * X accounts that looked right and were impostors). So it stages candidates
+ * with provenance and this page is where a human picks one. Promoting is the
+ * only way contact_email/linkedin_url/x_url ever get set, and promoting NEVER
+ * sets x_verified or linkedin_verified, because choosing to use a URL is not the
+ * same as having confirmed it.
  *
  * `patch` may only contain PROSPECT_WRITABLE_FIELDS (types/index.ts):
  * stage, notes, owner, next_action_at, last_contacted_at, replied_at,
  * reply_note. Every other field (domain, company, contact_*, segment, tier,
  * audit_token, ai_score, competitor_count, source, disqualified_reason,
- * created_at, updated_at) is read only — this page renders them but never
- * offers an edit control for them, including disqualified_reason, which reads
- * like something a human would type but is not on the writable list.
+ * created_at, updated_at, and the six channel-research fields added below)
+ * is read only — this page renders them but never offers an edit control for
+ * them, including disqualified_reason, which reads like something a human
+ * would type but is not on the writable list.
  *
- * The action names ('list' / 'update') and the update-endpoint envelope shape
- * are this builder's choice, not specified in the packet beyond the row shape
- * and the writable-field list — chosen to match the one action-dispatch
- * pattern this app already uses twice (promotions-admin.js,
- * PromotionsPanel.tsx: { action, ...payload } -> one function, one route).
- * If bg-backend's real prospects-admin.js uses a different envelope, only the
- * three functions in the "API" section below need to change.
+ * CHANNEL FIELDS (read only, research-derived): contact_email,
+ * contact_email_source, contact_email_kind ('individual' | 'role'), x_url,
+ * x_verified, linkedin_verified. `x_verified`/`linkedin_verified` are
+ * NOT NULL booleans defaulting false, and false is ambiguous by the
+ * contract's own admission — it means "never researched" OR "checked and
+ * could not be confirmed" (LinkedIn returns HTTP 999 to automated clients,
+ * so a profile URL can be positively confirmed but never positively denied).
+ * This page never labels an unconfirmed URL in a way that claims more than
+ * that — "Unconfirmed", never "Invalid" or "Unverified" (which reads as a
+ * failed check, not an absent one).
  *
- * BACKEND DEPENDENCY: prospects-admin.js is being built in parallel by
- * bg-backend and may not exist yet. Every call 404s until it ships; this page
- * shows a clear "not available yet" state instead of a raw fetch error
- * (same pattern as PromotionsPanel.tsx for promotions-admin.js), so this page
- * ships without blocking on that endpoint landing first.
+ * `last_contacted_at` and `replied_at` are no longer set by this page's own
+ * `update` patches — logging a `touch` sets them server-side (an 'out' touch
+ * sets last_contacted_at, an 'in' touch sets replied_at), in the same
+ * request as the insert, so the queue timestamps can never disagree with the
+ * touch history they are derived from. Stage changes on this page are now a
+ * pure `update` patch of `stage` alone.
+ *
+ * The action names and envelope shapes are confirmed live by bg-backend's
+ * prospects-admin.js header comment, matching this page's original
+ * one-action-dispatch precedent (promotions-admin.js / PromotionsPanel.tsx).
+ *
+ * BACKEND DEPENDENCY: if prospects-admin.js is ever rolled back or a call
+ * 404s for another reason, this page shows a clear "not available yet" state
+ * instead of a raw fetch error (same pattern as PromotionsPanel.tsx).
  *
  * WORK QUEUE, not a spreadsheet (see isActionableNow / queueSort below):
  * default view surfaces exactly two situations — audited and never contacted,
@@ -53,16 +94,20 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Search, ExternalLink, Linkedin, Globe, FileSearch, Clock, ChevronDown,
-  CheckCircle2, XCircle, Ban, Phone, StickyNote, CalendarClock, User as UserIcon,
-  Inbox, ListFilter,
+  Search, ExternalLink, Linkedin, Twitter, Mail, Globe, FileSearch, Clock, ChevronDown,
+  CheckCircle2, XCircle, Ban, StickyNote, CalendarClock, User as UserIcon,
+  Inbox, ListFilter, ShieldCheck, ShieldQuestion, ArrowUpRight, ArrowDownLeft, History,
+  Radar, Loader2, Link2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PageTitle } from '../components/Typography'
 import EmptyState from '../components/EmptyState'
 import Skeleton from '../components/Skeleton'
-import type { Prospect, ProspectStage, ProspectPatch } from '../types'
+import type {
+  Prospect, ProspectStage, ProspectPatch, Touch, TouchChannel, TouchDirection, TouchLogInput,
+  ContactCandidate, ContactCandidateKind,
+} from '../types'
 
 // ── API ─────────────────────────────────────────────────────────────────────
 // Same authenticated-POST pattern every other admin-only Netlify function in
@@ -85,6 +130,16 @@ async function authedPost<T>(fn: string, body: unknown): Promise<{ status: numbe
 const listProspects = () => authedPost<{ prospects?: Prospect[]; error?: string }>('prospects-admin', { action: 'list' })
 const updateProspect = (id: number, patch: ProspectPatch) =>
   authedPost<{ prospect?: Prospect; error?: string }>('prospects-admin', { action: 'update', id, patch })
+const logTouch = (input: TouchLogInput) =>
+  authedPost<{ touch?: Touch; prospect?: Prospect; error?: string }>('prospects-admin', { action: 'touch', ...input })
+const promoteCandidate = (candidate_id: number) =>
+  authedPost<{ prospect?: Prospect; candidate?: ContactCandidate; warning?: string; error?: string }>(
+    'prospects-admin', { action: 'promote', candidate_id },
+  )
+const resolveRoutes = (prospect_id: number) =>
+  authedPost<{ results?: { pages_fetched: number; candidates: unknown[]; errors: string[] }[]; error?: string }>(
+    'resolve-contact-routes', { prospect_id },
+  )
 
 // ── Stage vocabulary ─────────────────────────────────────────────────────────
 const STAGE_ORDER: ProspectStage[] = [
@@ -110,16 +165,29 @@ const NEXT_STEP: Partial<Record<ProspectStage, { to: ProspectStage; label: strin
   meeting:   { to: 'won',       label: 'Mark won' },
 }
 
-// Stage transitions this page performs also stamp the matching timestamp,
-// because "move to contacted" and "we touched them just now" are the same
-// real-world event for a founder working this list by hand. Only fires when
-// the target timestamp is genuinely a writable field (it is, per the
-// contract) and does not already have a value newer than this action.
-function autoStampFor(toStage: ProspectStage): ProspectPatch {
-  const now = new Date().toISOString()
-  if (toStage === 'contacted') return { last_contacted_at: now }
-  if (toStage === 'replied')   return { replied_at: now }
-  return {}
+// Stage changes are now a pure `update` patch of `stage` alone.
+// last_contacted_at/replied_at are stamped server-side by logging a `touch`
+// (see logTouch / TouchQuickLog below) — never by patching them directly, per
+// the contract's own instruction that those two fields must always be
+// derived from real touch history, not guessed at from a stage click.
+
+// ── Channel strength ─────────────────────────────────────────────────────────
+// How reachable a prospect actually is, independent of how strong the audit
+// evidence is. A verified individual profile is a much better target than a
+// role mailbox nobody reads personally — this feeds the queue as a tiebreak,
+// it never overrides evidence strength (see queueSort below).
+function channelStrength(p: Prospect): number {
+  let score = 0
+  if (p.contact_email) score += p.contact_email_kind === 'individual' ? 3 : 1
+  if (p.linkedin_url) score += p.linkedin_verified ? 3 : 1
+  if (p.x_url) score += p.x_verified ? 2 : 1
+  return score
+}
+
+function hasChannel(p: Prospect, channel: TouchChannel): boolean {
+  if (channel === 'email') return !!p.contact_email
+  if (channel === 'linkedin') return !!p.linkedin_url
+  return !!p.x_url
 }
 
 // ── Work-queue ordering ──────────────────────────────────────────────────────
@@ -149,14 +217,21 @@ function evidenceStrength(p: Prospect): number {
 
 // Top row is the one to do next. Overdue follow-ups always win (a promise to
 // a prospect is the one thing that must never silently slip), then evidence
-// strength, then most-recently-audited as a tiebreaker so nothing goes stale
-// at the bottom of a tie.
+// strength (unchanged, still the dominant signal — a strong finding on a
+// hard-to-reach prospect still beats a weak one that's easy to reach), then
+// channel strength as an extension: among equally strong evidence, a
+// verified individual profile or a real person's inbox is worth working
+// before a role mailbox or an unresearched prospect, then most-recently-
+// audited as the final tiebreaker so nothing goes stale at the bottom of a
+// tie.
 function queueSort(now: number) {
   return (a: Prospect, b: Prospect): number => {
     const overdueA = isOverdue(a, now), overdueB = isOverdue(b, now)
     if (overdueA !== overdueB) return overdueA ? -1 : 1
     const strengthDiff = evidenceStrength(b) - evidenceStrength(a)
     if (strengthDiff !== 0) return strengthDiff
+    const channelDiff = channelStrength(b) - channelStrength(a)
+    if (channelDiff !== 0) return channelDiff
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
   }
 }
@@ -246,13 +321,470 @@ function LinkChip({ href, icon: Icon, label }: { href: string; icon: typeof Exte
   )
 }
 
+// A confirmed profile and an unconfirmed one must never look the same, and an
+// unconfirmed one must never look like a failed one — false means "never
+// researched" or "checked and could not be confirmed" (LinkedIn 999s every
+// automated client), never "known bad". Verified = emerald + a filled shield.
+// Unconfirmed = the same neutral slate this page already uses for the 'new'
+// and 'lost' stage badges, with a question-mark shield, never red.
+function VerifiedBadge({ verified, unconfirmedTitle }: { verified: boolean; unconfirmedTitle: string }) {
+  if (verified) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shrink-0"
+        title="Confirmed reachable at this URL."
+      >
+        <ShieldCheck size={10} /> Verified
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-dark-700 text-slate-500 border border-dark-600 shrink-0"
+      title={unconfirmedTitle}
+    >
+      <ShieldQuestion size={10} /> Unconfirmed
+    </span>
+  )
+}
+
+// One chip per channel, either a working link (with its own trust signal) or
+// an honest absence — never a guess, never silently missing.
+function ChannelChips({ p }: { p: Prospect }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
+      {/* Email — kind is the load-bearing signal here: an info@ reaches a
+          queue, a named person's address reaches a person. */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        {p.contact_email ? (
+          <>
+            <a
+              href={`mailto:${p.contact_email}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-brand-300 transition-colors truncate max-w-[220px]"
+              title={p.contact_email_source ? `Found at ${p.contact_email_source}` : undefined}
+            >
+              <Mail size={12} className="shrink-0" /> <span className="truncate">{p.contact_email}</span>
+            </a>
+            {p.contact_email_kind === 'role' && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 shrink-0"
+                title="Reaches a shared inbox, not one named person."
+              >
+                Role inbox
+              </span>
+            )}
+            {p.contact_email_kind === 'individual' && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-dark-700 text-slate-400 border border-dark-600 shrink-0">
+                Individual
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+            <Mail size={12} /> No email found
+          </span>
+        )}
+      </div>
+
+      {/* LinkedIn */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        {p.linkedin_url ? (
+          <>
+            <a
+              href={p.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-brand-300 transition-colors"
+            >
+              <Linkedin size={12} className="shrink-0" /> LinkedIn
+            </a>
+            <VerifiedBadge
+              verified={p.linkedin_verified}
+              unconfirmedTitle="LinkedIn blocks automated verification (HTTP 999): this profile has not been confirmed as this person. Check it before using it."
+            />
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+            <Linkedin size={12} /> No LinkedIn found
+          </span>
+        )}
+      </div>
+
+      {/* X */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        {p.x_url ? (
+          <>
+            <a
+              href={p.x_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-brand-300 transition-colors"
+            >
+              <Twitter size={12} className="shrink-0" /> X
+            </a>
+            <VerifiedBadge
+              verified={p.x_verified}
+              unconfirmedTitle="This profile has not been confirmed as this person. Check it before using it."
+            />
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+            <Twitter size={12} /> No X found
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const CHANNEL_META: Record<TouchChannel, { label: string; icon: typeof Mail }> = {
+  email:    { label: 'Email',    icon: Mail },
+  linkedin: { label: 'LinkedIn', icon: Linkedin },
+  x:        { label: 'X',        icon: Twitter },
+}
+
+// Quick-log: tapping a channel icon logs an OUT touch to that channel
+// immediately — one tap, because this is meant to happen on a phone right
+// after sending something. Logging an inbound reply, or adding a subject/
+// note/backdated time, is one chevron-tap away behind the same control
+// rather than a separate page or modal.
+function TouchQuickLog({
+  p, onLog,
+}: {
+  p: Prospect
+  onLog: (input: TouchLogInput) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [channel, setChannel] = useState<TouchChannel>('email')
+  const [direction, setDirection] = useState<TouchDirection>('out')
+  const [subject, setSubject] = useState('')
+  const [note, setNote] = useState('')
+
+  const availableChannels = (['email', 'linkedin', 'x'] as TouchChannel[]).filter(c => hasChannel(p, c))
+  const channelsToOffer = availableChannels.length > 0 ? availableChannels : (['email', 'linkedin', 'x'] as TouchChannel[])
+
+  const quickLog = (c: TouchChannel) => onLog({ prospect_id: p.id, channel: c, direction: 'out' })
+
+  const submitDetailed = () => {
+    onLog({
+      prospect_id: p.id,
+      channel,
+      direction,
+      subject: subject.trim() || undefined,
+      note: note.trim() || undefined,
+    })
+    setSubject('')
+    setNote('')
+    setExpanded(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] text-slate-500 mr-0.5">Log touch:</span>
+        {channelsToOffer.map(c => {
+          const meta = CHANNEL_META[c]
+          const Icon = meta.icon
+          return (
+            <button
+              key={c}
+              onClick={() => quickLog(c)}
+              title={`Log a ${meta.label.toLowerCase()} you just sent`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-brand-300 hover:border-brand-500/40 transition-colors"
+            >
+              <Icon size={12} /> {meta.label}
+            </button>
+          )
+        })}
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors px-1.5 py-1.5"
+          aria-expanded={expanded}
+          title="Log a reply, backdate a touch, or add a subject/note"
+        >
+          More <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="grid gap-2 sm:grid-cols-2 bg-dark-900/40 border border-dark-700 rounded-lg p-3">
+          <div>
+            <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Channel</label>
+            <select
+              value={channel}
+              onChange={e => setChannel(e.target.value as TouchChannel)}
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500/50"
+            >
+              {(['email', 'linkedin', 'x'] as TouchChannel[]).map(c => (
+                <option key={c} value={c}>{CHANNEL_META[c].label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Direction</label>
+            <div className="inline-flex rounded-lg border border-dark-600 p-0.5 bg-dark-700 w-full">
+              <button
+                onClick={() => setDirection('out')}
+                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'out' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <ArrowUpRight size={11} /> Sent
+              </button>
+              <button
+                onClick={() => setDirection('in')}
+                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'in' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <ArrowDownLeft size={11} /> Received
+              </button>
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Subject (optional)</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="What it was about"
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Note (optional)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={2}
+              placeholder="Anything worth remembering about this touch"
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500/50 resize-y"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              onClick={submitDetailed}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors"
+            >
+              Log touch
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Newest first, channel + direction + when, plus subject/note if logged. This
+// is what stops the same prospect being contacted twice on two channels —
+// the history has to be visible right where the next action gets decided,
+// not buried behind a separate tab.
+function TouchHistory({ touches }: { touches: Touch[] }) {
+  if (touches.length === 0) {
+    return (
+      <p className="text-xs text-slate-600">
+        No touches logged yet. That's expected for most prospects on day one: this fills in the moment the first email, LinkedIn message or X message goes out.
+      </p>
+    )
+  }
+  return (
+    <ul className="space-y-1.5">
+      {touches.map(t => {
+        const meta = CHANNEL_META[t.channel]
+        const Icon = meta.icon
+        const DirIcon = t.direction === 'out' ? ArrowUpRight : ArrowDownLeft
+        return (
+          <li key={t.id} className="flex items-start gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 text-slate-400 shrink-0 mt-0.5">
+              <Icon size={12} />
+              <DirIcon size={11} className={t.direction === 'out' ? 'text-sky-400' : 'text-brand-300'} />
+            </span>
+            <span className="text-slate-300 shrink-0">
+              {meta.label} {t.direction === 'out' ? 'sent' : 'received'}
+            </span>
+            <span className="text-slate-600 shrink-0">· {timeAgo(t.occurred_at)}</span>
+            {(t.subject || t.note) && (
+              <span className="text-slate-500 truncate">· {t.subject || t.note}</span>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+// ── Contact route candidates ────────────────────────────────────────────────
+// What the resolver found, staged and waiting for a human to pick one. This
+// block is the whole reason the resolver is allowed to be cautious: it can
+// surface four plausible addresses and let the one person who knows the
+// account decide, instead of guessing one and writing it as fact.
+
+const CANDIDATE_META: Record<ContactCandidateKind, { label: string; icon: typeof Mail }> = {
+  email:    { label: 'Email',    icon: Mail },
+  linkedin: { label: 'LinkedIn', icon: Linkedin },
+  x:        { label: 'X',        icon: Twitter },
+}
+
+// The value currently live on the prospect row for this kind, so the list can
+// mark which candidate is in use. Derived rather than read off the
+// `promoted` flag, which records that a candidate was promoted at some point
+// and would go stale the moment a second one replaced it.
+function liveValueFor(p: Prospect, kind: ContactCandidateKind): string | null {
+  if (kind === 'email') return p.contact_email
+  if (kind === 'linkedin') return p.linkedin_url
+  return p.x_url
+}
+
+// Confidence describes how well SOURCED a string is, never whether it belongs
+// to the right person, so the tones stay informational: no green tick on
+// "high" and no red on "low". A low-confidence candidate is usually a real
+// address that belongs to somebody else (a testimonial, a customer logo), and
+// that is worth reading rather than hiding.
+const CONFIDENCE_TONE: Record<ContactCandidate['confidence'], { className: string; title: string }> = {
+  high: {
+    className: 'bg-dark-700 text-slate-300 border-dark-600',
+    title: 'Published in a contact context on a page this company owns.',
+  },
+  medium: {
+    className: 'bg-dark-700 text-slate-400 border-dark-600',
+    title: 'Found on a page this company owns, outside an obvious contact context.',
+  },
+  low: {
+    className: 'bg-dark-700 text-slate-500 border-dark-600 border-dashed',
+    title: 'Weakly sourced. Often a real address belonging to a different company, picked up from a testimonial or a customer logo. Open the source before using it.',
+  },
+}
+
+function CandidateRow({
+  c, isLive, willReplace, onPromote,
+}: {
+  c: ContactCandidate
+  isLive: boolean
+  willReplace: boolean
+  onPromote: (id: number) => void
+}) {
+  const meta = CANDIDATE_META[c.kind]
+  const Icon = meta.icon
+  const tone = CONFIDENCE_TONE[c.confidence]
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs py-1">
+      <Icon size={12} className="text-slate-500 shrink-0" />
+      <span className="text-slate-200 font-medium truncate max-w-[260px]" title={c.value}>{c.value}</span>
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium border shrink-0 ${tone.className}`} title={tone.title}>
+        {c.confidence}
+      </span>
+      {c.email_kind === 'role' && (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 shrink-0"
+          title="Reaches a shared inbox, not one named person."
+        >
+          Role inbox
+        </span>
+      )}
+      {c.email_kind === 'individual' && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-dark-700 text-slate-400 border border-dark-600 shrink-0">
+          Individual
+        </span>
+      )}
+      <a
+        href={c.source_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-brand-300 transition-colors shrink-0"
+        title={`Seen at ${c.source_url}`}
+      >
+        <Link2 size={10} /> source
+      </a>
+      <span className="ml-auto shrink-0">
+        {isLive ? (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/30">
+            <CheckCircle2 size={11} /> In use
+          </span>
+        ) : (
+          <button
+            onClick={() => onPromote(c.id)}
+            title={willReplace
+              ? 'Replaces the route currently on this prospect. The old one stays in this list.'
+              : 'Puts this on the prospect record. It does not mark the profile as verified.'}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-brand-300 hover:border-brand-500/40 transition-colors"
+          >
+            {willReplace ? 'Replace' : 'Use this'}
+          </button>
+        )}
+      </span>
+    </li>
+  )
+}
+
+const CANDIDATES_COLLAPSED = 4
+
+function ContactCandidates({
+  p, resolving, onResolve, onPromote,
+}: {
+  p: Prospect
+  resolving: boolean
+  onResolve: (id: number) => void
+  onPromote: (id: number) => void
+}) {
+  const [showAll, setShowAll] = useState(false)
+  const candidates = p.candidates
+  const hasAnyRoute = !!(p.contact_email || p.linkedin_url || p.x_url)
+  const visible = showAll ? candidates : candidates.slice(0, CANDIDATES_COLLAPSED)
+
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => onResolve(p.id)}
+          disabled={resolving}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-brand-300 hover:border-brand-500/40 transition-colors disabled:opacity-60 disabled:cursor-wait"
+          title="Reads this company's own pages and looks for a published address or profile. It never guesses one from a name pattern."
+        >
+          {resolving
+            ? <><Loader2 size={12} className="animate-spin" /> Reading their site…</>
+            : <><Radar size={12} /> {candidates.length > 0 ? 'Look again' : 'Find contact routes'}</>}
+        </button>
+        {candidates.length > 0 && (
+          <span className="text-[11px] text-slate-500">
+            {candidates.length} found{hasAnyRoute ? '' : ', none chosen yet'}
+          </span>
+        )}
+      </div>
+
+      {candidates.length > 0 && (
+        <div className="mt-2 bg-dark-900/40 border border-dark-700 rounded-lg px-3 py-2">
+          <ul className="divide-y divide-dark-700/60">
+            {visible.map(c => (
+              <CandidateRow
+                key={c.id}
+                c={c}
+                isLive={liveValueFor(p, c.kind) === c.value}
+                willReplace={!!liveValueFor(p, c.kind) && liveValueFor(p, c.kind) !== c.value}
+                onPromote={onPromote}
+              />
+            ))}
+          </ul>
+          {candidates.length > CANDIDATES_COLLAPSED && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors mt-1"
+            >
+              {showAll ? 'Show fewer' : `Show all ${candidates.length}`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────
 function ProspectRow({
-  p, now, onPatch,
+  p, now, resolving, onPatch, onLogTouch, onResolve, onPromote,
 }: {
   p: Prospect
   now: number
+  resolving: boolean
   onPatch: (id: number, patch: ProspectPatch) => void
+  onLogTouch: (input: TouchLogInput) => void
+  onResolve: (id: number) => void
+  onPromote: (candidateId: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [notesDraft, setNotesDraft] = useState(p.notes ?? '')
@@ -261,8 +793,10 @@ function ProspectRow({
   const overdue = isOverdue(p, now)
   const next = NEXT_STEP[p.stage]
 
+  // Stage changes are a pure stage patch now — logging a touch (below) is
+  // what stamps last_contacted_at/replied_at, server-side, from real history.
   const changeStage = (to: ProspectStage) => {
-    onPatch(p.id, { stage: to, ...autoStampFor(to) })
+    onPatch(p.id, { stage: to })
     if (to === 'replied') setExpanded(true) // surface the reply-note field right away
   }
 
@@ -289,14 +823,23 @@ function ProspectRow({
         <ScoreChip p={p} />
       </div>
 
-      {/* Verified contact route + the report — the two links that matter next */}
+      {/* The report + a generic contact page, if BrandGEO has one — the three
+          real contact channels (email/LinkedIn/X) get their own row below
+          with trust signals, so they don't belong in this plain link row. */}
       <div className="flex flex-wrap items-center gap-2 mt-3">
         {p.audit_token && <LinkChip href={reportUrl(p.audit_token)} icon={FileSearch} label="View report" />}
-        {p.contact_url && <LinkChip href={p.contact_url} icon={Globe} label="Contact" />}
-        {p.linkedin_url && <LinkChip href={p.linkedin_url} icon={Linkedin} label="LinkedIn" />}
+        {p.contact_url && <LinkChip href={p.contact_url} icon={Globe} label="Contact page" />}
         {p.segment && (
           <span className="text-[11px] text-slate-500 px-2 py-1">{p.segment}{p.tier ? ` · ${p.tier}` : ''}</span>
         )}
+      </div>
+
+      <ChannelChips p={p} />
+
+      <ContactCandidates p={p} resolving={resolving} onResolve={onResolve} onPromote={onPromote} />
+
+      <div className="mt-3">
+        <TouchQuickLog p={p} onLog={onLogTouch} />
       </div>
 
       {/* One-click progression + always-available jump-to-any-stage */}
@@ -307,15 +850,6 @@ function ProspectRow({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors"
           >
             <CheckCircle2 size={13} /> {next.label}
-          </button>
-        )}
-        {p.stage !== 'contacted' && !TERMINAL_STAGES.includes(p.stage) && (
-          <button
-            onClick={() => onPatch(p.id, { last_contacted_at: new Date().toISOString() })}
-            title="Log a touch without changing stage"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-slate-100 transition-colors"
-          >
-            <Phone size={12} /> Log touch
           </button>
         )}
         <select
@@ -347,13 +881,19 @@ function ProspectRow({
           className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors px-1.5 py-1.5"
           aria-expanded={expanded}
         >
-          <StickyNote size={12} /> Notes & next action
+          <StickyNote size={12} /> Notes, next action & history{p.touches.length > 0 ? ` (${p.touches.length})` : ''}
           <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
 
       {expanded && (
         <div className="mt-3 pt-3 border-t border-dark-700 grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1">
+              <History size={11} /> Touch history
+            </label>
+            <TouchHistory touches={p.touches} />
+          </div>
           <div>
             <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1">
               <CalendarClock size={11} /> Next action
@@ -430,10 +970,23 @@ export default function Prospects() {
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Kept separate from errorMsg on purpose. "This site publishes no address"
+  // is the expected answer for most companies, not a failure, and colouring
+  // it like one would train the reader to distrust a correct result.
+  const [noticeMsg, setNoticeMsg] = useState<string | null>(null)
+
+  // Which prospects have a resolver run in flight. A Set rather than a single
+  // id because reading one company's site takes seconds and there is no
+  // reason to make the next one wait.
+  const [resolving, setResolving] = useState<Set<number>>(new Set())
 
   const [view, setView] = useState<View>('queue')
   const [stageFilter, setStageFilter] = useState<ProspectStage | 'all'>('all')
   const [segmentFilter, setSegmentFilter] = useState<string>('all')
+  // 'none' is the one that matters on day one: measured 2026-08-16, all 43
+  // prospects at stage='new' had zero contact routes, so "who can I not even
+  // reach yet" is the actual work queue for the resolver.
+  const [channelFilter, setChannelFilter] = useState<TouchChannel | 'all' | 'none'>('all')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -445,11 +998,28 @@ export default function Prospects() {
       if (status === 404) { setUnavailable(true); setLoading(false); return }
       if (data?.error) { setErrorMsg(data.error); setLoading(false); return }
       setUnavailable(false)
-      setProspects(data?.prospects ?? [])
+      // Defensive: the contract guarantees `touches` and `candidates` on
+      // every list row, but empty arrays are the honest default rather than
+      // trusting that blindly. `candidates` in particular is absent from any
+      // prospects-admin.js build predating packet 019, so this is what keeps
+      // the page working against an older deploy instead of crashing on
+      // p.candidates.length.
+      setProspects((data?.prospects ?? []).map(p => ({ ...p, touches: p.touches ?? [], candidates: p.candidates ?? [] })))
       setLoading(false)
     })
     return () => { cancelled = true }
   }, [isAdmin])
+
+  // Full re-list. Used after a resolver run, because resolve-contact-routes.js
+  // returns pre-insert candidate shapes with no database id and a candidate
+  // without an id cannot be promoted. One extra round trip on a table of tens
+  // of rows, in exchange for never rendering a Use-this button that would 404.
+  const refresh = () =>
+    listProspects().then(({ status, data }) => {
+      if (status === 404 && !data) { setUnavailable(true); return }
+      if (data?.error || !data?.prospects) return
+      setProspects(data.prospects.map(p => ({ ...p, touches: p.touches ?? [], candidates: p.candidates ?? [] })))
+    })
 
   // Optimistic patch: update local state immediately (this is a founder moving
   // fast on a phone between meetings, not a form with a submit button), then
@@ -472,7 +1042,100 @@ export default function Prospects() {
         setProspects(prev => prev.map(p => (p.id === id ? previous : p)))
         return
       }
-      setProspects(prev => prev.map(p => (p.id === id ? data.prospect! : p)))
+      // prospects-admin.js now nests `touches` and `candidates` on every
+      // action's response, but this page still merges rather than replaces:
+      // it has to keep working against a deploy that predates that, and a
+      // merge costs nothing when the keys are present.
+      setProspects(prev => prev.map(p => (p.id === id ? {
+        ...data.prospect!,
+        touches: data.prospect!.touches ?? previous.touches,
+        candidates: data.prospect!.candidates ?? previous.candidates,
+      } : p)))
+    })
+  }
+
+  // Logging a touch is its own call, not a patch: `touch` sets
+  // last_contacted_at/replied_at server-side and is the only correct way to
+  // do that now (see the contract note at the top of this file). Optimistic
+  // here too, same reasoning as onPatch, and same merge caveat — the
+  // returned `prospect` carries no `touches` key, so the new touch is
+  // prepended locally instead of trusting a response key that doesn't exist.
+  const onLogTouch = (input: TouchLogInput) => {
+    const previous = prospects.find(p => p.id === input.prospect_id)
+    if (!previous) return
+    const optimisticNow = new Date().toISOString()
+    setProspects(prev => prev.map(p => (p.id === input.prospect_id ? {
+      ...p,
+      last_contacted_at: input.direction === 'out' ? optimisticNow : p.last_contacted_at,
+      replied_at: input.direction === 'in' ? optimisticNow : p.replied_at,
+    } : p)))
+    logTouch(input).then(({ status, data }) => {
+      if (status === 404 && !data) { setUnavailable(true); return }
+      if (data?.error || !data?.touch || !data?.prospect) {
+        setErrorMsg(data?.error || 'Could not log that touch. Reverted.')
+        setProspects(prev => prev.map(p => (p.id === input.prospect_id ? previous : p)))
+        return
+      }
+      const touch = data.touch
+      const prospect = data.prospect
+      setProspects(prev => prev.map(p => (p.id === input.prospect_id
+        ? { ...prospect, touches: [touch, ...p.touches], candidates: prospect.candidates ?? p.candidates }
+        : p)))
+    })
+  }
+
+  // Reads the prospect's own pages looking for a published address or
+  // profile. Never guesses one from a name pattern, never queries a lead
+  // database. See resolve-contact-routes.js's header for the constraints it
+  // holds itself to. Nothing it finds reaches the prospect row until someone
+  // clicks Use this below.
+  const onResolve = (id: number) => {
+    setResolving(prev => new Set(prev).add(id))
+    const done = () => setResolving(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+    resolveRoutes(id).then(({ status, data }) => {
+      if (status === 404 && !data) {
+        setErrorMsg('The contact route resolver is not deployed yet (resolve-contact-routes.js). Everything else on this page still works.')
+        done()
+        return
+      }
+      if (data?.error || !data?.results) {
+        setErrorMsg(data?.error || 'Could not read that site for contact routes.')
+        done()
+        return
+      }
+      const found = data.results[0]?.candidates?.length ?? 0
+      const pages = data.results[0]?.pages_fetched ?? 0
+      // Most companies publish no individual address at all, so an empty
+      // result is the honest answer and not a reason to start guessing. Say
+      // so in the neutral banner rather than the error one.
+      setNoticeMsg(found === 0
+        ? `Read ${pages} ${pages === 1 ? 'page' : 'pages'} and found nothing published. No address was guessed.`
+        : `Found ${found} contact ${found === 1 ? 'route' : 'routes'} across ${pages} ${pages === 1 ? 'page' : 'pages'}. Pick one below.`)
+      refresh().finally(done)
+    })
+  }
+
+  // Puts one staged candidate onto the prospect row. Not optimistic: unlike a
+  // stage change, this is the value a real message will be addressed to, so
+  // it should read as saved only once the server says it is.
+  const onPromote = (candidateId: number) => {
+    promoteCandidate(candidateId).then(({ status, data }) => {
+      if (status === 404 && !data) { setUnavailable(true); return }
+      if (data?.error || !data?.prospect) {
+        setErrorMsg(data?.error || 'Could not save that contact route.')
+        return
+      }
+      const prospect = data.prospect
+      setNoticeMsg(data.warning ?? null)
+      setProspects(prev => prev.map(p => (p.id === prospect.id ? {
+        ...prospect,
+        touches: prospect.touches ?? p.touches,
+        candidates: prospect.candidates ?? p.candidates,
+      } : p)))
     })
   }
 
@@ -496,6 +1159,11 @@ export default function Prospects() {
   const filtered = useMemo(() => {
     let rows = prospects
     if (segmentFilter !== 'all') rows = rows.filter(p => p.segment === segmentFilter)
+    if (channelFilter === 'none') {
+      rows = rows.filter(p => !p.contact_email && !p.linkedin_url && !p.x_url)
+    } else if (channelFilter !== 'all') {
+      rows = rows.filter(p => hasChannel(p, channelFilter))
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       rows = rows.filter(p =>
@@ -510,7 +1178,7 @@ export default function Prospects() {
       rows = rows.filter(p => p.stage === stageFilter)
     }
     return [...rows].sort(queueSort(now))
-  }, [prospects, segmentFilter, search, view, stageFilter, now])
+  }, [prospects, segmentFilter, channelFilter, search, view, stageFilter, now])
 
   if (!isAdmin) {
     return (
@@ -537,6 +1205,19 @@ export default function Prospects() {
       {errorMsg && (
         <p className="text-xs text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded-lg px-3 py-2 mb-6">
           {errorMsg}
+        </p>
+      )}
+      {noticeMsg && (
+        <p className="text-xs text-slate-300 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 mb-6 flex items-start gap-2">
+          <Radar size={13} className="text-slate-500 shrink-0 mt-0.5" />
+          <span>{noticeMsg}</span>
+          <button
+            onClick={() => setNoticeMsg(null)}
+            className="ml-auto text-slate-600 hover:text-slate-400 transition-colors shrink-0"
+            aria-label="Dismiss"
+          >
+            <XCircle size={13} />
+          </button>
         </p>
       )}
 
@@ -567,6 +1248,21 @@ export default function Prospects() {
             {segments.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
+
+        {/* Work one channel in a sitting: every email in a row, then every
+            LinkedIn, rather than switching context per prospect. */}
+        <select
+          value={channelFilter}
+          onChange={e => setChannelFilter(e.target.value as TouchChannel | 'all' | 'none')}
+          className="bg-dark-800 border border-dark-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-brand-500/50"
+          aria-label="Filter by channel"
+        >
+          <option value="all">All channels</option>
+          <option value="email">Has email</option>
+          <option value="linkedin">Has LinkedIn</option>
+          <option value="x">Has X</option>
+          <option value="none">No way to reach them</option>
+        </select>
 
         <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -648,7 +1344,16 @@ export default function Prospects() {
       ) : (
         <div className="space-y-3">
           {filtered.map(p => (
-            <ProspectRow key={p.id} p={p} now={now} onPatch={onPatch} />
+            <ProspectRow
+              key={p.id}
+              p={p}
+              now={now}
+              resolving={resolving.has(p.id)}
+              onPatch={onPatch}
+              onLogTouch={onLogTouch}
+              onResolve={onResolve}
+              onPromote={onPromote}
+            />
           ))}
         </div>
       )}
