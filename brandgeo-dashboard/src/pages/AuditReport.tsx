@@ -17,6 +17,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Loader2, AlertTriangle, TrendingUp, Mail } from 'lucide-react'
 import { SentimentDot } from '../components/ScoreBadge'
 import BrandGeoMark from '../components/BrandGeoLogo'
+import { ENGINE_META } from '../lib/planConfig'
 
 type ReportStatus = 'pending' | 'generating_prompts' | 'collecting' | 'ready' | 'error'
 
@@ -60,8 +61,13 @@ interface PendingReport { status: Exclude<ReportStatus, 'ready'>; domain: string
 
 type Report = TeaserReport | FullReport | PendingReport
 
-const ENGINE_LABEL: Record<string, string> = {
-  chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', perplexity: 'Perplexity', meta: 'Meta AI',
+// Single source for engine names is ENGINE_META in planConfig.ts (dashboard
+// guardrail: never re-declare an engine label locally). Falls back to the raw
+// id for a value engine_states could in principle carry that ENGINE_META does
+// not yet know about, so an unrecognised id degrades to its own name rather
+// than to a blank chip.
+function engineLabel(engine: string): string {
+  return ENGINE_META[engine as keyof typeof ENGINE_META]?.label ?? engine
 }
 
 const STATE_STYLE: Record<string, string> = {
@@ -116,8 +122,30 @@ function PreemptText({ engineCount }: { engineCount: number }) {
   )
 }
 
+// Status hue, not brand chrome and not engine identity. Violet is reserved for
+// chrome (buttons, links, the loading spinner) per dashboard-visual-system.md
+// section 8.6 rule 3, so it never appears here, and blue is already claimed by
+// Gemini's engine colour in ENGINE_META, so reusing it for a score would blur
+// the two colour channels the design system deliberately keeps apart.
+// 54% of stored audits score 0, so the low band is the majority case, not an
+// edge, and it has to read as a deliberate result, not fade into the page the
+// way a muted grey does. Amber (already this file's caution vocabulary, see
+// STATE_STYLE.partial and the low_confidence note) carries "there is real work
+// to do" without a red "you failed" tone on a page written to invite a fix, not
+// hand down a verdict.
+//
+// Two bands only, not four. A four-step ramp was tried and measured against
+// dashboard-visual-system.md section 8.3's 15 floor for marks that co-render
+// in one plot (the Breakdown grid renders six of these side by side): the two
+// emerald steps and the two amber steps each measured roughly half that floor,
+// so a 15 and a 45, or an 80 and a 60, were not reliably distinguishable by
+// colour alone, and in light mode the top two emerald classes even resolve to
+// the same hex. Both classes below already carry a light-mode override
+// (index.css), unlike text-amber-500 and text-emerald-300, which did not.
+// Section 13.6's "identity is never colour alone" is still satisfied: the
+// number itself is always rendered next to the colour.
 function scoreColor(score: number) {
-  return score >= 76 ? 'text-emerald-400' : score >= 51 ? 'text-brand-400' : score >= 21 ? 'text-blue-400' : 'text-slate-500'
+  return score >= 50 ? 'text-emerald-400' : 'text-amber-400'
 }
 
 export default function AuditReport() {
@@ -133,10 +161,34 @@ export default function AuditReport() {
     if (!token) return
     try {
       const res = await fetch(`/.netlify/functions/get-audit-report?token=${encodeURIComponent(token)}`)
+      if (!res.ok) {
+        // Read the body defensively. get-audit-report.js returns JSON on its
+        // own error responses, but a platform-level failure (function not
+        // deployed, cold-start failure) can return an HTML body instead, and
+        // res.json() would throw on that, into the outer catch, skipping the
+        // stop-polling logic below entirely.
+        const data = await res.json().catch(() => ({} as { error?: string }))
+        setLoadError(data.error || 'Could not load this report.')
+        // Any 4xx is a permanent failure: an unknown token, a bad request, or
+        // a forbidden request cannot become a 200 on retry, so stop polling
+        // rather than hitting a dead endpoint every 4 seconds until the tab
+        // closes. A 5xx is left polling, since that can be transient.
+        if (res.status >= 400 && res.status < 500 && pollRef.current) {
+          clearInterval(pollRef.current)
+          pollRef.current = null
+        }
+        return
+      }
       const data = await res.json()
-      if (!res.ok) { setLoadError(data.error || 'Could not load this report.'); return }
+      // Clear any earlier failure now that a fetch actually succeeded, so a
+      // transient network blip does not leave a stale error banner on screen
+      // once the page recovers.
+      setLoadError(null)
       setReport(data)
-      if (data.status === 'ready' && pollRef.current) {
+      // 'ready' and 'error' are both terminal: nothing about this token will
+      // change again without a brand new audit run, so stop polling on either
+      // outcome, not just the successful one.
+      if ((data.status === 'ready' || data.status === 'error') && pollRef.current) {
         clearInterval(pollRef.current)
         pollRef.current = null
       }
@@ -191,17 +243,35 @@ export default function AuditReport() {
           <div className="p-8 text-slate-500 text-sm animate-pulse">Loading your report…</div>
         )}
 
-        {report && report.status !== 'ready' && (
+        {report && report.status !== 'ready' && report.status !== 'error' && (
           <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 text-center">
             <Loader2 size={28} className="animate-spin text-brand-400 mx-auto mb-4" />
-            <h1 className="text-lg font-semibold text-white mb-1">
-              {report.status === 'error' ? "We couldn't finish this audit" : `Auditing ${report.domain}…`}
-            </h1>
+            <h1 className="text-lg font-semibold text-white mb-1">{`Auditing ${report.domain}…`}</h1>
             <p className="text-sm text-slate-400">
-              {report.status === 'error'
-                ? (report as PendingReport).error_message || `Something interrupted the check before we could score ${report.domain}. Run it again, it usually finishes in under a minute.`
-                : 'Asking AI engines the questions a buyer asks before they know you exist. This usually takes under a minute.'}
+              Asking AI engines the questions a buyer asks before they know you exist. This usually takes under a minute.
             </p>
+          </div>
+        )}
+
+        {/* Terminal failure, not a step on the way to a result. No spinner:
+            nothing is in progress and polling has already stopped (fetchReport
+            clears the interval on this status), so an endlessly spinning icon
+            here would be a lie about what is happening. The affordance is a
+            real link, not just retry copy, because there is nothing on this
+            page for the visitor to click otherwise. */}
+        {report && report.status === 'error' && (
+          <div className="bg-dark-800 border border-red-500/20 rounded-xl p-8 text-center">
+            <AlertTriangle size={28} className="text-red-400 mx-auto mb-4" />
+            <h1 className="text-lg font-semibold text-white mb-1">We couldn't finish this audit</h1>
+            <p className="text-sm text-slate-400 mb-5">
+              {report.error_message || `Something interrupted the check before we could score ${report.domain}.`}
+            </p>
+            <a
+              href="https://getbrandgeo.com/#free-audit"
+              className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+            >
+              Run a new audit
+            </a>
           </div>
         )}
 
@@ -229,7 +299,7 @@ export default function AuditReport() {
                         ? 'We could not reach this engine during your audit. This is not a result about your brand.'
                         : undefined}
                     >
-                      {ENGINE_LABEL[engine] ?? engine}: {STATE_PHRASE[state] ?? state}
+                      {engineLabel(engine)}: {STATE_PHRASE[state] ?? state}
                     </span>
                   ))}
                 </div>
@@ -295,6 +365,21 @@ function FullReportView({ report }: { report: FullReport }) {
   const mentionedCount = report.engine_results.filter(r => r.brand_mentioned).length
   const cellsChecked = report.engine_results.length
   const promptCount = new Set(report.engine_results.map(r => r.prompt_id)).size
+  // 'screening sample' is the copy deck's approved qualifier
+  // (docs/copy/audit-score-presentation-2026-08-14.md section on Direction C),
+  // ruled specifically because a 4-prompt, 2-engine screening sample cannot
+  // support the precision a bare /100 implies. That reasoning does not hold
+  // for a full-depth audit (6 prompts, up to 5 engines, per audit-domain.js),
+  // so a full report gets its own honest word instead of inheriting the
+  // screening qualifier it never earned.
+  const depthLabel = report.depth === 'full' ? 'full audit' : 'screening sample'
+  // Derived, not hardcoded. A screening run is engines x SCREENING_PROMPT_COUNT
+  // (2 x 4 = 8), a full run is up to five engines x six prompts, so a fixed
+  // "of 8" would print a false, self-contradicting line on a full-depth audit
+  // where most engines failed ("full audit" above a sentence describing the
+  // screening shape). engines_used and promptCount are both already on this
+  // report, so no new data is needed.
+  const expectedCells = report.engines_used.length * promptCount
   return (
     <div className="space-y-4">
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center">
@@ -303,10 +388,10 @@ function FullReportView({ report }: { report: FullReport }) {
           {report.ai_score}<span className="text-xl text-slate-500 font-normal">/100</span>
         </div>
         <p className="text-xs text-slate-500">
-          AI Visibility Score (screening sample) · {mentionedCount} of {cellsChecked} answers named you · {report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'} checked
+          AI Visibility Score ({depthLabel}) · {mentionedCount} of {cellsChecked} answers named you · {report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'} checked
         </p>
-        {cellsChecked < 8 && (
-          <p className="text-xs text-slate-500 mt-1">{cellsChecked} of 8 questions returned an answer.</p>
+        {cellsChecked < expectedCells && (
+          <p className="text-xs text-slate-500 mt-1">{cellsChecked} of {expectedCells} questions returned an answer.</p>
         )}
       </div>
 
@@ -343,7 +428,7 @@ function FullReportView({ report }: { report: FullReport }) {
                 ? 'We could not reach this engine during your audit. This is not a result about your brand.'
                 : undefined}
             >
-              {ENGINE_LABEL[engine] ?? engine}: {STATE_PHRASE[state] ?? state}
+              {engineLabel(engine)}: {STATE_PHRASE[state] ?? state}
             </span>
           ))}
         </div>
@@ -364,7 +449,7 @@ function FullReportView({ report }: { report: FullReport }) {
           <ul className="space-y-2">
             {report.top_gaps.map((g, i) => (
               <li key={i} className="text-sm text-slate-300 bg-dark-700 rounded-lg p-3">
-                <span className="font-medium text-white">{ENGINE_LABEL[g.engine] ?? g.engine}</span>{' '}
+                <span className="font-medium text-white">{engineLabel(g.engine)}</span>{' '}
                 {g.issue === 'competitor_named'
                   ? <>named <span className="text-amber-400 font-medium">{g.competitor_named}</span> instead of you</>
                   : <>didn't mention you</>}
@@ -386,7 +471,7 @@ function FullReportView({ report }: { report: FullReport }) {
             <div key={i} className="bg-dark-700 rounded-lg p-3 text-sm">
               <div className="flex items-center gap-2 mb-1">
                 <SentimentDot value={r.sentiment} />
-                <span className="font-medium text-white">{ENGINE_LABEL[r.engine] ?? r.engine}</span>
+                <span className="font-medium text-white">{engineLabel(r.engine)}</span>
                 <span className="text-slate-500">·</span>
                 <span className={r.brand_mentioned ? 'text-emerald-400' : 'text-slate-500'}>
                   {r.brand_mentioned ? (r.brand_position ? `Mentioned (#${r.brand_position})` : 'Mentioned') : 'Not mentioned'}

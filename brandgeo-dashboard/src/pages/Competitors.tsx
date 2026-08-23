@@ -256,6 +256,10 @@ export default function Competitors() {
   const [saving, setSaving] = useState(false)
   const [manualComps, setManualComps] = useState<any[]>([])
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
+  // Mirrors the capError banner in Prompts.tsx: one visible notice for a
+  // write that failed, shown next to the row it happened to rather than
+  // discarded.
+  const [competitorError, setCompetitorError] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -299,15 +303,48 @@ export default function Competitors() {
     setSaving(true)
     const entry = { name: newName.trim(), website: newWebsite.trim() || null, source: 'manual' as const, client_id: activeClientId }
     if (!isDemoMode) {
-      const { data: saved } = await supabase.from('competitors').insert(entry).select().single()
+      const { data: saved, error } = await supabase.from('competitors').insert(entry).select().single()
+      if (error) {
+        // The form stays open and what was typed stays typed, so a failed
+        // write never drops the name the user just entered. The driver
+        // message is logged for diagnosis, not shown, since it can name
+        // internal tables and policies.
+        console.error('[Competitors] addCompetitor failed:', error)
+        setCompetitorError(`Could not add ${entry.name}. Try again, and if it keeps failing contact support.`)
+        setSaving(false)
+        return
+      }
       if (saved) setManualComps(prev => [...prev, saved])
     }
+    setCompetitorError(null)
     setNewName(''); setNewWebsite(''); setShowAdd(false); setSaving(false)
   }
 
   const deleteManual = async (id: number) => {
-    if (!isDemoMode) await supabase.from('competitors').delete().eq('id', id)
+    const index = manualComps.findIndex(c => c.id === id)
+    const removed = manualComps[index]
+    // Optimistic removal, restored below at its original position if the
+    // server disagrees, so a failed delete never leaves the row silently
+    // gone with no explanation.
     setManualComps(prev => prev.filter(c => c.id !== id))
+    if (!isDemoMode) {
+      const { error } = await supabase.from('competitors').delete().eq('id', id)
+      if (error) {
+        if (removed) {
+          setManualComps(prev => {
+            const next = [...prev]
+            next.splice(index, 0, removed)
+            return next
+          })
+        }
+        // The driver message is logged for diagnosis, not shown, since it
+        // can name internal tables and policies.
+        console.error('[Competitors] deleteManual failed:', error)
+        setCompetitorError(`Could not remove ${removed?.name ?? 'that competitor'}. Try again, and if it keeps failing contact support.`)
+        return
+      }
+    }
+    setCompetitorError(null)
   }
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading competitors…</div>
@@ -352,6 +389,15 @@ export default function Competitors() {
           Add manually
         </button>
       </div>
+
+      {competitorError && (
+        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
+          <span>{competitorError}</span>
+          <button onClick={() => setCompetitorError(null)} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

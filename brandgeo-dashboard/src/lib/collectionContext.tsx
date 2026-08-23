@@ -26,12 +26,65 @@ interface Progress {
   clientName: string
 }
 
+// The enqueue endpoint (enqueue-collection.js via _enqueue.js / _auth.js) can
+// decline to start a run for several reasons a customer can act on: a plan
+// cooldown, a budget ceiling, or simply nothing left to collect. It always
+// returns them in the response body, but until now the browser only ever
+// logged that body and moved on -- a blocked click produced zero visible
+// feedback. `reason` mirrors the server's own strings verbatim (see the
+// switch in describeCollectionBlock, AIVisibility.tsx) plus two client-side
+// fallbacks ('request_failed', 'already_running') for when the server never
+// answered at all.
+export interface CollectionBlockReason {
+  reason: string
+  message?: string
+  retryAfterHours?: number
+  nextAvailableAt?: string
+}
+
+export interface CollectionCallResult {
+  engine: string
+  ok: boolean
+  status: number | null
+  // The endpoint's own reported reason when ok is false: an engine error code
+  // (quota_exceeded / api_error / auth_error), 'insert_error' when the row was
+  // never saved, 'skipped' when the endpoint declined to run, or 'request_failed'
+  // when the call never came back with a body worth reading. Undefined when ok
+  // is true. All three collect endpoints answer HTTP 200 even on a real engine
+  // failure, so this comes from the body, never from the status code alone.
+  reason?: string
+}
+
+export interface RunCollectionResult {
+  blocked: boolean
+  blockReason?: CollectionBlockReason
+}
+
+export interface RunSinglePromptResult {
+  ok: boolean
+  calls: CollectionCallResult[]
+}
+
 interface CollectionCtx {
   collecting: boolean
   progress: Progress | null
   lastCompletedAt: number   // increments as jobs finish -- watch to reload data
-  runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<void>
-  runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<void>
+  // Most recent reason a manual enqueue did NOT start a real run. Cleared the
+  // instant a run actually starts. Read directly in render (not inside an
+  // async handler) so callers never see a stale value from a captured
+  // closure -- every button that goes through runCollection shares this one
+  // piece of state, so a blocked click is never silent.
+  lastBlockReason:  CollectionBlockReason | null
+  // Drops any block reason currently on screen without waiting for another
+  // enqueue attempt. Needed for one case runCollection itself cannot cover:
+  // switching the active client. A cooldown/budget reason belongs to the
+  // client that produced it, and this context is app-level (survives tab
+  // navigation), so nothing else ever un-sets it when the admin picks a
+  // different client from the switcher. Called from AIVisibility's
+  // client-change effect, never from inside a request path.
+  clearBlockReason: () => void
+  runCollection:    (clientId: number, force?: boolean, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<RunCollectionResult>
+  runSinglePrompt:  (clientId: number, promptId: number, promptText: string, markets?: MarketSelection[], activeEngines?: EngineId[]) => Promise<RunSinglePromptResult>
   stopCollection:   () => void
 }
 
@@ -39,8 +92,10 @@ const CollectionContext = createContext<CollectionCtx>({
   collecting: false,
   progress: null,
   lastCompletedAt: 0,
-  runCollection:   async () => {},
-  runSinglePrompt: async () => {},
+  lastBlockReason: null,
+  clearBlockReason: () => {},
+  runCollection:   async () => ({ blocked: false }),
+  runSinglePrompt: async () => ({ ok: true, calls: [] }),
   stopCollection:  () => {},
 })
 
@@ -50,6 +105,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   const [collecting, setCollecting] = useState(false)
   const [progress, setProgress]     = useState<Progress | null>(null)
   const [lastCompletedAt, setLastCompletedAt] = useState(0)
+  const [lastBlockReason, setLastBlockReason] = useState<CollectionBlockReason | null>(null)
   const abortRef = useRef(false)
   // Track whether a collection is in flight (avoids stale closure on `collecting`)
   const runningRef = useRef(false)
@@ -63,13 +119,19 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
   }, [])
 
+  const clearBlockReason = useCallback(() => {
+    setLastBlockReason(null)
+  }, [])
+
   const runCollection = useCallback(async (
     clientId: number,
     force = false,
     markets?: MarketSelection[],
     activeEngines?: EngineId[],
-  ) => {
-    if (runningRef.current) return
+  ): Promise<RunCollectionResult> => {
+    if (runningRef.current) {
+      return { blocked: true, blockReason: { reason: 'already_running' } }
+    }
     runningRef.current = true
     abortRef.current   = false
     setCollecting(true)
@@ -87,7 +149,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       // 1. Enqueue the run — the server creates collection_jobs and kicks the worker.
-      const resp = await fetch('/.netlify/functions/enqueue-collection', {
+      const res = await fetch('/.netlify/functions/enqueue-collection', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -96,15 +158,28 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           markets,
           active_engines: activeEngines,
         }),
-      }).then(r => r.json()).catch(() => null)
+      }).catch(() => null)
+      const resp = res ? await res.json().catch(() => null) : null
 
-      // Nothing to collect (all done this month), blocked by budget, or an error —
-      // no run to watch. Refresh once so any just-freed state shows, then stop.
-      if (!resp || resp.skipped || !resp.run_id) {
-        if (resp && resp.reason) console.log('[Collection] enqueue skipped/blocked:', resp.reason)
+      // Nothing to collect (all done this month), blocked by cooldown or
+      // budget, or the request itself never got a usable answer (network
+      // failure, a non-2xx status, or a body that would not parse). Either
+      // way there is no run to watch. The reason goes into state, not just
+      // the console, so the caller (AIVisibility) can actually show it.
+      // Cleared below the moment a real run starts.
+      if (!res || !res.ok || !resp || resp.skipped || !resp.run_id) {
+        const blockReason: CollectionBlockReason = {
+          reason:          resp?.reason ?? 'request_failed',
+          message:         resp?.error ?? resp?.message ?? undefined,
+          retryAfterHours: resp?.retry_after_hours,
+          nextAvailableAt: resp?.next_available_at,
+        }
+        setLastBlockReason(blockReason)
         setLastCompletedAt(Date.now())
-        return
+        return { blocked: true, blockReason }
       }
+
+      setLastBlockReason(null)
 
       const runId = resp.run_id as number
       const total = (resp.total_jobs as number) ?? 0
@@ -130,6 +205,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         }
         tick()
       })
+
+      return { blocked: false }
     } finally {
       if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
       runningRef.current = false
@@ -148,7 +225,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     promptText: string,
     markets?: MarketSelection[],
     activeEngines?: EngineId[],
-  ) => {
+  ): Promise<RunSinglePromptResult> => {
     // Both lists come from planConfig, never inlined here. The inlined version
     // of promptEngines was missing grok and ai_overview, so Refresh silently did
     // nothing for them: they were absent from active_engines, collect-prompt
@@ -194,21 +271,77 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     const singleAuthHeader: Record<string, string> = { 'Content-Type': 'application/json' }
     if (singleToken) singleAuthHeader['Authorization'] = `Bearer ${singleToken}`
 
+    // Named per call so a caller can tell which engine(s) actually failed,
+    // not just that "something" did. This is what lets handleRefreshCell
+    // in AIVisibility.tsx decide whether EVERY call was rejected versus a
+    // partial success, instead of guessing from the reload that follows.
+    //
+    // A 200 from any of the three collect endpoints does NOT mean the engine
+    // call succeeded: collect-claude.js and collect-chatgpt.js answer 200 with
+    // { done: false, reason: <error_code> } on a real engine failure, and
+    // 200 with { done: false, reason: 'insert_error' } when the row was never
+    // saved at all. collect-prompt.js always answers 200 with
+    // { done: true, summary } even when every requested engine failed, with
+    // the per-engine outcome ('mentioned' / 'not_mentioned' vs. an error code
+    // or a timeout string) only visible inside `summary`. So `ok` has to come
+    // from the parsed body, never from the HTTP status alone.
+    let calls: CollectionCallResult[] = []
     try {
-      const calls: Promise<any>[] = []
-      if (runPrompt)   calls.push(fetch('/.netlify/functions/collect-prompt',  { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
-      if (runClaude)   calls.push(fetch('/.netlify/functions/collect-claude',   { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
-      if (runChatgpt)  calls.push(fetch('/.netlify/functions/collect-chatgpt', { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }))
-      await Promise.allSettled(calls)
+      const requests: { engine: string; run: Promise<Response> }[] = []
+      if (runPrompt)   requests.push({ engine: 'prompt',  run: fetch('/.netlify/functions/collect-prompt',  { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }) })
+      if (runClaude)   requests.push({ engine: 'claude',  run: fetch('/.netlify/functions/collect-claude',   { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }) })
+      if (runChatgpt)  requests.push({ engine: 'chatgpt', run: fetch('/.netlify/functions/collect-chatgpt', { method: 'POST', headers: singleAuthHeader, body: JSON.stringify(payload) }) })
+      const settled = await Promise.allSettled(requests.map(r => r.run))
+      calls = await Promise.all(settled.map(async (s, i): Promise<CollectionCallResult> => {
+        const engine = requests[i].engine
+        if (s.status !== 'fulfilled') {
+          return { engine, ok: false, status: null, reason: 'request_failed' }
+        }
+        const res = s.value
+        const responseBody = await res.json().catch(() => null)
+        if (!res.ok) {
+          return { engine, ok: false, status: res.status, reason: responseBody?.error ?? responseBody?.reason ?? 'http_error' }
+        }
+        // collect-claude / collect-chatgpt: a single-engine call, done === false
+        // (or skipped === true) is the failure signal, done === true is success.
+        // collect-prompt: one call can cover several fast engines, so success
+        // means every engine actually asked for landed 'mentioned' or
+        // 'not_mentioned' in `summary`, not an error code or a timeout string.
+        let reason: string | undefined
+        if (engine === 'prompt') {
+          if (!responseBody || responseBody.skipped === true) {
+            reason = 'skipped'
+          } else if (responseBody.done !== true || !responseBody.summary) {
+            reason = 'unknown_error'
+          } else {
+            const failingEngine = promptEngines.find(e => {
+              const outcome = responseBody.summary[e]
+              return outcome !== 'mentioned' && outcome !== 'not_mentioned'
+            })
+            reason = failingEngine ? String(responseBody.summary[failingEngine]) : undefined
+          }
+        } else {
+          if (!responseBody) reason = 'request_failed'
+          else if (responseBody.skipped === true) reason = 'skipped'
+          else if (responseBody.done === false) reason = responseBody.reason ?? 'unknown_error'
+          else reason = undefined
+        }
+        return { engine, ok: reason === undefined, status: res.status, reason }
+      }))
     } catch { /* network blip -- caller handles UI reset */ }
 
     setLastCompletedAt(Date.now())
     setTimeout(() => setLastCompletedAt(Date.now()), 15000)
     setTimeout(() => setLastCompletedAt(Date.now()), 40000)
+
+    // ok = at least one call actually succeeded. Zero calls made (the
+    // requested engine matched none of the three collect endpoints) counts
+    // as rejected too, same as every call failing outright.
+    return { ok: calls.length > 0 && calls.some(c => c.ok), calls }
   }, [])
 
   return (
-    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, runCollection, runSinglePrompt, stopCollection }}>
+    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, lastBlockReason, clearBlockReason, runCollection, runSinglePrompt, stopCollection }}>
       {children}
     </CollectionContext.Provider>
   )

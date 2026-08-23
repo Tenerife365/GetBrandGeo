@@ -196,20 +196,52 @@ export default function Prompts() {
 
   const startEdit = (p: Prompt) => { setEditId(p.id); setEditText(p.text) }
 
+  // One place that shows a notice and one that clears it.
+  const showNotice = (message: string) => setCapError(message)
+  const clearNotice = () => setCapError(null)
+
   const saveEdit = async () => {
     if (!editId) return
     setSaving(true)
     const cat = categorizePrompt(editText, brandName)   // re-categorise from the edited text
-    if (!isDemoMode) await supabase.from('prompts').update({ text: editText, category: cat }).eq('id', editId)
+    if (!isDemoMode) {
+      const { error } = await supabase.from('prompts').update({ text: editText, category: cat }).eq('id', editId)
+      if (error) {
+        // Local state and the open editor are both left exactly as they
+        // were, so a failed save never overwrites the saved text with the
+        // edited draft the database actually rejected. The raw driver error
+        // goes to the console, never to the customer.
+        console.error('[Prompts] saveEdit failed', error)
+        showNotice('Could not save that edit. Try again, and if it keeps failing, contact support.')
+        setSaving(false)
+        return
+      }
+    }
     setPrompts(prev => prev.map(p => p.id === editId ? { ...p, text: editText, category: cat } : p))
     setEditId(null)
     setSaving(false)
   }
 
   const deletePrompt = async (id: number) => {
-    if (!isDemoMode) await supabase.from('prompts').delete().eq('id', id)
+    // This file has no existing inline confirm-state pattern for a
+    // destructive action, so a plain confirm dialog is used rather than
+    // inventing a new interaction just for this one button. The prompt's
+    // own foreign key to ai_results is ON DELETE CASCADE (verified against
+    // production, db has no separate migration file for it), so a delete
+    // always succeeds and always takes the collected history with it. The
+    // confirm says that plainly rather than the milder, and wrong, claim
+    // that a constraint could stop it.
+    if (!window.confirm('Delete this prompt? Every AI answer already collected for it is deleted too, and that cannot be undone.')) return
+    if (!isDemoMode) {
+      const { error } = await supabase.from('prompts').delete().eq('id', id)
+      if (error) {
+        console.error('[Prompts] deletePrompt failed', error)
+        showNotice('Could not delete that prompt. Try again, and if it keeps failing, contact support.')
+        return
+      }
+    }
     setPrompts(prev => prev.filter(p => p.id !== id))
-    setCapError(null)   // a deletion is what unblocks a capped client
+    clearNotice()   // a deletion is what unblocks a capped client
   }
 
   const addPrompt = async (text?: string): Promise<boolean> => {
@@ -219,7 +251,7 @@ export default function Prompts() {
     // enforce_prompt_cap() trigger, which is why the insert error below is
     // handled rather than assumed away.
     if (capBlocks) {
-      setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`)
+      showNotice(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`)
       return false
     }
     // Category is auto-assigned from the prompt text (general taxonomy), not
@@ -242,7 +274,7 @@ export default function Prompts() {
         // When the cap itself is unknown, say so in words. The old fallback
         // interpolated a bare dash glyph, producing the broken string
         // "Your plan allows [dash] active prompts."
-        setCapError(
+        showNotice(
           !error.message.includes('prompt_cap_reached')
             ? `Could not add prompt: ${error.message}`
             : cap != null
@@ -256,7 +288,7 @@ export default function Prompts() {
     } else {
       setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
-    setCapError(null)
+    clearNotice()
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
     return true
@@ -396,7 +428,7 @@ export default function Prompts() {
             {t.pr_aiDiscover}
           </button>
           <button
-            onClick={() => (capBlocks ? setCapError(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
+            onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
             aria-disabled={capBlocks}
             title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
             className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors border ${
@@ -439,7 +471,7 @@ export default function Prompts() {
           <span>{capError}</span>
           {/* 14x14 glyph, 44x44 target. Extends over the message text beside it,
               which is not interactive, and 3px past the banner padding. */}
-          <button onClick={() => setCapError(null)} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
+          <button onClick={clearNotice} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
             <X size={14} />
           </button>
         </div>

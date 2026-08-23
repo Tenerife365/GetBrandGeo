@@ -341,8 +341,18 @@ export default function Account() {
     : PLAN_TIERS
   const currentIdx = displayedTiers.findIndex(p => p.id === activeClient?.plan)
 
+  // Self-serve tiers have a real checkout: getbrandgeo.com/#pricing, gated behind
+  // accept-terms per the standing C3 ruling (docs/growth/outbound-infra.md and
+  // CLAUDE.md's Stripe migration notes). Managed and Enterprise stay email, since
+  // those are done-for-you plans with no self-serve checkout to send anyone to.
+  const SELF_SERVE_UPGRADE_TARGETS: string[] = ['radar', 'essentials', 'growth', 'growth_pro']
+
   const upgradeTo = (tier: { id: string; label: string }) => {
-    if (hasStripe) return openBilling()
+    if (hasStripe) { openBilling(); return }
+    if (SELF_SERVE_UPGRADE_TARGETS.includes(tier.id)) {
+      window.open('https://getbrandgeo.com/#pricing', '_blank', 'noopener,noreferrer')
+      return
+    }
     window.location.href =
       `mailto:support@getbrandgeo.com?subject=${encodeURIComponent(`Upgrade to ${tier.label}`)}`
   }
@@ -532,7 +542,10 @@ export default function Account() {
           })}
         </div>
         {!hasStripe && (
-          <p className="text-[11px] text-slate-600 mt-3">Managed plans are handled by our team, so upgrading opens an email to us.</p>
+          <p className="text-[11px] text-slate-600 mt-3">
+            Upgrading to Radar, Essentials, Growth or Growth PRO opens our pricing page to complete checkout.
+            Managed and Enterprise are handled by our team, so upgrading those opens an email to us instead.
+          </p>
         )}
       </div>
 

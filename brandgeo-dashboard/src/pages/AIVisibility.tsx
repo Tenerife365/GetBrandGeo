@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
@@ -10,7 +11,7 @@ import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
-import { useCollection } from '../lib/collectionContext'
+import { useCollection, type CollectionBlockReason } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
@@ -71,6 +72,81 @@ function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
     }
     return (parsed as string[]).map((name, i) => ({ pos: i + 1, name }))
   } catch { return [] }
+}
+
+// An optional focusable follow-up for a blocked-collection notice (§11 rule 2:
+// "prose that names a destination without linking it is not an empty state").
+// 'open-engine-modal' is only ever rendered for an admin -- the modal it opens
+// is an admin-only surface, so a viewer must not be handed a control to it.
+type BlockAction =
+  | { kind: 'link'; to: string; label: string }
+  | { kind: 'open-engine-modal'; label: string }
+  | { kind: 'mailto'; href: string; label: string }
+
+// Turns a CollectionBlockReason (collectionContext.tsx) into copy a customer
+// can act on. Every reason the server can send is named explicitly; anything
+// unrecognised (a future server reason, or a request that never got a usable
+// answer at all) falls through to a plain, honest default that never echoes
+// the server's raw string, because that string is not always customer copy
+// (see the default case below). block.message is only trusted for 'cooldown',
+// whose text is written for customers in _enqueue.js.
+function describeCollectionBlock(block: CollectionBlockReason): { title: string; body: string; action?: BlockAction } {
+  switch (block.reason) {
+    case 'cooldown': {
+      const hrs = block.retryAfterHours
+      return {
+        title: 'On cooldown',
+        body: block.message
+          ?? (hrs
+            ? `Your plan sets how often a collection can run. The next one is available in about ${hrs} hour${hrs === 1 ? '' : 's'}.`
+            : 'Your plan sets how often a collection can run. Try again shortly.'),
+      }
+    }
+    // hourly_ceiling / monthly_budget / platform_budget deliberately IGNORE
+    // block.message. The server's own text for these three (_auth.js) names
+    // "LLM calls" and prints the client's exact EUR spend against its EUR
+    // cap, e.g. "EUR 0.16 of EUR 0.30" -- our cost of goods, not something a
+    // customer should ever see. This page already draws that line elsewhere
+    // (the "Collection allowance" row a few hundred lines below deliberately
+    // hides the euro meter from non-admins for the same reason). Admins can
+    // still see the real number in that same allowance meter, so nothing is
+    // lost, only kept off this notice.
+    case 'hourly_ceiling':
+      return { title: 'Rate limit reached', body: 'Too many checks ran in the last hour. Wait a bit, then try again.' }
+    case 'monthly_budget':
+      return {
+        title: 'Monthly limit reached',
+        body: 'This plan has used its collection allowance for the month. Contact support to raise it.',
+        action: { kind: 'mailto', href: 'mailto:support@getbrandgeo.com?subject=' + encodeURIComponent('Raise my monthly collection allowance'), label: 'Contact support' },
+      }
+    case 'platform_budget':
+      return { title: 'Paused for everyone', body: 'Collection is paused platform-wide right now. Try again later.' }
+    case 'no active prompts':
+      return {
+        title: 'Nothing to collect',
+        body: 'There are no active prompts to check yet. Add one in Prompts, then run again.',
+        action: { kind: 'link', to: '/prompts', label: 'Go to Prompts' },
+      }
+    case 'no active engines':
+      return {
+        title: 'Nothing to collect',
+        body: 'No AI engines are active on this plan right now. Check Engine Configuration.',
+        action: { kind: 'open-engine-modal', label: 'Check Engine Configuration' },
+      }
+    case 'nothing to collect (already up to date)':
+      return { title: 'Already up to date', body: 'Every active prompt has already been checked this month. Nothing new to collect.' }
+    case 'client not found':
+      return { title: 'Could not start', body: 'This client could not be found. Reload the page and try again.' }
+    default:
+      // Never render block.message here. Every 401/403 requireAuth rejection
+      // (_auth.js) and every plain 400 with no matching reason lands in this
+      // branch, and that text is internal auth vocabulary ("Unauthorized:
+      // invalid or expired token", "Forbidden: client mismatch"), not
+      // something a customer should read as an explanation. Logged instead,
+      // so it is still findable by whoever debugs the report.
+      if (block.message) console.warn('[AIVisibility] Unrecognised collection block reason:', block.reason, block.message)
+      return { title: 'Could not start collection', body: 'Something went wrong starting the run. Check your connection and try again.' }
+  }
 }
 
 // ── Admin Engine Toggle Modal ─────────────────────────────────────────────────
@@ -251,17 +327,34 @@ export default function AIVisibility() {
   const [refreshingCell, setRefreshingCell]     = useState<string | null>(null)  // `${promptId}:${engineId}`
   const [showEngineModal, setShowEngineModal]         = useState(false)
 
-  const { collecting, progress: collectProgress, lastCompletedAt, runCollection: startCollection, runSinglePrompt } = useCollection()
+  const { collecting, progress: collectProgress, lastCompletedAt, lastBlockReason, clearBlockReason, runCollection: startCollection, runSinglePrompt } = useCollection()
+  // Per-action failure flags, distinct from lastBlockReason: they track
+  // whether THIS SPECIFIC refresh (one engine, or one prompt-engine cell)
+  // came back empty-handed, so the small inline notice sits next to the
+  // control the user actually pressed rather than only at the top of the
+  // page. Cleared at the start of the next attempt on that same target.
+  const [engineRefreshFailed, setEngineRefreshFailed] = useState<EngineId | null>(null)
+  const [cellRefreshFailed, setCellRefreshFailed]     = useState<string | null>(null)  // `${promptId}:${engineId}`
 
   // Active engines as a LLM-typed array (only engines with state === 'active')
   const activeLLMs = activeEngines.map(id => ({ id, ...ENGINE_META[id] }))
 
   const runCollection = async () => {
+    // A per-action failure notice belongs to the attempt that produced it.
+    // Starting a new run here means the last one is done and this page is
+    // about to show whatever this run actually did, so any earlier "did not
+    // run" flag from a per-engine or per-cell retry can no longer be true of
+    // what is on screen. Left uncleared, a card could still say "Refresh did
+    // not run" underneath data this exact run just collected.
+    setEngineRefreshFailed(null)
+    setCellRefreshFailed(null)
     await startCollection(activeClientId, false, selections, activeEngines)
     load()
   }
 
   const forceCollection = async () => {
+    setEngineRefreshFailed(null)
+    setCellRefreshFailed(null)
     await startCollection(activeClientId, true, selections, activeEngines)
     load()
   }
@@ -273,8 +366,14 @@ export default function AIVisibility() {
   const handleRefreshEngine = async (engineId: EngineId) => {
     if (collecting || refreshingEngine !== null) return
     setRefreshingEngine(engineId)
+    setEngineRefreshFailed(null)
     try {
-      await startCollection(activeClientId, true, selections, [engineId])
+      const result = await startCollection(activeClientId, true, selections, [engineId])
+      // "Rejected" here means the enqueue call itself never started a run
+      // (cooldown, budget, or a request failure), the same condition the
+      // top-of-page notice reads from lastBlockReason, surfaced again right
+      // on the card whose button was actually pressed.
+      if (result.blocked) setEngineRefreshFailed(engineId)
     } finally {
       setRefreshingEngine(null)
       load()
@@ -285,9 +384,15 @@ export default function AIVisibility() {
   // the finest-grained, cheapest re-collect (one API call, one row replaced).
   const handleRefreshCell = async (prompt: Prompt, engineId: EngineId) => {
     if (refreshingCell !== null || collecting) return
-    setRefreshingCell(`${prompt.id}:${engineId}`)
+    const cellKey = `${prompt.id}:${engineId}`
+    setRefreshingCell(cellKey)
+    setCellRefreshFailed(null)
     try {
-      await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections, [engineId])
+      const result = await runSinglePrompt(activeClientId, prompt.id, prompt.text, selections, [engineId])
+      // Every call this cell made came back rejected (network failure or a
+      // non-2xx status), so the reload below will not show a new result.
+      // Say so rather than leaving the spinner's stop as the only signal.
+      if (!result.ok) setCellRefreshFailed(cellKey)
       await load()
     } finally {
       setRefreshingCell(null)
@@ -388,7 +493,17 @@ export default function AIVisibility() {
     setTimeout(() => setRefreshed(false), 2500)
   }
 
-  useEffect(() => { load() }, [activeClientId, activeEngines.join(',')])
+  useEffect(() => {
+    load()
+    setEngineRefreshFailed(null)
+    setCellRefreshFailed(null)
+    // lastBlockReason lives in CollectionContext, which is app-level and
+    // outlives this page, so a cooldown or budget notice from the PREVIOUS
+    // client would otherwise still be on screen after switching to a client
+    // that has never been blocked at all. Nothing else clears it on a client
+    // switch, so this page has to.
+    clearBlockReason()
+  }, [activeClientId, activeEngines.join(',')])
   useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
 
   // ── Collection allowance (PRICING-STRATEGY-2026-07 §12 T2a) ─────────────────
@@ -506,8 +621,13 @@ export default function AIVisibility() {
 
   const engineStatusCards = llmStats.map(s => {
     const isUnavailable = errorEngines.has(s.id) && s.checked === 0
-    const status: 'KNOW' | 'PARTIAL' | 'MISSING' | 'UNAVAILABLE' = isUnavailable
+    // Zero checks with no error is an absence of data, not a verdict: a red
+    // MISSING card reading "0/0 prompts" told the customer they had failed
+    // at something nobody had ever tried. dashboard-visual-system.md §11's
+    // rule against rendering a zero as a measurement applies here too.
+    const status: 'KNOW' | 'PARTIAL' | 'MISSING' | 'UNAVAILABLE' | 'NOT_MEASURED' = isUnavailable
       ? 'UNAVAILABLE'
+      : s.checked === 0 ? 'NOT_MEASURED'
       : s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
     let bestPos: number | null = null
     prompts.forEach(p => {
@@ -724,6 +844,59 @@ export default function AIVisibility() {
         </div>
       </div>
 
+      {/* Blocked-collection notice. Covers every button that goes through
+          startCollection (Run Collection, Force Refresh, and per-engine
+          Force Refresh below): they all share lastBlockReason in
+          collectionContext, so whichever one was actually pressed, a
+          cooldown, a budget ceiling, or nothing-to-collect always shows
+          here instead of the click silently doing nothing. */}
+      {lastBlockReason && (() => {
+        const { title, body, action } = describeCollectionBlock(lastBlockReason)
+        // 'open-engine-modal' opens an admin-only surface, so it only renders
+        // for an admin; every other action kind is safe for any viewer.
+        const showAction = !!action && (action.kind !== 'open-engine-modal' || isAdmin)
+        return (
+          <div className="mb-4 flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg text-xs bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" />
+              <div className="min-w-0">
+                <span className="font-semibold text-amber-300">{title}.</span>{' '}
+                <span className="text-amber-300/80">{body}</span>
+                {showAction && (
+                  <div className="mt-1.5">
+                    {action!.kind === 'link' && (
+                      <Link to={action!.to} className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2">
+                        {action!.label}
+                      </Link>
+                    )}
+                    {action!.kind === 'open-engine-modal' && (
+                      <button
+                        onClick={() => setShowEngineModal(true)}
+                        className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2"
+                      >
+                        {action!.label}
+                      </button>
+                    )}
+                    {action!.kind === 'mailto' && (
+                      <a href={action!.href} className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2">
+                        {action!.label}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={clearBlockReason}
+              aria-label="Dismiss"
+              className="relative flex-shrink-0 text-amber-300/70 hover:text-amber-200 after:absolute after:content-[''] after:[inset:-15px]"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )
+      })()}
+
       {/* Collection allowance row.
           SPLIT BY AUDIENCE 2026-07-29, owner's call. It used to show every user
           a "Monthly API budget" meter in euros. That is OUR cost of goods, not
@@ -919,17 +1092,29 @@ export default function AIVisibility() {
                   <span className="text-sm font-medium text-slate-300">{d.label}</span>
                   <span className="ml-2 text-xs text-slate-600">{d.desc}</span>
                 </div>
-                <span className={`shrink-0 text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {d.value}%
-                </span>
+                {/* No 0% here when nothing has been checked yet. A zero
+                    dimension score would read as a measured failing grade,
+                    not as "we have not looked" (§11 rule 1). */}
+                {totalChecked === 0 ? (
+                  <span className="shrink-0 text-xs italic text-slate-300">Not measured yet</span>
+                ) : (
+                  <span className={`shrink-0 text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                    {d.value}%
+                  </span>
+                )}
               </div>
               <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full bg-brand-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${d.value}%` }}
-                  transition={{ duration: 1, ease: EASE_OUT, delay: 0.15 }}
-                />
+                {/* No fill at all when unmeasured, not a fill stuck at 0.
+                    An empty track reads as "nothing recorded"; a 0-width
+                    animated bar still implies a bar chart with a real zero. */}
+                {totalChecked > 0 && (
+                  <motion.div
+                    className="h-full rounded-full bg-brand-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${d.value}%` }}
+                    transition={{ duration: 1, ease: EASE_OUT, delay: 0.15 }}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -945,11 +1130,17 @@ export default function AIVisibility() {
         {/* Active engine cards */}
         {engineStatusCards.map(e => {
           const statusStyles = {
-            KNOW:        { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20 hover:border-brand-500/40' },
-            PARTIAL:     { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' },
-            MISSING:     { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40'   },
-            UNAVAILABLE: { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
+            KNOW:         { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20 hover:border-brand-500/40' },
+            PARTIAL:      { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' },
+            MISSING:      { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40'   },
+            UNAVAILABLE:  { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
+            // Neutral, not a verdict: zero checks with no error is an absence
+            // of data, not a failure, so it gets the same quiet slate the
+            // rest of the app uses for "nothing measured yet" rather than
+            // MISSING's red.
+            NOT_MEASURED: { badge: 'bg-dark-700/60 text-slate-400 border border-dark-600',      dot: 'bg-slate-500',   card: 'border-dark-700 hover:border-dark-600'        },
           }[e.status]
+          const statusLabel = e.status === 'NOT_MEASURED' ? 'NOT MEASURED' : e.status
           return (
             <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${statusStyles.card}`}>
               {/* Top-right cluster: when this engine last returned data, and the
@@ -996,13 +1187,15 @@ export default function AIVisibility() {
                   <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
                     {e.isUnavailable
                       ? <><AlertTriangle size={8} className="mr-0.5" />UNAVAIL</>
-                      : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusStyles.dot}`} />{e.status}</>
+                      : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusStyles.dot}`} />{statusLabel}</>
                     }
                   </span>
                 </div>
 
                 {e.isUnavailable ? (
                   <div className="text-[10px] text-amber-400/80 mt-1">Temporarily unavailable · {isAdmin ? 'Force Refresh' : 'Run Collection'} to retry</div>
+                ) : e.status === 'NOT_MEASURED' ? (
+                  <div className="text-[10px] italic text-slate-300 mt-1">Not measured yet · run a collection to check this engine</div>
                 ) : (
                   <>
                     <div className="flex items-baseline gap-1.5 mt-1">
@@ -1043,6 +1236,22 @@ export default function AIVisibility() {
                     )}
                   </>
                 )}
+                {/* This specific "re-run this engine" click was rejected
+                    (cooldown, budget, or a request failure) rather than
+                    actually starting, same lastAttemptFailed presentation
+                    as above, so a manual retry that goes nowhere is never
+                    silent on the card whose button was pressed. Colour
+                    follows the same rule as the top-of-page notice: a
+                    cooldown or a budget ceiling is amber (warn/blocked),
+                    never red, red is reserved for a genuine request failure. */}
+                {engineRefreshFailed === e.id && (() => {
+                  const isRealFailure = lastBlockReason?.reason === 'request_failed'
+                  return (
+                    <div className={`flex items-center gap-1 text-[10px] mt-0.5 ${isRealFailure ? 'text-red-400' : 'text-amber-400'}`}>
+                      <AlertTriangle size={9} /> Refresh did not run{lastBlockReason ? ` · ${describeCollectionBlock(lastBlockReason).title.toLowerCase()}` : ''}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )
@@ -1459,6 +1668,16 @@ export default function AIVisibility() {
                               </button>
                             ))}
                           </div>
+                          {/* The single-cell refresh above came back with
+                              every call rejected (runSinglePrompt's summary
+                              in collectionContext.tsx), same small red
+                              lastAttemptFailed presentation as the engine
+                              grid, so this specific retry is never silent. */}
+                          {cellRefreshFailed === `${prompt.id}:${llm.id}` && (
+                            <div className="flex items-center gap-1 text-[10px] text-red-400 mb-1.5">
+                              <AlertTriangle size={9} /> Refresh failed, try again
+                            </div>
+                          )}
                           {r ? (
                             <>
                               <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -1602,7 +1821,10 @@ export default function AIVisibility() {
           return { cat, label: getCatLabel(cat), pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0, checked, mentioned }
         }).sort((a, b) => b.pct - a.pct)
 
-        if (catStats.length > 0) return (
+        // Nothing measured yet means every category would show 0%, which is
+        // not a comparison, it is a placeholder pretending to be data (§11
+        // rule 1). Suppress the whole card rather than render nine zeroes.
+        if (totalChecked > 0 && catStats.length > 0) return (
           <div className="mb-4 bg-dark-800 rounded-xl p-6">
             {/* Same min-width:auto shape as the score breakdown above: neither flex
                 item could shrink, so the long right-hand caption pushed past the card.

@@ -141,10 +141,14 @@ export default function Mentions() {
   })
 
   const totalMentions = mentions.length
-  const avgPosition = mentions.filter(m => m.brand_position).length
-    ? Math.round(mentions.filter(m => m.brand_position).reduce((s, m) => s + (m.brand_position ?? 0), 0) /
-        mentions.filter(m => m.brand_position).length)
-    : 0
+  const noMentions = totalMentions === 0
+  const positionedMentions = mentions.filter(m => m.brand_position)
+  // null, not 0, when nothing is ranked yet, so the card below can tell "no
+  // positioned mention exists" apart from a real average, and never has to
+  // spell the two the same way (the old fallback built the string "#-").
+  const avgPosition = positionedMentions.length
+    ? Math.round(positionedMentions.reduce((s, m) => s + (m.brand_position ?? 0), 0) / positionedMentions.length)
+    : null
   const positiveSentiment = mentions.filter(m => m.sentiment === 'positive').length
 
   const engineCounts = (Object.keys(ENGINE_META) as EngineId[]).map(llm => ({
@@ -166,23 +170,27 @@ export default function Mentions() {
       <SectionHeading className="sr-only">Mention summary</SectionHeading>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <TrendingUp size={20} className="text-emerald-400 shrink-0" />
+          <TrendingUp size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-emerald-400 shrink-0'} />
           <div>
-            <div className="text-2xl font-bold text-white tabular-nums">{totalMentions}</div>
+            <div className={`text-2xl tabular-nums ${noMentions ? 'font-medium text-slate-500' : 'font-bold text-white'}`}>{totalMentions}</div>
             <div className="text-xs text-slate-500 mt-0.5">{t.men_totalMentions}</div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <Award size={20} className="text-amber-400 shrink-0" />
+          <Award size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-amber-400 shrink-0'} />
           <div>
-            <div className="text-2xl font-bold text-white tabular-nums">#{avgPosition || '-'}</div>
+            {avgPosition !== null ? (
+              <div className="text-2xl font-bold text-white tabular-nums">#{avgPosition}</div>
+            ) : (
+              <div className="text-sm font-medium text-slate-500 mt-1.5">Not ranked yet</div>
+            )}
             <div className="text-xs text-slate-500 mt-0.5">{t.men_avgPosition}</div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <Bot size={20} className="text-blue-400 shrink-0" />
+          <Bot size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-blue-400 shrink-0'} />
           <div>
-            <div className="text-2xl font-bold text-sentiment-positive tabular-nums">{positiveSentiment}</div>
+            <div className={`text-2xl tabular-nums ${noMentions ? 'font-medium text-slate-500' : 'font-bold text-sentiment-positive'}`}>{positiveSentiment}</div>
             <div className="text-xs text-slate-500 mt-0.5">{t.men_positiveSentiment}</div>
           </div>
         </div>

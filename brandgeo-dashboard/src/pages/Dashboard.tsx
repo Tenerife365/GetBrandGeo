@@ -11,7 +11,7 @@ import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { useTheme } from '../lib/themeContext'
-import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
+import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import {
   computeAiVisibilityScore, buildScoreResultMap, isNoAnswerRow,
   type AiVisibilityDimensions, type ScoreInputRow,
@@ -43,6 +43,19 @@ const DIMENSION_LABELS: [keyof AiVisibilityDimensions, string][] = [
   ['recognition', 'Recognition'], ['knowledge', 'Knowledge'], ['sentiment', 'Sentiment'],
   ['accuracy', 'Accuracy'], ['reach', 'Reach'], ['consistency', 'Consistency'],
 ]
+
+// Plain "X, Y and Z" join of the plan's real engine names, sourced from
+// ENGINE_META so it can never name an engine the plan does not run. Replaces
+// a hardcoded "ChatGPT and Gemini" in the zero-data empty state below, which
+// falsely promised ChatGPT to a Free client (PLAN_ENGINES.free is Gemini
+// only, per the 2026-07-31 ruling).
+function joinEngineNames(ids: EngineId[]): string {
+  const names = ids.map(id => ENGINE_META[id]?.label ?? id)
+  if (names.length === 0) return 'AI engines'
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
 
 interface AIResultRow {
   id: number
@@ -401,8 +414,8 @@ export default function Dashboard() {
             title="Not measured yet"
             body={
               stats.promptCount === 0
-                ? `BrandGEO measures how AI engines like ChatGPT and Gemini answer real buyer questions about ${brandName}. Add a prompt to start.`
-                : `BrandGEO is about to check how AI engines answer ${stats.promptCount} tracked prompt${stats.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
+                ? `BrandGEO measures how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} real buyer questions about ${brandName}. Add a prompt to start.`
+                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${stats.promptCount} tracked prompt${stats.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
             }
             actionLabel={stats.promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
             actionTo={stats.promptCount === 0 ? '/prompts' : '/ai-visibility'}
@@ -522,9 +535,18 @@ export default function Dashboard() {
             <Stat
               icon={<TrendingUp size={15} />}
               label={t.dash_statMentionRate}
-              value={`${stats.mentionRate}%`}
+              // A zero-check tenant has no rate to alert on, only an absence of
+              // measurement (dashboard-visual-system.md 11 rule 1). Falls through
+              // to Stat's own "Not measured yet" branch instead of a red 0 percent,
+              // which used to sit directly under the "Not measured yet" hero above
+              // and contradict it on the same screen.
+              value={stats.totalChecks === 0 ? null : `${stats.mentionRate}%`}
               sub={t.dash_statMentionRateSub}
-              tone={stats.mentionRate < 25 ? 'alert' : stats.mentionRate < 50 ? 'warn' : 'neutral'}
+              tone={
+                stats.totalChecks === 0
+                  ? 'neutral'
+                  : stats.mentionRate < 25 ? 'alert' : stats.mentionRate < 50 ? 'warn' : 'neutral'
+              }
               spark={spark.mentionRate}
             />
             <Stat
