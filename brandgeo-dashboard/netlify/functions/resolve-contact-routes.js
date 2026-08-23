@@ -60,6 +60,8 @@ const {
   extractPlayAppIds,
   playListingMatches,
   mergeCandidates,
+  normaliseDomain,
+  hostMatchesDomain,
 } = require('./_contact_routes')
 
 /**
@@ -69,11 +71,55 @@ const {
  * address was one fetch away reports as a failure with no explanation. The
  * function would rather stop early and SAY which prospects it did not reach.
  *
- * 3 per call, not 10: at 18s each, ten prospects cannot fit in 26s and the
- * old limit would have silently guaranteed a timeout on any real batch. The
- * UI sends one at a time; the 43-row sweep is a script, not this endpoint.
+ * FIXED 2026-08-22 (review finding F6b, round 1). MAX_PROSPECTS_PER_CALL was
+ * 3, on arithmetic that assumed PER_PROSPECT_BUDGET_MS (18000) was a
+ * deadline. It was only a pre-check (see the old budgetLeft() in resolveOne):
+ * a listing fetch that started at t=17.9s still ran a full
+ * PER_PAGE_TIMEOUT_MS (6000) to t=23.9s, so one prospect's real worst case
+ * was PER_PROSPECT_BUDGET_MS + PER_PAGE_TIMEOUT_MS = 24000ms, not 18000ms.
+ * MAX_PROSPECTS_PER_CALL was set to 1 as the round 1 remedy, since two
+ * prospects cannot both fit under a 22000ms invocation budget once the real
+ * worst case is 24000ms.
+ *
+ * FIXED FURTHER 2026-08-22 (review finding major-4, round 2). Round 1's own
+ * arithmetic proved more than it used: 22000 - 24000 being negative does not
+ * only rule out a SECOND prospect, it proves the FIRST prospect's worst case
+ * (24000ms crawl alone, before four Supabase round trips: requireAuth's
+ * getUser and user_profiles lookup, the prospects select, the candidates
+ * upsert) leaves under 2000ms of margin under the 26000ms platform ceiling.
+ * That is close enough to real production timings to risk the whole
+ * invocation being killed, which returns nothing for the one prospect in the
+ * batch, the exact silent-failure mode this file exists to prevent, one layer
+ * further down than round 1 closed.
+ *
+ * The chosen remedy is to make PER_PROSPECT_BUDGET_MS an ACTUAL deadline
+ * rather than a pre-check: resolveOne's remaining() clamps every fetch after
+ * the first parallel batch to the milliseconds actually left, so a fetch that
+ * starts near the edge is cut short instead of being allowed to run a full
+ * PER_PAGE_TIMEOUT_MS regardless of when it started. A clamped fetch that
+ * aborts still returns { error: 'timeout' }, the same as any other fetch
+ * failure, so this costs nothing in honesty. The real worst case for one
+ * prospect drops to roughly PER_PROSPECT_BUDGET_MS (18000ms) plus a small,
+ * bounded margin for the abort to land, not
+ * PER_PROSPECT_BUDGET_MS + PER_PAGE_TIMEOUT_MS, which restores real margin
+ * under the 26s ceiling for the Supabase round trips and Lambda cold start.
+ * The rejected alternative was deleting INVOCATION_BUDGET_MS as a number the
+ * code could not honour; that was not chosen because the deadline fix is a
+ * bounded, low-risk change (no schema, no auth, no billing, no new env var)
+ * that actually restores the safety property the constant was meant to
+ * describe, rather than removing the description of a property nobody
+ * enforces.
+ *
+ * MAX_PROSPECTS_PER_CALL stays at 1. This round fixed the deadline so the ONE
+ * prospect a normal call makes actually fits with real margin; it did not
+ * reopen whether a batch of more than one should be re-enabled, which is a
+ * throughput decision for a separate packet. This has no UI cost either way:
+ * Prospects.tsx already calls this endpoint with one prospect_id per request
+ * (src/pages/Prospects.tsx), never a batch. Only a hypothetical multi-id
+ * script caller is affected, and it gets an explicit 400 above the limit
+ * instead of a silent truncation.
  */
-const MAX_PROSPECTS_PER_CALL = 3
+const MAX_PROSPECTS_PER_CALL = 1
 const MAX_PAGES_PER_PROSPECT = 12
 const MAX_PLAY_LISTINGS = 6
 const PER_PAGE_TIMEOUT_MS = 6000
@@ -99,12 +145,17 @@ function fail500(headers, code, error, extra = {}) {
 }
 
 /**
- * fetchPage(url) -> { url, html } | { url, error }
+ * fetchPage(url, timeoutMs) -> { url, html } | { url, error }
  * Never throws. A miss is data, not an exception.
+ *
+ * timeoutMs defaults to PER_PAGE_TIMEOUT_MS but callers inside resolveOne
+ * clamp it to whatever is actually left of PER_PROSPECT_BUDGET_MS (review
+ * finding major-4), so a fetch started near the edge of the per-prospect
+ * budget cannot run a full PER_PAGE_TIMEOUT_MS past it.
  */
-async function fetchPage(url) {
+async function fetchPage(url, timeoutMs = PER_PAGE_TIMEOUT_MS) {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), PER_PAGE_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const res = await fetch(url, {
       redirect: 'follow',
@@ -132,6 +183,14 @@ async function fetchPage(url) {
  */
 async function resolveOne(prospect) {
   const started = Date.now()
+  // remaining() is milliseconds actually left of PER_PROSPECT_BUDGET_MS, not
+  // a boolean pre-check. Review finding major-4: the old budgetLeft() only
+  // gated whether a fetch was ALLOWED to start, so a fetch starting at
+  // t=17.9s still ran a full PER_PAGE_TIMEOUT_MS to t=23.9s. Every fetch
+  // below is clamped to min(PER_PAGE_TIMEOUT_MS, remaining()), so the real
+  // worst case for this function is close to PER_PROSPECT_BUDGET_MS itself.
+  const remaining = () => PER_PROSPECT_BUDGET_MS - (Date.now() - started)
+
   const domain = prospect.domain
   const urls = candidatePaths(domain).slice(0, MAX_PAGES_PER_PROSPECT)
   const errors = []
@@ -142,7 +201,9 @@ async function resolveOne(prospect) {
     return { prospect_id: prospect.id, domain, pages_fetched: 0, candidates: [], errors: ['unparseable domain'] }
   }
 
-  const pages = await Promise.all(urls.map(fetchPage))
+  const pages = await Promise.all(
+    urls.map((u) => fetchPage(u, Math.min(PER_PAGE_TIMEOUT_MS, Math.max(0, remaining()))))
+  )
 
   let playUrl = null
   for (const page of pages) {
@@ -172,40 +233,81 @@ async function resolveOne(prospect) {
    * listing is fetched and accepted only if the listing itself references the
    * prospect's own domain, which is how Google renders a verified developer
    * website. Search proposes, the listing's own content decides.
+   *
+   * FIXED 2026-08-22 (review finding blocker-2). Accepting a listing used to
+   * license harvesting every address on that page with no further check.
+   * playListingMatches() itself is now host-boundary checked (see
+   * _contact_routes.js), which closes the specific evidence the reviewer
+   * produced (a stranger's page merely linking to the prospect's domain in a
+   * path, query string, fragment or userinfo section). This adds a second,
+   * independent layer: even if playListingMatches() is ever wrong about a
+   * given listing, only addresses AT the prospect's own domain are staged
+   * from a search-discovered listing, so a wrong accept cannot hand a
+   * stranger's named individual to the promote UI.
+   *
+   * Every branch below now records why nothing happened, per review finding
+   * blocker-3: a crawl truncated by the time budget and a company that
+   * genuinely publishes no address used to produce byte-identical responses,
+   * because both the loop's budget exit and its per-listing fetch failures
+   * recorded nothing.
    */
-  const budgetLeft = () => Date.now() - started < PER_PROSPECT_BUDGET_MS
-
-  if (playUrl && budgetLeft()) {
-    const play = await fetchPage(playUrl)
+  if (playUrl && remaining() > 0) {
+    const play = await fetchPage(playUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()))
     if (play.error) {
       errors.push(`${playUrl}: ${play.error}`)
     } else {
       pagesFetched++
       raw.push(...extractEmails(play.html, play.url))
     }
-  } else if (!playUrl && budgetLeft()) {
+  } else if (playUrl && remaining() <= 0) {
+    errors.push(`${playUrl}: skipped, per-prospect time budget reached before the own listing could be fetched`)
+  } else if (!playUrl && remaining() > 0) {
     const query = prospect.company || domain
     const searchUrl = playSearchUrl(query)
     if (searchUrl) {
-      const search = await fetchPage(searchUrl)
+      const search = await fetchPage(searchUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()))
       if (search.error) {
         errors.push(`${searchUrl}: ${search.error}`)
       } else {
         pagesFetched++
         const ids = extractPlayAppIds(search.html).slice(0, MAX_PLAY_LISTINGS)
+        const ownDomain = normaliseDomain(domain)
+        let examined = 0
         for (const id of ids) {
-          if (!budgetLeft()) break
+          const budget = remaining()
+          if (budget <= 0) {
+            errors.push(
+              `play listing scan stopped after ${examined} of ${ids.length} listings: ` +
+                'per-prospect time budget reached. Call again for this prospect.'
+            )
+            break
+          }
+          examined++
           const listingUrl = `https://play.google.com/store/apps/details?id=${id}&hl=en`
-          const listing = await fetchPage(listingUrl)
-          if (listing.error) continue
+          const listing = await fetchPage(listingUrl, Math.min(PER_PAGE_TIMEOUT_MS, budget))
+          if (listing.error) {
+            errors.push(`${listingUrl}: ${listing.error}`)
+            continue
+          }
           pagesFetched++
           if (!playListingMatches(listing.html, domain)) continue
           // Verified: this listing publishes the prospect's own domain.
-          raw.push(...extractEmails(listing.html, listing.url))
+          // Still filter harvested addresses down to the prospect's own
+          // domain (blocker-2's second layer): a search-discovered listing
+          // is evidence about a page Google rendered, not a page the
+          // prospect controls, so a false accept must not be able to stage
+          // a stranger's address.
+          for (const c of extractEmails(listing.html, listing.url)) {
+            const at = c.value.lastIndexOf('@')
+            const emailDomain = at >= 0 ? c.value.slice(at + 1) : ''
+            if (hostMatchesDomain(emailDomain, ownDomain)) raw.push(c)
+          }
           break
         }
       }
     }
+  } else {
+    errors.push('skipped Play search: per-prospect time budget reached before it could start')
   }
 
   return {
@@ -266,13 +368,34 @@ exports.handler = async (event) => {
   if (readError) return fail500(headers, 'read_prospects', readError)
   if (!prospects || prospects.length === 0) return json(404, { error: 'No prospect found for those ids.' })
 
+  // The real worst case for one prospect is now PER_PROSPECT_BUDGET_MS itself
+  // (see the FIXED 2026-08-22, round 2 comment above MAX_PROSPECTS_PER_CALL):
+  // resolveOne clamps every fetch to the budget actually remaining, rather
+  // than letting a fetch that starts near the edge run a full extra
+  // PER_PAGE_TIMEOUT_MS past it. REMAINING_BUDGET_FOR_NEXT_PROSPECT_MS is the
+  // invocation budget left over after that one prospect, which a second
+  // prospect would need available in order to safely start and finish within
+  // INVOCATION_BUDGET_MS.
+  const REMAINING_BUDGET_FOR_NEXT_PROSPECT_MS = INVOCATION_BUDGET_MS - PER_PROSPECT_BUDGET_MS
+
   const results = []
   const invocationStarted = Date.now()
+  let startedCount = 0
   for (const prospect of prospects) {
     // No silent caps. If the invocation is out of time, say which prospects
     // were not reached and why, rather than returning a short list that reads
     // like "we looked and found nothing" for a company nobody looked at.
-    if (Date.now() - invocationStarted > INVOCATION_BUDGET_MS - PER_PROSPECT_BUDGET_MS) {
+    //
+    // `startedCount > 0` guards the very first prospect from this check
+    // regardless of the sign of REMAINING_BUDGET_FOR_NEXT_PROSPECT_MS, so the
+    // sole prospect in every normal, single-id call always gets its attempt.
+    // The gate exists only to stop a SECOND prospect in the same batch from
+    // starting when there is no longer enough budget left for it to safely
+    // finish. With MAX_PROSPECTS_PER_CALL = 1 this branch cannot be reached
+    // at all today (there is never a second prospect to gate), and it is left
+    // in place as the correct behaviour if that constant is ever raised
+    // again.
+    if (startedCount > 0 && Date.now() - invocationStarted > REMAINING_BUDGET_FOR_NEXT_PROSPECT_MS) {
       results.push({
         prospect_id: prospect.id,
         domain: prospect.domain,
@@ -284,6 +407,7 @@ exports.handler = async (event) => {
       continue
     }
 
+    startedCount++
     let result
     try {
       result = await resolveOne(prospect)

@@ -177,11 +177,22 @@ function hostOf(url) {
   }
 }
 
+/**
+ * hostMatchesDomain(host, domain) -> boolean. The one host-boundary rule used
+ * everywhere a string is checked against a prospect's own domain: exact match
+ * or a proper subdomain, never a substring. "pacer.com" must not match
+ * "casepacer.com", and "casepacer.com" must not match
+ * "casepacer.com.evil.net" (the suffix check requires the leading dot).
+ */
+function hostMatchesDomain(host, domain) {
+  if (!host || !domain) return false
+  return host === domain || host.endsWith(`.${domain}`)
+}
+
 function isOwnDomainSource(sourceUrl, ownDomain) {
   const h = hostOf(sourceUrl)
   const d = normaliseDomain(ownDomain)
-  if (!h || !d) return false
-  return h === d || h.endsWith(`.${d}`)
+  return hostMatchesDomain(h, d)
 }
 
 function isPlayStoreSource(sourceUrl) {
@@ -405,6 +416,85 @@ function extractPlayAppIds(html) {
   return out
 }
 
+// Matches an absolute http(s) URL up to the first character that cannot be
+// part of one (whitespace or an HTML/attribute delimiter). Used to recover
+// every linked host mentioned on a listing page, the same way a browser
+// would resolve an <a href>.
+const ABSOLUTE_URL_RE = /https?:\/\/[^\s"'<>)]+/gi
+
+// Matches a bare dotted hostname wherever one appears in text, not just
+// inside a URL: "Developer website: casepacer.com" with no scheme.
+//
+// FIXED 2026-08-22 (review finding blocker-1). The boundary used to be
+// "not preceded or followed by [A-Za-z0-9.-]", which treats every OTHER
+// punctuation character, underscore, "@", "=", "#", "/", quotes and more, as
+// a valid boundary. That let a short prospect domain be read out of the
+// middle of a longer token: "pacer.com" leaked out of "case_pacer.com" (a
+// minified JS identifier), out of "?utm_source=case_pacer.com" (an analytics
+// param), out of a snake_case JSON key, and "casepacer.com" leaked out of a
+// URL's path, query string, fragment or userinfo section (for example
+// "https://cdn.evil.net/logos/casepacer.com/icon.png" or
+// "https://casepacer.com@evil.net/", where hostOf() correctly resolves
+// "evil.net" but this regex was overriding that by re-reading the path text).
+//
+// The fix requires a real host-starting position before the match (start of
+// string, whitespace, ">" or a quote) and a real host-ending position after
+// it (end of string, whitespace, "<", a quote, "/" or ":"). A URL's own host
+// is already recovered correctly via ABSOLUTE_URL_RE + hostOf() below, and an
+// email's domain is recovered separately via EMAIL_RE in
+// extractCandidateHosts(), so this regex no longer needs to float across "@"
+// or into a URL's path to do its job.
+//
+// Two properties from before are unchanged: "sub.casepacer.com" written in
+// prose is still found (bare text surrounded by real whitespace), and
+// "casepacer.com.evil.net" is still captured whole, as one longer host, which
+// then legitimately fails the suffix check against "casepacer.com".
+const BARE_HOST_RE =
+  /(?<=^|[\s>"'])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?=$|[\s<"'/:])/gi
+
+/**
+ * extractCandidateHosts(html) -> Set<string> of every host mentioned on the
+ * page, whether inside a full URL (parsed with the same hostOf() used for
+ * source-url provenance elsewhere in this file), written bare in text, or
+ * the domain half of an email address. An email's domain is deliberately
+ * included: Google requires and verifies the Play developer contact address,
+ * so a developer email at the prospect's own domain is itself evidence of
+ * ownership, not a weaker signal than a linked URL.
+ *
+ * The email-domain case is handled by its own EMAIL_RE pass rather than by
+ * BARE_HOST_RE floating across "@", per the 2026-08-22 fix on BARE_HOST_RE
+ * above: a plain host regex that treats "@" as a valid boundary would also
+ * treat "/", "=", "#" and "_" as valid boundaries, which is exactly the
+ * defect that let a domain be read out of a URL's path, query, fragment or
+ * userinfo, or out of a snake_case identifier.
+ */
+function extractCandidateHosts(html) {
+  const hosts = new Set()
+  if (typeof html !== 'string' || !html) return hosts
+
+  let m
+  ABSOLUTE_URL_RE.lastIndex = 0
+  while ((m = ABSOLUTE_URL_RE.exec(html)) !== null) {
+    const h = hostOf(m[0])
+    if (h) hosts.add(h)
+  }
+
+  BARE_HOST_RE.lastIndex = 0
+  while ((m = BARE_HOST_RE.exec(html)) !== null) {
+    hosts.add(m[1].toLowerCase().replace(/^www\./, ''))
+  }
+
+  EMAIL_RE.lastIndex = 0
+  while ((m = EMAIL_RE.exec(html)) !== null) {
+    const at = m[0].lastIndexOf('@')
+    if (at < 0) continue
+    const emailDomain = m[0].slice(at + 1).toLowerCase()
+    if (emailDomain) hosts.add(emailDomain)
+  }
+
+  return hosts
+}
+
 /**
  * playListingMatches(html, ownDomain) -> boolean.
  *
@@ -412,11 +502,25 @@ function extractPlayAppIds(html) {
  * accept a listing ONLY if the listing itself references the prospect's own
  * domain, which is how Google renders a verified developer website. A listing
  * that merely came back from a name search proves nothing.
+ *
+ * FIXED 2026-08-22 (review finding F6). This used to be
+ * `html.toLowerCase().includes(d)`, a bare substring test: a listing
+ * mentioning "casepacer.com" was accepted for prospect domains "pacer.com"
+ * and "acer.com", and "dev@staircase.com" was accepted for "case.com". A Play
+ * name search reliably returns unrelated apps (a live query for
+ * "PageLightPrime" returned twelve, eleven unrelated), so this guard is the
+ * only thing standing between that noise and a stranger's Google-verified
+ * address being staged against the wrong prospect. It now requires a host
+ * boundary match, the same rule isOwnDomainSource uses via
+ * hostMatchesDomain(), not a substring anywhere in the markup.
  */
 function playListingMatches(html, ownDomain) {
   const d = normaliseDomain(ownDomain)
   if (!d || typeof html !== 'string' || !html) return false
-  return html.toLowerCase().includes(d)
+  for (const h of extractCandidateHosts(html)) {
+    if (hostMatchesDomain(h, d)) return true
+  }
+  return false
 }
 
 /**
@@ -512,6 +616,8 @@ module.exports = {
   normaliseDomain,
   candidatePaths,
   hostOf,
+  hostMatchesDomain,
+  extractCandidateHosts,
   isOwnDomainSource,
   isPlayStoreSource,
   classifyEmailKind,
