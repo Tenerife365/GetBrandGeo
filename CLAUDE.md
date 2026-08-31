@@ -20,7 +20,611 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-08-15)
+## CURRENT STATE (newest entry 2026-08-21)
+
+### 2026-08-21: top 5 trust/UX improvements SHIPPED, F6/F6b closed, packet 020/021 review returned FAIL
+
+Two sessions were running in parallel on 2026-08-20 and both were interrupted.
+The PC froze, but that was the SECOND problem: a **weekly usage limit** at
+roughly 23:59 killed one builder and all three reviewers first. Recovered from
+the workflow run journals, not from memory. **2 commits, `b60a108` and
+`551a6d1`, both made 2026-08-21.**
+
+**What the audit was.** Constantin asked for the top 5 immediate improvements
+to build trust and an ultra-premium feel. A five-lens audit workflow ranked
+them, then a build workflow ran five `bg-app` builders in parallel over disjoint
+file scopes. 4 of 5 returned. Builder t1 (collection feedback) was killed
+mid-run **after writing 283 lines**, and 0 of 3 adversarial reviewers ever ran.
+So roughly 511 lines sat uncommitted and completely unreviewed. `tsc` and
+`npm run build` both passed, which is exactly why this was dangerous: nothing
+looked wrong.
+
+**t1's orphaned work was audited rather than rewritten.** 6 of its 7 criteria
+were already correct, including server field names checked against the real
+`_enqueue.js` and `enqueue-collection.js` response bodies. Two real gaps
+remained: `lastBlockReason` **leaked across a client switch** (the context is
+app-level and nothing cleared it), and the budget-block copy was rendering the
+server's raw message, which **prints our own EUR cost of goods** ("EUR 0.16 of
+EUR 0.30", "API budget") to a paying customer, contradicting the same file's
+documented rule that the euro meter is admin-only.
+
+**The 3-lens review then returned PASS_WITH_FINDINGS, FAIL, FAIL: 21 findings
+(2 blocker, 8 major, 11 minor), all fixed.** The one worth remembering:
+**all three collect endpoints answer HTTP 200 even when the engine call
+failed**, so the single-cell refresh judged success from `res.ok` and reported
+success for a quota error, an auth error, and a row that was never saved. It
+now parses the body.
+
+**F6 and F6b are closed, and the first attempt at them did not work.** Both
+were live in production. Two adversarial verifiers returned **FAIL with 3
+blockers** against the builder's own 8/8 self-report: the new `BARE_HOST_RE`
+still treated underscore and punctuation as valid host boundaries, a foreign
+domain still leaked in via a URL path/query/fragment, and a truncated crawl was
+still indistinguishable from an empty one. **Shipping on the builder's
+self-report would have left the headline defect live under a commit message
+claiming it was fixed.** After remediation: host matching is one shared
+`hostMatchesDomain` rule, a second layer filters search-discovered listing
+emails to the prospect's own domain, the per-prospect budget is a real deadline
+(worst case measured 18,005ms against the 26s ceiling, was 24,001ms), and
+`MAX_PROSPECTS_PER_CALL` is **1**. New test `tests/contact_routes_host_match.test.js`,
+30 assertions.
+
+**`MAX_PROSPECTS_PER_CALL = 1` costs nothing today.** `src/pages/Prospects.tsx`
+already posts a single `prospect_id` per click. Only a hypothetical multi-id
+script caller is affected, and it now gets an explicit 400 instead of a silently
+truncated crawl.
+
+**F13 is measured now, and it is smaller than the review implied.** Queried
+directly: **the 09:51 batch is CLEAN.** All 9 of its rows cite the prospect's
+own host. Only **candidate id 10** is contaminated (prospect 24 RunSensible,
+`source_url` on `rocketreach.co`, a named individual's personal LinkedIn
+profile, written 10:33, 42 minutes after the legitimate batch). **Nothing has
+ever been promoted**, so prospect 24's `linkedin_url` is still null and the
+broker value never reached the prospect record. But **touch id 18 went out 12
+minutes later**, a real connection request to that named person. That cannot be
+undone.
+
+**The never-query list is now a database constraint, not prose.**
+`db/supabase-prospect-contact-candidates-never-query-2026-08-21.sql`, **APPLIED
+TO PRODUCTION 2026-08-21** (`convalidated = false`, 10 rows preserved, 0
+promoted). It is deliberately `NOT VALID`: candidate 10 survives as the audit
+record, while `INSERT` and `UPDATE` are still enforced, and since `promote`
+updates the candidate row, **the database refuses to promote candidate 10**.
+Permanently unpromotable beats deleted, because deleting it destroys the only
+evidence. Predicate verified read-only first (9 of 10 rows pass, only id 10
+fails), then **proved behaviourally after applying**, with every write undone:
+promoting candidate 10 REFUSED, promoting candidate 3 (own host) ALLOWED so
+there is no false positive, inserting a new `hunter.io` row REFUSED, inserting
+a new own-domain row ALLOWED. **Do not widen this list into a global host
+block**: `logo.clearbit.com` is used legitimately by
+`src/components/BrandLogo.tsx` and `netlify/functions/social-image.js`.
+
+**Known open, all demonstrated rather than speculated:** the tightened host
+matcher has two false negatives, both fail-safe but both able to make a real
+address read as "publishes nothing", and one of them is **the exact
+backslash-escaped URL form Google Play embeds in its `AF_initDataCallback` JSON**,
+which is precisely the page the matcher targets. `Prospects.tsx` never reads
+`results[0].errors`, so the truncation message the backend now emits reaches the
+JSON and the logs but **not the banner a human reads**. `collect-prompt.js:150`
+logs `[Insert] FAILED` then returns `{done:true}`, so a saved-row failure is
+still invisible to the client. All three were dispatched as separate sessions
+2026-08-21.
+
+**Two measurement traps worth not relearning.** `grep -P "\x{2014}"` **fails on
+Git Bash** with "character value too large", exit 2, printing nothing, which is
+indistinguishable from a clean pass. Use `rg` for any em/en dash scan, and prove
+the pattern fires with a positive control. And a `git diff` scoped to
+`brandgeo-dashboard/src` sweeps in `Revenue.tsx`, which belongs to a different
+uncommitted session and **carries 6 em dashes**; scope dash scans to the files
+actually under review.
+
+**Deploy state: `b60a108` and `551a6d1` are PUSHED, 2026-08-21**, `origin/main`
+at `551a6d1`, one Netlify build for both. The pre-push hook blocked the first
+attempt, correctly: AUTONOMY section 7 groups dashboard pushes and the override
+is `BATCH_PUSH=1`, which exists so a human spends a build deliberately. Nothing
+under `brandgeo/web/` changed, so getbrandgeo.com is unaffected. Scale note
+required by section 7: `b60a108` has no scale impact (client-side render and
+state only, no new reads, writes or invocations); `551a6d1` is neutral to
+slightly reduced (reads and writes unchanged, real invocation count unchanged
+because the only caller already sends one id per click, and clamping every
+fetch to the remaining budget cuts worst-case function time from about 24s to
+about 18s).
+
+### 2026-08-20: contact route resolver + promotion UI DEPLOYED, follow-up schedule built
+
+Closes the 2026-08-16 blocker below ("all 43 `stage='new'` prospects have ZERO
+contact routes"). Packet `019` ran, plus its `bg-app` half in the same commit.
+
+**Dates, because three different ones are in play here and conflating them has
+already produced one wrong record.** `5452e59` was AUTHORED 2026-08-16. Outbound
+touches and the contact candidates were written 2026-08-17 by a parallel growth
+session. The commit was PUSHED and deployed 2026-08-20, which is also when
+everything in the rest of this entry was done. An earlier version of this entry
+was headed 2026-08-17 and was wrong.
+
+**Deploy is confirmed live**, not assumed from a green build: an unauthenticated
+`POST` to `/.netlify/functions/resolve-contact-routes` returns
+`401 {"error":"Unauthorized: missing token"}` rather than 404, so the function
+exists and its gate is wired.
+
+What shipped, all in one commit so both halves land in one build:
+`netlify/functions/resolve-contact-routes.js` (new) crawls up to 12 of the
+prospect's own pages, plus a Play Store name search and up to 6 listing
+fetches where the site links no address. It **never writes `public.prospects`**.
+It stages findings in the new `public.prospect_contact_candidates` table
+(migration `db/supabase-prospect-contact-candidates-2026-08-16.sql`) with
+`source_url` NOT NULL, and a human promotes one via a new `promote` action on
+`prospects-admin.js`. `src/pages/Prospects.tsx` gained the **Find contact
+routes** button and the candidate list with confidence, individual/role, and a
+link to the exact source URL.
+
+**The design ruling, so it is not re-argued:** a resolver can prove a string
+appeared at a URL, it cannot prove the string belongs to the person you mean.
+2026-08-15 produced three impostor X accounts that all looked correct. So
+`promote` accepts **only a candidate id**, no value, no kind, no source URL.
+The written string is by construction one the resolver saw at a recorded URL,
+which is why `update`'s 7-field `WRITABLE_FIELDS` whitelist did NOT have to be
+widened. `contact_email`, `linkedin_url` and `x_url` remain unpatchable from
+the UI, and the two write surfaces are disjoint by test. Promotion also
+**never sets `x_verified`/`linkedin_verified`** -- choosing to use a URL is not
+confirmation, and LinkedIn returns HTTP 999 to every automated client so it
+cannot be machine-confirmed at all. `promoted` means "was promoted at some
+point", not "is currently live"; live-ness is derived by comparing
+`candidate.value` against the prospect field, which cannot drift.
+
+**Deploy blocker found and fixed before it shipped, worth knowing.**
+`resolve-contact-routes` had no `netlify.toml` timeout entry, so it would have
+inherited the 10s default while budgeting 20s per prospect in batches of 10.
+Every real call would have been killed mid-crawl and returned nothing, which
+reads **identically to "this company publishes no address"** and would have
+been believed. Fixed: `timeout = 26`, batch cap 10 to 3, per-prospect 18s, a
+new 22s invocation budget, and an explicit `skipped: invocation time budget
+reached` report rather than a silent cap. `tests/prospects_admin_whitelist.test.js`
+is at 63 assertions, up from 49.
+
+**Still owed on this:**
+1. First click on **Find contact routes** against the real runtime is the
+   actual test of that timeout entry. If it returns nothing for a company that
+   obviously publishes an address, that is the timeout, not the company.
+2. The adminOnly gate on both new endpoints is unproven against the deployed
+   URL with a real viewer token (the live 401 only proves it rejects a
+   MISSING token).
+3. ~~DB-level rollback probe of the promote path.~~ **DONE 2026-08-20.**
+   Simulated promoting candidate 3 onto prospect 33 inside `begin; ...
+   rollback;`. In-transaction, exactly `contact_email`,
+   `contact_email_source`, `contact_email_kind` and the candidate's `promoted`
+   flag changed; `x_url`, `linkedin_url`, `x_verified`, `linkedin_verified`
+   and `stage` were untouched. After rollback nothing persisted
+   (`promoted_rows` 0, `verified_rows` still 8). RLS on
+   `prospect_contact_candidates` is 4 policies, one per verb, all
+   `is_admin()`.
+4. Packet `020` (`bg-backend` to `bg-verify`, Opus) is **STILL NOT RUN.** It
+   was dispatched 2026-08-20 and the agent stopped mid-run without writing
+   `docs/qa/contact-route-promotion-020-review.md`. It edited nothing, so the
+   code is unchanged, but the review produced nothing and must start over. It
+   is mandatory: this touches RLS and a new write path, and it lists SSRF
+   given `redirect: 'follow'` as a claim to attack.
+
+**A candidate row cites a lead database, and that needs a ruling.** Candidate
+id 10 (`runsensible.com`, kind `linkedin`) carries
+`source_url = https://rocketreach.co/sahar-asadi-email_106199103`. RocketReach
+is on the never-query list with Hunter, Apollo, Clearbit and Snov. It was
+written 2026-08-17 at 10:33 UTC, apart from the 09:51 batch, and touch id 18
+went out on the back of it. `_contact_routes.js` cannot emit that URL (it
+crawls only the prospect's own pages plus a Play Store fallback), so the row
+came from outside the resolver. Whether that is a process problem or a code
+problem is exactly what packet `020`'s claim 5 exists to settle.
+
+**Nothing has ever been promoted.** 0 rows have `promoted = true`, and all four
+prospects contacted 2026-08-17 (ids 24, 26, 30, 33) still have
+`contact_email` null while real email went to `adam@hoowla.com`,
+`sales@casepacer.com` and `sales@amberlo.io`. The routes exist only in
+`prospect_contact_candidates` and in touch notes. Unavoidable before the UI
+deployed; now it is just owed.
+
+### 2026-08-20: reply handling part A built, the due queue was starved not missing
+
+Design: `docs/arch/reply-handling.md`. Constantin's decisions, taken this day:
+**automatic Gmail polling** (not manual only) and a cadence of **+4 days, then
++7 days, then stop at 3 outbound touches**.
+
+**The premise in the 2026-08-16 entry below ("no follow-up sequence, no due
+queue") is imprecise in a way that changes the size of the job.** The due queue
+EXISTS and always has: `src/pages/Prospects.tsx` carries `isActionableNow()`,
+`isOverdue()`, `queueSort()`, `evidenceStrength()`, a `next_action_at` date
+picker wired to `update`, and an out/in toggle that can already log an inbound
+touch. It was starved, not missing. Measured 2026-08-20: **13 prospects at
+`stage='contacted'`, 0 of them carrying a `next_action_at`, 0 of 71 prospects
+carrying one at all, 0 inbound touches ever logged.** Nothing had ever written
+that column, because `touch` stamps exactly one field
+(`last_contacted_at` or `replied_at`) and never read it.
+
+**Built, all uncommitted, nothing deployed:**
+
+| File | What |
+|---|---|
+| `netlify/functions/_touches.js` | NEW. `recordTouch()` is now the ONE write path for `prospect_touches` and the prospect fields derived from it. |
+| `netlify/functions/prospects-admin.js` | The `touch` handler is now only a mapping from `recordTouch`'s structured outcome onto HTTP. |
+| `netlify/functions/poll-inbound-replies.js` | NEW. Cron-gated Gmail poller. Written, NOT deployed, deliberately NOT scheduled. |
+| `netlify.toml` | `poll-inbound-replies` timeout = 26. |
+| `tests/touches_record.test.js` | NEW, 20 assertions, exercises the actual call sequence. |
+| `tests/prospects_admin_whitelist.test.js` | 63 to **76** assertions. |
+
+**Applied to production (2 migrations, both verified after the fact):**
+`external_id text` on `prospect_touches` plus a PARTIAL unique index
+(`where external_id is not null`, so the 14 existing rows and every future
+manual touch are unaffected), file
+`db/supabase-prospect-touches-external-id-2026-08-20.sql`; and the
+`next_action_at` backfill, 13 rows.
+
+**The `_touches.js` extraction is the riskiest edit here** and is worth knowing
+about: an inline write path inside a LIVE, UNREVIEWED endpoint was moved into a
+shared function so the poller could not become a second copy of it, which is
+the `_plans.js` drift defect this project already paid for once. Nothing tested
+that call sequence before, which is why `tests/touches_record.test.js` exists.
+It uses a scripted fake, so it proves control flow and nothing about Postgres.
+
+**Deploy order for the poller is not negotiable** (design 7.1): set the four
+`GMAIL_*` env vars, THEN deploy, THEN schedule in `pg_cron` at minute 20 (not
+10, which is `schedule-collections`). Scheduling first writes an hourly
+`ok = false` row into `job_runs` forever, because the function fails closed
+without its credentials and 404s before it is deployed.
+
+**The backfill guard is the part worth remembering.** Logging an older touch
+after a newer one must not reschedule the future, which is the S8 defect one
+field over. The stamp UPDATE already answers this: it carries
+`buildAdvanceOnlyFilter()`, so it matches ZERO rows exactly when the touch is a
+backfill. So the rule is "write `next_action_at` only when the stamp actually
+applied". No new comparison, no second read, no new race.
+
+**Two distinctions that are load bearing and were tested explicitly:**
+`{ skip: true }` (write nothing) and `{ value: null }` (deliberately clear) are
+NOT the same, and collapsing them would wipe a date a human set on a closed
+prospect. And the rule never writes a stage: an exhausted prospect sits at
+`contacted` with a null `next_action_at` and leaves the queue, because calling
+it lost is a human judgement.
+
+**Backfilling the 13 produces a real queue immediately:** 8 due 2026-08-20,
+4 due 2026-08-21, 1 (glood.ai, already on its 2nd touch) due 2026-08-24.
+
+**Still owed on reply handling, and none of it is code:** the four `GMAIL_*`
+env vars (consent must be granted on the TalentWeLove account), the deploy, and
+then the `pg_cron` entry. Packet `021` covers this work and was dispatched to
+`bg-verify` together with `020`, on the reasoning that both halves ride the same
+build so one review of the final state beats two of a moving one.
+
+**Four limits are stated in the design and should not be rediscovered:**
+**automatic polling covers email only** (6 of 14 outbound touches; LinkedIn
+returns HTTP 999 to automated clients and X has no usable route); the mailbox
+is on the **TalentWeLove** Workspace, so a read-only Gmail scope there reaches
+unrelated company mail and **Constantin has not ruled on that**; a reply to a
+role inbox usually arrives FROM a different address than the one we mailed, so
+sender matching misses it and a thread-id match is the natural follow-up; and
+**bounces are invisible** (a mailer-daemon address never matches a
+`contact_email`, so a dead route keeps receiving follow-ups). The last two
+deserve their own packets.
+
+**Growth-side facts that outlived this session:** 22 of the 43 `stage='new'`
+rows have `company` null and several are large ESPs (ActiveCampaign, Klaviyo,
+Brevo, MailerLite, Omnisend, Voyado), so they are probably competitor research
+parked in the pipeline; 43 is not the real pipeline size until they are split
+out. Three report links are still owed on LinkedIn acceptance and are stored on
+their `prospect_touches.note` rows: Harry Singh `9E8gooatqve-HmJUByTdEuXq`,
+Harshul Jain `fSYVjKhY-aiQDmqC7g5iW3FL`, Serene Lim `12QW0p-YdnjkzmKNDe-3n38a`.
+Reply handling still does not exist: no follow-up sequence, no due queue, no
+inbound touch ever logged, and advancing a prospect to `replied` is still a
+manual SQL statement.
+
+### 2026-08-16: FIRST OUTBOUND EVER SENT. 9 prospects contacted across 3 channels
+
+**Every "nothing has been contacted" and "0 `prospect_touches`" claim below this
+entry is now STALE.** Founder batch 01 went out by hand today. Verified by query
+after the fact, not assumed: 71 prospects, **9 at `stage='contacted'`**, 9 with
+`last_contacted_at`, **9 rows in `prospect_touches`** (6 email, 3 linkedin, 0 x),
+0 inbound, 0 `replied_at`. Stage split is now `new=43, disqualified=19,
+contacted=9`.
+
+Who and how: PageLightPrime, PureClarity, EasyDVM, IntelliBill, DriveSchoolPro by
+email; Harry Singh (Lawcus), Harshul Jain (Glood.AI), Serene Lim (Vibefam) by
+LinkedIn connection request with a note; Smilenotes via their own web contact
+form. Full paste-ready record of every message:
+`docs/growth/outbound/fire-pack-2026-08-16.md`. Send log:
+`docs/growth/outbound/email/send-tracker-2026-08-16.md`.
+
+**The DKIM finding from 2026-08-15 was WRONG and is withdrawn. Do not add any TXT
+record at CyberFolks.** `constantin@getbrandgeo.com` is a send-as alias on the
+**TalentWeLove** Google Workspace, and Gmail's own settings page states it relays
+through `mail.getbrandgeo.com` on port 465 SSL. So the mail never leaves via
+Google's servers: cPanel Exim signs it on the `default` selector, which is
+published with a valid 2048 bit RSA key, and `mail.getbrandgeo.com` resolves to
+`91.200.121.45`, the A record of `getbrandgeo.com`, already authorised by the
+`+a` mechanism in SPF. DKIM and SPF both align. The absence of
+`google._domainkey` is irrelevant on this path. Constantin had settled this in
+earlier sessions and asked for it to be recorded here so it stops being
+re-derived.
+
+**Gmail does not reliably default to the getbrandgeo alias.** Two composes in a
+row opened as `constantin@talentwelove.com` with the TalentWeLove signature.
+Always open the From dropdown and pick it explicitly, then confirm the row before
+sending.
+
+**Three rulings made while sending, recorded so they are not re-argued:**
+
+1. **The report is a LINK, never an attachment.** Attachments cost
+   deliverability on cold mail for no gain and a PDF goes stale the moment the
+   data changes. All 9 tokens were re-verified against `get-audit-report` before
+   sending: every one returned `status: ready`, `unlocked: true`,
+   `low_confidence: false`, correct domain.
+2. **Smilenotes was routed away from `privacy@smilenotes.co.uk` deliberately**,
+   and this closes S4-era question about that prospect. It is the data protection
+   mailbox of a UK registered data controller where Lee McMeeking is both named
+   DPO and sole director; a commercial message there invites a UK GDPR reply
+   rather than a conversation. The X DM route is **CLOSED**, their inbox refuses
+   messages from non-followed accounts (attempted and refused today, recorded in
+   `prospects.notes` id 12 so nobody retries). Their own contact form at
+   `smilenotes.co.uk/help/contact` was used instead. That form carries bot
+   detection (`interaction_score`, `form_loaded_at`), so it must always be filled
+   by a human at human speed.
+3. **A LinkedIn Company Page cannot send connection requests or messages to
+   individuals.** Only a personal profile can. Those three went from Constantin's
+   personal profile `in/daniel-geo` as founder. Notes are capped at 200
+   characters and invitations carrying URLs get filtered, so **the report link is
+   still owed to all three on acceptance**. The three links are stored on their
+   `prospect_touches.note` rows so they cannot be lost.
+
+**Known environment problem, cost most of a session.** Driving Gmail through the
+Chrome extension failed repeatedly with `Cannot access a chrome-extension:// URL
+of different extension`, blocking synthetic clicks, keystrokes and JS injection
+while screenshots and DOM reads kept working. Two browser instances were
+connected at once, which is the likely cause. Partial workarounds: put every
+action in one `browser_batch` beginning with a `navigate`, and never call `find`
+or `read_page` mid-sequence, because any call between batches loses the
+attachment. **Do not drive Gmail this way again.** Constantin's ruling: outbound
+sending moves to scheduling from the dashboard.
+
+**`trybrandgeo.com` IS registered and fully stood up. The 2026-08-13 audit's
+"NXDOMAIN, never registered" is badly stale.** Measured 2026-08-16: A record
+`91.200.121.45`, MX `1 smtp.google.com` (Google Workspace),
+SPF `v=spf1 include:_spf.google.com ~all`, **`google._domainkey` published with a
+valid RSA key**, a `default` cPanel selector as well, and DMARC
+`p=none; rua=mailto:dmarc@trybrandgeo.com; fo=1; adkim=r; aspf=r; pct=100`.
+Note its `rua` is on its own domain, so its aggregate reports actually get
+delivered, unlike `getbrandgeo.com` whose `rua` points cross domain at
+`talentwelove.com` with no authorisation record. Someone executed
+`docs/growth/outbound-infra.md`. **Consequence: no third party sending platform
+is needed.** Google Workspace allows 2,000 recipients per user per day and the
+near term target is roughly 500 a month, so volume is not the constraint. Free
+ESP tiers are a trap here regardless: Resend, Brevo and comparable transactional
+providers prohibit cold outreach in their acceptable use policies, so using one
+risks the account and the domain reputation together.
+
+**Decision still owed on which domain sends at volume.** The five emails today
+went from `constantin@getbrandgeo.com` per Constantin's 2026-08-14 ruling, and
+that identity is part of why the message works, because the sender built the tool
+being described. `trybrandgeo.com` protects the primary domain but weakens that
+signal. Not urgent; it belongs with the sender build, not the resolver.
+
+**BLOCKER for tomorrow, found 2026-08-16 and larger than the tooling gap: all 43
+`stage='new'` prospects have ZERO contact routes.** 0 email, 0 `linkedin_url`,
+0 `x_url`, while 43 of 43 carry an `audit_token`, 43 of 43 an `ai_score`, and 40
+of 43 named competitors. The expensive half is paid for and the cheap half is
+missing. The nine contacted today were the only rows in the table with a route,
+because that research was done by hand and consumed most of a session. **There is
+no five day runway; there is no next batch at all until routes exist.** Packet
+`019` (`bg-orchestrator` to `bg-backend`, Opus) specifies the contact route
+resolver that closes this and is READY, not yet run.
+
+**What has NOT been tested and is the next real question after that:** what
+happens on a reply. There is no reply handling, no follow-up sequence, no due
+queue, and no inbound touch has ever been logged. Advancing a prospect to
+`replied` is currently a manual SQL statement.
+
+### 2026-08-15: prospect-channels re-review PASS, S8/S9 closed same day, 0 rows touched
+
+`bg-verify` returned **PASS, safe to push** on the S1/S2/S3/S5/S6 fix round
+below (`docs/qa/prospect-channels-review-2026-08-15.md`, section R1
+onward), independently reproducing all seven acceptance criteria, the S1
+boundary probe (floor and ceiling both exact, no off-by-one), and the
+`retry_of` attack surface (cannot cross prospects, cannot rewrite an
+existing touch's body). Two new findings, neither blocking the push:
+
+**S8, MEDIUM, closed same day, before push.** The prospect stamp UPDATE
+(`last_contacted_at`/`replied_at`) was unconditional, so an ordinary,
+explicitly-supported backfill (log today's email, then remember last week's
+LinkedIn message) rewound the queue field to the older date -- the same
+double-touch failure S1 was blocked on, just narrower (S1 bounded the blast
+radius to roughly seven months, it did not close the mechanism). Fixed with
+`buildAdvanceOnlyFilter()`: a single conditional `UPDATE ... WHERE (field IS
+NULL OR field < newIso)`, so the compare-and-swap is one atomic Postgres
+statement, safe under concurrent touches, no separate read-then-write.
+**Verified at the database level, not just as a filter string**: ran two
+`begin; ... rollback;` transactions against production, each inserting a
+same-day touch then an older backfill touch for a real prospect id. The
+OLD (unconditional) technique rewound `last_contacted_at` from
+`2026-08-15 17:38:53` to `2026-08-08 17:38:53` after the backfill. The NEW
+(conditional) technique, run the same way, left `last_contacted_at` at
+`2026-08-15 17:36:08` (unchanged) after the identical backfill, with BOTH
+touch timestamps present in `prospect_touches` either way. Both rolled back;
+confirmed `prospect_touches = 0` and both stamps null on every row
+afterward.
+
+**Chose the endpoint fix over the `rpc()` bg-verify flagged as the natural
+home for S2 and S8 together, reasoning stated inline since the coordinator
+asked for it explicitly.** A new `SECURITY DEFINER` function that writes
+`prospects`/`prospect_touches`, if it inherited this project's existing
+default EXECUTE grants the way `is_admin()`/`my_client_id()` already do,
+would let ANY authenticated caller bypass the admin-only RLS entirely via
+the function owner's privileges -- a genuine RLS-widening risk, not
+hypothetical, and closing it properly needs the same role-scoped
+rollback-probe verification `bg-verify` used to prove table containment.
+That is Opus-tier review work, not something to fold into the same round as
+a MEDIUM non-blocking fix. The conditional UPDATE gets the identical
+forward-only, race-safe guarantee with zero schema change and zero new
+attack surface. S2's `retry_of` idempotency workaround is therefore kept,
+not deleted; `bg-verify` should keep judging round to round whether the
+`rpc()` is still owed.
+
+**S9, INFO, closed.** The comment claiming a `retry_of` call "may omit
+channel/direction/occurred_at entirely" was wrong -- `validateTouch()`
+requires both `channel` and `direction` before `retry_of` is even parsed.
+Corrected to state what the code actually does (only `occurred_at` legitimately
+defaults).
+
+**Also closed, flagged in the prior round rather than fixed then, free this
+round per the coordinator's explicit allowance:** `validateUpdate()`'s `id`
+now routes through `parseId()`, closing the same coercion class S5 fixed on
+`prospect_id` (`true`, `[1]`, `"1e0"`, `" 1 "` all previously became `1`).
+
+**Confirmed after all fixes: 71 `prospects`, 0 `prospect_touches`, 0
+non-null `last_contacted_at`, 0 non-null `replied_at`.** Nothing has been
+contacted. 49/49 test assertions pass (up from 41). No em or en dash in any
+changed file. Handoff `018` to `bg-verify` is READY, not yet run.
+
+**Not this packet's to fix, recorded because the re-review surfaced it as
+now-live rather than theoretical:** 9 `prospects` rows were written outside
+this endpoint at 17:13-17:14 UTC today carrying real `contact_email`/
+`x_url`/verification data, confirmed via direct query not to have gone
+through `prospects-admin.js` (the write whitelist still rejects every one of
+those columns). This crossed **S4's own stated deadline** ("before the first
+`true` is written") -- 7 `x_verified=true` and 5 `linkedin_verified=true`
+rows now exist, and 3 `linkedin_verified=false` rows carry a real
+`linkedin_url`, which is exactly the ambiguity S4 named (unresearched vs.
+checked-and-failed, indistinguishable). **Decision owed from Constantin,
+now overdue rather than upcoming**: add `x_verified_at`/`linkedin_verified_at`
+timestamps (additive, does not disturb the shipped contract) per S4's
+original fix direction in `docs/qa/prospect-channels-review-2026-08-15.md`.
+
+### 2026-08-15: prospect-channels review fixes, S1/S2/S3/S5/S6 closed, 0 rows touched
+
+`bg-verify` returned PASS WITH FINDINGS on the channels work below
+(`docs/qa/prospect-channels-review-2026-08-15.md`), with a hard condition:
+**S1 (unbounded `occurred_at`) had to close before the first real touch is
+ever logged.** This pass closes S1, S2, S3, S5, S6 (S4 and S7 are explicitly
+deferred, S4 to a later deadline before the first `verified: true` write, S7
+pre-existing and out of scope). Handoff `017` to `bg-verify` is READY.
+
+**S1, BLOCKING, fixed.** `occurred_at` now rejects non-string input outright
+(`0`, `1`, `true`, `false`, arrays, objects all become 1970 or worse under a
+bare `new Date()` and were silently accepted before this fix) and clamps a
+valid ISO string to `[2026-01-01, now + 24h]` (`TOUCH_MIN_OCCURRED_AT`,
+`TOUCH_MAX_FUTURE_MS` in `prospects-admin.js`). A year-0001 date and
+`"3026-01-01"` are both rejected. Reconstructed the pre-fix logic standalone
+(not committed, run from `/tmp` and deleted) to confirm all six of the
+reviewer's exact values were genuinely accepted before this change and are
+genuinely rejected after; permanent regression tests for all six are in
+`tests/prospects_admin_whitelist.test.js`.
+
+**S5, LOW, fixed.** New `parseId()` replaces a bare `Number(v)` for
+`prospect_id` (and the new `retry_of`): rejects `true`, `[1]`, `"1e0"` and
+`" 1 "`, all of which previously coerced to `1` and would have misattributed
+a message to the wrong company. **Deliberately not applied to
+`validateUpdate()`'s `id` field**, which has the identical class of
+looseness but was not named in the review's S5 finding -- flagged in the
+handoff as a follow-up candidate rather than silently fixed beyond scope.
+
+**S6, LOW, fixed.** `fail500()` is now a module-scope, exported, testable
+function: every 5xx logs the real driver error server side and returns a
+fixed message plus a `code` naming the operation, never `error.message`
+verbatim. All 5 original leak sites now route through it.
+
+**S3, MEDIUM, fixed, ruling acted on.** `prospect_touches.prospect_id`'s FK
+was `ON DELETE CASCADE` (would silently destroy every message ever sent to a
+named human if a prospect row were deleted); changed to `ON DELETE RESTRICT`
+via new migration `db/supabase-prospect-touches-restrict-2026-08-15.sql`,
+applied to production and verified (`pg_get_constraintdef` now reads
+`... ON DELETE RESTRICT`). The base migration file's own `CREATE TABLE` DDL
+was also updated so a fresh apply on a clean database gets it right the
+first time; a header note explains why production needed the separate
+amendment file (`CREATE TABLE IF NOT EXISTS` does not alter an existing
+table). No delete affordance exists anywhere in the app per the reviewer's
+grep, so this closes a latent risk, not a live one.
+
+**S2, MEDIUM, fixed via the comment+idempotency path, not rpc().** Chose not
+to move the insert-then-stamp into a Postgres `rpc()` transaction (would add
+a new SECURITY DEFINER function to the same anon-executable-function
+category the security advisors already flag as accepted platform posture,
+for a two-write sequence with 0 real touches ever logged so far) -- the
+packet's own "either is acceptable" framing was used. Instead: the header
+comment no longer claims the writes "can never disagree" (that claim was
+false, per the review); a partial failure now returns a **structured**
+`touch_id` field on the 500 body, not just interpolated into a string; and a
+new optional `retry_of: <touch_id>` field on the `touch` action skips the
+insert and re-uses the existing touch row, so a retry after a partial
+failure cannot create a duplicate. `bg-verify` should judge in the next
+round whether this is sufficient or whether the `rpc()` path is still owed.
+
+**Also fixed, found by `bg-app` while building against packet 016's
+contract, not by `bg-verify`:** `update` and `touch` used to return a
+prospect with no `touches` key while `list` nested it, and only a comment
+said so. Chose to make the shape **uniform** rather than just fix the
+comment: `attachTouches()` runs one extra indexed query
+(`prospect_touches` filtered to one `prospect_id`) after `update` and
+`touch` now, so all three actions return a prospect that is never partial.
+`bg-app`'s existing client-side merge is unaffected either way (it only
+gains a key that previously did not exist).
+
+**Contract additions this round, stated loudly since packet 016 called the
+contract fixed:** `touch` gained an optional `retry_of` request field and an
+optional `touch_id` response field on its 500 body; `update` and `touch`
+responses both gained `touches: Touch[]`. All three are additive, nothing
+was renamed or removed.
+
+**Confirmed after all fixes: 71 `prospects` rows, 0 `prospect_touches` rows,
+0 non-null `last_contacted_at`, 0 non-null `replied_at`, 0 rows at
+`stage='contacted'`.** Nothing has been contacted. 41/41 assertions pass in
+`tests/prospects_admin_whitelist.test.js`. No em or en dash in any changed
+file, grep-verified.
+
+### 2026-08-15: prospect CRM extended to 3 channels (email/LinkedIn/X), migration applied, 0 rows touched
+
+`bg-backend` extended the prospect CRM from packet `015` (one implicit
+channel) to three, in parallel with `bg-app` building the UI against the
+identical contract. Migration `db/supabase-prospect-channels-migration.sql`
+is applied to production (`duiyifepitvugyulobqm`): `public.prospects` gains
+`contact_email`, `contact_email_source`, `contact_email_kind` (CHECK
+`individual`/`role`/null), `x_url`, `x_verified`, `linkedin_verified` (the
+last two default `false`, not null, because LinkedIn returns HTTP 999 to
+automated clients so an unverified URL must never render as fact); new table
+`public.prospect_touches` (one prospect, many touches, `channel`
+`email|linkedin|x`, `direction` `out|in`, both CHECK enforced) with the exact
+same admin-only RLS pattern as `prospects` itself (`public.is_admin()` on all
+four verbs). Verified directly against Postgres after applying, not assumed
+from the migration text: all 6 columns present with correct types/defaults,
+both CHECK constraints in place, RLS enabled with exactly 4 policies on
+`prospect_touches` all calling `is_admin()`, and `prospects` row count
+unchanged at 71 before and after (schema-only change, no data touched;
+`prospect_touches` starts at 0 rows). `get_advisors` (security) shows no new
+finding attributable to this migration.
+
+`prospects-admin.js` gains `action: 'touch'` behind the same
+`requireAuth({ adminOnly: true })` gate as `list`/`update`:
+`POST {action:'touch', prospect_id, channel, direction, occurred_at?,
+subject?, body?, note?} -> {touch, prospect}`. An outbound touch sets
+`prospects.last_contacted_at`, an inbound one sets `replied_at`, both to the
+touch's own `occurred_at` in the same handler call as the insert, so the
+queue can never disagree with the touch history. **`touch` never sets a
+stage** -- nobody has been contacted yet, and writing a touch that did not
+happen would corrupt the one record this table exists to keep honest, so no
+row was written by this session, migration only.
+
+**Envelope decision made and reported loudly, since `bg-app` builds against
+it:** `action: 'list'` nests each prospect's touches as `touches: Touch[]`
+directly on the prospect row (most recent first), not a sibling top-level
+`touches` key. One extra query grouped in memory by `prospect_id`, not N+1.
+
+`WRITABLE_FIELDS` for `action: 'update'` is unchanged at 7 fields; all 6 new
+columns are research/server-written only and are rejected (400, hard reject,
+not silently dropped) if sent in an update patch, same behavior as every
+other audit-derived column. `tests/prospects_admin_whitelist.test.js` extended
+with `validateTouch()` coverage (channel/direction validation, occurred_at
+default-and-round-trip, the out/in to last_contacted_at/replied_at mapping,
+optional subject/body/note) plus 2 new auth-gate cases for `touch` -- 29
+assertions total, all passing (`node tests/prospects_admin_whitelist.test.js`
+from `brandgeo-dashboard/`). No em or en dash in any of the three changed
+files, grep-verified.
+
+Handoff `016` to `bg-verify` is READY (mandatory, this touches RLS and a new
+table). Not yet run.
 
 ### 2026-08-15: prospect CRM data half built, migration applied, 71 rows backfilled
 
