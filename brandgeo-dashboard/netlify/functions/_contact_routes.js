@@ -178,6 +178,31 @@ function hostOf(url) {
 }
 
 /**
+ * unescapeSlashes(html) -> the same markup with backslash-escaped slashes
+ * turned back into ordinary ones, so a URL embedded in JSON reads like a URL.
+ *
+ * Added 2026-08-24 for extractCandidateHosts, extended 2026-08-24 to
+ * extractProfileUrls after the same blindness was found there.
+ *
+ * A URL inside a JSON blob in the page arrives as "https:\/\/example.com\/x",
+ * and every regex here that looks for a URL needs a literal "//" or "/", so
+ * the escaped form matched nothing at all and the page read as if it linked
+ * nowhere. This is not an exotic case. PHP's json_encode escapes "/" by
+ * default, so WordPress and most PHP sites embed their own JSON-LD and
+ * sameAs blocks this way, and Google Play carries listing data inside
+ * AF_initDataCallback blobs in exactly the same shape, which is precisely
+ * the markup these two functions exist to read.
+ *
+ * Cheap in strictness terms: hostOf() still parses whatever URL is recovered
+ * rather than trusting the surrounding text, and an escaped slash was never
+ * a boundary any check in this file relied on. Only "\/" is touched, so no
+ * other escape sequence in the document changes meaning.
+ */
+function unescapeSlashes(html) {
+  return String(html).replace(/\\\//g, '/')
+}
+
+/**
  * hostMatchesDomain(host, domain) -> boolean. The one host-boundary rule used
  * everywhere a string is checked against a prospect's own domain: exact match
  * or a proper subdomain, never a substring. "pacer.com" must not match
@@ -342,9 +367,16 @@ function extractProfileUrls(html, sourceUrl) {
   const seen = new Set()
   const out = []
 
+  // Both patterns below need literal slashes, so a profile linked only from
+  // an escaped JSON blob (a JSON-LD "sameAs" array is the common case, and
+  // it is where a small company's LinkedIn most often is) was invisible
+  // here. See unescapeSlashes() for why that shape is the norm rather than
+  // an oddity.
+  const text = unescapeSlashes(html)
+
   const liRe = /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/in\/([A-Za-z0-9\-_%]+)/gi
   let m
-  while ((m = liRe.exec(html)) !== null) {
+  while ((m = liRe.exec(text)) !== null) {
     const slug = m[1].replace(/[-_]+$/, '')
     if (!slug) continue
     const value = `https://www.linkedin.com/in/${slug}/`
@@ -354,7 +386,7 @@ function extractProfileUrls(html, sourceUrl) {
   }
 
   const xRe = /(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})(?![A-Za-z0-9_])/gi
-  while ((m = xRe.exec(html)) !== null) {
+  while ((m = xRe.exec(text)) !== null) {
     const handle = m[1]
     if (X_RESERVED.has(handle.toLowerCase())) continue
     const value = `https://x.com/${handle}`
@@ -495,16 +527,14 @@ const BARE_HOST_RE =
  * "/" sitting in front of the host, so before this the escaped form yielded no
  * host at all: the very pages this function targets are the ones most likely
  * to hide the domain that way, and a listing that does publish the prospect's
- * domain read as one that does not. Unescaping costs nothing in strictness
- * because hostOf() still parses the recovered URL rather than trusting the
- * surrounding text, and an escaped slash was never a host boundary that any
- * check here relied on.
+ * domain read as one that does not. Rationale and the strictness argument are
+ * in unescapeSlashes() above, which extractProfileUrls() shares.
  */
 function extractCandidateHosts(html) {
   const hosts = new Set()
   if (typeof html !== 'string' || !html) return hosts
 
-  const text = html.replace(/\\\//g, '/')
+  const text = unescapeSlashes(html)
 
   let m
   ABSOLUTE_URL_RE.lastIndex = 0

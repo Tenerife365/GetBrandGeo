@@ -206,6 +206,50 @@ async function run() {
     ok('a regional LinkedIn host (sg.linkedin.com) normalises to the canonical www URL')
   }
 
+  section('extractProfileUrls: a profile linked only from an escaped JSON blob is still found')
+  {
+    // Added 2026-08-24. Both patterns in extractProfileUrls need literal
+    // slashes, so a profile published only inside a JSON blob returned []
+    // and the page read as linking nobody. This is the common shape, not an
+    // exotic one: PHP's json_encode escapes "/" by default, so WordPress and
+    // most PHP sites emit their JSON-LD "sameAs" block exactly like this.
+    //
+    // String.raw is load bearing. Written as a normal quoted string, "\/"
+    // collapses to "/" at parse time and the fixture silently stops testing
+    // anything, so the escape is asserted before it is used.
+    const ESCAPED = String.raw`<script type="application/ld+json">{"sameAs":["https:\/\/www.linkedin.com\/in\/janedev","https:\/\/x.com\/janedev"]}</script>`
+    assert.ok(ESCAPED.includes('\\/'), 'the fixture must really contain a backslash-escaped slash')
+    ok('the escaped fixture carries a literal backslash, not a parse-time collapsed one')
+
+    const src = 'https://casepacer.com/about'
+    const got = extractProfileUrls(ESCAPED, src)
+    assert.deepStrictEqual(values(got, 'linkedin'), ['https://www.linkedin.com/in/janedev/'])
+    assert.deepStrictEqual(values(got, 'x'), ['https://x.com/janedev'])
+    ok('a LinkedIn profile and an X handle inside an escaped JSON-LD sameAs block are both recovered')
+
+    // The strongest form of the guarantee: escaping must make no difference
+    // at all, so the escaped page and the same page written plainly must
+    // produce byte-identical candidates.
+    const PLAIN = ESCAPED.replace(/\\\//g, '/')
+    assert.notStrictEqual(PLAIN, ESCAPED, 'the plain fixture must actually differ from the escaped one')
+    assert.deepStrictEqual(extractProfileUrls(ESCAPED, src), extractProfileUrls(PLAIN, src))
+    ok('an escaped page and its unescaped equivalent yield identical candidates')
+
+    // Unescaping must not smuggle anything past the two filters that already
+    // exist, so both are re-run in escaped form.
+    const company = extractProfileUrls(String.raw`<a href="https:\/\/linkedin.com\/company\/lawcus">Company</a>`, src)
+    assert.deepStrictEqual(values(company, 'linkedin'), [])
+    ok('an escaped LinkedIn /company/ URL is still NOT a contact route, same as the plain form')
+
+    const reserved = extractProfileUrls(String.raw`<a href="https:\/\/x.com\/intent\/tweet?text=hi">Share</a>`, src)
+    assert.deepStrictEqual(values(reserved, 'x'), [])
+    ok('an escaped x.com/intent share link is still filtered as a reserved path, not read as an account')
+
+    assert.deepStrictEqual(extractProfileUrls('', src), [])
+    assert.deepStrictEqual(extractProfileUrls(null, src), [])
+    ok('empty or non-string HTML still returns [] rather than throwing')
+  }
+
   section('extractPlayStoreUrl: the only source that ever yielded PageLightPrime')
   {
     const html = `<a href="https://play.google.com/store/apps/details?id=com.pagelightprime.mobileapp&hl=en">Get it on Google Play</a>`
