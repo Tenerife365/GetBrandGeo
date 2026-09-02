@@ -97,7 +97,7 @@ import {
   Search, ExternalLink, Linkedin, Twitter, Mail, Globe, FileSearch, Clock, ChevronDown,
   CheckCircle2, XCircle, Ban, StickyNote, CalendarClock, User as UserIcon,
   Inbox, ListFilter, ShieldCheck, ShieldQuestion, ArrowUpRight, ArrowDownLeft, History,
-  Radar, Loader2, Link2,
+  Radar, Loader2, Link2, AlertTriangle, RotateCw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -136,10 +136,16 @@ const promoteCandidate = (candidate_id: number) =>
   authedPost<{ prospect?: Prospect; candidate?: ContactCandidate; warning?: string; error?: string }>(
     'prospects-admin', { action: 'promote', candidate_id },
   )
+// `errors` is typed optional even though the live contract always sends it,
+// for the same reason `candidates` is defaulted on the list path below: this
+// page has to keep working against a deploy that predates the field, and an
+// undefined there must read as "this build cannot tell us", never as "the
+// crawl reported no problems".
 const resolveRoutes = (prospect_id: number) =>
-  authedPost<{ results?: { pages_fetched: number; candidates: unknown[]; errors: string[] }[]; error?: string }>(
-    'resolve-contact-routes', { prospect_id },
-  )
+  authedPost<{
+    results?: { pages_fetched?: number; candidates?: unknown[]; errors?: string[] }[]
+    error?: string
+  }>('resolve-contact-routes', { prospect_id })
 
 // ── Stage vocabulary ─────────────────────────────────────────────────────────
 const STAGE_ORDER: ProspectStage[] = [
@@ -715,10 +721,14 @@ function CandidateRow({
 const CANDIDATES_COLLAPSED = 4
 
 function ContactCandidates({
-  p, resolving, onResolve, onPromote,
+  p, resolving, unfinishedResolve, onResolve, onPromote,
 }: {
   p: Prospect
   resolving: boolean
+  // The last run on THIS prospect stopped early and the resolver said calling
+  // again would get further. It changes what the button promises: not "look
+  // again" at pages already read, but finish the pass that was cut short.
+  unfinishedResolve: boolean
   onResolve: (id: number) => void
   onPromote: (id: number) => void
 }) {
@@ -733,16 +743,30 @@ function ContactCandidates({
         <button
           onClick={() => onResolve(p.id)}
           disabled={resolving}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-brand-300 hover:border-brand-500/40 transition-colors disabled:opacity-60 disabled:cursor-wait"
-          title="Reads this company's own pages and looks for a published address or profile. It never guesses one from a name pattern."
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-wait ${
+            unfinishedResolve
+              ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30 hover:bg-amber-400/20'
+              : 'bg-dark-700/60 text-slate-300 border border-dark-600 hover:text-brand-300 hover:border-brand-500/40'
+          }`}
+          title={unfinishedResolve
+            ? 'The last pass ran out of time before it read everything. Each run gets a fresh time budget, so this picks up what the last one did not reach.'
+            : "Reads this company's own pages and looks for a published address or profile. It never guesses one from a name pattern."}
         >
           {resolving
             ? <><Loader2 size={12} className="animate-spin" /> Reading their site…</>
-            : <><Radar size={12} /> {candidates.length > 0 ? 'Look again' : 'Find contact routes'}</>}
+            : unfinishedResolve
+              ? <><RotateCw size={12} /> Finish reading their site</>
+              : <><Radar size={12} /> {candidates.length > 0 ? 'Look again' : 'Find contact routes'}</>}
         </button>
         {candidates.length > 0 && (
           <span className="text-[11px] text-slate-500">
             {candidates.length} found{hasAnyRoute ? '' : ', none chosen yet'}
+          </span>
+        )}
+        {unfinishedResolve && !resolving && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-amber-400/90">
+            <AlertTriangle size={11} className="shrink-0" />
+            Stopped early, so nothing here rules out an address
           </span>
         )}
       </div>
@@ -776,11 +800,12 @@ function ContactCandidates({
 
 // ── Row ───────────────────────────────────────────────────────────────────
 function ProspectRow({
-  p, now, resolving, onPatch, onLogTouch, onResolve, onPromote,
+  p, now, resolving, unfinishedResolve, onPatch, onLogTouch, onResolve, onPromote,
 }: {
   p: Prospect
   now: number
   resolving: boolean
+  unfinishedResolve: boolean
   onPatch: (id: number, patch: ProspectPatch) => void
   onLogTouch: (input: TouchLogInput) => void
   onResolve: (id: number) => void
@@ -836,7 +861,13 @@ function ProspectRow({
 
       <ChannelChips p={p} />
 
-      <ContactCandidates p={p} resolving={resolving} onResolve={onResolve} onPromote={onPromote} />
+      <ContactCandidates
+        p={p}
+        resolving={resolving}
+        unfinishedResolve={unfinishedResolve}
+        onResolve={onResolve}
+        onPromote={onPromote}
+      />
 
       <div className="mt-3">
         <TouchQuickLog p={p} onLog={onLogTouch} />
@@ -961,6 +992,144 @@ function ProspectRow({
   )
 }
 
+// ── Resolver outcome ──────────────────────────────────────────────────────
+// resolve-contact-routes.js reports what it could NOT do alongside what it
+// found: `results[0].errors` carries one plain string per page it failed to
+// fetch, per Play Store branch it had to skip, and per scan its per-prospect
+// time budget cut short (for example "play listing scan stopped after 2 of 6
+// listings: per-prospect time budget reached. Call again for this prospect.").
+// That field was added server side on 2026-08-21 for exactly one reason: a
+// crawl that stopped early was indistinguishable from a company that genuinely
+// publishes no address. Reading only `candidates` and `pages_fetched` throws
+// that distinction away again and prints "found nothing published" over a
+// crawl that never finished, which is a false statement about a real company.
+//
+// So two states, never one:
+//   no reasons    the crawl finished. "Nothing published" is a real answer.
+//   any reason    the crawl is INCOMPLETE. Absence proves nothing yet.
+//
+// A subset of the reasons mean a second call would get further. The budget is
+// per call (resolveOne stamps its start time on entry), so calling again
+// genuinely restarts it, which is why the resolver itself appends "Call again
+// for this prospect." Both markers below are matched because every time budget
+// message describes that same restartable stop, whether or not the resolver
+// spelled the instruction out. A page that answered HTTP 403 matches neither,
+// and correctly gets no retry button: it would answer 403 again.
+const RESOLVER_SAYS_CALL_AGAIN = /call again/i
+const RESOLVER_HIT_TIME_BUDGET = /time budget/i
+
+type ResolveOutcome = {
+  prospectId: number
+  domain: string
+  found: number
+  pages: number
+  // Verbatim from the resolver. Not reworded here: these name specific URLs and
+  // specific stopping points, and the operator's alternative today is the
+  // browser network tab or the Netlify function log.
+  reasons: string[]
+  retryable: boolean
+}
+
+const REASONS_COLLAPSED = 3
+
+function plural(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// Renders the result of one resolver run. The incomplete case is amber and
+// says what is unknown; the finished case is neutral, because "this company
+// publishes no individual address" is the expected answer for most companies
+// and colouring it as a fault would train the reader to distrust a correct
+// result.
+function ResolveOutcomeBanner({
+  outcome, resolving, onResolve, onDismiss,
+}: {
+  outcome: ResolveOutcome
+  resolving: boolean
+  onResolve: (id: number) => void
+  onDismiss: () => void
+}) {
+  const [showAllReasons, setShowAllReasons] = useState(false)
+  const { domain, found, pages, reasons, retryable } = outcome
+  const incomplete = reasons.length > 0
+  const visibleReasons = showAllReasons ? reasons : reasons.slice(0, REASONS_COLLAPSED)
+
+  if (!incomplete) {
+    return (
+      <p className="text-xs text-slate-300 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 mb-6 flex items-start gap-2">
+        <Radar size={13} className="text-slate-500 shrink-0 mt-0.5" />
+        <span>
+          {found === 0
+            ? `Read ${plural(pages, 'page', 'pages')} of ${domain} and found nothing published. No address was guessed.`
+            : `Found ${plural(found, 'contact route', 'contact routes')} across ${plural(pages, 'page', 'pages')} of ${domain}. Pick one below.`}
+        </span>
+        <button
+          onClick={onDismiss}
+          className="ml-auto text-slate-600 hover:text-slate-400 transition-colors shrink-0"
+          aria-label="Dismiss"
+        >
+          <XCircle size={13} />
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <div className="text-xs bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2.5 mb-6">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-amber-400/90 font-medium">Incomplete read of {domain}</p>
+          <p className="text-slate-300 mt-1">
+            {found === 0
+              ? `Read ${plural(pages, 'page', 'pages')} before stopping and found nothing in them. That is not the same as ${domain} publishing no address, because the read did not finish.`
+              : `Found ${plural(found, 'contact route', 'contact routes')} across ${plural(pages, 'page', 'pages')} and staged ${found === 1 ? 'it' : 'them'} below, but the read did not finish, so there may be more.`}
+          </p>
+          <p className="text-[11px] uppercase tracking-wide text-slate-500 mt-2">What it could not do</p>
+          <ul className="mt-1 space-y-0.5 text-slate-400">
+            {visibleReasons.map((reason, i) => (
+              <li key={`${i}-${reason}`} className="break-words">
+                <span className="text-slate-600">·</span> {reason}
+              </li>
+            ))}
+          </ul>
+          {reasons.length > REASONS_COLLAPSED && (
+            <button
+              onClick={() => setShowAllReasons(v => !v)}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors mt-1"
+            >
+              {showAllReasons ? 'Show fewer' : `Show all ${reasons.length}`}
+            </button>
+          )}
+          {retryable && (
+            <div className="flex flex-wrap items-center gap-2 mt-2.5">
+              <button
+                onClick={() => onResolve(outcome.prospectId)}
+                disabled={resolving}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-400/10 text-amber-300 border border-amber-400/30 hover:bg-amber-400/20 transition-colors disabled:opacity-60 disabled:cursor-wait"
+              >
+                {resolving
+                  ? <><Loader2 size={12} className="animate-spin" /> Reading their site…</>
+                  : <><RotateCw size={12} /> Run it again</>}
+              </button>
+              <span className="text-[11px] text-slate-500">
+                Each run gets a fresh time budget, so this picks up what the last one did not reach.
+              </span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-slate-600 hover:text-slate-400 transition-colors shrink-0"
+          aria-label="Dismiss"
+        >
+          <XCircle size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 type View = 'queue' | 'all'
 
@@ -970,10 +1139,15 @@ export default function Prospects() {
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  // Kept separate from errorMsg on purpose. "This site publishes no address"
-  // is the expected answer for most companies, not a failure, and colouring
-  // it like one would train the reader to distrust a correct result.
+  // Kept separate from errorMsg on purpose. A promote warning ("this replaced
+  // the route already on the row") is information, not a failure, and
+  // colouring it like one would train the reader to distrust a correct result.
   const [noticeMsg, setNoticeMsg] = useState<string | null>(null)
+  // The last resolver run, held as the structured outcome rather than a
+  // pre-rendered sentence, because a finished crawl and a truncated one are
+  // two different claims and must never share the same words. See
+  // ResolveOutcome above.
+  const [resolveOutcome, setResolveOutcome] = useState<ResolveOutcome | null>(null)
 
   // Which prospects have a resolver run in flight. A Set rather than a single
   // id because reading one company's site takes seconds and there is no
@@ -1091,6 +1265,12 @@ export default function Prospects() {
   // clicks Use this below.
   const onResolve = (id: number) => {
     setResolving(prev => new Set(prev).add(id))
+    // A verdict about a DIFFERENT company must not sit over this run: it would
+    // read as this one's answer. The same prospect's verdict stays put, because
+    // it still truthfully describes the last completed pass, and keeping it is
+    // what lets Run it again show its own progress rather than vanish under
+    // the click. Either way the result below replaces it.
+    setResolveOutcome(prev => (prev && prev.prospectId === id ? prev : null))
     const done = () => setResolving(prev => {
       const next = new Set(prev)
       next.delete(id)
@@ -1107,14 +1287,24 @@ export default function Prospects() {
         done()
         return
       }
-      const found = data.results[0]?.candidates?.length ?? 0
-      const pages = data.results[0]?.pages_fetched ?? 0
-      // Most companies publish no individual address at all, so an empty
-      // result is the honest answer and not a reason to start guessing. Say
-      // so in the neutral banner rather than the error one.
-      setNoticeMsg(found === 0
-        ? `Read ${pages} ${pages === 1 ? 'page' : 'pages'} and found nothing published. No address was guessed.`
-        : `Found ${found} contact ${found === 1 ? 'route' : 'routes'} across ${pages} ${pages === 1 ? 'page' : 'pages'}. Pick one below.`)
+      const result = data.results[0]
+      // The contract returns one result per requested id and 404s with a body
+      // when the id does not exist, so an empty list is not a "we looked and
+      // found nothing" answer and must not be printed as one.
+      if (!result) {
+        setErrorMsg('The resolver returned no result for that prospect. Nothing was read, and nothing was staged.')
+        done()
+        return
+      }
+      const reasons = Array.isArray(result.errors) ? result.errors.filter(r => typeof r === 'string' && r.trim()) : []
+      setResolveOutcome({
+        prospectId: id,
+        domain: prospects.find(p => p.id === id)?.domain ?? `prospect ${id}`,
+        found: result.candidates?.length ?? 0,
+        pages: result.pages_fetched ?? 0,
+        reasons,
+        retryable: reasons.some(r => RESOLVER_SAYS_CALL_AGAIN.test(r) || RESOLVER_HIT_TIME_BUDGET.test(r)),
+      })
       refresh().finally(done)
     })
   }
@@ -1219,6 +1409,14 @@ export default function Prospects() {
             <XCircle size={13} />
           </button>
         </p>
+      )}
+      {resolveOutcome && (
+        <ResolveOutcomeBanner
+          outcome={resolveOutcome}
+          resolving={resolving.has(resolveOutcome.prospectId)}
+          onResolve={onResolve}
+          onDismiss={() => setResolveOutcome(null)}
+        />
       )}
 
       {/* View + filters */}
@@ -1349,6 +1547,12 @@ export default function Prospects() {
               p={p}
               now={now}
               resolving={resolving.has(p.id)}
+              // The page banner explains a truncated crawl, but the button
+              // that would finish it lives down here on the row, and the two
+              // can be a scroll apart. This carries the one bit the button
+              // needs: the last run stopped early and said calling again
+              // would get further.
+              unfinishedResolve={resolveOutcome?.prospectId === p.id && resolveOutcome.retryable}
               onPatch={onPatch}
               onLogTouch={onLogTouch}
               onResolve={onResolve}
