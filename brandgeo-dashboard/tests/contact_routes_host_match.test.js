@@ -32,6 +32,21 @@
  * same no-network technique the reviewer used, to guard the per-prospect time
  * budget actually being a deadline and every silent exit actually being
  * loud.
+ *
+ * EXTENDED 2026-08-24 with the other half of the same problem. The 2026-08-22
+ * fix is correct and the sections above must keep passing untouched, but it
+ * left two demonstrated FALSE NEGATIVES. Both fail safe in the sense that they
+ * reject rather than accept, and both are still defects of exactly the kind
+ * this file exists to catch: a company that DOES publish its domain on its
+ * listing read as one that publishes nothing, so the resolver reports an empty
+ * result that is indistinguishable from a genuine absence. The two cases are a
+ * bare host followed by ordinary prose punctuation ("casepacer.com, phone
+ * 555"), and a backslash-escaped URL ("https:\/\/www.casepacer.com"), which is
+ * the exact form Google Play uses inside its AF_initDataCallback JSON blobs,
+ * so the pages this module targets are the ones most likely to hide the domain
+ * that way. The last two sections pin both, and deliberately re-run the F6 and
+ * blocker-2 exploit strings through the newly widened paths to prove the
+ * widening did not reopen them.
  */
 const assert = require('assert')
 const path = require('path')
@@ -382,6 +397,148 @@ async function run() {
     } finally {
       global.fetch = origFetch
     }
+  }
+
+  section('2026-08-24 false negative 1: a host followed by ordinary prose punctuation is still recovered')
+  {
+    // Every accept below returned false before the trailing lookahead was
+    // widened, so each one was a listing that publishes the prospect's own
+    // domain being scored as one that publishes nothing.
+    assert.strictEqual(playListingMatches('Website: casepacer.com, phone 555', 'casepacer.com'), true)
+    ok('a comma after the host no longer hides it (the reported reproduction, verbatim)')
+
+    assert.strictEqual(playListingMatches('Developer website: casepacer.com.', 'casepacer.com'), true)
+    ok('a sentence-ending full stop no longer hides the host')
+
+    assert.strictEqual(playListingMatches('Visit casepacer.com. Then call us.', 'casepacer.com'), true)
+    ok('a full stop mid paragraph no longer hides the host')
+
+    assert.strictEqual(playListingMatches('Website: casepacer.com; phone 555', 'casepacer.com'), true)
+    ok('a semicolon after the host no longer hides it')
+
+    assert.strictEqual(playListingMatches('Developer site (see casepacer.com) verified', 'casepacer.com'), true)
+    ok('a closing parenthesis after the host no longer hides it')
+
+    assert.strictEqual(playListingMatches('Developer sites: casepacer.com] end', 'casepacer.com'), true)
+    ok('a closing bracket after the host no longer hides it')
+
+    assert.strictEqual(playListingMatches('Contact us at sub.casepacer.com, or call.', 'casepacer.com'), true)
+    ok('a genuine subdomain followed by punctuation is accepted, same rule as the unpunctuated case')
+  }
+
+  section('2026-08-24: widening the TRAILING side did not reopen F6 or blocker-2')
+  {
+    // The leading lookbehind is the half that actually closed the blocker, and
+    // it is unchanged. These re-run the original exploit strings with the
+    // newly accepted trailing characters appended, so a future edit that
+    // relaxes the leading side to "fix" the asymmetry fails here rather than
+    // in production.
+    assert.strictEqual(playListingMatches('Website: casepacer.com, phone 555', 'pacer.com'), false)
+    ok('the newly recovered comma case still does not leak the shorter domain "pacer.com"')
+
+    assert.strictEqual(playListingMatches('var app_pacer.com, x=1', 'pacer.com'), false)
+    assert.strictEqual(playListingMatches('?utm_source=case_pacer.com; id=9', 'pacer.com'), false)
+    assert.strictEqual(playListingMatches('{"vendor_pacer.com": 1}', 'pacer.com'), false)
+    ok('an underscore before the host still blocks it, with a comma, semicolon or brace after')
+
+    assert.strictEqual(
+      playListingMatches('<p>Logo: https://cdn.evil.net/logos/casepacer.com, cached</p>', 'casepacer.com'),
+      false
+    )
+    assert.strictEqual(
+      playListingMatches('<p>Compare us: https://legaltechcompare.example/head-to-head/casepacer.com.</p>', 'casepacer.com'),
+      false
+    )
+    ok('a domain in a stranger URL path is still rejected when a comma or full stop follows it')
+
+    assert.strictEqual(playListingMatches('Contact us at casepacer.com.evil.net, really', 'casepacer.com'), false)
+    ok('the lookalike is still captured whole and still fails the suffix check, punctuation or not')
+
+    assert.strictEqual(playListingMatches('Our logo is casepacer.com.png, see above', 'casepacer.com'), false)
+    ok('a full stop followed by another label does not terminate the host early, so a filename cannot leak the domain')
+
+    // Deliberate asymmetry, recorded so it is not "tidied up" later. Only the
+    // trailing side was widened, so a host OPENED by a bracket or parenthesis
+    // is still missed. Both are fail-safe misses and both are the price of the
+    // blocker-1 fix: widening the leading class is exactly what reopens
+    // "case_pacer.com", so it must not be done to close these. If they ever
+    // need closing, it has to be by enumerating opening delimiters, never by
+    // going back to "any character that is not [A-Za-z0-9.-]".
+    assert.strictEqual(playListingMatches('hosts: [casepacer.com]', 'casepacer.com'), false)
+    assert.strictEqual(playListingMatches('Developer site (casepacer.com) verified', 'casepacer.com'), false)
+    ok('the leading lookbehind stays strict and is not to be loosened, even at the cost of these two misses')
+  }
+
+  section('2026-08-24 false negative 2: a backslash-escaped URL is recovered, as Google Play actually serves it')
+  {
+    // String.raw is load bearing. Written as a normal quoted string, "\/"
+    // collapses to "/" at parse time and the fixture silently stops testing
+    // anything, so the escape is asserted before it is used.
+    const ESCAPED = String.raw`["https:\/\/www.casepacer.com"]`
+    assert.ok(ESCAPED.includes('\\/'), 'the fixture must really contain a backslash-escaped slash')
+    ok('the escaped fixture carries a literal backslash, not a parse-time collapsed one')
+
+    // Before the fix this returned an empty set: ABSOLUTE_URL_RE needs a
+    // literal "//" and BARE_HOST_RE correctly refuses the "/" in front of the
+    // host, so nothing recovered it.
+    assert.ok(extractCandidateHosts(ESCAPED).has('casepacer.com'))
+    ok('extractCandidateHosts recovers the host from an escaped URL (it returned [] before)')
+
+    assert.strictEqual(playListingMatches(ESCAPED, 'casepacer.com'), true)
+    ok('a listing whose only mention of the domain is an escaped URL now verifies')
+
+    // The real shape: Play embeds listing data in an AF_initDataCallback JSON
+    // blob, which is why this case matters on the pages this module targets
+    // rather than being a curiosity. The developer contact here is deliberately
+    // a gmail address, both because small developers commonly list one and
+    // because it makes the escaped URL the ONLY own-domain evidence on the
+    // page. An earlier draft used support@casepacer.com and passed against the
+    // pre-fix module, since EMAIL_RE recovers an email's domain whatever the
+    // slashes around it do, so the fixture proved nothing about escaping.
+    const AF = String.raw`AF_initDataCallback({key:'ds:5',data:[[["CasePacer LLC","https:\/\/www.casepacer.com\/","casepacerapp@gmail.com"]]],sideChannel:{}});`
+    assert.ok(!AF.includes('@casepacer.com'), 'the blob must not carry own-domain evidence other than the escaped URL')
+    assert.strictEqual(playListingMatches(AF, 'casepacer.com'), true)
+    ok('a realistic AF_initDataCallback blob verifies on its escaped developer website alone')
+
+    assert.strictEqual(playListingMatches(String.raw`["https:\/\/sub.casepacer.com\/app"]`, 'casepacer.com'), true)
+    ok('an escaped subdomain URL is accepted, matching the unescaped behaviour')
+  }
+
+  section('2026-08-24: unescaping did not weaken any host boundary check')
+  {
+    // hostOf() still parses the recovered URL, so every blocker-2 exploit has
+    // to stay closed in its escaped form too. Each of these mentions the
+    // prospect domain only somewhere a URL's host is not.
+    assert.strictEqual(
+      playListingMatches(String.raw`["https:\/\/cdn.evil.net\/logos\/casepacer.com\/icon.png"]`, 'casepacer.com'),
+      false
+    )
+    ok('an escaped stranger URL with the domain in its path does not verify')
+
+    assert.strictEqual(playListingMatches(String.raw`["https:\/\/casepacer.com@evil.net\/"]`, 'casepacer.com'), false)
+    ok('escaped userinfo before "@" does not verify (hostOf still resolves evil.net)')
+
+    assert.strictEqual(
+      playListingMatches(String.raw`{"u":"https:\/\/cdn.tracker.net\/px?ref=casepacer.com&id=9"}`, 'casepacer.com'),
+      false
+    )
+    ok('an escaped tracking URL naming the domain in a query parameter does not verify')
+
+    assert.strictEqual(
+      playListingMatches(String.raw`["https:\/\/forum.example.net\/t\/1#casepacer.com"]`, 'casepacer.com'),
+      false
+    )
+    ok('an escaped URL naming the domain in its fragment does not verify')
+
+    assert.strictEqual(playListingMatches(String.raw`["https:\/\/www.casepacer.com"]`, 'pacer.com'), false)
+    assert.strictEqual(playListingMatches(String.raw`["https:\/\/www.casepacer.com"]`, 'acer.com'), false)
+    ok('the original F6 substring cases stay rejected against an escaped URL as well')
+
+    assert.strictEqual(
+      playListingMatches(String.raw`["https:\/\/www.casepacer.com.evil.net"]`, 'casepacer.com'),
+      false
+    )
+    ok('an escaped lookalike host is still rejected rather than read as a subdomain')
   }
 
   console.log(`\n${passed} assertions passed.`)

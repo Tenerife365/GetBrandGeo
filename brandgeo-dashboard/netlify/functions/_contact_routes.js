@@ -449,8 +449,28 @@ const ABSOLUTE_URL_RE = /https?:\/\/[^\s"'<>)]+/gi
 // prose is still found (bare text surrounded by real whitespace), and
 // "casepacer.com.evil.net" is still captured whole, as one longer host, which
 // then legitimately fails the suffix check against "casepacer.com".
+//
+// WIDENED 2026-08-24, TRAILING SIDE ONLY. The 2026-08-22 fix is correct and
+// the leading lookbehind must stay exactly as strict as it is, because that is
+// the half that actually closed the blocker: it is what stops "pacer.com"
+// being read out of "case_pacer.com" or out of a URL's path, query, fragment
+// or userinfo. The trailing side was over-tight in a way that produced silent
+// false negatives, which is the same failure class this file exists to
+// prevent, just pointed the other way: a company that DOES publish its domain
+// read as one that publishes nothing. A host followed by ordinary sentence
+// punctuation was not recovered at all, so "Website: casepacer.com, phone 555"
+// verified nothing. Comma, semicolon, closing bracket and closing parenthesis
+// are added to the terminator set.
+//
+// The full stop is deliberately NOT a plain member of that set. It is accepted
+// only when it is not followed by another label character, via
+// "\.(?![a-z0-9])". Written that way, "casepacer.com." at the end of a
+// sentence terminates, while "casepacer.com.evil.net" still cannot terminate
+// early at "casepacer.com" and is still captured whole as the longer host that
+// then legitimately fails the suffix check. That property does not rely on
+// greedy backtracking order, so it holds by construction rather than by luck.
 const BARE_HOST_RE =
-  /(?<=^|[\s>"'])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?=$|[\s<"'/:])/gi
+  /(?<=^|[\s>"'])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?=$|[\s<"'/:,;)\]]|\.(?![a-z0-9]))/gi
 
 /**
  * extractCandidateHosts(html) -> Set<string> of every host mentioned on the
@@ -467,25 +487,39 @@ const BARE_HOST_RE =
  * treat "/", "=", "#" and "_" as valid boundaries, which is exactly the
  * defect that let a domain be read out of a URL's path, query, fragment or
  * userinfo, or out of a snake_case identifier.
+ *
+ * BACKSLASH-ESCAPED SLASHES ARE UNESCAPED FIRST, added 2026-08-24. Google Play
+ * serves listing data inside AF_initDataCallback JSON blobs where every slash
+ * is escaped, so the developer website arrives as "https:\/\/www.example.com".
+ * ABSOLUTE_URL_RE needs a literal "//" and BARE_HOST_RE correctly refuses the
+ * "/" sitting in front of the host, so before this the escaped form yielded no
+ * host at all: the very pages this function targets are the ones most likely
+ * to hide the domain that way, and a listing that does publish the prospect's
+ * domain read as one that does not. Unescaping costs nothing in strictness
+ * because hostOf() still parses the recovered URL rather than trusting the
+ * surrounding text, and an escaped slash was never a host boundary that any
+ * check here relied on.
  */
 function extractCandidateHosts(html) {
   const hosts = new Set()
   if (typeof html !== 'string' || !html) return hosts
 
+  const text = html.replace(/\\\//g, '/')
+
   let m
   ABSOLUTE_URL_RE.lastIndex = 0
-  while ((m = ABSOLUTE_URL_RE.exec(html)) !== null) {
+  while ((m = ABSOLUTE_URL_RE.exec(text)) !== null) {
     const h = hostOf(m[0])
     if (h) hosts.add(h)
   }
 
   BARE_HOST_RE.lastIndex = 0
-  while ((m = BARE_HOST_RE.exec(html)) !== null) {
+  while ((m = BARE_HOST_RE.exec(text)) !== null) {
     hosts.add(m[1].toLowerCase().replace(/^www\./, ''))
   }
 
   EMAIL_RE.lastIndex = 0
-  while ((m = EMAIL_RE.exec(html)) !== null) {
+  while ((m = EMAIL_RE.exec(text)) !== null) {
     const at = m[0].lastIndexOf('@')
     if (at < 0) continue
     const emailDomain = m[0].slice(at + 1).toLowerCase()
