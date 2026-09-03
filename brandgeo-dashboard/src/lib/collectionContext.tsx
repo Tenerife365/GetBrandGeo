@@ -335,11 +335,13 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     // call succeeded: collect-claude.js and collect-chatgpt.js answer 200 with
     // { done: false, reason: <error_code> } on a real engine failure, and
     // 200 with { done: false, reason: 'insert_error' } when the row was never
-    // saved at all. collect-prompt.js always answers 200 with
-    // { done: true, summary } even when every requested engine failed, with
-    // the per-engine outcome ('mentioned' / 'not_mentioned' vs. an error code
-    // or a timeout string) only visible inside `summary`. So `ok` has to come
-    // from the parsed body, never from the HTTP status alone.
+    // saved at all. collect-prompt.js answers 200 with { done: true, summary }
+    // even when every requested engine failed, with the per-engine outcome
+    // ('mentioned' / 'not_mentioned' vs. an error code or a timeout string)
+    // only visible inside `summary`, and 200 with { done: false, reason:
+    // 'insert_error', summary } when its rows were never saved (since
+    // 2026-09-03; before that it said done: true). So `ok` has to come from
+    // the parsed body, never from the HTTP status alone.
     let calls: CollectionCallResult[] = []
     try {
       const requests: { engine: string; run: Promise<Response> }[] = []
@@ -366,6 +368,9 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         if (engine === 'prompt') {
           if (!responseBody || responseBody.skipped === true) {
             reason = 'skipped'
+          } else if (responseBody.done === false && typeof responseBody.reason === 'string') {
+            // The engines ran but the rows were never saved ('insert_error').
+            reason = responseBody.reason
           } else if (responseBody.done !== true || !responseBody.summary) {
             reason = 'unknown_error'
           } else {

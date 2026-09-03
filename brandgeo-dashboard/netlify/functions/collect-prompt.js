@@ -145,11 +145,16 @@ exports.handler = async (event) => {
 
   console.log(`[${invId}] summary:`, Object.entries(summary).map(([e, s]) => `${e}=${s}`).join(' | '))
 
+  let insertFailed = false
   if (rows.length > 0) {
     console.log('[Insert] saving:', rows.map(r => r.llm).join(', '))
     const { error } = await supabase.from('ai_results').insert(rows)
-    if (error) console.error('[Insert] FAILED:', error.message)
-    else console.log('[Insert] saved', rows.length, 'row(s)')
+    if (error) {
+      console.error('[Insert] FAILED:', error.message)
+      insertFailed = true
+    } else {
+      console.log('[Insert] saved', rows.length, 'row(s)')
+    }
   } else {
     console.warn('[Insert] nothing to save')
   }
@@ -158,6 +163,21 @@ exports.handler = async (event) => {
   const ctxGeo = market_label
     ? (region_label && !region_label.startsWith('All ') ? `${region_label}, ${market_label}` : market_label)
     : ctx.split('from ')[1]?.split('.')[0] ?? 'unknown'
+
+  // The engines ran and were billed, but nothing was saved, so the row the
+  // client is about to reload for will never appear. Until 2026-09-03 this
+  // still answered { done: true } and the single-cell refresh reported success
+  // for a result that did not exist. Same shape as collect-claude.js and
+  // collect-chatgpt.js (done: false, reason: 'insert_error'), minus their
+  // `detail`: the driver message stays in the function log, not in a body an
+  // authenticated viewer can read.
+  if (insertFailed) {
+    return {
+      statusCode: 200,
+      headers: auth.headers,
+      body: JSON.stringify({ done: false, prompt_id, reason: 'insert_error', summary, ctx_geo: ctxGeo }),
+    }
+  }
 
   return {
     statusCode: 200,
