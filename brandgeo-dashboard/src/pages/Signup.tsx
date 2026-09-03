@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, MailCheck, ArrowRight } from 'lucide-react'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { domainFromQuery, rememberSignupDomain } from '../lib/signupDomain'
+import { humanizeError, isCustomerFacingStatus, serverError } from '../lib/errors'
 
 // Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
 // bounce straight back to sign-in, so the wordmark links to the marketing site.
@@ -11,7 +12,7 @@ function BrandGeoLogo() {
   return <BrandGeoMark size="xl" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" />
 }
 
-const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
+const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
 const bc = 'w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
 
 export default function Signup() {
@@ -35,6 +36,11 @@ export default function Signup() {
   const signupDomain = domainFromQuery(searchParams.toString())
   useEffect(() => { rememberSignupDomain(signupDomain) }, [signupDomain])
 
+  useEffect(() => {
+    document.title = 'Start free · BrandGEO'
+    return () => { document.title = 'BrandGEO Dashboard' }
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (loading) return
@@ -49,11 +55,19 @@ export default function Signup() {
           company_website: companyWebsite,   // honeypot — expected to be ''
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Signup failed. Please try again.')
+      const data = await res.json().catch(() => null)
+      // A 4xx body with `error` is copy the API wrote for the customer
+      // (invalid address, disposable domain, daily limit); it must reach the
+      // screen as written. An auth or server fault is logged and shown as a
+      // fixed sentence, the same rule the shell applies to the billing portal.
+      if (!res.ok) {
+        if (data?.error && isCustomerFacingStatus(res.status)) throw serverError(String(data.error))
+        console.error('[Signup] signup-client failed:', res.status, data?.error ?? null)
+        throw new Error('Signup failed. Please try again.')
+      }
       setDone(true)
     } catch (err: any) {
-      setError(err.message)
+      setError(humanizeError(err, 'Signup failed. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -65,18 +79,15 @@ export default function Signup() {
       <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
           <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
-          <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
-            <div className="text-4xl mb-4">📧</div>
+          <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature">
+            <MailCheck className="mx-auto mb-3 text-emerald-400" size={36} />
             <h1 className="text-lg font-semibold text-white mb-2">Check your email</h1>
-            <p className="text-sm text-slate-400 mb-6">
+            <p className="text-sm text-slate-400 mb-2">
               We sent a link to{' '}
               <strong className="text-slate-300">{email}</strong>.<br />
               Click it to set your password, then we'll help you set up what to track.
             </p>
-            <Link to="/login" className={bc} style={{ textDecoration: 'none' }}>
-              Go to Login →
-            </Link>
-            <p className="text-xs text-slate-600 mt-4">
+            <p className="text-xs text-slate-600 mt-2">
               Didn't get it? Check spam, or{' '}
               <button
                 onClick={() => setDone(false)}
@@ -84,6 +95,10 @@ export default function Signup() {
               >
                 try again
               </button>.
+            </p>
+            <p className="text-xs text-slate-500 mt-4">
+              Already have a password?{' '}
+              <Link to="/login" className="text-brand-400 hover:text-brand-300 transition-colors">Log in</Link>
             </p>
           </div>
         </div>
@@ -96,7 +111,7 @@ export default function Signup() {
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
+        <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature">
           {/* Naming the domain is the whole point of carrying it: it tells a
               visitor arriving from the audit that this is the same journey and
               not a fresh form. Rendered as text by React, and validated as a
@@ -156,8 +171,9 @@ export default function Signup() {
             )}
 
             <button type="submit" disabled={loading} className={bc}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Sending link…' : 'Continue with email →'}
+              {loading
+                ? <><Loader2 size={16} className="animate-spin" /> Sending link…</>
+                : <>Continue with email <ArrowRight size={16} /></>}
             </button>
           </form>
         </div>
@@ -168,9 +184,9 @@ export default function Signup() {
         </p>
         <p className="text-center text-xs text-slate-600 mt-2">
           By signing up you agree to our{' '}
-          <a href="https://getbrandgeo.com/terms.html" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400">Terms</a>
+          <a href="https://getbrandgeo.com/terms.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Terms</a>
           {' '}and{' '}
-          <a href="https://getbrandgeo.com/privacy.html" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400">Privacy Policy</a>.
+          <a href="https://getbrandgeo.com/privacy.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Privacy Policy</a>.
         </p>
       </div>
     </div>

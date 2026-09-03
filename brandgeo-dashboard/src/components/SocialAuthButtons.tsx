@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Linkedin, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { humanizeError } from '../lib/errors'
 
 /**
  * SocialAuthButtons — "Continue with Google / LinkedIn" for both Signup and Login.
@@ -49,11 +50,11 @@ export default function SocialAuthButtons({ onError }: { onError?: (msg: string)
       // On success the browser is redirecting, so we normally never get here.
       if (error) {
         setBusy(null)
-        onError?.(error.message || 'Could not start sign-in. Please try again.')
+        onError?.(humanizeError(error, 'Could not start sign-in. Please try again.'))
       }
     } catch (e: any) {
       setBusy(null)
-      onError?.(e?.message || 'Could not start sign-in. Please try again.')
+      onError?.(humanizeError(e, 'Could not start sign-in. Please try again.'))
     }
   }
 
@@ -64,17 +65,12 @@ export default function SocialAuthButtons({ onError }: { onError?: (msg: string)
         Continue with Google
       </button>
 
-      {LINKEDIN_ENABLED ? (
+      {LINKEDIN_ENABLED && (
         <button type="button" className={btn} disabled={busy !== null} onClick={() => signInWith('linkedin_oidc')}>
           {busy === 'linkedin_oidc'
             ? <Loader2 size={16} className="animate-spin" />
             : <Linkedin size={16} className="text-[#0a66c2]" />}
           Continue with LinkedIn
-        </button>
-      ) : (
-        <button type="button" className={btn} disabled title="LinkedIn sign-in is coming soon">
-          <Linkedin size={16} className="text-slate-500" />
-          Continue with LinkedIn <span className="text-[10px] text-slate-500">soon</span>
         </button>
       )}
     </div>

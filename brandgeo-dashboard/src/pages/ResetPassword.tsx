@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
+import { humanizeError } from '../lib/errors'
 
 // Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
 // bounce straight back to sign-in, so the wordmark links to the marketing site.
@@ -34,23 +35,23 @@ export default function ResetPassword() {
     setLoading(true)
     const { error: err } = await supabase.auth.updateUser({ password })
     setLoading(false)
-    if (err) setError(err.message)
+    if (err) setError(humanizeError(err, 'Could not update your password. Please try again.'))
     else setDone(true)
   }
 
-  const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition disabled:opacity-50'
+  const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition disabled:opacity-50'
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
+        <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature">
           {done ? (
             <div className="text-center">
               <CheckCircle className="mx-auto mb-3 text-emerald-400" size={36} />
-              <h1 className="text-lg font-semibold text-white mb-2">Password updated</h1>
-              <p className="text-sm text-slate-400 mb-6">You can now sign in with your new password.</p>
-              <button onClick={() => navigate('/login')} className="w-full bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Go to sign in</button>
+              <h1 className="text-lg font-semibold text-white mb-2">Password saved</h1>
+              <p className="text-sm text-slate-400 mb-6">Next, tell us what to track.</p>
+              <button onClick={() => navigate('/', { replace: true })} className="w-full bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Continue</button>
             </div>
           ) : (
             <div>
@@ -74,7 +75,12 @@ export default function ResetPassword() {
             </div>
           )}
         </div>
-        <p className="text-center text-xs text-slate-600 mt-6">2026 BrandGEO - AI Visibility Intelligence</p>
+        <p className="text-center text-xs text-slate-600 mt-6">
+          © BrandGEO ·{' '}
+          <a href="https://getbrandgeo.com/terms.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Terms</a>
+          {' '}·{' '}
+          <a href="https://getbrandgeo.com/privacy.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Privacy Policy</a>
+        </p>
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
+import { humanizeError } from '../lib/errors'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
@@ -28,6 +29,15 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Tab title (F-title, dashboard-visual-system.md style): a visitor with
+  // several BrandGEO tabs open should be able to tell them apart. Restored
+  // on unmount so a page that mounts Login only briefly (e.g. a redirect
+  // bounce) does not leave a stale title behind on whatever renders next.
+  useEffect(() => {
+    document.title = 'Sign in · BrandGEO'
+    return () => { document.title = 'BrandGEO Dashboard' }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -35,7 +45,7 @@ export default function Login() {
     if (isDemoMode) { setTimeout(() => { navigate('/') }, 600); return }
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (err) setError(err.message)
+    if (err) setError(humanizeError(err, 'Could not sign in. Please try again.'))
     else navigate('/')
   }
 
@@ -47,18 +57,18 @@ export default function Login() {
       redirectTo: 'https://app.getbrandgeo.com/reset-password',
     })
     setLoading(false)
-    if (err) setError(err.message)
+    if (err) setError(humanizeError(err, 'Could not send the reset link. Please try again.'))
     else setMode('sent')
   }
 
-  const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
+  const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
   const bc = 'w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
 
   return (
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
+        <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature">
 
           {mode === 'sent' && (
             <div className="text-center">
@@ -88,7 +98,7 @@ export default function Login() {
           {mode === 'login' && (
             <div>
               <h1 className="text-lg font-semibold text-white mb-1">Sign in</h1>
-              <p className="text-sm text-slate-400 mb-6">Access your GEO dashboard</p>
+              <p className="text-sm text-slate-400 mb-6">Sign in to your BrandGEO dashboard</p>
               {isDemoMode && <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">Demo mode</div>}
               {!isDemoMode && (
                 <>
@@ -123,7 +133,12 @@ export default function Login() {
           Don't have an account?{' '}
           <Link to="/signup" className="text-brand-400 hover:text-brand-300 transition-colors">Sign up free</Link>
         </p>
-        <p className="text-center text-xs text-slate-600 mt-3">2026 BrandGEO - AI Visibility Intelligence</p>
+        <p className="text-center text-xs text-slate-600 mt-3">
+          © BrandGEO ·{' '}
+          <a href="https://getbrandgeo.com/terms.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Terms</a>
+          {' '}·{' '}
+          <a href="https://getbrandgeo.com/privacy.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-slate-500 hover:text-slate-400">Privacy Policy</a>
+        </p>
       </div>
     </div>
   )

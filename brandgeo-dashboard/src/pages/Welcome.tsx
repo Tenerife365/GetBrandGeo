@@ -3,6 +3,7 @@ import { Building2, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { readSignupDomain, clearSignupDomain } from '../lib/signupDomain'
+import { humanizeError, isCustomerFacingStatus, serverError } from '../lib/errors'
 
 // Authenticated shell (wrapped in PrivateRoute in App.tsx), so unlike Login/
 // Signup/ResetPassword the wordmark can safely link to "/" — no bounce risk.
@@ -10,7 +11,7 @@ function BrandGeoLogo() {
   return <BrandGeoMark size="xl" to="/" ariaLabel="BrandGEO: go to Overview" />
 }
 
-const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
+const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
 
 // Common personal-mailbox providers — an email at one of these should NOT be
 // treated as a company domain for the auto-prefill (SIGNUP-RESEARCH.md §2.2).
@@ -63,6 +64,11 @@ export default function Welcome() {
     })
   }, [])
 
+  useEffect(() => {
+    document.title = 'Set up tracking · BrandGEO'
+    return () => { document.title = 'BrandGEO Dashboard' }
+  }, [])
+
   async function submit() {
     if (loading || !accountType) return
     setError('')
@@ -91,8 +97,16 @@ export default function Welcome() {
           brand_website: brandWebsite.trim(),
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Setup failed. Please try again.')
+      const data = await res.json().catch(() => null)
+      // A 4xx body with `error` is copy the API wrote for the customer (which
+      // field is wrong); it must reach the screen as written, because this
+      // form sits behind the onboarding gate and nothing else tells them. An
+      // expired token or a server fault is logged and shown as a fixed sentence.
+      if (!res.ok) {
+        if (data?.error && isCustomerFacingStatus(res.status)) throw serverError(String(data.error))
+        console.error('[Welcome] provision-account failed:', res.status, data?.error ?? null)
+        throw new Error('Setup failed. Please try again.')
+      }
 
       // The carried domain has done its job. Cleared here rather than left to
       // expire, so it cannot prefill a different person's setup later on a
@@ -105,7 +119,7 @@ export default function Welcome() {
       // lands on the dashboard.
       window.location.assign('/')
     } catch (err: any) {
-      setError(err.message)
+      setError(humanizeError(err, 'Setup failed. Please try again.'))
       setLoading(false)
     }
   }
@@ -131,7 +145,7 @@ export default function Welcome() {
     <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8"><BrandGeoLogo /></div>
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8">
+        <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature">
           <h1 className="text-lg font-semibold text-white mb-1">What do you want to track in AI answers?</h1>
           <p className="text-sm text-slate-400 mb-5">This sets up what we monitor for you. You can change it later.</p>
 

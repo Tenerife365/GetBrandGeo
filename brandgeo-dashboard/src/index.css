@@ -151,6 +151,17 @@ html.light {
 .text-slate-500,
 .text-slate-600 { color: rgb(148 163 184) !important; }
 
+/* Placeholder contrast fix (both themes). Measured 2026-09-03: the 29 call
+   sites of .placeholder-slate-600 resolve to rgb(51 65 85), which is 1.93:1
+   on the dark input fill, badly under the 4.5:1 text floor (placeholder text
+   is text, not decoration, for WCAG purposes). One rule, !important so it
+   beats every per-input placeholder-slate-600 class without editing each
+   call site; the four auth screens' own placeholder-slate-600 usage is
+   removed directly since dropping the class here would leave a dead
+   utility name in the source. */
+input::placeholder,
+textarea::placeholder { color: rgb(148 163 184) !important; }
+
 /* Text color theme overrides (light mode) */
 html.light .text-white       { color: rgb(15 23 42) !important; }
 html.light .text-slate-100   { color: rgb(15 23 42) !important; }
@@ -245,9 +256,13 @@ html.light select {
   border-color: rgb(var(--dark-600));
 }
 
+/* !important is required here, not optional: the dark rule above carries
+   !important, and an important declaration beats a non-important one no
+   matter the specificity or source order. Without it this value never
+   applied and light-mode placeholders stayed at 2.4:1 on the input fill. */
 html.light input::placeholder,
 html.light textarea::placeholder {
-  color: rgb(148 163 184);
+  color: rgb(85 100 121) !important;
 }
 
 /* Brand-tinted sidebar (light mode) — a faint violet wash instead of plain
