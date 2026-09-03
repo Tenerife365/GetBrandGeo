@@ -136,11 +136,18 @@ the webhook has no such select; both files are clean and last changed
 red since the billing migration and nobody ran it. Billing file: owed to
 `bg-backend` on Opus with `bg-verify`, not a drive-by.
 
-**Recorded, not fixed:** the poll counts `done` or `failed` jobs alike, so a
-failed job reads as "checked" in the end-of-run line (needs a ruling); the
-four item-5 pages fire a duplicate load on mount when `lastCompletedAt` is
-already set; 226 pre-existing em or en dash lines sit in the base files'
-comments and older copy, none added by this batch, customer visibility
+**Ruled and built the same day (Constantin, 2026-09-03: "agreed"), COMMITTED,
+NOT PUSHED, same pending push:** `009a0a6` the end-of-run line now reads
+"N prompts checked, M failed", the failed part only when M is above zero, from
+ONE extra count read per completed run (not per tick, and skipped for a
+stopped run so Stop stays instant); `f2b8fee` the five pages that reload on
+`lastCompletedAt` (AI Visibility, Sentiment, Competitors, Mentions,
+Recommendations) go through a new `src/lib/useCollectionLanded.ts` hook that
+ignores the value seen at mount, closing the duplicate query set per visit.
+`npm run build` exit 0, added lines dash-free.
+
+**Recorded, not fixed:** 226 pre-existing em or en dash lines sit in the base
+files' comments and older copy, none added by this batch, customer visibility
 unscanned.
 
 ### 2026-08-21: top 5 trust/UX improvements SHIPPED, F6/F6b closed, packet 020/021 review returned FAIL
