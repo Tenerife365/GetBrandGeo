@@ -116,6 +116,13 @@ export const PLAN_ENGINES: Record<Plan, EngineId[]> = {
 // stays because Microsoft ships no public API for it at all.
 export const COMING_SOON_ENGINES = new Set<EngineId>(['meta', 'copilot', 'deepseek'])
 
+// Engines that WERE built and collected, then withdrawn. `meta` sits in
+// COMING_SOON_ENGINES only so a stale request never errors, but it must not
+// render as forthcoming ("Not yet built" is false for it) or as purchasable
+// ("Unlock on Growth" delivered nothing). The engine grid hides these; their
+// historical rows still render through ENGINE_META.
+export const RETIRED_ENGINES = new Set<EngineId>(['meta'])
+
 // ── All engines in display order ──────────────────────────────────────────────
 // Order is a design artefact, not just a list (dashboard-visual-system.md §8.2,
 // judgement call J5): the categorical adjacent-pair colour-vision check is
@@ -844,10 +851,19 @@ export function getEngineStates(
   const out = {} as Record<EngineId, EngineState>
 
   for (const engine of ALL_ENGINES) {
-    if (!planSet.has(engine)) {
-      out[engine] = 'locked'
-    } else if (COMING_SOON_ENGINES.has(engine)) {
+    // COMING_SOON_ENGINES checked FIRST, before plan membership. meta is in no
+    // plan's engine array at all, so under the old plan-set-first order it fell
+    // through to 'locked' on every plan, contradicting this file's own doc
+    // comment above COMING_SOON_ENGINES ("coming soon ... is the honest
+    // state"). A locked engine renders an "Unlock on X+" upgrade prompt, which
+    // is false for an engine no plan actually delivers. Checking coming-soon
+    // first makes meta/copilot/deepseek always read as coming soon, on every
+    // plan, matching the comment and never advertising a purchase that would
+    // not deliver the engine.
+    if (COMING_SOON_ENGINES.has(engine)) {
       out[engine] = 'coming_soon'       // not built yet — always coming soon
+    } else if (!planSet.has(engine)) {
+      out[engine] = 'locked'
     } else if (enginesEnabled?.[engine] === false) {
       out[engine] = 'coming_soon'       // admin disabled → show as coming soon
     } else {

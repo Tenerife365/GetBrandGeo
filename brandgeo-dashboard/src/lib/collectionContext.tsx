@@ -75,6 +75,11 @@ interface CollectionCtx {
   // closure -- every button that goes through runCollection shares this one
   // piece of state, so a blocked click is never silent.
   lastBlockReason:  CollectionBlockReason | null
+  // Written exactly once per run, in runCollection's finally block, from the
+  // poll's own final count. The shell renders its end-of-run notice from this
+  // and nothing else: inferring completion from `collecting` flipping false
+  // announced "complete" for a run the server refused and for a stopped one.
+  lastRunOutcome:   RunOutcome | null
   // Drops any block reason currently on screen without waiting for another
   // enqueue attempt. Needed for one case runCollection itself cannot cover:
   // switching the active client. A cooldown/budget reason belongs to the
@@ -93,6 +98,7 @@ const CollectionContext = createContext<CollectionCtx>({
   progress: null,
   lastCompletedAt: 0,
   lastBlockReason: null,
+  lastRunOutcome:  null,
   clearBlockReason: () => {},
   runCollection:   async () => ({ blocked: false }),
   runSinglePrompt: async () => ({ ok: true, calls: [] }),
@@ -101,15 +107,30 @@ const CollectionContext = createContext<CollectionCtx>({
 
 const POLL_INTERVAL_MS = 4000
 
+export type RunOutcome = {
+  outcome: 'completed' | 'stopped' | 'blocked'
+  done:    number   // jobs observed done or failed when the run ended
+  total:   number   // jobs enqueued; 0 for a blocked run
+  at:      number   // Date.now() at the write, so two identical runs still read as two
+  clientId: number  // the client the run was for, so a consumer can ignore another tenant's outcome
+}
+
 export function CollectionProvider({ children }: { children: React.ReactNode }) {
   const [collecting, setCollecting] = useState(false)
   const [progress, setProgress]     = useState<Progress | null>(null)
   const [lastCompletedAt, setLastCompletedAt] = useState(0)
   const [lastBlockReason, setLastBlockReason] = useState<CollectionBlockReason | null>(null)
+  const [lastRunOutcome, setLastRunOutcome] = useState<RunOutcome | null>(null)
   const abortRef = useRef(false)
+  // The pending poll promise's resolver, so Stop can end the wait directly.
+  const resolveRef = useRef<(() => void) | null>(null)
   // Track whether a collection is in flight (avoids stale closure on `collecting`)
   const runningRef = useRef(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Incremented per run. A tick whose count query was in flight when Stop
+  // landed can resolve after the next run has already reset the abort flag;
+  // the flag alone cannot tell that tick apart, the sequence number can.
+  const runSeqRef = useRef(0)
 
   // Stops the LOCAL poll / progress UI. It does NOT stop the server-side worker —
   // jobs already enqueued keep running (the whole point: the tab is just a
@@ -117,6 +138,12 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   const stopCollection = useCallback(() => {
     abortRef.current = true
     if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
+    // The abort flag is only read at the top of a tick. If Stop lands while
+    // the poll is idle between ticks (roughly three seconds in every four),
+    // clearing the timeout means no tick ever runs again, the awaited promise
+    // never settles, the finally never executes and `collecting` stays true
+    // for the rest of the session. Resolving it here ends the wait now.
+    if (resolveRef.current) { resolveRef.current(); resolveRef.current = null }
   }, [])
 
   const clearBlockReason = useCallback(() => {
@@ -134,7 +161,12 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     }
     runningRef.current = true
     abortRef.current   = false
+    const myRun = ++runSeqRef.current
     setCollecting(true)
+    // Decided from this function's own variables, never from React state, so
+    // the notice the shell shows cannot inherit a previous run's numbers.
+    let outcome: Omit<RunOutcome, 'at'> | null = null
+    let lastDone = 0
 
     try {
       // Client name (for the progress label)
@@ -176,6 +208,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         }
         setLastBlockReason(blockReason)
         setLastCompletedAt(Date.now())
+        outcome = { outcome: 'blocked', done: 0, total: 0, clientId }
         return { blocked: true, blockReason }
       }
 
@@ -190,26 +223,48 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       //    Reads go through RLS (own-client / admin SELECT). Each poll bumps
       //    lastCompletedAt so the dashboard reloads incrementally as rows land.
       await new Promise<void>((resolve) => {
+        resolveRef.current = resolve
+        // Bump lastCompletedAt only when the done count actually changes, not
+        // on every 4s tick. Consumers (AIVisibility.tsx and others) watch this
+        // as a reload trigger, so an unconditional bump replayed a full page
+        // reload roughly once per tick even when nothing new had landed. The
+        // finally block below still bumps it unconditionally once the run
+        // ends, so every consumer sees the final state regardless.
+        let prevDone = -1
         const tick = async () => {
-          if (abortRef.current) { resolve(); return }
+          if (abortRef.current || runSeqRef.current !== myRun) { resolve(); return }
           const { count } = await supabase
             .from('collection_jobs')
             .select('*', { count: 'exact', head: true })
             .eq('run_id', runId)
             .in('status', ['done', 'failed'])
+          // Stop may have landed while the count query was in flight, and the
+          // next run may even have started since; do not write progress or
+          // schedule another tick for a run that is over.
+          if (abortRef.current || runSeqRef.current !== myRun) { resolve(); return }
           const done = count ?? 0
+          lastDone = done
           setProgress({ done, total, clientId, clientName })
-          setLastCompletedAt(Date.now())
+          if (done !== prevDone) {
+            prevDone = done
+            setLastCompletedAt(Date.now())
+          }
           if (total > 0 && done >= total) { resolve(); return }
           pollRef.current = setTimeout(tick, POLL_INTERVAL_MS)
         }
         tick()
       })
 
+      outcome = abortRef.current
+        ? { outcome: 'stopped',   done: lastDone, total, clientId }
+        : { outcome: 'completed', done: lastDone, total, clientId }
+
       return { blocked: false }
     } finally {
       if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
+      resolveRef.current = null
       runningRef.current = false
+      setLastRunOutcome(outcome ? { ...outcome, at: Date.now() } : null)
       setCollecting(false)
       setProgress(null)
       setLastCompletedAt(Date.now())
@@ -341,7 +396,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   return (
-    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, lastBlockReason, clearBlockReason, runCollection, runSinglePrompt, stopCollection }}>
+    <CollectionContext.Provider value={{ collecting, progress, lastCompletedAt, lastBlockReason, lastRunOutcome, clearBlockReason, runCollection, runSinglePrompt, stopCollection }}>
       {children}
     </CollectionContext.Provider>
   )

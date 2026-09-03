@@ -14,7 +14,7 @@ import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection, type CollectionBlockReason } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import {
-  ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
+  ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, RETIRED_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
   getPlanLimits, QUEUE_ONLY_ENGINES,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
@@ -23,6 +23,7 @@ import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
+import Skeleton from '../components/Skeleton'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import { aggregateCompetitors } from '../lib/competitorFilter'
 import { promptCategoryLabel } from '../lib/promptCategories'
@@ -166,7 +167,10 @@ function EngineToggleModal({
 }) {
   const [saving, setSaving] = useState<EngineId | null>(null)
 
-  const planEngines = ALL_ENGINES.filter(e => engineStates[e] !== 'locked')
+  // A retired engine is coming-soon on every plan since coming-soon is decided
+  // before plan membership, so without this it would pass the filter and the
+  // admin modal would print "Coming Soon" for an engine that was withdrawn.
+  const planEngines = ALL_ENGINES.filter(e => engineStates[e] !== 'locked' && !RETIRED_ENGINES.has(e))
 
   const handleToggle = async (engine: EngineId, current: boolean) => {
     setSaving(engine)
@@ -349,14 +353,18 @@ export default function AIVisibility() {
     setEngineRefreshFailed(null)
     setCellRefreshFailed(null)
     await startCollection(activeClientId, false, selections, activeEngines)
-    load()
+    // Silent: this is a background completion of a run the user already saw
+    // progress for (via the lastCompletedAt effect below, also silent), not a
+    // fresh page open. A non-silent reload here would remount the whole page
+    // to the loading skeleton right after live data had already appeared.
+    load({ silent: true })
   }
 
   const forceCollection = async () => {
     setEngineRefreshFailed(null)
     setCellRefreshFailed(null)
     await startCollection(activeClientId, true, selections, activeEngines)
-    load()
+    load({ silent: true })
   }
 
   // Per-engine force refresh: re-run ALL prompts for ONE engine only (admin,
@@ -376,7 +384,7 @@ export default function AIVisibility() {
       if (result.blocked) setEngineRefreshFailed(engineId)
     } finally {
       setRefreshingEngine(null)
-      load()
+      load({ silent: true })
     }
   }
 
@@ -393,14 +401,22 @@ export default function AIVisibility() {
       // non-2xx status), so the reload below will not show a new result.
       // Say so rather than leaving the spinner's stop as the only signal.
       if (!result.ok) setCellRefreshFailed(cellKey)
-      await load()
+      await load({ silent: true })
     } finally {
       setRefreshingCell(null)
     }
   }
 
-  const load = async () => {
-    setLoading(true)
+  // `silent` distinguishes a background reload (data already on screen, from
+  // a collection in progress, a completed run, or a per-engine/per-cell refresh)
+  // from a first-mount or user-pressed-Reload load. A silent call never
+  // touches `loading` or `refreshed`, so the score card, engine grid and
+  // table stay mounted and simply update in place instead of the whole page
+  // flashing back to the loading skeleton. The "Refreshed!" flash next to the
+  // Reload button is reserved for that button's own non-silent call.
+  const load = async (opts: { silent?: boolean } = {}) => {
+    const silent = opts.silent === true
+    if (!silent) setLoading(true)
     if (isDemoMode) {
       const map: ResultMap = new Map()
       mockAIResults.forEach(r => {
@@ -410,7 +426,7 @@ export default function AIVisibility() {
       setPrompts(mockPrompts)
       setResults(map)
       setLastChecked(new Date().toISOString())
-      setLoading(false)
+      if (!silent) setLoading(false)
       return
     }
 
@@ -488,9 +504,11 @@ export default function AIVisibility() {
     setResults(map)
     setNoAnswerCells(noAnswer)
     if (latestChecked) setLastChecked(latestChecked)
-    setLoading(false)
-    setRefreshed(true)
-    setTimeout(() => setRefreshed(false), 2500)
+    if (!silent) {
+      setLoading(false)
+      setRefreshed(true)
+      setTimeout(() => setRefreshed(false), 2500)
+    }
   }
 
   useEffect(() => {
@@ -504,7 +522,12 @@ export default function AIVisibility() {
     // switch, so this page has to.
     clearBlockReason()
   }, [activeClientId, activeEngines.join(',')])
-  useEffect(() => { if (lastCompletedAt > 0) load() }, [lastCompletedAt])
+  // Silent: this fires roughly every 4s while a collection runs (see
+  // collectionContext.tsx) as well as once at the very end. Data is already
+  // on screen by the time this can fire, so it must never remount the page
+  // to the loading skeleton or flash "Refreshed!" -- it should just update
+  // the numbers in place as results land.
+  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt])
 
   // ── Collection allowance (PRICING-STRATEGY-2026-07 §12 T2a) ─────────────────
   // Mirrors, client-side, the exact checks enqueue-collection.js enforces
@@ -646,7 +669,9 @@ export default function AIVisibility() {
   })
 
   // Coming-soon and locked engines for the status grid
-  const comingSoonEngines = ALL_ENGINES.filter(e => engineStates[e] === 'coming_soon')
+  // A retired engine reads as coming_soon from getEngineStates (so nothing
+  // treats it as active) but is not forthcoming, so it renders nowhere here.
+  const comingSoonEngines = ALL_ENGINES.filter(e => engineStates[e] === 'coming_soon' && !RETIRED_ENGINES.has(e))
   const lockedEngines     = ALL_ENGINES.filter(e => engineStates[e] === 'locked')
 
   // ── Fix This hub ──────────────────────────────────────────────────────────
@@ -708,7 +733,65 @@ export default function AIVisibility() {
     return items
   })()
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.aiv_loading}</div>
+  // Content-shaped skeleton (DASHBOARD-UX-2026.md §6 Phase C, same pattern as
+  // Dashboard.tsx's Overview skeleton) -- mirrors this page's real layout
+  // (header / score card / engine grid / table header) so first mount doesn't
+  // jump from a bare text line to the full page (CLS), and only ever renders
+  // on a true first mount or a client switch (see the `silent` load() param
+  // above), never during an in-progress or completed collection run.
+  if (loading) return (
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-6 flex items-start justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <Skeleton className="h-9 w-32 rounded-lg" />
+      </div>
+
+      <div className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
+        <div className="flex flex-col items-center gap-3">
+          <Skeleton className="w-40 h-40 rounded-full" />
+          <Skeleton className="h-4 w-28" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-2 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-card-compact flex items-center gap-3">
+            <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-[2.75rem_1fr_repeat(3,8rem)] gap-2 border-b border-dark-700 bg-dark-700/50 px-4 py-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-3 w-full" />
+          ))}
+        </div>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="grid grid-cols-[2.75rem_1fr_repeat(3,8rem)] gap-2 border-b border-dark-700/50 px-4 py-3">
+            {Array.from({ length: 5 }).map((_, j) => (
+              <Skeleton key={j} className="h-4 w-full" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   const circumference   = 2 * Math.PI * 54
   const dashOffset      = circumference - (aiScore / 100) * circumference
@@ -834,7 +917,7 @@ export default function AIVisibility() {
           )}
           {/* Secondary/neutral outlined — same base as Engines + Force Refresh. */}
           <button
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -912,7 +995,21 @@ export default function AIVisibility() {
       {!isDemoMode && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {!isAdmin && collectionAllowance.nextAvailableAt && (
-            <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
+            <div className="flex items-center gap-2">
+              <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
+              {/* Only true for a plan whose cadence is slower than weekly (today,
+                  only free at 720h) -- every paid plan is already weekly
+                  (PLAN_COLLECTION_COOLDOWN_HOURS in planConfig.ts), so this link
+                  never promises an upgrade that would not actually change anything. */}
+              {planLimits.collectionCooldownH > 168 && (
+                <Link
+                  to="/account"
+                  className="text-[11px] font-medium text-brand-400 hover:text-brand-300 underline underline-offset-2"
+                >
+                  Upgrade for weekly runs
+                </Link>
+              )}
+            </div>
           )}
 
           {!isAdmin && (
@@ -1193,7 +1290,18 @@ export default function AIVisibility() {
                 </div>
 
                 {e.isUnavailable ? (
-                  <div className="text-[10px] text-amber-400/80 mt-1">Temporarily unavailable · {isAdmin ? 'Force Refresh' : 'Run Collection'} to retry</div>
+                  <div className="text-[10px] text-amber-400/80 mt-1">
+                    Temporarily unavailable ·{' '}
+                    {isAdmin
+                      ? 'Force Refresh to retry'
+                      : collectionAllowance.nextAvailableAt
+                        // A non-admin in cooldown can't press Run Collection to
+                        // retry -- the button is disabled until this date, so
+                        // saying "to retry" next to a disabled control would be
+                        // telling them to do something they cannot do.
+                        ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
+                        : 'Run Collection to retry'}
+                  </div>
                 ) : e.status === 'NOT_MEASURED' ? (
                   <div className="text-[10px] italic text-slate-300 mt-1">Not measured yet · run a collection to check this engine</div>
                 ) : (
@@ -1293,15 +1401,17 @@ export default function AIVisibility() {
             const meta      = ENGINE_META[id]
             const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
             return (
-              <div
+              <Link
                 key={id}
-                className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40"
+                to="/account"
+                aria-label={`${meta.label}: unlock on ${planLabel}`}
                 title={`${meta.label} is available on the ${planLabel} plan and above`}
+                className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40 hover:border-dark-600 hover:bg-dark-800/60 transition-colors"
               >
-                <img src={meta.logoUrl} alt={meta.label} className="w-4 h-4 object-contain grayscale opacity-70" />
+                <img src={meta.logoUrl} alt="" className="w-4 h-4 object-contain grayscale opacity-70" />
                 <span className="text-xs font-medium text-slate-500">{meta.label}</span>
-                <span className="text-[10px] text-slate-600">{planLabel}+</span>
-              </div>
+                <span className="text-[10px] text-slate-600">Unlock on {planLabel}</span>
+              </Link>
             )
           })}
         </div>
