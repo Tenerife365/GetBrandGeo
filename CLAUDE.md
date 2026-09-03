@@ -214,10 +214,13 @@ send wave 1 (touch 2) on 2026-09-04 and wave 2 (touch 3 closes) on 2026-09-11,
 logging each touch on the Prospects page so `next_action_at` advances. Step 2
 is prepared in `docs/growth/outbound/batch-02-prep-2026-09-03.md` (also
 ignored): the pipeline is 17 named prospects, not 39; the other 22 rows are the
-July calibration domains with `company = null`, and a one-statement,
-reversible split to `disqualified` is written there and NOT RUN; all 17 named
-prospects have zero routes, so the resolver click list is all 17, zero-score
-rows first. Step 3 (the Gmail reply poller) is a fix packet before it is a
+July calibration domains with `company = null`, and the one-statement, reversible split to `disqualified`
+was RUN on Constantin's go later the same day (22 rows, ids 50 to 71, returned
+by the statement; stage counts after: contacted 13, disqualified 41, new 17);
+all 17 named prospects have zero routes, so the resolver click list is all 17,
+zero-score rows first. Step 3 part A (the code fixes) was dispatched the same
+moment as workflow `wf_4e0c722b-ce4`: bg-backend on Opus at high effort, then
+bg-verify; no credentials, no deploy, no git inside the agents. Step 3 (the Gmail reply poller) is a fix packet before it is a
 deploy: the 2026-08-20 review of packets 020/021 returned FAIL and the code
 still shows F1 (sender matching takes the first angle-bracketed token), F2
 (the backfill guard ignores an earlier reply) and F5/F7 (the resolver follows
