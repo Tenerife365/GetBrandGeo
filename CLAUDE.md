@@ -114,10 +114,30 @@ invocations. Deploy `713479f` was created 10:49:51Z and published 10:50:29Z,
 unique to the batch in the live bundle `index-CMgok0LE.js`, never by hash.
 `origin/main` is `713479f`.
 
-**Recorded, not fixed:** `signup-client.js:112` carries an em dash inside the
-customer-facing rate-limit sentence, printed verbatim on a 429 (backend, one
-word, owed to `bg-backend`); the poll counts `done` or `failed` jobs alike, so
-a failed job reads as "checked" in the end-of-run line (needs a ruling); the
+**Follow-ups closed the same day, COMMITTED, NOT PUSHED (second build of the
+day, inside the two-a-day cap):** `655a7af` removes the em dash from the
+customer-facing 429 sentence in `signup-client.js`; `14e4105` closes the
+August chip where `collect-prompt.js` logged `[Insert] FAILED` and still
+answered `{ done: true }`, so the single-cell refresh reported success for a
+row that was never saved (now `{ done: false, reason: 'insert_error' }`, the
+sibling collectors' shape minus `detail`, and the client's prompt branch reads
+the reason); `7d07f5f` closes the other August chip: `Prospects.tsx` now reads
+`results[0].errors`, so a crawl cut short by its time budget says so instead
+of "found nothing published", counts unreadable pages, and routes a crash to
+the error banner. `npm run build` exit 0, added lines dash-free, 16 of 17
+node tests pass. Scale note for the push: neutral, no new reads, writes or
+invocations; one branch on an existing insert result plus client copy.
+
+**Found while running the suite, pre-existing and NOT touched:**
+`tests/package_provisioning.test.js` fails at HEAD. It asserts that
+`stripe-webhook.js` contains `.select('plan_grant_until, plan_source')` and
+the webhook has no such select; both files are clean and last changed
+2026-07-31 (test) and 2026-08-02 (`13bb92d`, webhook), so the suite has been
+red since the billing migration and nobody ran it. Billing file: owed to
+`bg-backend` on Opus with `bg-verify`, not a drive-by.
+
+**Recorded, not fixed:** the poll counts `done` or `failed` jobs alike, so a
+failed job reads as "checked" in the end-of-run line (needs a ruling); the
 four item-5 pages fire a duplicate load on mount when `lastCompletedAt` is
 already set; 226 pre-existing em or en dash lines sit in the base files'
 comments and older copy, none added by this batch, customer visibility
