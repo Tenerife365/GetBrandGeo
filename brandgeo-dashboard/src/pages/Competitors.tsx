@@ -16,6 +16,7 @@ import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
@@ -306,7 +307,7 @@ export default function Competitors() {
   // Reload quietly every time a collection run completes -- lastCompletedAt
   // bumps incrementally as jobs land (collectionContext.tsx), so this must
   // never assume a single final bump.
-  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   const addCompetitor = async () => {
     if (!newName.trim()) return

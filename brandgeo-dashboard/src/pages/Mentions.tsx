@@ -3,6 +3,7 @@ import { Bot, TrendingUp, Award, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
 import { PageTitle, SectionHeading } from '../components/Typography'
@@ -143,7 +144,7 @@ export default function Mentions() {
   // Reload quietly every time a collection run completes -- lastCompletedAt
   // bumps incrementally as jobs land (collectionContext.tsx), so this must
   // never assume a single final bump.
-  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   const filtered = mentions.filter(m => {
     if (filterLLM !== 'all' && m.llm !== filterLLM) return false

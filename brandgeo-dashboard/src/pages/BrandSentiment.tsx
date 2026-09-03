@@ -19,6 +19,7 @@ import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
@@ -243,7 +244,7 @@ export default function BrandSentiment() {
   // Reload quietly every time a collection run completes, not just once at
   // the very end -- lastCompletedAt bumps incrementally as jobs land (see
   // collectionContext.tsx), so this must never assume a single final bump.
-  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading sentiment data…</div>
 

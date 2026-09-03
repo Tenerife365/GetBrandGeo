@@ -27,6 +27,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
@@ -851,7 +852,7 @@ export default function Recommendations() {
   // Reload quietly every time a collection run completes -- lastCompletedAt
   // bumps incrementally as jobs land (collectionContext.tsx), so this must
   // never assume a single final bump.
-  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0

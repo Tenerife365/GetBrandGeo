@@ -12,6 +12,7 @@ import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection, type CollectionBlockReason } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, RETIRED_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
@@ -527,7 +528,7 @@ export default function AIVisibility() {
   // on screen by the time this can fire, so it must never remount the page
   // to the loading skeleton or flash "Refreshed!" -- it should just update
   // the numbers in place as results land.
-  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt])
+  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   // ── Collection allowance (PRICING-STRATEGY-2026-07 §12 T2a) ─────────────────
   // Mirrors, client-side, the exact checks enqueue-collection.js enforces
