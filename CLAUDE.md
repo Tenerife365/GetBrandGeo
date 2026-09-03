@@ -114,8 +114,9 @@ invocations. Deploy `713479f` was created 10:49:51Z and published 10:50:29Z,
 unique to the batch in the live bundle `index-CMgok0LE.js`, never by hash.
 `origin/main` is `713479f`.
 
-**Follow-ups closed the same day, COMMITTED, NOT PUSHED (second build of the
-day, inside the two-a-day cap):** `655a7af` removes the em dash from the
+**Follow-ups closed the same day, PUSHED and LIVE (second build of the day,
+deploy `8284c29` published 11:04:20Z, live bundle `index-BRQfUaOT.js`
+carries the new Prospects copy):** `655a7af` removes the em dash from the
 customer-facing 429 sentence in `signup-client.js`; `14e4105` closes the
 August chip where `collect-prompt.js` logged `[Insert] FAILED` and still
 answered `{ done: true }`, so the single-cell refresh reported success for a
@@ -137,7 +138,8 @@ red since the billing migration and nobody ran it. Billing file: owed to
 `bg-backend` on Opus with `bg-verify`, not a drive-by.
 
 **Ruled and built the same day (Constantin, 2026-09-03: "agreed"), COMMITTED,
-NOT PUSHED, same pending push:** `009a0a6` the end-of-run line now reads
+NOT PUSHED (a push now would be the third build of the day; hold it for
+tomorrow or the next batch):** `009a0a6` the end-of-run line now reads
 "N prompts checked, M failed", the failed part only when M is above zero, from
 ONE extra count read per completed run (not per tick, and skipped for a
 stopped run so Stop stays instant); `f2b8fee` the five pages that reload on
