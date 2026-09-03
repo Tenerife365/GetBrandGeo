@@ -1107,14 +1107,40 @@ export default function Prospects() {
         done()
         return
       }
-      const found = data.results[0]?.candidates?.length ?? 0
-      const pages = data.results[0]?.pages_fetched ?? 0
+      const result = data.results[0]
+      const found = result?.candidates?.length ?? 0
+      const pages = result?.pages_fetched ?? 0
+      const pageWord = pages === 1 ? 'page' : 'pages'
+      // The resolver reports what it could not do in `errors`: pages it could
+      // not read, a Play search it skipped, and above all a crawl cut short by
+      // its time budget. Until 2026-09-03 the banner never read them, so a
+      // truncated crawl printed "found nothing published", the one conclusion
+      // a truncated crawl cannot support.
+      const errors = result?.errors ?? []
+      if (errors.length > 0) console.warn('[Prospects] resolver reported:', errors)
+      const fatal = errors.find(e => e.startsWith('resolver crashed') || e === 'unparseable domain')
+      if (fatal) {
+        setErrorMsg(`The resolver could not run for this prospect (${fatal}). Nothing was written.`)
+        done()
+        return
+      }
+      const cutShort = errors.some(e => e.includes('time budget'))
+      const unread = errors.filter(e => !e.includes('time budget')).length
       // Most companies publish no individual address at all, so an empty
       // result is the honest answer and not a reason to start guessing. Say
-      // so in the neutral banner rather than the error one.
-      setNoticeMsg(found === 0
-        ? `Read ${pages} ${pages === 1 ? 'page' : 'pages'} and found nothing published. No address was guessed.`
-        : `Found ${found} contact ${found === 1 ? 'route' : 'routes'} across ${pages} ${pages === 1 ? 'page' : 'pages'}. Pick one below.`)
+      // so in the neutral banner rather than the error one, unless the crawl
+      // was cut short, in which case say that instead of "nothing published".
+      let msg: string
+      if (found === 0) {
+        msg = cutShort
+          ? `Read ${pages} ${pageWord} before the time budget ran out and found nothing yet. That is not a "publishes nothing" result. Run it again to finish.`
+          : `Read ${pages} ${pageWord} and found nothing published. No address was guessed.`
+      } else {
+        msg = `Found ${found} contact ${found === 1 ? 'route' : 'routes'} across ${pages} ${pageWord}. Pick one below.`
+        if (cutShort) msg += ' The crawl was cut short by its time budget, so there may be more. Run it again to finish.'
+      }
+      if (unread > 0) msg += ` ${unread} ${unread === 1 ? 'page' : 'pages'} could not be read (listed in the browser console).`
+      setNoticeMsg(msg)
       refresh().finally(done)
     })
   }
