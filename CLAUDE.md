@@ -27,7 +27,9 @@
 The study protocol (method only, no results) was published as Zenodo record
 10.5281/zenodo.22279050, CC BY 4.0, creator "Constantin, Daniel" / BrandGEO
 Global, the same creator string as 10.5281/zenodo.21395598 so both aggregate
-to one profile. Deposit script and token convention live in the GetBrandGEO
+to one profile. Constantin registered ORCID 0009-0008-4924-1987 the same day;
+both records carry it via a metadata edit (same DOIs, no new version), and
+bg-017, bg-105 and the homepage chip link to it. Deposit script and token convention live in the GetBrandGEO
 Drive folder under `6-Demos/zenodo-brand-fact-error-rate-protocol/`; the token
 is in `~/.zenodo/token` on this machine, never in a repo. Results go up as a
 separate linked record, never as a new version of the protocol.
