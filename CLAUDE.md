@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-09-03)
 
-### 2026-09-03: sprint 17 closed at 1 free subscriber, the next five trust items are built, reviewed and COMMITTED, push owed
+### 2026-09-03: sprint 17 closed at 1 free subscriber, the next five trust items are built, reviewed, PUSHED and LIVE
 
 **Sprint 17 result, stated by Constantin 2026-09-03: one new free subscriber.**
 Against G1 (EUR 2,900 MRR-equivalent), G2 (100 activated free accounts) and
@@ -99,18 +99,20 @@ renders only for plans slower than weekly (today, free at 720h). Every paid
 plan is already weekly, so the link would promise nothing there. Latent gap
 for a hypothetical 169 to 719h tier, documented in the review record.
 
-**COMMITTED, NOT PUSHED.** One commit per item, rank order, pathspec-limited so
+**PUSHED 2026-09-03 10:49Z, LIVE 10:50:29Z.** One commit per item, rank order, pathspec-limited so
 the other sessions' dirty files (`Revenue.tsx`, `netlify/functions`, `db/`,
 `brandgeo/web/site.js`) stayed out: `69460b0` Overview, `8f4799e` AuditReport,
 `c047191` AI Visibility plus `collectionContext.tsx` and `planConfig.ts`
 (`RETIRED_ENGINES`, `lastRunOutcome`, the Stop hang and its orphan tick),
 `ac1ec1c` auth screens plus new `src/lib/errors.ts`, `4c6db93` insight pages
-and `Layout.tsx`. Push needs `BATCH_PUSH=1` (AUTONOMY section 7) and spends
-one Netlify build. Scale note: Supabase reads neutral to reduced (item 3 bumps
+and `Layout.tsx`, then `713479f` docs. Pushed with `BATCH_PUSH=1` (AUTONOMY
+section 7), one Netlify build. Scale note: Supabase reads neutral to reduced (item 3 bumps
 `lastCompletedAt` only when the done count changes, so the per-tick page reload
 is gone, and item 2 stops polling dead tokens); no new writes; no new function
-invocations. After pushing, confirm within the hour that a deploy was CREATED
-(`netlify api listSiteDeploys`), given the ten-day silent gap above.
+invocations. Deploy `713479f` was created 10:49:51Z and published 10:50:29Z,
+38 seconds after the push, confirmed by the deploy record and by five strings
+unique to the batch in the live bundle `index-CMgok0LE.js`, never by hash.
+`origin/main` is `713479f`.
 
 **Recorded, not fixed:** `signup-client.js:112` carries an em dash inside the
 customer-facing rate-limit sentence, printed verbatim on a 429 (backend, one
