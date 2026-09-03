@@ -18,6 +18,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
+import { useCollection } from '../lib/collectionContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
@@ -165,6 +166,7 @@ type EngineFilter = LLMName | 'all'
 export default function BrandSentiment() {
   const { primaryMarket } = useMarket()
   const { activeClientId, activeClient, activeEngines } = useClient()
+  const { lastCompletedAt } = useCollection()
   const { getStartDate, timeRange } = useTimeFilter()
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
@@ -176,8 +178,12 @@ export default function BrandSentiment() {
   const [filterEngine, setFilterEngine] = useState<EngineFilter>('all')
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (opts: { silent?: boolean } = {}) => {
+    // Silent: a background reload triggered by lastCompletedAt, not a fresh
+    // page open. Data is already on screen, so this must never bounce the
+    // page back to the loading skeleton mid-view (same reasoning as
+    // AIVisibility.tsx's load({ silent: true })).
+    if (!opts.silent) setLoading(true)
 
     if (isDemoMode) {
       const demo: SentimentEvent[] = mockAIResults
@@ -234,6 +240,11 @@ export default function BrandSentiment() {
 
   useEffect(() => { load() }, [activeClientId, activeEngines.join(','), timeRange]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reload quietly every time a collection run completes, not just once at
+  // the very end -- lastCompletedAt bumps incrementally as jobs land (see
+  // collectionContext.tsx), so this must never assume a single final bump.
+  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading sentiment data…</div>
 
   const { total, counts, byEngine, score } = computeStats(events)
@@ -266,8 +277,10 @@ export default function BrandSentiment() {
             longer than one word. "mention{s}" agrees with the count — the old
             copy said "1 response that mention", which was already wrong. */}
         <p className="text-sm text-slate-400 mt-0.5">
-          How AI engines talk about {brandName}, measured across {total} response{total !== 1 ? 's' : ''} that
-          {' '}mention{total === 1 ? 's' : ''} it
+          {total === 0
+            ? 'No responses measured yet.'
+            : <>How AI engines talk about {brandName}, measured across {total} response{total !== 1 ? 's' : ''} that
+              {' '}mention{total === 1 ? 's' : ''} it</>}
         </p>
       </div>
 
@@ -301,27 +314,30 @@ export default function BrandSentiment() {
         </MotionCard>
         <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Smile size={12} className="text-sentiment-positive" />
+            <Smile size={12} className={total === 0 ? 'text-slate-500' : 'text-sentiment-positive'} />
             <span className="text-xs text-slate-500">Positive</span>
           </div>
-          <div className="text-2xl font-bold text-sentiment-positive tabular-nums">{counts.positive}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>
+          <div className={`text-2xl font-bold tabular-nums ${total === 0 ? 'text-slate-500' : 'text-sentiment-positive'}`}>{counts.positive}</div>
+          {/* No "% of mentions" caption at total 0 -- a percentage of zero
+              measurements is not a measurement (same reasoning as the score
+              card's null branch just above). */}
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>}
         </MotionCard>
         <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Meh size={12} className="text-sentiment-neutral" />
+            <Meh size={12} className={total === 0 ? 'text-slate-500' : 'text-sentiment-neutral'} />
             <span className="text-xs text-slate-500">Neutral</span>
           </div>
-          <div className="text-2xl font-bold text-slate-300 tabular-nums">{counts.neutral}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>
+          <div className={`text-2xl font-bold tabular-nums ${total === 0 ? 'text-slate-500' : 'text-slate-300'}`}>{counts.neutral}</div>
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>}
         </MotionCard>
         <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <Frown size={12} className="text-sentiment-negative" />
+            <Frown size={12} className={total === 0 ? 'text-slate-500' : 'text-sentiment-negative'} />
             <span className="text-xs text-slate-500">Negative</span>
           </div>
-          <div className="text-2xl font-bold text-sentiment-negative tabular-nums">{counts.negative}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{pct(counts.negative)}% of mentions</div>
+          <div className={`text-2xl font-bold tabular-nums ${total === 0 ? 'text-slate-500' : 'text-sentiment-negative'}`}>{counts.negative}</div>
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.negative)}% of mentions</div>}
         </MotionCard>
       </motion.div>
 

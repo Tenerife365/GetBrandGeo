@@ -15,6 +15,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockCompetitors } from '../lib/mockData'
 import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
+import { useCollection } from '../lib/collectionContext'
 import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
@@ -244,6 +245,7 @@ function buildEngineGroupData(
 export default function Competitors() {
   const { primaryMarket } = useMarket()
   const { activeClientId, activeClient, activeEngines } = useClient()
+  const { lastCompletedAt } = useCollection()
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
 
@@ -261,8 +263,11 @@ export default function Competitors() {
   // discarded.
   const [competitorError, setCompetitorError] = useState<string | null>(null)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (opts: { silent?: boolean } = {}) => {
+    // Silent: a background reload triggered by lastCompletedAt, not a fresh
+    // page open. Data is already on screen, so this must never bounce the
+    // page back to the loading state mid-view.
+    if (!opts.silent) setLoading(true)
 
     if (isDemoMode) {
       setData({
@@ -296,7 +301,12 @@ export default function Competitors() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
+  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload quietly every time a collection run completes -- lastCompletedAt
+  // bumps incrementally as jobs land (collectionContext.tsx), so this must
+  // never assume a single final bump.
+  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addCompetitor = async () => {
     if (!newName.trim()) return
@@ -379,7 +389,9 @@ export default function Competitors() {
             )}
           </div>
           <p className="text-sm text-slate-400 mt-0.5">
-            Top competitors mentioned across {totalResponses} AI responses for {brandName}
+            {totalResponses === 0
+              ? 'No responses measured yet.'
+              : `Top competitors mentioned across ${totalResponses} AI responses for ${brandName}`}
           </p>
         </div>
         <button onClick={() => setShowAdd(v => !v)}
@@ -403,7 +415,7 @@ export default function Competitors() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-dark-800 rounded-xl p-4">
           <div className="text-xs text-slate-500 mb-1">AI mentions of {brandName}</div>
-          <div className="text-2xl font-bold text-brand-300 tabular-nums">{brandMentions}</div>
+          <div className={`text-2xl font-bold tabular-nums ${totalResponses === 0 ? 'text-slate-500' : 'text-brand-300'}`}>{brandMentions}</div>
           <div className="text-xs text-slate-500 mt-0.5">
             {brandAvgPos ? `Avg position #${brandAvgPos}` : 'No position data'}
           </div>
@@ -535,8 +547,8 @@ export default function Competitors() {
             <span className="text-sm font-semibold text-brand-300">{brandName}</span>
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400">you</span>
           </div>
-          <div className="px-3 py-3 text-center font-bold text-emerald-400 tabular-nums">{brandMentions}</div>
-          <div className="px-3 py-3 text-center tabular-nums text-emerald-400 font-semibold">
+          <div className={`px-3 py-3 text-center font-bold tabular-nums ${totalResponses === 0 ? 'text-slate-500' : 'text-emerald-400'}`}>{brandMentions}</div>
+          <div className={`px-3 py-3 text-center tabular-nums font-semibold ${totalResponses === 0 ? 'text-slate-500' : 'text-emerald-400'}`}>
             {brandAvgPos ? `#${brandAvgPos}` : <NoData>Not ranked</NoData>}
           </div>
           <div className="px-3 py-3 flex items-center justify-center gap-1 flex-wrap">

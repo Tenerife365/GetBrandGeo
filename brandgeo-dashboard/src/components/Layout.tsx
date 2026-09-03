@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
@@ -95,7 +95,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
-  const { collecting, progress, stopCollection } = useCollection()
+  const { collecting, progress, stopCollection, lastRunOutcome } = useCollection()
   const { timeRange, setTimeRange } = useTimeFilter()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [showAddMarket, setShowAddMarket] = useState(false)
@@ -105,6 +105,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
   const [catSaving, setCatSaving]       = useState(false)
   const [showInternal, setShowInternal] = useState(false)   // separate "Internal / Research" control
+  // Inline sidebar notice, replacing alert() (billing portal / category update
+  // failures) -- a blocking native dialog stops the whole app dead for an
+  // error a customer can just read and dismiss.
+  const [sidebarNotice, setSidebarNotice] = useState<string | null>(null)
+  // End-of-run line below the progress bar: what the last run did, derived
+  // from collectionContext's lastRunOutcome further down. The only state is
+  // which outcome the user dismissed, keyed by its timestamp.
+  const [dismissedRunAt, setDismissedRunAt] = useState<number | null>(null)
 
   // Refs for the three dropdown menus below — used only to detect outside clicks
   // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
@@ -200,6 +208,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [showClients, showAddMarket, showLangs, showInternal, sidebarOpen])
+
+  // End-of-run notice. collectionContext writes lastRunOutcome exactly once
+  // per run, in its finally block, from the poll's own final count. That is
+  // the only honest source: inferring completion from `collecting` flipping
+  // false announced "complete" for a run the server refused (nothing was
+  // enqueued, so the previous run's total leaked through) and for a run the
+  // user stopped. Derived rather than stored, so it cannot outlive what it
+  // describes: a blocked run shows nothing; a run for another client shows
+  // nothing, because the count belongs to the tenant it ran for and the line
+  // names no client (the same leak lastBlockReason once had); a dismissed
+  // outcome stays dismissed until a new run ends; a run in progress hides it.
+  const runNotice = useMemo(() => {
+    if (!lastRunOutcome || lastRunOutcome.at === dismissedRunAt) return null
+    if (lastRunOutcome.clientId !== activeClientId) return null
+    if (lastRunOutcome.done <= 0) return null
+    if (lastRunOutcome.outcome === 'completed') {
+      return { kind: 'completed' as const, done: lastRunOutcome.done, total: lastRunOutcome.total }
+    }
+    if (lastRunOutcome.outcome === 'stopped') {
+      return { kind: 'stopped' as const, done: lastRunOutcome.done, total: lastRunOutcome.total }
+    }
+    return null
+  }, [lastRunOutcome, dismissedRunAt, activeClientId])
+  const dismissRunNotice = () => setDismissedRunAt(lastRunOutcome?.at ?? null)
 
   // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
   // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
@@ -317,9 +349,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         window.location.href = data.url   // hand off to Stripe's hosted portal
         return
       }
-      alert(data?.error || 'Could not open the billing portal. Please try again.')
-    } catch {
-      alert('Could not open the billing portal. Please try again.')
+      // Server message is logged for diagnosis, not shown -- it can name
+      // internal state. Same rule as the client-group handler below.
+      console.error('[Layout] billing portal failed:', data?.error ?? res.status)
+      setSidebarNotice('Could not open the billing portal. Try again, and if it keeps failing contact support.')
+    } catch (err) {
+      console.error('[Layout] billing portal failed:', err)
+      setSidebarNotice('Could not open the billing portal. Try again, and if it keeps failing contact support.')
     }
     setBillingLoading(false)
   }
@@ -334,9 +370,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false)
     focusAfterCommit(hamburgerRef.current)
   }
-  // The profile page has no historical data, so hide the global time-filter bar there.
   const { pathname } = useLocation()
-  const hideTimeFilter = pathname === '/account'
+  // Allowlist, not a blocklist. Of Layout's 14 routes, only these three pages
+  // actually read useTimeFilter today: Dashboard.tsx ('/'), BrandSentiment.tsx
+  // ('/sentiment'), and Revenue.tsx ('/usage', which the App.tsx route still
+  // calls Usage; App.tsx:118). Every other route showed a pill row that
+  // changed nothing on screen when pressed -- a control with no effect reads
+  // worse than no control. A page that gains real time-filtered data later
+  // adds itself here deliberately, rather than silently inheriting a
+  // live-looking bar it has never wired up.
+  const TIME_FILTER_ROUTES = ['/', '/sentiment', '/usage']
+  const hideTimeFilter = !TIME_FILTER_ROUTES.includes(pathname)
 
   // Scroll resets to the top on every route change. <main> is the scroll
   // container (not the window), so this resets that element, and react-router's
@@ -492,6 +536,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
+        {/* End-of-run notice -- same progress slot, shown once the run above
+            ends. Brand chrome like the in-progress banner (the sentiment tokens
+            are reserved for sentiment data, dashboard-visual-system.md 8.6).
+            A stopped run says stopped, with what was actually checked.
+            Dismissible, and cleared the moment another run starts. */}
+        {!collecting && runNotice && (
+          <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0 flex items-center justify-between gap-2">
+            <NavLink
+              to="/ai-visibility"
+              onClick={() => { dismissRunNotice(); closeSidebar() }}
+              className="text-xs text-brand-300 font-medium hover:underline"
+            >
+              {runNotice.kind === 'completed'
+                ? `Collection complete: ${runNotice.done} prompt${runNotice.done === 1 ? '' : 's'} checked`
+                : `Collection stopped: ${runNotice.done} of ${runNotice.total} prompts checked`}
+            </NavLink>
+            <button
+              onClick={dismissRunNotice}
+              aria-label="Dismiss"
+              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-slate-500 hover:text-brand-300 transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Inline notice, replacing alert() for billing-portal and
+            client-group-update failures (dismissible, does not block the app). */}
+        {sidebarNotice && (
+          <div className="px-3 py-2.5 bg-red-500/8 border-b border-red-500/20 flex-shrink-0 flex items-start justify-between gap-2">
+            <p className="text-xs text-red-300 leading-relaxed">{sidebarNotice}</p>
+            <button
+              onClick={() => setSidebarNotice(null)}
+              aria-label="Dismiss"
+              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-red-300/70 hover:text-red-200 transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
@@ -589,7 +674,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     const next = e.target.value
                     setCatSaving(true)
                     try { await updateClientCategory(activeClient.id, next) }
-                    catch (err) { alert('Could not update category: ' + (err as Error).message) }
+                    catch (err) {
+                      // Driver message is logged for diagnosis, not shown -- it
+                      // can name internal tables and policies.
+                      console.error('[Layout] updateClientCategory failed:', err)
+                      setSidebarNotice('Could not update the client group. Try again, and if it keeps failing contact support.')
+                    }
                     finally { setCatSaving(false) }
                   }}
                   className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-brand-500/50 disabled:opacity-50"

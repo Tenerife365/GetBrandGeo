@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
+import { useCollection } from '../lib/collectionContext'
 import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
 import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
@@ -650,6 +651,7 @@ function RecommendationsSkeleton() {
 
 export default function Recommendations() {
   const { activeClientId, activeClient, activeEngines, isAdmin } = useClient()
+  const { lastCompletedAt } = useCollection()
   const brandName = activeClient?.name ?? 'Your brand'
 
   const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
@@ -692,8 +694,11 @@ export default function Recommendations() {
     setStoredRecs(itemRows)
   }
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (opts: { silent?: boolean } = {}) => {
+    // Silent: a background reload triggered by lastCompletedAt, not a fresh
+    // page open or an explicit Refresh click. Data is already on screen, so
+    // this must never bounce the page back to the full-page skeleton.
+    if (!opts.silent) setLoading(true)
 
     const [{ data: okResults }, { data: errRows }, { data: prompts }] = await Promise.all([
       // status='error' rows are API failures (quota, auth, network). They are NOT
@@ -796,11 +801,14 @@ export default function Recommendations() {
       try {
         data = JSON.parse(text)
       } catch {
+        // Driver/status detail is logged for diagnosis, not shown -- a raw
+        // HTTP status and a pointer at internal infrastructure name nothing a
+        // customer can act on.
         console.error('[GenRec] non-JSON response:', res.status, text.slice(0, 300))
         throw new Error(
           res.status === 524 || res.status === 502
             ? 'The analysis timed out. Try again in a moment.'
-            : `Function error (HTTP ${res.status}). Check the Netlify logs.`
+            : 'Something went wrong generating insights. Try again, and if it keeps happening contact support.'
         )
       }
 
@@ -809,13 +817,13 @@ export default function Recommendations() {
       } else if (data.persisted) {
         await loadHistory()
       } else {
-        // Generated but not stored. Show it rather than throw it away — but say so
-        // plainly, because an unsaved deliverable has no audit trail.
+        // Generated but not stored. Show it rather than throw it away -- but say so
+        // plainly, because an unsaved deliverable has no audit trail. The driver's
+        // own persist_error is logged for diagnosis, not shown -- it can name
+        // internal tables and migrations.
+        if (data.persist_error) console.error('[GenRec] persist failed:', data.persist_error)
         setUnsavedRecs(data.recommendations ?? [])
-        setAiError(
-          `Generated, but NOT saved to the audit trail${data.persist_error ? `: ${data.persist_error}` : ''}. ` +
-          `Has supabase-recommendations-migration.sql been run?`
-        )
+        setAiError('Generated, but not saved to your history. Try again, and if it keeps happening contact support.')
       }
     } catch (e: any) {
       setAiError(e.message ?? 'Network error')
@@ -838,7 +846,12 @@ export default function Recommendations() {
     await loadHistory()
   }
 
-  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')])
+  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload quietly every time a collection run completes -- lastCompletedAt
+  // bumps incrementally as jobs land (collectionContext.tsx), so this must
+  // never assume a single final bump.
+  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
@@ -873,6 +886,8 @@ export default function Recommendations() {
           </div>
           {loading ? (
             <Skeleton className="h-5 w-[26rem] max-w-full motion-reduce:animate-none" />
+          ) : (stats?.totalChecks ?? 0) === 0 ? (
+            <p className="text-sm text-slate-400">No responses measured yet.</p>
           ) : (
             <p className="text-sm text-slate-400">
               Generated from {stats?.totalChecks ?? 0} successful AI checks. API failures are excluded.
@@ -1062,8 +1077,15 @@ export default function Recommendations() {
             )}
 
             {aiError && !aiLoading && (
-              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 text-xs text-red-400 mb-3">
-                {aiError}
+              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 mb-3 flex items-start justify-between gap-3">
+                <p className="text-xs text-red-400">{aiError}</p>
+                <button
+                  onClick={generateAiInsights}
+                  disabled={rawOk.length === 0}
+                  className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                >
+                  <RefreshCw size={11} /> Retry
+                </button>
               </div>
             )}
 

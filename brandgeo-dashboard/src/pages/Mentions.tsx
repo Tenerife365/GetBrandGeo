@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bot, TrendingUp, Award, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
+import { useCollection } from '../lib/collectionContext'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
 import { SentimentDot } from '../components/ScoreBadge'
 import { PageTitle, SectionHeading } from '../components/Typography'
@@ -77,6 +78,7 @@ type FilterCat = PromptCategory | 'all'
 export default function Mentions() {
   const { t } = useI18n()
   const { activeClientId, activeClient } = useClient()
+  const { lastCompletedAt } = useCollection()
   const brandName = activeClient?.name ?? 'your brand'
   const [mentions, setMentions] = useState<MentionEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,55 +86,64 @@ export default function Mentions() {
   const [filterCat, setFilterCat] = useState<FilterCat>('all')
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
-      if (isDemoMode) {
-        const events: MentionEvent[] = mockAIResults
-          .filter(r => r.brand_mentioned)
-          .map(r => {
-            const prompt = mockPrompts.find(p => p.id === r.prompt_id)
-            return {
-              id: r.id,
-              prompt_id: r.prompt_id,
-              promptText: prompt?.text ?? '',
-              category: (prompt?.category ?? 'general') as PromptCategory,
-              llm: r.llm as LLMName,
-              brand_position: r.brand_position,
-              sentiment: r.sentiment,
-              response_snippet: r.response_snippet,
-              checked_at: r.checked_at,
-            }
-          })
-          .sort((a, b) => (a.brand_position ?? 99) - (b.brand_position ?? 99))
-        setMentions(events)
-        setLoading(false)
-        return
-      }
+  const load = async (opts: { silent?: boolean } = {}) => {
+    // Silent: a background reload triggered by lastCompletedAt, not a fresh
+    // page open. Data is already on screen, so this must never bounce the
+    // page back to the full-page loading state.
+    if (!opts.silent) setLoading(true)
 
-      const { data } = await supabase
-        .from('ai_results')
-        .select('*, prompts(text, category, position)')
-        .eq('brand_mentioned', true)
-        .eq('client_id', activeClientId)
-        .order('checked_at', { ascending: false })
-
-      if (data) {
-        setMentions((data as RawMentionRow[]).map(r => ({
-          id: r.id,
-          prompt_id: r.prompt_id,
-          promptText: r.prompts?.text ?? '',
-          category: (r.prompts?.category ?? 'general') as PromptCategory,
-          llm: r.engine ?? r.llm,
-          brand_position: r.brand_position,
-          sentiment: r.sentiment,
-          response_snippet: r.response_snippet,
-          checked_at: r.checked_at,
-        })))
-      }
+    if (isDemoMode) {
+      const events: MentionEvent[] = mockAIResults
+        .filter(r => r.brand_mentioned)
+        .map(r => {
+          const prompt = mockPrompts.find(p => p.id === r.prompt_id)
+          return {
+            id: r.id,
+            prompt_id: r.prompt_id,
+            promptText: prompt?.text ?? '',
+            category: (prompt?.category ?? 'general') as PromptCategory,
+            llm: r.llm as LLMName,
+            brand_position: r.brand_position,
+            sentiment: r.sentiment,
+            response_snippet: r.response_snippet,
+            checked_at: r.checked_at,
+          }
+        })
+        .sort((a, b) => (a.brand_position ?? 99) - (b.brand_position ?? 99))
+      setMentions(events)
       setLoading(false)
+      return
     }
-    load()
-  }, [activeClientId])
+
+    const { data } = await supabase
+      .from('ai_results')
+      .select('*, prompts(text, category, position)')
+      .eq('brand_mentioned', true)
+      .eq('client_id', activeClientId)
+      .order('checked_at', { ascending: false })
+
+    if (data) {
+      setMentions((data as RawMentionRow[]).map(r => ({
+        id: r.id,
+        prompt_id: r.prompt_id,
+        promptText: r.prompts?.text ?? '',
+        category: (r.prompts?.category ?? 'general') as PromptCategory,
+        llm: r.engine ?? r.llm,
+        brand_position: r.brand_position,
+        sentiment: r.sentiment,
+        response_snippet: r.response_snippet,
+        checked_at: r.checked_at,
+      })))
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [activeClientId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload quietly every time a collection run completes -- lastCompletedAt
+  // bumps incrementally as jobs land (collectionContext.tsx), so this must
+  // never assume a single final bump.
+  useEffect(() => { if (lastCompletedAt > 0) load({ silent: true }) }, [lastCompletedAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = mentions.filter(m => {
     if (filterLLM !== 'all' && m.llm !== filterLLM) return false
