@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
@@ -10,6 +10,7 @@ import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
+import { useCollection } from '../lib/collectionContext'
 import { useTheme } from '../lib/themeContext'
 import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import {
@@ -74,7 +75,6 @@ interface OverviewStats {
   totalChecks: number
   mentionRate: number
   avgPosition: number | null
-  promptCount: number
 }
 
 /**
@@ -104,12 +104,10 @@ function computeStats(allRows: AIResultRow[]): OverviewStats {
   const avgPos = posRows.length > 0
     ? Math.round(posRows.reduce((s, r) => s + (r.brand_position ?? 0), 0) / posRows.length * 10) / 10
     : null
-  const uniquePrompts = new Set(rows.map(r => r.prompt_id)).size
   return {
     totalChecks: rows.length,
     mentionRate: rows.length > 0 ? Math.round((mentionCount / rows.length) * 100) : 0,
     avgPosition: avgPos,
-    promptCount: uniquePrompts,
   }
 }
 
@@ -158,7 +156,8 @@ function buildKpiSparklines(rows: AIResultRow[]): {
 export default function Dashboard() {
   const { activeClientId, activeClient, activeEngines } = useClient()
   const { t } = useI18n()
-  const { getStartDate, timeRange } = useTimeFilter()
+  const { getStartDate, timeRange, setTimeRange } = useTimeFilter()
+  const { lastCompletedAt } = useCollection()
   const { theme } = useTheme()
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'your brand'
@@ -180,9 +179,25 @@ export default function Dashboard() {
   const [recsLoaded, setRecsLoaded] = useState(false)
   // Progressive disclosure (Hick's Law) — detail charts/lists start hidden.
   const [showDetails, setShowDetails] = useState(false)
+  // Active prompt count, sourced from the SAME `prompts` query already fired
+  // in the Promise.all below (pData), never from the ai_results rows this
+  // page happens to have on hand. A brand-new client who added prompts but
+  // has 0 ai_results was reading promptCount off a Set of ai_results.prompt_id,
+  // which is empty until the first collection runs, so the zero-data hero
+  // told them to "Add a prompt" a second time even though prompts already
+  // existed. This is the one number that has to come from the prompts table.
+  const [promptCount, setPromptCount] = useState(0)
+  // Whether the client has EVER had a real (answered) ai_results row, sourced
+  // from the all-time scoreRows query below, never from the time-filtered
+  // `stats.totalChecks`. Gates the "Not measured yet" verdict hero, since that
+  // hero has to mean "no measurement exists", not "no measurement exists in
+  // the currently selected 7/30/90-day window", or a free client's score
+  // ring vanishes and gets replaced by a first-run verdict every time their
+  // last check falls outside the window (e.g. day 8 of a monthly cadence).
+  const [hasAnyRows, setHasAnyRows] = useState(false)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true)
 
     if (isDemoMode) {
       const demoRows: AIResultRow[] = mockAIResults.map((r: AIResult) => {
@@ -195,6 +210,8 @@ export default function Dashboard() {
       })
       setRows(demoRows)
       setStats(computeStats(demoRows))
+      setPromptCount(mockPrompts.filter((p: Prompt) => p.is_active).length)
+      setHasAnyRows(mockAIResults.some((r: AIResult) => !isNoAnswerRow(r)))
 
       // AI Visibility Score — same shared computation as AIVisibility.tsx, deliberately
       // all-time (not time-filtered) so both pages always show the identical headline number.
@@ -225,6 +242,8 @@ export default function Dashboard() {
       // never disagrees with AI Visibility's. Now also ordered + error-filtered +
       // carrying checked_at/status, so buildScoreResultMap can enforce
       // newest-non-error-wins itself rather than trusting this query's shape.
+      // Doubles as the all-time "has this client ever been measured" signal
+      // (hasAnyRows below), so no extra query is needed for that.
       supabase.from('ai_results')
         // response_snippet is selected ONLY so buildScoreResultMap can spot the
         // `[no_ai_overview]` marker. Drop it and the exclusion silently stops
@@ -243,6 +262,12 @@ export default function Dashboard() {
       setStats(computeStats(r))
     }
 
+    setPromptCount(pData?.length ?? 0)
+    // Only a query that answered may move this flag. A failed reload after a
+    // successful one must not flip it false and put the "Not measured yet"
+    // hero over real data that is still on screen.
+    if (scoreRows) setHasAnyRows(scoreRows.some(r => !isNoAnswerRow(r)))
+
     if (pData && scoreRows) {
       const scoreMap = buildScoreResultMap(scoreRows as unknown as ScoreInputRow[], activeEngines)
       setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
@@ -251,7 +276,19 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [activeClientId, timeRange])
+  // Reload on client switch, time-window change, or a background collection
+  // run finishing (lastCompletedAt, from CollectionContext, bumped once or
+  // several times per run; every bump must be handled, not just a presumed
+  // final one). A bump that leaves the client and window unchanged is a quiet
+  // background refresh: rows are already on screen, so it must not flip
+  // `loading` back to true and swap the real content out for the skeleton.
+  const loadKeyRef = useRef('')
+  useEffect(() => {
+    const key = `${activeClientId}|${timeRange}`
+    const quiet = key === loadKeyRef.current
+    loadKeyRef.current = key
+    load(quiet)
+  }, [activeClientId, timeRange, lastCompletedAt])
 
   // "What to do next" — reads the SAME persisted advice Recommendations.tsx
   // shows (recommendation_runs/recommendations, CLAUDE.md §14), it does not
@@ -321,6 +358,10 @@ export default function Dashboard() {
 
   // Ring sweep math — DASHBOARD-UX-2026.md §6 Phase B. RING_R must match the
   // SVG circles' r="54" below (kept as one constant so the two never drift).
+  // Human-readable window length for the "no checks in this window" line
+  // below, mirroring timeFilterContext.tsx's own 7d/30d/90d/all day counts.
+  const windowDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : null
+
   const RING_R = 54
   const RING_CIRC = 2 * Math.PI * RING_R
   const ringOffset = scoreData
@@ -393,7 +434,7 @@ export default function Dashboard() {
           <PageTitle>{greeting}, {brandName}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5">Here&apos;s your AI visibility snapshot.</p>
         </div>
-        <button onClick={load}
+        <button onClick={() => load()}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
           <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
@@ -404,7 +445,7 @@ export default function Dashboard() {
           dimensions — a verdict, not an absence of measurement. Never render a
           zero as though it were a measurement. Routes to /prompts when there are
           no prompts yet, otherwise to /ai-visibility to run the first collection. */}
-      {scoreData && stats && stats.totalChecks === 0 && (
+      {scoreData && stats && !hasAnyRows && (
         <motion.div
           className="bg-dark-800 rounded-xl mb-6"
           variants={heroReveal} initial="hidden" animate="show"
@@ -413,18 +454,18 @@ export default function Dashboard() {
             icon={Target}
             title="Not measured yet"
             body={
-              stats.promptCount === 0
+              promptCount === 0
                 ? `BrandGEO measures how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} real buyer questions about ${brandName}. Add a prompt to start.`
-                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${stats.promptCount} tracked prompt${stats.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
+                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${promptCount} tracked prompt${promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
             }
-            actionLabel={stats.promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
-            actionTo={stats.promptCount === 0 ? '/prompts' : '/ai-visibility'}
+            actionLabel={promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
+            actionTo={promptCount === 0 ? '/prompts' : '/ai-visibility'}
             minHeight={220}
           />
         </motion.div>
       )}
 
-      {scoreData && stats && stats.totalChecks > 0 && (
+      {scoreData && stats && hasAnyRows && (
         <motion.div
           className="bg-dark-800 rounded-card p-card-feature mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
           variants={heroReveal} initial="hidden" animate="show"
@@ -531,6 +572,24 @@ export default function Dashboard() {
           variants={heroReveal} initial="hidden" animate="show"
         >
           <h2 className="text-sm font-semibold text-slate-300 mb-4">Key metrics</h2>
+          {/* The score hero above is gated on all-time data (hasAnyRows), so it
+              keeps showing a real score even when the SELECTED window has no
+              rows in it, and a free client on a monthly cadence would otherwise
+              lose their score to a first-run verdict for three weeks out of
+              four. This line is what explains the gap between "there is a
+              score" and "these window-scoped stats read zero", with a control
+              that removes the gap instead of just naming it. */}
+          {hasAnyRows && stats.totalChecks === 0 && timeRange !== 'all' && windowDays != null && (
+            <div className="flex flex-wrap items-center gap-2 mb-4 text-xs text-slate-500">
+              <span className="italic">No checks in the last {windowDays} days.</span>
+              <button
+                onClick={() => setTimeRange('all')}
+                className="text-brand-400 hover:text-brand-300 font-medium transition-colors"
+              >
+                Show all time
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
             <Stat
               icon={<TrendingUp size={15} />}
@@ -558,7 +617,7 @@ export default function Dashboard() {
               spark={avgPosSpark}
               connectNulls
             />
-            <Stat icon={<Hash size={15} />} label={t.dash_statPrompts} value={String(stats.promptCount)} sub={t.dash_statPromptsSub} />
+            <Stat icon={<Hash size={15} />} label={t.dash_statPrompts} value={String(promptCount)} sub={t.dash_statPromptsSub} />
             <Stat icon={<Eye size={15} />} label={t.dash_statChecks} value={String(stats.totalChecks)} sub={t.dash_statChecksDesc} spark={spark.volume} />
           </div>
         </motion.div>
