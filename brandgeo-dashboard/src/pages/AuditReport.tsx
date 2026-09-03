@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Loader2, AlertTriangle, TrendingUp, Mail } from 'lucide-react'
+import { Loader2, AlertTriangle, TrendingUp, Mail, ArrowRight } from 'lucide-react'
 import { SentimentDot } from '../components/ScoreBadge'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { ENGINE_META } from '../lib/planConfig'
@@ -122,6 +122,20 @@ function PreemptText({ engineCount }: { engineCount: number }) {
   )
 }
 
+// One line, same wording on the teaser and the full view, placed directly
+// under the domain on both. The payload carries no timestamp for either view
+// (get-audit-report.js returns none), so this is deliberately generic rather
+// than a computed "audited on <date>": it states the retention policy
+// (db/supabase-scheduled-jobs-migration.sql, purge-old-prospect-audits, 90
+// days) instead of a date it does not have.
+function RetentionNote() {
+  return (
+    <p className="text-xs text-slate-500 mb-3">
+      A point-in-time measurement. We keep this report for 90 days.
+    </p>
+  )
+}
+
 // Status hue, not brand chrome and not engine identity. Violet is reserved for
 // chrome (buttons, links, the loading spinner) per dashboard-visual-system.md
 // section 8.6 rule 3, so it never appears here, and blue is already claimed by
@@ -151,31 +165,52 @@ function scoreColor(score: number) {
 export default function AuditReport() {
   const { token } = useParams<{ token: string }>()
   const [report, setReport] = useState<Report | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  // Terminal: an unknown or malformed token, a request that can never become a
+  // 200 on retry. Replaces the whole page with the same card shape the
+  // backend's own status:'error' branch uses (see FatalCard/`report.status
+  // === 'error'` below) rather than surfacing the server's own error text,
+  // which is never shown to a visitor.
+  const [fatalError, setFatalError] = useState<{ heading: string; body: string } | null>(null)
+  // Non-terminal: a 5xx or a network blip. Shown as a banner while polling
+  // keeps running, since the next poll can still succeed.
+  const [transientError, setTransientError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [unlocking, setUnlocking] = useState(false)
   const [unlockError, setUnlockError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }
 
   const fetchReport = async () => {
     if (!token) return
     try {
       const res = await fetch(`/.netlify/functions/get-audit-report?token=${encodeURIComponent(token)}`)
       if (!res.ok) {
-        // Read the body defensively. get-audit-report.js returns JSON on its
-        // own error responses, but a platform-level failure (function not
-        // deployed, cold-start failure) can return an HTML body instead, and
-        // res.json() would throw on that, into the outer catch, skipping the
-        // stop-polling logic below entirely.
-        const data = await res.json().catch(() => ({} as { error?: string }))
-        setLoadError(data.error || 'Could not load this report.')
-        // Any 4xx is a permanent failure: an unknown token, a bad request, or
-        // a forbidden request cannot become a 200 on retry, so stop polling
-        // rather than hitting a dead endpoint every 4 seconds until the tab
-        // closes. A 5xx is left polling, since that can be transient.
-        if (res.status >= 400 && res.status < 500 && pollRef.current) {
-          clearInterval(pollRef.current)
-          pollRef.current = null
+        // The server's own error text is never rendered to a visitor: status
+        // code alone decides what they see, so there is nothing to read from
+        // the body and no res.json() call that could throw on an HTML error
+        // page from a platform-level failure.
+        if (res.status === 404) {
+          setFatalError({
+            heading: 'This report link is no longer available',
+            body: 'We keep every report for 90 days after it is generated. This one has expired, or the link was mistyped.',
+          })
+          stopPolling()
+        } else if (res.status >= 400 && res.status < 500) {
+          // Any other 4xx (a bad request, a forbidden request) is also
+          // permanent: it cannot become a 200 on retry, so this stops polling
+          // too rather than hitting a dead endpoint every 4 seconds forever.
+          setFatalError({
+            heading: "We couldn't load this report",
+            body: 'Something about this request did not go through. Try opening the link again, or run a new audit.',
+          })
+          stopPolling()
+        } else {
+          // 5xx is left polling: it can be transient (a cold start, a dropped
+          // connection), unlike a 4xx.
+          setTransientError('Having trouble reaching your report. Still trying.')
         }
         return
       }
@@ -183,17 +218,15 @@ export default function AuditReport() {
       // Clear any earlier failure now that a fetch actually succeeded, so a
       // transient network blip does not leave a stale error banner on screen
       // once the page recovers.
-      setLoadError(null)
+      setFatalError(null)
+      setTransientError(null)
       setReport(data)
       // 'ready' and 'error' are both terminal: nothing about this token will
       // change again without a brand new audit run, so stop polling on either
       // outcome, not just the successful one.
-      if ((data.status === 'ready' || data.status === 'error') && pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
+      if (data.status === 'ready' || data.status === 'error') stopPolling()
     } catch {
-      setLoadError('Network error loading this report.')
+      setTransientError('Network error loading this report. Still trying.')
     }
   }
 
@@ -203,6 +236,18 @@ export default function AuditReport() {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  // This route sits outside <Layout>, which is the only other place in the app
+  // that writes document.title (Layout.tsx), so a cold visitor's tab reads the
+  // generic app title 'BrandGEO Dashboard' the whole time this page is open,
+  // even once we know whose report it is. domain is present on every variant
+  // of Report (teaser, full, and pending/error), so this only needs to wait
+  // for `report` to exist at all.
+  useEffect(() => {
+    if (!report?.domain) return
+    document.title = `${report.domain} · AI visibility audit · BrandGEO`
+    return () => { document.title = 'BrandGEO Dashboard' }
+  }, [report?.domain])
 
   const unlock = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -233,18 +278,36 @@ export default function AuditReport() {
             getbrandgeo.com. /audit is a sibling form, not a parent. */}
         <BrandGeoMark size="sm" href="https://getbrandgeo.com" ariaLabel="BrandGEO: go to getbrandgeo.com" className="mb-6" />
 
-        {loadError && (
-          <div className="bg-dark-800 border border-red-500/20 rounded-xl p-6 text-sm text-red-400 flex items-center gap-2">
-            <AlertTriangle size={16} /> {loadError}
+        {/* A dead or unreachable token replaces the whole page: there is
+            nothing else useful to show alongside it, and this is the only
+            branch a purged link (90 days, db/supabase-scheduled-jobs-migration.sql)
+            or a mistyped token ever reaches. */}
+        {fatalError ? (
+          <div className="bg-dark-800 border border-red-500/20 rounded-card p-card-feature text-center">
+            <AlertTriangle size={28} className="text-red-400 mx-auto mb-4" />
+            <h1 className="text-lg font-semibold text-white mb-1">{fatalError.heading}</h1>
+            <p className="text-sm text-slate-400 mb-5">{fatalError.body}</p>
+            <a
+              href="https://getbrandgeo.com/#free-audit"
+              className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+            >
+              Run a new audit
+            </a>
+          </div>
+        ) : (
+        <>
+        {transientError && (
+          <div className="bg-dark-800 border border-red-500/20 rounded-lg p-4 mb-4 text-sm text-red-400 flex items-center gap-2">
+            <AlertTriangle size={16} /> {transientError}
           </div>
         )}
 
-        {!loadError && !report && (
+        {!transientError && !report && (
           <div className="p-8 text-slate-500 text-sm animate-pulse">Loading your report…</div>
         )}
 
         {report && report.status !== 'ready' && report.status !== 'error' && (
-          <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 text-center">
+          <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature text-center">
             <Loader2 size={28} className="animate-spin text-brand-400 mx-auto mb-4" />
             <h1 className="text-lg font-semibold text-white mb-1">{`Auditing ${report.domain}…`}</h1>
             <p className="text-sm text-slate-400">
@@ -260,7 +323,7 @@ export default function AuditReport() {
             real link, not just retry copy, because there is nothing on this
             page for the visitor to click otherwise. */}
         {report && report.status === 'error' && (
-          <div className="bg-dark-800 border border-red-500/20 rounded-xl p-8 text-center">
+          <div className="bg-dark-800 border border-red-500/20 rounded-card p-card-feature text-center">
             <AlertTriangle size={28} className="text-red-400 mx-auto mb-4" />
             <h1 className="text-lg font-semibold text-white mb-1">We couldn't finish this audit</h1>
             <p className="text-sm text-slate-400 mb-5">
@@ -276,8 +339,9 @@ export default function AuditReport() {
         )}
 
         {report && report.status === 'ready' && !report.unlocked && (
-          <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 text-center">
+          <div className="bg-dark-800 border border-dark-700 rounded-card p-card-feature text-center">
             <p className="text-sm text-slate-400 mb-1">{report.domain}{report.category ? ` · ${report.category}` : ''}</p>
+            <RetentionNote />
             <div className={`text-6xl font-bold tabular-nums my-4 ${scoreColor(report.ai_score)}`}>
               {report.ai_score}<span className="text-2xl text-slate-500 font-normal">/100</span>
             </div>
@@ -331,13 +395,14 @@ export default function AuditReport() {
             <form onSubmit={unlock} className="max-w-sm mx-auto space-y-3">
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <label htmlFor="unlock-email" className="sr-only">Email address to unlock the full report</label>
                 <input
+                  id="unlock-email"
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  aria-label="Email address to unlock the full report"
-                  className="w-full pl-9 pr-3 py-2.5 bg-dark-700 border border-dark-600 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-brand-500/50"
+                  className="w-full pl-9 pr-3 py-2.5 bg-dark-700 border border-dark-600 rounded-lg text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition"
                 />
               </div>
               {unlockError && <p className="text-xs text-red-400">{unlockError}</p>}
@@ -356,6 +421,8 @@ export default function AuditReport() {
         {report && report.status === 'ready' && report.unlocked && (
           <FullReportView report={report} />
         )}
+        </>
+        )}
       </div>
     </div>
   )
@@ -364,7 +431,17 @@ export default function AuditReport() {
 function FullReportView({ report }: { report: FullReport }) {
   const mentionedCount = report.engine_results.filter(r => r.brand_mentioned).length
   const cellsChecked = report.engine_results.length
-  const promptCount = new Set(report.engine_results.map(r => r.prompt_id)).size
+  // For a screening-depth report the denominator is the fixed
+  // SCREENING_PROMPT_COUNT, not the distinct prompt_ids actually present in
+  // engine_results. If both engines dropped the same prompt, that Set would
+  // read 3 instead of 4, and this line would then disagree with the teaser
+  // card above (line ~296), which always states SCREENING_PROMPT_COUNT
+  // because it has no per-prompt data to derive a smaller number from. A
+  // full-depth report has no such fixed count to fall back to, so it keeps
+  // deriving from the actual results.
+  const promptCount = report.depth === 'full'
+    ? new Set(report.engine_results.map(r => r.prompt_id)).size
+    : SCREENING_PROMPT_COUNT
   // 'screening sample' is the copy deck's approved qualifier
   // (docs/copy/audit-score-presentation-2026-08-14.md section on Direction C),
   // ruled specifically because a 4-prompt, 2-engine screening sample cannot
@@ -384,6 +461,7 @@ function FullReportView({ report }: { report: FullReport }) {
     <div className="space-y-4">
       <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center">
         <p className="text-sm text-slate-400 mb-1">{report.domain}{report.category ? ` · ${report.category}` : ''}</p>
+        <RetentionNote />
         <div className={`text-5xl font-bold tabular-nums my-2 ${scoreColor(report.ai_score)}`}>
           {report.ai_score}<span className="text-xl text-slate-500 font-normal">/100</span>
         </div>
@@ -391,7 +469,9 @@ function FullReportView({ report }: { report: FullReport }) {
           AI Visibility Score ({depthLabel}) · {mentionedCount} of {cellsChecked} answers named you · {report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'} checked
         </p>
         {cellsChecked < expectedCells && (
-          <p className="text-xs text-slate-500 mt-1">{cellsChecked} of {expectedCells} questions returned an answer.</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {cellsChecked} of {expectedCells} answers came back ({report.engines_used.length} engine{report.engines_used.length === 1 ? '' : 's'}, {promptCount} question{promptCount === 1 ? '' : 's'}). The missing ones are not counted against you.
+          </p>
         )}
       </div>
 
@@ -503,9 +583,9 @@ function FullReportView({ report }: { report: FullReport }) {
         <p className="text-sm text-slate-300 mb-3">Want to keep track of this, and work through each gap?</p>
         <Link
           to={`/signup?domain=${encodeURIComponent(report.domain)}`}
-          className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+          className="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
         >
-          Start tracking {report.domain} →
+          Start tracking {report.domain} <ArrowRight size={16} />
         </Link>
         <p className="text-xs text-slate-500 mt-3">
           Free to start, no credit card. For every engine, automatic refreshes and fix recommendations,{' '}
