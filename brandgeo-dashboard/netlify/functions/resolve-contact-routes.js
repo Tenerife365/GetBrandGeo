@@ -62,6 +62,7 @@ const {
   mergeCandidates,
   normaliseDomain,
   hostMatchesDomain,
+  checkFetchTarget,
 } = require('./_contact_routes')
 
 /**
@@ -144,44 +145,158 @@ function fail500(headers, code, error, extra = {}) {
   }
 }
 
+// How many redirect hops to follow by hand. Each hop is re-checked, so this
+// is the number of times a site may bounce us before we stop believing it.
+const MAX_REDIRECT_HOPS = 3
+
 /**
- * fetchPage(url, timeoutMs) -> { url, html } | { url, error }
+ * defaultLookup(host) -> Promise<string[]> of resolved IP literals.
+ * Injectable so every test in this repo can exercise the guard below without
+ * touching DNS, which is both slow and non-deterministic in CI.
+ */
+async function defaultLookup(host) {
+  const { lookup } = require('dns').promises
+  const answers = await lookup(host, { all: true, verbatim: true })
+  return answers.map((a) => a.address)
+}
+
+/**
+ * withDeadline(promise, deadline) -> the promise's value, or a rejection whose
+ * name is 'DeadlineError' once `deadline` (epoch ms) has passed.
+ *
+ * ADDED 2026-09-03 (re-review finding N1, MEDIUM). dns.lookup has no timeout
+ * of its own and the AbortController in fetchPage covers only the fetch, so a
+ * stalled resolver ran the whole DNS phase outside the per-page budget:
+ * measured at 5070ms against a 1000ms budget. Twelve of those in parallel
+ * plus the sequential Play fetches could push an invocation past the 26s
+ * ceiling and return nothing, which reads as "publishes nothing". The lookup
+ * itself is not cancellable; its late result is discarded and no fetch
+ * follows it.
+ */
+function withDeadline(promise, deadline) {
+  const expired = () => {
+    const e = new Error('deadline passed')
+    e.name = 'DeadlineError'
+    return e
+  }
+  const left = deadline - Date.now()
+  if (left <= 0) {
+    promise.catch(() => {})
+    return Promise.reject(expired())
+  }
+  let timer
+  const bomb = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(expired()), left)
+  })
+  return Promise.race([promise, bomb]).finally(() => clearTimeout(timer))
+}
+
+/**
+ * fetchPage(url, timeoutMs, { ownDomain, lookup }) -> { url, html } | { url, error }
  * Never throws. A miss is data, not an exception.
  *
  * timeoutMs defaults to PER_PAGE_TIMEOUT_MS but callers inside resolveOne
  * clamp it to whatever is actually left of PER_PROSPECT_BUDGET_MS (review
  * finding major-4), so a fetch started near the edge of the per-prospect
- * budget cannot run a full PER_PAGE_TIMEOUT_MS past it.
+ * budget cannot run a full PER_PAGE_TIMEOUT_MS past it. The whole redirect
+ * chain shares that one budget: the deadline is computed once, up front.
+ *
+ * FIXED 2026-09-03 (review findings F5 and F7). This used to pass
+ * `redirect: 'follow'` with no check on where it was going, which was both an
+ * SSRF (a prospect page could 302 us onto 169.254.169.254 or a loopback port
+ * and we would run EMAIL_RE over the answer) and a provenance defect (res.url
+ * after redirects became source_url, so a candidate could honestly cite a
+ * host the design says this function never reads). Redirects are now followed
+ * BY HAND, one hop at a time, and every hop including the first is run
+ * through checkFetchTarget(): http/https only, own domain or the Play Store
+ * only, resolving to public addresses only. A refused hop returns a
+ * `refused: ...` error like any other miss, so the caller reports it in
+ * `errors` instead of silently reading nothing.
  */
-async function fetchPage(url, timeoutMs = PER_PAGE_TIMEOUT_MS) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
-    })
-    if (!res.ok) return { url, error: `HTTP ${res.status}` }
-    const ctype = res.headers.get('content-type') || ''
-    if (ctype && !/text\/html|application\/xhtml|text\/plain/i.test(ctype)) {
-      return { url, error: `skipped content-type ${ctype.split(';')[0]}` }
+async function fetchPage(url, timeoutMs = PER_PAGE_TIMEOUT_MS, { ownDomain = null, lookup = defaultLookup } = {}) {
+  const deadline = Date.now() + timeoutMs
+  let current = String(url)
+
+  for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+    const left = deadline - Date.now()
+    if (left <= 0) return { url: current, error: 'timeout' }
+
+    // Resolve first, then decide, then connect. See the KNOWN LIMIT note on
+    // checkFetchTarget in _contact_routes.js about the rebinding gap this
+    // does not close.
+    let addresses = []
+    let host
+    try {
+      host = new URL(current).hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    } catch (_) {
+      return { url: current, error: 'refused: unparseable url' }
     }
-    const html = (await res.text()).slice(0, MAX_HTML_BYTES)
-    // res.url reflects redirects, so provenance records where the string
-    // actually was, not where we asked for it.
-    return { url: res.url || url, html }
-  } catch (e) {
-    return { url, error: e && e.name === 'AbortError' ? 'timeout' : String((e && e.message) || e) }
-  } finally {
-    clearTimeout(timer)
+    try {
+      addresses = await withDeadline(Promise.resolve().then(() => lookup(host)), deadline)
+    } catch (e) {
+      if (e && e.name === 'DeadlineError') return { url: current, error: 'timeout' }
+      return { url: current, error: `refused: dns lookup failed for ${host}` }
+    }
+
+    const verdict = checkFetchTarget(current, addresses, { ownDomain })
+    if (!verdict.allow) return { url: current, error: `refused: ${verdict.reason}` }
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now()))
+    let res
+    try {
+      res = await fetch(current, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+      })
+    } catch (e) {
+      return { url: current, error: e && e.name === 'AbortError' ? 'timeout' : String((e && e.message) || e) }
+    } finally {
+      clearTimeout(timer)
+    }
+
+    const status = res.status || 0
+    if (status >= 300 && status < 400) {
+      const location = res.headers && res.headers.get ? res.headers.get('location') : null
+      if (!location) return { url: current, error: `HTTP ${status} with no Location header` }
+      let next
+      try {
+        next = new URL(location, current).toString()
+      } catch (_) {
+        return { url: current, error: `HTTP ${status} with an unparseable Location` }
+      }
+      current = next
+      continue
+    }
+
+    if (!res.ok) return { url: current, error: `HTTP ${status}` }
+    const ctype = (res.headers && res.headers.get ? res.headers.get('content-type') : '') || ''
+    if (ctype && !/text\/html|application\/xhtml|text\/plain/i.test(ctype)) {
+      return { url: current, error: `skipped content-type ${ctype.split(';')[0]}` }
+    }
+    let html
+    try {
+      html = (await res.text()).slice(0, MAX_HTML_BYTES)
+    } catch (e) {
+      return { url: current, error: String((e && e.message) || e) }
+    }
+    // `current` is the URL that was actually fetched after every redirect this
+    // function agreed to follow, and every one of those was checked, so
+    // provenance records where the string really was AND that place is
+    // guaranteed to be the prospect's own domain or the Play Store.
+    return { url: current, html }
   }
+
+  return { url: current, error: `refused: more than ${MAX_REDIRECT_HOPS} redirects` }
 }
 
 /**
- * resolveOne(prospect) -> Result (minus `written`, which the caller fills).
+ * resolveOne(prospect, { lookup }) -> Result (minus `written`, filled by the
+ * caller). `lookup` is threaded down to fetchPage so a test can exercise the
+ * whole path without DNS; production uses defaultLookup.
  */
-async function resolveOne(prospect) {
+async function resolveOne(prospect, { lookup = defaultLookup } = {}) {
   const started = Date.now()
   // remaining() is milliseconds actually left of PER_PROSPECT_BUDGET_MS, not
   // a boolean pre-check. Review finding major-4: the old budgetLeft() only
@@ -192,6 +307,11 @@ async function resolveOne(prospect) {
   const remaining = () => PER_PROSPECT_BUDGET_MS - (Date.now() - started)
 
   const domain = prospect.domain
+  // Every fetch this function makes is checked against the prospect own
+  // domain and the Play Store, and against the addresses its host resolves
+  // to (review findings F5 and F7). One options object, built once, so no
+  // call site can forget it.
+  const fetchOpts = { ownDomain: domain, lookup }
   const urls = candidatePaths(domain).slice(0, MAX_PAGES_PER_PROSPECT)
   const errors = []
   const raw = []
@@ -202,7 +322,7 @@ async function resolveOne(prospect) {
   }
 
   const pages = await Promise.all(
-    urls.map((u) => fetchPage(u, Math.min(PER_PAGE_TIMEOUT_MS, Math.max(0, remaining()))))
+    urls.map((u) => fetchPage(u, Math.min(PER_PAGE_TIMEOUT_MS, Math.max(0, remaining())), fetchOpts))
   )
 
   let playUrl = null
@@ -252,7 +372,7 @@ async function resolveOne(prospect) {
    * recorded nothing.
    */
   if (playUrl && remaining() > 0) {
-    const play = await fetchPage(playUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()))
+    const play = await fetchPage(playUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()), fetchOpts)
     if (play.error) {
       errors.push(`${playUrl}: ${play.error}`)
     } else {
@@ -265,7 +385,7 @@ async function resolveOne(prospect) {
     const query = prospect.company || domain
     const searchUrl = playSearchUrl(query)
     if (searchUrl) {
-      const search = await fetchPage(searchUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()))
+      const search = await fetchPage(searchUrl, Math.min(PER_PAGE_TIMEOUT_MS, remaining()), fetchOpts)
       if (search.error) {
         errors.push(`${searchUrl}: ${search.error}`)
       } else {
@@ -284,7 +404,7 @@ async function resolveOne(prospect) {
           }
           examined++
           const listingUrl = `https://play.google.com/store/apps/details?id=${id}&hl=en`
-          const listing = await fetchPage(listingUrl, Math.min(PER_PAGE_TIMEOUT_MS, budget))
+          const listing = await fetchPage(listingUrl, Math.min(PER_PAGE_TIMEOUT_MS, budget), fetchOpts)
           if (listing.error) {
             errors.push(`${listingUrl}: ${listing.error}`)
             continue

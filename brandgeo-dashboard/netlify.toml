@@ -142,6 +142,17 @@
 [functions."resolve-contact-routes"]
   timeout = 26
 
+# Inbound reply poller (docs/arch/reply-handling.md part B). One OAuth token
+# exchange, one Gmail list query per 25 open conversations, then a metadata GET
+# per candidate message plus the 3 to 4 queries recordTouch makes for each real
+# reply. The inherited 10s default would kill it mid-run, and a killed run
+# reports NOTHING, which reads identically to "nobody replied" -- the same
+# failure mode that nearly shipped in resolve-contact-routes. Its own budgets
+# sit BELOW this ceiling (40 messages per run, 22s invocation budget) and a run
+# that stops early says so in job_runs.detail.skipped_time_budget.
+[functions."poll-inbound-replies"]
+  timeout = 26
+
 # S21 admin Revenue page. Pages every Stripe invoice on the account (affiliate
 # attribution needs a customer's full history, not just the requested month —
 # docs/arch/revenue-report-data-contract.md §4) plus refunds, customers,

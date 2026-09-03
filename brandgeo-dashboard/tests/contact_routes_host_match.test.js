@@ -56,6 +56,13 @@ const { playListingMatches, hostMatchesDomain, extractCandidateHosts, isOwnDomai
 
 const RESOLVER_MOD = path.join(__dirname, '..', 'netlify', 'functions', 'resolve-contact-routes.js')
 
+// resolveOne() now resolves every host it is about to fetch and refuses any
+// answer that is not public (review finding F7). These tests must not touch
+// DNS, so they inject a lookup that reports one ordinary public address for
+// whatever host is asked about. The guard itself is tested exhaustively, with
+// hostile addresses, in tests/contact_routes_fetch_guard.test.js.
+const PUBLIC_LOOKUP = { lookup: async () => ['93.184.216.34'] }
+
 let passed = 0
 const ok = (n) => { passed++; console.log('  ok -', n) }
 const section = (n) => console.log(`\n${n}`)
@@ -255,7 +262,7 @@ async function run() {
     }
     try {
       const { resolveOne } = require(RESOLVER_MOD)
-      const result = await resolveOne({ id: 3, domain: 'casepacer.com', company: 'CasePacer' })
+      const result = await resolveOne({ id: 3, domain: 'casepacer.com', company: 'CasePacer' }, PUBLIC_LOOKUP)
       assert.strictEqual(
         result.candidates.some((c) => c.value === 'founder@otherlegal.example'),
         false
@@ -309,7 +316,7 @@ async function run() {
         id: 1,
         domain: 'truncated-crawl-test.com',
         company: 'Truncated Crawl Test',
-      })
+      }, PUBLIC_LOOKUP)
       assert.strictEqual(truncated.candidates.length, 0)
       assert.ok(truncated.errors.length > 0, 'a truncated crawl must record at least one error')
       assert.ok(
@@ -333,7 +340,7 @@ async function run() {
           text: async () => '<html><body>no address here</body></html>',
         }
       }
-      const complete = await resolveOne({ id: 2, domain: 'genuinely-empty-company.com', company: 'Genuinely Empty Company' })
+      const complete = await resolveOne({ id: 2, domain: 'genuinely-empty-company.com', company: 'Genuinely Empty Company' }, PUBLIC_LOOKUP)
       assert.strictEqual(complete.candidates.length, 0)
       assert.deepStrictEqual(complete.errors, [])
       ok('a genuinely complete crawl with nothing published still reports zero errors')
@@ -387,7 +394,7 @@ async function run() {
     try {
       const { resolveOne } = require(RESOLVER_MOD)
       const t0 = Date.now()
-      await resolveOne({ id: 4, domain: 'deadline-test-company.com', company: 'Deadline Test Company' })
+      await resolveOne({ id: 4, domain: 'deadline-test-company.com', company: 'Deadline Test Company' }, PUBLIC_LOOKUP)
       const elapsed = Date.now() - t0
       // 20000ms is the assertion threshold: comfortably above the fixed
       // worst case (~18000ms plus a small margin for the abort to land) and

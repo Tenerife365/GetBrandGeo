@@ -30,6 +30,7 @@ const {
   handler, validateUpdate, WRITABLE_FIELDS, VALID_STAGES, validateTouch, VALID_CHANNELS, VALID_DIRECTIONS,
   parseId, fail500, TOUCH_MIN_OCCURRED_AT, TOUCH_MAX_FUTURE_MS, stampFieldFor, buildAdvanceOnlyFilter,
   validatePromote, promotionPatch, candidateSort, VALID_CANDIDATE_KINDS,
+  nextActionAtFor, FOLLOW_UP_STEPS_DAYS, TERMINAL_STAGES,
 } = require(MOD)
 
 let passed = 0
@@ -637,6 +638,161 @@ async function run() {
     })
     assert.strictEqual(res.statusCode, 401)
     ok('an unauthenticated promote is rejected 401 before any Supabase call')
+  }
+
+  // ── Follow-up schedule (docs/arch/reply-handling.md part A) ───────────────
+  const OCC = '2026-08-17T12:00:00.000Z'
+  const plusDays = (d) => new Date(Date.parse(OCC) + d * 24 * 60 * 60 * 1000).toISOString()
+
+  section('schedule: the cadence Constantin ruled is +4 days, +7 days, then stop')
+  {
+    assert.deepStrictEqual(FOLLOW_UP_STEPS_DAYS, [4, 7])
+    ok('FOLLOW_UP_STEPS_DAYS is exactly [4, 7]; a third outbound touch stops')
+
+    const first = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 1, stage: 'contacted' })
+    assert.deepStrictEqual(first, { value: plusDays(4) })
+    ok('1st outbound touch schedules the next step 4 days out')
+
+    const second = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 2, stage: 'contacted' })
+    assert.deepStrictEqual(second, { value: plusDays(7) })
+    ok('2nd outbound touch schedules the next step 7 days out')
+
+    const third = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 3, stage: 'contacted' })
+    assert.deepStrictEqual(third, { value: null })
+    ok('3rd outbound touch CLEARS next_action_at: the sequence is exhausted, not extended')
+
+    const tenth = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 10, stage: 'contacted' })
+    assert.deepStrictEqual(tenth, { value: null })
+    ok('running far past the end of the array still stops rather than throwing')
+  }
+
+  section('schedule: a reply stops the queue asking')
+  {
+    const replied = nextActionAtFor({ direction: 'in', occurredAtIso: OCC, outboundCount: 1, stage: 'contacted' })
+    assert.deepStrictEqual(replied, { value: null })
+    ok('an inbound touch clears next_action_at regardless of how many touches went out')
+  }
+
+  section('schedule: skip and clear are different, and conflating them is the defect')
+  {
+    for (const stage of TERMINAL_STAGES) {
+      const res = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 1, stage })
+      assert.deepStrictEqual(res, { skip: true }, `stage ${stage} must skip, not clear`)
+    }
+    ok('every terminal stage returns { skip: true }, so a date a human set is never wiped')
+
+    const exhausted = nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 3, stage: 'contacted' })
+    assert.notDeepStrictEqual(exhausted, { skip: true })
+    assert.strictEqual('value' in exhausted, true)
+    ok('an exhausted sequence returns { value: null }, which DOES write, unlike skip')
+
+    assert.deepStrictEqual(TERMINAL_STAGES, new Set(['won', 'lost', 'disqualified']))
+    ok("TERMINAL_STAGES is won/lost/disqualified, matching the page's own exclusion")
+    for (const stage of TERMINAL_STAGES) {
+      assert.strictEqual(VALID_STAGES.has(stage), true, `${stage} must be a real stage`)
+    }
+    ok('every terminal stage is a stage the CHECK constraint actually allows')
+  }
+
+  section('schedule: a junk occurred_at skips rather than writing a bad date')
+  {
+    for (const bad of ['not-a-date', '', 'yesterday']) {
+      const res = nextActionAtFor({ direction: 'out', occurredAtIso: bad, outboundCount: 1, stage: 'contacted' })
+      assert.deepStrictEqual(res, { skip: true }, `${JSON.stringify(bad)} must skip`)
+    }
+    ok('an unparseable occurred_at skips; it never produces an Invalid Date write')
+  }
+
+  section('schedule: it never writes a stage, and never a contact route')
+  {
+    const outputs = [
+      nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 1, stage: 'contacted' }),
+      nextActionAtFor({ direction: 'in', occurredAtIso: OCC, outboundCount: 1, stage: 'contacted' }),
+      nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 3, stage: 'won' }),
+    ]
+    for (const res of outputs) {
+      for (const key of Object.keys(res)) {
+        assert.strictEqual(['skip', 'value'].includes(key), true, `unexpected key ${key}`)
+      }
+    }
+    ok('the function can only ever emit skip or value: no stage, no email, no url')
+
+    assert.strictEqual(WRITABLE_FIELDS.has('next_action_at'), true)
+    ok('next_action_at stays writable, so the auto-schedule is a default and not a lock')
+  }
+
+  section('F2: the reply guard, at the level of the pure rule')
+  {
+    // Review finding F2 (HIGH), 2026-09-03. The forward-only stamp is per
+    // column, so an outbound touch older than a logged reply passed the stamp
+    // (it IS newer than last_contacted_at) and armed a follow-up on somebody
+    // who had already answered.
+    const REPLIED = '2026-08-19T08:00:00.000Z'
+
+    const before = nextActionAtFor({
+      direction: 'out', occurredAtIso: '2026-08-18T09:00:00.000Z',
+      outboundCount: 1, stage: 'contacted', repliedAtIso: REPLIED,
+    })
+    assert.deepStrictEqual(before, { skip: true })
+    ok('an outbound touch BEFORE a logged reply skips: history, not a schedule input')
+
+    const equal = nextActionAtFor({
+      direction: 'out', occurredAtIso: REPLIED,
+      outboundCount: 1, stage: 'contacted', repliedAtIso: REPLIED,
+    })
+    assert.deepStrictEqual(equal, { skip: true })
+    ok('an outbound touch at exactly replied_at skips as well')
+
+    const after = nextActionAtFor({
+      direction: 'out', occurredAtIso: '2026-08-21T09:00:00.000Z',
+      outboundCount: 1, stage: 'contacted', repliedAtIso: REPLIED,
+    })
+    assert.deepStrictEqual(after, { value: '2026-08-25T09:00:00.000Z' })
+    ok('an outbound touch AFTER the reply still schedules: this is a guard, not a blanket stop')
+
+    // skip, not value: null. Wiping a date a human set on a prospect who
+    // replied is the other half of the same defect.
+    assert.strictEqual('value' in before, false)
+    ok('the guard SKIPS rather than clearing, so a hand-set date on a replied prospect survives')
+
+    const noReply = nextActionAtFor({
+      direction: 'out', occurredAtIso: '2026-08-18T09:00:00.000Z',
+      outboundCount: 1, stage: 'contacted', repliedAtIso: null,
+    })
+    assert.deepStrictEqual(noReply, { value: '2026-08-22T09:00:00.000Z' })
+    ok('a prospect who has never replied behaves exactly as before the fix')
+
+    for (const junk of ['not-a-date', 'yesterday']) {
+      assert.deepStrictEqual(
+        nextActionAtFor({ direction: 'out', occurredAtIso: OCC, outboundCount: 1, stage: 'contacted', repliedAtIso: junk }),
+        { skip: true },
+        `an unparseable replied_at (${junk}) must fail closed`
+      )
+    }
+    ok('an unparseable replied_at fails CLOSED: not chasing beats chasing somebody who answered')
+  }
+
+  section('F3: the occurred_at floor is one constant, shared with the poller')
+  {
+    // The bounds moved into _touches.js so poll-inbound-replies.js enforces
+    // the same floor the admin path has enforced since bg-verify S1. This
+    // pins that the admin path still sees the same value after the move.
+    const shared = require(path.join(__dirname, '..', 'netlify', 'functions', '_touches.js'))
+    assert.strictEqual(TOUCH_MIN_OCCURRED_AT, shared.TOUCH_MIN_OCCURRED_AT)
+    assert.strictEqual(TOUCH_MIN_OCCURRED_AT, Date.parse('2026-01-01T00:00:00.000Z'))
+    ok('prospects-admin.js and _touches.js name the SAME floor, so the two paths cannot drift')
+
+    // clampOccurredAt is the untrusted-input reading of the same bound: it
+    // corrects rather than rejecting, because a mail header has no human to
+    // hand a 400 to.
+    const now = Date.parse('2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt('Thu, 01 Jan 1970 00:00:00 +0000', now), '2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt('Mon, 01 Jan 1900 00:00:00 GMT', now), '2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt('Fri, 01 Jan 2100 00:00:00 GMT', now), '2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt('nonsense', now), '2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt(null, now), '2026-09-03T12:00:00.000Z')
+    assert.strictEqual(shared.clampOccurredAt('2026-08-20T08:00:00.000Z', now), '2026-08-20T08:00:00.000Z')
+    ok('clampOccurredAt pins a below-floor, unparseable or future date to now, and passes a real one through')
   }
 
   console.log(`\n${passed} assertions passed.`)

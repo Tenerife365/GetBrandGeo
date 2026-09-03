@@ -19,14 +19,34 @@
  *     -> 4xx { error: string }
  *   POST { action: 'touch', prospect_id, channel, direction, occurred_at?,
  *          subject?, body?, note?, retry_of? }
- *     -> 200 { touch: Touch, prospect: Prospect }  -- prospect is the row
+ *     -> 200 { touch: Touch, prospect: Prospect, warning?: string }
+ *                                         -- prospect is the row
  *                                            AFTER last_contacted_at/
  *                                            replied_at was updated, and ALSO
  *                                            carries `touches: Touch[]`. The
  *                                            UI never needs a second call.
+ *                                            `warning` appears when the touch
+ *                                            and the stamp both landed but the
+ *                                            follow-up date could not be
+ *                                            scheduled; the write succeeded and
+ *                                            must NOT be retried. Undeclared
+ *                                            until 2026-09-03 (review F8).
  *     -> 4xx { error: string }
  *     -> 500 { error: string, code: string, touch_id?: number }  -- see
- *                                            "not atomic" below.
+ *                                            "not atomic" below. NOTE the
+ *                                            2026-08-20 extraction into
+ *                                            _touches.js renamed four of these
+ *                                            codes (touch:retry_lookup ->
+ *                                            touch:retry_lookup_failed,
+ *                                            touch:insert -> touch:insert_failed,
+ *                                            touch:stamp -> touch:stamp_failed,
+ *                                            touch:restamp_fetch ->
+ *                                            touch:refetch_failed) and TOUCH_COLS
+ *                                            gained `external_id`, so every
+ *                                            Touch carries one more key. Both
+ *                                            were undeclared until 2026-09-03
+ *                                            (review F8); nothing in src/ reads
+ *                                            either, so no live caller broke.
  *   POST { action: 'promote', candidate_id }
  *     -> 200 { prospect: Prospect, candidate: Candidate, warning?: string }
  *     -> 4xx { error: string }
@@ -161,6 +181,18 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
+// The touch write path lives in _touches.js so the inbound reply poller can
+// reuse it instead of becoming a second copy (docs/arch/reply-handling.md 4.5).
+// The names below are re-exported at the bottom of this file so the existing
+// test suite keeps importing them from here.
+const {
+  recordTouch, nextActionAtFor, stampFieldFor, buildAdvanceOnlyFilter,
+  TOUCH_COLS, FOLLOW_UP_STEPS_DAYS, TERMINAL_STAGES,
+  // The occurred_at bounds moved to _touches.js on 2026-09-03 (review F3):
+  // there are two callers now and the poller was enforcing only half of them.
+  // They are still re-exported from this file so existing tests keep working.
+  TOUCH_MIN_OCCURRED_AT, TOUCH_MAX_FUTURE_MS,
+} = require('./_touches')
 
 const SELECT_COLS = `
   id, domain, company, contact_name, contact_role, contact_url, linkedin_url,
@@ -170,8 +202,6 @@ const SELECT_COLS = `
   contact_email, contact_email_source, contact_email_kind, x_url,
   x_verified, linkedin_verified
 `.replace(/\s+/g, ' ').trim()
-
-const TOUCH_COLS = 'id, prospect_id, channel, direction, occurred_at, subject, body, note, created_at'
 
 const CANDIDATE_COLS = 'id, prospect_id, kind, value, source_url, email_kind, confidence, promoted, created_at'
 
@@ -207,9 +237,9 @@ const VALID_CHANNELS = new Set(['email', 'linkedin', 'x'])
 const VALID_DIRECTIONS = new Set(['out', 'in'])
 
 // bg-verify S1 fix: occurred_at bounds. See the header comment's "OCCURRED_AT
-// IS BOUNDED" section for the reasoning behind these exact values.
-const TOUCH_MIN_OCCURRED_AT = Date.parse('2026-01-01T00:00:00.000Z')
-const TOUCH_MAX_FUTURE_MS = 24 * 60 * 60 * 1000
+// IS BOUNDED" section for the reasoning behind these exact values. The two
+// constants now live in _touches.js (imported above) so the poller enforces
+// the identical floor; review finding F3, 2026-09-03.
 
 // The ONLY columns a PATCH may ever touch. Everything else on the row
 // (domain, and every audit/research-derived field, including the new
@@ -429,34 +459,10 @@ function promotionPatch(candidate) {
   if (candidate.kind === 'linkedin') return { patch: { linkedin_url: candidate.value } }
   return { patch: { x_url: candidate.value } }
 }
+// stampFieldFor, buildAdvanceOnlyFilter and nextActionAtFor moved to
+// _touches.js on 2026-08-20 so the inbound reply poller shares them rather
+// than copying them. They are re-exported at the bottom of this file.
 
-/**
- * stampFieldFor(direction) -> 'last_contacted_at' | 'replied_at'
- *
- * Single source for the direction -> column mapping, used to build both the
- * UPDATE's SET payload and its WHERE filter, so the two can never name
- * different columns for the same touch.
- */
-function stampFieldFor(direction) {
-  return direction === 'out' ? 'last_contacted_at' : 'replied_at'
-}
-
-/**
- * buildAdvanceOnlyFilter(field, newIso) -> string
- *
- * bg-verify S8 fix, 2026-08-15. The PostgREST OR-filter that makes the
- * prospect stamp UPDATE forward-only: matches a row only when `field` is
- * null or strictly earlier than `newIso`. Extracted as a pure function so
- * the filter STRING is unit-testable without a database
- * (tests/prospects_admin_whitelist.test.js); the semantics it encodes --
- * that Postgres actually evaluates this as "only advance, never rewind" --
- * were separately proven against a real transaction that was rolled back
- * (see the S8 entry in CLAUDE.md's 2026-08-15 section), since a filter
- * string being well-formed is not the same as the database enforcing it.
- */
-function buildAdvanceOnlyFilter(field, newIso) {
-  return `${field}.is.null,${field}.lt.${newIso}`
-}
 
 /**
  * attachRelated(supabase, prospect) -> Promise<{ error, code } | { prospect }>
@@ -614,137 +620,46 @@ exports.handler = async (event) => {
   // header comment's "NOT ATOMIC" section for the honest description and the
   // retry_of contract that keeps a retry from duplicating the touch.
   if (body.action === 'touch') {
-    const { error: invalid, prospect_id, direction, occurredAtIso, insert, retryOf } = validateTouch(body)
+    const { error: invalid, prospect_id, insert, retryOf } = validateTouch(body)
     if (invalid) return json(400, { error: invalid })
 
-    let touch
-    if (retryOf) {
-      // Idempotent retry path (bg-verify S2). The insert already succeeded
-      // on a prior attempt and only the prospect stamp failed; re-use that
-      // touch row by id instead of inserting a duplicate. The FK plus this
-      // explicit prospect_id match means a retry_of for the wrong prospect
-      // (or a nonexistent one) fails closed as 404, not a cross-attribution.
-      const { data: existing, error: fetchError } = await supabase
-        .from('prospect_touches')
-        .select(TOUCH_COLS)
-        .eq('id', retryOf)
-        .eq('prospect_id', prospect_id)
-        .maybeSingle()
+    // The write itself lives in _touches.js so the inbound reply poller uses
+    // the identical path (docs/arch/reply-handling.md 4.5). Everything below
+    // is only the mapping from a structured outcome onto HTTP.
+    const outcome = await recordTouch(supabase, {
+      prospect_id,
+      insert,
+      retryOf,
+      selectCols: SELECT_COLS,
+    })
 
-      if (fetchError) return fail500(headers, 'touch:retry_lookup', fetchError)
-      if (!existing) {
-        return json(404, { error: `retry_of touch ${retryOf} not found for prospect ${prospect_id}. Retry with the full touch payload instead of retry_of.` })
+    if (!outcome.ok) {
+      if (outcome.kind === 'retry_not_found' || outcome.kind === 'prospect_not_found') {
+        return json(404, { error: outcome.message })
       }
-      touch = existing
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('prospect_touches')
-        .insert(insert)
-        .select(TOUCH_COLS)
-        .single()
-
-      if (insertError) {
-        // FK violation on a non-existent prospect_id surfaces as 23503.
-        if (insertError.code === '23503') return json(404, { error: `Prospect ${prospect_id} not found.` })
-        return fail500(headers, 'touch:insert', insertError)
+      if (outcome.kind === 'duplicate_external_id') {
+        // Not reachable from this endpoint: validateTouch() never accepts an
+        // external_id, so a UI caller cannot produce one. Mapped anyway rather
+        // than falling through to a misleading 500 if that ever changes.
+        return json(409, { error: outcome.message })
       }
-      touch = inserted
+      if (outcome.kind === 'stamp_failed' || outcome.kind === 'refetch_failed') {
+        // The touch is already durable; report that honestly and hand back a
+        // STRUCTURED touch_id (bg-verify S2) so the caller can retry with
+        // `retry_of` instead of resending the whole touch and duplicating it.
+        console.error(`[prospects-admin] touch: ${outcome.kind}:`, outcome.cause && outcome.cause.message)
+        return json(500, { error: outcome.message, code: `touch:${outcome.kind}`, touch_id: outcome.touch_id })
+      }
+      return fail500(headers, `touch:${outcome.kind}`, outcome.cause || new Error(outcome.message))
     }
 
-    // Stamp from the PERSISTED touch row, not the request (bg-verify S9
-    // correction: a retry_of call still must resend channel and direction in
-    // full -- validateTouch() requires both regardless of retry_of, before
-    // retry_of is even parsed. Reading the stamp values from the row that
-    // was actually written or reused, rather than trusting the request
-    // body, is still correct: it means a retry whose direction happens to
-    // disagree with the original is harmlessly ignored, since the persisted
-    // row is the truthful one).
-    const stampAtIso = touch.occurred_at
-    const stampField = stampFieldFor(touch.direction)
-
-    // bg-verify S8 fix. GREATEST() semantics: an older touch is an
-    // explicitly supported backfill (tests/prospects_admin_whitelist.test.js
-    // asserts an explicit occurred_at round-trips), and it must be recorded
-    // faithfully in prospect_touches, but it must NEVER move the derived
-    // queue field backwards -- that is exactly the double-touch failure
-    // this table exists to prevent, and S1 only bounded the blast radius to
-    // roughly seven months, it did not close the mechanism. This is a
-    // single conditional UPDATE, not a read-then-compare-then-write: the
-    // WHERE clause and the SET happen inside the same statement, so
-    // Postgres's row lock makes the compare-and-swap atomic even under two
-    // concurrent touches on the same prospect, which a separate SELECT
-    // followed by an UPDATE in application code would not guarantee.
-    //
-    // Chose this over the rpc() bg-verify flagged as the natural home for
-    // S2 and S8 together, and the reasoning is stated because the packet
-    // asked for it explicitly: an rpc() callable via PostgREST needs its
-    // own EXECUTE-grant review before it ships. This project's existing
-    // SECURITY DEFINER functions (is_admin(), my_client_id(), etc, see the
-    // "Supporting facts" in docs/qa/prospect-channels-review-2026-08-15.md)
-    // are already anon/authenticated-executable under Supabase's default
-    // grants. A new DEFINER function that writes prospects/prospect_touches
-    // would, unless explicitly REVOKEd from anon/authenticated and then
-    // re-verified with the same role-scoped rollback-probe method
-    // bg-verify used to prove RLS containment on this table, let ANY
-    // authenticated caller bypass the admin-only RLS entirely via the
-    // function owner's privileges -- a genuine RLS-widening risk, not a
-    // hypothetical one, and closing it properly is Opus-tier review work
-    // under this project's own escalation rule, not something to fold into
-    // the same round as a MEDIUM non-blocking fix under a push deadline.
-    // The conditional UPDATE below gets the identical forward-only,
-    // race-safe guarantee with zero schema change and zero new attack
-    // surface, so the rpc() is not worth it THIS round. S2's idempotency
-    // workaround (retry_of) is therefore kept, not deleted.
-    const { data: stampedRows, error: stampError } = await supabase
-      .from('prospects')
-      .update({ [stampField]: stampAtIso })
-      .eq('id', prospect_id)
-      .or(buildAdvanceOnlyFilter(stampField, stampAtIso))
-      .select(SELECT_COLS)
-
-    if (stampError) {
-      // The touch is already durable; report that honestly and hand back a
-      // STRUCTURED touch_id (bg-verify S2) so the caller can retry with
-      // `retry_of` instead of resending the whole touch and duplicating it.
-      console.error('[prospects-admin] touch: stamping prospect failed:', stampError.message)
-      return json(500, {
-        error: 'Touch was logged, but updating the prospect record failed. Retry this request with retry_of set to touch_id.',
-        code: 'touch:stamp',
-        touch_id: touch.id,
-      })
-    }
-
-    // A 0-row result means the conditional UPDATE's WHERE clause correctly
-    // did not match -- the existing stamp was already >= this touch's
-    // occurred_at, so the field is intentionally unchanged, NOT an error.
-    // Fetch the current row instead of trusting an empty result, since the
-    // touch itself is durable in prospect_touches either way.
-    let prospect
-    if (stampedRows && stampedRows.length > 0) {
-      prospect = stampedRows[0]
-    } else {
-      const { data: current, error: fetchError } = await supabase
-        .from('prospects')
-        .select(SELECT_COLS)
-        .eq('id', prospect_id)
-        .single()
-
-      if (fetchError) {
-        console.error('[prospects-admin] touch: refetching prospect after a no-op stamp failed:', fetchError.message)
-        return json(500, {
-          error: 'Touch was logged, but the prospect record could not be re-read. Retry this request with retry_of set to touch_id.',
-          code: 'touch:restamp_fetch',
-          touch_id: touch.id,
-        })
-      }
-      prospect = current
-    }
+    const { touch, prospect } = outcome
 
     const { error: relatedError, code: relatedCode } = await attachRelated(supabase, prospect)
     if (relatedError) return fail500(headers, `touch:${relatedCode}`, relatedError, { touch_id: touch.id })
 
-    console.log(`[prospects-admin] touch ${touch.id} logged (${touch.channel}/${touch.direction}) for prospect ${prospect_id} by ${auth.user.id}${retryOf ? ` (retry_of=${retryOf})` : ''}`)
-    return json(200, { touch, prospect })
+    console.log(`[prospects-admin] touch ${touch.id} logged (${touch.channel}/${touch.direction}) for prospect ${prospect_id} by ${auth.user.id}${retryOf ? ` (retry_of=${retryOf})` : ''} next_action_at=${prospect.next_action_at || 'none'}`)
+    return json(200, outcome.warning ? { touch, prospect, warning: outcome.warning } : { touch, prospect })
   }
 
   // ── promote ───────────────────────────────────────────────────────────────
@@ -829,3 +744,6 @@ module.exports.validatePromote = validatePromote
 module.exports.promotionPatch = promotionPatch
 module.exports.candidateSort = candidateSort
 module.exports.VALID_CANDIDATE_KINDS = VALID_CANDIDATE_KINDS
+module.exports.nextActionAtFor = nextActionAtFor
+module.exports.FOLLOW_UP_STEPS_DAYS = FOLLOW_UP_STEPS_DAYS
+module.exports.TERMINAL_STAGES = TERMINAL_STAGES

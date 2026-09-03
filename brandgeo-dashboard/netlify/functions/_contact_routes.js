@@ -155,6 +155,14 @@ function normaliseDomain(domain) {
   d = d.replace(/^www\./, '')
   d = d.split('/')[0].split('?')[0].split('#')[0]
   if (!d.includes('.')) return null
+  // A bare IP literal is not a domain (review finding F7, second entry path).
+  // `prospects.domain` is not in prospects-admin.js's WRITABLE_FIELDS, so this
+  // can only arrive by hand-run SQL, and no row carries one today (0 of 71,
+  // measured by the reviewer). Refusing here means candidatePaths() cannot
+  // build https://10.0.0.5/contact in the first place, rather than relying on
+  // the address check downstream to catch it. A host:port form keeps working;
+  // only the IP host itself is refused.
+  if (ipv4Class(d.split(':')[0]) || d.startsWith('[')) return null
   return d
 }
 
@@ -668,6 +676,207 @@ function mergeCandidates(raw, ownDomain) {
   return out
 }
 
+// ---------------------------------------------------------------------------
+// Fetch target guard (review findings F5 and F7, 2026-09-03)
+//
+// F7 is SSRF: normaliseDomain() only ever required a dot, so 127.0.0.1,
+// 10.0.0.5, 192.168.1.1 and 169.254.169.254 all parsed as domains, and
+// fetchPage followed redirects to anywhere. A prospect site under someone
+// else's control could answer any of the 12 candidate paths with a 302 to an
+// internal address; the resolver would fetch it, run EMAIL_RE over the
+// response, and stage whatever matched as a candidate visible in the admin
+// UI. That is a read oracle onto the function's own network.
+//
+// F5 is provenance: because redirects were followed, res.url (which becomes
+// source_url) could be ANY host, while the design document and the packet
+// both claim the resolver only ever reads the prospect's own pages plus the
+// Play Store. The claim was true of intent and false of the code.
+//
+// Both are the same check applied at the same place, which is why they are
+// one function: a hop is allowed only when it is (a) http or https, (b) on
+// the prospect's own domain or play.google.com, and (c) resolving entirely to
+// public addresses. Refusing a hop that leaves the two allowed hosts makes
+// the provenance claim true by construction rather than by intention.
+//
+// THIS FUNCTION IS PURE ON PURPOSE. It takes the addresses the caller already
+// resolved rather than resolving them itself, so every branch is unit
+// testable with no network and no DNS (tests/contact_routes_fetch_guard.test.js).
+//
+// KNOWN LIMIT, stated rather than hidden: resolving the host and then handing
+// the URL to fetch() is a time-of-check to time-of-use gap. A DNS entry whose
+// answer changes between the check and the connection (DNS rebinding) is not
+// closed by this, and cannot be without a custom HTTP agent that pins the
+// socket to the address that was checked. The guard raises the cost of the
+// attack from "302 to 169.254.169.254" to "control authoritative DNS for a
+// host on the prospect's own domain AND win a race", which is a different
+// class of attacker.
+// ---------------------------------------------------------------------------
+
+/** The one host that is not the prospect's own and is still allowed. */
+const PLAY_STORE_HOST = 'play.google.com'
+
+/** Hostnames that never belong to a real prospect site. */
+const BLOCKED_HOST_SUFFIXES = ['.local', '.internal', '.localhost', '.home.arpa']
+
+/**
+ * ipv4Class(ip) -> 'public' | 'blocked' | null (not an IPv4 literal)
+ * Blocks loopback, private, link local (which is where cloud metadata lives),
+ * carrier grade NAT, benchmark, multicast and reserved space.
+ */
+function ipv4Class(ip) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(ip).trim())
+  if (!m) return null
+  const o = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])]
+  if (o.some((n) => n > 255)) return 'blocked'
+  if (o[0] === 0) return 'blocked'
+  if (o[0] === 10) return 'blocked'
+  if (o[0] === 127) return 'blocked'
+  if (o[0] === 169 && o[1] === 254) return 'blocked'
+  if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return 'blocked'
+  if (o[0] === 192 && o[1] === 168) return 'blocked'
+  if (o[0] === 192 && o[1] === 0 && (o[2] === 0 || o[2] === 2)) return 'blocked'
+  if (o[0] === 100 && o[1] >= 64 && o[1] <= 127) return 'blocked'
+  if (o[0] === 198 && (o[1] === 18 || o[1] === 19)) return 'blocked'
+  if (o[0] >= 224) return 'blocked'
+  return 'public'
+}
+
+/**
+ * expandIpv6(ip) -> number[8] | null
+ * Expands "::" and any trailing dotted-quad into eight 16 bit groups so the
+ * classification below can be plain arithmetic rather than string matching.
+ */
+function expandIpv6(ip) {
+  let s = String(ip).trim().toLowerCase()
+  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1)
+  const pct = s.indexOf('%')
+  if (pct >= 0) s = s.slice(0, pct)
+  if (!s.includes(':')) return null
+
+  const v4 = /:((?:\d{1,3}\.){3}\d{1,3})$/.exec(s)
+  if (v4) {
+    const o = v4[1].split('.').map(Number)
+    if (o.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null
+    const hex = (n) => n.toString(16)
+    s = s.slice(0, s.length - v4[1].length) + hex((o[0] << 8) | o[1]) + ':' + hex((o[2] << 8) | o[3])
+  }
+
+  const halves = s.split('::')
+  if (halves.length > 2) return null
+  const head = halves[0] ? halves[0].split(':') : []
+  let groups
+  if (halves.length === 2) {
+    const tail = halves[1] ? halves[1].split(':') : []
+    const fill = 8 - head.length - tail.length
+    if (fill < 0) return null
+    groups = [...head, ...Array(fill).fill('0'), ...tail]
+  } else {
+    groups = head
+  }
+  if (groups.length !== 8) return null
+  const nums = groups.map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN))
+  return nums.some((n) => !Number.isFinite(n)) ? null : nums
+}
+
+/** embeddedIpv4(hi, lo) -> the dotted quad carried in two 16 bit groups */
+function embeddedIpv4(hi, lo) {
+  return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`
+}
+
+/** ipv6Class(ip) -> 'public' | 'blocked' | null (not an IPv6 literal) */
+function ipv6Class(ip) {
+  const n = expandIpv6(ip)
+  if (!n) return null
+  // IPv4 mapped (::ffff:a.b.c.d) and IPv4 compatible (::a.b.c.d) reach the
+  // same hosts as the bare IPv4 address, so they are classified as one.
+  if (n.slice(0, 5).every((g) => g === 0) && (n[5] === 0xffff || n[5] === 0)) {
+    if (n[5] === 0 && n[6] === 0 && n[7] <= 1) return 'blocked' // :: and ::1
+    return ipv4Class(embeddedIpv4(n[6], n[7])) || 'blocked'
+  }
+  // N3 (2026-09-03 re-review): three more forms carry an IPv4 address the
+  // packet ends up at. The NAT64 well-known prefix 64:ff9b::/96 (RFC 6052) and
+  // 6to4 2002::/16 (RFC 3056) are classified as the embedded address. The
+  // local-use NAT64 prefix 64:ff9b:1::/48 (RFC 8215) is never globally
+  // routable, so it is blocked outright.
+  if (n[0] === 0x0064 && n[1] === 0xff9b) {
+    if (n[2] === 1) return 'blocked'
+    if (n[2] === 0 && n[3] === 0 && n[4] === 0 && n[5] === 0) return ipv4Class(embeddedIpv4(n[6], n[7])) || 'blocked'
+  }
+  if (n[0] === 0x2002) return ipv4Class(embeddedIpv4(n[1], n[2])) || 'blocked'
+  if ((n[0] & 0xfe00) === 0xfc00) return 'blocked' // fc00::/7 unique local
+  if ((n[0] & 0xffc0) === 0xfe80) return 'blocked' // fe80::/10 link local
+  if ((n[0] & 0xff00) === 0xff00) return 'blocked' // ff00::/8 multicast
+  if (n[0] === 0x2001 && (n[1] & 0xfff8) === 0x0db8) return 'blocked' // documentation
+  return 'public'
+}
+
+/**
+ * addressIsPublic(address) -> boolean
+ * Anything that is not a parseable public IPv4 or IPv6 literal is refused.
+ * Fail closed: an address this function cannot classify is one it cannot
+ * vouch for.
+ */
+function addressIsPublic(address) {
+  const v4 = ipv4Class(address)
+  if (v4) return v4 === 'public'
+  const v6 = ipv6Class(address)
+  if (v6) return v6 === 'public'
+  return false
+}
+
+/**
+ * checkFetchTarget(url, addresses, { ownDomain }) ->
+ *   { allow: true, host } | { allow: false, reason }
+ *
+ * `addresses` is what the caller's DNS lookup returned for the URL's host: a
+ * string or an array of strings. Every one of them must be public, because a
+ * host with one public and one private answer reaches the private one on the
+ * next connection just as easily.
+ *
+ * `ownDomain` is the prospect's domain. When it is absent the host check is
+ * limited to the Play Store, which is deliberately stricter than skipping it.
+ */
+function checkFetchTarget(url, addresses, { ownDomain = null } = {}) {
+  let parsed
+  try {
+    parsed = new URL(String(url))
+  } catch (_) {
+    return { allow: false, reason: 'unparseable url' }
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { allow: false, reason: `refused scheme ${parsed.protocol.replace(':', '')}` }
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  const bare = host.replace(/^www\./, '')
+  if (!host) return { allow: false, reason: 'no host' }
+
+  if (host === 'localhost' || BLOCKED_HOST_SUFFIXES.some((s) => host.endsWith(s))) {
+    return { allow: false, reason: `refused host ${host}: internal name` }
+  }
+
+  const own = normaliseDomain(ownDomain)
+  const onOwnDomain = !!own && hostMatchesDomain(bare, own)
+  if (!onOwnDomain && host !== PLAY_STORE_HOST) {
+    return {
+      allow: false,
+      reason: `refused host ${host}: not the prospect's own domain${own ? ` (${own})` : ''} or ${PLAY_STORE_HOST}`,
+    }
+  }
+
+  const list = Array.isArray(addresses) ? addresses : addresses ? [addresses] : []
+  if (list.length === 0) return { allow: false, reason: `refused host ${host}: no resolved address` }
+
+  for (const address of list) {
+    if (!addressIsPublic(address)) {
+      return { allow: false, reason: `refused host ${host}: resolves to non-public address ${address}` }
+    }
+  }
+
+  return { allow: true, host }
+}
+
 module.exports = {
   CANDIDATE_PATHS,
   ROLE_LOCAL_PARTS,
@@ -692,4 +901,10 @@ module.exports = {
   extractPlayStoreUrl,
   scoreConfidence,
   mergeCandidates,
+  PLAY_STORE_HOST,
+  ipv4Class,
+  ipv6Class,
+  expandIpv6,
+  addressIsPublic,
+  checkFetchTarget,
 }
