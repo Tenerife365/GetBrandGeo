@@ -112,6 +112,7 @@ export type RunOutcome = {
   done:    number   // jobs observed done or failed when the run ended
   total:   number   // jobs enqueued; 0 for a blocked run
   at:      number   // Date.now() at the write, so two identical runs still read as two
+  failed:  number   // jobs that ended failed, counted once when the run completed; 0 for a stopped or blocked run
   clientId: number  // the client the run was for, so a consumer can ignore another tenant's outcome
 }
 
@@ -208,7 +209,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         }
         setLastBlockReason(blockReason)
         setLastCompletedAt(Date.now())
-        outcome = { outcome: 'blocked', done: 0, total: 0, clientId }
+        outcome = { outcome: 'blocked', done: 0, total: 0, failed: 0, clientId }
         return { blocked: true, blockReason }
       }
 
@@ -255,9 +256,25 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         tick()
       })
 
+      // `done` counts jobs that ended done OR failed, so on its own it lets a
+      // failed job read as "checked". One extra read per completed run, not
+      // per tick, splits it so the shell can say "N checked, M failed"
+      // (ruling 2026-09-03). Skipped for a stopped run: Stop must stay
+      // instant, and the server keeps working after it anyway, so its
+      // numbers are a snapshot rather than a result.
+      let failed = 0
+      if (!abortRef.current && lastDone > 0) {
+        const { count: failedCount } = await supabase
+          .from('collection_jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('run_id', runId)
+          .eq('status', 'failed')
+        failed = failedCount ?? 0
+      }
+
       outcome = abortRef.current
-        ? { outcome: 'stopped',   done: lastDone, total, clientId }
-        : { outcome: 'completed', done: lastDone, total, clientId }
+        ? { outcome: 'stopped',   done: lastDone, total, failed, clientId }
+        : { outcome: 'completed', done: lastDone, total, failed, clientId }
 
       return { blocked: false }
     } finally {

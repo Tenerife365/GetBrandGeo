@@ -89,6 +89,19 @@ const CLIENT_GROUPS: { key: ClientGroupKey; label: string }[] = [
 const CUSTOMER_GROUP_KEYS: ClientGroupKey[] = ['active', 'free', 'test']
 const INTERNAL_GROUP_KEYS: ClientGroupKey[] = ['research', 'archived']
 
+// The end-of-run line. `done` from collectionContext counts jobs that ended
+// done OR failed; `failed` is the split, counted once for a completed run and
+// 0 for a stopped one. A failed job is named as failed rather than counted as
+// checked (ruling 2026-09-03), and a run where everything failed still shows,
+// as "0 prompts checked, N failed".
+function describeRun(n: { kind: 'completed' | 'stopped'; done: number; total: number; failed: number }): string {
+  const checked = Math.max(0, n.done - n.failed)
+  const tail = n.failed > 0 ? `, ${n.failed} failed` : ''
+  return n.kind === 'completed'
+    ? `Collection complete: ${checked} prompt${checked === 1 ? '' : 's'} checked${tail}`
+    : `Collection stopped: ${checked} of ${n.total} prompts checked${tail}`
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const { selections, addSelection, removeSelection, updateRegion } = useMarket()
@@ -224,10 +237,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (lastRunOutcome.clientId !== activeClientId) return null
     if (lastRunOutcome.done <= 0) return null
     if (lastRunOutcome.outcome === 'completed') {
-      return { kind: 'completed' as const, done: lastRunOutcome.done, total: lastRunOutcome.total }
+      return { kind: 'completed' as const, done: lastRunOutcome.done, total: lastRunOutcome.total, failed: lastRunOutcome.failed }
     }
     if (lastRunOutcome.outcome === 'stopped') {
-      return { kind: 'stopped' as const, done: lastRunOutcome.done, total: lastRunOutcome.total }
+      return { kind: 'stopped' as const, done: lastRunOutcome.done, total: lastRunOutcome.total, failed: lastRunOutcome.failed }
     }
     return null
   }, [lastRunOutcome, dismissedRunAt, activeClientId])
@@ -548,9 +561,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => { dismissRunNotice(); closeSidebar() }}
               className="text-xs text-brand-300 font-medium hover:underline"
             >
-              {runNotice.kind === 'completed'
-                ? `Collection complete: ${runNotice.done} prompt${runNotice.done === 1 ? '' : 's'} checked`
-                : `Collection stopped: ${runNotice.done} of ${runNotice.total} prompts checked`}
+              {describeRun(runNotice)}
             </NavLink>
             <button
               onClick={dismissRunNotice}
