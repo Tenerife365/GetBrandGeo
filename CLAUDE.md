@@ -22,6 +22,26 @@
 
 ## CURRENT STATE (newest entry 2026-09-03)
 
+### 2026-09-03: the Brand Fact Error Rate protocol is pre-registered on Zenodo and BG-105 is LIVE
+
+The study protocol (method only, no results) was published as Zenodo record
+10.5281/zenodo.22279050, CC BY 4.0, creator "Constantin, Daniel" / BrandGEO
+Global, the same creator string as 10.5281/zenodo.21395598 so both aggregate
+to one profile. Deposit script and token convention live in the GetBrandGEO
+Drive folder under `6-Demos/zenodo-brand-fact-error-rate-protocol/`; the token
+is in `~/.zenodo/token` on this machine, never in a repo. Results go up as a
+separate linked record, never as a new version of the protocol.
+
+`721a0d4` adds `brandgeo/web/bg-105.html` (announcement, citation block, DOI
+in the Article schema), lists it first on `blog.html`, adds a proof chip and a
+footer link on `index.html`, and a sitemap entry. Pushed 2026-09-03, all four
+live URLs verified byte for byte against `git show HEAD:` over HTTP. `site.js`
+was dirty from another session and was left out by pathspec. Two things
+noticed and NOT changed: article pages from bg-104 back still use the retired
+`#6c63ff` / `#00d4aa` palette (bg-105 uses the current violet tokens from
+`blog.html`), and the homepage chip still says "34 research articles" while
+the blog lists BG-001 through BG-105.
+
 ### 2026-09-03: sprint 17 closed at 1 free subscriber, the next five trust items are built, reviewed, PUSHED and LIVE
 
 **Sprint 17 result, stated by Constantin 2026-09-03: one new free subscriber.**
