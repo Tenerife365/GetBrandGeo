@@ -109,7 +109,7 @@ exports.handler = async (event) => {
 
   if (recentAttempts !== null && recentAttempts >= SIGNUPS_PER_IP_PER_DAY) {
     console.warn(`[signup] rate limit hit for ip_hash ${ipHash.slice(0, 12)}…`)
-    return fail(429, `Too many signup attempts. Max ${SIGNUPS_PER_IP_PER_DAY} per day — please try again tomorrow.`)
+    return fail(429, `Too many signup attempts. Max ${SIGNUPS_PER_IP_PER_DAY} per day. Please try again tomorrow.`)
   }
 
   // Record BEFORE the work so failed/retried attempts also count against the cap.
