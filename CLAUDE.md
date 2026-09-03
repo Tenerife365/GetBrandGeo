@@ -218,15 +218,39 @@ July calibration domains with `company = null`, and the one-statement, reversibl
 was RUN on Constantin's go later the same day (22 rows, ids 50 to 71, returned
 by the statement; stage counts after: contacted 13, disqualified 41, new 17);
 all 17 named prospects have zero routes, so the resolver click list is all 17,
-zero-score rows first. Step 3 part A (the code fixes) was dispatched the same
-moment as workflow `wf_4e0c722b-ce4`: bg-backend on Opus at high effort, then
-bg-verify; no credentials, no deploy, no git inside the agents. Step 3 (the Gmail reply poller) is a fix packet before it is a
-deploy: the 2026-08-20 review of packets 020/021 returned FAIL and the code
-still shows F1 (sender matching takes the first angle-bracketed token), F2
-(the backfill guard ignores an earlier reply) and F5/F7 (the resolver follows
-redirects with no private-address guard); owed to `bg-backend` on Opus with
-`bg-verify`, after Constantin's ruling on the read-only Gmail scope reaching
-unrelated TalentWeLove mail. The seats' own question stands: does the poller
+zero-score rows first. Step 3 part A (the code fixes) ran as workflow `wf_4e0c722b-ce4`:
+bg-backend on Opus at high effort, then bg-verify (584k tokens, 33 minutes,
+no credentials, no deploy, no git inside the agents). Of the fourteen
+2026-08-20 findings, ten were closed by the builder (F1, F2, F3, F5, F7, F8,
+F9, F10, F11, F12), two were already closed by `551a6d1` (F6, F6b), and two
+are not code (F4 is the moving tree, F13 is data; F14, the promote handler,
+was outside the write scope and is unchanged). bg-verify returned PASS WITH
+FINDINGS (`docs/qa/reply-handling-fix-review-2026-09-03.md`) with one
+MEDIUM blocker and two LOW residuals, all three closed by the orchestrator
+within the hour and recorded in an amendment to that report: N1, the new DNS
+phase in `resolve-contact-routes.js` ran outside the per-page deadline
+(measured 5070ms against a 1000ms budget, enough to push an invocation past
+26s and read as "publishes nothing"), now raced against the deadline by
+`withDeadline()`; N2, a stray bracket beside one well-formed `<...>` token
+still misparsed, now refused; N3, NAT64 and 6to4 literals embedding a
+private IPv4 classified as public, now classified as the embedded address.
+Tests: 270 assertions across six files, up from 265. Two test fixtures and
+both reviews carried a real prospect's personal address, and one fixture a
+named individual's RocketReach slug; all were replaced with neutral strings
+before anything was committed, because this repository is public. **The
+whole reply-handling set is one commit, `8bd9aec`** (the 2026-08-20 build,
+these fixes, the applied `external_id` migration, the design, packets 021
+and 022, both reviews), **NOT pushed**: it is dashboard code, so the push
+spends a Netlify build, and today's two are used. **Behaviour to know once
+this is live and the resolver is clicked again:** a prospect site that
+redirects off its own domain now yields no candidate and an `errors` entry
+naming the refused host (BirdsView, rebranded to Avys, is the likely first
+case); correct `prospects.domain`, never widen the guard. And a partial
+poller run is `job_runs.ok = false`; read `detail.complete` to tell partial
+from broken. Step 3 part B (the deploy) still waits on Constantin's ruling
+on the read-only Gmail scope reaching unrelated TalentWeLove mail, and the
+order is unchanged: the four `GMAIL_*` variables in Netlify, then the
+deploy, then the `pg_cron` entry at minute 20, never the other way round. The seats' own question stands: does the poller
 get deployed before batch 02, because until it exists "zero replies" only
 means zero we can see.
 
