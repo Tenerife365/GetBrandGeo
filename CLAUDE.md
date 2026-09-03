@@ -159,9 +159,14 @@ the webhook has no such select; both files are clean and last changed
 red since the billing migration and nobody ran it. Billing file: owed to
 `bg-backend` on Opus with `bg-verify`, not a drive-by.
 
-**Ruled and built the same day (Constantin, 2026-09-03: "agreed"), COMMITTED,
-NOT PUSHED (a push now would be the third build of the day; hold it for
-tomorrow or the next batch):** `009a0a6` the end-of-run line now reads
+**Ruled and built the same day (Constantin, 2026-09-03: "agreed"), PUSHED and
+LIVE (third build of the day, deploy `41e880a` published 11:09:49Z; the
+orchestrator had recommended holding it, Constantin pushed it, and it built in
+38 seconds). A parallel web session then pushed `721a0d4`, `41fb2e8` and
+`3559266` (BG-105 and the Zenodo protocol record, `brandgeo/web/` only), which
+Netlify cancelled as designed and labels "error: Canceled build due to no
+content change"; that label is not a failure. Two sessions are committing to
+this tree at once, so git commands must stay serialized:** `009a0a6` the end-of-run line now reads
 "N prompts checked, M failed", the failed part only when M is above zero, from
 ONE extra count read per completed run (not per tick, and skipped for a
 stopped run so Stop stays instant); `f2b8fee` the five pages that reload on
