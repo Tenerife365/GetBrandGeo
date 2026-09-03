@@ -20,7 +20,106 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-08-21)
+## CURRENT STATE (newest entry 2026-09-03)
+
+### 2026-09-03: sprint 17 closed at 1 free subscriber, the next five trust items are built, reviewed and COMMITTED, push owed
+
+**Sprint 17 result, stated by Constantin 2026-09-03: one new free subscriber.**
+Against G1 (EUR 2,900 MRR-equivalent), G2 (100 activated free accounts) and
+G3 (three channels firing daily), none was met. The 2026-08-13 diagnosis holds:
+no always-on channel ever fired, so one signup reads as no traffic, not as a
+product rejection. A polish audit cannot fix an empty funnel top; the next
+question is acquisition, and it has not been launched.
+
+**Correction to the 2026-08-21 entry: the push built, but ten days late.**
+`b60a108` and `551a6d1` were pushed 2026-08-21 and Netlify created NO deploy
+until 2026-08-31 17:42Z, when both queued builds ran (551a6d1 published,
+a9c612b correctly cancelled as docs-only). So batch 1 was live for the
+sprint's final day only. Verified via `netlify api getSite` and by grepping the
+live bundle for identifiers unique to the batch, NOT by comparing a local
+`dist/` hash, which produced a false "never deployed" claim twice (2026-08-21
+and again 2026-09-03 00:19). Netlify's `npm install` resolves a different
+dependency set, so identical source hashes differently. Judge a deploy by
+`published_deploy.commit_ref` or a unique identifier in the live bundle.
+
+**Two of the three 2026-08-21 chip sessions landed the same night:**
+`f11e8d9` (host matcher false negatives, pushed 00:23 local, built within two
+minutes) and `3bb3a7a` (escaped Play Store URL form, pushed 00:44, published
+00:45), so push-to-build is working normally again. **Still not landed:** the
+`collect-prompt.js` silent insert failure and the `Prospects.tsx` truncation
+banner.
+
+**A session-only cron never fired.** The re-audit was scheduled with
+`CronCreate` for 02:24 local so it would run after the 5-hour usage window
+refreshed. The desktop session went idle overnight and the job vanished
+(`CronList` empty by morning, no transcript entry 00:30 to 07:23). Never
+promise a timed follow-up on a session cron alone: keep the session alive and
+check `CronList` near the fire time, or hand over the exact `scriptPath` to
+fire by hand. Memory `session-cron-does-not-survive-idle` records it.
+
+**The re-audit ran by hand at 07:28 and found the next five.** Workflow
+`wf_d5906b18-d25`: 4 read-only lenses at concurrency 2 (the 32 GB RAM cap, no
+builds or browsers inside agents), a ranker and a skeptic, 6 agents, 24 raw
+findings, 5 of 5 stand. Report `docs/audit/product-reaudit-2026-09-03.md`
+(`3d98bdc`). Batch 1 was excluded as already fixed; the lenses read HEAD
+`3bb3a7a`; `netlify/functions` and `Revenue.tsx` were off limits. The five, in
+rank order: (1) Overview's first-run hero read `ai_results` rows instead of the
+prompts query, looping a client with prompts back to /prompts, and hid a free
+client's score for three weeks of every month; (2) the cold audit report died
+on a dead or purged token as raw "Audit not found" with no way forward, and
+reports purge at 90 days so every batch-01 link was scheduled to fail that
+way; (3) AI Visibility blanked to a text line on every 4-second poll during
+the first collection and listed retired engines as purchasable; (4) the auth
+screens sent a new user to the login form, led with a dead LinkedIn button,
+and printed raw transport strings; (5) the insight pages showed coloured zeros
+above "Not measured yet", only AI Visibility reloaded when a run landed, and
+the time filter rendered on 13 routes while changing data on 3.
+
+**Built by 5 `bg-app` builders at concurrency 2 (`wf_9f1943f3-5ed`, 20 min),
+all five self-reporting every criterion met. The three-lens review
+(`wf_269a6214-ba0`, correctness, acceptance, design and copy truth) returned
+FAIL, FAIL, FAIL: 20 findings, 5 blocker, 6 major, 9 minor.** The two worth
+remembering: `serverError()` did not exist yet, so the new error humanizer
+swallowed the API's own validation copy (rejected disposable address, daily
+limit, which field is wrong) into "Signup failed. Please try again.", a closed
+loop for that visitor; and the shell's end-of-run notice inferred completion
+from `collecting` flipping false, so it announced "Collection complete" for a
+run the server refused (the previous run's total leaked through) and for a
+stopped one. All 20 fixed in one pass, then an independent verifier re-checked
+every finding: **PASS_WITH_FINDINGS**, all 20 closed or accepted, four residual
+minors (retired engine still "Coming Soon" in the admin modal, the notice
+surviving a client switch, an orphan poll tick after Stop, the pass-through
+unbounded by status), all four fixed before commit. Record:
+`docs/qa/next5-review-2026-09-03.md`. `npm run build` exit 0, zero em or en
+dashes in added lines (scan proven with a positive control), dirty set exactly
+the batch. Free RAM stayed between 7.5 and 10 GB throughout; no freeze.
+
+**One accepted deviation, so it is not re-argued:** the cooldown upgrade link
+renders only for plans slower than weekly (today, free at 720h). Every paid
+plan is already weekly, so the link would promise nothing there. Latent gap
+for a hypothetical 169 to 719h tier, documented in the review record.
+
+**COMMITTED, NOT PUSHED.** One commit per item, rank order, pathspec-limited so
+the other sessions' dirty files (`Revenue.tsx`, `netlify/functions`, `db/`,
+`brandgeo/web/site.js`) stayed out: `69460b0` Overview, `8f4799e` AuditReport,
+`c047191` AI Visibility plus `collectionContext.tsx` and `planConfig.ts`
+(`RETIRED_ENGINES`, `lastRunOutcome`, the Stop hang and its orphan tick),
+`ac1ec1c` auth screens plus new `src/lib/errors.ts`, `4c6db93` insight pages
+and `Layout.tsx`. Push needs `BATCH_PUSH=1` (AUTONOMY section 7) and spends
+one Netlify build. Scale note: Supabase reads neutral to reduced (item 3 bumps
+`lastCompletedAt` only when the done count changes, so the per-tick page reload
+is gone, and item 2 stops polling dead tokens); no new writes; no new function
+invocations. After pushing, confirm within the hour that a deploy was CREATED
+(`netlify api listSiteDeploys`), given the ten-day silent gap above.
+
+**Recorded, not fixed:** `signup-client.js:112` carries an em dash inside the
+customer-facing rate-limit sentence, printed verbatim on a 429 (backend, one
+word, owed to `bg-backend`); the poll counts `done` or `failed` jobs alike, so
+a failed job reads as "checked" in the end-of-run line (needs a ruling); the
+four item-5 pages fire a duplicate load on mount when `lastCompletedAt` is
+already set; 226 pre-existing em or en dash lines sit in the base files'
+comments and older copy, none added by this batch, customer visibility
+unscanned.
 
 ### 2026-08-21: top 5 trust/UX improvements SHIPPED, F6/F6b closed, packet 020/021 review returned FAIL
 
