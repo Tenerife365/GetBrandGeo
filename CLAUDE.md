@@ -174,6 +174,54 @@ ignores the value seen at mount, closing the duplicate query set per visit.
 files' comments and older copy, none added by this batch, customer visibility
 unscanned.
 
+**Acquisition restart, step 1 DONE (on disk only, nothing sent, nothing
+committed by design), steps 2 and 3 prepared.** Sprint 17 closed at one free
+subscriber because no channel ever fired, so the next work is acquisition, not
+polish. Step 1 is the follow-up queue: 13 contacted prospects, 0 replies
+logged, all overdue since 2026-08-20 to 24. Workflow `wf_ca9eb458-afa` ran the
+four GTM seats at medium effort, two at a time (gtm-cro, then gtm-email with
+gtm-linkedin, then gtm-verify), 877k tokens, 20 minutes, reading routes and
+tokens from the database themselves (SELECT only) and facts from the public
+report JSON. Outputs, all GIT-IGNORED because this repo is public and they name
+real people (`.gitignore` rule `docs/growth/outbound/**` from 2026-08-16, plus
+`docs/growth/qa/**` added today; both committed today, the first had sat
+uncommitted since August): `docs/growth/outbound/sequence/followups-2026-09-03.md`
+(11 of 13 get a touch; Smilenotes stops at one; RunSensible is PARKED because
+its only individual route came from rocketreach.co, candidate 10, which the
+never-query list forbids; Amberlo and CasePacer park after touch 2),
+`docs/growth/outbound/email/followups-2026-09-03.md` (16 cards),
+`docs/growth/outbound/linkedin/followups-2026-09-03.md` (7 drafts),
+`docs/growth/qa/verify-followups-2026-09-03.md` (LIVE WITH FINDINGS, 19 of 23
+fire, 4 held on one clause each). The four clauses were fixed by the
+orchestrator and re-checked against the same JSON instead of a second verifier
+run: "the only company named anywhere" became "the only company that came back
+on more than one question" (nine other names exist in `engine_results`);
+"search Lawcus/Vibefam by name and you are there" claimed a measurement never
+made (the brand name is never sent to an engine) and became a framing
+sentence; Glood.AI's "no vendor on any of the four questions" became "on any
+question it answered" (three Gemini cells, not four). **What Constantin must
+do, in order:** run the Gmail gate at the top of the sequence file (search for
+replies and mailer-daemon bounces on the 2026-08-16/17 sends; a reply removes
+the prospect and is logged as an inbound touch on the Prospects page); observe
+whether the Lawcus and Vibefam LinkedIn invitations were accepted, which
+decides 6 of the 16 email cards (branch A is LinkedIn, branch B is email);
+send wave 1 (touch 2) on 2026-09-04 and wave 2 (touch 3 closes) on 2026-09-11,
+logging each touch on the Prospects page so `next_action_at` advances. Step 2
+is prepared in `docs/growth/outbound/batch-02-prep-2026-09-03.md` (also
+ignored): the pipeline is 17 named prospects, not 39; the other 22 rows are the
+July calibration domains with `company = null`, and a one-statement,
+reversible split to `disqualified` is written there and NOT RUN; all 17 named
+prospects have zero routes, so the resolver click list is all 17, zero-score
+rows first. Step 3 (the Gmail reply poller) is a fix packet before it is a
+deploy: the 2026-08-20 review of packets 020/021 returned FAIL and the code
+still shows F1 (sender matching takes the first angle-bracketed token), F2
+(the backfill guard ignores an earlier reply) and F5/F7 (the resolver follows
+redirects with no private-address guard); owed to `bg-backend` on Opus with
+`bg-verify`, after Constantin's ruling on the read-only Gmail scope reaching
+unrelated TalentWeLove mail. The seats' own question stands: does the poller
+get deployed before batch 02, because until it exists "zero replies" only
+means zero we can see.
+
 ### 2026-08-21: top 5 trust/UX improvements SHIPPED, F6/F6b closed, packet 020/021 review returned FAIL
 
 Two sessions were running in parallel on 2026-08-20 and both were interrupted.

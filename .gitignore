@@ -10,6 +10,7 @@ brandgeo/web/deploy.log
 
 # Secrets — never commit these
 .env
+scripts/.env.local
 credentials.json
 token.json
 
@@ -118,3 +119,17 @@ assets/audio/music/
 # Ruled 2026-08-14.
 docs/growth/outbound/target-list*
 docs/growth/outbound/contacted.md
+
+# 2026-08-16: the rule above never matched anything. No file named
+# "target-list*" has ever existed, while seven files that DO name prospects
+# and publish their verified contact routes sat untracked, one `git add -A`
+# away from this public repo. Roughly 52 named companies and several named
+# individuals. Widened to the directory, with the two files that carry no
+# live contact data allowed back in. Both were already tracked.
+docs/growth/outbound/**
+!docs/growth/outbound/WHERE-PROSPECT-LISTS-LIVE.md
+!docs/growth/outbound/icp-evidence-machine-and-sequence-2026-08-14.md
+
+# 2026-09-03: the GTM verify reports quote the exact To addresses and profile
+# URLs they check, so they carry the same live contact data as the packs.
+docs/growth/qa/**
