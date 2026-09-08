@@ -100,7 +100,7 @@ uppercase, venue plus 50), the landing URL
 Stripe command Constantin runs to create that venue's code, and the
 verification the venue gives after approval (a deal page URL).
 
-The Stripe command per code, run by Constantin from
+Preferred: `.scriptsstripe-deal-code.ps1 -Code <CODE> -Channel <venue>` from the repo root in PowerShell (add `-CreateCoupon -EnableGrowthProLink` on the very first run only; `-DryRun` prints without writing). It builds the same call below and filters the npm shim noise PowerShell paints red. The raw command per code, run by Constantin from
 `C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-dashboard`, Stripe
 CLI 1.44, live mode. Writes to live Stripe are blocked for agents by the
 permission classifier and belong to him alone:
