@@ -20,7 +20,50 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-09-03)
+## CURRENT STATE (newest entry 2026-09-08)
+
+### 2026-09-08: the reply-handling set is live but the poller has no credentials; the deals campaign is packet 023
+
+`8bd9aec` and `1f99649` were pushed by Constantin between 2026-09-03 and
+2026-09-08; `origin/main` is `1f99649` and the poller answers `401` to an
+unauthenticated POST, so the reply-handling code is deployed. **The four
+`GMAIL_*` variables are NOT set:** one probe run through the same
+vault-keyed `net.http_post` the cron would use returned `503 gmail not
+configured` and wrote one `ok = false` row into `job_runs` (`stage: config`,
+2026-09-08 16:16Z, the orchestrator's probe, not a scheduled failure). No
+`poll-inbound-replies` entry exists in `cron.job`, deliberately: scheduling
+before the variables writes an hourly failure row forever. The order stands:
+set the variables in Netlify, redeploy (functions read env at deploy), then
+the `cron.schedule` statement in design section 7.1. The Netlify CLI on this
+machine is broken (corrupt npx cache, `env:list` prints a package.json parse
+error), so variable presence is proven by the function's own answer, never by
+the CLI.
+
+**Deals campaign.** Constantin's ruling 2026-09-08: three organic free signups
+in total, his own network excluded, so the product launches earlier by paying
+in discount: a 30 day campaign on the top 50 deal, coupon, affiliate and launch
+venues, 50% off monthly plans for the first 3 months, one Stripe promotion code
+per venue, `UNEED50` first because the Uneed deal form was being filled that
+day. Live Stripe, measured in read mode: coupons `XKfymWe7` (partner free
+month, the 2026-08-02 affiliate ruling) and `0I4TP6fs` (bonus months), no
+promotion code at all; the Radar, Essentials and Growth monthly payment links
+accept promotion codes, the Growth PRO monthly link
+(`plink_1TzvvK63lspobjfOp4kSb2Ab`) and all four annual links do not. **Live
+Stripe writes from an agent seat are blocked by the permission classifier** (a
+`stripe coupons create --live` was refused), so the coupon, every code and the
+Growth PRO link flag are Constantin's commands, listed in the packet. Packet
+`.claude/handoffs/023-bg-orchestrator-to-gtm-lead-deals-and-affiliates-30-day-campaign.md`
+is the whole delegation: stage A venue ranking to 50 (gtm-demand, gtm-analyst,
+gtm-verify), stage B codes and paste-ready fire cards (gtm-cro, gtm-conversion,
+gtm-email), stage C product (C1 the checkout flag, C2 a `?promo=` deep link
+through `site.js` and `_terms_gate.js` using Stripe's native
+`prefilled_promo_code`, C3 the promotions table finally wired to Stripe coupons
+with attribution written into `client_events`, C4 a daily scoreboard), stage D
+the 30 day calendar (gtm-lead). Four open questions need his ruling before
+stage D fills days 15 to 30: paid placement budget, lifetime deal marketplaces
+(recommended OUT), code expiry, and whether the shared coupon id should be
+venue neutral before other codes hang off it.
+
 
 ### 2026-09-03: the Brand Fact Error Rate protocol is pre-registered on Zenodo and BG-105 is LIVE
 
