@@ -20,7 +20,33 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-09-08)
+## CURRENT STATE (newest entry 2026-09-10)
+
+### 2026-09-10: account handover; packet 024 is the cold start for the next subscription
+
+The subscription that ran every session up to this date expires 2026-09-11
+and hit its weekly limit, so sessions continue on a different Claude account
+on the same machine. Packet
+`.claude/handoffs/024-bg-orchestrator-to-next-session-status-and-pending-2026-09-10.md`
+carries the goal, the measured state, the ordered pending list with exact
+commands, and the binding rules; the first session on the new account starts
+by reading it. Auto memory survives the switch (it is keyed by Windows user
+and project path, not by account), MCP connectors do not and must be
+re-authorised.
+
+**Stripe on 2026-09-08, read back live:** the Growth PRO monthly link now
+accepts promotion codes (the one write that landed); coupon `UNEED50` and
+promotion code `UNEED50` do NOT exist; and the Stripe CLI's stored key
+(`...khKm`, id `mk_1UDWzh63lspobjfOOZCtwIMi`) is rejected as expired on every
+call, most likely rolled while its permissions were being edited. Recovery is
+pending item 1 of packet 024: a fresh restricted key named `deals-cli` with
+Coupons, Promotion codes and Payment Links at Write, `stripe login
+--interactive --project-name=talentwelove`, then
+`.\scripts\stripe-deal-code.ps1 -Code UNEED50 -Channel uneed -CreateCoupon`
+without the link switch. Nothing else changed: `c8e2880` and `0d27081` are
+still unpushed (docs and scripts, no build), `GMAIL_*` is still unset, no
+poller cron, packet 023 stage A not launched, follow-up waves unconfirmed.
+
 
 ### 2026-09-08: the reply-handling set is live but the poller has no credentials; the deals campaign is packet 023
 
