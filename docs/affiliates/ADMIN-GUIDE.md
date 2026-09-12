@@ -68,7 +68,7 @@ program (any subset of the rule keys, for example a 25% rate for one partner).
 codes**. A coupon code typed at checkout attributes the customer to the
 affiliate even without a click, and beats an earlier link. For BrandGEO's
 Stripe checkout, paste the Stripe promotion code id (`promo_...`) on the
-coupon so a checkout that used it is attributed automatically. Codes are
+coupon so a checkout that used it is attributed automatically. Codes are deactivated, not deleted.
 
 **The referred customer's discount (ruled 2026-09-12).** The BrandGEO program
 gives 20 in total: 10% of every payment to the affiliate for 12 months, and
@@ -89,8 +89,6 @@ The affiliate's commission is computed on the amount Stripe reports as paid,
 so on a discounted invoice it is 10% of the discounted price. Every payment
 link, monthly and annual, must have "Allow promotion codes" enabled or the
 customer cannot type the code at checkout.
-deactivated, not deleted.
-
 ## Conversions and commissions
 
 **Conversions** are what happened: lead, qualified lead, sale, recurring,
