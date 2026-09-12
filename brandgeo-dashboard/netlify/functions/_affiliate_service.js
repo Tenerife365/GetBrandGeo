@@ -517,8 +517,38 @@ async function manualAttribute(supabase, { program, membershipId, externalCustom
   return { ok: true, attribution: att.attribution }
 }
 
+/**
+ * promoCodeForReferral(supabase, programSlug, rawCode) -> string | null
+ *
+ * The coupon code Stripe should prefill at checkout for a customer who arrived
+ * through this referral (the referred customer's discount, ruled 2026-09-12).
+ * The referral code is usually a link code; the discount lives on the same
+ * membership's active coupon code that is bound to a Stripe promotion code
+ * (stripe_promotion_code_id). If the referral code is itself such a coupon
+ * code it is returned as is. Anything short of an active program, an active
+ * referral code, an active membership and an active affiliate returns null:
+ * the discount is a courtesy that must never block a purchase, so the caller
+ * treats null as "send the plain link".
+ */
+async function promoCodeForReferral(supabase, programSlug, rawCode) {
+  const program = await getProgramBySlug(supabase, programSlug)
+  if (!program || program.status !== ACTIVE) return null
+  const found = await findCode(supabase, program.id, rawCode)
+  if (!found || !found.membership || !found.affiliate) return null
+  if (!found.code.is_active) return null
+  if (found.membership.status !== ACTIVE || found.affiliate.status !== ACTIVE) return null
+  const bound = (c) => !!c && c.kind === 'coupon' && c.is_active === true && !!c.stripe_promotion_code_id
+  if (bound(found.code)) return found.code.code
+  const { data, error } = await supabase.from('affiliate_codes').select('*')
+    .eq('membership_id', found.membership.id).eq('kind', 'coupon').eq('is_active', true)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`coupon lookup failed: ${error.message}`)
+  const coupon = (data || []).find(bound)
+  return coupon ? coupon.code : null
+}
+
 module.exports = {
   audit,
   getProgramBySlug, getProgramById, getMembership, getAffiliate, findCode, findVisit, findAttribution, findAttributionByStripe,
-  resolveReferralLink, upsertAttribution, recordConversion, reverseConversion, markSubscriptionEnded, manualAttribute,
+  resolveReferralLink, promoCodeForReferral, upsertAttribution, recordConversion, reverseConversion, markSubscriptionEnded, manualAttribute,
 }

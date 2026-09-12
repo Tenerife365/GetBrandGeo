@@ -22,6 +22,12 @@
  * the opposite trade to the audit endpoints, which degrade gracefully because
  * nothing there is a contract.
  *
+ * THE REFERRED CUSTOMER'S DISCOUNT (2026-09-12). A request that carries an
+ * affiliate referral gets the affiliate's Stripe promotion code appended as
+ * `prefilled_promo_code`, so Stripe applies the discount at checkout without
+ * the customer typing it. Stripe ignores the parameter when the link does not
+ * allow promotion codes, so this is additive and never a reason to refuse.
+ *
  * WHAT IT DOES NOT DO. It does not create a Stripe object, take a payment, or
  * touch provisioning: the payment links are ordinary Stripe Payment Links and
  * stripe-webhook.js still owns everything after the money moves. The acceptance
@@ -33,7 +39,8 @@
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 const { corsHeaders, preflight, err, hashIp, PUBLIC_ALLOWED_ORIGINS } = require('./_prospect_guard')
-const { resolveCheckout, withReference, TERMS_VERSION } = require('./_terms_gate')
+const { resolveCheckout, withReference, withPromoCode, TERMS_VERSION } = require('./_terms_gate')
+const service = require('./_affiliate_service')
 
 // Affiliate fields are optional and shape-checked only: a code is 3 to 32
 // [A-Z0-9_-] characters, a visit token is base64url up to 64 characters, a
@@ -42,6 +49,9 @@ const { resolveCheckout, withReference, TERMS_VERSION } = require('./_terms_gate
 const AFF_CODE_RE = /^[A-Z0-9][A-Z0-9_-]{2,31}$/
 const AFF_TOKEN_RE = /^[A-Za-z0-9_-]{8,64}$/
 const AFF_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,39}$/
+// The program a bare referral belongs to when the snippet named none; the same
+// default provision-account.js and the Stripe handler use.
+const DEFAULT_PROGRAM_SLUG = process.env.AFFILIATE_STRIPE_PROGRAM_SLUG || 'brandgeo'
 function readAffiliateRef(body) {
   const code = String(body.affiliate_ref || '').trim().toUpperCase()
   const visit = String(body.affiliate_visit || '').trim()
@@ -54,7 +64,7 @@ function readAffiliateRef(body) {
 }
 exports.readAffiliateRef = readAffiliateRef
 
-exports.handler = async (event) => {
+async function handle(event, { supabase: injected = null } = {}) {
   const origin = event.headers['origin'] || event.headers['Origin'] || ''
   if (event.httpMethod === 'OPTIONS') return preflight(origin)
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders(origin), body: 'Method Not Allowed' }
@@ -88,7 +98,8 @@ exports.handler = async (event) => {
     }
   }
 
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+  // Tests hand in the in-memory fake; production builds the real client.
+  const supabase = injected || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   const reference = crypto.randomUUID()
 
   // Affiliate attribution (2026-09-12). The tracking snippet on getbrandgeo.com
@@ -126,11 +137,31 @@ exports.handler = async (event) => {
     }
   }
 
-  console.log(`[AcceptTerms] ${decision.plan}/${decision.period} v${TERMS_VERSION} ref:${reference}`)
+  // The referred customer's discount (ruled 2026-09-12). When the acceptance
+  // carries a referral, the affiliate's coupon code that is bound to a Stripe
+  // promotion code is prefilled on the payment link, so the customer gets the
+  // discount without typing anything and the checkout is attributed by that
+  // code. No bound coupon, an inactive affiliate, or a lookup failure leaves
+  // the URL as it was: the acceptance is already written and the buyer is
+  // entitled to the checkout, discount or not.
+  let promo = null
+  if (affiliate.code) {
+    try {
+      promo = await service.promoCodeForReferral(supabase, affiliate.program || DEFAULT_PROGRAM_SLUG, affiliate.code)
+    } catch (e) {
+      console.warn('[AcceptTerms] promo code lookup failed, checkout continues without it:', e.message)
+    }
+  }
+  const url = withPromoCode(withReference(decision.url, reference), promo)
+
+  console.log(`[AcceptTerms] ${decision.plan}/${decision.period} v${TERMS_VERSION} ref:${reference}${promo ? " promo:" + promo : ""}`)
 
   return {
     statusCode: 200,
     headers: corsHeaders(origin),
-    body: JSON.stringify({ ok: true, url: withReference(decision.url, reference), reference }),
+    body: JSON.stringify({ ok: true, url, reference, promo_code: promo }),
   }
 }
+
+exports.handle = handle
+exports.handler = (event) => handle(event)

@@ -159,7 +159,7 @@ The admin can add a `coupon` code to a membership (Programs tab, codes). A
 conversion posted with that code as `affiliate_code` is attributed to the
 affiliate even without a click, and a coupon beats an earlier link. For
 BrandGEO's own checkout, set `stripe_promotion_code_id` on the code: a Stripe
-checkout that used that promotion code is attributed automatically.
+checkout that used that promotion code is attributed automatically. Since 2026-09-12 the same binding also prefills the code on the payment link: when a terms acceptance carries the referral, `accept-terms.js` appends `prefilled_promo_code=<code>` beside `client_reference_id`, so the referred customer gets the discount without typing it (Stripe ignores the parameter on a link that does not allow promotion codes). A coupon code with no Stripe binding, an inactive code, or a suspended membership or affiliate prefills nothing and never blocks the checkout.
 
 ## 6. Manual attribution
 
@@ -178,7 +178,7 @@ records a lead or sale the same way.
 - `src/pages/Signup.tsx` stores the referral from the URL; `Welcome.tsx` sends
   it to `provision-account.js`, which records a `lead` keyed on the hashed
   email. No commission yet: a free account earns nothing.
-- `accept-terms.js` stores the referral beside the terms acceptance.
+- `accept-terms.js` stores the referral beside the terms acceptance and, when that affiliate has an active coupon code bound to a Stripe promotion code, appends it to the payment link as `prefilled_promo_code`.
 - `stripe-webhook.js` hands every verified event to `_affiliate_stripe.js`:
   `checkout.session.completed` and the first `invoice.paid` become one `sale`
   (keyed on the invoice id), renewals (`billing_reason: subscription_cycle`)

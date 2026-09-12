@@ -268,6 +268,20 @@ function withReference(url, reference) {
   return `${url}${url.includes('?') ? '&' : '?'}client_reference_id=${encodeURIComponent(reference)}`;
 }
 
+/**
+ * Append a promotion code for Stripe to prefill at checkout. Payment Links
+ * read `prefilled_promo_code` and apply it only when the link allows promotion
+ * codes and the code is active; otherwise Stripe ignores it silently, so this
+ * can never block a purchase. Used for the referred customer's discount (ruled
+ * 2026-09-12): the affiliate's coupon code rides on the link so the customer
+ * gets the discount without typing it. Same shape rule as affiliate codes, 3
+ * to 32 [A-Z0-9_-]; anything else, including nothing, leaves the URL unchanged.
+ */
+function withPromoCode(url, code) {
+  if (!code || !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(String(code))) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}prefilled_promo_code=${encodeURIComponent(code)}`;
+}
+
 module.exports = {
   TERMS_VERSION,
   TERMS_URL,
@@ -275,6 +289,7 @@ module.exports = {
   SELF_SERVE_CHECKOUT_PLANS,
   resolveCheckout,
   withReference,
+  withPromoCode,
   // Exported so it can be tested directly. It decides what URL a paying
   // customer is sent to, and it rejects hostile input, so it is worth pinning
   // rather than exercising only through resolveCheckout, which needs the env

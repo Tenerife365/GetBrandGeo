@@ -86,7 +86,7 @@ job was scheduled; the cron file is optional. Advisors: the only new items
 are `affiliate_rate_limits` with RLS and no policy (INFO, intended) and the
 `affiliate_my_id()` grant.
 
-**Tests and build.** 104 checks in four files (27, 16, 17, 44), all green;
+**Tests and build.** 120 checks in five files (27, 16, 17, 44, 16), all green;
 the rest of `tests/` green except the pre-existing
 `package_provisioning.test.js`; `npm run build` exit 0. **One real defect
 was found by the Stripe test and fixed before anything shipped:** a Stripe
@@ -127,7 +127,7 @@ variable changed.
 2. First real partner: invite from the admin page, then walk the 14 steps in
    `TEST-RESULTS.md` section 3. Nothing has been run against production
    with a real affiliate yet.
-3. RULED 2026-09-12, Stripe objects still owed: customer discount repeating for 12 months while subscribed; affiliate keeps 10 percent of renewals for 12 months on the discounted amount; annual links get "Allow promotion codes" enabled. Recipe in `ADMIN-GUIDE.md`. Constantin wants 20 in total, 10 to the affiliate and 10 off for the referred customer. The affiliate half is live (10 percent of `invoice.amount_paid`, so of the discounted price, plus 10 percent of renewals for 12 months). The customer half is not in the module: it needs one Stripe coupon (10 percent off) and one promotion code per affiliate, pasted as `stripe_promotion_code_id` on that affiliate's coupon code in the admin page; a checkout using the code is attributed automatically. The annual payment links refused promotion codes on 2026-09-08 and are to be enabled, and the `?promo=` prefilled deep link of packet 023 C2 is not built. The public FAQ on `affiliates.html` was corrected from 20 to 10 percent the same day.
+3. RULED 2026-09-12, Stripe objects still owed, deep link BUILT the same day (committed, rides the next `BATCH_PUSH=1` push, one Netlify build): customer discount repeating for 12 months while subscribed; affiliate keeps 10 percent of renewals for 12 months on the discounted amount; annual links get "Allow promotion codes" enabled. Recipe in `ADMIN-GUIDE.md`. Constantin wants 20 in total, 10 to the affiliate and 10 off for the referred customer. The affiliate half is live (10 percent of `invoice.amount_paid`, so of the discounted price, plus 10 percent of renewals for 12 months). The customer half is not in the module: it needs one Stripe coupon (10 percent off) and one promotion code per affiliate, pasted as `stripe_promotion_code_id` on that affiliate's coupon code in the admin page; a checkout using the code is attributed automatically. The annual payment links refused promotion codes on 2026-09-08 and are to be enabled, and the prefilled promo code deep link is built in `accept-terms.js` (`_terms_gate.withPromoCode`, `_affiliate_service.promoCodeForReferral`, 16 checks in `tests/affiliate_promo_link.test.js`), which also covers packet 023 C2 for the affiliate case. The public FAQ on `affiliates.html` was corrected from 20 to 10 percent the same day.
 
 **Known gaps, recorded not fixed:** `site.js`'s `redirectToSignup` (the
 audit widget) does not carry the referral, and `unlock-audit-report.js`

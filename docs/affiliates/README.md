@@ -62,7 +62,7 @@ pay stay with a human.
 | Database | `db/supabase-affiliate-migration-2026-09-12.sql` (14 tables, 3 RPCs, RLS, storage bucket), `db/supabase-affiliate-seed-2026-09-12.sql`, `db/supabase-affiliate-cron-2026-09-12.sql` |
 | Shared logic | `netlify/functions/_affiliate_core.js` (money, rules, attribution policy, validation, CSV), `_affiliate_service.js` (attribution and conversion writes), `_affiliate_auth.js` (affiliate JWT gate, program API key gate), `_affiliate_email.js`, `_affiliate_stripe.js` |
 | Endpoints | `affiliate-redirect.js` (`/r/*`), `affiliate-programs-public.js`, `affiliate-apply.js`, `affiliate-conversions.js` (`/api/affiliate/conversions`), `affiliate-portal.js`, `affiliate-admin.js` |
-| Hooks into existing code | `stripe-webhook.js` (calls the affiliate hook after provisioning), `accept-terms.js` (stores the referral beside the acceptance), `provision-account.js` (records the signup lead) |
+| Hooks into existing code | `stripe-webhook.js` (calls the affiliate hook after provisioning), `accept-terms.js` (stores the referral beside the acceptance and prefills the affiliate's Stripe promotion code on the payment link), `provision-account.js` (records the signup lead) |
 | Dashboard | `src/pages/AffiliatesAdmin.tsx` (`/affiliates`, admin), `src/pages/affiliate/AffiliatePortal.tsx` (`/affiliate`), `AffiliateLogin.tsx`, `AffiliateJoin.tsx`, `src/lib/affiliateApi.tsx`, `src/lib/affiliateRef.ts`, `src/types/affiliate.ts` |
 | Marketing site | `brandgeo/web/affiliates.html`, `affiliates.js`, `affiliate-terms.html`, `affiliate-track.js`, `.htaccess` (`/r/*` forward), `cookies.html` (the `bg_ref` row) |
 | Config | `netlify.toml` (`/r/*` and `/api/affiliate/conversions` rewrites, function timeouts) |

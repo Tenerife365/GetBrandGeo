@@ -88,7 +88,7 @@ Stripe and is set up once per affiliate:
 The affiliate's commission is computed on the amount Stripe reports as paid,
 so on a discounted invoice it is 10% of the discounted price. Every payment
 link, monthly and annual, must have "Allow promotion codes" enabled or the
-customer cannot type the code at checkout.
+customer cannot type the code at checkout. When the checkout starts on getbrandgeo.com while the referral cookie is live, the code is prefilled on the payment link automatically (accept-terms appends it beside the acceptance reference); the customer only types it when they arrive without the cookie.
 
 ## Conversions and commissions
 
