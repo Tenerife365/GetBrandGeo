@@ -89,6 +89,7 @@ The affiliate's commission is computed on the amount Stripe reports as paid,
 so on a discounted invoice it is 10% of the discounted price. Every payment
 link, monthly and annual, must have "Allow promotion codes" enabled or the
 customer cannot type the code at checkout.
+
 ## Conversions and commissions
 
 **Conversions** are what happened: lead, qualified lead, sale, recurring,
