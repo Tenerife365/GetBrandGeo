@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-09-12)
 
-### 2026-09-12: affiliate module BUILT, migrated to production, 104 checks green, NOT committed
+### 2026-09-12: affiliate module BUILT, migrated to production, 104 checks green, PUSHED and LIVE
 
 An owned, multi-program affiliate MVP inside the existing platform (no paid
 affiliate platform, no separate app), commissioned by Constantin on
@@ -106,19 +106,30 @@ event, reads only. Supabase writes: one visit row per click (purged at 90
 days once the cron is scheduled), one conversion plus at most one commission
 per sale.
 
-**NOT done, in order, all Constantin's:**
-1. Commit, pathspec-limited to the files above (other sessions' dirty files
-   `site.js`, `unlock-audit-report.js`, `_revenue.js`, `revenue-report.js`,
-   `Revenue.tsx`, the gtm docs and `db/supabase-prospect-channels-migration.sql`
-   stay out), then push with `BATCH_PUSH=1`: one Netlify build.
-2. Stripe Dashboard, live account `acct_1Tzui063lspobjfO`, the webhook
-   endpoint: enable `invoice.paid` and `charge.refunded`. Without them
-   renewals and refunds never reach the module.
-3. cPanel upload of the eight web files listed in the README.
-4. Optional: run `db/supabase-affiliate-cron-2026-09-12.sql` (retention and
+**PUSHED and LIVE the same day.** Commit `843fe72` (60 files, pathspec-limited
+so the other sessions' dirty files `site.js`, `unlock-audit-report.js`,
+`_revenue.js`, `revenue-report.js`, `Revenue.tsx`, the gtm docs and
+`db/supabase-prospect-channels-migration.sql` stayed out), pushed with
+`BATCH_PUSH=1`, one Netlify build. Verified over HTTP 60 seconds after the
+push, not from the build log: `affiliate-admin` answers 401 to an
+unauthenticated POST (400 before the build), `/r/brandgeo/NOSUCHCODE` is a 302
+to the destination with nothing recorded, `affiliate-programs-public` returns
+the seeded `brandgeo` program, and all eight web files serve 200 from
+getbrandgeo.com with the tracker loaded on the homepage. **The Stripe webhook
+endpoint `adventurous-legacy` (`we_1Tzv3Q63lspobjfOijurdpTZ`, API version
+`2026-07-29.dahlia`) now listens to 5 events:** `invoice.paid` and
+`charge.refunded` were added by Constantin in the Dashboard on 2026-09-12
+beside the existing three; the signing secret was not rolled, so no Netlify
+variable changed.
+
+**Still owed, both Constantin's:**
+1. Optional: run `db/supabase-affiliate-cron-2026-09-12.sql` (retention and
    maturing at 04:35 and 04:40 UTC, minutes chosen clear of :10 and :20).
-5. First real partner: invite from the admin page, then walk the 14 steps in
-   `TEST-RESULTS.md` section 3.
+   Until then raw clicks accumulate and pending commissions mature only when
+   an admin opens the page.
+2. First real partner: invite from the admin page, then walk the 14 steps in
+   `TEST-RESULTS.md` section 3. Nothing has been run against production
+   with a real affiliate yet.
 
 **Known gaps, recorded not fixed:** `site.js`'s `redirectToSignup` (the
 audit widget) does not carry the referral, and `unlock-audit-report.js`
