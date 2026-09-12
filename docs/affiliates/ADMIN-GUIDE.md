@@ -76,9 +76,7 @@ gives 20 in total: 10% of every payment to the affiliate for 12 months, and
 subscribed. The module pays the affiliate half. The customer half lives in
 Stripe and is set up once per affiliate:
 
-1. Stripe Dashboard, live mode, Product catalog, Coupons: one coupon,
-   percentage 10, duration "Multiple months", 12 months. Create it once and
-   reuse it for every affiliate.
+1. The coupon exists on the live account since 2026-09-12: `AFFILIATE10`, 10% off, repeating for 12 months. Do not create a second one; every affiliate hangs off it.
 2. On that coupon, one promotion code per affiliate whose code string equals
    the affiliate's own code, first-time orders only. Copy its id (`promo_...`).
 3. In this page, on the affiliate's membership, add a coupon code with the same
@@ -86,9 +84,9 @@ Stripe and is set up once per affiliate:
    attributed to that affiliate, and every renewal follows the first sale.
 
 The affiliate's commission is computed on the amount Stripe reports as paid,
-so on a discounted invoice it is 10% of the discounted price. Every payment
-link, monthly and annual, must have "Allow promotion codes" enabled or the
-customer cannot type the code at checkout. When the checkout starts on getbrandgeo.com while the referral cookie is live, the code is prefilled on the payment link automatically (accept-terms appends it beside the acceptance reference); the customer only types it when they arrive without the cookie.
+so on a discounted invoice it is 10% of the discounted price. All seven active
+payment links accept promotion codes since 2026-09-12 (the three yearly ones
+were enabled that day). When the checkout starts on getbrandgeo.com while the referral cookie is live, the code is prefilled on the payment link automatically (accept-terms appends it beside the acceptance reference); the customer only types it when they arrive without the cookie.
 
 ## Conversions and commissions
 
