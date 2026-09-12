@@ -29,6 +29,10 @@ import Account from './pages/Account'
 import Tickets from './pages/Tickets'
 import AuditRequest from './pages/AuditRequest'
 import AuditReport from './pages/AuditReport'
+import AffiliatesAdmin from './pages/AffiliatesAdmin'
+import AffiliateLogin from './pages/affiliate/AffiliateLogin'
+import AffiliateJoin from './pages/affiliate/AffiliateJoin'
+import AffiliatePortal from './pages/affiliate/AffiliatePortal'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -49,6 +53,23 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   if (authed === null) return null
   return authed ? <>{children}</> : <Navigate to="/login" replace />
+}
+
+// Affiliate portal gate: same session check as PrivateRoute but bounces to the
+// affiliate sign-in page, and deliberately NOT wrapped in OnboardGate or
+// Layout. An affiliate has an auth user and no user_profiles row, so the
+// customer shell would send them to /welcome to create a client they do not
+// want. affiliate-portal.js re-verifies the JWT and the affiliate row itself.
+function AffiliateRoute({ children }: { children: React.ReactNode }) {
+  const [authed, setAuthed] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (isDemoMode) { setAuthed(sessionStorage.getItem('demo_logged_in') === 'true'); return }
+    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setAuthed(!!session))
+    return () => listener.subscription.unsubscribe()
+  }, [])
+  if (authed === null) return null
+  return authed ? <>{children}</> : <Navigate to="/affiliate/login" replace />
 }
 
 // Sits between PrivateRoute (authed?) and Layout: a freshly-authenticated user
@@ -105,6 +126,14 @@ export default function App() {
               {/* Public, unauthenticated — Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10) */}
               <Route path="/audit" element={<AuditRequest />} />
               <Route path="/audit/:token" element={<AuditReport />} />
+              {/* Affiliate module (docs/affiliates/README.md). The portal has its
+                  own shell and its own gate: see AffiliateRoute above. The join
+                  page is public, the single-use token in the URL is the credential.
+                  Referral links /r/:slug/:code never reach React: netlify.toml
+                  rewrites them to the affiliate-redirect function first. */}
+              <Route path="/affiliate/login" element={<AffiliateLogin />} />
+              <Route path="/affiliate/join/:token" element={<AffiliateJoin />} />
+              <Route path="/affiliate" element={<AffiliateRoute><AffiliatePortal /></AffiliateRoute>} />
               <Route path="/" element={<PrivateRoute><OnboardGate><Layout><Dashboard /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/mentions" element={<PrivateRoute><OnboardGate><Layout><Mentions /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/competitors" element={<PrivateRoute><OnboardGate><Layout><Competitors /></Layout></OnboardGate></PrivateRoute>} />
@@ -117,6 +146,7 @@ export default function App() {
               <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Revenue /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/prospects" element={<PrivateRoute><OnboardGate><Layout><Prospects /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/affiliates" element={<PrivateRoute><OnboardGate><Layout><AffiliatesAdmin /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
               {/* One route, two views. Admins get the triage queue (customer
                   requests plus BrandGEO's own internal work); everyone else

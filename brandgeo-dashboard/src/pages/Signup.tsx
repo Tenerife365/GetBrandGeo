@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, MailCheck, ArrowRight } from 'lucide-react'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { domainFromQuery, rememberSignupDomain } from '../lib/signupDomain'
+import { affiliateRefFromQuery, rememberAffiliateRef } from '../lib/affiliateRef'
 import { humanizeError, isCustomerFacingStatus, serverError } from '../lib/errors'
 
 // Unauthenticated shell, same reasoning as Login.tsx: "/" is gated and would
@@ -35,6 +36,12 @@ export default function Signup() {
   const [searchParams] = useSearchParams()
   const signupDomain = domainFromQuery(searchParams.toString())
   useEffect(() => { rememberSignupDomain(signupDomain) }, [signupDomain])
+
+  // Affiliate referral (?ref=<code>&bg_rid=<visit>), carried the same way and
+  // for the same reason as the domain above. Forwarded by Welcome.tsx to
+  // provision-account, which records the lead server side. See affiliateRef.ts.
+  const search = searchParams.toString()
+  useEffect(() => { rememberAffiliateRef(affiliateRefFromQuery(search)) }, [search])
 
   useEffect(() => {
     document.title = 'Start free · BrandGEO'

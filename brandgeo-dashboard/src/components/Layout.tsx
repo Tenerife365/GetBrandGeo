@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, LifeBuoy, Target,
+  Eye, EyeOff, LifeBuoy, Target, Handshake,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -314,6 +314,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // this split, and it stays reachable on mobile through the sidebar
         // drawer via the hamburger menu.
         ...(isAdmin ? [{ to: '/prospects', icon: Target, label: t.nav_prospects }] : []),
+        // Admin-only affiliate programs (docs/affiliates/ADMIN-GUIDE.md). Same
+        // sidebar-only placement as Prospects, for the same reason.
+        ...(isAdmin ? [{ to: '/affiliates', icon: Handshake, label: 'Affiliates' }] : []),
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Revenue' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],

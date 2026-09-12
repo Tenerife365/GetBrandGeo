@@ -20,7 +20,116 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-09-10)
+## CURRENT STATE (newest entry 2026-09-12)
+
+### 2026-09-12: affiliate module BUILT, migrated to production, 104 checks green, NOT committed
+
+An owned, multi-program affiliate MVP inside the existing platform (no paid
+affiliate platform, no separate app), commissioned by Constantin on
+2026-09-12 and built autonomously in one session. Everything a next session
+needs is under `docs/affiliates/`: `README.md` (what it does, file map, env
+vars, seven-step deploy order), `INTEGRATION.md` (referral link contract,
+tracker script, conversion API, Stripe wiring), `ADMIN-GUIDE.md`,
+`AFFILIATE-GUIDE.md`, `TEST-RESULTS.md` (measured numbers, 14-step manual
+E2E, limitations) and ten demo screenshots in `screenshots/`.
+
+**Shape.** Programs (slug, branding, destination URL, rules, attribution
+window and mode, approval delay default 30 days, minimum payout, terms
+version, public or private, draft/active/paused/archived) with an API key per
+program for other projects; affiliates who join several programs with
+per-program approval; public `/affiliates.html` and application form;
+invitation and magic-link login; referral links `/r/<slug>/<CODE>` (302 with
+`ref`, `bg_rid`, `ref_days`, `utm_source=affiliate`, `utm_medium=referral`,
+`utm_campaign=<slug>`, UTMs preserved); consent-aware `affiliate-track.js`;
+coupon codes (optionally bound to a Stripe promotion code); conversions
+lead, qualified_lead, sale, recurring, custom through
+`POST /api/affiliate/conversions` with idempotency and server-side commission
+in integer cents and basis points; Stripe sales, renewals and refunds via the
+verified webhook; commissions pending, approved, payable, paid, rejected,
+reversed; payout batches with CSV, mark paid with reference, invoice uploads
+to a private bucket; audit log on every money or attribution change; no
+DELETE policy on any table, the only delete is a draft batch's items.
+
+**Files.** Netlify: `_affiliate_core.js` (pure rules, money, attribution,
+state machine, CSV), `_affiliate_service.js` (writes), `_affiliate_stripe.js`,
+`_affiliate_auth.js`, `_affiliate_email.js`, `affiliate-admin.js`,
+`affiliate-portal.js`, `affiliate-apply.js`, `affiliate-programs-public.js`,
+`affiliate-conversions.js`, `affiliate-redirect.js`; edits to
+`stripe-webhook.js` (two more handled events, hands every event to the
+affiliate handler after idempotency), `accept-terms.js`, `provision-account.js`
+(records the signup lead), `netlify.toml` (rewrites for `/r/*` and
+`/api/affiliate/*` before the SPA fallback, timeouts). Dashboard:
+`src/pages/AffiliatesAdmin.tsx`, `src/pages/affiliate/` (login, join,
+portal), `src/lib/affiliateApi.tsx`, `src/lib/affiliateRef.ts`,
+`src/types/affiliate.ts`, routes in `App.tsx`, sidebar entry in
+`Layout.tsx`, referral capture in `Signup.tsx` and `Welcome.tsx`. Web:
+`affiliates.html`, `affiliates.js`, `affiliate-terms.html`,
+`affiliate-track.js`, plus `index.html`, `cookies.html`, `sitemap.xml`,
+`.htaccess` (the `/r/` forward). Database: `db/supabase-affiliate-migration-2026-09-12.sql`,
+`db/supabase-affiliate-seed-2026-09-12.sql`, `db/supabase-affiliate-cron-2026-09-12.sql`.
+Tests: `tests/affiliate_{core,auth,stripe,flow}.test.js` and
+`tests/helpers/` (an in-memory Supabase fake and an `_auth.js` mock).
+
+**Production database, done and read back.** Migrations
+`affiliate_module_2026_09_12` and `affiliate_function_hardening_2026_09_12`
+are applied to `duiyifepitvugyulobqm`: 14 tables, RLS on all, 48 policies, 0
+DELETE policies, 5 functions all pinned to `search_path = public`, 7
+triggers, private bucket `affiliate-documents`, 3 new columns on
+`terms_acceptances` with its 12 rows untouched, RPCs executable by
+`service_role` only (plus `authenticated` on `affiliate_my_id()`, which the
+policies call). Seed section A is run: program `brandgeo` (active, public,
+20 percent of every sale and of renewals for 12 months, 30-day last touch,
+30-day approval, EUR 50 minimum) and `talentwelove` (draft, private, EUR 100
+per qualified lead, EUR 500 per sale, 60-day first touch). Section B (two
+`@example.com` affiliates) is commented out and is for staging only. No cron
+job was scheduled; the cron file is optional. Advisors: the only new items
+are `affiliate_rate_limits` with RLS and no policy (INFO, intended) and the
+`affiliate_my_id()` grant.
+
+**Tests and build.** 104 checks in four files (27, 16, 17, 44), all green;
+the rest of `tests/` green except the pre-existing
+`package_provisioning.test.js`; `npm run build` exit 0. **One real defect
+was found by the Stripe test and fixed before anything shipped:** a Stripe
+sale matched through a stored attribution was recorded with source `manual`.
+Two measurement lessons went to memory: `apply_migration` validates
+`LANGUAGE sql` function bodies at CREATE (a helper defined before its table
+fails the whole migration), and the demo preview's real port comes from
+`preview_logs`, not the tool result (5174, not 59919).
+
+**Scale note (AUTONOMY section 7).** No new cron, no new scheduled
+invocation. New function invocations happen only on affiliate traffic: one
+per referral click (rate-limited to 30 per minute per IP hash), one per
+public application (5 per IP per window), the public program list is
+cached five minutes at the edge, and the admin page runs the maturing
+function once per load. The Stripe webhook does one extra handler call per
+event, reads only. Supabase writes: one visit row per click (purged at 90
+days once the cron is scheduled), one conversion plus at most one commission
+per sale.
+
+**NOT done, in order, all Constantin's:**
+1. Commit, pathspec-limited to the files above (other sessions' dirty files
+   `site.js`, `unlock-audit-report.js`, `_revenue.js`, `revenue-report.js`,
+   `Revenue.tsx`, the gtm docs and `db/supabase-prospect-channels-migration.sql`
+   stay out), then push with `BATCH_PUSH=1`: one Netlify build.
+2. Stripe Dashboard, live account `acct_1Tzui063lspobjfO`, the webhook
+   endpoint: enable `invoice.paid` and `charge.refunded`. Without them
+   renewals and refunds never reach the module.
+3. cPanel upload of the eight web files listed in the README.
+4. Optional: run `db/supabase-affiliate-cron-2026-09-12.sql` (retention and
+   maturing at 04:35 and 04:40 UTC, minutes chosen clear of :10 and :20).
+5. First real partner: invite from the admin page, then walk the 14 steps in
+   `TEST-RESULTS.md` section 3.
+
+**Known gaps, recorded not fixed:** `site.js`'s `redirectToSignup` (the
+audit widget) does not carry the referral, and `unlock-audit-report.js`
+records no lead; both files were dirty from other sessions and were not
+touched; the one-line fixes are in `INTEGRATION.md` section 7 and
+`TEST-RESULTS.md` section 5. The RLS policies were verified by reading
+`pg_policies`, not by querying as an affiliate user; that probe needs a
+real affiliate login. `AffiliatesAdmin.tsx` lets `isDemoMode` through its
+admin gate so the demo build can render the fixtures; `isDemoMode` is
+false in production.
+
 
 ### 2026-09-10: account handover; packet 024 is the cold start for the next subscription
 

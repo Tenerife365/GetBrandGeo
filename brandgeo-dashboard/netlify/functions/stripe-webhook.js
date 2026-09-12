@@ -66,6 +66,17 @@ const {
   todayUtc,
 } = require('./_package_checkout')
 
+// Affiliate commissions (2026-09-12). Loaded lazily inside a try so a defect in
+// the affiliate module can never take the provisioning webhook down with it.
+async function handleAffiliateEvent(db, type, object, log) {
+  try {
+    const { handleStripeEvent } = require('./_affiliate_stripe')
+    await handleStripeEvent(db, type, object, log)
+  } catch (e) {
+    log('affiliate hook failed (ignored):', e.message)
+  }
+}
+
 const APP_URL = 'https://app.getbrandgeo.com'
 
 // Fallback price-ID → plan map (real live IDs, STRIPE-WEBHOOK-SPEC.md §5B).
@@ -121,10 +132,16 @@ exports.handler = async (event) => {
 
   // Event types we don't handle: return 200 immediately so Stripe stops
   // retrying them (a 4xx/5xx here would trigger endless retries).
+  // invoice.paid and charge.refunded were added 2026-09-12 for the affiliate
+  // module (_affiliate_stripe.js: renewals earn recurring commission, refunds
+  // reverse it). They must ALSO be enabled on the endpoint in the Stripe
+  // Dashboard, otherwise Stripe never sends them and nothing here runs.
   const HANDLED = new Set([
     'checkout.session.completed',
     'customer.subscription.updated',
     'customer.subscription.deleted',
+    'invoice.paid',
+    'charge.refunded',
   ])
   if (!HANDLED.has(type)) {
     return { statusCode: 200, body: JSON.stringify({ received: true, ignored: type }) }
@@ -155,6 +172,10 @@ exports.handler = async (event) => {
     } else if (type === 'customer.subscription.deleted') {
       await handleSubscriptionDeleted(stripeEvent.data.object, log)
     }
+    // Affiliate attribution runs AFTER provisioning and never throws: a
+    // commission bookkeeping failure must not turn into a 500 that makes
+    // Stripe retry (and re-run) the provisioning above. It logs and moves on.
+    await handleAffiliateEvent(supabase, type, stripeEvent.data.object, log)
     return { statusCode: 200, body: JSON.stringify({ received: true }) }
   } catch (err) {
     log('handler error:', err.message)

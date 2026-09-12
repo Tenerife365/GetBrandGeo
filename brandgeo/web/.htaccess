@@ -48,6 +48,14 @@
   RewriteEngine On
   RewriteCond %{HTTPS} off
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # ─── Affiliate referral links (2026-09-12) ───────────────────────────────
+  # getbrandgeo.com/r/<program>/<code> forwards to the dashboard host, where a
+  # Netlify function records the click and 302s to the program destination.
+  # The marketing site stays static and holds no secrets; app.getbrandgeo.com
+  # does the work. QSA keeps any UTM the affiliate appended. Temporary (302)
+  # so a change of tracking host never leaves a cached permanent redirect.
+  RewriteRule ^r/(.+)$ https://app.getbrandgeo.com/r/$1 [R=302,L,QSA,NE]
 </IfModule>
 
 # ─── Prevent directory listing ────────────────────────────────────────────────

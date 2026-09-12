@@ -3,6 +3,7 @@ import { Building2, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { readSignupDomain, clearSignupDomain } from '../lib/signupDomain'
+import { readAffiliateRef, clearAffiliateRef } from '../lib/affiliateRef'
 import { humanizeError, isCustomerFacingStatus, serverError } from '../lib/errors'
 
 // Authenticated shell (wrapped in PrivateRoute in App.tsx), so unlike Login/
@@ -95,6 +96,13 @@ export default function Welcome() {
           account_type: accountType,
           brand_name: brandName.trim(),
           brand_website: brandWebsite.trim(),
+          // Affiliate referral captured on /signup (affiliateRef.ts). The
+          // server validates it again and records a lead; nothing here decides
+          // who is credited.
+          ...(() => {
+            const ref = readAffiliateRef()
+            return ref ? { affiliate_ref: ref.code, affiliate_visit: ref.visit, affiliate_program: ref.program } : {}
+          })(),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -114,6 +122,7 @@ export default function Welcome() {
       // all). Only on success: a failed provision returns the user to this form,
       // which still needs the prefill.
       clearSignupDomain()
+      clearAffiliateRef()
 
       // Full reload so ClientProvider re-inits with the new profile/client, then
       // lands on the dashboard.

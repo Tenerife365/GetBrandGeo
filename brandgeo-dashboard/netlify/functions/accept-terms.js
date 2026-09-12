@@ -35,6 +35,25 @@ const { createClient } = require('@supabase/supabase-js')
 const { corsHeaders, preflight, err, hashIp, PUBLIC_ALLOWED_ORIGINS } = require('./_prospect_guard')
 const { resolveCheckout, withReference, TERMS_VERSION } = require('./_terms_gate')
 
+// Affiliate fields are optional and shape-checked only: a code is 3 to 32
+// [A-Z0-9_-] characters, a visit token is base64url up to 64 characters, a
+// program slug is lowercase [a-z0-9-] up to 40. Anything else becomes null,
+// never an error: a bad affiliate cookie must not block a purchase.
+const AFF_CODE_RE = /^[A-Z0-9][A-Z0-9_-]{2,31}$/
+const AFF_TOKEN_RE = /^[A-Za-z0-9_-]{8,64}$/
+const AFF_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,39}$/
+function readAffiliateRef(body) {
+  const code = String(body.affiliate_ref || '').trim().toUpperCase()
+  const visit = String(body.affiliate_visit || '').trim()
+  const program = String(body.affiliate_program || '').trim().toLowerCase()
+  return {
+    code: AFF_CODE_RE.test(code) ? code : null,
+    visit: AFF_TOKEN_RE.test(visit) ? visit : null,
+    program: AFF_SLUG_RE.test(program) ? program : null,
+  }
+}
+exports.readAffiliateRef = readAffiliateRef
+
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || event.headers['Origin'] || ''
   if (event.httpMethod === 'OPTIONS') return preflight(origin)
@@ -72,6 +91,14 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   const reference = crypto.randomUUID()
 
+  // Affiliate attribution (2026-09-12). The tracking snippet on getbrandgeo.com
+  // (affiliate-track.js) adds these three fields when the visitor arrived via
+  // an /r/ link. They are validated by shape only and stored on the acceptance
+  // row; stripe-webhook.js reads them back through client_reference_id when
+  // the payment lands (_affiliate_stripe.js resolveContext). Nothing here
+  // decides who gets paid: that is the server-side conversion path.
+  const affiliate = readAffiliateRef(body)
+
   const { error: insErr } = await supabase.from('terms_acceptances').insert([{
     reference,
     terms_version: decision.version,
@@ -83,6 +110,9 @@ exports.handler = async (event) => {
     requester_ip_hash: hashIp(event),
     user_agent: String(event.headers['user-agent'] || '').slice(0, 500),
     origin: origin || null,
+    affiliate_code: affiliate.code,
+    affiliate_visit_token: affiliate.visit,
+    affiliate_program: affiliate.program,
   }])
 
   if (insErr) {

@@ -271,9 +271,49 @@ exports.handler = async (event) => {
     meta: { email: user.email || null, account_type: accountType, brand_website: brandWebsite, plan: 'free' },
   })
 
+  // Affiliate lead (2026-09-12, best-effort, never blocks provisioning). When
+  // the signup page carried a referral (Signup.tsx reads ?ref= / bg_rid from
+  // the /r/ redirect and Welcome.tsx forwards it here), record a `lead`
+  // conversion keyed on the hashed signup email. A later Stripe checkout with
+  // the same email then inherits this attribution (_affiliate_stripe.js).
+  // Leads earn nothing by themselves; the commission comes with the sale.
+  await recordAffiliateLead(supabase, { body, user, clientId: clientRow.id, brandWebsite })
+
   return {
     statusCode: 201,
     headers,
     body: JSON.stringify({ success: true, client_id: clientRow.id, created: true }),
+  }
+}
+
+async function recordAffiliateLead(supabase, { body, user, clientId, brandWebsite }) {
+  const code = String(body.affiliate_ref || '').trim().toUpperCase()
+  const visit = String(body.affiliate_visit || '').trim()
+  if (!code && !visit) return
+  try {
+    const core = require('./_affiliate_core')
+    const service = require('./_affiliate_service')
+    const slug = String(body.affiliate_program || process.env.AFFILIATE_STRIPE_PROGRAM_SLUG || 'brandgeo').toLowerCase()
+    const program = await service.getProgramBySlug(supabase, slug)
+    if (!program) return
+    const input = {
+      idempotency_key: `lead:client:${clientId}`,
+      conversion_type: 'lead',
+      affiliate_code: core.isValidCode(code) ? code : null,
+      visit_token: /^[A-Za-z0-9_-]{8,64}$/.test(visit) ? visit : null,
+      external_id: `client:${clientId}`,
+      external_customer_id: null,
+      customer_email: user.email || null,
+      amount_cents: 0,
+      currency: program.currency,
+      status: 'confirmed',
+      metadata: { via: 'provision-account', client_id: clientId, brand_website: brandWebsite || null },
+    }
+    if (!input.affiliate_code && !input.visit_token) return
+    const result = await service.recordConversion(supabase, { program, input, actor: { type: 'system', label: 'provision-account' }, source: input.visit_token ? 'link' : 'form' })
+    if (!result.ok) console.log(`[provision] affiliate lead not recorded for client ${clientId}: ${result.error}`)
+    else console.log(`[provision] affiliate lead recorded for client ${clientId} (${result.duplicate ? 'duplicate' : 'new'})`)
+  } catch (e) {
+    console.error(`[provision] affiliate lead hook failed for client ${clientId}: ${e.message}`)
   }
 }

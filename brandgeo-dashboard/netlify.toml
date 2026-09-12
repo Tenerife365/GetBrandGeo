@@ -50,6 +50,25 @@
     # if the vendor ever moves the API there it must be listed explicitly.
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com"
 
+# ── Affiliate module (2026-09-12) ─────────────────────────────────────────────
+# Referral links are https://app.getbrandgeo.com/r/<program>/<code>. They MUST
+# be rewritten to the redirect function BEFORE the SPA fallback below, or the
+# React app would swallow them and record nothing. status 200 = rewrite (the
+# function itself answers 302 to the program destination).
+[[redirects]]
+  from = "/r/*"
+  to = "/.netlify/functions/affiliate-redirect/:splat"
+  status = 200
+  force = true
+
+# Public conversion API for other projects: POST /api/affiliate/conversions
+# with a program API key (docs/affiliates/INTEGRATION.md).
+[[redirects]]
+  from = "/api/affiliate/conversions"
+  to = "/.netlify/functions/affiliate-conversions"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -303,4 +322,35 @@
 
 # seo-audit-page: one Haiku call (internal timeout 20s) scoring a crawled page.
 [functions."seo-audit-page"]
+  timeout = 26
+
+# ── Affiliate module (2026-09-12, docs/affiliates/README.md) ─────────────────
+# affiliate-redirect: one RPC (affiliate_record_visit) then a 302. Fast, but a
+# cold start plus the RPC must never leave a referred visitor staring at a
+# timeout, so it gets the same margin as the other DB-only endpoints.
+[functions."affiliate-redirect"]
+  timeout = 15
+
+# affiliate-programs-public: one SELECT, cached 5 minutes at the edge.
+[functions."affiliate-programs-public"]
+  timeout = 15
+
+# affiliate-apply: two rate-limit RPCs, dedupe reads, one insert, two Resend
+# emails (applicant + admin).
+[functions."affiliate-apply"]
+  timeout = 15
+
+# affiliate-conversions: the program API. Attribution resolution is 3 to 6 DB
+# round trips plus one email; 15s covers a cold start.
+[functions."affiliate-conversions"]
+  timeout = 15
+
+# affiliate-portal: the affiliate's own dashboard. `me` reads eight tables;
+# join_accept creates the auth user and mints a magic link (auth.admin calls).
+[functions."affiliate-portal"]
+  timeout = 26
+
+# affiliate-admin: invite (N memberships + codes + email), payouts.create_batch
+# (one update per commission) and export (up to 5,000 rows) are the slow paths.
+[functions."affiliate-admin"]
   timeout = 26

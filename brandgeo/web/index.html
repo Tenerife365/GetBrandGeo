@@ -2397,6 +2397,7 @@
         <li><a href="/terms.html">Terms</a></li>
         <li><a href="/privacy.html">Privacy Policy</a></li>
         <li><a href="/cookies.html">Cookies</a></li>
+        <li><a href="/affiliates.html">Affiliate program</a></li>
         <li><a href="https://gdpr.eu" target="_blank" rel="noopener">GDPR Compliant</a></li>
       </ul>
       <p class="reg-info">
@@ -2455,5 +2456,9 @@
      same-origin files because the CSP forbids inline scripts. -->
 <script src="site.js?v=2026-08-15a"></script>
 <script src="instrument.js?v=2026-08-07a"></script>
+<!-- Affiliate referral capture (docs/affiliates/README.md). Reads ?ref= off a
+     partner link, keeps it consent-aware, and forwards it into signup and
+     checkout. Loaded last so it can decorate links site.js has built. -->
+<script src="affiliate-track.js?v=2026-09-12a"></script>
 </body>
 </html>
