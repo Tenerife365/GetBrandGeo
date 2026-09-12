@@ -91,12 +91,18 @@ after the fact, not taken from the UI's own confirmation:
   `promo_1UEtDY63lspobjfOYwUfx6f9`).
 - Step 4, click. One `affiliate_visits` row at 17:23:44Z: landing path
   `/r/brandgeo/MONICA7F05`, code `MONICA7F05`, device family `windows`, a
-  64-character hash where the address would be, no raw IP, no country.
+  64-character hash where the address would be, no raw IP, no country. The
+  click was a `curl` request sent with a Windows user agent string, so the
+  device family is the header that was sent.
 - Step 5, terms and checkout. One `terms_acceptances` row at 17:23:46Z
   (growth, monthly, code `MONICA7F05`, program `brandgeo`, reference
-  `6456b9c5-70e1-4ae3-b634-5a04b2adf2b8`); its `affiliate_visit_token` is
-  null, so this acceptance links to the affiliate by code, not to the click.
-  The URL `accept-terms` returned carried both `client_reference_id` and
+  `6456b9c5-70e1-4ae3-b634-5a04b2adf2b8`). It was posted to `accept-terms`
+  by `curl` two seconds after the click with `affiliate_ref` in the body and
+  no `affiliate_visit`, so its `affiliate_visit_token` is null by the test
+  method, not by a defect. The browser path (the tracker storing `bg_rid` on
+  landing and adding it to the gate call through its fetch patch) has not
+  been exercised against production; it is the thing to read back on the
+  first real acceptance. The URL returned carried both `client_reference_id` and
   `prefilled_promo_code=DANIEL10`. Opened in a real browser (the app's
   Browser pane) the Stripe page applied the code on load: EUR 269.10 per
   month "until coupon expires", chip `DANIEL10` at minus EUR 29.90, "10% off

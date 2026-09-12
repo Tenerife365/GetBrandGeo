@@ -130,8 +130,10 @@ variable changed.
    `MONICA7F05` and `DANIEL10`, one click at 17:23:44Z, one terms acceptance
    with reference `6456b9c5-70e1-4ae3-b634-5a04b2adf2b8`, and the prefilled
    code applied on load in a real browser: EUR 269.10, "10% off for 12
-   months"). The first invite never reached the server and was sent again;
-   the acceptance carries the code but no visit token. Nobody has paid, so
+   months"). The first invite never reached the server and was sent again.
+   The click and the acceptance were two curl requests, so the acceptance
+   carries the code and no visit token by test method; the tracker's
+   browser path is unexercised against production. Nobody has paid, so
    steps 6 to 14 (sale, renewal, refund, approve, batch, CSV, mark paid) are
    still owed; the payout steps can be rehearsed from a manual sale on the
    admin page. Measurement trap: headless Chrome gets "This code is
