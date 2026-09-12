@@ -69,8 +69,71 @@ applied cleanly.
 
 ## 3. Manual end-to-end checklist (14 steps, to run against production once deployed)
 
-Nothing below has been run against production yet; the code path of every
-step is covered by `affiliate_flow.test.js` against the fake.
+The code path of every step is covered by `affiliate_flow.test.js` against
+the fake. **Steps 1 to 5 ran against production on 2026-09-12 with a real
+partner. Steps 6 to 14 are not run because nobody has paid.** Every number
+below was read back from `duiyifepitvugyulobqm` or from the live Stripe page
+after the fact, not taken from the UI's own confirmation:
+
+- Step 2, invite. The first attempt never reached the server: no affiliate
+  row, and the audit log's last entry was `program.updated` at 14:47Z.
+  Constantin sent it again at 15:58Z; that one wrote the affiliate
+  `cee25156-440f-45dc-84ff-049a0a33949d` with `email_sent = true` and four
+  audit rows (`affiliate.created`, `membership.invited`, `code.created`,
+  `affiliate.invited`); a resend at 17:21:59Z is logged as
+  `affiliate.invite_resent`.
+- Step 3, join. `affiliate.joined` at 17:22:27Z; the affiliate is `active`
+  with a login (`auth.users` id `ed5e69ec-af15-4e56-b054-d161ac3bb0b7`,
+  terms version of 2026-09-12), membership
+  `eff83994-a7f5-400a-a9be-f25ba1c56608` active on `brandgeo`, and two
+  codes: `MONICA7F05` (link, primary) and `DANIEL10` (coupon, created
+  17:23:06Z, bound to Stripe promotion code
+  `promo_1UEtDY63lspobjfOYwUfx6f9`).
+- Step 4, click. One `affiliate_visits` row at 17:23:44Z: landing path
+  `/r/brandgeo/MONICA7F05`, code `MONICA7F05`, device family `windows`, a
+  64-character hash where the address would be, no raw IP, no country.
+- Step 5, terms and checkout. One `terms_acceptances` row at 17:23:46Z
+  (growth, monthly, code `MONICA7F05`, program `brandgeo`, reference
+  `6456b9c5-70e1-4ae3-b634-5a04b2adf2b8`); its `affiliate_visit_token` is
+  null, so this acceptance links to the affiliate by code, not to the click.
+  The URL `accept-terms` returned carried both `client_reference_id` and
+  `prefilled_promo_code=DANIEL10`. Opened in a real browser (the app's
+  Browser pane) the Stripe page applied the code on load: EUR 269.10 per
+  month "until coupon expires", chip `DANIEL10` at minus EUR 29.90, "10% off
+  for 12 months", total due today EUR 269.10. The first load that evening
+  had shown "Something went wrong, please try again" and applied only after
+  Apply was pressed; the second load applied by itself, so that was a
+  transient validation error, not the link.
+- Measurement trap, recorded so it is not rediscovered: headless Chrome over
+  CDP (the client this project uses for layout) answers "This code is
+  invalid." for the same code, whether prefilled, retyped, or typed by hand
+  on the undecorated link, and shows the full EUR 299.00 in all three cases.
+  Stripe refuses promotion codes from that client. A headless "invalid" says
+  nothing about the code; judge promotion codes in a real browser only, and
+  no screenshot of the headless page belongs in this folder.
+- The dashboard's own upgrade button sends to `getbrandgeo.com/#pricing`, so
+  the prefill fires only while the 30-day referral cookie is alive. A
+  referred customer who comes back later types `DANIEL10` by hand, which
+  Stripe accepts on all seven active links.
+
+**Row-level isolation, probed as the real affiliate, 2026-09-12.** The check
+section 5 said needed a real login. Three `execute_sql` transactions set
+`role = authenticated` and `request.jwt.claims.sub` to the affiliate's auth
+id, and rolled back. Visible to the affiliate: `affiliates` 1 (self),
+`affiliate_memberships` 1, `affiliate_programs` 1 (`brandgeo`; the draft
+`talentwelove` is hidden), `affiliate_codes` 2 (own), `affiliate_resources`
+4 (the program's shared assets), and 0 rows in every other table: visits,
+attributions, conversions, commissions, payout batches, payout items, audit
+log, applications, rate limits, `terms_acceptances`, `clients`,
+`user_profiles`, `prospects`. `affiliate_my_id()` returned
+`cee25156-440f-45dc-84ff-049a0a33949d`. Writes as that user: `UPDATE ... SET
+id = id` on programs, affiliates, memberships, codes, commissions,
+attributions and `terms_acceptances`, and `DELETE` on commissions, visits,
+audit log, affiliates and codes, each affected 0 rows; an `INSERT` into
+`affiliate_visits` was refused with `42501 new row violates row-level
+security policy`. The affiliate's own raw click row is invisible to them by
+design: `affiliate_visits` has no self policy and the portal serves click
+counts through the service key.
 
 1. Admin page, Programs: two programs exist (`brandgeo` active public, `talentwelove` draft private). Set `talentwelove` to active if you want to test both.
 2. Affiliates tab, Invite: your own second email, both programs, a code. The invitation email arrives (or the join link is shown when `RESEND_API_KEY` is unset).
@@ -112,18 +175,20 @@ admin page lets demo mode through its admin gate; production never does.
 
 ## 5. Limitations and what is not verified
 
-- **Live Stripe path.** The webhook handlers ran only against the fake. The
-  first real `invoice.paid` and `charge.refunded` are the test of the two
-  event types that must be enabled on the endpoint in the Stripe Dashboard
-  (README, deploy step 4). Until then renewals and refunds do not arrive.
+- **Live Stripe path.** The webhook handlers ran only against the fake. Both
+  extra event types (`invoice.paid`, `charge.refunded`) are enabled on the
+  endpoint since 2026-09-12 (README, deploy step 4), and no referred
+  customer has paid yet, so the first real `checkout.session.completed`,
+  `invoice.paid` and `charge.refunded` from a referred checkout are still
+  the test of steps 6 to 9 in section 3.
 - **Emails.** `sendBrandedEmail` is a no-op without `RESEND_API_KEY`, so the
   tests prove the calls, not the delivery.
 - **Postgres semantics.** The fake emulates the builder, the unique
   constraints and the three RPCs; it does not run the RLS policies or the SQL
-  functions. The policies were verified by reading `pg_policies` back, not by
-  querying as an affiliate user. A role-scoped probe (sign in as an affiliate,
-  select another affiliate's rows through the anon key, expect zero rows) is
-  the remaining check and needs a real affiliate login.
+  functions. The policies were verified by reading `pg_policies` back and,
+  on 2026-09-12, by the role-scoped probe recorded in section 3: counts,
+  updates, deletes and an insert as the real affiliate inside rolled-back
+  transactions, own rows only, every write refused or empty.
 - **Audit widget path.** `site.js` (`redirectToSignup`) does not append the
   referral, so a visitor who signs up from the audit widget is attributed only
   if the same email came through a decorated form first. `site.js` was dirty
@@ -132,11 +197,11 @@ admin page lets demo mode through its admin gate; production never does.
 - **Audit report unlock.** `unlock-audit-report.js` does not record a lead;
   same reason, same fix direction (read `affiliate_visit` from the request and
   call `recordConversion` with `conversion_type: 'lead'`).
-- **Retention.** The 90-day click purge and the daily maturing job are in
-  `db/supabase-affiliate-cron-2026-09-12.sql` and are not scheduled. Without
-  them, raw clicks accumulate and pending commissions mature only when an admin
-  opens the page. The `data_retention_policies` register does not list the
-  affiliate tables yet.
+- **Retention.** The 90-day click purge and the daily maturing job in
+  `db/supabase-affiliate-cron-2026-09-12.sql` were scheduled by Constantin on
+  2026-09-12 and read back: `cron.job` 8 `affiliate-retention` (`35 4 * * *`)
+  and 9 `affiliate-mature` (`40 4 * * *`), both active. The
+  `data_retention_policies` register does not list the affiliate tables yet.
 - **Cross-domain referral.** The redirect lands on `getbrandgeo.com` with the
   referral in the URL and the tracker keeps it there; when the visitor moves to
   `app.getbrandgeo.com` the referral travels in the decorated link and the

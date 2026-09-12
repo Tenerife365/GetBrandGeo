@@ -124,9 +124,19 @@ variable changed.
 
 **Still owed, Constantin's:**
 1. DONE 2026-09-12: the cron file was run by Constantin. `cron.job` 8 `affiliate-retention` (`35 4 * * *`) and 9 `affiliate-mature` (`40 4 * * *`) are active, so raw clicks purge at 90 days and pending commissions mature nightly without an admin opening the page.
-2. First real partner: invite from the admin page, then walk the 14 steps in
-   `TEST-RESULTS.md` section 3. Nothing has been run against production
-   with a real affiliate yet.
+2. First real partner: IN PROGRESS 2026-09-12. Steps 1 to 5 of
+   `TEST-RESULTS.md` section 3 ran against production with a real partner
+   (affiliate `cee25156-440f-45dc-84ff-049a0a33949d`, active, codes
+   `MONICA7F05` and `DANIEL10`, one click at 17:23:44Z, one terms acceptance
+   with reference `6456b9c5-70e1-4ae3-b634-5a04b2adf2b8`, and the prefilled
+   code applied on load in a real browser: EUR 269.10, "10% off for 12
+   months"). The first invite never reached the server and was sent again;
+   the acceptance carries the code but no visit token. Nobody has paid, so
+   steps 6 to 14 (sale, renewal, refund, approve, batch, CSV, mark paid) are
+   still owed; the payout steps can be rehearsed from a manual sale on the
+   admin page. Measurement trap: headless Chrome gets "This code is
+   invalid." from Stripe for the same valid code, so promotion codes are
+   judged in a real browser only.
 3. RULED 2026-09-12, Stripe objects DONE the same evening from this seat and read back: coupon `AFFILIATE10` (10 percent, repeating 12 months) and `allow_promotion_codes` on the three yearly links, so all seven active links accept codes. The CLI reads live keys from the Windows credential store, so editing `config.toml` changes nothing and the masked `stripe login --interactive` prompt dropped the paste; `STRIPE_API_KEY` in `~/.bashrc` (sourced by hand, the Bash tool does not source it) won, and the line was removed afterwards. Live writes from this seat were NOT refused this time. A shell quirk printed the key into the session transcript: Constantin rolls it. Deep link BUILT, PUSHED and LIVE the same day (`5cca710`, deploy created 15:14:25Z, published 15:15:11Z, read from the deploy record; the three docs-only pushes before it show as error "Canceled" by design): customer discount repeating for 12 months while subscribed; affiliate keeps 10 percent of renewals for 12 months on the discounted amount; annual links get "Allow promotion codes" enabled. Recipe in `ADMIN-GUIDE.md`. Constantin wants 20 in total, 10 to the affiliate and 10 off for the referred customer. The affiliate half is live (10 percent of `invoice.amount_paid`, so of the discounted price, plus 10 percent of renewals for 12 months). The customer half is not in the module: it needs one Stripe coupon (10 percent off) and one promotion code per affiliate, pasted as `stripe_promotion_code_id` on that affiliate's coupon code in the admin page; a checkout using the code is attributed automatically. The annual payment links refused promotion codes on 2026-09-08 and are to be enabled, and the prefilled promo code deep link is built in `accept-terms.js` (`_terms_gate.withPromoCode`, `_affiliate_service.promoCodeForReferral`, 16 checks in `tests/affiliate_promo_link.test.js`), which also covers packet 023 C2 for the affiliate case. The public FAQ on `affiliates.html` was corrected from 20 to 10 percent the same day.
 4. Roll the exposed `rk_live` agent key (Stripe Dashboard, Developers, API keys). When the first affiliate is approved, a fresh restricted key (Promotion codes write) goes back into `~/.bashrc` as `STRIPE_API_KEY` for the one command that creates their code, then the line comes out again.
 
@@ -134,9 +144,11 @@ variable changed.
 audit widget) does not carry the referral, and `unlock-audit-report.js`
 records no lead; both files were dirty from other sessions and were not
 touched; the one-line fixes are in `INTEGRATION.md` section 7 and
-`TEST-RESULTS.md` section 5. The RLS policies were verified by reading
-`pg_policies`, not by querying as an affiliate user; that probe needs a
-real affiliate login. `AffiliatesAdmin.tsx` lets `isDemoMode` through its
+`TEST-RESULTS.md` section 5. The RLS probe as a real affiliate is DONE
+2026-09-12 (section 3 of `TEST-RESULTS.md`): the affiliate sees own rows
+only, the draft program and every other table read 0, all updates and
+deletes touch 0 rows, an insert is refused by RLS. The affiliate's own raw
+click row is hidden by design. `AffiliatesAdmin.tsx` lets `isDemoMode` through its
 admin gate so the demo build can render the fixtures; `isDemoMode` is
 false in production.
 
