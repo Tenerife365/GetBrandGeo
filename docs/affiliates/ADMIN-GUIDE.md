@@ -69,6 +69,26 @@ codes**. A coupon code typed at checkout attributes the customer to the
 affiliate even without a click, and beats an earlier link. For BrandGEO's
 Stripe checkout, paste the Stripe promotion code id (`promo_...`) on the
 coupon so a checkout that used it is attributed automatically. Codes are
+
+**The referred customer's discount (ruled 2026-09-12).** The BrandGEO program
+gives 20 in total: 10% of every payment to the affiliate for 12 months, and
+10% off for the referred customer for their first 12 months while they stay
+subscribed. The module pays the affiliate half. The customer half lives in
+Stripe and is set up once per affiliate:
+
+1. Stripe Dashboard, live mode, Product catalog, Coupons: one coupon,
+   percentage 10, duration "Multiple months", 12 months. Create it once and
+   reuse it for every affiliate.
+2. On that coupon, one promotion code per affiliate whose code string equals
+   the affiliate's own code, first-time orders only. Copy its id (`promo_...`).
+3. In this page, on the affiliate's membership, add a coupon code with the same
+   string and paste the `promo_...` id. A checkout that used the code is
+   attributed to that affiliate, and every renewal follows the first sale.
+
+The affiliate's commission is computed on the amount Stripe reports as paid,
+so on a discounted invoice it is 10% of the discounted price. Every payment
+link, monthly and annual, must have "Allow promotion codes" enabled or the
+customer cannot type the code at checkout.
 deactivated, not deleted.
 
 ## Conversions and commissions
