@@ -76,7 +76,7 @@ step is covered by `affiliate_flow.test.js` against the fake.
 3. Open the join link, accept the terms, choose a payout method. You land on `/affiliate` signed in. In the admin page the memberships show one `active` and, if you left it, one `pending`; approve or reject the second.
 4. In a private window open `https://app.getbrandgeo.com/r/brandgeo/<CODE>`: you land on getbrandgeo.com with `ref`, `bg_rid`, `ref_days` and the three UTMs; Clicks & audit shows the visit with a device family and no IP.
 5. Accept analytics on the banner, sign up on the dashboard from that window: Conversions shows a `lead` from source `link` with a masked email and no commission.
-6. Pay with a Stripe Payment Link from the same account (or a EUR 1 test product): `checkout.session.completed` and the first `invoice.paid` produce one `sale`, source `stripe`, a `pending` commission of 20 percent, approval date +30 days.
+6. Pay with a Stripe Payment Link from the same account (or a EUR 1 test product): `checkout.session.completed` and the first `invoice.paid` produce one `sale`, source `stripe`, a `pending` commission at the program's sale rate (10 percent since Constantin's 2026-09-12 edit; the seed said 20), approval date +30 days.
 7. Affiliate dashboard: the sale appears with a masked reference, the commission reads `pending`, the email "new conversion" arrived.
 8. Refund the charge in the Stripe Dashboard: the conversion turns `refunded`, the commission `reversed`, the audit log holds `conversion.reversed`.
 9. Second sale (new checkout): a second `sale` and `pending` commission.

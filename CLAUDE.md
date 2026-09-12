@@ -78,7 +78,7 @@ triggers, private bucket `affiliate-documents`, 3 new columns on
 `terms_acceptances` with its 12 rows untouched, RPCs executable by
 `service_role` only (plus `authenticated` on `affiliate_my_id()`, which the
 policies call). Seed section A is run: program `brandgeo` (active, public,
-20 percent of every sale and of renewals for 12 months, 30-day last touch,
+10 percent of every sale and of renewals for 12 months (seeded at 20, changed to 10 by Constantin in the admin page the same day), 30-day last touch,
 30-day approval, EUR 50 minimum) and `talentwelove` (draft, private, EUR 100
 per qualified lead, EUR 500 per sale, 60-day first touch). Section B (two
 `@example.com` affiliates) is commented out and is for staging only. No cron
@@ -122,14 +122,12 @@ endpoint `adventurous-legacy` (`we_1Tzv3Q63lspobjfOijurdpTZ`, API version
 beside the existing three; the signing secret was not rolled, so no Netlify
 variable changed.
 
-**Still owed, both Constantin's:**
-1. Optional: run `db/supabase-affiliate-cron-2026-09-12.sql` (retention and
-   maturing at 04:35 and 04:40 UTC, minutes chosen clear of :10 and :20).
-   Until then raw clicks accumulate and pending commissions mature only when
-   an admin opens the page.
+**Still owed, Constantin's:**
+1. DONE 2026-09-12: the cron file was run by Constantin. `cron.job` 8 `affiliate-retention` (`35 4 * * *`) and 9 `affiliate-mature` (`40 4 * * *`) are active, so raw clicks purge at 90 days and pending commissions mature nightly without an admin opening the page.
 2. First real partner: invite from the admin page, then walk the 14 steps in
    `TEST-RESULTS.md` section 3. Nothing has been run against production
    with a real affiliate yet.
+3. Decision owed (asked 2026-09-12): Constantin wants 20 in total, 10 to the affiliate and 10 off for the referred customer. The affiliate half is live (10 percent of `invoice.amount_paid`, so of the discounted price, plus 10 percent of renewals for 12 months). The customer half is not in the module: it needs one Stripe coupon (10 percent off) and one promotion code per affiliate, pasted as `stripe_promotion_code_id` on that affiliate's coupon code in the admin page; a checkout using the code is attributed automatically. The four annual payment links refuse promotion codes (measured 2026-09-08), and the `?promo=` prefilled deep link of packet 023 C2 is not built. The public FAQ on `affiliates.html` was corrected from 20 to 10 percent the same day.
 
 **Known gaps, recorded not fixed:** `site.js`'s `redirectToSignup` (the
 audit widget) does not carry the referral, and `unlock-audit-report.js`
