@@ -195,6 +195,15 @@ export default function Dashboard() {
   // ring vanishes and gets replaced by a first-run verdict every time their
   // last check falls outside the window (e.g. day 8 of a monthly cadence).
   const [hasAnyRows, setHasAnyRows] = useState(false)
+  // Is a collection already running for this client? Only consulted by the
+  // zero-data hero below. Since 2026-09-20 a self-serve account is seeded with
+  // prompts and its first collection is enqueued server-side at signup
+  // (provision-account.js, then activate-client-background.js), so the customer
+  // now arrives on this page with prompts, no results, and a run already in
+  // flight. Without this the hero told them to "Run first collection" for work
+  // that was already under way, and their plan's cooldown would have refused
+  // the click they were being asked to make.
+  const [collectionPending, setCollectionPending] = useState(false)
 
   const load = async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -212,6 +221,7 @@ export default function Dashboard() {
       setStats(computeStats(demoRows))
       setPromptCount(mockPrompts.filter((p: Prompt) => p.is_active).length)
       setHasAnyRows(mockAIResults.some((r: AIResult) => !isNoAnswerRow(r)))
+      setCollectionPending(false)
 
       // AI Visibility Score — same shared computation as AIVisibility.tsx, deliberately
       // all-time (not time-filtered) so both pages always show the identical headline number.
@@ -273,6 +283,24 @@ export default function Dashboard() {
       setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
     }
 
+    // Deliberately NOT in the Promise.all above, and deliberately conditional:
+    // only a client that has never been measured can render the zero-data hero,
+    // so only a client that has never been measured needs this answer. Every
+    // established client would otherwise pay a query per Overview load forever
+    // for a value nothing reads. `head: true` makes it a count, and
+    // idx_collection_jobs_client covers (client_id, status).
+    const neverMeasured = !!scoreRows && !scoreRows.some(r => !isNoAnswerRow(r))
+    if (neverMeasured) {
+      const { count } = await supabase
+        .from('collection_jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', activeClientId)
+        .in('status', ['pending', 'running'])
+      setCollectionPending((count ?? 0) > 0)
+    } else {
+      setCollectionPending(false)
+    }
+
     setLoading(false)
   }
 
@@ -289,6 +317,31 @@ export default function Dashboard() {
     loadKeyRef.current = key
     load(quiet)
   }, [activeClientId, timeRange, lastCompletedAt])
+
+  // A signup collection runs on the SERVER, so nothing in this tab knows when
+  // it lands: `lastCompletedAt` is bumped by CollectionContext, which only
+  // watches a run the browser itself started. Without this poll a customer who
+  // stayed on the page would keep reading "your first results are on the way"
+  // until they reloaded by hand, which is a worse first impression than the
+  // empty state this whole change replaces.
+  //
+  // Bounded at both ends rather than left running: it starts only while a run
+  // is actually in flight for a client with no data at all, and it stops on the
+  // first measured row or after MAX_TICKS. A collection that dies silently must
+  // not leave a tab polling for the rest of the day.
+  useEffect(() => {
+    if (isDemoMode || !collectionPending || hasAnyRows) return
+    const POLL_MS = 12_000
+    const MAX_TICKS = 40          // about 8 minutes, comfortably past a first run
+    let ticks = 0
+    let cancelled = false
+    const id = setInterval(() => {
+      if (cancelled) return
+      if (++ticks > MAX_TICKS) { clearInterval(id); setCollectionPending(false); return }
+      load(true)                  // quiet: never swap live content for a skeleton
+    }, POLL_MS)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [collectionPending, hasAnyRows, activeClientId, timeRange])
 
   // "What to do next" — reads the SAME persisted advice Recommendations.tsx
   // shows (recommendation_runs/recommendations, CLAUDE.md §14), it does not
@@ -445,6 +498,12 @@ export default function Dashboard() {
           dimensions — a verdict, not an absence of measurement. Never render a
           zero as though it were a measurement. Routes to /prompts when there are
           no prompts yet, otherwise to /ai-visibility to run the first collection. */}
+      {/* While a signup run is in flight the CTA below goes to /prompts, not
+          /ai-visibility: the progress bar on that page is driven by
+          CollectionContext, which only tracks a run the BROWSER started, so a
+          server-started run would render there as a table of empty cells with
+          no sign of activity. /prompts shows the questions actually being
+          asked, which is true and is the thing worth seeing at that moment. */}
       {scoreData && stats && !hasAnyRows && (
         <motion.div
           className="bg-dark-800 rounded-xl mb-6"
@@ -452,14 +511,16 @@ export default function Dashboard() {
         >
           <SharedEmptyState
             icon={Target}
-            title="Not measured yet"
+            title={collectionPending ? 'Your first results are on the way' : 'Not measured yet'}
             body={
-              promptCount === 0
-                ? `BrandGEO measures how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} real buyer questions about ${brandName}. Add a prompt to start.`
-                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${promptCount} tracked prompt${promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
+              collectionPending
+                ? `${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'is' : 'are'} being asked ${promptCount} buyer question${promptCount === 1 ? '' : 's'} about ${brandName} right now. This usually takes a few minutes, and it keeps running if you close this tab.`
+                : promptCount === 0
+                  ? `BrandGEO measures how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} real buyer questions about ${brandName}. Add a prompt to start.`
+                  : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${promptCount} tracked prompt${promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
             }
-            actionLabel={promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
-            actionTo={promptCount === 0 ? '/prompts' : '/ai-visibility'}
+            actionLabel={collectionPending ? 'See your prompts' : promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
+            actionTo={collectionPending || promptCount === 0 ? '/prompts' : '/ai-visibility'}
             minHeight={220}
           />
         </motion.div>

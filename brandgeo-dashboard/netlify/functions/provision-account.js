@@ -28,6 +28,15 @@
  *      (idempotent re-run of onboarding). A crafted request cannot escalate.
  * ─────────────────────────────────────────────────────────────────────────────
  *
+ * AFTER PROVISIONING (2026-09-20): this function also kicks
+ * activate-client-background.js, which seeds the client's prompts, reusing the
+ * ones this domain's own free public audit already generated where it ran, and
+ * enqueues their first collection. Before that, a self-serve customer landed on
+ * an Overview that said "Not measured yet" and was asked to write buyer
+ * questions themselves, while the admin wizard at /onboard did both for the
+ * clients an employee set up by hand. See triggerActivation() at the bottom of
+ * this file and _activation.js for the rules.
+ *
  * POST body:
  *   { account_type: 'company' | 'personal',
  *     brand_name?: string,        // required for personal; derived from domain for company
@@ -147,6 +156,15 @@ exports.handler = async (event) => {
       console.error('[provision] update existing client failed:', updErr.message)
       return fail(500, 'Could not save your brand. Please try again.')
     }
+
+    // Activation fires on the re-run path too, not only on creation. It is
+    // guarded on the client having no prompts and no results, so an ordinary
+    // re-run (someone who already has both) does nothing at all. The case it
+    // catches is a client provisioned by an earlier code path that never seeded
+    // anything: they finally supply a website here, and this is the first
+    // moment activation has a domain to work from.
+    await triggerActivation({ clientId: existingProfile.client_id, userId: user.id })
+
     return {
       statusCode: 200,
       headers,
@@ -279,10 +297,61 @@ exports.handler = async (event) => {
   // Leads earn nothing by themselves; the commission comes with the sale.
   await recordAffiliateLead(supabase, { body, user, clientId: clientRow.id, brandWebsite })
 
+  // Seed prompts and start the first collection, so the customer lands on a
+  // dashboard that is measuring something. Fire and forget: the account is
+  // already complete and usable, and the customer is watching a spinner.
+  await triggerActivation({ clientId: clientRow.id, userId: user.id })
+
   return {
     statusCode: 201,
     headers,
     body: JSON.stringify({ success: true, client_id: clientRow.id, created: true }),
+  }
+}
+
+/**
+ * triggerActivation, kicks activate-client-background.js so the new client gets
+ * prompts and a first collection instead of an empty dashboard.
+ *
+ * WHY IT IS A SEPARATE FUNCTION AND NOT THIS ONE. Seeding can involve a
+ * homepage fetch (6s ceiling) and a gpt-4o-mini call when the domain has no
+ * prior public audit to reuse, and enqueueing adds several more round trips.
+ * provision-account runs on a 15s budget (netlify.toml) with a customer
+ * waiting, so doing it inline would trade an empty dashboard for a timeout.
+ * activate-client-background.js is a Netlify Background Function and answers
+ * 202 immediately, so this await costs a round trip, not the work.
+ *
+ * NEVER THROWS, and never changes what the customer sees. An account that was
+ * provisioned correctly must not report failure because its activation did not
+ * start; the fallback is exactly the behaviour that existed before activation
+ * did, an empty dashboard with a working "Add a prompt" route. Same reasoning
+ * as the audit row and the affiliate lead above, and like them it runs only
+ * after every step that can still roll back.
+ */
+async function triggerActivation({ clientId, userId }) {
+  const base = process.env.URL || 'https://app.getbrandgeo.com'
+  try {
+    const res = await Promise.race([
+      fetch(`${base}/.netlify/functions/activate-client-background`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Self-to-self call. The background function's own gate REFUSES when
+          // this variable is unset (it fails closed, unlike
+          // collection-worker-background.js), so a missing key means no
+          // activation rather than an open endpoint that seeds rows and spends
+          // engine budget for any client id a stranger names.
+          'X-Internal-Key': process.env.INTERNAL_AUDIT_KEY || '',
+        },
+        body: JSON.stringify({ client_id: clientId, user_id: userId }),
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('activation trigger timeout')), 5000)),
+    ])
+    if (!res.ok && res.status !== 202) {
+      console.error(`[provision] activation trigger for client ${clientId} returned ${res.status}`)
+    }
+  } catch (e) {
+    console.error(`[provision] activation trigger failed for client ${clientId}: ${e.message}`)
   }
 }
 

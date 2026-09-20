@@ -117,6 +117,13 @@
 [functions."provision-account"]
   timeout = 15
 
+# activate-client-background is a Netlify Background Function (the `-background`
+# filename suffix gives it up to 15 minutes automatically), so like
+# collection-worker-background and run-full-audit-background it takes NO
+# `timeout` setting. It is why provision-account can stay at 15s: seeding a new
+# client's prompts may involve a homepage fetch plus an LLM call, which does not
+# fit a budget with a customer watching a spinner.
+
 [functions."resend-invite"]
   timeout = 15
 
