@@ -22,6 +22,59 @@
 
 ## CURRENT STATE (newest entry 2026-09-21)
 
+### 2026-09-21: MCP access for Essentials and up; packet 025 written, NOTHING built, rulings owed
+
+Constantin's ask, verbatim: "ar trebui sa facem disponibil conectarea prin
+MCP la platforma noastra pentru conturile de la 99 de euro in sus, cred ca de
+la essentials". A remote MCP (Model Context Protocol) server so a customer's
+own AI tools (Claude, Claude Code, Cursor, ChatGPT) can read that customer's
+visibility data, gated to plan `essentials` and above (`free` and `radar`
+out; `pro` legacy, `managed`, `enterprise` in), read-only in release one.
+
+**State: design delegation only.** Packet
+`.claude/handoffs/025-bg-orchestrator-to-bg-architect-mcp-access-essentials-and-up.md`
+(status NEEDS_HUMAN) asks `bg-architect` on Opus for `docs/arch/mcp-access.md`.
+What it fixes so it is not re-argued: MCP Streamable HTTP, stateless, one
+function `mcp-server.js` behind a `/mcp` rewrite placed before the SPA
+fallback, JSON responses only (no SSE, no session), timeout 26; credential is
+a per-client API key `bgmcp_<clientId>_<48 hex>` shown once, stored as sha256
+hash plus prefix in a new `client_api_keys` table (copy of the affiliate
+program key pattern in `_affiliate_core.js`), bearer header, revoke by
+`revoked_at`, no DELETE policy; the plan gate is ONE server function
+`mcpAllowedFor(plan)` over `_plans.js` `planRank()` checked on every call
+against the live `clients.plan` (so downgrades and lapsed grants close access
+by themselves), never a third copy of the ladder; seven read-only tools
+(brand overview, visibility summary, prompts, prompt results, competitors,
+sentiment, recommendations), every query filtered by `client_id` and
+excluding error rows, row cap and window clamp; 60 calls a minute per key and
+5,000 a day per client; key management on `Account.tsx` through a new
+`client-api-keys.js`; public `brandgeo/web/mcp.html` with setup snippets, one
+pricing row from Essentials up, one FAQ entry; migration before deploy; all
+dashboard pieces on one Netlify build. No write tools and no OAuth in release
+one, both listed under "Later". `requireAuth()` is not touched; the MCP gate
+is a second, separate path.
+
+**Rulings owed (packet section "Open questions", defaults apply if silent,
+build waits on 1 and 2):** (1) gate at Essentials, Radar out; (2) bearer key
+first, OAuth 2.1 second release (claude.ai web and ChatGPT connectors want
+OAuth, Claude Code, Cursor, Windsurf and VS Code take a header today); (3) no
+write tools in release one; (4) up to 5 named keys per client; (5) pricing
+label, working text "MCP access for your AI tools"; (6) limits equal across
+gated plans or more for Managed and Enterprise.
+
+**Next command once 1 and 2 are answered, in a fresh session:**
+`Read .claude/handoffs/025-bg-orchestrator-to-bg-architect-mcp-access-essentials-and-up.md and write the spec.`
+Then bg-backend on Opus (new credential and RLS), bg-app and bg-web on
+Sonnet, bg-verify on Opus with Fable only for the key resolution and the RLS
+probe. Scale note: no cron, invocations only on customer calls, reads only,
+one `last_used_at` write per minute per active key.
+
+**Not done this session, on purpose:** no code, no migration, no build. The
+2026-09-21 affiliate commit `8c94119` from the other session is still NOT
+pushed; this packet commit is docs only and rides with it under
+`$env:BATCH_PUSH=1` when Constantin pushes.
+
+
 ### 2026-09-21: affiliates can be credited for hand-set-up (custom plan) accounts; BUILT, 130 checks green, COMMITTED, NOT pushed
 
 Constantin's ask, verbatim: "I want to also be able to add to affiliates the
