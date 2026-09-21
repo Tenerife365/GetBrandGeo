@@ -421,3 +421,33 @@ export interface JoinPreview {
   terms_version: string
   terms_url: string
 }
+
+/** One affiliate an account is attached to, from accounts.list. */
+export interface AdminAccountAttachment {
+  attribution_id: string
+  program_id: string
+  program_slug: string | null
+  membership_id: string
+  affiliate_id: string | null
+  affiliate_name: string | null
+  source: AttributionSource
+  stripe_customer_id: string | null
+  converted_at: string | null
+}
+
+/** A client account as the admin's attach picker sees it (custom or hand-assigned plans included). */
+export interface AdminAccount {
+  id: number
+  name: string
+  slug: string | null
+  plan: string | null
+  plan_source: string | null
+  plan_grant_until: string | null
+  plan_grant_note: string | null
+  paid_until: string | null
+  subscription_started_at: string | null
+  stripe_customer_id: string | null
+  category: string | null
+  created_at: string
+  attached: AdminAccountAttachment[]
+}

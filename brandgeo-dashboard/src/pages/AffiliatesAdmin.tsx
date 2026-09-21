@@ -14,12 +14,12 @@ import { isDemoMode, supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import EmptyState from '../components/EmptyState'
 import { PageTitle, SectionHeading, StatLabel, StatValue } from '../components/Typography'
-import { affiliatePost, downloadCsv, fmtDate, copyText, StatusPill } from '../lib/affiliateApi'
+import { affiliatePost, downloadCsv, fmtDate, money, copyText, StatusPill } from '../lib/affiliateApi'
 import {
   CONVERSION_TYPES, COMMISSION_STATUSES, PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type AdminOverview, type AffiliateProgram, type ProgramInput, type AdminAffiliate, type AdminMembership, type AffiliateApplication,
   type AdminVisit, type AdminConversion, type AdminCommission, type PayoutCandidate, type PayoutBatch, type AuditEntry, type AffiliateResource,
-  type CustomRules, type PayoutMethod,
+  type CustomRules, type PayoutMethod, type AdminAccount,
 } from '../types/affiliate'
 
 type Tab = 'programs' | 'affiliates' | 'conversions' | 'payouts' | 'activity'
@@ -744,6 +744,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
   const [commissions, setCommissions] = useState<AdminCommission[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [manualOpen, setManualOpen] = useState(false)
+  const [attachOpen, setAttachOpen] = useState(false)
   const { busy, error, ok, run, setOk } = useAsync()
 
   const loadConversions = useCallback(async () => {
@@ -800,6 +801,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
           <SectionHeading>Leads and sales</SectionHeading>
           <div className="flex gap-2">
             <button type="button" className={btnGhost} onClick={() => exportCsv('conversions')}><Download size={14} /> CSV</button>
+            <button type="button" className={btnGhost} onClick={() => setAttachOpen(true)}><Handshake size={14} /> Attach an account</button>
             <button type="button" className={btnPrimary} onClick={() => setManualOpen(true)}><Plus size={14} /> Record manually</button>
           </div>
         </div>
@@ -877,7 +879,133 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
       </section>
 
       {manualOpen && <ManualConversionModal programs={programs} onClose={() => setManualOpen(false)} onDone={(msg) => { setManualOpen(false); setOk(msg); reloadAll() }} />}
+      {attachOpen && <AttachAccountModal programs={programs} onClose={() => setAttachOpen(false)} onDone={(msg) => { setAttachOpen(false); setOk(msg); reloadAll() }} />}
     </div>
+  )
+}
+
+const PLAN_SOURCE_LABELS: Record<string, string> = {
+  manual: 'assigned by hand', package: 'package', trial: 'free trial', comp: 'complimentary', stripe: 'Stripe subscription', signup: 'signup', expired: 'expired',
+}
+
+const DEMO_ACCOUNTS: AdminAccount[] = [
+  { id: 54, name: 'Northwind Bakery', slug: 'northwind-bakery', plan: 'essentials', plan_source: 'manual', plan_grant_until: null, plan_grant_note: 'Custom plan agreed by email', paid_until: '2026-10-17', subscription_started_at: '2026-09-17', stripe_customer_id: null, category: 'customer', created_at: '2026-09-17T09:00:00Z', attached: [] },
+  { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', plan_grant_until: '2027-06-02', plan_grant_note: null, paid_until: '2027-07-30', subscription_started_at: '2026-06-02', stripe_customer_id: 'cus_demo55', category: 'customer', created_at: '2026-06-02T09:00:00Z', attached: [{ attribution_id: 'at1', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: 'cus_demo55', converted_at: '2026-09-12T10:00:00Z' }] },
+]
+
+interface AttachResult {
+  ok: boolean
+  attribution: { id: string; stripe_customer_id: string | null }
+  stripe_customer_id: string | null
+  stripe_customer_resolved_from: 'input' | 'client' | 'attribution' | 'stripe' | null
+  stripe_customer_conflict: boolean
+  client: { id: number; name: string; plan: string | null; plan_source: string | null }
+  conversion: { id: string } | null
+  commission: { id: string; currency: string } | null
+  commission_amount: string | null
+  sale_amount: string | null
+  duplicate: boolean
+}
+
+/**
+ * Attach an account that was set up by hand (custom or assigned plan) to the
+ * affiliate who recommended it: one manual attribution keyed client:<id>, the
+ * Stripe customer linked so later invoices credit the affiliate on their own,
+ * and optionally the payment already made recorded as a sale now.
+ */
+function AttachAccountModal({ programs, onClose, onDone }: { programs: AffiliateProgram[]; onClose: () => void; onDone: (m: string) => void }) {
+  const [programId, setProgramId] = useState(programs[0]?.id || '')
+  const [memberships, setMemberships] = useState<{ id: string; label: string }[]>([])
+  const [accounts, setAccounts] = useState<AdminAccount[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
+  const [f, setF] = useState({ membership_id: '', client_id: '', stripe_customer_id: '', record_sale: false, amount: '', currency: '', occurred_at: '', external_id: '', stripe_invoice_id: '', note: '', reason: '' })
+  const { busy, error, run } = useAsync()
+  useEffect(() => {
+    if (!programId) return
+    if (isDemoMode) { setMemberships(DEMO_AFFILIATES.flatMap((a) => a.memberships.filter((m) => m.program_id === programId).map((m) => ({ id: m.id, label: a.full_name })))); return }
+    api<{ affiliates: AdminAffiliate[] }>({ action: 'affiliates.list', limit: 500 }).then((r) => {
+      if (!r.data) return
+      setMemberships(r.data.affiliates.flatMap((a) => a.memberships.filter((m) => m.program_id === programId).map((m) => ({ id: m.id, label: `${a.full_name} (${m.status})` }))))
+    })
+  }, [programId])
+  useEffect(() => {
+    if (isDemoMode) { setAccounts(DEMO_ACCOUNTS); setLoadingAccounts(false); return }
+    api<{ accounts: AdminAccount[] }>({ action: 'accounts.list', limit: 1000 }).then((r) => {
+      if (r.data) setAccounts(r.data.accounts.filter((a) => a.category !== 'research'))
+      setLoadingAccounts(false)
+    })
+  }, [])
+  const program = programs.find((p) => p.id === programId)
+  const account = accounts.find((a) => String(a.id) === f.client_id) || null
+  const affiliateLabel = memberships.find((m) => m.id === f.membership_id)?.label || 'the affiliate'
+  function pickAccount(id: string) {
+    const a = accounts.find((x) => String(x.id) === id)
+    const known = a?.stripe_customer_id || a?.attached.find((x) => x.stripe_customer_id)?.stripe_customer_id || ''
+    setF({ ...f, client_id: id, stripe_customer_id: known })
+  }
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (isDemoMode) { onDone('Demo mode: nothing recorded.'); return }
+    const res = await run(() => api<AttachResult>({
+      action: 'accounts.attach', program_id: programId, membership_id: f.membership_id, client_id: Number(f.client_id),
+      stripe_customer_id: f.stripe_customer_id || undefined, reason: f.reason,
+      ...(f.record_sale ? { amount: f.amount, currency: f.currency || program?.currency, occurred_at: f.occurred_at || undefined, external_id: f.external_id || undefined, stripe_invoice_id: f.stripe_invoice_id || undefined, note: f.note || undefined } : {}),
+    }))
+    if (!res) return
+    const parts = [`${res.client.name} is attached to ${affiliateLabel}.`]
+    if (res.stripe_customer_id) {
+      const from = res.stripe_customer_resolved_from === 'stripe' ? 'found in Stripe by client id' : res.stripe_customer_resolved_from === 'client' ? 'from the account' : res.stripe_customer_resolved_from === 'attribution' ? 'kept from the earlier attachment' : 'as typed'
+      parts.push(`Stripe customer ${res.stripe_customer_id} is linked (${from}), so future invoices for it credit the affiliate on their own.`)
+    } else {
+      parts.push('No Stripe customer is linked yet: invoices for this account will not credit the affiliate until you attach it again with the customer id.')
+    }
+    if (res.stripe_customer_conflict) parts.push('The attribution already carried a different Stripe customer id, which was kept.')
+    if (res.conversion) {
+      if (res.duplicate) parts.push('That payment was already recorded; nothing was added.')
+      else parts.push(res.commission ? `Sale of ${money(res.sale_amount, res.commission.currency)} recorded, commission ${money(res.commission_amount, res.commission.currency)} pending.` : 'Sale recorded with no commission (see its flags).')
+    }
+    onDone(parts.join(' '))
+  }
+  return (
+    <Modal title="Attach an account to an affiliate" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-xs text-slate-400">For accounts you set up by hand on a custom or assigned plan after a partner recommended them. The account is attributed to the affiliate (a manual attribution, which overrides links and coupons), its Stripe customer is linked so later invoices credit them automatically, and a payment already made can be recorded as a sale now. The commission comes from the program rules; you cannot type it.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Program"><select className={ic} value={programId} onChange={(e) => setProgramId(e.target.value)}>{programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label="Affiliate"><select className={ic} required value={f.membership_id} onChange={(e) => setF({ ...f, membership_id: e.target.value })}><option value="">Choose</option>{memberships.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></Field>
+        </div>
+        <Field label="Account" hint={loadingAccounts ? 'Loading accounts' : 'Research workspaces are hidden'}>
+          <select className={ic} required value={f.client_id} onChange={(e) => pickAccount(e.target.value)}>
+            <option value="">Choose</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.plan || 'free'}{a.plan_source ? `, ${PLAN_SOURCE_LABELS[a.plan_source] ?? a.plan_source}` : ''}){a.attached.length ? ' attached' : ''}</option>)}
+          </select>
+        </Field>
+        {account && (
+          <div className="text-xs text-slate-400 bg-dark-700/60 border border-dark-600 rounded-lg px-3 py-2 space-y-0.5">
+            <div><span className="text-slate-500">Plan: </span><span className="text-slate-200">{account.plan || 'free'}</span>{account.plan_source ? ` (${PLAN_SOURCE_LABELS[account.plan_source] ?? account.plan_source})` : ''}{account.plan_grant_note ? `, ${account.plan_grant_note}` : ''}</div>
+            {account.plan_grant_until && <div><span className="text-slate-500">Reverts to Free: </span>{fmtDate(account.plan_grant_until)}</div>}
+            {account.paid_until && <div><span className="text-slate-500">Paid until: </span>{fmtDate(account.paid_until)}</div>}
+            <div><span className="text-slate-500">Stripe customer on the account: </span>{account.stripe_customer_id || 'none (Stripe is searched by client id when you save)'}</div>
+            {account.attached.length > 0 && <div><span className="text-slate-500">Already attached to: </span>{account.attached.map((x) => `${x.affiliate_name || 'an affiliate'} (${x.program_slug || 'program'}${x.converted_at ? ', has a sale' : ''})`).join(', ')}</div>}
+          </div>
+        )}
+        <Field label="Stripe customer id (optional)" hint="cus_... from the customer page in Stripe. Leave empty to use the account's own id, or to search Stripe by client id."><input className={ic} value={f.stripe_customer_id} onChange={(e) => setF({ ...f, stripe_customer_id: e.target.value.trim() })} maxLength={80} placeholder="cus_" /></Field>
+        <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={f.record_sale} onChange={(e) => setF({ ...f, record_sale: e.target.checked })} /> Also record a payment this account already made as a sale</label>
+        {f.record_sale && (
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label={`Amount paid (${f.currency || program?.currency || ''})`} hint="What the customer paid, not the commission"><input className={ic} inputMode="decimal" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="0.00" /></Field>
+            <Field label="Currency" hint="Defaults to the program currency"><input className={ic} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} maxLength={3} /></Field>
+            <Field label="Paid at" hint="Defaults to now"><input className={ic} type="datetime-local" value={f.occurred_at} onChange={(e) => setF({ ...f, occurred_at: e.target.value })} /></Field>
+            <Field label="Stripe invoice id (optional)" hint="in_... for a Stripe invoice, so the webhook cannot count it a second time"><input className={ic} value={f.stripe_invoice_id} onChange={(e) => setF({ ...f, stripe_invoice_id: e.target.value.trim() })} maxLength={80} placeholder="in_" /></Field>
+            <Field label="Invoice number or reference (optional)" hint="Prevents recording the same payment twice"><input className={ic} value={f.external_id} onChange={(e) => setF({ ...f, external_id: e.target.value })} maxLength={200} /></Field>
+            <Field label="Internal note (optional)"><input className={ic} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} maxLength={1000} /></Field>
+          </div>
+        )}
+        <Field label="Reason (required, audited)"><input className={ic} required value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} maxLength={500} placeholder="e.g. Recommended by the partner in August, plan assigned by hand" /></Field>
+        <Notice kind="error" text={error} />
+        <div className="flex justify-end gap-2"><button type="button" className={btnGhost} onClick={onClose}>Cancel</button><button type="submit" className={btnPrimary} disabled={busy}>{busy && <Loader2 size={14} className="animate-spin" />} Attach</button></div>
+      </form>
+    </Modal>
   )
 }
 

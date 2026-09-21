@@ -20,7 +20,80 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-09-12)
+## CURRENT STATE (newest entry 2026-09-21)
+
+### 2026-09-21: affiliates can be credited for hand-set-up (custom plan) accounts; BUILT, 130 checks green, COMMITTED, NOT pushed
+
+Constantin's ask, verbatim: "I want to also be able to add to affiliates the
+custom plans I did dedicated for some accounts that were recommended". The
+accounts he set up by hand on a custom or assigned plan (`plan_source`
+manual, package, comp, trial) after a partner recommended them could not be
+credited to that partner: `manualAttribute` never stored a Stripe customer,
+hand-invoiced clients carry `clients.stripe_customer_id = null` (they are
+linked only through `Customer.metadata.client_id`, the join `_revenue.js`
+uses), and a hand-issued `invoice.paid` carries no code, no
+`client_reference_id` and no subscription, so the only way it can reach an
+affiliate is `findAttributionByStripe({ customerId })`, which needs the
+customer id ON the attribution row.
+
+**Built, one commit, docs in `docs/affiliates/`.** `affiliate-admin.js` gains
+`accounts.list` (clients with `plan_source`, grant dates, Stripe id, and
+which affiliate each is attached to; research rows returned, hidden by the
+UI) and `accounts.attach` (program, membership, `client_id`, reason
+required; optional `stripe_customer_id` `cus_`, `stripe_invoice_id` `in_`,
+and a past payment as `amount` or `amount_cents`). It writes ONE manual
+attribution keyed `client:<id>` through `service.manualAttribute`, which now
+takes `stripeCustomerId` and sets it on the attribution once (never
+overwrites a value a payment wrote; reports `stripe_customer_conflict`). The
+customer id is resolved in order: typed, `clients` row, an earlier
+attachment, then a read-only `stripe.customers.search` on
+`metadata['client_id']` (needs `STRIPE_SECRET_KEY`; silent unless exactly one
+live match; injectable as `stripeCustomerLookup` in tests). A past payment
+is recorded in the same call as a manual `sale` with the commission from the
+rules; with an `in_` id the key is `stripe_invoice:<id>`, the webhook's own,
+so the same invoice arriving later is a duplicate, else
+`manual:<slug>:client:<id>:<reference>`. `upsertAttribution` now writes the
+`attribution.reassigned` audit only when membership or source actually
+changes (a repeated attach used to log a change with identical before and
+after). UI: a ghost button "Attach an account" beside "Record manually" on
+the Conversions tab of `AffiliatesAdmin.tsx`, modal with account picker,
+plan summary, Stripe id prefill, optional payment block, reason; types
+`AdminAccount` and `AdminAccountAttachment` in `src/types/affiliate.ts`.
+Nothing else in the module changed; `_affiliate_stripe.js` is untouched and
+the new path is exercised through it in `affiliate_stripe.test.js`.
+
+**Measured.** 130 affiliate checks in five files (27, 16, 19, 52, 16; was
+120), `npm run build` exit 0, zero em or en dashes in added lines (positive
+control fired), fixtures use `@example.com` only. Production read the same
+day: 0 attributions, 0 conversions, 0 commissions, one active membership
+(Monica Goane, `brandgeo`, `eff83994-a7f5-400a-a9be-f25ba1c56608`); ten
+non-research accounts on a paid plan and NONE carries a Stripe customer id
+on its row: 1 Bucate pe Roate (growth_pro, package, to 2027-06-02), 2
+BrandGEO (managed), 5 Paunescu & Asociatii (managed), 19 Talentwelove
+(managed, manual), 54 IMoM (essentials, manual), 55 IBSB (essentials), 56
+Inspira Cosmetics (essentials), and 20, 27, 52 (accounts named after
+individuals, ids only here). Which of these the partner recommended is
+Constantin's knowledge; nothing was attached from this seat.
+
+**Scale note (AUTONOMY section 7).** No new cron, no new scheduled
+invocation. `accounts.list` runs on opening the modal (two reads plus the
+maps the page already loads); `accounts.attach` is one admin click: a
+handful of reads, one attribution write, at most one conversion, one
+commission, two audit rows, and at most one Stripe search. Neutral for
+every other caller.
+
+**Owed, Constantin's, in order.** (1) Push with `BATCH_PUSH=1` when a build
+is due (dashboard code, so it spends one Netlify build). (2) In the admin
+Affiliates page, Conversions, "Attach an account": for each account the
+partner recommended, pick Monica, the account, the reason, and tick the
+payment block ONLY for money paid before the attachment (the amount the
+customer paid, the `in_` id of the Stripe invoice when there is one).
+Anything paid after arrives through the webhook by itself once the customer
+id is linked. (3) If the message after saving says no Stripe customer is
+linked, copy `cus_...` from the customer page in Stripe and attach again.
+(4) The `rk_live` key rotation from 2026-09-12 is still owed. The payout
+rehearsal (`TEST-RESULTS.md` section 3 steps 6 to 14) can now start from a
+recorded past payment instead of waiting for a new one.
 
 ### 2026-09-12: affiliate module BUILT, migrated to production, 104 checks green, PUSHED and LIVE
 

@@ -180,11 +180,13 @@ async function upsertAttribution(supabase, { program, membership, externalCustom
     }
     const { data, error } = await supabase.from('affiliate_attributions').update(patch).eq('id', existing.id).select('*').single()
     if (error) throw new Error(`attribution reassign failed: ${error.message}`)
-    await audit(supabase, {
-      actor, action: 'attribution.reassigned', entityType: 'attribution', entityId: existing.id,
-      programId: program.id, affiliateId: membership.affiliate_id,
-      before: { membership_id: existing.membership_id, source: existing.source }, after: { membership_id: membership.id, source }, reason: manualReason,
-    })
+    if (existing.membership_id !== membership.id || existing.source !== source) {
+      await audit(supabase, {
+        actor, action: 'attribution.reassigned', entityType: 'attribution', entityId: existing.id,
+        programId: program.id, affiliateId: membership.affiliate_id,
+        before: { membership_id: existing.membership_id, source: existing.source }, after: { membership_id: membership.id, source }, reason: manualReason,
+      })
+    }
     return { attribution: data, membership_id: membership.id, flags, winner: 'incoming' }
   }
 
@@ -505,16 +507,33 @@ async function markSubscriptionEnded(supabase, { subscriptionId, now = new Date(
 
 /**
  * Manual attribution by an admin: ties a customer identity to a membership
- * without recording a conversion. Records who, why and when.
+ * without recording a conversion. Records who, why and when. With
+ * stripeCustomerId the attribution is also linked to that Stripe customer,
+ * which is what lets a later invoice.paid for it find this row
+ * (findAttributionByStripe) when the payment carries no code and the clients
+ * row has no stripe_customer_id, the case for every hand-invoiced account.
+ * Set once: a value a payment already wrote is never overwritten, and the
+ * caller is told when the two differ.
  */
-async function manualAttribute(supabase, { program, membershipId, externalCustomerId, customerRef, reason, actor, now = new Date() }) {
+async function manualAttribute(supabase, { program, membershipId, externalCustomerId, customerRef, reason, actor, stripeCustomerId = null, now = new Date() }) {
   const membership = await getMembership(supabase, membershipId)
   if (!membership || membership.program_id !== program.id) return { ok: false, status: 422, error: 'Membership does not belong to this program' }
   const att = await upsertAttribution(supabase, {
     program, membership, externalCustomerId, source: 'manual', now, customerRef, actor, manualReason: reason,
   })
-  await audit(supabase, { actor, action: 'attribution.manual', entityType: 'attribution', entityId: att.attribution.id, programId: program.id, affiliateId: membership.affiliate_id, after: { membership_id: membership.id, external_customer_id: externalCustomerId }, reason })
-  return { ok: true, attribution: att.attribution }
+  let attribution = att.attribution
+  let stripeCustomerConflict = false
+  if (stripeCustomerId) {
+    if (!attribution.stripe_customer_id) {
+      const { data, error } = await supabase.from('affiliate_attributions').update({ stripe_customer_id: stripeCustomerId }).eq('id', attribution.id).select('*').single()
+      if (error) throw new Error(`attribution stripe link failed: ${error.message}`)
+      attribution = data
+    } else if (attribution.stripe_customer_id !== stripeCustomerId) {
+      stripeCustomerConflict = true
+    }
+  }
+  await audit(supabase, { actor, action: 'attribution.manual', entityType: 'attribution', entityId: attribution.id, programId: program.id, affiliateId: membership.affiliate_id, after: { membership_id: membership.id, external_customer_id: externalCustomerId, stripe_customer_id: attribution.stripe_customer_id || null }, reason })
+  return { ok: true, attribution, stripe_customer_conflict: stripeCustomerConflict }
 }
 
 /**

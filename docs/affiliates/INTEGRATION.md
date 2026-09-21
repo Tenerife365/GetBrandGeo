@@ -169,6 +169,21 @@ identity, the affiliate and a reason. It beats every other rule and is
 audited with the admin id. A manual conversion (Conversions, Add manual)
 records a lead or sale the same way.
 
+For a BrandGEO account set up by hand (custom or assigned plan, invoiced
+from Stripe by the admin) use Conversions, Attach an account instead
+(`accounts.list` and `accounts.attach` on `affiliate-admin.js`, added
+2026-09-21). It writes the same manual attribution keyed `client:<id>` and
+stores the account's Stripe customer id on it, resolved from the request,
+the `clients` row, an earlier attachment, or a Stripe customer search on
+`metadata['client_id']` (read only, needs `STRIPE_SECRET_KEY`, silent when
+the match is not exactly one live customer). From then on a hand-issued
+`invoice.paid` for that customer, which carries no code, no
+`client_reference_id` and no `clients.stripe_customer_id`, is matched by
+`findAttributionByStripe` and credited as a sale, with renewals and refunds
+following the usual rules. A payment made before the attachment can be
+recorded in the same call as a manual sale; with a `stripe_invoice_id` it is
+keyed `stripe_invoice:<id>` so the webhook cannot count it again.
+
 ## 7. How BrandGEO itself is wired
 
 - `brandgeo/web/affiliate-track.js` on every marketing page, loaded after
@@ -185,8 +200,10 @@ records a lead or sale the same way.
   become `recurring`, `charge.refunded` reverses (a partial refund only
   flags), `customer.subscription.deleted` ends recurring. Attribution order:
   the promotion code on the payment, the terms acceptance
-  (`client_reference_id`), the stored attribution for the provisioned client,
-  the stored attribution for the hashed email.
+  (`client_reference_id`), the stored attribution carrying the Stripe
+  customer id (how an attached hand-invoiced account is found), the stored
+  attribution for the provisioned client, the stored attribution for the
+  hashed email.
 - The audit widget path in `site.js` (`redirectToSignup`) does not carry the
   referral yet; the tracker covers links and forms, so a visitor who signs up
   from the audit widget is attributed by their hashed email only if the same

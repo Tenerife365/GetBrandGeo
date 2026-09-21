@@ -110,6 +110,34 @@ customer id, or `email:<hash>` as it appears on the conversion list) to an
 affiliate in a program, with a reason. It beats every automatic rule and is
 never displaced by a later click or coupon.
 
+**Attach an account** (added 2026-09-21). For the accounts you set up by hand
+on a custom or assigned plan after a partner recommended them: the ones
+whose Account page says "Assign plan", "Package", "Complimentary" or "Free
+trial", and whose invoices you issue from Stripe yourself. Pick the program,
+the affiliate and the account (research workspaces are hidden). Saving
+writes one manual attribution keyed `client:<id>`, so it behaves exactly
+like the paragraph above, and links the account's Stripe customer to it.
+That link is what makes the next hand-issued invoice for the account credit
+the affiliate on its own: a payment without a code, click or acceptance can
+only reach an affiliate through the Stripe customer id stored on the
+attribution, and hand-invoiced accounts have no customer id on their clients
+row. The id is taken from what you type, then from the account, then from an
+earlier attachment, then found in Stripe by the customer's `client_id`
+metadata (the way the Revenue page links them). If the message after saving
+says no Stripe customer is linked, copy `cus_...` from the customer page in
+Stripe and attach again; nothing else changes.
+
+Tick "Also record a payment this account already made" only for money that
+arrived BEFORE the attachment: anything paid afterwards arrives through the
+webhook and would be counted twice. Enter what the customer paid, not the
+commission, which comes from the program rules. For a past Stripe invoice
+enter its `in_...` id: the sale then takes the webhook's own key, so the same
+invoice arriving later is a duplicate and never a second commission. For a
+payment that never went through Stripe use the invoice number as the
+reference for the same protection. Attaching the same account again is
+harmless: the attribution is reused, a repeated payment reference adds
+nothing, and only a change of affiliate is logged as a reassignment.
+
 **Reverse** a conversion (refund or cancellation) with a reason. Its unpaid
 commission becomes `reversed`; a paid one is flagged for reconciliation.
 

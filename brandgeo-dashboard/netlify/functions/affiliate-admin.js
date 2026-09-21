@@ -15,6 +15,7 @@
  *   visits.list
  *   conversions.list | conversions.create_manual | conversions.reverse
  *   attributions.list | attributions.manual
+ *   accounts.list | accounts.attach (a client on a custom or hand-assigned plan, credited to an affiliate)
  *   commissions.list | commissions.approve | commissions.reject | commissions.reverse | commissions.reopen | commissions.mature
  *   payouts.candidates | payouts.create_batch | payouts.list | payouts.mark_paid | payouts.cancel
  *   payouts.upload_url | payouts.attach_document | payouts.document_url
@@ -99,9 +100,35 @@ async function issueInviteToken(db, affiliate) {
   return token
 }
 
+/**
+ * Hand-invoiced customers are tied to a client only through the Stripe
+ * Customer's metadata.client_id (revenue-report.js reads the same field; the
+ * clients.stripe_customer_id column is null for them), so accounts.attach
+ * searches Stripe by that key when the clients row carries nothing. Read
+ * only. Returns null without a key, on any error, or when the match is not
+ * exactly one live customer; the admin can always paste the id instead.
+ */
+async function stripeCustomerByClientId(clientId) {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) return null
+  try {
+    const stripe = require('stripe')(key)
+    const res = await stripe.customers.search({ query: `metadata['client_id']:'${Number(clientId)}'`, limit: 2 })
+    const found = (res && Array.isArray(res.data) ? res.data : []).filter((c) => c && !c.deleted && STRIPE_CUSTOMER_RE.test(String(c.id)))
+    return found.length === 1 ? found[0].id : null
+  } catch (e) {
+    console.warn('[affiliate-admin] Stripe customer search failed:', e.message)
+    return null
+  }
+}
+
+const STRIPE_CUSTOMER_RE = /^cus_[A-Za-z0-9]+$/
+const STRIPE_INVOICE_RE = /^in_[A-Za-z0-9]+$/
+const ACCOUNT_FIELDS = 'id, name, slug, plan, plan_source, plan_grant_until, plan_grant_note, paid_until, subscription_started_at, stripe_customer_id, category, created_at'
+
 exports.handler = async (event) => handle(event)
 
-async function handle(event, { supabase = null } = {}) {
+async function handle(event, { supabase = null, stripeCustomerLookup = null } = {}) {
   const auth = await requireAuth(event, { adminOnly: true })
   if (auth.response) return auth.response
   const headers = auth.headers
@@ -537,6 +564,99 @@ async function handle(event, { supabase = null } = {}) {
       const result = await service.manualAttribute(db, { program, membershipId: String(body.membership_id || ''), externalCustomerId, customerRef: core.str(body.customer_ref, 120), reason, actor })
       if (!result.ok) return json(result.status, { error: result.error })
       return json(201, { ok: true, attribution: result.attribution })
+    }
+
+    // ── accounts: clients on custom or hand-assigned plans ───────────────────
+    if (action === 'accounts.list') {
+      const { data: clients, error } = await db.from('clients').select(ACCOUNT_FIELDS).order('name', { ascending: true }).limit(limitOf(body))
+      if (error) throw error
+      const { data: atts } = await db.from('affiliate_attributions').select('*')
+      const maps = await mapsFor(db)
+      const byClient = new Map()
+      for (const a of atts || []) {
+        const key = String(a.external_customer_id || '')
+        if (!key.startsWith('client:')) continue
+        const id = Number(key.slice('client:'.length))
+        if (!Number.isInteger(id)) continue
+        const d = decorate(a, maps)
+        const list = byClient.get(id) || []
+        list.push({ attribution_id: a.id, program_id: a.program_id, program_slug: d.program_slug, membership_id: a.membership_id, affiliate_id: d.affiliate_id, affiliate_name: d.affiliate_name, source: a.source, stripe_customer_id: a.stripe_customer_id || null, converted_at: a.converted_at || null })
+        byClient.set(id, list)
+      }
+      return json(200, { accounts: (clients || []).map((c) => ({ ...c, attached: byClient.get(Number(c.id)) || [] })) })
+    }
+    if (action === 'accounts.attach') {
+      const program = await service.getProgramById(db, String(body.program_id || ''))
+      if (!program) return json(404, { error: 'Program not found.' })
+      const membership = await service.getMembership(db, String(body.membership_id || ''))
+      if (!membership || membership.program_id !== program.id) return json(400, { error: 'Pick an affiliate membership in this program.' })
+      const clientId = Number(body.client_id)
+      if (!Number.isInteger(clientId) || clientId <= 0) return json(400, { error: 'client_id must be a positive integer.' })
+      const reason = core.str(body.reason, 500)
+      if (!reason) return json(400, { error: 'A reason is required to attach an account.' })
+      const stripeInput = core.str(body.stripe_customer_id, 80)
+      if (stripeInput && !STRIPE_CUSTOMER_RE.test(stripeInput)) return json(400, { error: 'stripe_customer_id must look like cus_... (copy it from the customer page in Stripe).' })
+      const stripeInvoiceId = core.str(body.stripe_invoice_id, 80)
+      if (stripeInvoiceId && !STRIPE_INVOICE_RE.test(stripeInvoiceId)) return json(400, { error: 'stripe_invoice_id must look like in_... (the invoice id, not its number).' })
+      const { data: client, error: cErr } = await db.from('clients').select(ACCOUNT_FIELDS).eq('id', clientId).maybeSingle()
+      if (cErr) throw cErr
+      if (!client) return json(404, { error: 'Account not found.' })
+
+      // Which Stripe customer pays for this account: the typed id, then the
+      // clients row, then what an earlier attachment already linked, then
+      // Stripe's own metadata.client_id (hand invoices are linked that way
+      // and the column is null for them).
+      const externalCustomerId = `client:${clientId}`
+      let stripeCustomerId = stripeInput || client.stripe_customer_id || null
+      let resolvedFrom = stripeInput ? 'input' : (client.stripe_customer_id ? 'client' : null)
+      if (!stripeCustomerId) {
+        const prior = await service.findAttribution(db, program.id, externalCustomerId)
+        if (prior && prior.stripe_customer_id) { stripeCustomerId = prior.stripe_customer_id; resolvedFrom = 'attribution' }
+      }
+      if (!stripeCustomerId) {
+        const lookup = stripeCustomerLookup || stripeCustomerByClientId
+        const foundId = await lookup(clientId)
+        if (foundId && STRIPE_CUSTOMER_RE.test(String(foundId))) { stripeCustomerId = String(foundId); resolvedFrom = 'stripe' }
+      }
+
+      const customerRef = core.str(body.customer_ref, 120) || core.str(client.name, 120) || `client ${clientId}`
+      const attached = await service.manualAttribute(db, { program, membershipId: membership.id, externalCustomerId, customerRef, reason, actor, stripeCustomerId })
+      if (!attached.ok) return json(attached.status, { error: attached.error })
+
+      // The plan payment, when the admin records one now: a manual sale keyed
+      // on the account. A past Stripe invoice recorded by its id takes the
+      // webhook's own idempotency key, so the same invoice arriving later
+      // through stripe-webhook.js is a duplicate, never a second commission.
+      const given = (v) => v !== undefined && v !== null && String(v).trim() !== ''
+      let sale = null
+      if (given(body.amount) || given(body.amount_cents)) {
+        const externalId = stripeInvoiceId || core.str(body.external_id, 200) || null
+        const { errors, row } = core.validateConversionInput({
+          idempotency_key: stripeInvoiceId ? `stripe_invoice:${stripeInvoiceId}` : `manual:${program.slug}:client:${clientId}:${externalId || core.randomToken(8)}`,
+          conversion_type: 'sale', external_id: externalId || undefined, external_customer_id: externalCustomerId,
+          amount: body.amount, amount_cents: body.amount_cents, currency: body.currency || program.currency, occurred_at: body.occurred_at,
+          metadata: { note: core.str(body.note, 1000) || undefined, attached_account: true, client_id: clientId, plan: client.plan || null, plan_source: client.plan_source || null },
+        })
+        if (errors.length) return json(400, { error: errors[0], errors, attribution: attached.attribution })
+        row.customer_ref = customerRef
+        row.manual_reason = reason
+        const stripe = stripeCustomerId || stripeInvoiceId ? { customer_id: stripeCustomerId || null, invoice_id: stripeInvoiceId || null } : null
+        sale = await service.recordConversion(db, { program, input: row, actor, source: 'manual', membershipId: membership.id, stripe })
+        if (!sale.ok) return json(sale.status, { error: sale.error, attribution: attached.attribution })
+      }
+      return json(201, {
+        ok: true,
+        attribution: sale && sale.attribution ? sale.attribution : attached.attribution,
+        stripe_customer_id: stripeCustomerId,
+        stripe_customer_resolved_from: resolvedFrom,
+        stripe_customer_conflict: !!attached.stripe_customer_conflict,
+        client: { id: client.id, name: client.name, slug: client.slug, plan: client.plan, plan_source: client.plan_source },
+        conversion: sale ? sale.conversion : null,
+        commission: sale ? sale.commission : null,
+        commission_amount: sale && sale.commission ? core.centsToMajor(sale.commission.amount_cents) : null,
+        sale_amount: sale && sale.conversion ? core.centsToMajor(sale.conversion.amount_cents) : null,
+        duplicate: sale ? !!sale.duplicate : false,
+      })
     }
 
     // ── commissions ───────────────────────────────────────────────────────────

@@ -187,6 +187,26 @@ async function main() {
   assert.deepStrictEqual(aff.promoFromInvoice({ discounts: [{ promotion_code: { id: 'promo_3', code: 'X' } }] }), { promotionCodeId: 'promo_3', promotionCode: 'X' })
   ok('expanded and unexpanded promotion codes are both read')
 
+  section('an attached account (custom plan) is credited on a later hand-issued invoice')
+  const service = env.fn('_affiliate_service.js')
+  const attached = await service.manualAttribute(db, { program, membershipId: mAna.id, externalCustomerId: 'client:54', customerRef: 'Northwind Bakery', reason: 'custom plan, recommended by Ana', actor: { type: 'admin', id: 'admin-1', label: 'admin@example.com' }, stripeCustomerId: 'cus_north54' })
+  assert.strictEqual(attached.ok, true)
+  assert.strictEqual(attached.attribution.stripe_customer_id, 'cus_north54')
+  const invHand = { id: 'in_hand1', customer: 'cus_north54', subscription: null, customer_email: null, amount_paid: 25000, currency: 'eur', billing_reason: 'manual', payment_intent: 'pi_hand1', charge: 'ch_hand1', status_transitions: { paid_at: T0 + 10 * 86400 } }
+  r = await aff.handleStripeEvent(db, 'invoice.paid', invHand, quiet)
+  assert.strictEqual(r.ok, true, JSON.stringify(r))
+  assert.strictEqual(r.duplicate, false)
+  assert.strictEqual(r.conversion.membership_id, mAna.id)
+  assert.strictEqual(r.conversion.source, 'manual')
+  assert.strictEqual(r.conversion.external_customer_id, 'client:54')
+  assert.strictEqual(r.conversion.conversion_type, 'sale')
+  assert.strictEqual(r.conversion.stripe_invoice_id, 'in_hand1')
+  assert.strictEqual(r.commission.amount_cents, 5000)
+  ok('a hand-issued invoice for the attached Stripe customer credits the affiliate through the stored attribution, with no code, visit or clients link')
+  r = await aff.handleStripeEvent(db, 'invoice.paid', invHand, quiet)
+  assert.strictEqual(r.duplicate, true)
+  ok('the same invoice delivered twice is a duplicate')
+
   console.log(`\n${passed} checks passed`)
 }
 

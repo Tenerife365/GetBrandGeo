@@ -527,6 +527,117 @@ async function main() {
   assert.ok(rows('affiliate_attributions').length >= 5)
   ok('the only delete anywhere is a payout item leaving a draft batch; conversions, commissions, attributions and batches are never removed')
 
+  section('13. attaching an account on a custom or hand-assigned plan to an affiliate')
+  db.seed('clients', [
+    { id: 54, name: 'Northwind Bakery', slug: 'northwind-bakery', plan: 'essentials', plan_source: 'manual', category: 'customer', stripe_customer_id: null },
+    { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', category: 'customer', stripe_customer_id: 'cus_acme55' },
+    { id: 90, name: 'Research: Somewhere', slug: 'research-somewhere', plan: 'pro', category: 'research', stripe_customer_id: null },
+  ])
+  const lookups = []
+  const stripeCustomerLookup = async (clientId) => { lookups.push(clientId); return clientId === 54 ? 'cus_north54' : null }
+  const adminAttach = (body) => admin.handle(env.post(body, { token: 'admin-jwt' }), { supabase: db, stripeCustomerLookup }).then(env.parse)
+
+  r = await adminPost({ action: 'accounts.list' })
+  assert.strictEqual(r.status, 200)
+  assert.ok(r.body.accounts.some((a) => a.id === 54 && Array.isArray(a.attached) && a.attached.length === 0))
+  assert.ok(r.body.accounts.some((a) => a.category === 'research'))
+  ok('accounts.list returns the clients (category included so the UI can hide research rows) with an empty attached list before anything is attached')
+
+  const attsBefore = rows('affiliate_attributions').length
+  const convsBefore = rows('affiliate_conversions').length
+  const auditBefore = rows('affiliate_audit_log').length
+  const attach54 = { action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 54, reason: 'Recommended by Ana before signup; plan assigned by hand', amount: '250.00', external_id: 'INV-2026-054', occurred_at: '2026-09-17T09:00:00Z', note: 'first month of the custom plan' }
+  r = await adminAttach(attach54)
+  assert.strictEqual(r.status, 201, JSON.stringify(r.body))
+  assert.strictEqual(r.body.attribution.external_customer_id, 'client:54')
+  assert.strictEqual(r.body.attribution.source, 'manual')
+  assert.strictEqual(r.body.attribution.membership_id, mAna1.id)
+  assert.strictEqual(r.body.attribution.stripe_customer_id, 'cus_north54')
+  assert.strictEqual(r.body.attribution.converted_at, '2026-09-17T09:00:00.000Z')
+  assert.strictEqual(r.body.stripe_customer_id, 'cus_north54')
+  assert.strictEqual(r.body.stripe_customer_resolved_from, 'stripe')
+  assert.deepStrictEqual(lookups, [54])
+  assert.strictEqual(r.body.conversion.conversion_type, 'sale')
+  assert.strictEqual(r.body.conversion.amount_cents, 25000)
+  assert.strictEqual(r.body.conversion.source, 'manual')
+  assert.strictEqual(r.body.conversion.external_customer_id, 'client:54')
+  assert.strictEqual(r.body.conversion.stripe_customer_id, 'cus_north54')
+  assert.strictEqual(r.body.conversion.metadata.client_id, 54)
+  assert.strictEqual(r.body.conversion.metadata.plan_source, 'manual')
+  assert.strictEqual(r.body.commission.amount_cents, 5000)
+  assert.strictEqual(r.body.commission.status, 'pending')
+  assert.strictEqual(r.body.commission_amount, '50.00')
+  assert.strictEqual(r.body.sale_amount, '250.00')
+  assert.strictEqual(r.body.duplicate, false)
+  assert.ok(rows('affiliate_audit_log').some((a) => a.action === 'attribution.manual' && a.after && a.after.external_customer_id === 'client:54' && a.after.stripe_customer_id === 'cus_north54'))
+  assert.ok(!rows('affiliate_audit_log').slice(auditBefore).some((a) => a.action === 'attribution.reassigned'), 'a first attachment is not a reassignment')
+  ok('accounts.attach keys the attribution client:<id>, finds the Stripe customer by client id, records the sale and a 20% pending commission')
+
+  r = await adminAttach(attach54)
+  assert.strictEqual(r.status, 201)
+  assert.strictEqual(r.body.duplicate, true)
+  assert.strictEqual(r.body.stripe_customer_resolved_from, 'attribution')
+  assert.strictEqual(r.body.stripe_customer_id, 'cus_north54')
+  assert.deepStrictEqual(lookups, [54], 'the customer id the first attachment stored is reused, Stripe is not asked again')
+  assert.strictEqual(rows('affiliate_conversions').length, convsBefore + 1)
+  assert.strictEqual(rows('affiliate_attributions').length, attsBefore + 1)
+  assert.strictEqual(rows('affiliate_commissions').filter((c) => c.conversion_id === r.body.conversion.id).length, 1)
+  assert.ok(!rows('affiliate_audit_log').slice(auditBefore).some((a) => a.action === 'attribution.reassigned'), 'repeating the same attachment is not a reassignment either')
+  ok('attaching again with the same invoice reference adds no second sale, commission or attribution, and reuses the linked Stripe customer')
+
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 55, reason: 'Recommended by Ana', amount_cents: 29900, stripe_invoice_id: 'in_acme001', occurred_at: '2026-09-01T09:00:00Z' })
+  assert.strictEqual(r.status, 201, JSON.stringify(r.body))
+  assert.strictEqual(r.body.stripe_customer_resolved_from, 'client')
+  assert.strictEqual(r.body.attribution.stripe_customer_id, 'cus_acme55')
+  assert.strictEqual(r.body.conversion.idempotency_key, 'stripe_invoice:in_acme001')
+  assert.strictEqual(r.body.conversion.external_id, 'in_acme001')
+  assert.strictEqual(r.body.conversion.stripe_invoice_id, 'in_acme001')
+  assert.strictEqual(r.body.commission.amount_cents, 5980)
+  assert.deepStrictEqual(lookups, [54])
+  ok('an account whose clients row names the Stripe customer needs no lookup, and a past Stripe invoice recorded by its id takes the webhook idempotency key')
+
+  const svc = env.fn('_affiliate_service.js')
+  const byStripe = await svc.findAttributionByStripe(db, { customerId: 'cus_north54' })
+  assert.strictEqual(byStripe.external_customer_id, 'client:54')
+  assert.strictEqual(byStripe.membership_id, mAna1.id)
+  ok('findAttributionByStripe returns the attached account by its Stripe customer, the path a later invoice.paid takes')
+
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 999, reason: 'x' })
+  assert.strictEqual(r.status, 404)
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 54, reason: 'x', stripe_customer_id: 'not-a-customer' })
+  assert.strictEqual(r.status, 400)
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 54, reason: 'x', amount: '1.00', stripe_invoice_id: 'INV-1' })
+  assert.strictEqual(r.status, 400)
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mBen2.id, client_id: 54, reason: 'x' })
+  assert.strictEqual(r.status, 400)
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 54 })
+  assert.strictEqual(r.status, 400)
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 'abc', reason: 'x' })
+  assert.strictEqual(r.status, 400)
+  assert.strictEqual(rows('affiliate_conversions').length, convsBefore + 2)
+  ok('unknown account 404; a malformed Stripe customer or invoice id, a membership from another program, a missing reason and a bad client id are all 400 with nothing written')
+
+  r = await adminPost({ action: 'accounts.list' })
+  const acc54 = r.body.accounts.find((a) => a.id === 54)
+  assert.strictEqual(acc54.attached.length, 1)
+  assert.strictEqual(acc54.attached[0].affiliate_name, 'Ana Partner')
+  assert.strictEqual(acc54.attached[0].program_slug, 'brandgeo')
+  assert.strictEqual(acc54.attached[0].stripe_customer_id, 'cus_north54')
+  assert.strictEqual(acc54.attached[0].source, 'manual')
+  ok('accounts.list shows which affiliate each account is attached to')
+
+  db.seed('clients', [{ id: 56, name: 'Blue Harbor Dental', slug: 'blue-harbor-dental', plan: 'essentials', plan_source: 'manual', category: 'customer', stripe_customer_id: null }])
+  r = await adminAttach({ action: 'accounts.attach', program_id: P1.id, membership_id: mAna1.id, client_id: 56, reason: 'Recommended, not invoiced yet' })
+  assert.strictEqual(r.status, 201, JSON.stringify(r.body))
+  assert.strictEqual(r.body.conversion, null)
+  assert.strictEqual(r.body.commission, null)
+  assert.strictEqual(r.body.stripe_customer_id, null)
+  assert.strictEqual(r.body.stripe_customer_resolved_from, null)
+  assert.strictEqual(r.body.attribution.external_customer_id, 'client:56')
+  assert.strictEqual(r.body.attribution.converted_at, null)
+  assert.deepStrictEqual(lookups, [54, 56])
+  ok('attaching without a payment writes the attribution only: no conversion, no commission, and Stripe was asked but had no customer')
+
   console.log(`\n${passed} checks passed`)
 }
 
