@@ -824,8 +824,15 @@ export default function AIVisibility() {
     })
   }
 
-  // Total columns in prompt table = active engines only
-  const tableColsTemplate = `2.75rem 1fr repeat(${activeLLMs.length}, 8rem)`
+  // Total columns in prompt table = active engines only. The prompt column
+  // carries a real minimum and the engine columns are elastic between 3.5rem
+  // and 5.5rem, so at half-screen widths the prompt keeps its room and the
+  // table scrolls sideways only below its true minimum, instead of crushing
+  // the prompt to three letters while seven 8rem engine columns stay rigid.
+  const PROMPT_COL_MIN_REM = 13
+  const ENGINE_COL_MIN_REM = 3.5
+  const tableColsTemplate = `2.5rem minmax(${PROMPT_COL_MIN_REM}rem, 1fr) repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))`
+  const tableMinWidth = `${2.5 + PROMPT_COL_MIN_REM + activeLLMs.length * ENGINE_COL_MIN_REM}rem`
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
@@ -1555,17 +1562,17 @@ export default function AIVisibility() {
       {/* ── Prompt table (active engines only) ──────────────────────────────── */}
       <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
+        <div style={{ minWidth: tableMinWidth }}>
         <div
           className="grid border-b border-dark-700 bg-dark-700/50"
           style={{ gridTemplateColumns: tableColsTemplate }}
         >
-          <div className="px-2 py-3 text-[11px] font-medium text-slate-600 uppercase tracking-wide self-center">#</div>
-          <div className="px-4 py-3 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
+          <div className="px-2 py-2.5 text-[11px] font-medium text-slate-600 uppercase tracking-wide self-center">#</div>
+          <div className="px-3 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
           {activeLLMs.map(llm => (
-            <div key={llm.id} className="px-2 py-3 flex flex-col items-center justify-center gap-1">
+            <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
               <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-              <span className="text-[11px] font-semibold text-slate-300">{llm.label}</span>
+              <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
             </div>
           ))}
         </div>
@@ -1588,7 +1595,9 @@ export default function AIVisibility() {
               className="border-b border-dark-700 last:border-0"
             >
               <div
-                className="w-full grid hover:bg-dark-700/30 transition-colors cursor-pointer"
+                // Alternate row tint so the eye can follow one prompt across
+                // seven engine cells in a long list.
+                className={`w-full grid transition-colors cursor-pointer hover:bg-dark-700/30 ${i % 2 === 1 ? 'bg-dark-700/15' : ''}`}
                 style={{ gridTemplateColumns: tableColsTemplate }}
                 onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
                 role="button"
@@ -1602,8 +1611,8 @@ export default function AIVisibility() {
                   }
                 }}
               >
-                <div className="px-2 py-3.5 self-center">
-                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1 rounded-md bg-dark-700 text-[11px] font-semibold text-slate-500 tabular-nums">
+                <div className="px-2 py-2.5 self-center">
+                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-dark-700 text-[10px] font-semibold text-slate-500 tabular-nums">
                     {/* Sequential, never the stored `position`. That column is a
                         sort key, not a label: it keeps the gaps left by prompts
                         that were suggested and never kept, and by deactivated
@@ -1616,9 +1625,18 @@ export default function AIVisibility() {
                   </span>
                 </div>
 
-                <div className="px-4 py-3.5 self-center min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getCatColor(prompt.category)}`}>
+                <div className="px-3 py-2.5 self-center min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TruncatedText text={prompt.text} className="text-sm text-slate-200 truncate flex-1 min-w-0" />
+                    <span className="shrink-0 text-slate-600" aria-hidden="true">
+                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </span>
+                  </div>
+                  {/* One line, never wraps: category, coverage, and the admin hint.
+                      The prompt text above is the thing the user reads, so the
+                      metadata stays small and out of its way. */}
+                  <div className="flex items-center gap-1.5 mt-1 min-w-0 whitespace-nowrap">
+                    <span className={`shrink-0 text-[10px] font-medium px-1.5 leading-[15px] rounded-full ${getCatColor(prompt.category)}`}>
                       {getCatLabel(prompt.category)}
                     </span>
                     {hasData && (() => {
@@ -1628,22 +1646,16 @@ export default function AIVisibility() {
                         : ratio >= 0.4 ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
                         : 'bg-red-500/10 text-red-300 border-red-500/20'
                       return (
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border tabular-nums ${cls}`}>
+                        <span className={`shrink-0 inline-flex items-center text-[10px] font-semibold px-1.5 leading-[13px] rounded-full border tabular-nums ${cls}`}>
                           {mentionCount}/{checkedLLMs} engines
                         </span>
                       )
                     })()}
                     {isAdmin && (
-                      <span className="ml-auto text-[10px] text-slate-600 hidden md:inline" title="Expand this row to re-run a single engine">
+                      <span className="min-w-0 truncate text-[9px] text-slate-600 hidden lg:inline" title="Expand this row to re-run a single engine">
                         expand to refresh per engine
                       </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TruncatedText text={prompt.text} className="text-sm text-slate-200 truncate flex-1" />
-                    <span className="shrink-0 text-slate-600" aria-hidden="true">
-                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    </span>
                   </div>
                 </div>
 
@@ -1658,13 +1670,13 @@ export default function AIVisibility() {
                     // not rendering an AI Overview for that question.
                     const noAnswer = noAnswerCells.has(`${prompt.id}:${llm.id}`)
                     return (
-                      <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                      <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center gap-1">
                         {/* text-slate-700 has no dark-mode remap in index.css, so it
                             rendered rgb(51,65,85) in BOTH themes: 1.72:1 on this card in
                             dark, against a 3:1 floor for a non-text indicator. The dashed
                             ring and the dimmer fill still separate this from Not checked. */}
                         <span
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full ${noAnswer
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${noAnswer
                             ? 'bg-dark-700/20 text-slate-500 ring-1 ring-dashed ring-dark-600/40'
                             : 'bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60'}`}
                           title={noAnswer
@@ -1683,22 +1695,22 @@ export default function AIVisibility() {
                   const competitors = parseCompetitors(r.competitors_mentioned)
                   const topComp = competitors[0] ?? null
                   return (
-                    <div key={llm.id} className="px-2 py-3.5 flex flex-col items-center gap-1.5">
+                    <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center gap-1">
                       {r.brand_mentioned ? (
                         <>
                           <span
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
                             title={t.aiv_mentioned} aria-label={t.aiv_mentioned}
                           >
-                            <Check size={15} strokeWidth={2.5} />
+                            <Check size={14} strokeWidth={2.5} />
                           </span>
                           {r.brand_position && (
-                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded tabular-nums">
+                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 leading-4 rounded tabular-nums">
                               #{r.brand_position}
                             </span>
                           )}
                           {topComp && r.brand_position && topComp.pos < r.brand_position && (
-                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-[72px] truncate" title={`#${topComp.pos} ${topComp.name} ranks above`}>
+                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-full truncate" title={`#${topComp.pos} ${topComp.name} ranks above`}>
                               #{topComp.pos} above
                             </span>
                           )}
@@ -1706,13 +1718,13 @@ export default function AIVisibility() {
                       ) : (
                         <>
                           <span
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500/10 text-red-400/90 ring-1 ring-red-500/25"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/10 text-red-400/90 ring-1 ring-red-500/25"
                             title={t.aiv_absent} aria-label={t.aiv_absent}
                           >
-                            <X size={14} strokeWidth={2.5} />
+                            <X size={13} strokeWidth={2.5} />
                           </span>
                           {topComp && (
-                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-[72px] truncate" title={`#${topComp.pos} ${topComp.name}`}>
+                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-full truncate" title={`#${topComp.pos} ${topComp.name}`}>
                               #{topComp.pos} {topComp.name}
                             </span>
                           )}
