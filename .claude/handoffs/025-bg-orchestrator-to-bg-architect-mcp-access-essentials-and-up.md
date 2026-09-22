@@ -2,8 +2,9 @@
 id: 025
 from: bg-orchestrator
 to: bg-architect
-status: NEEDS_HUMAN
+status: READY
 created: 2026-09-21
+updated: 2026-09-22 (ruling 1 moved the gate to Radar; ruling 2 applied by default)
 scope_write: docs/arch/mcp-access.md
 scope_read: brandgeo-dashboard/netlify/functions/_auth.js, brandgeo-dashboard/netlify/functions/_plans.js, brandgeo-dashboard/netlify/functions/_cost.js, brandgeo-dashboard/netlify/functions/_affiliate_core.js, brandgeo-dashboard/netlify/functions/_affiliate_auth.js, brandgeo-dashboard/netlify/functions/affiliate-conversions.js, brandgeo-dashboard/netlify/functions/expire-plan-grants.js, brandgeo-dashboard/netlify.toml, brandgeo-dashboard/src/lib/planConfig.ts, brandgeo-dashboard/src/pages/Account.tsx, brandgeo-dashboard/src/pages/AIVisibility.tsx, brandgeo-dashboard/src/pages/Competitors.tsx, brandgeo-dashboard/src/pages/Recommendations.tsx, brandgeo-dashboard/tests/helpers/, db/supabase-affiliate-migration-2026-09-12.sql, docs/AGENT-OS.md, docs/affiliates/INTEGRATION.md
 model: opus
@@ -15,11 +16,13 @@ Constantin, 2026-09-21: "ar trebui sa facem disponibil conectarea prin MCP la
 platforma noastra pentru conturile de la 99 de euro in sus, cred ca de la
 essentials". BrandGEO exposes a remote MCP (Model Context Protocol) server so
 a customer's own AI tools (Claude, Claude Code, Cursor, ChatGPT and the like)
-can read that customer's visibility data. Gate: plan `essentials` and above,
-so `free` and `radar` are out; `pro` (legacy), `managed` and `enterprise`
-are in. Read-only in the first release. Nothing is built yet; this packet
-asks for the architecture spec, and section "Open questions" needs
-Constantin's rulings before the build stage starts.
+can read that customer's visibility data. **Gate, RULED 2026-09-22 by
+Constantin ("mcp connection incepand cu radar, da"): plan `radar` and
+above**, so only `free` is out; `radar`, `essentials`, `growth`,
+`growth_pro`, `pro` (legacy), `managed` and `enterprise` are in. Read-only
+in the first release; credential is a bearer API key first, OAuth later
+(question 2, default applied). Nothing is built yet; this packet asks for
+the architecture spec. The filename still says Essentials; the ruling wins.
 
 ## What already exists (measured 2026-09-21, reuse, do not reinvent)
 
@@ -72,12 +75,12 @@ Constantin's rulings before the build stage starts.
    `Authorization: Bearer <key>`. Resolve by hash, refuse revoked, stamp
    `last_used_at` at most once per minute per key (not per call).
 4. **Plan gate.** One exported function in `_plans.js`,
-   `mcpAllowedFor(plan)`, defined as `planRank(plan) >= planRank('essentials')`,
+   `mcpAllowedFor(plan)`, defined as `planRank(plan) >= planRank('radar')`,
    so the ladder is not copied. A mirror `PLAN_MCP_ACCESS` or a same-named
    helper in `planConfig.ts` for the UI only. Checked on EVERY `tools/call`
    and `tools/list` against the live `clients.plan`; a key on a client that
    dropped below the gate answers a JSON-RPC error whose message names the
-   plan needed (`Upgrade to Essentials`), not a bare 403. Key issuance is
+   plan needed (`Upgrade to Radar`), not a bare 403. Key issuance is
    also refused below the gate. Also refuse when `clients.category` is the
    research category (`_cost.js` `RESEARCH_CATEGORY`) unless admin issued.
 5. **Tools, read-only, first release.** Specify name, input schema, output
@@ -108,8 +111,8 @@ Constantin's rulings before the build stage starts.
 7. **Key management UI.** On `Account.tsx`, section "MCP access": for a
    gated plan, an "Issue key" button (label input, key shown once in a copy
    box with the three client setup snippets), a list of active keys
-   (prefix, label, created, last used) with "Revoke"; for `free` and `radar`
-   the same section shows the upgrade line naming Essentials. Admin sees
+   (prefix, label, created, last used) with "Revoke"; for `free` only
+   the same section shows the upgrade line naming Radar (EUR 29). Admin sees
    it for any client, viewer for their own. Backend actions on a new admin
    and viewer function `client-api-keys.js` (`list`, `issue`, `revoke`)
    behind `requireAuth({ clientId })`, envelope in the `promotions-admin.js`
@@ -120,7 +123,7 @@ Constantin's rulings before the build stage starts.
    https://app.getbrandgeo.com/mcp --header "Authorization: Bearer <key>"`,
    Claude Desktop or claude.ai custom connector, Cursor `mcp.json`), the
    tool list, the plan gate and the rate limits. One row on the pricing
-   table (`index.html`) from Essentials upward, wording owed to `bg-copy`
+   table (`index.html`) from Radar upward, wording owed to `bg-copy`
    (working label: "MCP access for your AI tools"). `faq.html` one Q and A.
    The spec states the exact client support claim `bg-web` may print; any
    client that only accepts OAuth is listed as "coming" not "supported".
@@ -182,14 +185,15 @@ Constantin's rulings before the build stage starts.
 
 ## Open questions for Constantin
 
-Answer with the number and a word; the spec is written to the defaults if
-no answer arrives, and the build stage waits for the answers to 1 and 2.
+Rulings received 2026-09-22. Question 1 was answered; the defaults below
+apply to every question he did not answer, and the build stage is unblocked.
 
-1. **Gate.** Essentials and above, so Radar (EUR 29) is out. Default: yes.
+1. **Gate. RULED 2026-09-22: Radar (EUR 29) and above**, so only Free is
+   out. The original default (Essentials) is superseded.
 2. **Credential in the first release.** Bearer API key (works today in
    Claude Code, Cursor, Windsurf, VS Code, and in Claude Desktop through a
    local bridge). OAuth 2.1 sign-in (what claude.ai web connectors and
-   ChatGPT connectors want) as a second release. Default: key first.
+   ChatGPT connectors want) as a second release. Default applied: key first.
 3. **Write tools.** None in the first release. Default: none; `add_prompt`
    is the first candidate for release two.
 4. **Keys per client.** Default: up to 5 named keys, so an agency client

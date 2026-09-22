@@ -22,7 +22,19 @@
 
 ## CURRENT STATE (newest entry 2026-09-21)
 
-### 2026-09-21: MCP access for Essentials and up; packet 025 written, NOTHING built, rulings owed
+### 2026-09-21: MCP access from Radar up (ruled 2026-09-22); packet 025 READY, NOTHING built
+
+**Ruling 2026-09-22, Constantin: "mcp connection incepand cu radar, da".**
+The gate is `radar` and above, so only `free` is out: `mcpAllowedFor(plan)`
+is `planRank(plan) >= planRank('radar')`, the upgrade line names Radar
+(EUR 29) and shows for Free only, and the pricing row starts at Radar.
+Questions 2 to 6 were not answered, so the packet defaults apply (bearer
+key first and OAuth 2.1 later, no write tools, up to 5 named keys, working
+label "MCP access for your AI tools", equal limits across gated plans).
+Packet 025 is updated and READY; its filename still says Essentials, the
+ruling wins. The push of `8c94119` and `424836e` was DONE by Constantin on
+2026-09-22. The 2026-09-21 text below reads Essentials where it now means
+Radar.
 
 Constantin's ask, verbatim: "ar trebui sa facem disponibil conectarea prin
 MCP la platforma noastra pentru conturile de la 99 de euro in sus, cred ca de
