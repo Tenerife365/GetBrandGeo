@@ -20,7 +20,26 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-09-21)
+## CURRENT STATE (newest entry 2026-09-22)
+
+### 2026-09-22: clients 20 and 27 fully deleted
+
+Constantin deleted two self-serve accounts (client 20, growth; client 27,
+essentials) through the admin Account page "Delete account", which runs
+`delete-client.js`. Read back from production the same day: 0 rows for
+either id in `clients`, `ai_results`, `prompts`, `collection_jobs`,
+`collection_runs`, `recommendation_runs`, `recommendations`,
+`social_profiles` and `user_profiles`; both auth users, their identities and
+sessions are gone; two `account_deleted` admin notifications were written.
+Before deletion neither had affiliate, terms, lead, contract, ticket or
+`client_events` rows, and neither carried a Stripe customer id. Neither ever
+paid. Constantin searched Stripe the same day by both login emails and by
+`metadata.client_id` 20 and 27: no customer exists, so nothing was left
+behind there. No Stripe object was touched from this seat. The paid-account list in the 2026-09-21 entry below is stale on
+these two ids. Latent gap recorded, not fixed: `delete-client.js` does not
+clear `tickets`, so an account with a support ticket would fail on the
+foreign key.
+
 
 ### 2026-09-21: MCP access from Radar up (ruled 2026-09-22); packet 025 READY, NOTHING built
 
