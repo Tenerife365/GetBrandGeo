@@ -1,6 +1,6 @@
 # 027: orchestrator to a fresh session, the BrandGEO sales presentation (PDF)
 
-Written 2026-09-22. Status: READY. Kickoff line for the new session:
+Written 2026-09-22. Status: DONE 2026-09-22 (deck built, source committed; PDFs local, Drive copy owed by Constantin). Kickoff line for the new session:
 
 ```
 Read .claude/handoffs/027-bg-orchestrator-to-deck-session-brandgeo-sales-presentation.md and build the deck.

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BrandGEO Presentation, September 2026, industry appendix</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+  .ap-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .ap-url { font-family: var(--mono); font-size: 19px; color: var(--t3); }
+  .ap .cols-3 .card { min-height: 330px; }
+  .ap .stat { font-size: 84px; }
+  .ap .q { display: grid; grid-template-columns: 420px 1fr; align-items: center; gap: 32px; }
+  .ap .q .k { margin: 0; }
+</style>
+</head>
+<body>
+<!-- Source for BrandGEO-Presentation-2026-09-appendix.pdf. One page per
+     industry page on getbrandgeo.com. Figures are quoted from each page's own
+     stats block; ledger IDs F62 to F71 in fact-ledger.md. The buyer question
+     on each page is an illustration of the method, not a sourced claim.
+     To edit a page, edit its entry in PAGES below; the template is shared so
+     every page keeps the identical layout. -->
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="mg" gradientUnits="userSpaceOnUse" x1="128" y1="88" x2="384" y2="416">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <symbol id="mark" viewBox="0 0 512 512">
+      <g fill="none" stroke="url(#mg)" stroke-width="56" stroke-linecap="round">
+        <path d="M156 116V388"/>
+        <circle cx="272" cy="304" r="84"/>
+      </g>
+      <circle cx="272" cy="304" r="28" fill="url(#mg)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main id="pages"></main>
+
+<script>
+const PAGES = [
+  { // F62
+    name: "e-commerce", slug: "ecommerce",
+    stats: [
+      ["693%", "year over year surge in AI-driven traffic to US retail sites, 2025 holiday season"],
+      ["4.4x", "better conversion for shoppers arriving via AI search than via traditional organic search"],
+      ["About 40%", "of Amazon shopping sessions on Black Friday 2025 involved Rufus, its AI assistant"]
+    ],
+    q: "Best running shoes for flat feet under 150 euros?",
+    src: "Adobe Analytics, 2025 holiday season. Semrush study, 2025. Sensor Tower, 100,000 session holiday analysis."
+  },
+  { // F63
+    name: "education and online learning", slug: "education",
+    stats: [
+      ["79%", "of prospective students read Google's AI Overviews when they appear during programme research"],
+      ["45%", "of prospective students use AI tools in their college search; only 13% check it on the official school&nbsp;site"],
+      ["30%", "of institutions report a formal AI search strategy in place"]
+    ],
+    q: "Which online MBA is best for working parents?",
+    src: "Search Influence, 2026 Higher Education Marketing Stats. Everspring, 2026 AI enrollment research."
+  },
+  { // F64
+    name: "financial services and fintech", slug: "financial-services",
+    stats: [
+      ["55%", "of Americans asked an AI chatbot for financial advice in 2026, up from 10% in 2025"],
+      ["49%", "of AI chatbot users say AI already influenced a real financial decision they made"],
+      ["18%", "feel comfortable letting AI make a major financial decision on its own"]
+    ],
+    q: "Which high-yield savings account is best right now?",
+    src: "TD Bank 2026 consumer survey (2,500 respondents), via American Banker. LendingTree 2026 AI chatbot user survey."
+  },
+  { // F65
+    name: "healthcare providers", slug: "healthcare",
+    stats: [
+      ["40 million", "people ask ChatGPT a health related question every day"],
+      ["55%", "of adults who used AI for health advice did so to check or explore symptoms"],
+      ["24%", "overlap between the pages AI cites and the pages ranking on Google, the highest of any industry"]
+    ],
+    q: "Which dermatologist near me treats adult acne?",
+    src: "OpenAI, \"AI as a Healthcare Ally\", January 2026. Siftly, 2026 AI Citation Rate Benchmarks."
+  },
+  { // F66
+    name: "home services and contractors", slug: "home-services",
+    stats: [
+      ["45%", "of consumers use AI tools to find local businesses, up from 6% a year earlier"],
+      ["22%", "of homeowners go to an AI tool first, before Google, when they need a contractor"],
+      ["87%", "of independent HVAC and plumbing contractors are effectively never cited by AI in their own metro"]
+    ],
+    q: "Who is the most reliable emergency plumber in [your&nbsp;city]?",
+    src: "BrightLocal, 2026 Local Consumer Review Survey. Scorpion, 2026 State of Home Services Marketing. 5WPR, HVAC and Plumbing AI Visibility Index 2026."
+  },
+  { // F67
+    name: "hotels and travel brands", slug: "hotels",
+    stats: [
+      ["58%", "of travellers turn to AI tools for trip planning, ahead of the 55% using travel websites"],
+      ["63%", "of travellers who used AI to plan a trip rely on it for most or every trip"],
+      ["31.6 pts", "rise in a hotel's AI recommendation probability from a top guest rating"]
+    ],
+    q: "Best boutique hotel in Lisbon under 200 euros a night?",
+    src: "Qlik Travel Planning Survey, July 2026. TakeUp AI-Planned Travel Report, 2026. June 2026 algorithm audit study, via Hospitality Net."
+  },
+  { // F68
+    name: "law firms", slug: "law-firms",
+    stats: [
+      ["77 to 78%", "of legal searches show a Google AI Overview, the AI summary above the results"],
+      ["About 7", "legal directories are the sources AI cites for virtually every legal question tested"],
+      ["98.8%", "of local business locations are invisible to ChatGPT recommendations"]
+    ],
+    q: "Best family law attorney in [your&nbsp;city] for a contested divorce?",
+    src: "Semrush, 10 million keyword analysis. 5WPR and Haute Lawyer Network, 2026. SOCi, 2026 Local Visibility Index."
+  },
+  { // F69
+    name: "real estate agencies", slug: "real-estate",
+    stats: [
+      ["67%", "of homebuyers use AI as their primary research step, up from 17% eighteen months earlier"],
+      ["91%", "of US real estate agents are effectively invisible in AI answers in their own market"],
+      ["4x", "90-day close rate of AI-sourced buyer leads (9.6%) versus Zillow Premier Agent leads (2.4%)"]
+    ],
+    q: "Best buyer's agent for first time buyers in [your&nbsp;city]?",
+    src: "FlyDragon, 2026 State of AI Search in Real Estate and benchmark."
+  },
+  { // F70
+    name: "restaurants and hospitality", slug: "restaurants",
+    stats: [
+      ["83%", "of restaurant locations never appear in AI recommendations, though 86% keep a normal Google presence"],
+      ["45%", "of consumers use AI tools for local business recommendations, up from 6% a year earlier"],
+      ["53.4%", "of AI share of voice in each category goes to the top three restaurant brands"]
+    ],
+    q: "Good romantic Italian restaurant in [your&nbsp;city] for an anniversary?",
+    src: "Uberall, 2026 GEO Benchmark. Bloom Intelligence, AI Restaurant Discovery 2026. 5WPR, US Restaurants and Chains AI Visibility Index 2026."
+  },
+  { // F71
+    name: "SaaS companies", slug: "saas",
+    stats: [
+      ["51%", "of B2B software buyers start research in an AI chatbot, up from 29% a year earlier"],
+      ["5.1x", "conversion of AI-search referred traffic versus Google organic: 14.2% against 2.8%"],
+      ["3x", "more likely to be named by ChatGPT with active profiles on two or more review platforms"]
+    ],
+    q: "Which CRM is best for a 20 person agency?",
+    src: "G2, \"The Answer Economy\", April 2026. Averi, March 2026. Quoleady LLMO research, 2026."
+  }
+];
+
+const esc = s => s.replace(/&(?!nbsp;)/g, "&amp;").replace(/</g, "&lt;");
+const n2 = i => String(i).padStart(2, "0");
+document.getElementById("pages").innerHTML = PAGES.map((p, i) => `
+<section class="slide ap">
+  <div class="ap-top">
+    <div class="eyebrow"><span class="n">${n2(i + 1)} / ${PAGES.length}</span>Industry brief</div>
+    <div class="ap-url">getbrandgeo.com/ai-visibility-for-${p.slug}.html</div>
+  </div>
+  <h2>AI visibility for <em>${esc(p.name)}</em></h2>
+  <div class="body">
+    <div class="cols-3">
+      ${p.stats.map(s => `
+      <div class="card stat-card">
+        <div class="stat ac">${esc(s[0])}</div>
+        <div class="stat-label">${esc(s[1])}</div>
+      </div>`).join("")}
+    </div>
+    <div class="card mt-s q">
+      <div class="k">A buyer question we would ask</div>
+      <div class="bubble">"${esc(p.q)}"</div>
+    </div>
+  </div>
+  <div class="foot"><span class="src">Sources, as cited on the page: ${esc(p.src)} Example question is an illustration.</span><span class="brand"><svg><use href="#mark"/></svg>BrandGEO</span></div>
+</section>`).join("");
+</script>
+</body>
+</html>
