@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
+import TruncatedText from '../components/TruncatedText'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Globe2, Copy, CheckCheck, Check, Minus, Zap, Settings, X, Lock, Clock, Info,
@@ -1639,7 +1640,7 @@ export default function AIVisibility() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-slate-200 truncate flex-1">{prompt.text}</p>
+                    <TruncatedText text={prompt.text} className="text-sm text-slate-200 truncate flex-1" />
                     <span className="shrink-0 text-slate-600" aria-hidden="true">
                       {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </span>
