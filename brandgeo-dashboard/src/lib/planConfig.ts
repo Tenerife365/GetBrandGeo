@@ -412,7 +412,7 @@ export const PLAN_LABELS: Record<Plan, string> = {
 // Engines are gated above; whole FEATURES (pages/tools) are gated here. Add a
 // feature id + its minimum plan, and gate the page with hasFeature() + render
 // <FeatureLocked feature=… /> for plans below it. All plan gating lives here.
-export type FeatureId = 'ai_social' | 'ai_seo'
+export type FeatureId = 'ai_social' | 'ai_seo' | 'mcp_access'
 
 /**
  * Features that NO plan grants, at any price. Only an admin can reach them, and
@@ -449,6 +449,13 @@ export const FEATURE_MIN_PLAN: Record<FeatureId, Plan> = {
   // tiers in PLAN_SEO_DRAFTS_PER_MONTH, and in seo-draft.js's own copy, because
   // a draft is an LLM generation and a crawl is a fetch.
   ai_seo:    'radar',
+  // Remote MCP access (docs/arch/mcp-access.md ruling 1, Constantin 2026-09-22:
+  // "mcp connection incepand cu radar, da"). Gate at Radar and above; only Free
+  // is out. Mirrors `MCP_MIN_PLAN` in netlify/functions/_plans.js — that server
+  // threshold is the one that actually decides access (mcpAllowedFor()); this
+  // entry is the UI's read of the same ruling, kept in sync by
+  // tests/mcp_server.test.js's plan-agreement assertion (section 10).
+  mcp_access: 'radar',
 }
 
 // Copy for the locked / coming-soon screen. Admin-only features must NOT be
@@ -462,6 +469,12 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
   ai_seo: {
     label: 'AI SEO',
     blurb: 'Turn your AI visibility gaps into ready-to-write content briefs, then generate full, GEO-scored drafts built to be cited by AI answer engines.',
+  },
+  mcp_access: {
+    label: 'MCP access',
+    // COPY: pending bg-copy (docs/arch/mcp-access.md section 12, stage 2).
+    // Placeholder wording only, not customer-approved copy.
+    blurb: 'Connect your own AI tools, such as Claude Code and Cursor, to read your BrandGEO visibility data over MCP.',
   },
 }
 

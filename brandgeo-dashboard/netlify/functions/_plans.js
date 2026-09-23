@@ -106,6 +106,18 @@ function planRank(p) {
   return i < 0 ? 0 : i;
 }
 
+// Remote MCP access (docs/arch/mcp-access.md). A threshold over planRank(), NOT
+// a list of plans: _plans.js has drifted from planConfig.ts before (growth_pro
+// missing from every table here, CLAUDE.md Growth PRO defects C1 to C4, and
+// docs/qa/plans-divergence-b1.md F1 to F4), and a list would be one more copy
+// of the ladder to drift. Unknown plan strings fail closed.
+// UI mirror: planConfig.ts FEATURE_MIN_PLAN.mcp_access; tests/mcp_server.test.js
+// proves the two agree for every plan in PLAN_ORDER.
+const MCP_MIN_PLAN = 'radar';
+function mcpAllowedFor(plan) {
+  return isValidPlan(plan) && planRank(plan) >= planRank(MCP_MIN_PLAN);
+}
+
 // What a plan unlocks, in human terms, for notifications. engineLabels is
 // derived from _cost.js's activeEnginesFor(), so it is exactly the set of
 // engines the queue will run for this plan.
@@ -123,4 +135,5 @@ function planUnlocks(plan) {
 module.exports = {
   PLAN_ORDER, PLAN_LABELS, ENGINE_LABELS, PLAN_BLURB,
   isValidPlan, planRank, planUnlocks,
+  MCP_MIN_PLAN, mcpAllowedFor,
 };

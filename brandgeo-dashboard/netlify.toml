@@ -69,6 +69,14 @@
   status = 200
   force = true
 
+# Remote MCP server (docs/arch/mcp-access.md). Must sit above the /* fallback,
+# or POST /mcp is served index.html and every MCP client reports a parse error.
+[[redirects]]
+  from = "/mcp"
+  to = "/.netlify/functions/mcp-server"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -354,3 +362,18 @@
 # (one update per commission) and export (up to 5,000 rows) are the slow paths.
 [functions."affiliate-admin"]
   timeout = 26
+
+# ── Remote MCP access (docs/arch/mcp-access.md) ──────────────────────────────
+# Remote MCP server. Reads only; one invocation per JSON-RPC message.
+# esbuild so the function can import src/lib/competitorFilter.ts and
+# src/lib/aiVisibilityScore.ts directly instead of a hand-synced copy.
+# Set for this one function only; every other function keeps the default
+# bundler. Its aggregate scans stop at 18s internally, below this ceiling.
+[functions."mcp-server"]
+  timeout = 26
+  node_bundler = "esbuild"
+
+# MCP key management for the Account page: list / issue / revoke, a couple of
+# DB ops per call, same shape as promotions-admin.
+[functions."client-api-keys"]
+  timeout = 15

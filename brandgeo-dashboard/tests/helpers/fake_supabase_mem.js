@@ -26,6 +26,7 @@ const UNIQUE = {
   stripe_events: [['id']],
   terms_acceptances: [['reference']],
   user_profiles: [['id']],
+  client_api_keys: [['key_hash']],
 }
 
 const HAS_UPDATED_AT = new Set(['affiliate_programs', 'affiliates', 'affiliate_memberships', 'affiliate_attributions', 'affiliate_conversions', 'affiliate_commissions', 'affiliate_payout_batches'])
@@ -52,6 +53,7 @@ const DEFAULTS = {
   clients: () => ({ stripe_customer_id: null, stripe_subscription_id: null }),
   user_profiles: () => ({}),
   client_events: () => ({}),
+  client_api_keys: () => ({ label: '', created_by: null, last_used_at: null, revoked_at: null }),
 }
 
 function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)) }
@@ -75,8 +77,17 @@ class Query {
     this.mode = 'many'
     this.payload = null
     this.returning = false
+    this.countMode = null
+    this.head = false
   }
-  select(cols = '*') { if (this.op === 'select') this.cols = cols; else { this.returning = true; this.cols = cols } return this }
+  // opts: { count: 'exact', head: true } as supabase-js takes them (added for
+  // the MCP suites, docs/arch/mcp-access.md section 5.2). head returns
+  // { data: null, count }; count without head adds count beside data. The
+  // count is taken over the matched rows BEFORE limit, as PostgREST does.
+  select(cols = '*', opts = {}) {
+    if (this.op === 'select') { this.cols = cols; this.countMode = (opts && opts.count) || null; this.head = !!(opts && opts.head) } else { this.returning = true; this.cols = cols }
+    return this
+  }
   insert(rows) { this.op = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this }
   update(patch) { this.op = 'update'; this.payload = patch; return this }
   delete() { this.op = 'delete'; return this }
@@ -110,6 +121,13 @@ class Query {
     return null
   }
   _finish(rows) {
+    if (this.op === 'select' && this.head) return { data: null, count: rows.length, error: null }
+    const count = this.op === 'select' && this.countMode ? rows.length : undefined
+    const res = this._finishRows(rows)
+    if (count !== undefined) res.count = count
+    return res
+  }
+  _finishRows(rows) {
     let out = rows
     for (const [c, asc] of this.orders.slice().reverse()) out = out.slice().sort((a, b) => (asc ? 1 : -1) * cmp(a[c], b[c]))
     if (this.lim != null) out = out.slice(0, this.lim)

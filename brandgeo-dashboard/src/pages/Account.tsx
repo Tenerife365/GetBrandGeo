@@ -11,10 +11,11 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { PLAN_LABELS, PLAN_ORDER, type Plan } from '../lib/planConfig'
+import { PLAN_LABELS, PLAN_ORDER, featureUnlockPlan, type Plan } from '../lib/planConfig'
 import { PageTitle } from '../components/Typography'
 import BrandLogo from '../components/BrandLogo'
 import PromotionsPanel from '../components/PromotionsPanel'
+import McpAccessSection from '../components/McpAccessSection'
 
 interface ClientEvent {
   id: number
@@ -548,6 +549,16 @@ export default function Account() {
           </p>
         )}
       </div>
+
+      {/* MCP access (docs/arch/mcp-access.md section 7.2). Placed after the plan
+          blocks. Visible to an admin for any client, and to a viewer for their
+          own; McpAccessSection itself hides in demo mode. */}
+      <McpAccessSection
+        clientId={activeClientId}
+        plan={activeClient?.plan ?? 'free'}
+        isAdmin={isAdmin}
+        onUpgrade={() => upgradeTo({ id: featureUnlockPlan('mcp_access') ?? 'radar', label: PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar'] })}
+      />
 
       {/* Manage plan (admin) */}
       {isAdmin && (
