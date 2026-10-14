@@ -42,8 +42,10 @@ unless the new copy answers 403 to an unsigned GET. `.htaccess` denies
 `deploy-secret.php`, `article-builder.html`, `.bak` and `.prev`. Local
 evidence and the two measurement traps (Windows `taskkill` wants `ps -W`
 column 4; winget PHP has no CA bundle) are section 14 of the QA doc. Packet
-031 lists Constantin's four steps: push, read the status file within two
-minutes, move the secret out of the docroot, probe the two 403s. Then
+031 lists Constantin's steps in order: push (the OLD deployer copies the new
+files, so no status file yet), probe the two 403s to prove `.htaccess`
+landed, read `deploy-status.json` after the NEXT push of anything, then move
+the secret out of the docroot. Then
 `bg-verify` on Opus.
 
 **Packets READY, not run:** `029` (staging: judge panel of three designs,

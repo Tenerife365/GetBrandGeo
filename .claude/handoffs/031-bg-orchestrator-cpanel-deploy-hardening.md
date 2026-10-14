@@ -2,7 +2,7 @@
 id: 031
 from: bg-orchestrator
 to: built in the orchestrator session on 2026-10-14; bg-verify on Opus for the review after the first live push
-status: BUILT, NOT PUSHED (see "Requires Constantin")
+status: BUILT, COMMITTED 1330dbe, NOT PUSHED (see "Requires Constantin")
 created: 2026-10-14
 scope_write: brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/qa/deploy-pipeline-cpanel.md (amendment only), .claude/handoffs/031-*.md
 scope_read: docs/qa/deploy-pipeline-cpanel.md, brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/TECH-STACK.md
@@ -85,19 +85,23 @@ take them down without cPanel access).
 
 1. Push (web files only, Netlify cancels its build):
    `$env:BATCH_PUSH=1; git push origin main`
-2. Within two minutes, open `https://getbrandgeo.com/deploy-status.json`.
-   The old deployer deploys the new one, so this first run is written by
-   the NEW code and must show the pushed sha. If it 404s, the old deployer
-   failed on this push: upload `brandgeo/web/deploy.php` by hand in cPanel
-   File Manager to `/home/getbran1/getbrandgeo.com/` and push any one-line
-   web change to re-run.
+2. Within two minutes, `GET https://getbrandgeo.com/deploy-secret.php` and
+   `GET https://getbrandgeo.com/article-builder.html` must both answer 403.
+   That proves the OLD deployer copied the new `.htaccess` (and, in the same
+   loop, the new `deploy.php`). The old code is the one running during this
+   push, so no status file exists yet. If the two GETs still answer 200 or
+   404 after five minutes, the old deployer failed on this push: upload
+   `brandgeo/web/deploy.php` and `brandgeo/web/.htaccess` by hand in cPanel
+   File Manager to `/home/getbran1/getbrandgeo.com/`.
+2b. The NEXT push of anything to `main` (docs count: the webhook fires on
+   every push and the new code writes a status file even with zero web
+   files) creates `https://getbrandgeo.com/deploy-status.json`. Open it: its
+   `sha` must be that push's commit and `secret_location` will read
+   `DOCROOT, move it` until step 3 is done.
 3. In cPanel File Manager, copy `/home/getbran1/getbrandgeo.com/deploy-secret.php`
    to `/home/getbran1/repositories/deploy-secret.php`, then delete the
    docroot copy. The next push's status file must then read
    `secret_location: outside docroot`.
-4. Optional, once: `GET https://getbrandgeo.com/deploy-secret.php` must
-   return 403 (the deny rule), and `GET https://getbrandgeo.com/article-builder.html`
-   must return 403 too.
 
 ## Then
 

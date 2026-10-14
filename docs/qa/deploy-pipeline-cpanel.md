@@ -1045,8 +1045,10 @@ run under `php -S`; none is set in production.
 Not reproducible on this machine: the success branch of F6 (write succeeds,
 self-GET answers 403) because the built-in server holds the file lock and
 serves one request at a time. It is exercised by the first live push that
-carries `deploy.php`, which is this one: the OLD deployer writes the new file
-and the NEW code writes the first status file.
+carries `deploy.php` AFTER this one. On this push the OLD deployer (no
+self-check, no status file) copies the new `deploy.php` and `.htaccess`;
+the new code first runs on the push after, and writes the first
+`deploy-status.json` then, even if that push touches no web file.
 
 Two measurement traps worth not relearning: `ps -W` on Git Bash prints the
 Cygwin pid first and `taskkill` needs the Windows pid (column 4), so three
@@ -1057,7 +1059,8 @@ local issuer certificate" until `curl.cainfo` points at Git's
 
 ### Still owed
 
-- The first live push, the status file check, the secret move and the two
-  403 probes, all Constantin's, listed in packet 031.
+- The first live push, the two 403 probes that prove `.htaccess` landed, the
+  status file on the push after, and the secret move, all Constantin's,
+  listed in packet 031 in that order.
 - `bg-verify` review `docs/qa/cpanel-deploy-hardening-031-review.md`.
 - Deletions are still not propagated (section 4); unchanged by design.
