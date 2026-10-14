@@ -20,6 +20,46 @@
 
 ---
 
+## CURRENT STATE (newest entry 2026-10-14)
+
+### 2026-10-14: cPanel deploy hardening BUILT (not pushed), DevOps packets 029 and 030 READY, Python backend ruled retired
+
+Constantin asked for four things: a staging environment designed and built by
+a DevOps expert team, a second DevOps session for error tracking, uptime and
+alerting, the three cPanel findings fixed, and whether the Python backend is
+still needed.
+
+**cPanel (F1 to F6 of `docs/qa/deploy-pipeline-cpanel.md`) BUILT, exercised
+locally, NOT pushed.** `brandgeo/web/deploy.php` 1.1: secret loads from
+`/home/getbran1/repositories/deploy-secret.php` with the docroot copy as
+fallback; payloads at GitHub's 20-commit cap take the file list from the
+public compare API, falling back to `commits[]` with `truncated: true`;
+every run writes public `deploy-status.json` (sha, counts, failed, skipped,
+source, secret_location, finish_fn, sapi, rollback); private paths
+(`article-builder.html`, `images/_staging/`, `.bak`, `deploy-secret.php`)
+never deploy; a self-overwrite backs up to `deploy.php.prev` and rolls back
+unless the new copy answers 403 to an unsigned GET. `.htaccess` denies
+`deploy-secret.php`, `article-builder.html`, `.bak` and `.prev`. Local
+evidence and the two measurement traps (Windows `taskkill` wants `ps -W`
+column 4; winget PHP has no CA bundle) are section 14 of the QA doc. Packet
+031 lists Constantin's four steps: push, read the status file within two
+minutes, move the secret out of the docroot, probe the two 403s. Then
+`bg-verify` on Opus.
+
+**Packets READY, not run:** `029` (staging: judge panel of three designs,
+schema from a `pg_dump` baseline never from `db/`, isolation list, the MCP
+stage 1 migration as the rehearsal) and `030` (observability: mandatory
+`pg_cron` watchdog over `job_runs` emailing through Resend via `pg_net`,
+`health.js`, optional Sentry free tier, external pinger, alert table in a
+runbook). Each carries its kickoff line and its open questions with defaults.
+
+**Python backend `brandgeo/backend/`: NOT needed.** It is git-ignored
+(`.gitignore` line 2), has no commit history, nothing in the repo references
+it, its four tables (`query_templates`, `monitoring_runs`, `engine_results`,
+`visibility_scores`) do not exist in production, and it targets retired
+models. Archive the folder to `BrandGEO-archives\` and mark section 1.2's
+Python mentions as history. No production impact either way.
+
 ## CURRENT STATE (newest entry 2026-09-22)
 
 ### 2026-09-22: clients 20 and 27 fully deleted
