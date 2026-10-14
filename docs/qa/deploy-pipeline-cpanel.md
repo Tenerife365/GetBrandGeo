@@ -994,3 +994,70 @@ reliably in about 5 seconds of copy loop. Verify with section 7 rather than with
 the GitHub delivery list, which stays uninformative per F2.
 
 No secret value, token, or credential appears anywhere in this document.
+
+## 14. Amendment 2026-10-14: F1 to F6 built, exercised locally, awaiting the first live push
+
+Packet `.claude/handoffs/031-bg-orchestrator-cpanel-deploy-hardening.md`.
+Built in the orchestrator session, reviewed by nobody yet; `bg-verify` on Opus
+reviews the live result after the push.
+
+What changed in `brandgeo/web/deploy.php` (version string `BrandGEO-Deploy/1.1`):
+
+| Finding | Change |
+|---|---|
+| F1 | A `$PRIVATE_PATTERNS` list (`article-builder.html`, `images/_staging/`, `*.bak`, `deploy-secret.php`) is never fetched; each hit is logged and listed under `skipped` in the status file. A path with `..` is now counted under `skipped` too instead of vanishing. |
+| F2 | Every run writes `deploy-status.json` into the docroot: sha, before, start, finish, expected, deployed, failed[], skipped[], truncated, source, commits_in_payload, secret_location, sapi, finish_fn, rollback. No secret in it. |
+| F3 | The secret loads from `/home/getbran1/repositories/deploy-secret.php` when that file exists, else from the docroot copy; `secret_location` says which. `.htaccess` gained `Require all denied` blocks for `deploy-secret.php`, `article-builder.html` and `.bak`/`.prev` files, with the pre-2.4 `Deny from all` form in an `IfModule !mod_authz_core.c` branch. |
+| F4 | `finish_fn` records which of `fastcgi_finish_request`, `litespeed_finish_request` or neither fired, and `sapi` records `php_sapi_name()`. |
+| F5 | When `commits[]` holds 20 or more entries and `before` is a real sha, the public compare API (`/repos/{owner}/{repo}/compare/{before}...{after}?per_page=250`) supplies the file list (statuses added, modified, renamed, copied, changed). On failure the script falls back to `commits[]` and sets `truncated: true`. Under 20 commits nothing changed. |
+| F6 | When `deploy.php` is in the push the live copy is copied to `/home/getbran1/repositories/deploy.php.prev` first. After a successful write the script GETs its own URL (one retry if the request itself fails); anything but 403 copies the backup back and sets `rollback: true`. |
+
+Four environment overrides (`BRANDGEO_DEPLOYPATH`, `BRANDGEO_LOGFILE`,
+`BRANDGEO_SECRET_OUTSIDE`, `BRANDGEO_SELF_URL`) exist only so the script can
+run under `php -S`; none is set in production.
+
+### Exercised locally, PHP 8.4.24 built-in server, temp docroot, local throwaway secret
+
+`php -l` clean. Five runs through the real code path with HMAC-signed payloads:
+
+1. Wrong signature: `403 Forbidden`, nothing written.
+2. 20 commits in the payload naming only `robots.txt`, `before`/`after` set to
+   the real range `843fe72...9f33835` (exactly 20 commits on GitHub, 33 files,
+   4 under `brandgeo/web/`): the compare path was taken, all 4 files landed
+   (`affiliates.html`, `faq.html`, `index-new.html`, `index.html`), the
+   deployed `index.html` is byte-identical to `git show 9f33835:brandgeo/web/index.html`,
+   status `source: compare`, `expected: 4`, `deployed: 4`, `truncated: false`.
+   Before the local CA bundle was configured the same payload produced
+   `source: commits`, `truncated: true`, `failed: [robots.txt]`, which is the
+   designed fallback and is what a compare outage would look like live.
+3. 3 commits naming `robots.txt`, the three private paths and
+   `brandgeo/web/../deploy.php`: `expected: 5`, `deployed: 1`, `skipped` lists
+   all four others, none of them on disk.
+4. Self-overwrite: `deploy.php.prev` was written before the write. The write
+   itself was refused by the Windows file lock on a running script (an artefact
+   of this machine, not of Linux), so the status shows `failed: [deploy.php]`,
+   `rollback: false` and the live copy untouched, which is the correct outcome
+   for a failed write. An earlier version of the script ran the self-check even
+   after a failed write and rolled back needlessly; fixed before commit.
+5. `httpStatus()` judged directly: the running deployer answers 403, a missing
+   file does not, a closed port returns 0.
+
+Not reproducible on this machine: the success branch of F6 (write succeeds,
+self-GET answers 403) because the built-in server holds the file lock and
+serves one request at a time. It is exercised by the first live push that
+carries `deploy.php`, which is this one: the OLD deployer writes the new file
+and the NEW code writes the first status file.
+
+Two measurement traps worth not relearning: `ps -W` on Git Bash prints the
+Cygwin pid first and `taskkill` needs the Windows pid (column 4), so three
+servers ended up stacked on one port and the old one kept answering; and the
+winget PHP ships no CA bundle, so every HTTPS fetch fails with "unable to get
+local issuer certificate" until `curl.cainfo` points at Git's
+`mingw64/etc/ssl/certs/ca-bundle.crt`.
+
+### Still owed
+
+- The first live push, the status file check, the secret move and the two
+  403 probes, all Constantin's, listed in packet 031.
+- `bg-verify` review `docs/qa/cpanel-deploy-hardening-031-review.md`.
+- Deletions are still not propagated (section 4); unchanged by design.

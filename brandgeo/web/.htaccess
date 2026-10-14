@@ -61,3 +61,37 @@
 # ─── Prevent directory listing ────────────────────────────────────────────────
 
 Options -Indexes
+
+# ─── Private files that must never be served ────────────────────────────────
+# deploy-secret.php holds the webhook secret: if PHP handling ever changes it
+# would be served as text. article-builder.html is an internal tool and .bak
+# files are backups; deploy.php refuses to propagate deletions, so a deny rule
+# is the only way to take an already-live copy down. The deployer itself also
+# skips these paths (see $PRIVATE_PATTERNS in deploy.php).
+<Files "deploy-secret.php">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</Files>
+<Files "article-builder.html">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</Files>
+<FilesMatch "\.(bak|prev)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
