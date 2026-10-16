@@ -1064,3 +1064,36 @@ local issuer certificate" until `curl.cainfo` points at Git's
   listed in packet 031 in that order.
 - `bg-verify` review `docs/qa/cpanel-deploy-hardening-031-review.md`.
 - Deletions are still not propagated (section 4); unchanged by design.
+
+## 15. Amendment 2026-10-16: live, reviewed, F5 corrected in 1.2
+
+Packet 031 went live on 2026-10-16: `ca31195` was pushed, both private
+files answered 403 within two minutes, the secret was moved to
+`/home/getbran1/repositories/` by hand, and the first `deploy-status.json`
+(sha `1612cc9`) read `secret_location: outside docroot`, `sapi: litespeed`,
+`finish_fn: litespeed_finish_request`.
+
+`bg-verify` (`docs/qa/cpanel-deploy-hardening-031-review.md`) returned FAIL
+on one MAJOR finding that this amendment closes: F5's premise was stale.
+GitHub's push payload carries up to 2048 commits, not 20 (webhook docs,
+checked 2026-10-16), so `commits[]` was already complete for every push this
+repository has made. Version 1.1 replaced it with the compare list at 20
+commits, and the compare API caps `files[]` at 300: measured on the real
+range `6d2117b...1612cc9` (99 commits), exactly 300 files came back and
+`brandgeo/web/index.html` was not among them. A push like that would have
+skipped files while reporting `truncated: false`.
+
+Version 1.2: `commits[]` is always read; at 2048 commits the compare list is
+merged into it (`source: commits+compare`) and `truncated` stays true unless
+the API listed fewer than 300 files. Also from the review: R2, `.htaccess`
+now refuses `images/_staging/` (was still served); R3, a self-overwrite with
+no backup is not installed at all and the status file gains `self_check`
+(`not needed`, `ok`, `skipped, no backup`, `answered N, rolled back`).
+
+Measured locally under `php -S` with signed payloads: 1 commit deploys 1 of 1,
+`source: commits`; 2048 commits over `843fe72...9f33835` deploys 5 of 5
+(4 from compare plus 1 from `commits[]`), `truncated: false`; 2048 commits
+over `6d2117b...1612cc9` flags `truncated: true` and deploys 187 of 188, the
+one failure being `deploy.php` under the Windows file lock from section 14.
+Still owed: the first live push that carries `deploy.php` itself proves the
+self-check branch; `self_check` in the status file is where to read it.

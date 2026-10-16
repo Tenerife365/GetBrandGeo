@@ -32,11 +32,15 @@
  * site). Anything outside brandgeo/web/ is ignored, and a short list of private
  * paths under it is never deployed either ($PRIVATE_PATTERNS).
  *
- * Pushes with 20 or more commits: GitHub caps the webhook payload's commits[]
- * at 20, so a bigger push used to deploy only the files of the first 20 and say
- * nothing. When the cap is hit this script now asks the public compare API for
- * the full file list of the before...after range. If that call fails it falls
- * back to commits[] and records truncated=true in the status file.
+ * Big pushes: GitHub caps the webhook payload's commits[] at 2048 commits, so
+ * below that the list is complete and is the only source. At the cap the
+ * payload is a prefix of the push, so this script also asks the public compare
+ * API for the before...after range and merges both lists. The compare API
+ * itself lists at most 300 files, so a list that long is a prefix too. Either
+ * way the status file records truncated=true when the file list may be short,
+ * and the deploy proceeds with what is known. (Version 1.1 assumed a cap of 20
+ * and replaced commits[] with the compare list at 20 commits, which could drop
+ * files on a push over 300 changed files; 1.2 corrects that.)
  *
  * Secret: loaded from $SECRET_OUTSIDE (outside the web root) when that file
  * exists, otherwise from deploy-secret.php next to this script. The outside
@@ -51,7 +55,7 @@
  *
  * Status file (public, no secrets): sha, started, finished, expected, deployed,
  * failed[], skipped[], truncated, source (commits|compare), secret_location,
- * sapi, finish_fn, rollback. The sha is public on GitHub already.
+ * sapi, finish_fn, rollback, self_check. The sha is public on GitHub already.
  *
  * Local testing: the four BRANDGEO_* environment variables below override the
  * production paths so the script can run under "php -S" against a temp docroot.
@@ -68,7 +72,8 @@ $SELF_BACKUP    = dirname($LOGFILE) . '/deploy.php.prev';   // previous deployer
 $SELF_URL   = getenv('BRANDGEO_SELF_URL') ?: 'https://getbrandgeo.com/deploy.php';
 $STATUSFILE = $DEPLOYPATH . 'deploy-status.json';   // public, see header
 $MAX_FILES  = 200;                                // sanity cap per push
-$COMMIT_CAP = 20;                                 // GitHub's commits[] ceiling per push event
+$COMMIT_CAP = 2048;                               // GitHub's commits[] ceiling per push event
+$COMPARE_FILE_CAP = 300;                          // the compare API's files[] ceiling per range
 $PRIVATE_PATTERNS = [                             // never deployed, relative to the docroot
     '#^article-builder\.html$#',
     '#^images/_staging/#',
@@ -143,30 +148,32 @@ if (function_exists('fastcgi_finish_request')) {
 $started = gmdate('Y-m-d\TH:i:s\Z');
 
 // --- Collect changed files under the web prefix. --------------------------
-// commits[] is complete below GitHub's cap. At the cap the payload is a prefix
-// of the push, so the compare API is asked for the whole range instead.
+// commits[] is complete below GitHub's cap of 2048 commits, so it is always
+// read. At the cap the payload is a prefix of the push, so the compare API is
+// asked for the whole range as well and the two lists are merged. The compare
+// API lists at most $COMPARE_FILE_CAP files, so a list that long is a prefix
+// too and the run stays flagged truncated.
 $commits = $event['commits'] ?? [];
 $source = 'commits';
 $truncated = false;
 $changed = [];
-if (count($commits) >= $COMMIT_CAP && $before !== '') {
-    $full = compareFiles($OWNER_REPO, $before, $sha);
-    if ($full !== null) {
-        $source = 'compare';
-        foreach ($full as $path) {
-            if (strpos($path, $WEB_PREFIX) === 0) { $changed[$path] = true; }
+foreach ($commits as $commit) {
+    foreach (['added', 'modified'] as $k) {
+        foreach (($commit[$k] ?? []) as $path) {
+            if (is_string($path) && strpos($path, $WEB_PREFIX) === 0) { $changed[$path] = true; }
         }
-    } else {
-        $truncated = true;   // fall through to the capped list, and say so
     }
 }
-if ($source === 'commits') {
-    if (count($commits) >= $COMMIT_CAP) { $truncated = true; }
-    foreach ($commits as $commit) {
-        foreach (['added', 'modified'] as $k) {
-            foreach (($commit[$k] ?? []) as $path) {
+if (count($commits) >= $COMMIT_CAP) {
+    $truncated = true;   // commits[] is a prefix; cleared only when compare covers the range
+    if ($before !== '') {
+        $cmp = compareFiles($OWNER_REPO, $before, $sha);
+        if ($cmp !== null) {
+            $source = 'commits+compare';
+            foreach ($cmp['paths'] as $path) {
                 if (strpos($path, $WEB_PREFIX) === 0) { $changed[$path] = true; }
             }
+            if ($cmp['listed'] < $COMPARE_FILE_CAP) { $truncated = false; }
         }
     }
 }
@@ -180,6 +187,7 @@ $done = 0;
 $failed = [];
 $skipped = [];
 $selfTouched = false;
+$selfCheck = 'not needed';
 foreach ($changed as $i => $path) {
     if ($i >= $MAX_FILES) { $log[] = "cap reached at $MAX_FILES"; $truncated = true; break; }
     $rel = substr($path, strlen($WEB_PREFIX));
@@ -203,7 +211,15 @@ foreach ($changed as $i => $path) {
         // Keep the working deployer somewhere a broken one can be undone from.
         @mkdir(dirname($SELF_BACKUP), 0755, true);
         $backedUp = @copy($dest, $SELF_BACKUP);
-        $log[] = $backedUp ? 'backup: deploy.php.prev written' : 'backup: could not write deploy.php.prev, self-check skipped';
+        if (!$backedUp) {
+            // Without a backup a broken deployer could not be undone, so the new
+            // copy is not installed at all; the status file says so.
+            $log[] = 'backup: could not write deploy.php.prev, deploy.php NOT installed';
+            $failed[] = 'deploy.php (no backup)';
+            $selfCheck = 'skipped, no backup';
+            continue;
+        }
+        $log[] = 'backup: deploy.php.prev written';
     }
     // Write atomically: temp file then rename, so a reader never sees a half file.
     $tmp = $dest . '.tmp_' . getmypid();
@@ -230,10 +246,12 @@ if ($selfTouched) {
     if ($code === 0) { sleep(2); $code = httpStatus($SELF_URL); }   // one retry on a failed request, not on a wrong answer
     if ($code === 403) {
         $log[] = "self-check: deploy.php answers 403, ok";
+        $selfCheck = 'ok';
     } else {
         $rollback = @copy($SELF_BACKUP, $DEPLOYPATH . 'deploy.php');
         $log[] = "self-check: deploy.php answered $code, " . ($rollback ? 'ROLLED BACK to deploy.php.prev' : 'ROLLBACK FAILED');
         $failed[] = 'deploy.php (self-check)';
+        $selfCheck = "answered $code, " . ($rollback ? 'rolled back' : 'rollback failed');
     }
 }
 
@@ -257,6 +275,7 @@ $status = [
     'sapi'            => php_sapi_name(),
     'finish_fn'       => $finishFn,
     'rollback'        => $rollback,
+    'self_check'      => $selfCheck,
 ];
 $statusTmp = $STATUSFILE . '.tmp_' . getmypid();
 if (file_put_contents($statusTmp, json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n") !== false) {
@@ -274,6 +293,7 @@ function isPrivate(string $rel, array $patterns): bool {
 }
 
 /** Full file list for before...after via the public compare API, or null. */
+/** Changed paths of a range plus how many files the API listed (300 is its cap). */
 function compareFiles(string $ownerRepo, string $before, string $after): ?array {
     // Owner, repo and both shas are validated or fixed above, so this URL cannot
     // be steered by the payload to any other host or path.
@@ -288,7 +308,7 @@ function compareFiles(string $ownerRepo, string $before, string $after): ?array 
         if (!in_array($st, ['added', 'modified', 'renamed', 'copied', 'changed'], true)) { continue; }
         if (isset($f['filename']) && is_string($f['filename'])) { $out[] = $f['filename']; }
     }
-    return $out;
+    return ['paths' => $out, 'listed' => count($data['files'])];
 }
 
 /** HTTP status of a GET, or 0 when the request itself failed. */
@@ -299,7 +319,7 @@ function httpStatus(string $url): int {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_TIMEOUT        => 15,
-            CURLOPT_USERAGENT      => 'BrandGEO-Deploy/1.1',
+            CURLOPT_USERAGENT      => 'BrandGEO-Deploy/1.2',
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
         curl_exec($ch);
@@ -309,7 +329,7 @@ function httpStatus(string $url): int {
     }
     $ctx = stream_context_create(['http' => [
         'timeout' => 15, 'ignore_errors' => true,
-        'header' => "User-Agent: BrandGEO-Deploy/1.1\r\n",
+        'header' => "User-Agent: BrandGEO-Deploy/1.2\r\n",
     ]]);
     @file_get_contents($url, false, $ctx);
     if (isset($http_response_header[0]) && preg_match('#HTTP/\S+\s+(\d{3})#', $http_response_header[0], $m)) {
@@ -320,7 +340,7 @@ function httpStatus(string $url): int {
 
 /** HTTPS GET helper: curl first, then allow_url_fopen fallback. */
 function httpGet(string $url, array $headers = []): ?string {
-    $headers[] = 'User-Agent: BrandGEO-Deploy/1.1';
+    $headers[] = 'User-Agent: BrandGEO-Deploy/1.2';
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [

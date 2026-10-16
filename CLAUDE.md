@@ -32,8 +32,9 @@ still needed.
 **cPanel (F1 to F6 of `docs/qa/deploy-pipeline-cpanel.md`) BUILT, exercised
 locally, NOT pushed.** `brandgeo/web/deploy.php` 1.1: secret loads from
 `/home/getbran1/repositories/deploy-secret.php` with the docroot copy as
-fallback; payloads at GitHub's 20-commit cap take the file list from the
-public compare API, falling back to `commits[]` with `truncated: true`;
+fallback; big pushes: GitHub's real cap is 2048 commits (bg-verify corrected
+the audit's 20 on 2026-10-16; 1.1 swapped `commits[]` for the 300-file-capped
+compare list at 20 commits, 1.2 merges both and flags `truncated` at either cap);
 every run writes public `deploy-status.json` (sha, counts, failed, skipped,
 source, secret_location, finish_fn, sapi, rollback); private paths
 (`article-builder.html`, `images/_staging/`, `.bak`, `deploy-secret.php`)

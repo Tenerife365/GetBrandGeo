@@ -56,6 +56,9 @@
   # does the work. QSA keeps any UTM the affiliate appended. Temporary (302)
   # so a change of tracking host never leaves a cached permanent redirect.
   RewriteRule ^r/(.+)$ https://app.getbrandgeo.com/r/$1 [R=302,L,QSA,NE]
+
+  # Staging images are working copies, never public (packet 031 R2).
+  RewriteRule ^images/_staging/ - [F,L]
 </IfModule>
 
 # ─── Prevent directory listing ────────────────────────────────────────────────

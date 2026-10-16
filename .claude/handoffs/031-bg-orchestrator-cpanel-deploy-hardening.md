@@ -2,7 +2,7 @@
 id: 031
 from: bg-orchestrator
 to: built in the orchestrator session on 2026-10-14; bg-verify on Opus for the review after the first live push
-status: LIVE since 2026-10-16, steps 1 to 3 done, awaiting the first status file and bg-verify
+status: LIVE, reviewed FAIL then fixed as 1.2 on 2026-10-16, 1.2 NOT PUSHED
 created: 2026-10-14
 scope_write: brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/qa/deploy-pipeline-cpanel.md (amendment only), .claude/handoffs/031-*.md
 scope_read: docs/qa/deploy-pipeline-cpanel.md, brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/TECH-STACK.md
@@ -126,3 +126,15 @@ the same morning: `deploy-secret.php` answered 403 and `article-builder.html`
 unsigned GET on `deploy.php` 403, `deploy-status.json` 404 until the next
 push. The commit carrying this note is that next push; its status file must
 read `secret_location: "outside docroot"` and `sha` equal to this commit.
+
+## Review 2026-10-16 and version 1.2
+
+bg-verify returned FAIL: R1 MAJOR (the 20-commit premise was wrong, GitHub
+sends up to 2048 commits, and the compare API caps at 300 files, so 1.1 could
+drop files on a big push), R2 MINOR (`images/_staging/` still served), R3
+MINOR (self-overwrite installed even without a backup). All three are fixed
+in `deploy.php` 1.2 and `.htaccess`, tested locally (QA doc section 15), and
+ride the next push. R4 to R6 (INFO) are recorded in the review, not fixed.
+Owed after that push: `https://getbrandgeo.com/images/_staging/n1.png` must
+answer 403, the status file must carry `self_check`, and the push after that
+one, if it ever carries `deploy.php`, proves the rollback branch.
