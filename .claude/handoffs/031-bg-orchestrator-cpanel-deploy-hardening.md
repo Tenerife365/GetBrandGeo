@@ -2,7 +2,7 @@
 id: 031
 from: bg-orchestrator
 to: built in the orchestrator session on 2026-10-14; bg-verify on Opus for the review after the first live push
-status: LIVE, reviewed FAIL then fixed as 1.2 on 2026-10-16, 1.2 NOT PUSHED
+status: CLOSED, deploy.php 1.2 LIVE and verified from outside on 2026-10-16
 created: 2026-10-14
 scope_write: brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/qa/deploy-pipeline-cpanel.md (amendment only), .claude/handoffs/031-*.md
 scope_read: docs/qa/deploy-pipeline-cpanel.md, brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/TECH-STACK.md
@@ -138,3 +138,16 @@ ride the next push. R4 to R6 (INFO) are recorded in the review, not fixed.
 Owed after that push: `https://getbrandgeo.com/images/_staging/n1.png` must
 answer 403, the status file must carry `self_check`, and the push after that
 one, if it ever carries `deploy.php`, proves the rollback branch.
+
+## Closed 2026-10-16
+
+Constantin pushed `1c3fdc2`. Read over HTTP from outside the server within
+a minute: `deploy-status.json` sha `1c3fdc27...`, before `1612cc9...`,
+expected 2, deployed 2, failed [], skipped [], truncated false, source
+commits, commits_in_payload 1, secret_location "outside docroot", sapi
+litespeed, finish_fn litespeed_finish_request, rollback false. That run was
+1.1 overwriting itself with 1.2: backup written, self-check GET answered
+403, no rollback, so the F6 success branch is proven live. The `self_check`
+field is written by 1.2 and appears from the next push. `images/_staging/`
+403, unsigned `deploy.php` 403, `deploy-secret.php` 404, `deploy.php.prev`
+404. Nothing is owed on this packet. R4 to R6 stay recorded in the review.

@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-14)
 
-### 2026-10-14: cPanel deploy hardening BUILT (not pushed), DevOps packets 029 and 030 READY, Python backend ruled retired
+### 2026-10-14: cPanel deploy hardening LIVE as deploy.php 1.2 (2026-10-16), DevOps packets 029 and 030 READY, Python backend ruled retired
 
 Constantin asked for four things: a staging environment designed and built by
 a DevOps expert team, a second DevOps session for error tracking, uptime and
@@ -48,6 +48,20 @@ files, so no status file yet), probe the two 403s to prove `.htaccess`
 landed, read `deploy-status.json` after the NEXT push of anything, then move
 the secret out of the docroot. Then
 `bg-verify` on Opus.
+
+**All of it DONE and LIVE by 2026-10-16.** Constantin pushed `ca31195`,
+`1612cc9` (status file read `secret_location: "outside docroot"` after he
+moved the secret in cPanel File Manager) and `1c3fdc2` (deploy.php 1.2).
+bg-verify's review (`docs/qa/cpanel-deploy-hardening-031-review.md`, FAIL:
+R1 MAJOR wrong 20-commit premise, R2 `images/_staging/` served, R3
+self-overwrite without backup) is closed by 1.2. Read from outside the server
+after the `1c3fdc2` push: status file `sha` 1c3fdc2, `expected` 2,
+`deployed` 2, `failed` empty, `truncated` false, `rollback` false, so the
+1.1 self-backup and self-check path ran once for real; `images/_staging/`
+403; unsigned `deploy.php` 403; `deploy-secret.php` 404; `deploy.php.prev`
+404. The `self_check` field appears from the next push. R4 to R6 (INFO:
+rate-limited compare reads as truncated, deleting `main` writes an all-zero
+sha, overlapping runs) are recorded, not fixed.
 
 **Packets READY, not run:** `029` (staging: judge panel of three designs,
 schema from a `pg_dump` baseline never from `db/`, isolation list, the MCP
