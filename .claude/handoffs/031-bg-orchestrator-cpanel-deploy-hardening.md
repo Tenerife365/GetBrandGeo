@@ -2,7 +2,7 @@
 id: 031
 from: bg-orchestrator
 to: built in the orchestrator session on 2026-10-14; bg-verify on Opus for the review after the first live push
-status: BUILT, COMMITTED 1330dbe, NOT PUSHED (see "Requires Constantin")
+status: LIVE since 2026-10-16, steps 1 to 3 done, awaiting the first status file and bg-verify
 created: 2026-10-14
 scope_write: brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/qa/deploy-pipeline-cpanel.md (amendment only), .claude/handoffs/031-*.md
 scope_read: docs/qa/deploy-pipeline-cpanel.md, brandgeo/web/deploy.php, brandgeo/web/.htaccess, docs/TECH-STACK.md
@@ -114,3 +114,15 @@ in the script) and writes `docs/qa/cpanel-deploy-hardening-031-review.md`.
 
 Propagating deletions, a status endpoint beyond the JSON file, moving the
 site off shared hosting, any Netlify change.
+
+## Progress 2026-10-16
+
+Constantin pushed `ca31195` on 2026-10-16. Measured from outside the server
+the same morning: `deploy-secret.php` answered 403 and `article-builder.html`
+403 within two minutes, so the old deployer copied the new `.htaccess` and
+`deploy.php` (step 2 done). He then moved `deploy-secret.php` to
+`/home/getbran1/repositories/` in cPanel File Manager (step 3 done):
+`deploy-secret.php` now answers 404, `article-builder.html` still 403, an
+unsigned GET on `deploy.php` 403, `deploy-status.json` 404 until the next
+push. The commit carrying this note is that next push; its status file must
+read `secret_location: "outside docroot"` and `sha` equal to this commit.
