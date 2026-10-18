@@ -20,6 +20,57 @@
 
 ---
 
+## CURRENT STATE (newest entry 2026-10-18)
+
+### 2026-10-18: AI Visibility prompt-first brief WRITTEN (ruling owed), OpenRouter outage FOUND, client 57 onboarded
+
+**Client 57 was created by Constantin on 2026-10-17** through the Onboard
+wizard (Growth, weekly, `plan_source` null, no grant date, no Stripe
+customer, one viewer profile, 5 prompts). Read back the same day: 20 ok rows
+on chatgpt, claude, gemini and google_ai with 0 brand mentions (engines name
+retailers and device brands instead), and 5 perplexity rows all
+`quota_exceeded`. The account was recommended by a content partner who is
+NOT yet an affiliate; crediting her means: admin Affiliates page, invite her,
+approve the membership in program `brandgeo`, then Conversions, "Attach an
+account", client 57, reason. Nothing paid yet, so no payment block. If the
+plan is hand-sold, set `plan_source` and `plan_grant_until` on the Account
+page so `expire-plan-grants` knows what to do with it.
+
+**LIVE DEFECT, not fixed from this seat: Perplexity and Grok have failed on
+every call since 2026-10-06.** `ai_results` read 2026-10-18: 0 ok rows and
+287 (perplexity) plus 282 (grok) `quota_exceeded` rows in 14 days, last
+attempt 2026-10-17 01:17Z, on every account whose plan has either engine
+(client 1 last ok perplexity 2026-09-11; clients 54 and 19 never ok). Both
+go through OpenRouter in `_collect.js`; lines 262 to 272 map HTTP 402, 429
+and any "credit" message to `quota_exceeded`, and the detail is not stored.
+Twelve days of zero successes reads as an exhausted OpenRouter credit
+balance; only the OpenRouter dashboard can confirm. Order: check and top up
+OpenRouter, confirm with one admin single-cell refresh on Perplexity, then
+ship the page changes. On the page this outage renders as grey "Not checked"
+cells and "Temporarily unavailable", which is part of the confusion the brief
+below addresses.
+
+**Brief WRITTEN, nothing built:**
+`docs/design/ai-visibility-prompt-focus-2026-10-18.md`. Constantin's ask:
+prompts without a result confuse customers, focus the page on the prompts
+that work, auto-sort by performance, check peec and Scrunch. Measured
+inventory of the page: error rows are skipped at load so an outage looks
+like "never checked" (lines 457 to 465) or silently shows an older ok row;
+Absent, No answer, Could not check and Not checked are three near-identical
+glyphs; locked engines have no column; order is stored `position` with no
+sort control; the only per-prompt summary is a 9px chip; zero mentions
+render as a wall of red with "Needs Work" and six 0% dimensions (three of
+them undefined without a mention). Eight recommendations R1 to R8, ranked:
+client-side performance sort with a visible control, two sections with a
+headline sentence and competitors named instead, four honest non-result
+states with dates, code-aware engine card copy, locked engines as columns
+(max two), per-prompt competitor block, undefined dimensions shown as n/a,
+small copy fixes. Competitor review in section 6: no first-party doc of any
+tool documents a default sort or a visual state for a failed engine run, so
+R3 and R4 would be a differentiator. Open questions with defaults in section
+8. Next step once ruled: bg-design spec then bg-app build, one Netlify build,
+bg-verify after. Scale: presentation only, one `ai_results` read as today.
+
 ## CURRENT STATE (newest entry 2026-10-14)
 
 ### 2026-10-14: cPanel deploy hardening LIVE as deploy.php 1.2 (2026-10-16), DevOps packets 029 and 030 READY, Python backend ruled retired
