@@ -60,8 +60,10 @@ pay stay with a human.
   adds up. It is the only page that states a rate; a partner's own portal
   shows amounts and dates only. Linked from `affiliates.html` and the partner
   sign-in page. The sample rule is illustration: the live program rule is
-  whatever the admin page says, and today a one-time fee earns the sale rate
-  unless the fee form's commission field is filled.
+  whatever the admin page says: a service fee earns the program's "Custom
+  services percent" (`affiliate_programs.services_commission_bps`, added
+  2026-10-22, null falls back to the sale rate), plan time paid up front
+  earns the sale rate, and a rate typed on the fee wins over both.
 - **Audit.** Every financial or attribution change writes
   `affiliate_audit_log` with the actor. Conversions, commissions, attributions,
   batches and items are never hard-deleted.

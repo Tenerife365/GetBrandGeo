@@ -30,6 +30,7 @@ function publicShape(p) {
     sale_commission_percent: p.sale_commission_type === 'percent' ? Number(p.sale_commission_bps) / 100 : null,
     recurring_percent: Number(p.recurring_commission_bps) > 0 ? Number(p.recurring_commission_bps) / 100 : null,
     recurring_months: p.recurring_months,
+    services_percent: p.services_commission_bps === null || p.services_commission_bps === undefined ? null : Number(p.services_commission_bps) / 100,
     attribution_days: p.attribution_days,
     approval_days: p.approval_days,
     min_payout: centsToMajor(p.min_payout_cents),

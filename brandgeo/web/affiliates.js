@@ -22,9 +22,9 @@
     });
   }
 
-  // Facts the program API does not carry yet, per program slug: a clearer
-  // label for the sale rule and the rate on customized solutions (one-time
-  // work sold outside the plans).
+  // Facts per program slug: a clearer label for the sale rule, and the rate on
+  // customized solutions (one-time work sold outside the plans) used only until
+  // the program API returns services_percent.
   var EXTRAS = { brandgeo: { saleLabel: 'of every platform subscription payment', servicesPercent: 5 } };
 
   function card(p) {
@@ -39,7 +39,8 @@
     if (p.sale_commission_type === 'percent' && p.sale_commission_percent) facts.push('<li><strong>' + esc(p.sale_commission_percent) + '%</strong> ' + esc(extra.saleLabel || 'of every sale') + '</li>');
     if (p.sale_commission_type === 'fixed' && p.sale_commission) facts.push('<li><strong>' + esc(p.currency) + ' ' + esc(p.sale_commission) + '</strong> per sale</li>');
     if (p.recurring_percent) facts.push('<li><strong>' + esc(p.recurring_percent) + '%</strong> of renewals' + (p.recurring_months ? ' for ' + esc(p.recurring_months) + ' months' : ', for as long as the customer stays') + '</li>');
-    if (extra.servicesPercent) facts.push('<li><strong>' + esc(extra.servicesPercent) + '%</strong> once on customized solutions (setup, audits, content work)</li>');
+    var services = p.services_percent !== null && p.services_percent !== undefined ? Number(p.services_percent) : extra.servicesPercent;
+    if (services > 0) facts.push('<li><strong>' + esc(services) + '%</strong> once on customized solutions (setup, audits, content work)</li>');
     facts.push('<li>' + esc(p.attribution_days) + '-day attribution window</li>');
     facts.push('<li>Approved ' + esc(p.approval_days) + ' days after the sale, paid ' + esc((p.payout_schedule || 'monthly').toLowerCase()) + '</li>');
     facts.push('<li>Minimum payout ' + esc(p.currency) + ' ' + esc(p.min_payout) + '</li>');

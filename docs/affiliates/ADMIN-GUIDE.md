@@ -182,10 +182,16 @@ payment. Every change writes an `attribution.billing_set` audit row.
 
 The **One-time fee** button on an attached account is for money outside the plans (a setup, an audit, a
 one-off project). Enter what was sold (the partner sees this line), what the
-customer paid, the date and a reason. It is commissioned once at the
-account's rate (below) or, without one, the affiliate's or program's sale
-rate. To use a different rate for this fee only, fill "Commission % for
-this fee" or "Or a fixed commission" (one of the two). It counts in the
+customer paid, the date, a reason and what kind of fee it is. A **custom
+service** (the default: a setup, an audit, content work) is commissioned
+once at the custom services rate: the account's, else the affiliate's, else
+the program's "Custom services percent" (Programs tab, added 2026-10-22,
+brandgeo is meant to read 5). With no services rate set anywhere it falls
+back to the sale rate, as before. **Plan time paid up front** (a package
+sold by hand instead of a subscription) always earns the payment rate, the
+same as a subscription. To use a different rate for this fee only, fill
+"Commission % for this fee" or "Or a fixed commission" (one of the two);
+that wins over both. It counts in the
 partner's Earned and never in the payment count, the estimate or the
 recurring window. Give it an invoice
 number or reference so it cannot be recorded twice. **If Stripe invoices the
@@ -197,9 +203,10 @@ as an ordinary plan payment.
 **A commission rate per account** (added 2026-10-22). The Commission
 column of Attached accounts shows the rate each account earns its partner,
 tagged "this account" when it has its own. **Set commission** opens the
-rate for that account only: % of each payment (the first payment and
-one-time fees), % of renewals, how many months renewals earn, or a fixed
-amount per sale instead of a percent. An empty field keeps the affiliate's
+rate for that account only: % of each payment (the first plan payment, and
+plan time paid up front), % of renewals, how many months renewals earn, a
+fixed amount per sale instead of a percent, and % of custom services (once,
+on one-time service fees). An empty field keeps the affiliate's
 or the program's value, so for IMoM at 5% you fill 5 and 5 and leave the
 rest empty. A reason is required and every change writes an
 `attribution.commission_set` audit row. "Use the default rate" removes the
@@ -209,7 +216,9 @@ recorded there is commissioned at it. The rate applies to payments
 recorded from then on, including renewals arriving through Stripe;
 commissions already written keep their amount (reject and record again if
 one must change). If the account already paid, changing the renewal months
-recomputes the window from its first payment. Order of precedence: a rate
+recomputes the window from its first payment. An account at 5 and 5 still
+earns the program's services rate on a service fee unless its own "% of
+custom services" is filled. Order of precedence: a rate
 given for one fee, then the account's rate, then the affiliate's custom
 rules in that program, then the program's rules. Every commission stores
 which one applied (`rule_snapshot.custom_source`: `payment`, `account`,

@@ -43,6 +43,8 @@ export interface AffiliateProgram {
   sale_commission_bps: number
   recurring_commission_bps: number
   recurring_months: number | null
+  /** Rate on one-time fees for custom services, basis points, paid once. Null: those fees earn the sale rule. */
+  services_commission_bps: number | null
   attribution_days: number
   attribution_mode: AttributionMode
   approval_days: number
@@ -63,7 +65,7 @@ export interface AffiliateProgram {
 export type ProgramInput = Partial<Pick<AffiliateProgram,
   'slug' | 'name' | 'tagline' | 'description' | 'logo_url' | 'brand_color' | 'destination_url' | 'status' | 'is_public' |
   'currency' | 'lead_commission_cents' | 'sale_commission_type' | 'sale_commission_cents' | 'sale_commission_bps' |
-  'recurring_commission_bps' | 'recurring_months' | 'attribution_days' | 'attribution_mode' | 'approval_days' |
+  'recurring_commission_bps' | 'recurring_months' | 'services_commission_bps' | 'attribution_days' | 'attribution_mode' | 'approval_days' |
   'min_payout_cents' | 'payout_schedule' | 'terms_md' | 'terms_url' | 'terms_version'>>
 
 export interface AffiliateCode {
@@ -88,6 +90,7 @@ export interface CustomRules {
   sale_commission_bps?: number
   recurring_commission_bps?: number
   recurring_months?: number | null
+  services_commission_bps?: number
 }
 
 export interface AdminMembership {
@@ -199,7 +202,7 @@ export interface AdminConversion {
   is_self_referral: boolean
   flags: string[]
   manual_reason: string | null
-  metadata?: { one_time?: boolean; description?: string; note?: string; client_id?: number } | null
+  metadata?: { one_time?: boolean; fee_kind?: 'service' | 'plan'; description?: string; note?: string; client_id?: number } | null
   reversal_reason: string | null
   reversed_at: string | null
   commission: { id: string; status: CommissionStatus; amount: string; currency: string; reconciliation_flag: boolean } | null

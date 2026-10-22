@@ -137,6 +137,7 @@ function addMonths(date, months) {
 const RULE_KEYS = [
   'lead_commission_cents', 'sale_commission_type', 'sale_commission_cents',
   'sale_commission_bps', 'recurring_commission_bps', 'recurring_months',
+  'services_commission_bps',
 ]
 
 /**
@@ -159,6 +160,7 @@ function effectiveRules(program, membership, attribution = null, override = null
   const rules = {}
   let source = null
   for (const k of RULE_KEYS) rules[k] = program[k]
+  if (rules.services_commission_bps === undefined) rules.services_commission_bps = null
   for (const [name, layer] of layers) {
     let used = false
     for (const k of RULE_KEYS) if (has(layer, k)) { rules[k] = layer[k]; used = true }
@@ -179,14 +181,17 @@ function percentOf(amountCents, bps) {
 }
 
 /**
- * computeCommission({ rules, conversionType, amountCents, occurredAt, attribution })
+ * computeCommission({ rules, conversionType, amountCents, occurredAt, attribution, service })
  *   -> { amountCents, snapshot } | { amountCents: 0, snapshot, reason }
  *
  * `attribution` supplies first_sale_at and recurring_until for recurring
- * payments. A zero result is still returned with the reason so the caller can
+ * payments. `service` marks a one-time fee for custom services (setup, audit,
+ * project): it earns services_commission_bps once, unless a rate was given for
+ * that one fee (custom_source 'payment') or no services rate is set anywhere,
+ * in which case the sale rule applies as before. A zero result is still returned with the reason so the caller can
  * record WHY nothing is owed (the audit trail matters more than the amount).
  */
-function computeCommission({ rules, conversionType, amountCents, occurredAt, attribution = null }) {
+function computeCommission({ rules, conversionType, amountCents, occurredAt, attribution = null, service = false }) {
   const amount = parseCents(amountCents) ?? 0
   const snapshot = {
     conversion_type: conversionType,
@@ -205,6 +210,14 @@ function computeCommission({ rules, conversionType, amountCents, occurredAt, att
     return c > 0
       ? { amountCents: c, snapshot: { ...snapshot, rule: 'fixed_per_qualified_lead', lead_commission_cents: c } }
       : { amountCents: 0, snapshot: { ...snapshot, rule: 'fixed_per_qualified_lead', lead_commission_cents: 0 }, reason: 'program_pays_nothing_for_leads' }
+  }
+
+  const serviceBps = rules.services_commission_bps
+  if (conversionType === 'custom' && service && rules.custom_source !== 'payment' && serviceBps !== null && serviceBps !== undefined) {
+    const bps = Number(serviceBps)
+    const c = percentOf(amount, bps)
+    const snap = { ...snapshot, rule: 'percent_of_service', bps, base_amount_cents: amount }
+    return c > 0 ? { amountCents: c, snapshot: snap } : { amountCents: 0, snapshot: snap, reason: amount === 0 ? 'zero_amount' : 'zero_rate' }
   }
 
   if (conversionType === 'sale' || conversionType === 'custom') {
@@ -277,6 +290,9 @@ function summarizeRules(program, membership = null, attribution = null) {
     }
   } else if (r.sale_commission_type === 'fixed' && Number(r.sale_commission_cents) > 0) {
     parts.push(`${formatMoney(r.sale_commission_cents, cur)} per sale`)
+  }
+  if (Number(r.services_commission_bps) > 0) {
+    parts.push(`${(Number(r.services_commission_bps) / 100).toString().replace(/\.0+$/, '')}% once on custom services`)
   }
   if (Number(r.lead_commission_cents) > 0) parts.push(`${formatMoney(r.lead_commission_cents, cur)} per qualified lead`)
   return parts.length ? parts.join(', plus ') : 'Commission set per agreement'
@@ -468,6 +484,14 @@ function validateProgramInput(body, { partial = false } = {}) {
       else out[k] = n
     }
   }
+  if (has('services_commission_bps')) {
+    if (body.services_commission_bps === null || body.services_commission_bps === '') out.services_commission_bps = null
+    else {
+      const n = Number(body.services_commission_bps)
+      if (!isSafeInt(n) || n < 0 || n > 10000) errors.push('services_commission_bps must be empty (use the sale rule) or 0 to 10000')
+      else out.services_commission_bps = n
+    }
+  }
   if (has('recurring_months')) {
     if (body.recurring_months === null || body.recurring_months === '') out.recurring_months = null
     else {
@@ -489,7 +513,7 @@ function validateCustomRules(input) {
       const c = parseCents(input[k]); if (c === null) errors.push(`${k} must be a whole number of cents`); else rules[k] = c
     }
   }
-  for (const k of ['sale_commission_bps', 'recurring_commission_bps']) {
+  for (const k of ['sale_commission_bps', 'recurring_commission_bps', 'services_commission_bps']) {
     if (input[k] !== undefined && input[k] !== null) {
       const n = Number(input[k]); if (!isSafeInt(n) || n < 0 || n > 10000) errors.push(`${k} must be 0 to 10000`); else rules[k] = n
     }
@@ -680,6 +704,11 @@ function validateBilling(body) {
 /** A one-time fee recorded by the admin: commissioned once, never an estimate basis. */
 function isOneTimeFee(conversion) {
   return !!conversion && conversion.conversion_type === 'custom' && !!conversion.metadata && conversion.metadata.one_time === true
+}
+
+/** A one-time fee for custom services (the default kind), as opposed to plan time paid up front. */
+function isServiceFee(conversion) {
+  return isOneTimeFee(conversion) && conversion.metadata.fee_kind !== 'plan'
 }
 
 /**
@@ -878,7 +907,7 @@ module.exports = {
   normalizeCode, isValidCode, isValidSlug, normalizeEmail, isValidEmail, sha256, hashEmail, maskEmail, shortRef,
   randomToken, suggestCode, makeApiKey, hashApiKey, apiKeyPrefix, addDays, addMonths,
   effectiveRules, percentOf, computeCommission, recurringUntil, approveAfter, summarizeRules,
-  PLAN_LIST_PRICE_CENTS, BILLING_INTERVALS, validateBilling, isOneTimeFee, projectReferredAccount,
+  PLAN_LIST_PRICE_CENTS, BILLING_INTERVALS, validateBilling, isOneTimeFee, isServiceFee, projectReferredAccount,
   affiliateBalances, commissionKind,
   decideAttribution, touchIsFresh, isSelfReferral, canTransition, COMMISSION_TRANSITIONS,
   buildRedirectUrl, isSafeDestination,

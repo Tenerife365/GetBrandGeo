@@ -43,8 +43,8 @@ const api = <T,>(body: Record<string, unknown>) => affiliatePost<T>('affiliate-a
 
 /* ── Demo fixtures (vite --mode demo only; never reached in production) ──── */
 const DEMO_PROGRAMS: AffiliateProgram[] = [
-  { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: 'Refer companies that want to know how AI engines describe them.', logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', is_public: true, currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 2000, recurring_commission_bps: 2000, recurring_months: 12, attribution_days: 30, attribution_mode: 'last_touch', approval_days: 30, min_payout_cents: 5000, payout_schedule: 'Monthly, by the 10th', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12', has_api_key: true, api_key_prefix: 'bgaff_brandgeo_3f1c', api_key_created_at: '2026-09-12T08:00:00Z', commission_summary: '20% of every sale, plus 20% of each renewal for 12 months', created_at: '2026-09-12T08:00:00Z', archived_at: null },
-  { id: 'p2', slug: 'talentwelove', name: 'TalentWeLove Recruiting', tagline: 'Recruitment services for tech teams', description: null, logo_url: null, brand_color: '#0ea5e9', destination_url: 'https://talentwelove.com/', status: 'active', is_public: false, currency: 'EUR', lead_commission_cents: 10000, sale_commission_type: 'fixed', sale_commission_cents: 50000, sale_commission_bps: 0, recurring_commission_bps: 0, recurring_months: 0, attribution_days: 60, attribution_mode: 'first_touch', approval_days: 45, min_payout_cents: 10000, payout_schedule: 'Monthly', terms_md: null, terms_url: null, terms_version: '2026-09-12', has_api_key: false, api_key_prefix: null, api_key_created_at: null, commission_summary: 'EUR 100.00 per qualified lead, EUR 500.00 per sale', created_at: '2026-09-12T08:00:00Z', archived_at: null },
+  { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: 'Refer companies that want to know how AI engines describe them.', logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', is_public: true, currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 2000, recurring_commission_bps: 2000, recurring_months: 12, services_commission_bps: 500, attribution_days: 30, attribution_mode: 'last_touch', approval_days: 30, min_payout_cents: 5000, payout_schedule: 'Monthly, by the 10th', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12', has_api_key: true, api_key_prefix: 'bgaff_brandgeo_3f1c', api_key_created_at: '2026-09-12T08:00:00Z', commission_summary: '20% of every payment for the first 12 months, plus 5% once on custom services', created_at: '2026-09-12T08:00:00Z', archived_at: null },
+  { id: 'p2', slug: 'talentwelove', name: 'TalentWeLove Recruiting', tagline: 'Recruitment services for tech teams', description: null, logo_url: null, brand_color: '#0ea5e9', destination_url: 'https://talentwelove.com/', status: 'active', is_public: false, currency: 'EUR', lead_commission_cents: 10000, sale_commission_type: 'fixed', sale_commission_cents: 50000, sale_commission_bps: 0, recurring_commission_bps: 0, recurring_months: 0, services_commission_bps: null, attribution_days: 60, attribution_mode: 'first_touch', approval_days: 45, min_payout_cents: 10000, payout_schedule: 'Monthly', terms_md: null, terms_url: null, terms_version: '2026-09-12', has_api_key: false, api_key_prefix: null, api_key_created_at: null, commission_summary: 'EUR 100.00 per qualified lead, EUR 500.00 per sale', created_at: '2026-09-12T08:00:00Z', archived_at: null },
 ]
 const DEMO_AFFILIATES: AdminAffiliate[] = [
   { id: 'a1', email: 'demo.affiliate@example.com', full_name: 'Demo Affiliate', company: 'Demo Studio', website: 'https://example.com', social_url: null, country: 'ES', promo_method: 'Newsletter and LinkedIn', status: 'active', payout_method: 'wise', payout_details: { account_holder: 'Demo Affiliate', email: 'demo.affiliate@example.com' }, terms_accepted_at: '2026-09-01T10:00:00Z', terms_version: '2026-09-12', invited_at: '2026-08-30T10:00:00Z', invite_expires_at: null, suspended_at: null, suspended_reason: null, notes: null, user_id: 'u1', has_login: true, invite_pending: false, created_at: '2026-08-30T10:00:00Z', totals: { EUR: { pending: '59.80', approved: '119.60', payable: '0.00', paid: '59.80' } }, memberships: [
@@ -230,7 +230,7 @@ export default function AffiliatesAdmin() {
 /* ── Programs ───────────────────────────────────────────────────────────── */
 const EMPTY_PROGRAM: ProgramInput = {
   slug: '', name: '', tagline: '', description: '', logo_url: '', brand_color: '#8b5cf6', destination_url: 'https://', status: 'draft', is_public: false,
-  currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 2000, recurring_commission_bps: 0, recurring_months: null,
+  currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 2000, recurring_commission_bps: 0, recurring_months: null, services_commission_bps: null,
   attribution_days: 30, attribution_mode: 'last_touch', approval_days: 30, min_payout_cents: 5000, payout_schedule: 'Monthly', terms_md: '', terms_url: '', terms_version: '',
 }
 
@@ -276,6 +276,7 @@ function ProgramForm({ initial, onSave, onCancel, busy, error }: { initial: Prog
         {p.sale_commission_type === 'percent' && <Field label="Percent of sale" hint="e.g. 20 = 20%"><input className={ic} inputMode="decimal" value={((p.sale_commission_bps || 0) / 100).toString()} onChange={(e) => set('sale_commission_bps', Math.round(Number(e.target.value) * 100) || 0)} /></Field>}
         <Field label="Recurring percent" hint="Of each renewal, 0 for one-time only"><input className={ic} inputMode="decimal" value={((p.recurring_commission_bps || 0) / 100).toString()} onChange={(e) => set('recurring_commission_bps', Math.round(Number(e.target.value) * 100) || 0)} /></Field>
         <Field label="Recurring months" hint="Empty = unlimited, 0 = none"><input className={ic} inputMode="numeric" value={p.recurring_months === null || p.recurring_months === undefined ? '' : String(p.recurring_months)} onChange={(e) => set('recurring_months', e.target.value === '' ? null : Number(e.target.value))} /></Field>
+        <Field label="Custom services percent" hint="Once, on one-time fees (setup, audit, project). Empty = the sale rule"><input className={ic} inputMode="decimal" value={p.services_commission_bps === null || p.services_commission_bps === undefined ? '' : (p.services_commission_bps / 100).toString()} onChange={(e) => set('services_commission_bps', e.target.value.trim() === '' ? null : Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0)} placeholder="sale rule" /></Field>
       </div>
       <div className="grid sm:grid-cols-4 gap-3">
         <Field label="Attribution days"><input className={ic} inputMode="numeric" value={String(p.attribution_days ?? 30)} onChange={(e) => set('attribution_days', Number(e.target.value) || 0)} /></Field>
@@ -926,8 +927,8 @@ function billingLabel(b: AttachmentBilling | null | undefined, currency: string)
 }
 
 /* ── The commission rate of one attached account ────────────────────────── */
-type CommissionDraft = { pct: string; rec: string; months: string; fixed: string }
-const EMPTY_COMMISSION: CommissionDraft = { pct: '', rec: '', months: '', fixed: '' }
+type CommissionDraft = { pct: string; rec: string; months: string; fixed: string; svc: string }
+const EMPTY_COMMISSION: CommissionDraft = { pct: '', rec: '', months: '', fixed: '', svc: '' }
 function commissionDraftOf(r: CustomRules | null | undefined): CommissionDraft {
   if (!r) return EMPTY_COMMISSION
   const pct = (bps: number | undefined) => (bps === undefined || bps === null ? '' : String(bps / 100))
@@ -936,6 +937,7 @@ function commissionDraftOf(r: CustomRules | null | undefined): CommissionDraft {
     rec: pct(r.recurring_commission_bps),
     months: r.recurring_months === undefined || r.recurring_months === null ? '' : String(r.recurring_months),
     fixed: r.sale_commission_type === 'fixed' && r.sale_commission_cents !== undefined ? centsToInput(r.sale_commission_cents) : '',
+    svc: pct(r.services_commission_bps),
   }
 }
 /** The partial rules to store; empty fields fall back to the membership and program rate. A string is an input error. */
@@ -950,6 +952,7 @@ function commissionPayload(d: CommissionDraft): CustomRules | null | string {
   if (d.pct.trim()) { const b = percent(d.pct, '% of each payment'); if (typeof b === 'string') return b; rules.sale_commission_type = 'percent'; rules.sale_commission_bps = b }
   if (d.fixed.trim()) { rules.sale_commission_type = 'fixed'; rules.sale_commission_cents = inputToCents(d.fixed) }
   if (d.rec.trim()) { const b = percent(d.rec, '% of renewals'); if (typeof b === 'string') return b; rules.recurring_commission_bps = b }
+  if (d.svc.trim()) { const b = percent(d.svc, '% of custom services'); if (typeof b === 'string') return b; rules.services_commission_bps = b }
   if (d.months.trim()) {
     const m = Number(d.months.trim())
     if (!Number.isInteger(m) || m < 0 || m > 120) return 'Renewal months must be a whole number from 0 to 120.'
@@ -960,11 +963,12 @@ function commissionPayload(d: CommissionDraft): CustomRules | null | string {
 
 function CommissionFields({ value, onChange, currency }: { value: CommissionDraft; onChange: (d: CommissionDraft) => void; currency: string }) {
   return (
-    <div className="grid sm:grid-cols-4 gap-3">
-      <Field label="% of each payment" hint="First payment and one-time fees"><input className={ic} inputMode="decimal" value={value.pct} onChange={(e) => onChange({ ...value, pct: e.target.value })} placeholder="default" /></Field>
+    <div className="grid sm:grid-cols-3 gap-3">
+      <Field label="% of each payment" hint="First plan payment"><input className={ic} inputMode="decimal" value={value.pct} onChange={(e) => onChange({ ...value, pct: e.target.value })} placeholder="default" /></Field>
       <Field label="% of renewals"><input className={ic} inputMode="decimal" value={value.rec} onChange={(e) => onChange({ ...value, rec: e.target.value })} placeholder="default" /></Field>
       <Field label="Renewal months" hint="0 for none"><input className={ic} inputMode="numeric" value={value.months} onChange={(e) => onChange({ ...value, months: e.target.value })} placeholder="default" /></Field>
       <Field label={`Or fixed per sale (${currency})`}><input className={ic} inputMode="decimal" value={value.fixed} onChange={(e) => onChange({ ...value, fixed: e.target.value })} placeholder="default" /></Field>
+      <Field label="% of custom services" hint="Once, on one-time fees"><input className={ic} inputMode="decimal" value={value.svc} onChange={(e) => onChange({ ...value, svc: e.target.value })} placeholder="default" /></Field>
     </div>
   )
 }
@@ -1005,7 +1009,7 @@ function AttachedAccountsSection({ programs, reloadKey, onDone }: { programs: Af
   return (
     <section className="space-y-3">
       <SectionHeading>Attached accounts</SectionHeading>
-      <p className="text-xs text-slate-400">The price each account really pays drives the estimate its partner sees. Set it for every account you attached by hand; until then the partner sees "not set yet". The commission column is the rate this account earns: its own rate when you set one, otherwise the affiliate's or the program's. Fees outside the plans (a setup, an audit, a one-off project) are commissioned once at the payment rate, or at a rate you give for that fee, and never count toward the estimate. Partners see amounts and dates, never the rate. A price is only what the account pays: no commission exists until its payment is recorded, either through Stripe or with "Record payment".</p>
+      <p className="text-xs text-slate-400">The price each account really pays drives the estimate its partner sees. Set it for every account you attached by hand; until then the partner sees "not set yet". The commission column is the rate this account earns: its own rate when you set one, otherwise the affiliate's or the program's. Fees outside the plans (a setup, an audit, a one-off project) are commissioned once at the custom services rate (the payment rate when none is set), or at a rate you give for that fee, and never count toward the estimate. Partners see amounts and dates, never the rate. A price is only what the account pays: no commission exists until its payment is recorded, either through Stripe or with "Record payment".</p>
       <div className={`${card} overflow-x-auto`}>
         <table className="min-w-full">
           <thead><tr><th className={th}>Account</th><th className={th}>Affiliate</th><th className={th}>Price it pays</th><th className={th}>Payments recorded</th><th className={th}>Commission</th><th className={th}></th></tr></thead>
@@ -1111,7 +1115,7 @@ function SetCommissionModal({ row, currency, onClose, onDone }: { row: AttachedR
 type FeePrefill = { description: string; amount: string }
 
 function RecordFeeModal({ row, currency, prefill, onClose, onDone }: { row: AttachedRow; currency: string; prefill?: FeePrefill; onClose: () => void; onDone: (m: string) => void }) {
-  const [f, setF] = useState({ description: prefill?.description || '', amount: prefill?.amount || '', occurred_at: '', stripe_invoice_id: '', reference: '', note: '', reason: '', commission_percent: '', commission_amount: '' })
+  const [f, setF] = useState({ description: prefill?.description || '', amount: prefill?.amount || '', occurred_at: '', stripe_invoice_id: '', reference: '', note: '', reason: '', commission_percent: '', commission_amount: '', fee_kind: 'service' as 'service' | 'plan' })
   const { busy, error, run } = useAsync()
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -1119,7 +1123,7 @@ function RecordFeeModal({ row, currency, prefill, onClose, onDone }: { row: Atta
     const res = await run(() => api<{ duplicate: boolean; fee_amount: string | null; commission_amount: string | null; commission: { currency: string } | null }>({
       action: 'accounts.record_fee', attribution_id: row.attachment.attribution_id, description: f.description, amount: f.amount, reason: f.reason,
       occurred_at: f.occurred_at || undefined, stripe_invoice_id: f.stripe_invoice_id || undefined, reference: f.reference || undefined, note: f.note || undefined,
-      commission_percent: f.commission_percent.trim() || undefined, commission_amount: f.commission_amount.trim() || undefined,
+      commission_percent: f.commission_percent.trim() || undefined, commission_amount: f.commission_amount.trim() || undefined, fee_kind: f.fee_kind,
     }))
     if (!res) return
     if (res.duplicate) { onDone('That fee was already recorded; nothing was added.'); return }
@@ -1129,7 +1133,7 @@ function RecordFeeModal({ row, currency, prefill, onClose, onDone }: { row: Atta
     <Modal title={`${prefill ? 'Record payment' : 'One-time fee'} for ${row.account.name}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         {prefill && <p className="text-xs text-amber-300">Prefilled from the price you set. Check the amount and set "Paid at" to the day the money arrived.</p>}
-        <p className="text-xs text-slate-400">A fee outside the plans that this account paid. {row.attachment.affiliate_name || 'The partner'} earns the account's payment rate on it once ({row.attachment.commission?.summary || 'the program rate'}), or the rate you give below for this fee only. It never starts or extends the recurring window and never counts toward the estimate. If it was paid by a Stripe invoice, record it here with the invoice id before the invoice is paid, so the webhook cannot count it again as a plan payment.</p>
+        <p className="text-xs text-slate-400">A fee outside the plans that this account paid. {row.attachment.affiliate_name || 'The partner'} earns on it once: the rate you give below for this fee only, else the custom services rate for a service, else the account's payment rate ({row.attachment.commission?.summary || 'the program rate'}). Plan time paid up front always earns the payment rate. It never starts or extends the recurring window and never counts toward the estimate. If it was paid by a Stripe invoice, record it here with the invoice id before the invoice is paid, so the webhook cannot count it again as a plan payment.</p>
         <Field label="What was sold" hint="Shown to the partner"><input className={ic} required value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} maxLength={200} placeholder="e.g. Website GEO audit and setup" /></Field>
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label={`Amount paid (${currency})`} hint="What the customer paid, not the commission"><input className={ic} inputMode="decimal" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="0.00" /></Field>
@@ -1137,8 +1141,14 @@ function RecordFeeModal({ row, currency, prefill, onClose, onDone }: { row: Atta
           <Field label="Stripe invoice id (optional)" hint="in_... when Stripe invoiced it"><input className={ic} value={f.stripe_invoice_id} onChange={(e) => setF({ ...f, stripe_invoice_id: e.target.value.trim() })} maxLength={80} placeholder="in_" /></Field>
           <Field label="Invoice number or reference (optional)" hint="Prevents recording the same fee twice"><input className={ic} value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} maxLength={120} /></Field>
         </div>
+        <Field label="What kind of fee">
+          <select className={ic} value={f.fee_kind} onChange={(e) => setF({ ...f, fee_kind: e.target.value === 'plan' ? 'plan' : 'service' })}>
+            <option value="service">Custom service: setup, audit, content work (services rate)</option>
+            <option value="plan">Plan time paid up front (payment rate)</option>
+          </select>
+        </Field>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Commission % for this fee (optional)" hint="Empty: the account's rate"><input className={ic} inputMode="decimal" value={f.commission_percent} disabled={!!f.commission_amount} onChange={(e) => setF({ ...f, commission_percent: e.target.value })} placeholder="e.g. 5" /></Field>
+          <Field label="Commission % for this fee (optional)" hint="Empty: the rate for this kind of fee"><input className={ic} inputMode="decimal" value={f.commission_percent} disabled={!!f.commission_amount} onChange={(e) => setF({ ...f, commission_percent: e.target.value })} placeholder="e.g. 5" /></Field>
           <Field label={`Or a fixed commission (${currency})`} hint="Instead of a percent"><input className={ic} inputMode="decimal" value={f.commission_amount} disabled={!!f.commission_percent} onChange={(e) => setF({ ...f, commission_amount: e.target.value })} placeholder="0.00" /></Field>
         </div>
         <Field label="Internal note (optional)"><input className={ic} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} maxLength={1000} /></Field>

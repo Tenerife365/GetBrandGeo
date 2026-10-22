@@ -401,7 +401,7 @@ async function recordConversion(supabase, { program, input, actor = { type: 'sys
   const blocked = flags.find((f) => f === 'membership_not_active' || f === 'program_not_active' || f === 'affiliate_not_active')
   const calc = blocked
     ? { amountCents: 0, snapshot: { rule: 'blocked' }, reason: blocked }
-    : core.computeCommission({ rules, conversionType: input.conversion_type, amountCents: input.amount_cents || 0, occurredAt, attribution })
+    : core.computeCommission({ rules, conversionType: input.conversion_type, amountCents: input.amount_cents || 0, occurredAt, attribution, service: core.isServiceFee({ conversion_type: input.conversion_type, metadata: input.metadata }) })
 
   if (calc.amountCents > 0 && (input.status || 'confirmed') === 'confirmed') {
     const commRow = {

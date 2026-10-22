@@ -22,6 +22,31 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
+### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED, migration NOT applied, NOT pushed
+
+Constantin's go: "build the 5% services rate". Closes the gap recorded in
+the fifth entry below. New nullable `services_commission_bps` on
+`affiliate_programs` (CHECK 0 to 10000), migration
+`db/supabase-affiliate-services-rate-2026-10-22.sql`, additive, null keeps
+today's behaviour, no amount changes. The same key works in membership and
+account `custom_rules` (jsonb). A one-time fee now carries
+`metadata.fee_kind` (`service`, the default, or `plan` for plan time paid
+up front). Order for a service fee: a rate typed on that fee, else the
+services rate (account, membership, program, last wins), else the sale rule;
+a `plan` fee always takes the sale rule. Snapshot rule
+`percent_of_service`. `summarizeRules` adds "N% once on custom services";
+`affiliate-programs-public` returns `services_percent`, and
+`affiliates.js` prefers it over its hard-coded 5 (kept as the fallback while
+the API says null). Admin: "Custom services percent" on the program form,
+"% of custom services" in Set commission and the attach dialog, a "What
+kind of fee" select on the fee form. Checks 49 core and 67 flow (167 in
+five files), build exit 0, added lines dash-free (control fired). Existing
+commissions untouched (client 52's EUR 100 stays). **Order, not
+negotiable:** apply the migration (Constantin's go), THEN push, because the
+program form sends the new key and an update would fail on a missing
+column. Then Constantin sets 5 in "Custom services percent" on brandgeo,
+and `affiliate-programs-public` should read `services_percent: 5`.
+
 ### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, PUSHED and LIVE (9a208ee)
 
 Constantin's ask: "a demo account for users to understand how it works, 10%
@@ -39,7 +64,7 @@ partner" in the header, a "Want your own?" card at the end. Linked from
 `affiliates.html` (what you get, and the FAQ "Where do I see my numbers?")
 and from `AffiliateLogin.tsx`. Build exit 0, 43 core and 66 flow checks
 green, added lines dash-free (positive control fired), phone width 375 has no
-horizontal scroll. **Gap, recorded not fixed:** the program has no "custom
+horizontal scroll. **Gap, recorded not fixed (CLOSED by the sixth entry above):** the program has no "custom
 services" rate; a one-time fee earns the sale rule (10%) unless the fee
 form's percent field is filled, so 5% is typed per fee today. Making it the
 program default, and saying so on the public page, waits on Constantin.

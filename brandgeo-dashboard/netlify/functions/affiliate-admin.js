@@ -774,7 +774,9 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
     if (action === 'accounts.record_fee') {
       // A fee outside the plans (a setup, an audit, a one-off project) paid by
       // an attached account. Recorded as a custom conversion flagged one_time:
-      // the sale rule commissions it once, it never opens or extends the
+      // commissioned once, at the rate given for this fee, else the services
+      // rate (fee_kind 'service', the default), else the sale rule. A fee of
+      // kind 'plan' (plan time paid up front) always takes the sale rule; it never opens or extends the
       // recurring window, and the affiliate's estimate never counts it again.
       const { data: att, error } = await db.from('affiliate_attributions').select('*').eq('id', String(body.attribution_id || '')).maybeSingle()
       if (error) throw error
@@ -792,12 +794,14 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
       const reference = core.str(body.reference, 120)
       const override = feeRateOverride(body)
       if (override.error) return json(400, { error: override.error })
+      const feeKind = body.fee_kind === undefined || body.fee_kind === null || body.fee_kind === '' ? 'service' : body.fee_kind
+      if (!['service', 'plan'].includes(feeKind)) return json(400, { error: 'fee_kind must be service or plan.' })
       const clientId = clientIdOf(att)
       const { errors, row } = core.validateConversionInput({
         idempotency_key: stripeInvoiceId ? `stripe_invoice:${stripeInvoiceId}` : `manual:${program.slug}:${att.external_customer_id}:fee:${reference || core.randomToken(8)}`,
         conversion_type: 'custom', external_id: stripeInvoiceId || reference || undefined, external_customer_id: att.external_customer_id,
         amount: body.amount, amount_cents: body.amount_cents, currency: body.currency || program.currency, occurred_at: body.occurred_at,
-        metadata: { one_time: true, description, note: core.str(body.note, 1000) || undefined, client_id: clientId || undefined, rate_override: override.rules || undefined },
+        metadata: { one_time: true, fee_kind: feeKind, description, note: core.str(body.note, 1000) || undefined, client_id: clientId || undefined, rate_override: override.rules || undefined },
       })
       if (errors.length) return json(400, { error: errors[0], errors })
       if (!row.amount_cents) return json(400, { error: 'The fee amount must be above zero.' })
