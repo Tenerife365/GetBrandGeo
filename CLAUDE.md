@@ -22,15 +22,27 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, COMMITTED, migration NOT APPLIED, NOT pushed
+### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, migration APPLIED, PUSHED and LIVE (c8e0e9e)
 
 Constantin's ask: custom commission per account (IMoM, client 54, at 5%
 against the program's 10%), partners see only values (commission, total to
 receive, when each amount becomes available), and a way to pay them and
 record it in accounting. New nullable `custom_rules jsonb` on
 `affiliate_attributions`, migration
-`db/supabase-affiliate-account-commission-2026-10-22.sql`, **NOT applied:
-apply it BEFORE pushing**, the admin list and the portal read the column.
+`db/supabase-affiliate-account-commission-2026-10-22.sql`, APPLIED on
+Constantin's go as migration `affiliate_attribution_custom_rules_2026_10_22`
+before the push and read back (column nullable jsonb, object-or-null CHECK,
+RLS on, the same 3 admin policies, the one existing row untouched).
+`c8e0e9e` pushed with `BATCH_PUSH=1`, deploy ready 06:56:00Z, live bundle
+`index-bL333ijD.js` carries "Set commission", "Total to receive" and "Use
+the default rate". Owed, Constantin's, in the admin UI: Doctor Mihail
+(client 52, paid EUR 1,000 on 2026-09-15) gets a One-time fee at the program
+rate (EUR 100 to Adrian), then "Set price" to "Pays nothing" so the estimate
+stops counting a second EUR 1,000; IMoM (client 54, paid 2026-10-07) is
+attached to Adrian at 5 and 5 with Renewal months 2 (payments on Oct 7, Nov
+7 and Dec 7 commissioned), its October payment recorded in the attach
+dialog, the November and December ones through "Record manually" with type
+recurring and customer id `client:54`.
 Rule layers, last wins: program, membership `custom_rules`, attribution
 `custom_rules`, a rate given for one fee; the snapshot records
 `custom_source`. Admin: Commission column and "Set commission" on Attached
