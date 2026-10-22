@@ -43,6 +43,15 @@ horizontal scroll. **Gap, recorded not fixed:** the program has no "custom
 services" rate; a one-time fee earns the sale rule (10%) unless the fee
 form's percent field is filled, so 5% is typed per fee today. Making it the
 program default, and saying so on the public page, waits on Constantin.
+**Public page, later the same day, on Constantin's word ("mention the 5% on
+customized solutions and 10% of Subscriptions"):** `affiliates.html` now
+states 10% of platform subscription payments (renewals for 12 months) and 5%
+once on customized solutions, in the program card, "How commission is
+calculated" and a new FAQ entry; `affiliates.js` carries the same two facts
+for slug `brandgeo` in an `EXTRAS` map, because the program API has no
+services rate. The program itself is unchanged: until a services rate is
+built, the admin types 5 in the fee form's percent field on every one-time
+fee, or the fee pays 10%.
 Live check 2026-10-22: `origin/main` is `9a208ee`, `/affiliate/demo` answers
 200, the live bundle `index-FhwEajL4.js` carries "Sample partner dashboard",
 "How commissions work in this sample", "Want your own?" and "see a sample

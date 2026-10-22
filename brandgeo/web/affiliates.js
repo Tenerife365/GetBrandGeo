@@ -22,7 +22,13 @@
     });
   }
 
+  // Facts the program API does not carry yet, per program slug: a clearer
+  // label for the sale rule and the rate on customized solutions (one-time
+  // work sold outside the plans).
+  var EXTRAS = { brandgeo: { saleLabel: 'of every platform subscription payment', servicesPercent: 5 } };
+
   function card(p) {
+    var extra = EXTRAS[p.slug] || {};
     var initial = esc((p.name || '?').charAt(0));
     var color = /^#[0-9a-fA-F]{3,8}$/.test(p.brand_color || '') ? p.brand_color : '#8b5cf6';
     var logo = p.logo_url && /^https:\/\//.test(p.logo_url)
@@ -30,9 +36,10 @@
       : '<span class="pc-mark" style="background:' + color + '">' + initial + '</span>';
     var facts = [];
     if (p.lead_commission && Number(p.lead_commission) > 0) facts.push('<li><strong>' + esc(p.currency) + ' ' + esc(p.lead_commission) + '</strong> per qualified lead</li>');
-    if (p.sale_commission_type === 'percent' && p.sale_commission_percent) facts.push('<li><strong>' + esc(p.sale_commission_percent) + '%</strong> of every sale</li>');
+    if (p.sale_commission_type === 'percent' && p.sale_commission_percent) facts.push('<li><strong>' + esc(p.sale_commission_percent) + '%</strong> ' + esc(extra.saleLabel || 'of every sale') + '</li>');
     if (p.sale_commission_type === 'fixed' && p.sale_commission) facts.push('<li><strong>' + esc(p.currency) + ' ' + esc(p.sale_commission) + '</strong> per sale</li>');
     if (p.recurring_percent) facts.push('<li><strong>' + esc(p.recurring_percent) + '%</strong> of renewals' + (p.recurring_months ? ' for ' + esc(p.recurring_months) + ' months' : ', for as long as the customer stays') + '</li>');
+    if (extra.servicesPercent) facts.push('<li><strong>' + esc(extra.servicesPercent) + '%</strong> once on customized solutions (setup, audits, content work)</li>');
     facts.push('<li>' + esc(p.attribution_days) + '-day attribution window</li>');
     facts.push('<li>Approved ' + esc(p.approval_days) + ' days after the sale, paid ' + esc((p.payout_schedule || 'monthly').toLowerCase()) + '</li>');
     facts.push('<li>Minimum payout ' + esc(p.currency) + ' ' + esc(p.min_payout) + '</li>');
