@@ -144,6 +144,10 @@ IMoM (client 54) read the same day is still on the defaults: no
 `custom_rules`, so its October EUR 499 sale carries EUR 49.90 pending at
 10% (approves 2026-11-06) and its renewal window runs to 2027-10-07, not
 two months. "Set commission" fixes both once the amount is confirmed.
+**Ruled 2026-10-22, Constantin: "for now the data is correct as it is".**
+IMoM stays on the program defaults (10% on the October sale, renewals for
+12 months); no "Set commission" is owed. Do not re-raise the 5% and two
+month idea unless he brings it back.
 
 ### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, migration APPLIED, PUSHED and LIVE (c8e0e9e)
 
