@@ -50,6 +50,14 @@ Live check 2026-10-22: `origin/main` is `8ca4b35`, the live bundle
 `index-CvmbG8oy.js` carries "View as partner", "At a glance", "Back to
 BrandGEO" and "Payments recorded", and an unauthenticated POST to
 `affiliate-admin` answers 401.
+Client 52 payment DONE 2026-10-22, recorded by Constantin in the UI and read
+back: one `custom` conversion with `metadata.one_time`, EUR 1,000,
+occurred 2026-09-15, and Adrian's commission EUR 100 at the program's 10%,
+already `approved` (its 30 days ended 2026-10-15), not yet in a payout.
+IMoM (client 54) read the same day is still on the defaults: no
+`custom_rules`, so its October EUR 499 sale carries EUR 49.90 pending at
+10% (approves 2026-11-06) and its renewal window runs to 2027-10-07, not
+two months. "Set commission" fixes both once the amount is confirmed.
 
 ### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, migration APPLIED, PUSHED and LIVE (c8e0e9e)
 
