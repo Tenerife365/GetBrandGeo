@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED, migration NOT applied, NOT pushed
+### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED (2464c16), migration APPLIED 2026-10-22, NOT pushed
 
 Constantin's go: "build the 5% services rate". Closes the gap recorded in
 the fifth entry below. New nullable `services_commission_bps` on
@@ -46,6 +46,12 @@ negotiable:** apply the migration (Constantin's go), THEN push, because the
 program form sends the new key and an update would fail on a missing
 column. Then Constantin sets 5 in "Custom services percent" on brandgeo,
 and `affiliate-programs-public` should read `services_percent: 5`.
+Migration APPLIED on Constantin's go as
+`affiliate_program_services_rate_2026_10_22` and read back: column integer,
+nullable, no default; the CHECK reads null or 0 to 10000; RLS on, the same 4
+policies (admin insert, select, update, member select); both programs
+(`brandgeo`, `talentwelove`) read null, so no amount changed. Owed, in
+order: push, then 5 in "Custom services percent" on brandgeo.
 
 ### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, PUSHED and LIVE (9a208ee)
 
