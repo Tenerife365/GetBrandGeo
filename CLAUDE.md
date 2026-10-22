@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED (2464c16), migration APPLIED 2026-10-22, NOT pushed
+### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED (2464c16), migration APPLIED, PUSHED and LIVE (ff51a56)
 
 Constantin's go: "build the 5% services rate". Closes the gap recorded in
 the fifth entry below. New nullable `services_commission_bps` on
@@ -52,6 +52,13 @@ nullable, no default; the CHECK reads null or 0 to 10000; RLS on, the same 4
 policies (admin insert, select, update, member select); both programs
 (`brandgeo`, `talentwelove`) read null, so no amount changed. Owed, in
 order: push, then 5 in "Custom services percent" on brandgeo.
+Live check 2026-10-22 09:00Z: `origin/main` is `ff51a56`, the live bundle
+`index-DKZ_HfzB.js` carries "Custom services percent", "What kind of fee"
+and "Plan time paid up front", `affiliate-admin` answers 401 unauthenticated,
+`affiliate-programs-public` returns the `services_percent` key (null until
+the admin sets it), and getbrandgeo.com `deploy-status.json` reads sha
+`ff51a56`, expected 1, deployed 1, failed empty, rollback false. Still owed,
+Constantin's, in the admin UI: 5 in "Custom services percent" on brandgeo.
 
 ### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, PUSHED and LIVE (9a208ee)
 
