@@ -199,6 +199,7 @@ export interface AdminConversion {
   is_self_referral: boolean
   flags: string[]
   manual_reason: string | null
+  metadata?: { one_time?: boolean; description?: string; note?: string; client_id?: number } | null
   reversal_reason: string | null
   reversed_at: string | null
   commission: { id: string; status: CommissionStatus; amount: string; currency: string; reconciliation_flag: boolean } | null
@@ -359,6 +360,9 @@ export interface PortalConversion {
   occurred_at: string
   program_id: string
   membership_id: string
+  /** A one-time fee outside the plans, with the description the admin wrote. */
+  one_time_fee?: boolean
+  description?: string | null
 }
 
 export interface PortalCommission {
@@ -407,6 +411,10 @@ export interface PortalAffiliate {
 
 export type ReferredAccountStatus =
   | 'not_paying_yet' | 'paying' | 'one_time' | 'window_ended' | 'cancelled' | 'complimentary' | 'not_eligible'
+  | 'prepaid' | 'no_further_payments'
+
+/** How the price behind an estimate is billed: month, year, once (a prepaid package) or none. */
+export type BillingInterval = 'month' | 'year' | 'once' | 'none'
 
 /** One account attributed to the affiliate, with what it has earned and an estimate of what is still to come. No client or Stripe id. */
 export interface PortalReferredAccount {
@@ -428,7 +436,13 @@ export interface PortalReferredAccount {
   estimate: string | null
   estimate_cents: number | null
   monthly_basis: string | null
-  estimate_basis: 'list_price' | 'last_payment' | null
+  /** set_price: the admin set the real price; price_not_set: attached by hand, no price yet, so no estimate. */
+  estimate_basis: 'set_price' | 'list_price' | 'last_payment' | 'price_not_set' | null
+  basis?: string | null
+  basis_interval?: BillingInterval | null
+  prepaid_until?: string | null
+  fees_count?: number
+  fees_total?: string
 }
 
 export interface PortalMe {
@@ -460,6 +474,16 @@ export interface AdminAccountAttachment {
   source: AttributionSource
   stripe_customer_id: string | null
   converted_at: string | null
+  billing?: AttachmentBilling | null
+}
+
+/** The price an attached account really pays, set by the admin. Feeds the partner's estimate only. */
+export interface AttachmentBilling {
+  interval: BillingInterval
+  amount: string
+  amount_cents: number
+  paid_until: string | null
+  note: string | null
 }
 
 /** A client account as the admin's attach picker sees it (custom or hand-assigned plans included). */

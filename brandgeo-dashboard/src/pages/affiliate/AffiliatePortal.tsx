@@ -9,7 +9,8 @@
  *
  * #referred lists every account attributed to the affiliate, paying or not,
  * with what it has earned and an estimate of what is still to come. The
- * estimate is computed server side (core.projectReferredAccount) at the plan's
+ * estimate is computed server side (core.projectReferredAccount) from the price
+ * the admin set for the account (else, for self-serve accounts, the plan's
  * list price, monthly billing, inside the program's recurring window.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -57,6 +58,7 @@ const DEMO_ME: PortalMe = {
   conversions: [
     { id: 'c1', conversion_type: 'sale', status: 'confirmed', source: 'link', customer_ref: 'a***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-09-10T09:12:00Z', program_id: 'p1', membership_id: 'm1' },
     { id: 'c2', conversion_type: 'lead', status: 'confirmed', source: 'link', customer_ref: 'm***@example.com', amount: '0.00', currency: 'EUR', occurred_at: '2026-09-09T16:40:00Z', program_id: 'p1', membership_id: 'm1' },
+    { id: 'c4', conversion_type: 'custom', status: 'confirmed', source: 'manual', customer_ref: 'Northwind Bakery', amount: '800.00', currency: 'EUR', occurred_at: '2026-10-05T09:00:00Z', program_id: 'p1', membership_id: 'm1', one_time_fee: true, description: 'Website GEO audit and setup' },
     { id: 'c3', conversion_type: 'sale', status: 'refunded', source: 'coupon', customer_ref: 'k***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-08-20T11:00:00Z', program_id: 'p1', membership_id: 'm1' },
   ],
   commissions: [
@@ -67,8 +69,8 @@ const DEMO_ME: PortalMe = {
   payouts: [{ id: 'b1', status: 'paid', currency: 'EUR', total: '29.90', item_count: 1, payout_method: 'wise', external_reference: 'WISE-48812', created_at: '2026-08-09T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', documents: [] }],
   payout_detail_fields: DEFAULT_FIELDS,
   referred_accounts: [
-    { id: 'r1', program_id: 'p1', customer_ref: 'Northwind Bakery', source: 'manual', referred_at: '2026-08-01T10:00:00Z', plan: 'growth', status: 'paying', currency: 'EUR', payments_count: 3, last_payment_at: '2026-10-05T10:00:00Z', first_sale_at: '2026-08-05T10:00:00Z', window_ends_at: '2027-08-05T10:00:00Z', payments_left: 9, earned: '89.70', paid: '29.90', estimate: '269.10', estimate_cents: 26910, monthly_basis: '299.00', estimate_basis: 'list_price' },
-    { id: 'r2', program_id: 'p1', customer_ref: 'Blue Harbor Dental', source: 'manual', referred_at: '2026-10-12T10:00:00Z', plan: 'essentials', status: 'not_paying_yet', currency: 'EUR', payments_count: 0, last_payment_at: null, first_sale_at: null, window_ends_at: null, payments_left: 12, earned: '0.00', paid: '0.00', estimate: '118.80', estimate_cents: 11880, monthly_basis: '99.00', estimate_basis: 'list_price' },
+    { id: 'r1', program_id: 'p1', customer_ref: 'Northwind Bakery', source: 'manual', referred_at: '2026-08-01T10:00:00Z', plan: 'growth', status: 'paying', currency: 'EUR', payments_count: 3, last_payment_at: '2026-10-05T10:00:00Z', first_sale_at: '2026-08-05T10:00:00Z', window_ends_at: '2027-08-05T10:00:00Z', payments_left: 9, earned: '169.70', paid: '29.90', estimate: '225.00', estimate_cents: 22500, monthly_basis: '250.00', estimate_basis: 'set_price', basis: '250.00', basis_interval: 'month', fees_count: 1, fees_total: '800.00' },
+    { id: 'r2', program_id: 'p1', customer_ref: 'Blue Harbor Dental', source: 'manual', referred_at: '2026-10-12T10:00:00Z', plan: 'essentials', status: 'not_paying_yet', currency: 'EUR', payments_count: 0, last_payment_at: null, first_sale_at: null, window_ends_at: null, payments_left: 1, earned: '0.00', paid: '0.00', estimate: '120.00', estimate_cents: 12000, monthly_basis: null, estimate_basis: 'set_price', basis: '1200.00', basis_interval: 'once', prepaid_until: '2027-10-12T00:00:00Z', fees_count: 0, fees_total: '0.00' },
     { id: 'r3', program_id: 'p1', customer_ref: 'm***@example.com', source: 'link', referred_at: '2026-09-09T16:40:00Z', plan: 'free', status: 'not_paying_yet', currency: 'EUR', payments_count: 0, last_payment_at: null, first_sale_at: null, window_ends_at: null, payments_left: 12, earned: '0.00', paid: '0.00', estimate: null, estimate_cents: null, monthly_basis: null, estimate_basis: null },
   ],
 }
@@ -84,7 +86,9 @@ const REFERRED_STATUS: Record<ReferredAccountStatus, { label: string; tone: stri
   one_time: { label: 'Paid once', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', note: 'This program pays a single commission per account.' },
   window_ended: { label: 'Window closed', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'Renewals after the commission window earn nothing.' },
   cancelled: { label: 'Cancelled', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'The subscription has ended.' },
-  complimentary: { label: 'Complimentary', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'A free or trial plan we gave this account. It earns once they start paying.' },
+  complimentary: { label: 'Complimentary', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'We give this account its plan at no charge. It earns once it starts paying.' },
+  prepaid: { label: 'Prepaid', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', note: 'Paid a package up front. No further payment is expected for that period.' },
+  no_further_payments: { label: 'No further payments', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'No more payments are expected from this account under its current agreement.' },
   not_eligible: { label: 'Not eligible', tone: 'bg-red-500/15 text-red-300 border-red-500/30', note: 'Purchases by the affiliate themselves earn no commission.' },
 }
 
@@ -246,7 +250,7 @@ export default function AffiliatePortal() {
                         <tr key={c.id}>
                           <td className="px-4 py-2 whitespace-nowrap text-slate-300">{fmtDate(c.occurred_at)}</td>
                           <td className="px-4 py-2 text-slate-300">{programsById.get(c.program_id)?.name || ''}</td>
-                          <td className="px-4 py-2 text-slate-300">{c.conversion_type.replace('_', ' ')}</td>
+                          <td className="px-4 py-2 text-slate-300">{c.one_time_fee ? <>one-time fee{c.description && <div className="text-xs text-slate-500 max-w-[16rem]">{c.description}</div>}</> : c.conversion_type.replace('_', ' ')}</td>
                           <td className="px-4 py-2 text-slate-400">{c.customer_ref}</td>
                           <td className="px-4 py-2 text-right text-slate-200 whitespace-nowrap">{Number(c.amount) > 0 ? `${c.currency} ${c.amount}` : ''}</td>
                           <td className="px-4 py-2 text-slate-400">{c.source}</td>
@@ -324,11 +328,22 @@ function referredView(r: PortalReferredAccount) {
   return {
     st,
     note: onFree ? 'On the free plan. It earns once they upgrade to a paid plan.' : st.note,
-    basis: r.monthly_basis ? `${r.currency} ${r.monthly_basis} / month${r.estimate_basis === 'last_payment' ? ', last payment' : ''}` : '',
+    basis: basisLabel(r),
+    fees: (r.fees_count || 0) > 0 ? `includes ${r.fees_count} one-time fee${r.fees_count === 1 ? '' : 's'} (${r.currency} ${r.fees_total} paid)` : '',
     showEstimate: r.estimate !== null && r.payments_left > 0,
-    left: `${r.payments_left} more payment${r.payments_left === 1 ? '' : 's'}${r.window_ends_at ? `, until ${fmtDate(r.window_ends_at)}` : r.status === 'not_paying_yet' ? ' from the first one' : ''}`,
-    noEstimate: onFree ? 'after upgrade' : '0.00',
+    left: r.basis_interval === 'once' ? 'on the package payment' : `${r.payments_left} more payment${r.payments_left === 1 ? '' : 's'}${r.window_ends_at ? `, until ${fmtDate(r.window_ends_at)}` : r.status === 'not_paying_yet' ? ' from the first one' : ''}`,
+    noEstimate: onFree ? 'after upgrade' : r.estimate_basis === 'price_not_set' ? 'not set yet' : '0.00',
   }
+}
+
+/** What the estimate is based on, in words: the price the account really pays when we set one. */
+function basisLabel(r: PortalReferredAccount): string {
+  const amount = r.basis ?? r.monthly_basis
+  if (r.basis_interval === 'none') return 'pays nothing'
+  if (!amount) return ''
+  if (r.basis_interval === 'once') return `${r.currency} ${amount} package${r.prepaid_until ? `, prepaid until ${fmtDate(r.prepaid_until)}` : ''}`
+  if (r.basis_interval === 'year') return `${r.currency} ${amount} / year`
+  return `${r.currency} ${amount} / month${r.estimate_basis === 'last_payment' ? ', last payment' : ''}`
 }
 
 function ReferredAccounts({ rows, programsById }: { rows: PortalReferredAccount[]; programsById: Map<string, PortalProgram> }) {
@@ -338,7 +353,7 @@ function ReferredAccounts({ rows, programsById }: { rows: PortalReferredAccount[
   return (
     <section id="referred" className="space-y-3 scroll-mt-20">
       <SectionHeading>Referred accounts</SectionHeading>
-      <p className="text-xs text-slate-500">Every account credited to you, paying or not. Earned is what your commissions add up to so far, refunds excluded. Still to come is an estimate, not a promise: it assumes the account keeps its current plan, pays monthly at list price and stays until your commission window closes.</p>
+      <p className="text-xs text-slate-500">Every account credited to you, paying or not. Earned is what your commissions add up to so far, refunds excluded. Still to come is an estimate, not a promise: it uses the price the account pays today (monthly, yearly or a prepaid package) and assumes it stays until your commission window closes. One-time fees outside the plans are in Earned, never in the estimate. "Not set yet" means we have not recorded this account's price.</p>
       {rows.length === 0 ? (
         <EmptyState icon={Building2} title="No referred accounts yet" body="When someone you referred signs up, or we credit an account you introduced to us, it appears here with what it can earn you." />
       ) : (
@@ -366,6 +381,7 @@ function ReferredAccounts({ rows, programsById }: { rows: PortalReferredAccount[
                       <dt className="text-[11px] text-slate-500">Earned</dt>
                       <dd className="text-sm font-semibold text-white">{r.currency} {r.earned}</dd>
                       <dd className="text-[11px] text-slate-500">{r.payments_count} payment{r.payments_count === 1 ? '' : 's'}{Number(r.paid) > 0 ? `, ${r.currency} ${r.paid} paid out` : ''}</dd>
+                      {v.fees && <dd className="text-[11px] text-slate-500">{v.fees}</dd>}
                     </div>
                     <div className="rounded-lg bg-dark-700/60 px-3 py-2">
                       <dt className="text-[11px] text-slate-500">Still to come</dt>
@@ -416,6 +432,7 @@ function ReferredAccounts({ rows, programsById }: { rows: PortalReferredAccount[
                       <td className="px-4 py-2 text-right text-slate-200 whitespace-nowrap">
                         {r.currency} {r.earned}
                         {Number(r.paid) > 0 && <div className="text-xs text-slate-500">{r.currency} {r.paid} paid out</div>}
+                        {v.fees && <div className="text-xs text-slate-500 max-w-[14rem] whitespace-normal">{v.fees}</div>}
                       </td>
                       <td className="px-4 py-2 text-right whitespace-nowrap">
                         {v.showEstimate ? (

@@ -48,6 +48,7 @@ function shapeConversion(c) {
   return {
     id: c.id, conversion_type: c.conversion_type, status: c.status, source: c.source, customer_ref: c.customer_ref || 'customer',
     amount: core.centsToMajor(c.amount_cents), currency: c.currency, occurred_at: c.occurred_at, program_id: c.program_id, membership_id: c.membership_id,
+    one_time_fee: core.isOneTimeFee(c), description: core.isOneTimeFee(c) ? (c.metadata.description || null) : null,
   }
 }
 
@@ -139,6 +140,8 @@ async function referredAccounts(db, pairs, conversions, commissions, now = new D
       earned: core.centsToMajor(p.earned_cents), paid: core.centsToMajor(p.paid_cents),
       estimate: p.estimate_cents === null ? null : core.centsToMajor(p.estimate_cents), estimate_cents: p.estimate_cents,
       monthly_basis: p.monthly_basis_cents === null ? null : core.centsToMajor(p.monthly_basis_cents), estimate_basis: p.estimate_basis,
+      basis: p.basis_cents === null ? null : core.centsToMajor(p.basis_cents), basis_interval: p.basis_interval, prepaid_until: p.prepaid_until,
+      fees_count: p.fees_count, fees_total: core.centsToMajor(p.fees_total_cents),
     }
   })
 }

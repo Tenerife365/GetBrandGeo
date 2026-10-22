@@ -16,6 +16,8 @@
  *   conversions.list | conversions.create_manual | conversions.reverse
  *   attributions.list | attributions.manual
  *   accounts.list | accounts.attach (a client on a custom or hand-assigned plan, credited to an affiliate)
+ *   accounts.set_billing (the price an attached account really pays, for the affiliate's estimate)
+ *   accounts.record_fee (a one-time fee outside the plans, commissioned once at the sale rate)
  *   commissions.list | commissions.approve | commissions.reject | commissions.reverse | commissions.reopen | commissions.mature
  *   payouts.candidates | payouts.create_batch | payouts.list | payouts.mark_paid | payouts.cancel
  *   payouts.upload_url | payouts.attach_document | payouts.document_url
@@ -125,6 +127,17 @@ async function stripeCustomerByClientId(clientId) {
 const STRIPE_CUSTOMER_RE = /^cus_[A-Za-z0-9]+$/
 const STRIPE_INVOICE_RE = /^in_[A-Za-z0-9]+$/
 const ACCOUNT_FIELDS = 'id, name, slug, plan, plan_source, plan_grant_until, plan_grant_note, paid_until, subscription_started_at, stripe_customer_id, category, created_at'
+
+/** The price set on an attribution, as the admin UI shows it, or null when none is set. */
+function billingOf(a) {
+  if (!a || !core.BILLING_INTERVALS.includes(a.billing_interval)) return null
+  return { interval: a.billing_interval, amount: core.centsToMajor(Number(a.billing_amount_cents) || 0), amount_cents: Number(a.billing_amount_cents) || 0, paid_until: a.billing_paid_until || null, note: a.billing_note || null }
+}
+
+function clientIdOf(attribution) {
+  const m = /^client:(\d+)$/.exec(String(attribution.external_customer_id || ''))
+  return m ? Number(m[1]) : null
+}
 
 exports.handler = async (event) => handle(event)
 
@@ -580,7 +593,7 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
         if (!Number.isInteger(id)) continue
         const d = decorate(a, maps)
         const list = byClient.get(id) || []
-        list.push({ attribution_id: a.id, program_id: a.program_id, program_slug: d.program_slug, membership_id: a.membership_id, affiliate_id: d.affiliate_id, affiliate_name: d.affiliate_name, source: a.source, stripe_customer_id: a.stripe_customer_id || null, converted_at: a.converted_at || null })
+        list.push({ attribution_id: a.id, program_id: a.program_id, program_slug: d.program_slug, membership_id: a.membership_id, affiliate_id: d.affiliate_id, affiliate_name: d.affiliate_name, source: a.source, stripe_customer_id: a.stripe_customer_id || null, converted_at: a.converted_at || null, billing: billingOf(a) })
         byClient.set(id, list)
       }
       return json(200, { accounts: (clients || []).map((c) => ({ ...c, attached: byClient.get(Number(c.id)) || [] })) })
@@ -598,6 +611,12 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
       if (stripeInput && !STRIPE_CUSTOMER_RE.test(stripeInput)) return json(400, { error: 'stripe_customer_id must look like cus_... (copy it from the customer page in Stripe).' })
       const stripeInvoiceId = core.str(body.stripe_invoice_id, 80)
       if (stripeInvoiceId && !STRIPE_INVOICE_RE.test(stripeInvoiceId)) return json(400, { error: 'stripe_invoice_id must look like in_... (the invoice id, not its number).' })
+      let billingPatch = null
+      if (body.billing !== undefined && body.billing !== null) {
+        const v = core.validateBilling(body.billing)
+        if (v.errors.length) return json(400, { error: `billing: ${v.errors[0]}`, errors: v.errors })
+        billingPatch = v.patch
+      }
       const { data: client, error: cErr } = await db.from('clients').select(ACCOUNT_FIELDS).eq('id', clientId).maybeSingle()
       if (cErr) throw cErr
       if (!client) return json(404, { error: 'Account not found.' })
@@ -622,6 +641,7 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
       const customerRef = core.str(body.customer_ref, 120) || core.str(client.name, 120) || `client ${clientId}`
       const attached = await service.manualAttribute(db, { program, membershipId: membership.id, externalCustomerId, customerRef, reason, actor, stripeCustomerId })
       if (!attached.ok) return json(attached.status, { error: attached.error })
+      if (billingPatch) attached.attribution = await service.setAttributionBilling(db, { attribution: attached.attribution, patch: billingPatch, actor, reason })
 
       // The plan payment, when the admin records one now: a manual sale keyed
       // on the account. A past Stripe invoice recorded by its id takes the
@@ -656,6 +676,60 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
         commission_amount: sale && sale.commission ? core.centsToMajor(sale.commission.amount_cents) : null,
         sale_amount: sale && sale.conversion ? core.centsToMajor(sale.conversion.amount_cents) : null,
         duplicate: sale ? !!sale.duplicate : false,
+        billing: billingOf(sale && sale.attribution ? sale.attribution : attached.attribution),
+      })
+    }
+    if (action === 'accounts.set_billing') {
+      const { data: att, error } = await db.from('affiliate_attributions').select('*').eq('id', String(body.attribution_id || '')).maybeSingle()
+      if (error) throw error
+      if (!att) return json(404, { error: 'Attachment not found.' })
+      const v = core.validateBilling(body.billing)
+      if (v.errors.length) return json(400, { error: `billing: ${v.errors[0]}`, errors: v.errors })
+      const updated = await service.setAttributionBilling(db, { attribution: att, patch: v.patch, actor, reason: core.str(body.reason, 500) })
+      return json(200, { ok: true, attribution: updated, billing: billingOf(updated) })
+    }
+    if (action === 'accounts.record_fee') {
+      // A fee outside the plans (a setup, an audit, a one-off project) paid by
+      // an attached account. Recorded as a custom conversion flagged one_time:
+      // the sale rule commissions it once, it never opens or extends the
+      // recurring window, and the affiliate's estimate never counts it again.
+      const { data: att, error } = await db.from('affiliate_attributions').select('*').eq('id', String(body.attribution_id || '')).maybeSingle()
+      if (error) throw error
+      if (!att) return json(404, { error: 'Attachment not found.' })
+      const program = await service.getProgramById(db, att.program_id)
+      if (!program) return json(404, { error: 'Program not found.' })
+      const description = core.str(body.description, 200)
+      if (!description) return json(400, { error: 'Describe the fee (what was sold).' })
+      const reason = core.str(body.reason, 500)
+      if (!reason) return json(400, { error: 'A reason is required to record a fee.' })
+      const given = (v) => v !== undefined && v !== null && String(v).trim() !== ''
+      if (!given(body.amount) && !given(body.amount_cents)) return json(400, { error: 'The fee amount is required.' })
+      const stripeInvoiceId = core.str(body.stripe_invoice_id, 80)
+      if (stripeInvoiceId && !STRIPE_INVOICE_RE.test(stripeInvoiceId)) return json(400, { error: 'stripe_invoice_id must look like in_... (the invoice id, not its number).' })
+      const reference = core.str(body.reference, 120)
+      const clientId = clientIdOf(att)
+      const { errors, row } = core.validateConversionInput({
+        idempotency_key: stripeInvoiceId ? `stripe_invoice:${stripeInvoiceId}` : `manual:${program.slug}:${att.external_customer_id}:fee:${reference || core.randomToken(8)}`,
+        conversion_type: 'custom', external_id: stripeInvoiceId || reference || undefined, external_customer_id: att.external_customer_id,
+        amount: body.amount, amount_cents: body.amount_cents, currency: body.currency || program.currency, occurred_at: body.occurred_at,
+        metadata: { one_time: true, description, note: core.str(body.note, 1000) || undefined, client_id: clientId || undefined },
+      })
+      if (errors.length) return json(400, { error: errors[0], errors })
+      if (!row.amount_cents) return json(400, { error: 'The fee amount must be above zero.' })
+      row.customer_ref = att.customer_ref || null
+      row.manual_reason = reason
+      const stripe = att.stripe_customer_id || stripeInvoiceId ? { customer_id: att.stripe_customer_id || null, invoice_id: stripeInvoiceId || null } : null
+      // The attachment's own source is passed through, so a fee on a link or
+      // coupon customer does not rewrite that attribution as a manual one.
+      const fee = await service.recordConversion(db, { program, input: row, actor, source: att.source, membershipId: att.membership_id, stripe })
+      if (!fee.ok) return json(fee.status, { error: fee.error })
+      return json(201, {
+        ok: true,
+        conversion: fee.conversion,
+        commission: fee.commission,
+        fee_amount: fee.conversion ? core.centsToMajor(fee.conversion.amount_cents) : null,
+        commission_amount: fee.commission ? core.centsToMajor(fee.commission.amount_cents) : null,
+        duplicate: !!fee.duplicate,
       })
     }
 

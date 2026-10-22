@@ -34,10 +34,15 @@ password to remember. The link signs you into your dashboard at
 - **Referred accounts.** Every account credited to you, paying or not: its
   name as we know it, its plan, whether it pays yet, how many payments it
   made, what it has earned you so far (refunds excluded, with what is already
-  paid out), and an estimate of what is still to come. The estimate assumes
-  the account keeps its plan, pays monthly at list price and stays until your
-  commission window closes (12 months from its first payment for BrandGEO).
-  It is an estimate, not a promise. Accounts on the free plan earn once they
+  paid out), and an estimate of what is still to come. The estimate uses the
+  price the account really pays (per month, per year, or a package paid up
+  front) and assumes it stays until your commission window closes (12 months
+  from its first payment for BrandGEO). For an account we set up by hand the
+  estimate reads "not set yet" until we record its price, rather than
+  guessing from the list price. A one-time fee outside the plans (a setup or
+  a one-off project) earns you the sale rate once: it shows in Earned and in
+  your conversions with what was sold, and never in the estimate. It is an
+  estimate, not a promise. Accounts on the free plan earn once they
   upgrade. Below this list, "How you get paid" sets out the four steps from
   a payment to your transfer. Screenshots:
   `screenshots/portal-referred-accounts-desktop.png`,

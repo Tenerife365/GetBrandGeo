@@ -537,6 +537,23 @@ async function manualAttribute(supabase, { program, membershipId, externalCustom
 }
 
 /**
+ * setAttributionBilling(supabase, { attribution, patch, actor, reason })
+ *
+ * Writes the price the account really pays (core.validateBilling's patch) on
+ * the attribution, with an audit row carrying before and after. It feeds the
+ * affiliate's estimate only; no commission is computed from it.
+ */
+async function setAttributionBilling(supabase, { attribution, patch, actor, reason = null }) {
+  const keys = ['billing_amount_cents', 'billing_interval', 'billing_paid_until', 'billing_note']
+  const before = Object.fromEntries(keys.map((k) => [k, attribution[k] === undefined ? null : attribution[k]]))
+  const { data, error } = await supabase.from('affiliate_attributions').update(patch).eq('id', attribution.id).select('*').single()
+  if (error) throw new Error(`attribution billing update failed: ${error.message}`)
+  const membership = await getMembership(supabase, attribution.membership_id)
+  await audit(supabase, { actor, action: 'attribution.billing_set', entityType: 'attribution', entityId: attribution.id, programId: attribution.program_id, affiliateId: membership ? membership.affiliate_id : null, before, after: patch, reason })
+  return data
+}
+
+/**
  * promoCodeForReferral(supabase, programSlug, rawCode) -> string | null
  *
  * The coupon code Stripe should prefill at checkout for a customer who arrived
@@ -570,4 +587,5 @@ module.exports = {
   audit,
   getProgramBySlug, getProgramById, getMembership, getAffiliate, findCode, findVisit, findAttribution, findAttributionByStripe,
   resolveReferralLink, promoCodeForReferral, upsertAttribution, recordConversion, reverseConversion, markSubscriptionEnded, manualAttribute,
+  setAttributionBilling,
 }

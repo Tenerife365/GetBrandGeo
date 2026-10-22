@@ -620,34 +620,95 @@ function firstPaymentCommission(rules, basisCents) {
 }
 
 /**
+ * The price an account really pays, set by the admin on its attribution
+ * (billing_amount_cents, billing_interval, billing_paid_until, billing_note).
+ * A hand-sold account rarely pays the list price: a package paid once, an
+ * annual invoice, a custom monthly fee, or nothing at all.
+ *   month  a recurring monthly amount
+ *   year   a recurring yearly amount
+ *   once   one payment that covers a period (a prepaid package); no renewal
+ *          is estimated, billing_paid_until says until when it runs
+ *   none   the account pays nothing (complimentary)
+ */
+const BILLING_INTERVALS = ['month', 'year', 'once', 'none']
+
+/**
+ * validateBilling(body) -> { errors, patch }
+ *
+ * body: { interval, amount | amount_cents, paid_until, note } or { clear: true }.
+ * patch holds the four attribution columns, all null when cleared.
+ */
+function validateBilling(body) {
+  const errors = []
+  const empty = { billing_amount_cents: null, billing_interval: null, billing_paid_until: null, billing_note: null }
+  if (!body || typeof body !== 'object') return { errors: ['billing is required'], patch: null }
+  if (body.clear === true) return { errors, patch: empty }
+  const interval = String(body.interval || '').trim()
+  if (!BILLING_INTERVALS.includes(interval)) return { errors: ['interval must be one of ' + BILLING_INTERVALS.join(', ')], patch: null }
+  let cents = 0
+  if (interval !== 'none') {
+    if (body.amount_cents !== undefined && body.amount_cents !== null && body.amount_cents !== '') cents = parseCents(body.amount_cents)
+    else if (body.amount !== undefined && body.amount !== null && body.amount !== '') cents = majorToCents(body.amount)
+    else cents = null
+    if (cents === null) errors.push('amount must be a decimal with at most two places')
+    else if (cents <= 0) errors.push('amount must be above zero; use interval none for an account that pays nothing')
+  }
+  let paidUntil = null
+  if (body.paid_until) {
+    const d = new Date(body.paid_until)
+    if (isNaN(d.getTime())) errors.push('paid_until is not a date')
+    else paidUntil = d.toISOString()
+  }
+  if (errors.length) return { errors, patch: null }
+  return { errors, patch: { billing_amount_cents: interval === 'none' ? 0 : cents, billing_interval: interval, billing_paid_until: paidUntil, billing_note: str(body.note, 500) } }
+}
+
+/** A one-time fee recorded by the admin: commissioned once, never an estimate basis. */
+function isOneTimeFee(conversion) {
+  return !!conversion && conversion.conversion_type === 'custom' && !!conversion.metadata && conversion.metadata.one_time === true
+}
+
+/**
  * projectReferredAccount({ rules, attribution, account, payments, commissions, now })
  *
  * One row of the affiliate's "Referred accounts" panel. `payments` are the
- * confirmed paying conversions on this attribution, `commissions` the
- * commissions on those conversions, `account` the clients row when the
+ * confirmed paying conversions on this attribution (one-time fees included),
+ * `commissions` the commissions on them, `account` the clients row when the
  * attribution maps to one ({ plan, plan_source }).
  *
- * The estimate is what is STILL to come, never what is already earned, and it
- * assumes monthly billing at the plan's list price (or at the last payment
- * when the plan has no list price). It is labelled an estimate everywhere it
- * is shown: a hand invoice, an annual plan or a discount moves the real figure.
+ * The estimate is what is STILL to come, never what is already earned. Its
+ * basis, in order:
+ *   1. set_price     the price the admin set on the attribution
+ *   2. list_price    the plan's list price, monthly, for a self-serve account
+ *   3. last_payment  the last plan payment, monthly, when the plan has none
+ * An account the admin attached by hand (source manual) never falls back to
+ * the list price: a hand-sold deal is not the list price, so without a set
+ * price there is no estimate (estimate_cents null, basis price_not_set).
+ * One-time fees count in earned and never in the estimate.
  */
 function projectReferredAccount({ rules, attribution, account = null, payments = [], commissions = [], now = new Date() }) {
   const at = new Date(now)
-  const sorted = [...payments].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at))
+  const fees = payments.filter(isOneTimeFee)
+  const sorted = payments.filter((p) => !isOneTimeFee(p)).sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at))
   const last = sorted.length ? sorted[sorted.length - 1] : null
   const sum = (statuses) => commissions.filter((c) => statuses.includes(c.status)).reduce((s, c) => s + Number(c.amount_cents || 0), 0)
   const plan = account && account.plan ? account.plan : null
+  const interval = BILLING_INTERVALS.includes(attribution.billing_interval) ? attribution.billing_interval : null
   const out = {
     plan,
     payments_count: sorted.length,
     last_payment_at: last ? new Date(last.occurred_at).toISOString() : null,
+    fees_count: fees.length,
+    fees_total_cents: fees.reduce((s, f) => s + Number(f.amount_cents || 0), 0),
     earned_cents: sum(EARNED_STATUSES),
     paid_cents: sum(['paid']),
     first_sale_at: attribution.first_sale_at || (sorted[0] ? new Date(sorted[0].occurred_at).toISOString() : null),
     window_ends_at: attribution.recurring_until || null,
+    prepaid_until: null,
     payments_left: 0,
     estimate_cents: 0,
+    basis_cents: null,
+    basis_interval: null,
     monthly_basis_cents: null,
     estimate_basis: null,
     status: 'paying',
@@ -656,11 +717,36 @@ function projectReferredAccount({ rules, attribution, account = null, payments =
 
   if (attribution.is_self_referral) return { ...out, status: 'not_eligible' }
   if (attribution.subscription_ended_at && new Date(attribution.subscription_ended_at) <= at) return { ...out, status: 'cancelled' }
-  if (!sorted.length && account && UNPAID_PLAN_SOURCES.includes(account.plan_source)) return { ...out, status: 'complimentary' }
 
-  if (plan && PLAN_LIST_PRICE_CENTS[plan]) { out.monthly_basis_cents = PLAN_LIST_PRICE_CENTS[plan]; out.estimate_basis = 'list_price' }
-  else if (last && Number(last.amount_cents) > 0) { out.monthly_basis_cents = Number(last.amount_cents); out.estimate_basis = 'last_payment' }
-  const basis = out.monthly_basis_cents
+  let step = 1
+  if (interval) {
+    out.estimate_basis = 'set_price'
+    if (interval === 'none') return { ...out, status: sorted.length ? 'no_further_payments' : 'complimentary' }
+    out.basis_cents = Number(attribution.billing_amount_cents) || 0
+    out.basis_interval = interval
+    if (interval === 'month') out.monthly_basis_cents = out.basis_cents
+    if (interval === 'once') {
+      out.prepaid_until = attribution.billing_paid_until ? new Date(attribution.billing_paid_until).toISOString() : null
+      if (out.first_sale_at) return { ...out, status: 'prepaid' }
+      out.status = 'not_paying_yet'
+      out.payments_left = out.basis_cents > 0 ? 1 : 0
+      out.estimate_cents = out.basis_cents > 0 ? firstPaymentCommission(rules, out.basis_cents) : 0
+      return out
+    }
+    step = interval === 'year' ? 12 : 1
+  } else {
+    if (!sorted.length && account && UNPAID_PLAN_SOURCES.includes(account.plan_source)) return { ...out, status: 'complimentary' }
+    if (attribution.source === 'manual') {
+      out.estimate_basis = 'price_not_set'
+      out.estimate_cents = null
+      if (!out.first_sale_at) out.status = 'not_paying_yet'
+      return out
+    }
+    if (plan && PLAN_LIST_PRICE_CENTS[plan]) { out.basis_cents = PLAN_LIST_PRICE_CENTS[plan]; out.estimate_basis = 'list_price' }
+    else if (last && Number(last.amount_cents) > 0) { out.basis_cents = Number(last.amount_cents); out.estimate_basis = 'last_payment' }
+    if (out.basis_cents !== null) { out.basis_interval = 'month'; out.monthly_basis_cents = out.basis_cents }
+  }
+  const basis = out.basis_cents
   const rb = Number(rules.recurring_commission_bps || 0)
   // An unlimited recurring window is estimated over its first 12 months, so a
   // number on screen is never "forever".
@@ -669,7 +755,10 @@ function projectReferredAccount({ rules, attribution, account = null, payments =
   if (!out.first_sale_at) {
     out.status = 'not_paying_yet'
     if (!basis) return out
-    const renewals = rb > 0 ? Math.max(0, months - 1) : 0
+    // Renewal k lands k * step months after the first payment and earns while
+    // it is still inside the window.
+    let renewals = 0
+    if (rb > 0) for (let k = 1; k * step < months; k++) renewals++
     out.payments_left = 1 + renewals
     out.estimate_cents = firstPaymentCommission(rules, basis) + renewals * percentOf(basis, rb)
     return out
@@ -682,7 +771,7 @@ function projectReferredAccount({ rules, attribution, account = null, payments =
   // Renewal m lands on first + m months; it earns while it is still inside
   // the window (computeCommission refuses one dated after recurring_until).
   let left = 0
-  for (let m = 1; m <= 600; m++) {
+  for (let m = step; m <= 600; m += step) {
     const d = addMonths(first, m)
     if (d >= until) break
     if (d > at) left++
@@ -707,7 +796,7 @@ module.exports = {
   normalizeCode, isValidCode, isValidSlug, normalizeEmail, isValidEmail, sha256, hashEmail, maskEmail, shortRef,
   randomToken, suggestCode, makeApiKey, hashApiKey, apiKeyPrefix, addDays, addMonths,
   effectiveRules, percentOf, computeCommission, recurringUntil, approveAfter, summarizeRules,
-  PLAN_LIST_PRICE_CENTS, projectReferredAccount,
+  PLAN_LIST_PRICE_CENTS, BILLING_INTERVALS, validateBilling, isOneTimeFee, projectReferredAccount,
   decideAttribution, touchIsFresh, isSelfReferral, canTransition, COMMISSION_TRANSITIONS,
   buildRedirectUrl, isSafeDestination,
   validateProgramInput, validateCustomRules, validateApplication, sanitizePayoutDetails, validateConversionInput,

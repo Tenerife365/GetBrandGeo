@@ -19,7 +19,7 @@ import {
   CONVERSION_TYPES, COMMISSION_STATUSES, PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type AdminOverview, type AffiliateProgram, type ProgramInput, type AdminAffiliate, type AdminMembership, type AffiliateApplication,
   type AdminVisit, type AdminConversion, type AdminCommission, type PayoutCandidate, type PayoutBatch, type AuditEntry, type AffiliateResource,
-  type CustomRules, type PayoutMethod, type AdminAccount,
+  type CustomRules, type PayoutMethod, type AdminAccount, type AdminAccountAttachment, type AttachmentBilling, type BillingInterval,
 } from '../types/affiliate'
 
 type Tab = 'programs' | 'affiliates' | 'conversions' | 'payouts' | 'activity'
@@ -745,6 +745,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [manualOpen, setManualOpen] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
+  const [accountsKey, setAccountsKey] = useState(0)
   const { busy, error, ok, run, setOk } = useAsync()
 
   const loadConversions = useCallback(async () => {
@@ -760,7 +761,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
   }, [kf])
   useEffect(() => { loadConversions() }, [loadConversions])
   useEffect(() => { loadCommissions() }, [loadCommissions])
-  const reloadAll = () => { loadConversions(); loadCommissions(); onChanged() }
+  const reloadAll = () => { loadConversions(); loadCommissions(); setAccountsKey((k) => k + 1); onChanged() }
 
   async function reverse(c: AdminConversion) {
     const status = window.confirm('Mark as REFUNDED? (Cancel = mark as cancelled instead)') ? 'refunded' : 'cancelled'
@@ -796,6 +797,8 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
       <Notice kind="error" text={error} />
       <Notice kind="ok" text={ok} onClose={() => setOk('')} />
 
+      <AttachedAccountsSection programs={programs} reloadKey={accountsKey} onDone={(msg) => { setOk(msg); reloadAll() }} />
+
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SectionHeading>Leads and sales</SectionHeading>
@@ -816,7 +819,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
                     <td className={td + ' whitespace-nowrap'}>{fmtDate(c.occurred_at, true)}</td>
                     <td className={td}>{c.program_slug}</td>
                     <td className={td}>{c.affiliate_name}</td>
-                    <td className={td}>{c.conversion_type.replace('_', ' ')}</td>
+                    <td className={td}>{c.metadata?.one_time ? <>one-time fee{c.metadata.description && <div className="text-[11px] text-slate-500 max-w-[220px]">{c.metadata.description}</div>}</> : c.conversion_type.replace('_', ' ')}</td>
                     <td className={td + ' text-slate-400'}>{c.customer_ref || ''}<div className="text-[11px] text-slate-500">{c.external_id || c.idempotency_key}</div></td>
                     <td className={td + ' text-right whitespace-nowrap'}>{c.amount_cents ? `${c.currency} ${c.amount}` : ''}</td>
                     <td className={td}>{c.source}</td>
@@ -890,8 +893,155 @@ const PLAN_SOURCE_LABELS: Record<string, string> = {
 
 const DEMO_ACCOUNTS: AdminAccount[] = [
   { id: 54, name: 'Northwind Bakery', slug: 'northwind-bakery', plan: 'essentials', plan_source: 'manual', plan_grant_until: null, plan_grant_note: 'Custom plan agreed by email', paid_until: '2026-10-17', subscription_started_at: '2026-09-17', stripe_customer_id: null, category: 'customer', created_at: '2026-09-17T09:00:00Z', attached: [] },
-  { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', plan_grant_until: '2027-06-02', plan_grant_note: null, paid_until: '2027-07-30', subscription_started_at: '2026-06-02', stripe_customer_id: 'cus_demo55', category: 'customer', created_at: '2026-06-02T09:00:00Z', attached: [{ attribution_id: 'at1', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: 'cus_demo55', converted_at: '2026-09-12T10:00:00Z' }] },
+  { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', plan_grant_until: '2027-06-02', plan_grant_note: null, paid_until: '2027-07-30', subscription_started_at: '2026-06-02', stripe_customer_id: 'cus_demo55', category: 'customer', created_at: '2026-06-02T09:00:00Z', attached: [{ attribution_id: 'at1', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: 'cus_demo55', converted_at: '2026-09-12T10:00:00Z', billing: { interval: 'once', amount: '3500.00', amount_cents: 350000, paid_until: '2027-06-02T00:00:00.000Z', note: 'Package paid up front' } }] },
 ]
+
+/* ── The price an attached account really pays, and one-time fees ───────── */
+type BillingDraft = { interval: '' | BillingInterval; amount: string; paid_until: string; note: string }
+const EMPTY_BILLING: BillingDraft = { interval: '', amount: '', paid_until: '', note: '' }
+const BILLING_OPTIONS: { value: '' | BillingInterval; label: string }[] = [
+  { value: '', label: 'Not set (the partner sees no estimate)' },
+  { value: 'month', label: 'Per month' },
+  { value: 'year', label: 'Per year' },
+  { value: 'once', label: 'Once, a prepaid package' },
+  { value: 'none', label: 'Pays nothing (complimentary)' },
+]
+function billingDraftOf(b: AttachmentBilling | null | undefined): BillingDraft {
+  if (!b) return EMPTY_BILLING
+  return { interval: b.interval, amount: b.interval === 'none' ? '' : b.amount, paid_until: b.paid_until ? b.paid_until.slice(0, 10) : '', note: b.note || '' }
+}
+function billingPayload(b: BillingDraft): Record<string, unknown> | undefined {
+  if (!b.interval) return undefined
+  return { interval: b.interval, amount: b.interval === 'none' ? undefined : b.amount, paid_until: b.interval === 'once' && b.paid_until ? b.paid_until : undefined, note: b.note || undefined }
+}
+function billingLabel(b: AttachmentBilling | null | undefined, currency: string): string {
+  if (!b) return 'Not set'
+  if (b.interval === 'none') return 'Pays nothing'
+  if (b.interval === 'once') return `${money(b.amount, currency)} once${b.paid_until ? `, prepaid to ${fmtDate(b.paid_until)}` : ''}`
+  return `${money(b.amount, currency)} per ${b.interval}`
+}
+
+function BillingFields({ value, onChange, currency }: { value: BillingDraft; onChange: (b: BillingDraft) => void; currency: string }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Field label="How it is billed"><select className={ic} value={value.interval} onChange={(e) => onChange({ ...value, interval: e.target.value as BillingDraft['interval'] })}>{BILLING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field>
+        {value.interval && value.interval !== 'none' && <Field label={`Amount (${currency})`} hint="What the customer pays, not the commission"><input className={ic} inputMode="decimal" required value={value.amount} onChange={(e) => onChange({ ...value, amount: e.target.value })} placeholder="0.00" /></Field>}
+        {value.interval === 'once' && <Field label="Prepaid until (optional)" hint="Shown to the partner"><input className={ic} type="date" value={value.paid_until} onChange={(e) => onChange({ ...value, paid_until: e.target.value })} /></Field>}
+        {value.interval && <Field label="Admin note (optional)" hint="Never shown to the partner"><input className={ic} value={value.note} onChange={(e) => onChange({ ...value, note: e.target.value })} maxLength={500} /></Field>}
+      </div>
+    </div>
+  )
+}
+
+type AttachedRow = { account: AdminAccount; attachment: AdminAccountAttachment }
+
+/**
+ * Accounts attached to an affiliate, with the price each really pays. The
+ * partner's estimate uses that price; without one, a hand-attached account
+ * shows no estimate. Fees outside the plans are recorded here too.
+ */
+function AttachedAccountsSection({ programs, reloadKey, onDone }: { programs: AffiliateProgram[]; reloadKey: number; onDone: (m: string) => void }) {
+  const [rows, setRows] = useState<AttachedRow[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [pricing, setPricing] = useState<AttachedRow | null>(null)
+  const [feeFor, setFeeFor] = useState<AttachedRow | null>(null)
+  useEffect(() => {
+    const pick = (list: AdminAccount[]) => setRows(list.flatMap((a) => a.attached.map((attachment) => ({ account: a, attachment }))))
+    if (isDemoMode) { pick(DEMO_ACCOUNTS); setLoaded(true); return }
+    api<{ accounts: AdminAccount[] }>({ action: 'accounts.list', limit: 1000 }).then((r) => { if (r.data) pick(r.data.accounts); setLoaded(true) })
+  }, [reloadKey])
+  const currencyOf = (programId: string) => programs.find((p) => p.id === programId)?.currency || 'EUR'
+  if (!loaded || rows.length === 0) return null
+  return (
+    <section className="space-y-3">
+      <SectionHeading>Attached accounts</SectionHeading>
+      <p className="text-xs text-slate-400">The price each account really pays drives the estimate its partner sees. Set it for every account you attached by hand; until then the partner sees "not set yet". Fees outside the plans (a setup, an audit, a one-off project) are commissioned once at the sale rate and never count toward the estimate.</p>
+      <div className={`${card} overflow-x-auto`}>
+        <table className="min-w-full">
+          <thead><tr><th className={th}>Account</th><th className={th}>Affiliate</th><th className={th}>Price it pays</th><th className={th}></th></tr></thead>
+          <tbody className="divide-y divide-dark-700">
+            {rows.map(({ account, attachment }) => (
+              <tr key={attachment.attribution_id}>
+                <td className={td}>{account.name}<div className="text-[11px] text-slate-500">{account.plan || 'free'}{account.plan_source ? ` (${PLAN_SOURCE_LABELS[account.plan_source] ?? account.plan_source})` : ''}</div></td>
+                <td className={td}>{attachment.affiliate_name || 'an affiliate'}<div className="text-[11px] text-slate-500">{attachment.program_slug} via {attachment.source}</div></td>
+                <td className={td + (attachment.billing ? ' text-slate-200' : ' text-amber-300')}>{billingLabel(attachment.billing, currencyOf(attachment.program_id))}{attachment.billing?.note && <div className="text-[11px] text-slate-500">{attachment.billing.note}</div>}</td>
+                <td className={td + ' whitespace-nowrap text-right'}>
+                  <button type="button" className={btnSmall + ' bg-dark-700 text-slate-200 mr-1'} onClick={() => setPricing({ account, attachment })}>Set price</button>
+                  <button type="button" className={btnSmall + ' bg-brand-500/15 text-brand-300'} onClick={() => setFeeFor({ account, attachment })}><Plus size={12} /> One-time fee</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pricing && <SetPriceModal row={pricing} currency={currencyOf(pricing.attachment.program_id)} onClose={() => setPricing(null)} onDone={(m) => { setPricing(null); onDone(m) }} />}
+      {feeFor && <RecordFeeModal row={feeFor} currency={currencyOf(feeFor.attachment.program_id)} onClose={() => setFeeFor(null)} onDone={(m) => { setFeeFor(null); onDone(m) }} />}
+    </section>
+  )
+}
+
+function SetPriceModal({ row, currency, onClose, onDone }: { row: AttachedRow; currency: string; onClose: () => void; onDone: (m: string) => void }) {
+  const [bill, setBill] = useState<BillingDraft>(billingDraftOf(row.attachment.billing))
+  const [reason, setReason] = useState('')
+  const { busy, error, run } = useAsync()
+  async function save(clear: boolean) {
+    if (isDemoMode) { onDone('Demo mode: nothing saved.'); return }
+    const billing = clear ? { clear: true } : billingPayload(bill)
+    if (!billing) return
+    const res = await run(() => api<{ billing: AttachmentBilling | null }>({ action: 'accounts.set_billing', attribution_id: row.attachment.attribution_id, billing, reason: reason || undefined }))
+    if (res) onDone(res.billing ? `${row.account.name}: price set to ${billingLabel(res.billing, currency)}. The partner's estimate now uses it.` : `${row.account.name}: price cleared. The partner sees no estimate for it.`)
+  }
+  return (
+    <Modal title={`Price for ${row.account.name}`} onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); save(false) }} className="space-y-3">
+        <p className="text-xs text-slate-400">What this account really pays. It only feeds the estimate {row.attachment.affiliate_name || 'the partner'} sees; commissions are still computed from the payments recorded. A prepaid package is estimated as one payment; renewals inside the program's recurring window are estimated at this price.</p>
+        <BillingFields value={bill} onChange={setBill} currency={currency} />
+        <Field label="Reason (optional, audited)"><input className={ic} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="e.g. Annual contract signed in October" /></Field>
+        <Notice kind="error" text={error} />
+        <div className="flex flex-wrap justify-end gap-2">
+          {row.attachment.billing && <button type="button" className={btnGhost} disabled={busy} onClick={() => save(true)}>Clear price</button>}
+          <button type="button" className={btnGhost} onClick={onClose}>Cancel</button>
+          <button type="submit" className={btnPrimary} disabled={busy || !bill.interval}>{busy && <Loader2 size={14} className="animate-spin" />} Save price</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function RecordFeeModal({ row, currency, onClose, onDone }: { row: AttachedRow; currency: string; onClose: () => void; onDone: (m: string) => void }) {
+  const [f, setF] = useState({ description: '', amount: '', occurred_at: '', stripe_invoice_id: '', reference: '', note: '', reason: '' })
+  const { busy, error, run } = useAsync()
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (isDemoMode) { onDone('Demo mode: nothing recorded.'); return }
+    const res = await run(() => api<{ duplicate: boolean; fee_amount: string | null; commission_amount: string | null; commission: { currency: string } | null }>({
+      action: 'accounts.record_fee', attribution_id: row.attachment.attribution_id, description: f.description, amount: f.amount, reason: f.reason,
+      occurred_at: f.occurred_at || undefined, stripe_invoice_id: f.stripe_invoice_id || undefined, reference: f.reference || undefined, note: f.note || undefined,
+    }))
+    if (!res) return
+    if (res.duplicate) { onDone('That fee was already recorded; nothing was added.'); return }
+    onDone(res.commission ? `Fee of ${money(res.fee_amount, currency)} recorded for ${row.account.name}, commission ${money(res.commission_amount, res.commission.currency)} pending.` : `Fee recorded for ${row.account.name} with no commission (see its flags).`)
+  }
+  return (
+    <Modal title={`One-time fee for ${row.account.name}`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-xs text-slate-400">A fee outside the plans that this account paid. {row.attachment.affiliate_name || 'The partner'} earns the program's sale rate on it once. It never starts or extends the recurring window and never counts toward the estimate. If it was paid by a Stripe invoice, record it here with the invoice id before the invoice is paid, so the webhook cannot count it again as a plan payment.</p>
+        <Field label="What was sold" hint="Shown to the partner"><input className={ic} required value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} maxLength={200} placeholder="e.g. Website GEO audit and setup" /></Field>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label={`Amount paid (${currency})`} hint="What the customer paid, not the commission"><input className={ic} inputMode="decimal" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="0.00" /></Field>
+          <Field label="Paid at" hint="Defaults to now"><input className={ic} type="datetime-local" value={f.occurred_at} onChange={(e) => setF({ ...f, occurred_at: e.target.value })} /></Field>
+          <Field label="Stripe invoice id (optional)" hint="in_... when Stripe invoiced it"><input className={ic} value={f.stripe_invoice_id} onChange={(e) => setF({ ...f, stripe_invoice_id: e.target.value.trim() })} maxLength={80} placeholder="in_" /></Field>
+          <Field label="Invoice number or reference (optional)" hint="Prevents recording the same fee twice"><input className={ic} value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} maxLength={120} /></Field>
+        </div>
+        <Field label="Internal note (optional)"><input className={ic} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} maxLength={1000} /></Field>
+        <Field label="Reason (required, audited)"><input className={ic} required value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} maxLength={500} placeholder="e.g. One-off project invoiced by hand" /></Field>
+        <Notice kind="error" text={error} />
+        <div className="flex justify-end gap-2"><button type="button" className={btnGhost} onClick={onClose}>Cancel</button><button type="submit" className={btnPrimary} disabled={busy}>{busy && <Loader2 size={14} className="animate-spin" />} Record fee</button></div>
+      </form>
+    </Modal>
+  )
+}
 
 interface AttachResult {
   ok: boolean
@@ -905,6 +1055,7 @@ interface AttachResult {
   commission_amount: string | null
   sale_amount: string | null
   duplicate: boolean
+  billing: AttachmentBilling | null
 }
 
 /**
@@ -919,6 +1070,7 @@ function AttachAccountModal({ programs, onClose, onDone }: { programs: Affiliate
   const [accounts, setAccounts] = useState<AdminAccount[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [f, setF] = useState({ membership_id: '', client_id: '', stripe_customer_id: '', record_sale: false, amount: '', currency: '', occurred_at: '', external_id: '', stripe_invoice_id: '', note: '', reason: '' })
+  const [bill, setBill] = useState<BillingDraft>(EMPTY_BILLING)
   const { busy, error, run } = useAsync()
   useEffect(() => {
     if (!programId) return
@@ -948,7 +1100,7 @@ function AttachAccountModal({ programs, onClose, onDone }: { programs: Affiliate
     if (isDemoMode) { onDone('Demo mode: nothing recorded.'); return }
     const res = await run(() => api<AttachResult>({
       action: 'accounts.attach', program_id: programId, membership_id: f.membership_id, client_id: Number(f.client_id),
-      stripe_customer_id: f.stripe_customer_id || undefined, reason: f.reason,
+      stripe_customer_id: f.stripe_customer_id || undefined, reason: f.reason, billing: billingPayload(bill),
       ...(f.record_sale ? { amount: f.amount, currency: f.currency || program?.currency, occurred_at: f.occurred_at || undefined, external_id: f.external_id || undefined, stripe_invoice_id: f.stripe_invoice_id || undefined, note: f.note || undefined } : {}),
     }))
     if (!res) return
@@ -959,6 +1111,8 @@ function AttachAccountModal({ programs, onClose, onDone }: { programs: Affiliate
     } else {
       parts.push('No Stripe customer is linked yet: invoices for this account will not credit the affiliate until you attach it again with the customer id.')
     }
+    if (res.billing) parts.push(`Price set to ${billingLabel(res.billing, program?.currency || 'EUR')}; the partner's estimate uses it.`)
+    else parts.push('No price set: the partner sees no estimate for this account until you set one under Attached accounts.')
     if (res.stripe_customer_conflict) parts.push('The attribution already carried a different Stripe customer id, which was kept.')
     if (res.conversion) {
       if (res.duplicate) parts.push('That payment was already recorded; nothing was added.')
@@ -990,6 +1144,11 @@ function AttachAccountModal({ programs, onClose, onDone }: { programs: Affiliate
           </div>
         )}
         <Field label="Stripe customer id (optional)" hint="cus_... from the customer page in Stripe. Leave empty to use the account's own id, or to search Stripe by client id."><input className={ic} value={f.stripe_customer_id} onChange={(e) => setF({ ...f, stripe_customer_id: e.target.value.trim() })} maxLength={80} placeholder="cus_" /></Field>
+        <div className="border-t border-dark-700 pt-3">
+          <div className="text-sm text-slate-200 mb-1">Price this account really pays</div>
+          <p className="text-xs text-slate-400 mb-2">Drives the estimate the partner sees. A hand-sold account never falls back to the list price, so leave it empty only if you do not know yet.</p>
+          <BillingFields value={bill} onChange={setBill} currency={f.currency || program?.currency || 'EUR'} />
+        </div>
         <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={f.record_sale} onChange={(e) => setF({ ...f, record_sale: e.target.checked })} /> Also record a payment this account already made as a sale</label>
         {f.record_sale && (
           <div className="grid sm:grid-cols-2 gap-3">

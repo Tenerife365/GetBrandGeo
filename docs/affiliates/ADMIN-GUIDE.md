@@ -138,6 +138,29 @@ reference for the same protection. Attaching the same account again is
 harmless: the attribution is reused, a repeated payment reference adds
 nothing, and only a change of affiliate is logged as a reassignment.
 
+**Attached accounts: the real price, and one-time fees** (added 2026-10-22).
+The Conversions tab lists every account attached to an affiliate with the
+price it really pays. That price drives the estimate the partner sees in
+the portal; it never changes a commission, which still comes from the
+payments recorded. Set it in the attach dialog or later with **Set price**:
+per month, per year, once (a prepaid package, with the date it runs to), or
+pays nothing. The admin note stays admin-only. Until a price is set, a
+hand-attached account shows the partner "not set yet" instead of the list
+price of its plan, because hand-sold accounts rarely pay the list price.
+Self-serve accounts still fall back to the list price, then to the last
+payment. Every change writes an `attribution.billing_set` audit row.
+
+**Record one-time fee** is for money outside the plans (a setup, an audit, a
+one-off project). Enter what was sold (the partner sees this line), what the
+customer paid, the date and a reason. It is commissioned once at the
+program's sale rate, counts in the partner's Earned and never in the
+payment count, the estimate or the recurring window. Give it an invoice
+number or reference so it cannot be recorded twice. **If Stripe invoices the
+fee, record it here with the `in_...` id BEFORE the invoice is paid**: the
+fee then holds the webhook's own key and the payment arriving later is a
+duplicate. Recorded after the webhook, the same invoice would already count
+as an ordinary plan payment.
+
 **Reverse** a conversion (refund or cancellation) with a reason. Its unpaid
 commission becomes `reversed`; a paid one is flagged for reconciliation.
 
