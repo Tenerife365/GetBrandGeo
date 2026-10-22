@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (later): real price per attached account, and one-time fees; BUILT, 149 checks green, COMMITTED, migration NOT applied, NOT pushed
+### 2026-10-22 (later): real price per attached account, and one-time fees; BUILT, 149 checks green, COMMITTED (f2416aa), migration APPLIED 2026-10-22, NOT pushed
 
 Constantin's ask: "make the estimate use the real price, but also have the
 option to add manually specific 1-time fees I do outside of our existing
@@ -30,9 +30,10 @@ products". Hand-sold accounts rarely pay list price, so a hand-attached
 account no longer guesses one. Four nullable columns on
 `affiliate_attributions` (`billing_amount_cents`, `billing_interval`
 month/year/once/none, `billing_paid_until`, `billing_note`), migration
-`db/supabase-affiliate-billing-2026-10-22.sql`, **NOT APPLIED: it must run
-on Constantin's go BEFORE the push**, or `accounts.list` and the portal fail
-reading columns that do not exist. The table stays admin-only under RLS, so
+`db/supabase-affiliate-billing-2026-10-22.sql`, APPLIED on Constantin's go
+as migration `affiliate_attribution_billing_2026_10_22` and read back: four
+nullable columns, both CHECK constraints, RLS on, the same 3 admin policies,
+0 rows touched. The table stays admin-only under RLS, so
 the note never reaches a partner. Estimate basis in order: `set_price`,
 `list_price` (self-serve only), `last_payment`; a manual-source attachment
 without a price reads `price_not_set` ("not set yet" in the portal). New
@@ -46,7 +47,7 @@ never in payments, the estimate, `first_sale_at` or the recurring window; key
 Stripe invoices must be recorded with its `in_` id BEFORE it is paid, else the
 webhook counts it as a plan payment (ADMIN-GUIDE says so). Checks 39 core and
 59 flow (149 total), build exit 0, demo admin and portal pages read back in
-the browser. Owed, in order: the migration (go), push with
+the browser. Owed, in order: push with
 `$env:BATCH_PUSH=1`, then set the real price on each account the first partner
 recommended.
 
