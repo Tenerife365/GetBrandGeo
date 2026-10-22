@@ -51,7 +51,11 @@ calculated" and a new FAQ entry; `affiliates.js` carries the same two facts
 for slug `brandgeo` in an `EXTRAS` map, because the program API has no
 services rate. The program itself is unchanged: until a services rate is
 built, the admin types 5 in the fee form's percent field on every one-time
-fee, or the fee pays 10%.
+fee, or the fee pays 10%. Pushed as `52227e8` and live: `deploy-status.json`
+reads sha `52227e8`, expected 2, deployed 2, failed empty, rollback false;
+the live `affiliates.html` carries the 5% card fact, the "At BrandGEO that
+means" sentence and the new FAQ, and the live `affiliates.js` carries
+`servicesPercent` and the subscription label.
 Live check 2026-10-22: `origin/main` is `9a208ee`, `/affiliate/demo` answers
 200, the live bundle `index-FhwEajL4.js` carries "Sample partner dashboard",
 "How commissions work in this sample", "Want your own?" and "see a sample
