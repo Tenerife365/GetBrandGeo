@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, COMMITTED, NOT pushed
+### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, PUSHED and LIVE (9a208ee)
 
 Constantin's ask: "a demo account for users to understand how it works, 10%
 for subscriptions from the platform and 5% from custom services". Built as a
@@ -43,6 +43,11 @@ horizontal scroll. **Gap, recorded not fixed:** the program has no "custom
 services" rate; a one-time fee earns the sale rule (10%) unless the fee
 form's percent field is filled, so 5% is typed per fee today. Making it the
 program default, and saying so on the public page, waits on Constantin.
+Live check 2026-10-22: `origin/main` is `9a208ee`, `/affiliate/demo` answers
+200, the live bundle `index-FhwEajL4.js` carries "Sample partner dashboard",
+"How commissions work in this sample", "Want your own?" and "see a sample
+dashboard", and getbrandgeo.com `deploy-status.json` reads sha `9a208ee`,
+expected 1, deployed 1, failed empty; `affiliates.html` links the sample twice.
 
 ### 2026-10-22 (fourth): affiliate sidebar, View as partner, unpaid price made visible; BUILT, 160 checks green, PUSHED and LIVE (8ca4b35)
 
