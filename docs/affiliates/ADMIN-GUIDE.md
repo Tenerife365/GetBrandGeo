@@ -150,7 +150,7 @@ price of its plan, because hand-sold accounts rarely pay the list price.
 Self-serve accounts still fall back to the list price, then to the last
 payment. Every change writes an `attribution.billing_set` audit row.
 
-**Record one-time fee** is for money outside the plans (a setup, an audit, a
+The **One-time fee** button on an attached account is for money outside the plans (a setup, an audit, a
 one-off project). Enter what was sold (the partner sees this line), what the
 customer paid, the date and a reason. It is commissioned once at the
 program's sale rate, counts in the partner's Earned and never in the
