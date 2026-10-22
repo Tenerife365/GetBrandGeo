@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
-### 2026-10-22 (fourth): affiliate sidebar, View as partner, unpaid price made visible; BUILT, 160 checks green, COMMITTED, NOT pushed
+### 2026-10-22 (fourth): affiliate sidebar, View as partner, unpaid price made visible; BUILT, 160 checks green, PUSHED and LIVE (8ca4b35)
 
 Constantin's report: IMoM showed a commission and client 52 (an account
 named after an individual, id only here) did not. Cause, read from production: client 52 had only "Set price" (once,
@@ -46,6 +46,10 @@ through `src/lib/affiliateNavStore.ts`. Checks 43 core and 66 flow (160),
 build exit 0, four demo screenshots in `docs/affiliates/screenshots/`.
 Open: IMoM's "EUR 125 for 3 months" does not match 5% of the recorded EUR
 499 sale (EUR 24.95); the amount needs Constantin's confirmation.
+Live check 2026-10-22: `origin/main` is `8ca4b35`, the live bundle
+`index-CvmbG8oy.js` carries "View as partner", "At a glance", "Back to
+BrandGEO" and "Payments recorded", and an unauthenticated POST to
+`affiliate-admin` answers 401.
 
 ### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, migration APPLIED, PUSHED and LIVE (c8e0e9e)
 
