@@ -381,6 +381,15 @@ section('referred accounts: earned and still to come')
   assert.strictEqual(p.earned_cents, 35000)
   ok('a prepaid package: one commission on the package, then prepaid with nothing estimated')
 
+  const packageFee = { conversion_type: 'custom', amount_cents: 100000, occurred_at: '2026-09-15T10:00:00Z', metadata: { one_time: true, description: 'GEO setup' } }
+  p = core.projectReferredAccount({ rules, attribution: billed({ billing_interval: 'once', billing_amount_cents: 100000 }), account: { plan: 'growth' }, payments: [packageFee], commissions: [{ amount_cents: 10000, status: 'approved' }], now })
+  assert.strictEqual(p.status, 'prepaid')
+  assert.strictEqual(p.estimate_cents, 0)
+  assert.strictEqual(p.payments_left, 0)
+  assert.strictEqual(p.earned_cents, 10000)
+  assert.strictEqual(p.first_sale_at, null)
+  ok('a package paid by a one-time fee reads prepaid: earned once, never estimated a second time, no recurring window opened')
+
   p = core.projectReferredAccount({ rules, attribution: billed({ billing_interval: 'none', billing_amount_cents: 0 }), account: { plan: 'growth', plan_source: 'manual' }, now })
   assert.strictEqual(p.status, 'complimentary')
   assert.strictEqual(p.estimate_cents, 0)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
@@ -92,6 +92,17 @@ function OnboardGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Admin only: the partner portal rendered read only for one affiliate ("View as
+// partner" on /affiliates). Presentation only, like the platform's view as
+// user: the admin keeps their own session, affiliate-admin.js portal.preview
+// re-checks the admin role server side, and nothing is minted or swapped.
+function AffiliatePreviewRoute() {
+  const { isAdmin } = useClient()
+  const { affiliateId } = useParams()
+  if (!isAdmin && !isDemoMode) return <Navigate to="/" replace />
+  return <AffiliatePortal previewId={affiliateId || ''} />
+}
+
 function DemoLoginInterceptor() {
   useEffect(() => {
     if (isDemoMode) sessionStorage.setItem('demo_logged_in', 'true')
@@ -146,6 +157,7 @@ export default function App() {
               <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Revenue /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/prospects" element={<PrivateRoute><OnboardGate><Layout><Prospects /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/affiliates/preview/:affiliateId" element={<PrivateRoute><OnboardGate><AffiliatePreviewRoute /></OnboardGate></PrivateRoute>} />
               <Route path="/affiliates" element={<PrivateRoute><OnboardGate><Layout><AffiliatesAdmin /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
               {/* One route, two views. Admins get the triage queue (customer

@@ -6,6 +6,7 @@
  *
  * Actions (grouped):
  *   overview
+ *   portal.preview { affiliate_id } (the partner's dashboard payload, read only, for "View as partner")
  *   programs.list | programs.create | programs.update | programs.rotate_key
  *   resources.list | resources.create | resources.update
  *   affiliates.list | affiliates.invite | affiliates.resend_invite | affiliates.update | affiliates.suspend | affiliates.reactivate
@@ -212,6 +213,19 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
         },
         totals: Object.fromEntries(Object.entries(totals).map(([cur, t]) => [cur, Object.fromEntries(Object.entries(t).map(([k, v]) => [k, core.centsToMajor(v)]))])),
       })
+    }
+
+    // ── portal preview (view as partner) ──────────────────────────────────────
+    // The exact payload the affiliate's own dashboard reads, built by the same
+    // function, for an admin to see the portal as that partner. Read only: no
+    // token is minted, nothing is written, and the portal's write actions stay
+    // behind the affiliate's own JWT in affiliate-portal.js.
+    if (action === 'portal.preview') {
+      const { data: affiliate, error } = await db.from('affiliates').select('*').eq('id', String(body.affiliate_id || '')).maybeSingle()
+      if (error) throw error
+      if (!affiliate) return json(404, { error: 'Affiliate not found.' })
+      const payload = await require('./affiliate-portal').buildMe(db, affiliate, new Date())
+      return json(200, { ...payload, preview: true })
     }
 
     // ── programs ──────────────────────────────────────────────────────────────
@@ -618,6 +632,18 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
       if (error) throw error
       const { data: atts } = await db.from('affiliate_attributions').select('*')
       const maps = await mapsFor(db)
+      // What was actually recorded per attachment, so a price set without a
+      // payment shows as such (a price never creates a commission).
+      const attIds = (atts || []).map((a) => a.id)
+      const { data: paid } = attIds.length
+        ? await db.from('affiliate_conversions').select('attribution_id, conversion_type, amount_cents, occurred_at, metadata').in('attribution_id', attIds).eq('status', 'confirmed').in('conversion_type', ['sale', 'recurring', 'custom'])
+        : { data: [] }
+      const paymentsOf = (id) => {
+        const rows = (paid || []).filter((c) => c.attribution_id === id)
+        const fees = rows.filter(core.isOneTimeFee)
+        const last = rows.reduce((m, c) => (!m || new Date(c.occurred_at) > new Date(m) ? c.occurred_at : m), null)
+        return { count: rows.length - fees.length, fees_count: fees.length, total: core.centsToMajor(rows.reduce((t, c) => t + Number(c.amount_cents || 0), 0)), last_at: last }
+      }
       const byClient = new Map()
       for (const a of atts || []) {
         const key = String(a.external_customer_id || '')
@@ -626,7 +652,7 @@ async function handle(event, { supabase = null, stripeCustomerLookup = null } = 
         if (!Number.isInteger(id)) continue
         const d = decorate(a, maps)
         const list = byClient.get(id) || []
-        list.push({ attribution_id: a.id, program_id: a.program_id, program_slug: d.program_slug, membership_id: a.membership_id, affiliate_id: d.affiliate_id, affiliate_name: d.affiliate_name, source: a.source, stripe_customer_id: a.stripe_customer_id || null, converted_at: a.converted_at || null, billing: billingOf(a), commission: commissionOf(maps.programs.get(a.program_id), maps.memberships.get(a.membership_id) || null, a) })
+        list.push({ attribution_id: a.id, program_id: a.program_id, program_slug: d.program_slug, membership_id: a.membership_id, affiliate_id: d.affiliate_id, affiliate_name: d.affiliate_name, source: a.source, stripe_customer_id: a.stripe_customer_id || null, converted_at: a.converted_at || null, billing: billingOf(a), payments: paymentsOf(a.id), commission: commissionOf(maps.programs.get(a.program_id), maps.memberships.get(a.membership_id) || null, a) })
         byClient.set(id, list)
       }
       return json(200, { accounts: (clients || []).map((c) => ({ ...c, attached: byClient.get(Number(c.id)) || [] })) })

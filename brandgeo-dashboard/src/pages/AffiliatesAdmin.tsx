@@ -6,8 +6,9 @@
  * amount arrives as a formatted string from the server.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
-  AlertCircle, Loader2, Plus, RefreshCw, Copy, Check, Download, KeyRound, Mail, Ban, RotateCcw, ChevronDown, ChevronRight,
+  AlertCircle, Eye, Loader2, Plus, RefreshCw, Copy, Check, Download, KeyRound, Mail, Ban, RotateCcw, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, Undo2, FileText, Upload, ExternalLink, Handshake, Filter,
 } from 'lucide-react'
 import { isDemoMode, supabase } from '../lib/supabase'
@@ -15,6 +16,7 @@ import { useClient } from '../lib/clientContext'
 import EmptyState from '../components/EmptyState'
 import { PageTitle, SectionHeading, StatLabel, StatValue } from '../components/Typography'
 import { affiliatePost, downloadCsv, fmtDate, money, copyText, StatusPill } from '../lib/affiliateApi'
+import { AFFILIATE_TABS, affiliateTabOf, owedLabel, publishAffiliateOverview } from '../lib/affiliateNavStore'
 import {
   CONVERSION_TYPES, COMMISSION_STATUSES, PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type AdminOverview, type AffiliateProgram, type ProgramInput, type AdminAffiliate, type AdminMembership, type AffiliateApplication,
@@ -22,14 +24,8 @@ import {
   type CustomRules, type PayoutMethod, type AdminAccount, type AdminAccountAttachment, type AttachmentBilling, type BillingInterval,
 } from '../types/affiliate'
 
-type Tab = 'programs' | 'affiliates' | 'conversions' | 'payouts' | 'activity'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'programs', label: 'Programs' },
-  { id: 'affiliates', label: 'Affiliates & applications' },
-  { id: 'conversions', label: 'Conversions & commissions' },
-  { id: 'payouts', label: 'Payouts' },
-  { id: 'activity', label: 'Clicks & audit' },
-]
+// The tab lives in the location hash so the sidebar (Layout) and this page agree on it.
+const TABS = AFFILIATE_TABS
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
 // Same look, intrinsic width: for the filter bars, where w-full in `ic` would win over a trailing w-auto.
@@ -156,7 +152,10 @@ function useAsync() {
 /* ── Page ───────────────────────────────────────────────────────────────── */
 export default function AffiliatesAdmin() {
   const { isAdmin } = useClient()
-  const [tab, setTab] = useState<Tab>(() => (['programs', 'affiliates', 'conversions', 'payouts', 'activity'].includes(window.location.hash.slice(1)) ? (window.location.hash.slice(1) as Tab) : (window.location.hash === '#applications' ? 'affiliates' : 'programs')))
+  const location = useLocation()
+  const navigate = useNavigate()
+  const tab = affiliateTabOf(location.hash)
+  const setTab = (t: string) => navigate({ hash: `#${t}` }, { replace: true })
   const [overview, setOverview] = useState<AdminOverview | null>(null)
   const [programs, setPrograms] = useState<AffiliateProgram[]>([])
   const [loadErr, setLoadErr] = useState('')
@@ -164,13 +163,16 @@ export default function AffiliatesAdmin() {
   const loadOverview = useCallback(async () => {
     if (isDemoMode) {
       setPrograms(DEMO_PROGRAMS)
-      setOverview({ programs: DEMO_PROGRAMS, counts: { affiliates_active: 1, affiliates_total: 2, applications_pending: 1, clicks_total: 148, reconciliation_flags: 0 }, totals: { EUR: { pending: '59.80', approved: '119.60', payable: '0.00', paid: '59.80', reversed: '59.80', rejected: '0.00' } } })
+      const demo: AdminOverview = { programs: DEMO_PROGRAMS, counts: { affiliates_active: 1, affiliates_total: 2, applications_pending: 1, clicks_total: 148, reconciliation_flags: 0 }, totals: { EUR: { pending: '59.80', approved: '119.60', payable: '0.00', paid: '59.80', reversed: '59.80', rejected: '0.00' } } }
+      setOverview(demo)
+      publishAffiliateOverview(demo)
       return
     }
     const res = await api<AdminOverview>({ action: 'overview' })
     if (res.error || !res.data) { setLoadErr(res.error || 'Could not load the affiliate overview.'); return }
     setLoadErr('')
     setOverview(res.data)
+    publishAffiliateOverview(res.data)
     setPrograms(res.data.programs)
   }, [])
 
@@ -202,14 +204,14 @@ export default function AffiliatesAdmin() {
           <div className={`${card} p-3`}><StatLabel>Active affiliates</StatLabel><StatValue>{overview.counts.affiliates_active}<span className="text-sm text-slate-500 font-normal"> / {overview.counts.affiliates_total}</span></StatValue></div>
           <div className={`${card} p-3`}><StatLabel>Applications waiting</StatLabel><StatValue>{overview.counts.applications_pending}</StatValue></div>
           <div className={`${card} p-3`}><StatLabel>Clicks</StatLabel><StatValue>{overview.counts.clicks_total}</StatValue></div>
-          <div className={`${card} p-3`}><StatLabel>Owed (approved + payable)</StatLabel><StatValue size="tile">{Object.entries(overview.totals).map(([cur, t]) => `${cur} ${(Number(t.approved || 0) + Number(t.payable || 0)).toFixed(2)}`).join(' · ') || '0.00'}</StatValue></div>
+          <div className={`${card} p-3`}><StatLabel>Owed (approved + payable)</StatLabel><StatValue size="tile">{owedLabel(overview)}</StatValue></div>
           <div className={`${card} p-3`}><StatLabel>Needs reconciliation</StatLabel><StatValue>{overview.counts.reconciliation_flags}</StatValue></div>
         </div>
       )}
 
       <div className="flex gap-1 border-b border-dark-700 overflow-x-auto" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); window.history.replaceState(null, '', `#${t.id}`) }}
+          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
             className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${tab === t.id ? 'border-brand-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
             {t.label}
           </button>
@@ -582,6 +584,7 @@ function AffiliatesTab({ programs, onChanged }: { programs: AffiliateProgram[]; 
                         {!a.has_login && <button type="button" className={btnGhost} disabled={busy} onClick={() => affiliateAction(a, 'resend_invite')}><Mail size={14} /> Resend invite</button>}
                         <button type="button" className={btnGhost} disabled={busy} onClick={() => addMembership(a)}><Plus size={14} /> Add to program</button>
                         <button type="button" className={btnGhost} disabled={busy} onClick={() => editPayout(a)}>Edit payout details</button>
+                        <Link to={`/affiliates/preview/${a.id}`} className={btnGhost} title="Open their dashboard read only, exactly as they see it"><Eye size={14} /> View as partner</Link>
                       </div>
                       {Object.keys(a.payout_details || {}).length > 0 && (
                         <div className="text-xs text-slate-400">Payout details: {Object.entries(a.payout_details).map(([k, v]) => `${k}: ${v}`).join(' · ')}</div>
@@ -893,7 +896,8 @@ const PLAN_SOURCE_LABELS: Record<string, string> = {
 
 const DEMO_ACCOUNTS: AdminAccount[] = [
   { id: 54, name: 'Northwind Bakery', slug: 'northwind-bakery', plan: 'essentials', plan_source: 'manual', plan_grant_until: null, plan_grant_note: 'Custom plan agreed by email', paid_until: '2026-10-17', subscription_started_at: '2026-09-17', stripe_customer_id: null, category: 'customer', created_at: '2026-09-17T09:00:00Z', attached: [] },
-  { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', plan_grant_until: '2027-06-02', plan_grant_note: null, paid_until: '2027-07-30', subscription_started_at: '2026-06-02', stripe_customer_id: 'cus_demo55', category: 'customer', created_at: '2026-06-02T09:00:00Z', attached: [{ attribution_id: 'at1', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: 'cus_demo55', converted_at: '2026-09-12T10:00:00Z', billing: { interval: 'once', amount: '3500.00', amount_cents: 350000, paid_until: '2027-06-02T00:00:00.000Z', note: 'Package paid up front' }, commission: { custom_rules: { sale_commission_type: 'percent', sale_commission_bps: 500, recurring_commission_bps: 500 }, source: 'account', summary: '5% of every payment for the first 12 months' } }] },
+  { id: 55, name: 'Acme Studio', slug: 'acme-studio', plan: 'growth', plan_source: 'package', plan_grant_until: '2027-06-02', plan_grant_note: null, paid_until: '2027-07-30', subscription_started_at: '2026-06-02', stripe_customer_id: 'cus_demo55', category: 'customer', created_at: '2026-06-02T09:00:00Z', attached: [{ attribution_id: 'at1', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: 'cus_demo55', converted_at: '2026-09-12T10:00:00Z', billing: { interval: 'once', amount: '3500.00', amount_cents: 350000, paid_until: '2027-06-02T00:00:00.000Z', note: 'Package paid up front' }, payments: { count: 0, fees_count: 1, total: '3500.00', last_at: '2026-06-02T09:00:00Z' }, commission: { custom_rules: { sale_commission_type: 'percent', sale_commission_bps: 500, recurring_commission_bps: 500 }, source: 'account', summary: '5% of every payment for the first 12 months' } }] },
+  { id: 56, name: 'Harbor Clinic', slug: 'harbor-clinic', plan: 'essentials', plan_source: 'manual', plan_grant_until: null, plan_grant_note: null, paid_until: null, subscription_started_at: '2026-09-15', stripe_customer_id: null, category: 'customer', created_at: '2026-09-15T09:00:00Z', attached: [{ attribution_id: 'at2', program_id: 'p1', program_slug: 'brandgeo', membership_id: 'm1', affiliate_id: 'a1', affiliate_name: 'Demo Affiliate', source: 'manual', stripe_customer_id: null, converted_at: null, billing: { interval: 'once', amount: '1000.00', amount_cents: 100000, paid_until: null, note: 'GEO setup' }, payments: { count: 0, fees_count: 0, total: '0.00', last_at: null }, commission: { custom_rules: null, source: null, summary: '10% of every sale, plus 10% of each renewal for 12 months' } }] },
 ]
 
 /* ── The price an attached account really pays, and one-time fees ───────── */
@@ -989,7 +993,7 @@ function AttachedAccountsSection({ programs, reloadKey, onDone }: { programs: Af
   const [rows, setRows] = useState<AttachedRow[]>([])
   const [loaded, setLoaded] = useState(false)
   const [pricing, setPricing] = useState<AttachedRow | null>(null)
-  const [feeFor, setFeeFor] = useState<AttachedRow | null>(null)
+  const [feeFor, setFeeFor] = useState<{ row: AttachedRow; prefill?: FeePrefill } | null>(null)
   const [rating, setRating] = useState<AttachedRow | null>(null)
   useEffect(() => {
     const pick = (list: AdminAccount[]) => setRows(list.flatMap((a) => a.attached.map((attachment) => ({ account: a, attachment }))))
@@ -1001,30 +1005,44 @@ function AttachedAccountsSection({ programs, reloadKey, onDone }: { programs: Af
   return (
     <section className="space-y-3">
       <SectionHeading>Attached accounts</SectionHeading>
-      <p className="text-xs text-slate-400">The price each account really pays drives the estimate its partner sees. Set it for every account you attached by hand; until then the partner sees "not set yet". The commission column is the rate this account earns: its own rate when you set one, otherwise the affiliate's or the program's. Fees outside the plans (a setup, an audit, a one-off project) are commissioned once at the payment rate, or at a rate you give for that fee, and never count toward the estimate. Partners see amounts and dates, never the rate.</p>
+      <p className="text-xs text-slate-400">The price each account really pays drives the estimate its partner sees. Set it for every account you attached by hand; until then the partner sees "not set yet". The commission column is the rate this account earns: its own rate when you set one, otherwise the affiliate's or the program's. Fees outside the plans (a setup, an audit, a one-off project) are commissioned once at the payment rate, or at a rate you give for that fee, and never count toward the estimate. Partners see amounts and dates, never the rate. A price is only what the account pays: no commission exists until its payment is recorded, either through Stripe or with "Record payment".</p>
       <div className={`${card} overflow-x-auto`}>
         <table className="min-w-full">
-          <thead><tr><th className={th}>Account</th><th className={th}>Affiliate</th><th className={th}>Price it pays</th><th className={th}>Commission</th><th className={th}></th></tr></thead>
+          <thead><tr><th className={th}>Account</th><th className={th}>Affiliate</th><th className={th}>Price it pays</th><th className={th}>Payments recorded</th><th className={th}>Commission</th><th className={th}></th></tr></thead>
           <tbody className="divide-y divide-dark-700">
-            {rows.map(({ account, attachment }) => (
+            {rows.map(({ account, attachment }) => {
+              const pay = attachment.payments
+              const recorded = pay ? pay.count + pay.fees_count : 0
+              const unpaid = !!attachment.billing && attachment.billing.interval !== 'none' && !!pay && recorded === 0
+              const cur = currencyOf(attachment.program_id)
+              return (
               <tr key={attachment.attribution_id}>
                 <td className={td}>{account.name}<div className="text-[11px] text-slate-500">{account.plan || 'free'}{account.plan_source ? ` (${PLAN_SOURCE_LABELS[account.plan_source] ?? account.plan_source})` : ''}</div></td>
                 <td className={td}>{attachment.affiliate_name || 'an affiliate'}<div className="text-[11px] text-slate-500">{attachment.program_slug} via {attachment.source}</div></td>
                 <td className={td + (attachment.billing ? ' text-slate-200' : ' text-amber-300')}>{billingLabel(attachment.billing, currencyOf(attachment.program_id))}{attachment.billing?.note && <div className="text-[11px] text-slate-500">{attachment.billing.note}</div>}</td>
+                <td className={td}>
+                  {!pay ? <span className="text-slate-500">Unknown</span>
+                    : recorded === 0
+                      ? <span className={unpaid ? 'text-amber-300' : 'text-slate-500'}>None yet{unpaid && <div className="text-[11px] text-amber-300/90 max-w-[14rem]">Price set, no payment recorded, so no commission yet.</div>}</span>
+                      : <span className="text-slate-200">{money(pay.total, cur)}<div className="text-[11px] text-slate-500">{[pay.count ? `${pay.count} plan payment${pay.count === 1 ? '' : 's'}` : '', pay.fees_count ? `${pay.fees_count} one-time fee${pay.fees_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}{pay.last_at ? `, last ${fmtDate(pay.last_at)}` : ''}</div></span>}
+                </td>
                 <td className={td + ' text-slate-300 max-w-[16rem]'}>{attachment.commission?.summary || 'Program rate'}{attachment.commission?.source === 'account' && <span className="ml-1 text-[10px] uppercase tracking-wide text-brand-300">this account</span>}{attachment.commission?.source === 'membership' && <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-500">affiliate rate</span>}</td>
                 <td className={td + ' whitespace-nowrap text-right'}>
                   <button type="button" className={btnSmall + ' bg-dark-700 text-slate-200 mr-1'} onClick={() => setPricing({ account, attachment })}>Set price</button>
                   <button type="button" className={btnSmall + ' bg-dark-700 text-slate-200 mr-1'} onClick={() => setRating({ account, attachment })}>Set commission</button>
-                  <button type="button" className={btnSmall + ' bg-brand-500/15 text-brand-300'} onClick={() => setFeeFor({ account, attachment })}><Plus size={12} /> One-time fee</button>
+                  {unpaid && attachment.billing?.interval === 'once'
+                    ? <button type="button" className={btnSmall + ' bg-amber-500/20 text-amber-200 border border-amber-500/40'} onClick={() => setFeeFor({ row: { account, attachment }, prefill: { amount: attachment.billing?.amount || '', description: attachment.billing?.note || 'Package' } })}><Plus size={12} /> Record payment</button>
+                    : <button type="button" className={btnSmall + ' bg-brand-500/15 text-brand-300'} onClick={() => setFeeFor({ row: { account, attachment } })}><Plus size={12} /> One-time fee</button>}
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
       {pricing && <SetPriceModal row={pricing} currency={currencyOf(pricing.attachment.program_id)} onClose={() => setPricing(null)} onDone={(m) => { setPricing(null); onDone(m) }} />}
       {rating && <SetCommissionModal row={rating} currency={currencyOf(rating.attachment.program_id)} onClose={() => setRating(null)} onDone={(m) => { setRating(null); onDone(m) }} />}
-      {feeFor && <RecordFeeModal row={feeFor} currency={currencyOf(feeFor.attachment.program_id)} onClose={() => setFeeFor(null)} onDone={(m) => { setFeeFor(null); onDone(m) }} />}
+      {feeFor && <RecordFeeModal row={feeFor.row} prefill={feeFor.prefill} currency={currencyOf(feeFor.row.attachment.program_id)} onClose={() => setFeeFor(null)} onDone={(m) => { setFeeFor(null); onDone(m) }} />}
     </section>
   )
 }
@@ -1045,6 +1063,7 @@ function SetPriceModal({ row, currency, onClose, onDone }: { row: AttachedRow; c
       <form onSubmit={(e) => { e.preventDefault(); save(false) }} className="space-y-3">
         <p className="text-xs text-slate-400">What this account really pays. It only feeds the estimate {row.attachment.affiliate_name || 'the partner'} sees; commissions are still computed from the payments recorded. A prepaid package is estimated as one payment; renewals inside the program's recurring window are estimated at this price.</p>
         <BillingFields value={bill} onChange={setBill} currency={currency} />
+        {bill.interval === 'once' && <p className="text-xs text-amber-300">A price does not record the payment. Once the customer has paid, use "Record payment" on this row: that creates the commission.</p>}
         <Field label="Reason (optional, audited)"><input className={ic} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="e.g. Annual contract signed in October" /></Field>
         <Notice kind="error" text={error} />
         <div className="flex flex-wrap justify-end gap-2">
@@ -1089,8 +1108,10 @@ function SetCommissionModal({ row, currency, onClose, onDone }: { row: AttachedR
   )
 }
 
-function RecordFeeModal({ row, currency, onClose, onDone }: { row: AttachedRow; currency: string; onClose: () => void; onDone: (m: string) => void }) {
-  const [f, setF] = useState({ description: '', amount: '', occurred_at: '', stripe_invoice_id: '', reference: '', note: '', reason: '', commission_percent: '', commission_amount: '' })
+type FeePrefill = { description: string; amount: string }
+
+function RecordFeeModal({ row, currency, prefill, onClose, onDone }: { row: AttachedRow; currency: string; prefill?: FeePrefill; onClose: () => void; onDone: (m: string) => void }) {
+  const [f, setF] = useState({ description: prefill?.description || '', amount: prefill?.amount || '', occurred_at: '', stripe_invoice_id: '', reference: '', note: '', reason: '', commission_percent: '', commission_amount: '' })
   const { busy, error, run } = useAsync()
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -1105,8 +1126,9 @@ function RecordFeeModal({ row, currency, onClose, onDone }: { row: AttachedRow; 
     onDone(res.commission ? `Fee of ${money(res.fee_amount, currency)} recorded for ${row.account.name}, commission ${money(res.commission_amount, res.commission.currency)} pending.` : `Fee recorded for ${row.account.name} with no commission (see its flags).`)
   }
   return (
-    <Modal title={`One-time fee for ${row.account.name}`} onClose={onClose}>
+    <Modal title={`${prefill ? 'Record payment' : 'One-time fee'} for ${row.account.name}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
+        {prefill && <p className="text-xs text-amber-300">Prefilled from the price you set. Check the amount and set "Paid at" to the day the money arrived.</p>}
         <p className="text-xs text-slate-400">A fee outside the plans that this account paid. {row.attachment.affiliate_name || 'The partner'} earns the account's payment rate on it once ({row.attachment.commission?.summary || 'the program rate'}), or the rate you give below for this fee only. It never starts or extends the recurring window and never counts toward the estimate. If it was paid by a Stripe invoice, record it here with the invoice id before the invoice is paid, so the webhook cannot count it again as a plan payment.</p>
         <Field label="What was sold" hint="Shown to the partner"><input className={ic} required value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} maxLength={200} placeholder="e.g. Website GEO audit and setup" /></Field>
         <div className="grid sm:grid-cols-2 gap-3">

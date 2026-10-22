@@ -741,7 +741,10 @@ function projectReferredAccount({ rules, attribution, account = null, payments =
     if (interval === 'month') out.monthly_basis_cents = out.basis_cents
     if (interval === 'once') {
       out.prepaid_until = attribution.billing_paid_until ? new Date(attribution.billing_paid_until).toISOString() : null
-      if (out.first_sale_at) return { ...out, status: 'prepaid' }
+      // A prepaid package is usually recorded as a one-time fee (admin page,
+      // Attached accounts, "Record payment"), which never sets first_sale_at;
+      // either way it is paid, so it is not estimated a second time.
+      if (out.first_sale_at || fees.length) return { ...out, status: 'prepaid' }
       out.status = 'not_paying_yet'
       out.payments_left = out.basis_cents > 0 ? 1 : 0
       out.estimate_cents = out.basis_cents > 0 ? firstPaymentCommission(rules, out.basis_cents) : 0

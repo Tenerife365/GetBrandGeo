@@ -882,6 +882,40 @@ async function main() {
   assert.ok(r.body.commissions.every((k) => k.kind !== undefined && k.customer_ref !== undefined))
   ok('the portal sends balances (to receive, available, on hold, paid, the dates the rest clears) and per-commission amounts with what each was earned on, and never a rate (the invitation keeps the offer sentence, checked in section 2)')
 
+  section('17. payments per attached account, and the admin view as partner')
+  r = await adminPost({ action: 'accounts.list' })
+  const blueRow = r.body.accounts.find((a) => a.id === 56).attached[0]
+  const blueConvs = rows('affiliate_conversions').filter((c) => c.attribution_id === blueAtt.id && c.status === 'confirmed' && ['sale', 'recurring', 'custom'].includes(c.conversion_type))
+  const blueFees = blueConvs.filter((c) => c.metadata && c.metadata.one_time)
+  assert.ok(blueFees.length >= 3)
+  assert.strictEqual(blueRow.payments.fees_count, blueFees.length)
+  assert.strictEqual(blueRow.payments.count, blueConvs.length - blueFees.length)
+  assert.strictEqual(Math.round(Number(blueRow.payments.total) * 100), blueConvs.reduce((t, c) => t + Number(c.amount_cents), 0))
+  const unpaid = r.body.accounts.flatMap((a) => a.attached).filter((x) => !rows('affiliate_conversions').some((c) => c.attribution_id === x.attribution_id))
+  for (const x of unpaid) assert.deepStrictEqual([x.payments.count, x.payments.fees_count, x.payments.last_at], [0, 0, null])
+  ok('accounts.list carries what was recorded per attachment (plan payments, one-time fees, total, last date), so a price with no payment behind it shows as such')
+
+  const writesBefore = JSON.stringify(['affiliate_conversions', 'affiliate_commissions', 'affiliate_attributions', 'affiliate_audit_log', 'affiliates'].map((t) => rows(t).length))
+  r = await adminPost({ action: 'portal.preview', affiliate_id: ana.id })
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body))
+  assert.strictEqual(r.body.preview, true)
+  const own = (await anaMe()).body
+  assert.deepStrictEqual(r.body.balances, own.balances)
+  assert.deepStrictEqual(r.body.commissions, own.commissions)
+  assert.deepStrictEqual(r.body.memberships, own.memberships)
+  assert.deepStrictEqual(r.body.referred_accounts.map((x) => x.id), own.referred_accounts.map((x) => x.id))
+  assert.strictEqual(r.body.affiliate.id, ana.id)
+  const previewRaw = JSON.stringify(r.body)
+  for (const forbidden of ['commission_summary', '"custom_rules"', 'rule_snapshot', 'rate_override', 'invite_token_hash']) assert.ok(!previewRaw.includes(forbidden), `preview sends ${forbidden}`)
+  r = await adminPost({ action: 'portal.preview', affiliate_id: 'nope' })
+  assert.strictEqual(r.status, 404)
+  r = await call(admin, env.post({ action: 'portal.preview', affiliate_id: ana.id }, { token: 'ana-jwt' }))
+  assert.ok(r.status === 401 || r.status === 403, `a non-admin token got ${r.status}`)
+  r = await call(admin, env.post({ action: 'portal.preview', affiliate_id: ana.id }, {}))
+  assert.ok(r.status === 401 || r.status === 403, `no token got ${r.status}`)
+  assert.strictEqual(JSON.stringify(['affiliate_conversions', 'affiliate_commissions', 'affiliate_attributions', 'affiliate_audit_log', 'affiliates'].map((t) => rows(t).length)), writesBefore, 'the preview writes nothing')
+  ok('portal.preview returns the same payload the partner reads (same builder), flagged preview, never a rate, 404 for an unknown affiliate, refused without an admin token, and writes nothing')
+
   console.log(`\n${passed} checks passed`)
 }
 

@@ -13,6 +13,13 @@
  * the admin set for the account (else, for self-serve accounts, the plan's
  * list price, monthly billing, inside the program's recurring window.
  *
+ * Preview: /affiliates/preview/:affiliateId renders this same page for an
+ * admin, read only ("View as partner" on the admin Affiliates tab). The data
+ * comes from affiliate-admin.js `portal.preview`, which builds the payload with
+ * the same function as `me`, so the admin sees exactly what the partner sees.
+ * Presentation only: no token is minted, no partner session is created, every
+ * save, upload and document link is off, and the amber bar stays on screen.
+ *
  * Values, not rates: the page shows commission amounts, what each was earned
  * on, the date it becomes available, and balances (to receive, available
  * now, next to clear). It never shows a commission percentage, because the
@@ -21,7 +28,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  AlertCircle, Loader2, LogOut, Copy, Check, Link2, MousePointerClick, Users, ShoppingCart, Wallet,
+  AlertCircle, Loader2, LogOut, Eye, EyeOff, Copy, Check, Link2, MousePointerClick, Users, ShoppingCart, Wallet,
   FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp, CalendarClock, CheckCircle2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -141,8 +148,9 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
   )
 }
 
-export default function AffiliatePortal() {
+export default function AffiliatePortal({ previewId }: { previewId?: string } = {}) {
   const navigate = useNavigate()
+  const preview = !!previewId
   const [me, setMe] = useState<PortalMe | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -151,24 +159,30 @@ export default function AffiliatePortal() {
   const load = useCallback(async () => {
     setError('')
     if (isDemoMode) { setMe(DEMO_ME); setLoading(false); return }
-    const res = await affiliatePost<PortalMe>('affiliate-portal', { action: 'me' })
-    if (res.status === 401) { navigate('/affiliate/login', { replace: true }); return }
-    if (res.error || !res.data) setError(res.error || 'Could not load your dashboard.')
+    const res = previewId
+      ? await affiliatePost<PortalMe>('affiliate-admin', { action: 'portal.preview', affiliate_id: previewId })
+      : await affiliatePost<PortalMe>('affiliate-portal', { action: 'me' })
+    if (res.status === 401 && !previewId) { navigate('/affiliate/login', { replace: true }); return }
+    if (res.error || !res.data) setError(res.error || (previewId ? 'Could not load this partner dashboard.' : 'Could not load your dashboard.'))
     else setMe(res.data)
     setLoading(false)
-  }, [navigate])
+  }, [navigate, previewId])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    document.title = 'Affiliate dashboard · BrandGEO'
+    document.title = preview ? `Viewing as ${me?.affiliate?.full_name || 'partner'} · BrandGEO` : 'Affiliate dashboard · BrandGEO'
     return () => { document.title = 'BrandGEO Dashboard' }
-  }, [])
+  }, [preview, me])
   useEffect(() => {
     if (!loading && window.location.hash) {
       const el = document.getElementById(window.location.hash.slice(1))
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [loading])
+
+  function exitPreview() {
+    navigate('/affiliates#affiliates')
+  }
 
   async function signOut() {
     if (!isDemoMode) await supabase.auth.signOut()
@@ -186,14 +200,27 @@ export default function AffiliatePortal() {
       <header className="border-b border-dark-700 bg-dark-800/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <BrandGeoMark href="/affiliate" ariaLabel="Affiliate dashboard" />
+            <BrandGeoMark href={preview ? '/affiliates' : '/affiliate'} ariaLabel={preview ? 'Affiliates admin' : 'Affiliate dashboard'} />
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-brand-300"><Handshake size={12} /> Affiliate</span>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" className={btnGhost} onClick={load} aria-label="Refresh"><RefreshCw size={14} /><span className="hidden sm:inline">Refresh</span></button>
-            <button type="button" className={btnGhost} onClick={signOut}><LogOut size={14} /><span className="hidden sm:inline">Sign out</span></button>
+            {!preview && <button type="button" className={btnGhost} onClick={signOut}><LogOut size={14} /><span className="hidden sm:inline">Sign out</span></button>}
           </div>
         </div>
+        {preview && (
+          <div role="status" className="bg-amber-500/15 border-t border-amber-500/30 text-amber-200">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-sm">
+              <span className="flex items-center gap-2 min-w-0">
+                <Eye size={15} className="shrink-0" />
+                <span className="truncate">Viewing as <strong className="font-semibold">{me?.affiliate?.full_name || 'partner'}</strong>, read only. This is exactly what they see.</span>
+              </span>
+              <button type="button" onClick={exitPreview} className="shrink-0 inline-flex items-center gap-1.5 min-h-[32px] px-3 rounded-control text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100">
+                <EyeOff size={13} /> Exit
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-10">
@@ -209,10 +236,10 @@ export default function AffiliatePortal() {
         {!me || !me.affiliate ? (
           <EmptyState
             icon={Handshake}
-            title="No affiliate account on this login"
-            body="This email is signed in but is not linked to an affiliate account. Apply on getbrandgeo.com/affiliates, or sign in with the email your invitation went to."
-            actionLabel="Affiliate sign in"
-            actionTo="/affiliate/login"
+            title={preview ? 'Partner not found' : 'No affiliate account on this login'}
+            body={preview ? 'This affiliate could not be loaded. Go back to the Affiliates page and pick the partner again.' : 'This email is signed in but is not linked to an affiliate account. Apply on getbrandgeo.com/affiliates, or sign in with the email your invitation went to.'}
+            actionLabel={preview ? 'Back to Affiliates' : 'Affiliate sign in'}
+            actionTo={preview ? '/affiliates#affiliates' : '/affiliate/login'}
           />
         ) : (
           <>
@@ -324,7 +351,7 @@ export default function AffiliatePortal() {
                 <EmptyState icon={FileText} title="No payouts yet" body="A payout is created once your approved commissions reach the program minimum. You can attach your invoice to each payout here." />
               ) : (
                 <div className="space-y-3">
-                  {me.payouts.map((b) => <PayoutCard key={b.id} b={b} onChanged={load} onNotice={setNotice} />)}
+                  {me.payouts.map((b) => <PayoutCard key={b.id} b={b} onChanged={load} onNotice={setNotice} readOnly={preview} />)}
                 </div>
               )}
             </section>
@@ -332,7 +359,7 @@ export default function AffiliatePortal() {
             {/* Settings */}
             <section id="settings" className="space-y-4 scroll-mt-20">
               <SectionHeading>Profile and payout details</SectionHeading>
-              <SettingsForm me={me} onSaved={(msg) => { setNotice(msg); load() }} />
+              <SettingsForm me={me} onSaved={(msg) => { setNotice(msg); load() }} readOnly={preview} />
               <p className="text-xs text-slate-500">
                 Terms accepted {fmtDate(me.affiliate.terms_accepted_at)} (version {me.affiliate.terms_version || 'n/a'}). Read the current <a href="https://getbrandgeo.com/affiliate-terms.html" target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300">affiliate terms</a>. Questions: <a href="mailto:support@getbrandgeo.com" className="text-brand-400 hover:text-brand-300">support@getbrandgeo.com</a>.
               </p>
@@ -628,7 +655,7 @@ function ProgramCard({ m }: { m: PortalMembership }) {
   )
 }
 
-function PayoutCard({ b, onChanged, onNotice }: { b: PortalBatch; onChanged: () => void; onNotice: (m: string) => void }) {
+function PayoutCard({ b, onChanged, onNotice, readOnly = false }: { b: PortalBatch; onChanged: () => void; onNotice: (m: string) => void; readOnly?: boolean }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -653,7 +680,7 @@ function PayoutCard({ b, onChanged, onNotice }: { b: PortalBatch; onChanged: () 
   }
 
   async function open(path: string) {
-    if (isDemoMode) return
+    if (isDemoMode || readOnly) return
     const res = await affiliatePost<{ url: string }>('affiliate-portal', { action: 'document_url', batch_id: b.id, path })
     if (res.data?.url) window.open(res.data.url, '_blank', 'noopener')
     else setErr(res.error || 'Could not open the document.')
@@ -674,14 +701,14 @@ function PayoutCard({ b, onChanged, onNotice }: { b: PortalBatch; onChanged: () 
           <ul className="mt-2 flex flex-wrap gap-2">
             {b.documents.map((d) => (
               <li key={d.path}>
-                <button type="button" onClick={() => open(d.path)} className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"><FileText size={12} /> {d.name} <span className="text-slate-500">({d.kind}, {d.uploaded_by})</span></button>
+                <button type="button" onClick={() => open(d.path)} disabled={readOnly} className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 disabled:text-slate-400 disabled:cursor-default"><FileText size={12} /> {d.name} <span className="text-slate-500">({d.kind}, {d.uploaded_by})</span></button>
               </li>
             ))}
           </ul>
         )}
         {err && <p className="text-xs text-red-300 mt-1">{err}</p>}
       </div>
-      {b.status !== 'cancelled' && (
+      {b.status !== 'cancelled' && !readOnly && (
         <label className={`${btnGhost} cursor-pointer`}>
           {busy ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />} Attach invoice
           <input type="file" className="sr-only" accept=".pdf,.png,.jpg,.jpeg" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
@@ -691,7 +718,7 @@ function PayoutCard({ b, onChanged, onNotice }: { b: PortalBatch; onChanged: () 
   )
 }
 
-function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) => void }) {
+function SettingsForm({ me, onSaved, readOnly = false }: { me: PortalMe; onSaved: (msg: string) => void; readOnly?: boolean }) {
   const a = me.affiliate!
   const fields = me.payout_detail_fields || DEFAULT_FIELDS
   const [profile, setProfile] = useState({ full_name: a.full_name, company: a.company || '', website: a.website || '', social_url: a.social_url || '', country: a.country || '' })
@@ -702,6 +729,7 @@ function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) =>
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (readOnly) return
     setErr(''); setBusy('profile')
     if (isDemoMode) { setTimeout(() => { setBusy(null); onSaved('Profile saved.') }, 300); return }
     const res = await affiliatePost<{ ok: boolean }>('affiliate-portal', { action: 'update_profile', ...profile })
@@ -710,6 +738,7 @@ function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) =>
   }
   async function savePayout(e: React.FormEvent) {
     e.preventDefault()
+    if (readOnly) return
     if (!method) { setErr('Choose a payout method.'); return }
     setErr(''); setBusy('payout')
     if (isDemoMode) { setTimeout(() => { setBusy(null); onSaved('Payout details saved.') }, 300); return }
@@ -720,7 +749,8 @@ function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) =>
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <form onSubmit={saveProfile} className="rounded-card border border-dark-700 bg-dark-800 p-5 space-y-3">
+      <form onSubmit={saveProfile} className="rounded-card border border-dark-700 bg-dark-800 p-5">
+        <fieldset disabled={readOnly} className="space-y-3">
         <h3 className="text-sm font-semibold text-white">Profile</h3>
         {(['full_name', 'company', 'website', 'social_url', 'country'] as const).map((k) => (
           <div key={k}>
@@ -729,10 +759,12 @@ function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) =>
           </div>
         ))}
         <div className="text-xs text-slate-500">Email: {a.email} (contact support to change it)</div>
-        <button type="submit" disabled={busy === 'profile'} className={btnPrimary}>{busy === 'profile' ? <Loader2 className="animate-spin" size={14} /> : null} Save profile</button>
+        {!readOnly && <button type="submit" disabled={busy === 'profile'} className={btnPrimary}>{busy === 'profile' ? <Loader2 className="animate-spin" size={14} /> : null} Save profile</button>}
+        </fieldset>
       </form>
 
-      <form onSubmit={savePayout} className="rounded-card border border-dark-700 bg-dark-800 p-5 space-y-3">
+      <form onSubmit={savePayout} className="rounded-card border border-dark-700 bg-dark-800 p-5">
+        <fieldset disabled={readOnly} className="space-y-3">
         <h3 className="text-sm font-semibold text-white">Payout method</h3>
         <select className={ic} value={method} onChange={(e) => { setMethod(e.target.value as PayoutMethod | ''); setDetails({}) }} aria-label="Payout method">
           <option value="">Choose</option>
@@ -748,7 +780,9 @@ function SettingsForm({ me, onSaved }: { me: PortalMe; onSaved: (msg: string) =>
         ))}
         <p className="text-[11px] text-slate-500">Only what a transfer needs. Never enter a password, card number or API key.</p>
         {err && <p className="text-xs text-red-300">{err}</p>}
-        <button type="submit" disabled={busy === 'payout'} className={btnPrimary}>{busy === 'payout' ? <Loader2 className="animate-spin" size={14} /> : null} Save payout details</button>
+        {!readOnly && <button type="submit" disabled={busy === 'payout'} className={btnPrimary}>{busy === 'payout' ? <Loader2 className="animate-spin" size={14} /> : null} Save payout details</button>}
+        {readOnly && !method && <p className="text-xs text-amber-300">No payout method saved yet. A payout cannot be sent until the partner adds one.</p>}
+        </fieldset>
       </form>
     </div>
   )

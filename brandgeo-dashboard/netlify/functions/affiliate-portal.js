@@ -197,6 +197,72 @@ async function issueMagicLink(db, affiliate) {
   return link
 }
 
+/**
+ * The whole dashboard payload for one affiliate. Shared by `me` (the
+ * affiliate's own JWT) and by affiliate-admin.js `portal.preview` (an admin
+ * viewing the portal as that partner), so the preview can never drift from
+ * what the partner sees. Reads only.
+ */
+async function buildMe(db, affiliate, at = new Date()) {
+  const pairs = await programsForAffiliate(db, affiliate.id)
+  const membershipIds = pairs.map((p) => p.membership.id)
+  const { data: codes } = membershipIds.length ? await db.from('affiliate_codes').select('*').in('membership_id', membershipIds) : { data: [] }
+  const { data: conversions } = membershipIds.length
+    ? await db.from('affiliate_conversions').select('*').in('membership_id', membershipIds).order('occurred_at', { ascending: false }).limit(200)
+    : { data: [] }
+  const { data: commissions } = await db.from('affiliate_commissions').select('*').eq('affiliate_id', affiliate.id).order('created_at', { ascending: false }).limit(500)
+  const { data: batches } = await db.from('affiliate_payout_batches').select('*').eq('affiliate_id', affiliate.id).order('created_at', { ascending: false }).limit(100)
+  const programIds = pairs.filter((p) => p.membership.status === 'active').map((p) => p.program.id)
+  const { data: resources } = programIds.length ? await db.from('affiliate_resources').select('*').in('program_id', programIds).eq('is_active', true).order('sort_order', { ascending: true }) : { data: [] }
+
+  const memberships = pairs.map(({ membership, program }) => {
+    const mine = (codes || []).filter((c) => c.membership_id === membership.id)
+    const primary = mine.find((c) => c.kind === 'link' && c.is_primary && c.is_active) || mine.find((c) => c.kind === 'link' && c.is_active) || null
+    const convs = (conversions || []).filter((c) => c.membership_id === membership.id)
+    return {
+      id: membership.id, status: membership.status, approved_at: membership.approved_at, clicks_total: Number(membership.clicks_total || 0), clicks_last_at: membership.clicks_last_at,
+      program: shapeProgramForAffiliate(program, membership),
+      referral_link: primary ? `${APP_URL}/r/${program.slug}/${primary.code}` : null,
+      referral_code: primary ? primary.code : null,
+      coupon_codes: mine.filter((c) => c.kind === 'coupon' && c.is_active).map((c) => c.code),
+      leads: convs.filter((c) => (c.conversion_type === 'lead' || c.conversion_type === 'qualified_lead') && c.status === 'confirmed').length,
+      sales: convs.filter((c) => (c.conversion_type === 'sale' || c.conversion_type === 'recurring' || c.conversion_type === 'custom') && c.status === 'confirmed').length,
+      resources: (resources || []).filter((r) => r.program_id === program.id).map((r) => ({ id: r.id, title: r.title, kind: r.kind, url: r.url, body: r.body })),
+    }
+  })
+
+  const sums = {}
+  for (const c of commissions || []) {
+    const k = c.currency
+    sums[k] = sums[k] || { pending: 0, approved: 0, payable: 0, paid: 0, reversed: 0, rejected: 0 }
+    sums[k][c.status] = (sums[k][c.status] || 0) + Number(c.amount_cents)
+  }
+  const stats = {
+    clicks: memberships.reduce((s, m) => s + m.clicks_total, 0),
+    leads: memberships.reduce((s, m) => s + m.leads, 0),
+    conversions: memberships.reduce((s, m) => s + m.sales, 0),
+    by_currency: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([s, cents]) => [s, core.centsToMajor(cents)]))])),
+  }
+
+  const referred_accounts = await referredAccounts(db, pairs, conversions || [], commissions || [], at)
+  const balances = shapeBalances(core.affiliateBalances(commissions || [], pairs.filter((p) => p.membership.status === 'active').map((p) => p.program)))
+  const conversionById = new Map((conversions || []).map((c) => [c.id, c]))
+
+  return {
+    referred_accounts,
+    affiliate: {
+      id: affiliate.id, full_name: affiliate.full_name, email: affiliate.email, company: affiliate.company, website: affiliate.website, social_url: affiliate.social_url,
+      country: affiliate.country, status: affiliate.status, payout_method: affiliate.payout_method, payout_details: affiliate.payout_details || {},
+      terms_accepted_at: affiliate.terms_accepted_at, terms_version: affiliate.terms_version, created_at: affiliate.created_at,
+    },
+    memberships, stats, balances,
+    conversions: (conversions || []).map(shapeConversion),
+    commissions: (commissions || []).map((c) => shapeCommission(c, conversionById.get(c.conversion_id) || null)),
+    payouts: (batches || []).map(shapeBatch),
+    payout_detail_fields: core.PAYOUT_DETAIL_FIELDS,
+  }
+}
+
 async function handle(event, { supabase = null, now = null } = {}) {
   const origin = event.headers['origin'] || event.headers['Origin'] || ''
   const headers = corsHeaders(origin)
@@ -263,64 +329,7 @@ async function handle(event, { supabase = null, now = null } = {}) {
 
   if (body.action === 'me') {
     if (!affiliate) return json(200, { affiliate: null, memberships: [], stats: null, balances: {}, conversions: [], commissions: [], payouts: [], referred_accounts: [] })
-    const pairs = await programsForAffiliate(db, affiliate.id)
-    const membershipIds = pairs.map((p) => p.membership.id)
-    const { data: codes } = membershipIds.length ? await db.from('affiliate_codes').select('*').in('membership_id', membershipIds) : { data: [] }
-    const { data: conversions } = membershipIds.length
-      ? await db.from('affiliate_conversions').select('*').in('membership_id', membershipIds).order('occurred_at', { ascending: false }).limit(200)
-      : { data: [] }
-    const { data: commissions } = await db.from('affiliate_commissions').select('*').eq('affiliate_id', affiliate.id).order('created_at', { ascending: false }).limit(500)
-    const { data: batches } = await db.from('affiliate_payout_batches').select('*').eq('affiliate_id', affiliate.id).order('created_at', { ascending: false }).limit(100)
-    const programIds = pairs.filter((p) => p.membership.status === 'active').map((p) => p.program.id)
-    const { data: resources } = programIds.length ? await db.from('affiliate_resources').select('*').in('program_id', programIds).eq('is_active', true).order('sort_order', { ascending: true }) : { data: [] }
-
-    const memberships = pairs.map(({ membership, program }) => {
-      const mine = (codes || []).filter((c) => c.membership_id === membership.id)
-      const primary = mine.find((c) => c.kind === 'link' && c.is_primary && c.is_active) || mine.find((c) => c.kind === 'link' && c.is_active) || null
-      const convs = (conversions || []).filter((c) => c.membership_id === membership.id)
-      return {
-        id: membership.id, status: membership.status, approved_at: membership.approved_at, clicks_total: Number(membership.clicks_total || 0), clicks_last_at: membership.clicks_last_at,
-        program: shapeProgramForAffiliate(program, membership),
-        referral_link: primary ? `${APP_URL}/r/${program.slug}/${primary.code}` : null,
-        referral_code: primary ? primary.code : null,
-        coupon_codes: mine.filter((c) => c.kind === 'coupon' && c.is_active).map((c) => c.code),
-        leads: convs.filter((c) => (c.conversion_type === 'lead' || c.conversion_type === 'qualified_lead') && c.status === 'confirmed').length,
-        sales: convs.filter((c) => (c.conversion_type === 'sale' || c.conversion_type === 'recurring' || c.conversion_type === 'custom') && c.status === 'confirmed').length,
-        resources: (resources || []).filter((r) => r.program_id === program.id).map((r) => ({ id: r.id, title: r.title, kind: r.kind, url: r.url, body: r.body })),
-      }
-    })
-
-    const sums = {}
-    for (const c of commissions || []) {
-      const k = c.currency
-      sums[k] = sums[k] || { pending: 0, approved: 0, payable: 0, paid: 0, reversed: 0, rejected: 0 }
-      sums[k][c.status] = (sums[k][c.status] || 0) + Number(c.amount_cents)
-    }
-    const stats = {
-      clicks: memberships.reduce((s, m) => s + m.clicks_total, 0),
-      leads: memberships.reduce((s, m) => s + m.leads, 0),
-      conversions: memberships.reduce((s, m) => s + m.sales, 0),
-      by_currency: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([s, cents]) => [s, core.centsToMajor(cents)]))])),
-    }
-
-    const at = now ? now() : new Date()
-    const referred_accounts = await referredAccounts(db, pairs, conversions || [], commissions || [], at)
-    const balances = shapeBalances(core.affiliateBalances(commissions || [], pairs.filter((p) => p.membership.status === 'active').map((p) => p.program)))
-    const conversionById = new Map((conversions || []).map((c) => [c.id, c]))
-
-    return json(200, {
-      referred_accounts,
-      affiliate: {
-        id: affiliate.id, full_name: affiliate.full_name, email: affiliate.email, company: affiliate.company, website: affiliate.website, social_url: affiliate.social_url,
-        country: affiliate.country, status: affiliate.status, payout_method: affiliate.payout_method, payout_details: affiliate.payout_details || {},
-        terms_accepted_at: affiliate.terms_accepted_at, terms_version: affiliate.terms_version, created_at: affiliate.created_at,
-      },
-      memberships, stats, balances,
-      conversions: (conversions || []).map(shapeConversion),
-      commissions: (commissions || []).map((c) => shapeCommission(c, conversionById.get(c.conversion_id) || null)),
-      payouts: (batches || []).map(shapeBatch),
-      payout_detail_fields: core.PAYOUT_DETAIL_FIELDS,
-    })
+    return json(200, await buildMe(db, affiliate, now ? now() : new Date()))
   }
 
   if (body.action === 'update_profile') {
@@ -392,4 +401,5 @@ async function handle(event, { supabase = null, now = null } = {}) {
 
 exports.handler = (event) => handle(event)
 exports.handle = handle
+exports.buildMe = buildMe
 exports.AFFILIATE_TERMS_VERSION = AFFILIATE_TERMS_VERSION

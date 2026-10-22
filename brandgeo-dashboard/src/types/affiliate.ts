@@ -499,6 +499,15 @@ export interface AdminAccountAttachment {
   converted_at: string | null
   billing?: AttachmentBilling | null
   commission?: AttachmentCommission | null
+  payments?: AttachmentPayments | null
+}
+
+/** Payments recorded on one attachment: plan payments, one-time fees, their sum (formatted major units) and the latest date. Admin only. */
+export interface AttachmentPayments {
+  count: number
+  fees_count: number
+  total: string
+  last_at: string | null
 }
 
 /** The commission rate of one attached account: its own partial rules (null: default), which layer decides, and the sentence. Admin only. */

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, LifeBuoy, Target, Handshake,
+  Eye, EyeOff, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -21,6 +21,17 @@ import { useI18n, LANGUAGES } from '../lib/i18nContext'
 import { useCollection } from '../lib/collectionContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import type { TimeRange } from '../lib/timeFilterContext'
+import { AFFILIATE_TABS, affiliateTabOf, owedLabel, useAffiliateOverview, type AffiliateTab } from '../lib/affiliateNavStore'
+
+// Icons and short labels for the affiliate admin's tabs, used by the sidebar
+// and the mobile bottom bar while the route is /affiliates.
+const AFFILIATE_TAB_META: Record<AffiliateTab, { icon: typeof Handshake; short: string }> = {
+  programs:    { icon: Handshake,         short: 'Programs' },
+  affiliates:  { icon: Users,             short: 'Partners' },
+  conversions: { icon: Receipt,           short: 'Sales' },
+  payouts:     { icon: Wallet,            short: 'Payouts' },
+  activity:    { icon: MousePointerClick, short: 'Clicks' },
+}
 
 // React 18 does not know the `inert` attribute (native support lands in React
 // 19), and @types/react 18.3.31 has no declaration for it. A bare `inert={true}`
@@ -386,7 +397,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false)
     focusAfterCommit(hamburgerRef.current)
   }
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
+  // Affiliate mode: on /affiliates the sidebar is about the affiliate program,
+  // not the active client. Its tabs replace the AI visibility nav, its numbers
+  // replace the client switcher and markets, and a link leads back. Nothing
+  // about the client context changes; this is presentation only.
+  const affiliateMode = pathname === '/affiliates' || pathname.startsWith('/affiliates/')
+  const affiliateTab = affiliateTabOf(hash)
+  const affiliateOverview = useAffiliateOverview()
   // Allowlist, not a blocklist. Of Layout's 14 routes, only these three pages
   // actually read useTimeFilter today: Dashboard.tsx ('/'), BrandSentiment.tsx
   // ('/sentiment'), and Revenue.tsx ('/usage', which the App.tsx route still
@@ -496,7 +514,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 control disappears the moment it is used, because the whole
                 point is that the admin chrome goes away. The exit lives in the
                 banner, which is always visible while impersonating. */}
-            {isRealAdmin && !viewingAsUser && (
+            {isRealAdmin && !viewingAsUser && !affiliateMode && (
               <button
                 onClick={() => setViewingAsUser(true)}
                 title="View this client as one of its users"
@@ -520,8 +538,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Collection progress — visible from any tab */}
-        {collecting && progress && (
+        {/* Collection progress: visible from any tab except the affiliate admin */}
+        {!affiliateMode && collecting && progress && (
           <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
@@ -557,7 +575,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             are reserved for sentiment data, dashboard-visual-system.md 8.6).
             A stopped run says stopped, with what was actually checked.
             Dismissible, and cleared the moment another run starts. */}
-        {!collecting && runNotice && (
+        {!affiliateMode && !collecting && runNotice && (
           <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0 flex items-center justify-between gap-2">
             <NavLink
               to="/ai-visibility"
@@ -591,7 +609,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
+        {/* Affiliate mode: the program's sections and its headline numbers */}
+        {affiliateMode && (
+          <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Affiliate program">
+            <div>
+              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Affiliate program</div>
+              <div className="space-y-1">
+                {AFFILIATE_TABS.map(({ id, label }) => {
+                  const Icon = AFFILIATE_TAB_META[id].icon
+                  const active = pathname === '/affiliates' && affiliateTab === id
+                  return (
+                    <Link key={id} to={{ pathname: '/affiliates', hash: `#${id}` }} replace={pathname === '/affiliates'}
+                      onClick={closeSidebar} aria-current={active ? 'page' : undefined}
+                      className={navItemClass({ isActive: active })}>
+                      <Icon size={16} />
+                      {label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+            {affiliateOverview && (
+              <div>
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">At a glance</div>
+                <dl className="px-3 space-y-2 text-sm">
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Owed to partners</dt><dd className="text-slate-100 font-medium text-right">{owedLabel(affiliateOverview)}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Active partners</dt><dd className="text-slate-100 font-medium">{affiliateOverview.counts.affiliates_active}<span className="text-slate-500 font-normal"> / {affiliateOverview.counts.affiliates_total}</span></dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Applications waiting</dt><dd className={affiliateOverview.counts.applications_pending ? 'text-amber-300 font-medium' : 'text-slate-100 font-medium'}>{affiliateOverview.counts.applications_pending}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Needs reconciliation</dt><dd className={affiliateOverview.counts.reconciliation_flags ? 'text-amber-300 font-medium' : 'text-slate-100 font-medium'}>{affiliateOverview.counts.reconciliation_flags}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Referral clicks</dt><dd className="text-slate-100 font-medium">{affiliateOverview.counts.clicks_total}</dd></div>
+                </dl>
+              </div>
+            )}
+            <div>
+              <Link to="/" onClick={closeSidebar} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+                <ArrowLeft size={16} /> Back to BrandGEO
+              </Link>
+            </div>
+          </nav>
+        )}
+
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
+        {!affiliateMode && (
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
@@ -614,9 +673,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
+        )}
 
-        {/* Client switcher — admin only */}
-        {isAdmin && clients.length > 0 && (
+        {/* Client switcher: admin only, not in affiliate mode */}
+        {!affiliateMode && isAdmin && clients.length > 0 && (
           <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
             <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
@@ -756,7 +816,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             this is. STATIC identity only (logo + name): the actual profile link
             is the single "My Profile" entry in the bottom actions, so this no
             longer duplicates it. (Ownership; de-duped 2026-07-19) */}
-        {!isAdmin && activeClient && (
+        {!affiliateMode && !isAdmin && activeClient && (
           <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
             <div className="flex items-center gap-2.5 px-1 py-1">
               <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
@@ -768,7 +828,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Market selector — multi-select with per-market region pickers */}
+        {/* Market selector: multi-select with per-market region pickers; client data, so not in affiliate mode */}
+        {!affiliateMode && (
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs text-slate-600 uppercase tracking-wider">{t.sidebar_market}</span>
@@ -888,6 +949,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           )}
         </div>
+        )}
 
         {/* Bottom actions */}
         <div className="p-4 border-t border-dark-700/60 space-y-1 flex-shrink-0">
@@ -897,7 +959,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             My Profile
           </NavLink>
           {/* Billing (only when the client has a Stripe subscription) stays its own row */}
-          {activeClient?.stripe_customer_id && (
+          {!affiliateMode && activeClient?.stripe_customer_id && (
             <button
               onClick={openBilling}
               disabled={billingLoading}
@@ -1010,7 +1072,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
-          {collecting && progress && (
+          {affiliateMode && <span className="text-xs font-medium text-slate-400">Affiliates</span>}
+          {!affiliateMode && collecting && progress && (
             <div className="ml-auto flex items-center gap-1.5 text-xs text-brand-400">
               <Loader2 size={12} className="animate-spin" />
               <span>{progress.done}/{progress.total}</span>
@@ -1042,7 +1105,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         <main ref={mainRef} id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
-          <ClientBanner />
+          {!affiliateMode && <ClientBanner />}
           {children}
         </main>
       </div>
@@ -1058,7 +1121,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         inert={isMobile && sidebarOpen ? '' : undefined}
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb"
       >
-        {nav.map(({ to, icon: Icon, label }) => (
+        {affiliateMode && AFFILIATE_TABS.map(({ id }) => {
+          const { icon: Icon, short } = AFFILIATE_TAB_META[id]
+          const active = pathname === '/affiliates' && affiliateTab === id
+          return (
+            <Link key={id} to={{ pathname: '/affiliates', hash: `#${id}` }} replace={pathname === '/affiliates'}
+              aria-current={active ? 'page' : undefined}
+              className={`mobile-nav-item${active ? ' is-active' : ''}`}>
+              <Icon size={19} />
+              <span className="mobile-nav-label">{short}</span>
+            </Link>
+          )
+        })}
+        {!affiliateMode && nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

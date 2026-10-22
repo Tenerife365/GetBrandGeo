@@ -9,6 +9,25 @@ open reconciliation flags and the commission totals per currency and status.
 Every change to money or attribution is written to the audit log with your
 user id. Nothing financial can be deleted from this page, by design.
 
+**The sidebar is the program's while you are here (2026-10-22).** On
+`/affiliates` the left column swaps the AI visibility navigation for the five
+tabs, an "At a glance" block (owed to partners, active partners, applications
+waiting, reconciliation flags, referral clicks) and "Back to BrandGEO". The
+client switcher, markets, collection progress, billing and the client banner
+are hidden there, because none of them is about affiliates. On a phone the
+bottom bar shows the five tabs; "Back to BrandGEO" is in the menu. The tab
+lives in the address (`/affiliates#conversions`), so a link to a tab opens it.
+
+**View as partner.** On the Affiliates tab, open a partner's row and click
+"View as partner". You get their own dashboard at
+`/affiliates/preview/<affiliate id>`, built by the same function the partner's
+login uses, so what you see is exactly what they see: balances, referred
+accounts, commissions, payouts and settings. It is read only and presentation
+only: you stay signed in as yourself, nothing is minted, every save, upload
+and document link is off, and an amber bar names the partner with an Exit
+button the whole time. The server re-checks that you are an admin on every
+load.
+
 ## Programs
 
 **New program.** Slug (lower case, becomes part of every referral link:
@@ -89,6 +108,17 @@ payment links accept promotion codes since 2026-09-12 (the three yearly ones
 were enabled that day). When the checkout starts on getbrandgeo.com while the referral cookie is live, the code is prefilled on the payment link automatically (accept-terms appends it beside the acceptance reference); the customer only types it when they arrive without the cookie.
 
 ## Conversions and commissions
+
+**A price is not a payment.** "Set price" on an attached account only tells
+the partner's estimate what the account pays. No commission exists until the
+payment itself is recorded, through Stripe or by hand. The Attached accounts
+table has a "Payments recorded" column; a priced account with nothing
+recorded reads "None yet" in amber. For a package priced "once", the row's
+button becomes an amber "Record payment" that opens the fee form prefilled
+with the price and its note: set "Paid at" to the day the money arrived, give
+a reason, save. The commission is created at the account's rate, pending for
+the approval delay counted from that date, so a payment dated more than 30
+days ago is approved on the next page load.
 
 **Conversions** are what happened: lead, qualified lead, sale, recurring,
 custom, with amount, currency, source (link, coupon, form, api, stripe,

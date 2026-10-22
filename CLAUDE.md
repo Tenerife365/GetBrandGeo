@@ -22,6 +22,31 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
+### 2026-10-22 (fourth): affiliate sidebar, View as partner, unpaid price made visible; BUILT, 160 checks green, COMMITTED, NOT pushed
+
+Constantin's report: IMoM showed a commission and client 52 (an account
+named after an individual, id only here) did not. Cause, read from production: client 52 had only "Set price" (once,
+EUR 1,000, "GEO setup") and no recorded payment, so no commission existed.
+A price never creates one. Now `accounts.list` returns `payments` per
+attachment (plan payments, fees, total, last date), the Attached accounts
+table has a "Payments recorded" column, a priced account with none reads an
+amber "None yet", and an unpaid `once` package gets an amber "Record payment"
+that opens the fee form prefilled with price and note. The payment itself is
+Constantin's to record in the UI (Paid at 2026-09-15), never by SQL. A
+`once` package plus a recorded fee projects as prepaid, no second estimate.
+**View as partner:** `/affiliates/preview/:affiliateId` renders
+`AffiliatePortal` read only from new admin action `portal.preview`, which
+calls the same exported `buildMe` as the partner's `me`; amber bar with
+Exit, saves, uploads and documents off, no token minted, admin re-checked
+server side. **Affiliate sidebar:** on `/affiliates` Layout swaps the AI
+visibility nav for the five tabs, an "At a glance" block and "Back to
+BrandGEO", and hides client switcher, markets, collection progress, billing,
+`ClientBanner` and the view-as-user eye; the tab lives in the hash, shared
+through `src/lib/affiliateNavStore.ts`. Checks 43 core and 66 flow (160),
+build exit 0, four demo screenshots in `docs/affiliates/screenshots/`.
+Open: IMoM's "EUR 125 for 3 months" does not match 5% of the recorded EUR
+499 sale (EUR 24.95); the amount needs Constantin's confirmation.
+
 ### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, migration APPLIED, PUSHED and LIVE (c8e0e9e)
 
 Constantin's ask: custom commission per account (IMoM, client 54, at 5%
