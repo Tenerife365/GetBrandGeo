@@ -26,11 +26,16 @@ password to remember. The link signs you into your dashboard at
 
 ## Your dashboard
 
+- **Earnings** (first on the page). Total to receive, what is available
+  now (cleared the approval period and goes into the next payout), the next
+  date an amount becomes available and how much, and what has been paid out
+  so far. Below, every amount still on hold with the date it becomes
+  available. Screenshots: `screenshots/portal-earnings-desktop.png`,
+  `screenshots/portal-earnings-phone.png` (demo data).
 - **Programs.** For each program you are in: your referral link, your code,
-  any coupon codes, the commission rules, the payout terms, and the
-  promotional resources we provide. Copy the link with one click.
-- **Stats.** Clicks, leads, sales, and the commission totals per currency by
-  status.
+  any coupon codes, the payout terms, and the promotional resources we
+  provide. Copy the link with one click.
+- **Activity.** Clicks, leads and sales.
 - **Referred accounts.** Every account credited to you, paying or not: its
   name as we know it, its plan, whether it pays yet, how many payments it
   made, what it has earned you so far (refunds excluded, with what is already
@@ -40,8 +45,8 @@ password to remember. The link signs you into your dashboard at
   from its first payment for BrandGEO). For an account we set up by hand the
   estimate reads "not set yet" until we record its price, rather than
   guessing from the list price. A one-time fee outside the plans (a setup or
-  a one-off project) earns you the sale rate once: it shows in Earned and in
-  your conversions with what was sold, and never in the estimate. It is an
+  a one-off project) earns you a commission once: it shows in Earned and in
+  your commissions with what was sold, and never in the estimate. It is an
   estimate, not a promise. Accounts on the free plan earn once they
   upgrade. Below this list, "How you get paid" sets out the four steps from
   a payment to your transfer. Screenshots:
@@ -51,14 +56,20 @@ password to remember. The link signs you into your dashboard at
 - **Conversions.** Every lead and sale attributed to you: date, type, a
   masked customer reference (never the customer's email or order details),
   amount and status.
-- **Commissions.** Each with its status:
+- **Commissions.** Each with the amount, what it was earned on (the
+  account, and whether it was a payment, a renewal or a one-time fee), when
+  it becomes available, and its status
+  (`screenshots/portal-commissions-values.png`):
   `pending` (inside the approval delay, usually 30 days, so a refund can
   still cancel it), `approved` (owed), `payable` (in a payout being
   prepared), `paid` (with the date), `reversed` (the sale was refunded) or
   `rejected` (with the reason).
 - **Payouts.** Each payout with its date, total, method and the transfer
   reference. You can attach your invoice to a payout.
-- **Settings.** Your profile and payout details.
+- **Settings.** Your profile and your payout details: bank transfer
+  (account holder and IBAN) or PayPal, Wise or Revolut. Fill them in before
+  your first payout; we transfer to what is saved there when the payout is
+  prepared.
 
 ## How tracking works
 
@@ -79,8 +90,9 @@ converts; we keep them.
 
 ## How you get paid
 
-Commissions are approved after the program's approval delay, provided the
-sale was not refunded. Once your approved balance in a currency reaches the
+Your dashboard shows money, not rates: each commission as an amount, with
+the date it becomes available. Commissions are approved after the program's
+approval delay, provided the sale was not refunded. Once your approved balance in a currency reaches the
 program minimum, we create a payout, transfer it through the method you chose,
 and mark it paid with the reference. You get an email at each step: new
 conversion, commission approved, payout completed.

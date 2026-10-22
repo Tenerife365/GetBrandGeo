@@ -12,12 +12,17 @@
  * estimate is computed server side (core.projectReferredAccount) from the price
  * the admin set for the account (else, for self-serve accounts, the plan's
  * list price, monthly billing, inside the program's recurring window.
+ *
+ * Values, not rates: the page shows commission amounts, what each was earned
+ * on, the date it becomes available, and balances (to receive, available
+ * now, next to clear). It never shows a commission percentage, because the
+ * rate can differ per account; the server does not send one.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertCircle, Loader2, LogOut, Copy, Check, Link2, MousePointerClick, Users, ShoppingCart, Wallet,
-  FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp,
+  FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp, CalendarClock, CheckCircle2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { supabase, isDemoMode } from '../../lib/supabase'
@@ -29,6 +34,7 @@ import {
   PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type PortalMe, type PortalMembership, type PortalBatch, type PayoutMethod, type PayoutDetailFields,
   type PortalProgram, type PortalReferredAccount, type ReferredAccountStatus,
+  type PortalBalance, type PortalCommission,
 } from '../../types/affiliate'
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
@@ -51,10 +57,11 @@ const FIELD_LABELS: Record<string, string> = {
 const DEMO_ME: PortalMe = {
   affiliate: { id: 'a1', full_name: 'Demo Affiliate', email: 'demo.affiliate@example.com', company: 'Demo Studio', website: 'https://example.com', social_url: null, country: 'ES', status: 'active', payout_method: 'wise', payout_details: { account_holder: 'Demo Affiliate', email: 'demo.affiliate@example.com' }, terms_accepted_at: '2026-09-01T10:00:00Z', terms_version: '2026-09-12', created_at: '2026-09-01T10:00:00Z' },
   memberships: [
-    { id: 'm1', status: 'active', approved_at: '2026-09-01T10:00:00Z', clicks_total: 148, clicks_last_at: '2026-09-11T14:22:00Z', program: { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: null, logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', currency: 'EUR', commission_summary: '10% of every sale, plus 10% of each renewal for 12 months', attribution_days: 30, approval_days: 30, min_payout: '50.00', payout_schedule: 'Monthly, within 15 days after month end', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, custom_rules: null, referral_link: 'https://app.getbrandgeo.com/r/brandgeo/DEMO10', referral_code: 'DEMO10', coupon_codes: ['DEMOFREE'], leads: 9, sales: 3, resources: [{ id: 1, title: 'Logo pack and screenshots', kind: 'link', url: 'https://getbrandgeo.com/affiliates.html#assets', body: null }] },
-    { id: 'm2', status: 'pending', approved_at: null, clicks_total: 0, clicks_last_at: null, program: { id: 'p2', slug: 'talentwelove', name: 'TalentWeLove Recruiting', tagline: 'Recruitment services for tech teams', description: null, logo_url: null, brand_color: '#0ea5e9', destination_url: 'https://talentwelove.com/', status: 'active', currency: 'EUR', commission_summary: 'EUR 100.00 per qualified lead, EUR 500.00 per sale', attribution_days: 60, approval_days: 45, min_payout: '100.00', payout_schedule: 'Monthly', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, custom_rules: null, referral_link: null, referral_code: null, coupon_codes: [], leads: 0, sales: 0, resources: [] },
+    { id: 'm1', status: 'active', approved_at: '2026-09-01T10:00:00Z', clicks_total: 148, clicks_last_at: '2026-09-11T14:22:00Z', program: { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: null, logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', currency: 'EUR', attribution_days: 30, approval_days: 30, min_payout: '50.00', payout_schedule: 'Monthly, within 15 days after month end', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, referral_link: 'https://app.getbrandgeo.com/r/brandgeo/DEMO10', referral_code: 'DEMO10', coupon_codes: ['DEMOFREE'], leads: 9, sales: 3, resources: [{ id: 1, title: 'Logo pack and screenshots', kind: 'link', url: 'https://getbrandgeo.com/affiliates.html#assets', body: null }] },
+    { id: 'm2', status: 'pending', approved_at: null, clicks_total: 0, clicks_last_at: null, program: { id: 'p2', slug: 'talentwelove', name: 'TalentWeLove Recruiting', tagline: 'Recruitment services for tech teams', description: null, logo_url: null, brand_color: '#0ea5e9', destination_url: 'https://talentwelove.com/', status: 'active', currency: 'EUR', attribution_days: 60, approval_days: 45, min_payout: '100.00', payout_schedule: 'Monthly', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, referral_link: null, referral_code: null, coupon_codes: [], leads: 0, sales: 0, resources: [] },
   ],
-  stats: { clicks: 148, leads: 9, conversions: 3, by_currency: { EUR: { pending: '29.90', approved: '59.80', payable: '0.00', paid: '29.90', reversed: '0.00', rejected: '0.00' } } },
+  stats: { clicks: 148, leads: 9, conversions: 3, by_currency: { EUR: { pending: '54.90', approved: '80.00', payable: '0.00', paid: '29.90', reversed: '0.00', rejected: '0.00' } } },
+  balances: { EUR: { to_receive: '134.90', available_now: '80.00', in_payout: '0.00', on_hold: '54.90', paid: '29.90', min_payout: '50.00', meets_minimum: true, next_available_at: '2026-11-04', next_available_amount: '29.90', upcoming: [{ date: '2026-11-04', amount: '29.90' }, { date: '2026-12-04', amount: '25.00' }] } },
   conversions: [
     { id: 'c1', conversion_type: 'sale', status: 'confirmed', source: 'link', customer_ref: 'a***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-09-10T09:12:00Z', program_id: 'p1', membership_id: 'm1' },
     { id: 'c2', conversion_type: 'lead', status: 'confirmed', source: 'link', customer_ref: 'm***@example.com', amount: '0.00', currency: 'EUR', occurred_at: '2026-09-09T16:40:00Z', program_id: 'p1', membership_id: 'm1' },
@@ -62,9 +69,10 @@ const DEMO_ME: PortalMe = {
     { id: 'c3', conversion_type: 'sale', status: 'refunded', source: 'coupon', customer_ref: 'k***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-08-20T11:00:00Z', program_id: 'p1', membership_id: 'm1' },
   ],
   commissions: [
-    { id: 'k1', conversion_id: 'c1', program_id: 'p1', status: 'pending', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-10-10T09:12:00Z', approved_at: null, paid_at: null, rule: '10% of sale', created_at: '2026-09-10T09:12:00Z' },
-    { id: 'k2', conversion_id: 'c4', program_id: 'p1', status: 'approved', amount: '59.80', amount_cents: 5980, currency: 'EUR', approve_after: '2026-09-01T00:00:00Z', approved_at: '2026-09-02T00:00:00Z', paid_at: null, rule: '10% of sale', created_at: '2026-08-01T00:00:00Z' },
-    { id: 'k3', conversion_id: 'c5', program_id: 'p1', status: 'paid', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-08-01T00:00:00Z', approved_at: '2026-08-02T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', rule: '10% of sale', created_at: '2026-07-01T00:00:00Z' },
+    { id: 'k4', conversion_id: 'c6', program_id: 'p1', status: 'pending', amount: '25.00', amount_cents: 2500, currency: 'EUR', approve_after: '2026-12-04T09:00:00Z', approved_at: null, paid_at: null, created_at: '2026-11-04T09:00:00Z', customer_ref: 'Blue Harbor Dental', kind: 'payment', description: null },
+    { id: 'k1', conversion_id: 'c1', program_id: 'p1', status: 'pending', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-11-04T09:12:00Z', approved_at: null, paid_at: null, created_at: '2026-10-05T09:12:00Z', customer_ref: 'Northwind Bakery', kind: 'renewal', description: null },
+    { id: 'k2', conversion_id: 'c4', program_id: 'p1', status: 'approved', amount: '80.00', amount_cents: 8000, currency: 'EUR', approve_after: '2026-09-01T00:00:00Z', approved_at: '2026-09-02T00:00:00Z', paid_at: null, created_at: '2026-08-01T00:00:00Z', customer_ref: 'Northwind Bakery', kind: 'one_time_fee', description: 'Website GEO audit and setup' },
+    { id: 'k3', conversion_id: 'c5', program_id: 'p1', status: 'paid', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-08-01T00:00:00Z', approved_at: '2026-08-02T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', created_at: '2026-07-01T00:00:00Z', customer_ref: 'Northwind Bakery', kind: 'payment', description: null },
   ],
   payouts: [{ id: 'b1', status: 'paid', currency: 'EUR', total: '29.90', item_count: 1, payout_method: 'wise', external_reference: 'WISE-48812', created_at: '2026-08-09T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', documents: [] }],
   payout_detail_fields: DEFAULT_FIELDS,
@@ -105,6 +113,23 @@ function sumByCurrency(rows: PortalReferredAccount[], pick: (r: PortalReferredAc
     totals.set(r.currency, (totals.get(r.currency) || 0) + Math.round(Number(v) * 100))
   }
   return [...totals.entries()].map(([cur, cents]) => `${cur} ${(cents / 100).toFixed(2)}`).join(' · ')
+}
+
+const KIND_LABELS: Record<string, string> = { payment: 'Payment', renewal: 'Renewal', one_time_fee: 'One-time fee', lead: 'Lead' }
+
+/** When a commission becomes, or became, money in the affiliate's pocket. */
+function availability(k: PortalCommission, balance: PortalBalance | undefined, now = Date.now()): { text: string; tone: string } {
+  if (k.status === 'pending') {
+    if (k.approve_after && new Date(k.approve_after).getTime() > now) return { text: `Available from ${fmtDate(k.approve_after)}`, tone: 'text-amber-300' }
+    return { text: 'Available within a day', tone: 'text-amber-300' }
+  }
+  if (k.status === 'approved') {
+    if (balance && !balance.meets_minimum) return { text: `Available, paid once your balance reaches ${k.currency} ${balance.min_payout}`, tone: 'text-emerald-300' }
+    return { text: 'Available, in the next payout', tone: 'text-emerald-300' }
+  }
+  if (k.status === 'payable') return { text: 'In a payout being prepared', tone: 'text-brand-300' }
+  if (k.status === 'paid') return { text: `Paid ${fmtDate(k.paid_at)}`, tone: 'text-slate-400' }
+  return { text: 'Cancelled, the payment was refunded or reversed', tone: 'text-slate-500' }
 }
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -201,20 +226,15 @@ export default function AffiliatePortal() {
               </div>
             </div>
 
-            {/* Stats */}
-            <section aria-label="Overview" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Earnings */}
+            <Earnings balances={me.balances || {}} />
+
+            {/* Activity */}
+            <section aria-label="Activity" className="grid grid-cols-3 gap-3">
               <Stat icon={MousePointerClick} label="Clicks" value={String(me.stats?.clicks ?? 0)} />
               <Stat icon={Users} label="Leads" value={String(me.stats?.leads ?? 0)} />
               <Stat icon={ShoppingCart} label="Sales" value={String(me.stats?.conversions ?? 0)} />
-              <Stat icon={Wallet} label="Paid out" value={Object.entries(me.stats?.by_currency || {}).map(([cur, t]) => `${cur} ${t.paid || '0.00'}`).join(' · ') || '0.00'} />
             </section>
-            {me.stats && Object.keys(me.stats.by_currency).length > 0 && (
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400 -mt-6">
-                {Object.entries(me.stats.by_currency).map(([cur, t]) => (
-                  <span key={cur}>{cur}: pending {t.pending || '0.00'} · approved {t.approved || '0.00'} · in a payout {t.payable || '0.00'}</span>
-                ))}
-              </div>
-            )}
 
             {/* Programs */}
             <section id="programs" className="space-y-4 scroll-mt-20">
@@ -266,27 +286,31 @@ export default function AffiliatePortal() {
             {/* Commissions */}
             <section id="commissions" className="space-y-3 scroll-mt-20">
               <SectionHeading>Commissions</SectionHeading>
-              <p className="text-xs text-slate-500">Pending commissions become approved after the program's approval period, unless the sale is refunded. Approved commissions are grouped into a payout once they pass the minimum.</p>
+              <p className="text-xs text-slate-500">Each commission becomes available once the approval period after its payment has passed without a refund. Available commissions go into the next monthly payout once your balance reaches the minimum.</p>
               {me.commissions.length === 0 ? (
                 <EmptyState icon={Wallet} title="No commissions yet" body="Your first sale creates your first commission." />
               ) : (
                 <div className="overflow-x-auto rounded-card border border-dark-700 bg-dark-800">
                   <table className="min-w-full text-sm">
                     <thead className="text-xs text-slate-400 uppercase tracking-wider">
-                      <tr><th className="text-left px-4 py-2">Created</th><th className="text-left px-4 py-2">Program</th><th className="text-left px-4 py-2">Rule</th><th className="text-right px-4 py-2">Amount</th><th className="text-left px-4 py-2">Approves after</th><th className="text-left px-4 py-2">Paid</th><th className="text-left px-4 py-2">Status</th></tr>
+                      <tr><th className="text-left px-4 py-2">Earned on</th><th className="text-left px-4 py-2">For</th><th className="text-right px-4 py-2">Commission</th><th className="text-left px-4 py-2">Availability</th><th className="text-left px-4 py-2">Status</th></tr>
                     </thead>
                     <tbody className="divide-y divide-dark-700">
-                      {me.commissions.map((k) => (
-                        <tr key={k.id}>
-                          <td className="px-4 py-2 whitespace-nowrap text-slate-300">{fmtDate(k.created_at)}</td>
-                          <td className="px-4 py-2 text-slate-300">{programsById.get(k.program_id)?.name || ''}</td>
-                          <td className="px-4 py-2 text-slate-400">{k.rule || ''}</td>
-                          <td className="px-4 py-2 text-right text-slate-200 whitespace-nowrap">{k.currency} {k.amount}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-slate-400">{k.status === 'pending' ? fmtDate(k.approve_after) : ''}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-slate-400">{fmtDate(k.paid_at)}</td>
-                          <td className="px-4 py-2"><StatusPill value={k.status} /></td>
-                        </tr>
-                      ))}
+                      {me.commissions.map((k) => {
+                        const av = availability(k, me.balances?.[k.currency])
+                        return (
+                          <tr key={k.id} className="align-top">
+                            <td className="px-4 py-2 whitespace-nowrap text-slate-300">{fmtDate(k.created_at)}</td>
+                            <td className="px-4 py-2">
+                              <div className="text-slate-200">{k.customer_ref || programsById.get(k.program_id)?.name || ''}</div>
+                              <div className="text-xs text-slate-500 max-w-[18rem]">{[k.kind ? KIND_LABELS[k.kind] : '', k.description || '', programsById.size > 1 ? programsById.get(k.program_id)?.name || '' : ''].filter(Boolean).join(' · ')}</div>
+                            </td>
+                            <td className="px-4 py-2 text-right text-white font-medium whitespace-nowrap">{k.currency} {k.amount}</td>
+                            <td className={`px-4 py-2 text-xs ${av.tone} max-w-[16rem]`}>{av.text}</td>
+                            <td className="px-4 py-2"><StatusPill value={k.status} /></td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -476,8 +500,53 @@ function HowYouGetPaid({ program }: { program: PortalProgram | null }) {
           </li>
         ))}
       </ol>
-      <p className="text-xs text-slate-500">You earn: {program.commission_summary}. Full rules in the <a href={program.terms_url} target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300">program terms</a>.</p>
+      <p className="text-xs text-slate-500">Full rules in the <a href={program.terms_url} target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300">program terms</a>.</p>
     </section>
+  )
+}
+
+/** The money summary at the top: what is owed, what is available, and when the rest clears. */
+function Earnings({ balances }: { balances: Record<string, PortalBalance> }) {
+  const entries = Object.entries(balances)
+  if (!entries.length) return null
+  return (
+    <section id="earnings" aria-label="Your earnings" className="space-y-3 scroll-mt-20">
+      {entries.map(([cur, b]) => {
+        const toGo = Math.max(0, Math.round(Number(b.min_payout) * 100) - Math.round(Number(b.available_now) * 100))
+        return (
+          <div key={cur} className="space-y-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <MoneyCard icon={Wallet} label="Total to receive" value={`${cur} ${b.to_receive}`} sub={`${cur} ${b.available_now} available, ${cur} ${b.on_hold} on hold`} strong />
+              <MoneyCard icon={CheckCircle2} label="Available now" value={`${cur} ${b.available_now}`}
+                sub={Number(b.available_now) <= 0 ? 'Nothing has cleared yet' : Number(b.in_payout) > 0 ? `${cur} ${b.in_payout} in a payout being prepared` : b.meets_minimum ? 'Goes into the next monthly payout' : `Paid from ${cur} ${b.min_payout}, ${cur} ${(toGo / 100).toFixed(2)} to go`} />
+              <MoneyCard icon={CalendarClock} label="Next available" value={b.next_available_at ? fmtDate(b.next_available_at) : 'Nothing on hold'}
+                sub={b.next_available_at ? `${cur} ${b.next_available_amount} becomes available` : 'New commissions show their date here'} />
+              <MoneyCard icon={TrendingUp} label="Paid out" value={`${cur} ${b.paid}`} sub="Transferred to you so far" />
+            </div>
+            {b.upcoming.length > 1 && (
+              <div className="rounded-card border border-dark-700 bg-dark-800 px-4 py-3">
+                <div className="text-xs text-slate-500 mb-2">On hold, by the date it becomes available</div>
+                <ul className="flex flex-wrap gap-2">
+                  {b.upcoming.map((u) => (
+                    <li key={u.date} className="text-xs rounded-lg bg-dark-700/60 px-2.5 py-1.5 text-slate-300"><span className="text-slate-500">{fmtDate(u.date)}</span> {cur} {u.amount}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+function MoneyCard({ icon: Icon, label, value, sub, strong = false }: { icon: LucideIcon; label: string; value: string; sub: string; strong?: boolean }) {
+  return (
+    <div className={`rounded-card border p-4 ${strong ? 'border-brand-500/40 bg-brand-500/10' : 'border-dark-700 bg-dark-800'}`}>
+      <div className="flex items-center gap-2 text-slate-400"><Icon size={14} /><StatLabel>{label}</StatLabel></div>
+      <StatValue className="mt-1">{value}</StatValue>
+      <p className="text-[11px] text-slate-500 mt-1">{sub}</p>
+    </div>
   )
 }
 
@@ -514,8 +583,6 @@ function ProgramCard({ m }: { m: PortalMembership }) {
         <div className="rounded-lg bg-dark-700/60 py-2"><dt className="text-[11px] text-slate-500">Leads</dt><dd className="text-sm font-semibold text-white">{m.leads}</dd></div>
         <div className="rounded-lg bg-dark-700/60 py-2"><dt className="text-[11px] text-slate-500">Sales</dt><dd className="text-sm font-semibold text-white">{m.sales}</dd></div>
       </dl>
-
-      <p className="text-sm text-slate-300"><span className="text-slate-500">You earn:</span> {p.commission_summary}</p>
 
       {m.status === 'active' && m.referral_link ? (
         <div className="space-y-2">

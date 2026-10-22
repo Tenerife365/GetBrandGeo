@@ -153,13 +153,44 @@ payment. Every change writes an `attribution.billing_set` audit row.
 The **One-time fee** button on an attached account is for money outside the plans (a setup, an audit, a
 one-off project). Enter what was sold (the partner sees this line), what the
 customer paid, the date and a reason. It is commissioned once at the
-program's sale rate, counts in the partner's Earned and never in the
-payment count, the estimate or the recurring window. Give it an invoice
+account's rate (below) or, without one, the affiliate's or program's sale
+rate. To use a different rate for this fee only, fill "Commission % for
+this fee" or "Or a fixed commission" (one of the two). It counts in the
+partner's Earned and never in the payment count, the estimate or the
+recurring window. Give it an invoice
 number or reference so it cannot be recorded twice. **If Stripe invoices the
 fee, record it here with the `in_...` id BEFORE the invoice is paid**: the
 fee then holds the webhook's own key and the payment arriving later is a
 duplicate. Recorded after the webhook, the same invoice would already count
 as an ordinary plan payment.
+
+**A commission rate per account** (added 2026-10-22). The Commission
+column of Attached accounts shows the rate each account earns its partner,
+tagged "this account" when it has its own. **Set commission** opens the
+rate for that account only: % of each payment (the first payment and
+one-time fees), % of renewals, how many months renewals earn, or a fixed
+amount per sale instead of a percent. An empty field keeps the affiliate's
+or the program's value, so for IMoM at 5% you fill 5 and 5 and leave the
+rest empty. A reason is required and every change writes an
+`attribution.commission_set` audit row. "Use the default rate" removes the
+account's own rate. The same fields are in the attach dialog, so a new
+account can be attached at its rate in one step, and a past payment
+recorded there is commissioned at it. The rate applies to payments
+recorded from then on, including renewals arriving through Stripe;
+commissions already written keep their amount (reject and record again if
+one must change). If the account already paid, changing the renewal months
+recomputes the window from its first payment. Order of precedence: a rate
+given for one fee, then the account's rate, then the affiliate's custom
+rules in that program, then the program's rules. Every commission stores
+which one applied (`rule_snapshot.custom_source`: `payment`, `account`,
+`membership` or null).
+
+**What partners see.** The portal shows amounts and dates, never a rate:
+what they have to receive, what is available now, what is on hold and the
+date each part becomes available, what was paid, and per commission what it
+was earned on (account, payment, renewal or one-time fee with its
+description). The offer sentence appears only on the invitation they
+accept.
 
 **Reverse** a conversion (refund or cancellation) with a reason. Its unpaid
 commission becomes `reversed`; a paid one is flagged for reconciliation.
@@ -192,6 +223,19 @@ and a note, and the clawback decision is yours.
 5. **Documents.** The affiliate can attach an invoice to the batch from their
    dashboard; you can attach documents too and open them through a short
    lived signed URL. Files live in the private bucket `affiliate-documents`.
+
+**Bank details and accounting.** The affiliate enters their payout
+details themselves in the portal, Settings, Payout method (bank transfer
+with account holder and IBAN, or PayPal, Wise, Revolut); the batch keeps a
+copy as it was when created, so a later change never rewrites a payout
+already prepared. The module does not move money and Stripe does not take
+part: Stripe can only record transfers it makes itself, through Stripe
+Connect, which needs each affiliate onboarded as a connected account and a
+funded platform balance. Until the volume justifies that, pay by SEPA
+transfer from the business account and keep the accounting trail here: the
+CSV of the batch, the transfer reference on Mark paid, and the affiliate's
+invoice (or your self-billed invoice) attached to the batch. Which of the
+two invoices the accountant wants is their call, ask once and keep to it.
 
 Monthly routine: open Payouts, review candidates against the reconciliation
 flags on the commissions tab, create one batch per affiliate, export, pay,

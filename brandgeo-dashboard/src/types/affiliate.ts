@@ -323,7 +323,8 @@ export interface PortalProgram {
   destination_url: string
   status: ProgramStatus
   currency: string
-  commission_summary: string
+  /** The offer sentence. Sent on the invitation only (JoinPreview); the dashboard shows money, not rates. */
+  commission_summary?: string
   attribution_days: number
   approval_days: number
   min_payout: string
@@ -340,7 +341,6 @@ export interface PortalMembership {
   clicks_total: number
   clicks_last_at: string | null
   program: PortalProgram
-  custom_rules: CustomRules | null
   referral_link: string | null
   referral_code: string | null
   coupon_codes: string[]
@@ -376,8 +376,30 @@ export interface PortalCommission {
   approve_after: string | null
   approved_at: string | null
   paid_at: string | null
-  rule: string | null
   created_at: string
+  /** What the commission was earned on. Never a rate. */
+  customer_ref?: string | null
+  kind?: 'payment' | 'renewal' | 'one_time_fee' | 'lead' | null
+  description?: string | null
+}
+
+/** What the affiliate is owed in one currency, as money and dates. */
+export interface PortalBalance {
+  /** Everything not paid yet: on hold plus available. */
+  to_receive: string
+  /** Cleared the approval period (includes in_payout). */
+  available_now: string
+  /** In a payout being prepared. */
+  in_payout: string
+  /** Inside the approval period; a refund still cancels it. */
+  on_hold: string
+  paid: string
+  min_payout: string
+  meets_minimum: boolean
+  next_available_at: string | null
+  next_available_amount: string | null
+  /** On-hold amounts by the day they become available, earliest first. */
+  upcoming: { date: string; amount: string }[]
 }
 
 export interface PortalBatch {
@@ -450,6 +472,7 @@ export interface PortalMe {
   affiliate: PortalAffiliate | null
   memberships: PortalMembership[]
   stats: { clicks: number; leads: number; conversions: number; by_currency: Totals } | null
+  balances?: Record<string, PortalBalance>
   conversions: PortalConversion[]
   commissions: PortalCommission[]
   payouts: PortalBatch[]
@@ -475,6 +498,14 @@ export interface AdminAccountAttachment {
   stripe_customer_id: string | null
   converted_at: string | null
   billing?: AttachmentBilling | null
+  commission?: AttachmentCommission | null
+}
+
+/** The commission rate of one attached account: its own partial rules (null: default), which layer decides, and the sentence. Admin only. */
+export interface AttachmentCommission {
+  custom_rules: CustomRules | null
+  source: 'membership' | 'account' | 'payment' | null
+  summary: string | null
 }
 
 /** The price an attached account really pays, set by the admin. Feeds the partner's estimate only. */

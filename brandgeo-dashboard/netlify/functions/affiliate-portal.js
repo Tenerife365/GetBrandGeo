@@ -7,7 +7,7 @@
  *   join_preview   { token }                        -> { affiliate, programs, terms }
  *   join_accept    { token, payout_method?, payout_details?, terms_accepted, privacy_accepted }
  *                                                   -> { ok, action_link }   (a Supabase magic link; the browser follows it)
- *   me             {}                               -> { affiliate, memberships[], stats, conversions[], commissions[], payouts[], referred_accounts[] }
+ *   me             {}                               -> { affiliate, memberships[], stats, balances, conversions[], commissions[], payouts[], referred_accounts[] }
  *   update_profile { full_name?, company?, website?, social_url?, country? }
  *   update_payout  { payout_method, payout_details }
  *   apply_program  { program }                      -> membership pending
@@ -20,6 +20,14 @@
  * contents, never Stripe ids. Referred accounts carry the same customer_ref,
  * the plan (needed for the estimate) and money, never a client id or a
  * Stripe id.
+ *
+ * VALUES, NOT RATES (2026-10-22). `me` shows the affiliate money and dates:
+ * each commission's amount, what it was earned on and when it becomes
+ * available, plus balances (to receive, available now, on hold, paid, the
+ * next amounts to clear and their dates). It never sends a commission rate,
+ * a rule sentence or custom_rules, because a rate can differ per account.
+ * The join preview still shows the program's offer, which is what the
+ * affiliate accepts.
  */
 
 const { requireAffiliate, serviceClient, jsonResponse } = require('./_affiliate_auth')
@@ -34,14 +42,18 @@ const AFFILIATE_TERMS_VERSION = '2026-09-12'
 
 function nowIso() { return new Date().toISOString() }
 
-function shapeProgramForAffiliate(p, membership) {
-  return {
+function shapeProgramForAffiliate(p, membership, { withOffer = false } = {}) {
+  const out = {
     id: p.id, slug: p.slug, name: p.name, tagline: p.tagline, description: p.description, logo_url: p.logo_url, brand_color: p.brand_color,
     destination_url: p.destination_url, status: p.status, currency: p.currency,
-    commission_summary: summarizeRules(p, membership), attribution_days: p.attribution_days, approval_days: p.approval_days,
+    attribution_days: p.attribution_days, approval_days: p.approval_days,
     min_payout: core.centsToMajor(p.min_payout_cents), payout_schedule: p.payout_schedule,
     terms_md: p.terms_md, terms_url: p.terms_url || 'https://getbrandgeo.com/affiliate-terms.html', terms_version: p.terms_version,
   }
+  // The offer sentence is shown only on the invitation, where it is what the
+  // affiliate accepts; the dashboard shows money, not rates.
+  if (withOffer) out.commission_summary = summarizeRules(p, membership)
+  return out
 }
 
 function shapeConversion(c) {
@@ -52,11 +64,25 @@ function shapeConversion(c) {
   }
 }
 
-function shapeCommission(c) {
+function shapeCommission(c, conversion = null) {
+  const fee = conversion && core.isOneTimeFee(conversion)
   return {
     id: c.id, conversion_id: c.conversion_id, program_id: c.program_id, status: c.status, amount: core.centsToMajor(c.amount_cents), amount_cents: Number(c.amount_cents),
-    currency: c.currency, approve_after: c.approve_after, approved_at: c.approved_at, paid_at: c.paid_at, rule: c.rule_snapshot && c.rule_snapshot.rule, created_at: c.created_at,
+    currency: c.currency, approve_after: c.approve_after, approved_at: c.approved_at, paid_at: c.paid_at, created_at: c.created_at,
+    customer_ref: conversion ? conversion.customer_ref || 'customer' : null,
+    kind: core.commissionKind(conversion),
+    description: fee ? conversion.metadata.description || null : null,
   }
+}
+
+function shapeBalances(balances) {
+  const m = core.centsToMajor
+  return Object.fromEntries(Object.entries(balances).map(([cur, b]) => [cur, {
+    to_receive: m(b.to_receive_cents), available_now: m(b.available_cents), in_payout: m(b.in_payout_cents), on_hold: m(b.on_hold_cents), paid: m(b.paid_cents),
+    min_payout: m(b.min_payout_cents), meets_minimum: b.meets_minimum,
+    next_available_at: b.next_available_at, next_available_amount: b.next_available_at ? m(b.next_available_cents) : null,
+    upcoming: b.upcoming.map((u) => ({ date: u.date, amount: m(u.amount_cents) })),
+  }]))
 }
 
 function shapeBatch(b) {
@@ -128,7 +154,8 @@ async function referredAccounts(db, pairs, conversions, commissions, now = new D
 
   return atts.map((a) => {
     const pair = byMembership.get(a.membership_id)
-    const rules = core.effectiveRules(pair.program, pair.membership)
+    // The account's own rate when it has one (affiliate_attributions.custom_rules).
+    const rules = core.effectiveRules(pair.program, pair.membership, a)
     const payments = conversions.filter((c) => c.attribution_id === a.id && c.status === 'confirmed' && PAYING_TYPES.includes(c.conversion_type))
     const paymentIds = new Set(conversions.filter((c) => c.attribution_id === a.id).map((c) => c.id))
     const mine = commissions.filter((k) => paymentIds.has(k.conversion_id))
@@ -194,7 +221,7 @@ async function handle(event, { supabase = null, now = null } = {}) {
     if (body.action === 'join_preview') {
       return json(200, {
         affiliate: { full_name: affiliate.full_name, email: core.maskEmail(affiliate.email), company: affiliate.company, payout_method: affiliate.payout_method, terms_accepted_at: affiliate.terms_accepted_at },
-        programs: pairs.map(({ program, membership }) => ({ ...shapeProgramForAffiliate(program, membership), membership_status: membership.status })),
+        programs: pairs.map(({ program, membership }) => ({ ...shapeProgramForAffiliate(program, membership, { withOffer: true }), membership_status: membership.status })),
         terms_version: AFFILIATE_TERMS_VERSION,
         terms_url: 'https://getbrandgeo.com/affiliate-terms.html',
       })
@@ -235,7 +262,7 @@ async function handle(event, { supabase = null, now = null } = {}) {
   const actor = affiliate ? { type: 'affiliate', id: affiliate.id, label: affiliate.email } : { type: 'affiliate', id: user.id, label: user.email }
 
   if (body.action === 'me') {
-    if (!affiliate) return json(200, { affiliate: null, memberships: [], stats: null, conversions: [], commissions: [], payouts: [], referred_accounts: [] })
+    if (!affiliate) return json(200, { affiliate: null, memberships: [], stats: null, balances: {}, conversions: [], commissions: [], payouts: [], referred_accounts: [] })
     const pairs = await programsForAffiliate(db, affiliate.id)
     const membershipIds = pairs.map((p) => p.membership.id)
     const { data: codes } = membershipIds.length ? await db.from('affiliate_codes').select('*').in('membership_id', membershipIds) : { data: [] }
@@ -254,7 +281,6 @@ async function handle(event, { supabase = null, now = null } = {}) {
       return {
         id: membership.id, status: membership.status, approved_at: membership.approved_at, clicks_total: Number(membership.clicks_total || 0), clicks_last_at: membership.clicks_last_at,
         program: shapeProgramForAffiliate(program, membership),
-        custom_rules: membership.custom_rules || null,
         referral_link: primary ? `${APP_URL}/r/${program.slug}/${primary.code}` : null,
         referral_code: primary ? primary.code : null,
         coupon_codes: mine.filter((c) => c.kind === 'coupon' && c.is_active).map((c) => c.code),
@@ -277,7 +303,10 @@ async function handle(event, { supabase = null, now = null } = {}) {
       by_currency: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([s, cents]) => [s, core.centsToMajor(cents)]))])),
     }
 
-    const referred_accounts = await referredAccounts(db, pairs, conversions || [], commissions || [], now ? now() : new Date())
+    const at = now ? now() : new Date()
+    const referred_accounts = await referredAccounts(db, pairs, conversions || [], commissions || [], at)
+    const balances = shapeBalances(core.affiliateBalances(commissions || [], pairs.filter((p) => p.membership.status === 'active').map((p) => p.program)))
+    const conversionById = new Map((conversions || []).map((c) => [c.id, c]))
 
     return json(200, {
       referred_accounts,
@@ -286,9 +315,9 @@ async function handle(event, { supabase = null, now = null } = {}) {
         country: affiliate.country, status: affiliate.status, payout_method: affiliate.payout_method, payout_details: affiliate.payout_details || {},
         terms_accepted_at: affiliate.terms_accepted_at, terms_version: affiliate.terms_version, created_at: affiliate.created_at,
       },
-      memberships, stats,
+      memberships, stats, balances,
       conversions: (conversions || []).map(shapeConversion),
-      commissions: (commissions || []).map(shapeCommission),
+      commissions: (commissions || []).map((c) => shapeCommission(c, conversionById.get(c.conversion_id) || null)),
       payouts: (batches || []).map(shapeBatch),
       payout_detail_fields: core.PAYOUT_DETAIL_FIELDS,
     })

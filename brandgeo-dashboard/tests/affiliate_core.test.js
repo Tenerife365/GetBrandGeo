@@ -63,6 +63,63 @@ assert.strictEqual(r.snapshot.custom, true)
 assert.strictEqual(rules.recurring_commission_bps, 2000, 'keys not overridden keep the program value')
 ok('a custom per-affiliate rate overrides only the keys it sets')
 
+const membership25 = { custom_rules: { sale_commission_bps: 2500 } }
+const account5 = { custom_rules: { sale_commission_type: 'percent', sale_commission_bps: 500, recurring_commission_bps: 500 } }
+rules = core.effectiveRules(program, membership25, account5)
+assert.strictEqual(rules.sale_commission_bps, 500)
+assert.strictEqual(rules.recurring_commission_bps, 500)
+assert.strictEqual(rules.recurring_months, 12, 'a key no layer sets keeps the program value')
+assert.strictEqual(rules.custom_source, 'account')
+r = core.computeCommission({ rules, conversionType: 'sale', amountCents: 100000, occurredAt: '2026-10-22T00:00:00Z' })
+assert.strictEqual(r.amountCents, 5000)
+assert.strictEqual(r.snapshot.custom_source, 'account')
+rules = core.effectiveRules(program, membership25, { custom_rules: { recurring_months: 3 } })
+assert.strictEqual(rules.sale_commission_bps, 2500, 'the membership rate survives an account layer that does not set it')
+assert.strictEqual(rules.recurring_months, 3)
+assert.strictEqual(core.effectiveRules(program, membership25, { custom_rules: null }).custom_source, 'membership')
+assert.strictEqual(core.effectiveRules(program, null, { custom_rules: { sale_commission_bps: null } }).custom_source, null, 'a null key changes nothing')
+assert.strictEqual(core.effectiveRules(program, null).custom_source, null)
+rules = core.effectiveRules(program, membership25, account5, { sale_commission_type: 'fixed', sale_commission_cents: 12000 })
+assert.strictEqual(rules.custom_source, 'payment')
+r = core.computeCommission({ rules, conversionType: 'custom', amountCents: 100000, occurredAt: '2026-10-22T00:00:00Z' })
+assert.strictEqual(r.amountCents, 12000)
+assert.strictEqual(core.summarizeRules(program, null, account5), '5% of every payment for the first 12 months')
+ok('layers: program, then affiliate, then account, then one payment; each sets only its keys; custom_source names the top layer used')
+
+let bal = core.affiliateBalances([
+  { status: 'pending', amount_cents: 2990, currency: 'EUR', approve_after: '2026-11-04T09:00:00Z' },
+  { status: 'pending', amount_cents: 1000, currency: 'EUR', approve_after: '2026-11-04T18:00:00Z' },
+  { status: 'pending', amount_cents: 2500, currency: 'EUR', approve_after: '2026-12-04T09:00:00Z' },
+  { status: 'approved', amount_cents: 3000, currency: 'EUR' },
+  { status: 'payable', amount_cents: 1500, currency: 'EUR' },
+  { status: 'paid', amount_cents: 2990, currency: 'EUR' },
+  { status: 'reversed', amount_cents: 9999, currency: 'EUR' },
+  { status: 'rejected', amount_cents: 9999, currency: 'EUR' },
+], [{ currency: 'EUR', min_payout_cents: 5000 }, { currency: 'EUR', min_payout_cents: 10000 }, { currency: 'USD', min_payout_cents: 2000 }])
+assert.strictEqual(bal.EUR.on_hold_cents, 6490)
+assert.strictEqual(bal.EUR.available_cents, 4500)
+assert.strictEqual(bal.EUR.in_payout_cents, 1500)
+assert.strictEqual(bal.EUR.to_receive_cents, 10990)
+assert.strictEqual(bal.EUR.paid_cents, 2990)
+assert.strictEqual(bal.EUR.min_payout_cents, 10000, 'the highest program minimum in the currency, as the payout grouping uses')
+assert.deepStrictEqual(bal.EUR.upcoming, [{ date: '2026-11-04', amount_cents: 3990 }, { date: '2026-12-04', amount_cents: 2500 }])
+assert.strictEqual(bal.EUR.next_available_at, '2026-11-04')
+assert.strictEqual(bal.EUR.next_available_cents, 3990)
+assert.strictEqual(bal.EUR.meets_minimum, false)
+assert.strictEqual(bal.USD.to_receive_cents, 0)
+assert.strictEqual(bal.USD.next_available_at, null)
+bal = core.affiliateBalances([{ status: 'approved', amount_cents: 6000, currency: 'EUR' }], [{ currency: 'EUR', min_payout_cents: 5000 }])
+assert.strictEqual(bal.EUR.meets_minimum, true)
+assert.deepStrictEqual(core.affiliateBalances([], []), {})
+ok('balances: on hold, available, in payout, to receive and paid per currency; reversed and rejected count nowhere; same-day amounts grouped; minimum is the highest threshold')
+
+assert.strictEqual(core.commissionKind({ conversion_type: 'custom', metadata: { one_time: true } }), 'one_time_fee')
+assert.strictEqual(core.commissionKind({ conversion_type: 'recurring' }), 'renewal')
+assert.strictEqual(core.commissionKind({ conversion_type: 'qualified_lead' }), 'lead')
+assert.strictEqual(core.commissionKind({ conversion_type: 'sale' }), 'payment')
+assert.strictEqual(core.commissionKind(null), null)
+ok('commissionKind names what a commission was earned on, never a rate')
+
 rules = core.effectiveRules(program, null)
 const firstSale = '2026-01-15T10:00:00Z'
 const until = core.recurringUntil(rules, firstSale)

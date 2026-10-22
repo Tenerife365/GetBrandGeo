@@ -22,6 +22,33 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
+### 2026-10-22 (third): commission rate per account and per fee, portal shows money not rates; BUILT, 157 checks green, COMMITTED, migration NOT APPLIED, NOT pushed
+
+Constantin's ask: custom commission per account (IMoM, client 54, at 5%
+against the program's 10%), partners see only values (commission, total to
+receive, when each amount becomes available), and a way to pay them and
+record it in accounting. New nullable `custom_rules jsonb` on
+`affiliate_attributions`, migration
+`db/supabase-affiliate-account-commission-2026-10-22.sql`, **NOT applied:
+apply it BEFORE pushing**, the admin list and the portal read the column.
+Rule layers, last wins: program, membership `custom_rules`, attribution
+`custom_rules`, a rate given for one fee; the snapshot records
+`custom_source`. Admin: Commission column and "Set commission" on Attached
+accounts (`accounts.set_commission`, reason required, audit
+`attribution.commission_set`, recomputes `recurring_until` when the account
+already paid), the same fields on attach, and an optional percent or fixed
+commission on "One-time fee" (`metadata.rate_override`). Portal: `me`
+returns `balances` per currency (to receive, available, in payout, on hold,
+paid, minimum, amounts by the day they clear) and commissions with what they
+were earned on; no rate field leaves the server except the offer sentence on
+`join_preview`. Bank details already existed (Settings, Payout method).
+Payout recommendation to Constantin: SEPA by hand plus the batch CSV, the
+Mark paid reference and the invoice on the batch; Stripe Connect only at
+volume; the accountant rules invoice versus self-billing. Open: the portal
+conversions table still shows the customer's payment amount, from which a
+partner can work out the rate. Checks 42 core and 64 flow (157 total), build
+exit 0, five demo screenshots in `docs/affiliates/screenshots/`.
+
 ### 2026-10-22 (later): real price per attached account, and one-time fees; BUILT, 149 checks green, COMMITTED (f2416aa), migration APPLIED 2026-10-22, NOT pushed
 
 Constantin's ask: "make the estimate use the real price, but also have the

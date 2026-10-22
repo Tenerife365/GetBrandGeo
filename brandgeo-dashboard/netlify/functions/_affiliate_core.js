@@ -140,23 +140,36 @@ const RULE_KEYS = [
 ]
 
 /**
- * The rules that apply to one membership: the program's columns, with any key
- * present in membership.custom_rules overriding. A custom rate for a specific
- * affiliate is therefore a partial object, never a whole copy.
+ * The rules that apply to one payment. Layers, lowest first: the program's
+ * columns, membership.custom_rules (a rate for one affiliate),
+ * attribution.custom_rules (a rate for one referred account, added
+ * 2026-10-22), then `override` (a rate for one payment, used by a one-time
+ * fee). Every layer is a partial object: a key present and not null wins over
+ * the layers below it, so a custom rate is never a whole copy.
+ * custom_source names the highest layer that changed anything.
  */
-function effectiveRules(program, membership) {
-  const custom = membership && membership.custom_rules && typeof membership.custom_rules === 'object' ? membership.custom_rules : {}
+function effectiveRules(program, membership, attribution = null, override = null) {
+  const layerOf = (row) => row && row.custom_rules && typeof row.custom_rules === 'object' && !Array.isArray(row.custom_rules) ? row.custom_rules : {}
+  const layers = [
+    ['membership', layerOf(membership)],
+    ['account', layerOf(attribution)],
+    ['payment', override && typeof override === 'object' && !Array.isArray(override) ? override : {}],
+  ]
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k) && o[k] !== undefined && o[k] !== null
   const rules = {}
-  for (const k of RULE_KEYS) {
-    rules[k] = Object.prototype.hasOwnProperty.call(custom, k) && custom[k] !== null && custom[k] !== undefined
-      ? custom[k]
-      : program[k]
+  let source = null
+  for (const k of RULE_KEYS) rules[k] = program[k]
+  for (const [name, layer] of layers) {
+    let used = false
+    for (const k of RULE_KEYS) if (has(layer, k)) { rules[k] = layer[k]; used = true }
+    if (used) source = name
   }
   rules.currency = program.currency || 'EUR'
   rules.approval_days = Number(program.approval_days ?? 30)
   rules.attribution_days = Number(program.attribution_days ?? 30)
   rules.attribution_mode = program.attribution_mode || 'last_touch'
-  rules.custom = Object.keys(custom).length > 0
+  rules.custom = source !== null
+  rules.custom_source = source
   return rules
 }
 
@@ -180,6 +193,7 @@ function computeCommission({ rules, conversionType, amountCents, occurredAt, att
     currency: rules.currency,
     custom: !!rules.custom,
   }
+  if (rules.custom_source) snapshot.custom_source = rules.custom_source
 
   if (conversionType === 'lead') {
     // A raw lead never pays; only a qualified lead does. Recorded for counts.
@@ -246,8 +260,8 @@ function approveAfter(occurredAt, approvalDays) {
 }
 
 /** Plain-English summary of a program's rules for the public page and emails. */
-function summarizeRules(program, membership = null) {
-  const r = effectiveRules(program, membership)
+function summarizeRules(program, membership = null, attribution = null) {
+  const r = effectiveRules(program, membership, attribution)
   const cur = r.currency
   const parts = []
   if (r.sale_commission_type === 'percent' && Number(r.sale_commission_bps) > 0) {
@@ -782,6 +796,71 @@ function projectReferredAccount({ rules, attribution, account = null, payments =
   return out
 }
 
+/**
+ * affiliateBalances(commissions, programs) -> { [currency]: balance }
+ *
+ * What the affiliate is owed, as money and dates only (the portal shows no
+ * rates). Per currency, in cents:
+ *   to_receive  pending + approved + payable (everything not yet paid)
+ *   available   approved + payable (cleared the approval period)
+ *   in_payout   payable (in a payout being prepared)
+ *   on_hold     pending (inside the approval period, a refund still cancels it)
+ *   paid        paid out
+ *   min_payout  the highest minimum among the programs in that currency, the
+ *               same threshold the admin's payout grouping applies
+ *   upcoming    pending amounts grouped by the day they clear (approve_after),
+ *               earliest first, at most 12 days
+ * Reversed and rejected commissions count nowhere. `programs` seeds a zero
+ * balance for each currency the affiliate can earn in.
+ */
+function affiliateBalances(commissions = [], programs = []) {
+  const out = {}
+  const cur = (c) => {
+    const k = c || 'EUR'
+    if (!out[k]) out[k] = { to_receive_cents: 0, available_cents: 0, in_payout_cents: 0, on_hold_cents: 0, paid_cents: 0, min_payout_cents: 0, upcoming: new Map() }
+    return out[k]
+  }
+  for (const p of programs) {
+    const b = cur(p.currency)
+    b.min_payout_cents = Math.max(b.min_payout_cents, Number(p.min_payout_cents || 0))
+  }
+  for (const c of commissions) {
+    const amount = Number(c.amount_cents || 0)
+    const b = cur(c.currency)
+    if (c.status === 'pending') {
+      b.on_hold_cents += amount
+      b.to_receive_cents += amount
+      const day = c.approve_after ? new Date(c.approve_after).toISOString().slice(0, 10) : null
+      if (day) b.upcoming.set(day, (b.upcoming.get(day) || 0) + amount)
+    } else if (c.status === 'approved') {
+      b.available_cents += amount
+      b.to_receive_cents += amount
+    } else if (c.status === 'payable') {
+      b.available_cents += amount
+      b.in_payout_cents += amount
+      b.to_receive_cents += amount
+    } else if (c.status === 'paid') {
+      b.paid_cents += amount
+    }
+  }
+  for (const b of Object.values(out)) {
+    b.upcoming = [...b.upcoming.entries()].sort((x, y) => x[0].localeCompare(y[0])).slice(0, 12).map(([date, amount_cents]) => ({ date, amount_cents }))
+    b.next_available_at = b.upcoming.length ? b.upcoming[0].date : null
+    b.next_available_cents = b.upcoming.length ? b.upcoming[0].amount_cents : 0
+    b.meets_minimum = b.available_cents > 0 && b.available_cents >= b.min_payout_cents
+  }
+  return out
+}
+
+/** What a commission was earned on, in words the affiliate reads: never a rate. */
+function commissionKind(conversion) {
+  if (!conversion) return null
+  if (isOneTimeFee(conversion)) return 'one_time_fee'
+  if (conversion.conversion_type === 'recurring') return 'renewal'
+  if (conversion.conversion_type === 'lead' || conversion.conversion_type === 'qualified_lead') return 'lead'
+  return 'payment'
+}
+
 function toCsv(columns, rows) {
   const lines = [columns.join(',')]
   for (const r of rows) lines.push(columns.map((c) => csvCell(r[c])).join(','))
@@ -797,6 +876,7 @@ module.exports = {
   randomToken, suggestCode, makeApiKey, hashApiKey, apiKeyPrefix, addDays, addMonths,
   effectiveRules, percentOf, computeCommission, recurringUntil, approveAfter, summarizeRules,
   PLAN_LIST_PRICE_CENTS, BILLING_INTERVALS, validateBilling, isOneTimeFee, projectReferredAccount,
+  affiliateBalances, commissionKind,
   decideAttribution, touchIsFresh, isSelfReferral, canTransition, COMMISSION_TRANSITIONS,
   buildRedirectUrl, isSafeDestination,
   validateProgramInput, validateCustomRules, validateApplication, sanitizePayoutDetails, validateConversionInput,

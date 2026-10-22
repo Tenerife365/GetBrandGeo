@@ -226,7 +226,7 @@ async function upsertAttribution(supabase, { program, membership, externalCustom
  * Returns { ok: true, conversion, commission, attribution, duplicate }
  *      or { ok: false, status, error }.
  */
-async function recordConversion(supabase, { program, input, actor = { type: 'system' }, source = 'api', membershipId = null, stripe = null, now = new Date(), notify = true }) {
+async function recordConversion(supabase, { program, input, actor = { type: 'system' }, source = 'api', membershipId = null, stripe = null, now = new Date(), notify = true, ruleOverride = null }) {
   if (!program) return { ok: false, status: 404, error: 'Unknown program' }
   if (program.status === 'archived') return { ok: false, status: 422, error: 'This program is archived' }
   const nowIso = new Date(now).toISOString()
@@ -377,7 +377,9 @@ async function recordConversion(supabase, { program, input, actor = { type: 'sys
   }
 
   // 7. Lock the attribution on the first sale and mark Stripe ids for renewals.
-  const rules = core.effectiveRules(program, membership)
+  // The rate: program, then the membership's custom rate, then the account's
+  // own rate, then a rate given for this one payment (a one-time fee).
+  const rules = core.effectiveRules(program, membership, att.attribution, ruleOverride)
   const attPatch = {}
   if (input.conversion_type === 'sale' && !att.attribution.converted_at) {
     attPatch.converted_at = occurredAt
@@ -554,6 +556,35 @@ async function setAttributionBilling(supabase, { attribution, patch, actor, reas
 }
 
 /**
+ * setAttributionCommission(supabase, { attribution, customRules, actor, reason })
+ *
+ * The commission rate for one referred account (core.validateCustomRules'
+ * output, or null to fall back to the membership and program rate). It applies
+ * to payments recorded from now on; a commission already written keeps its
+ * amount and its rule_snapshot. When the account has paid already, the
+ * recurring window is recomputed from its first payment, because the account
+ * rate may change recurring_months or switch renewals on or off.
+ */
+async function setAttributionCommission(supabase, { attribution, customRules, actor, reason = null }) {
+  const patch = { custom_rules: customRules || null }
+  if (attribution.first_sale_at) {
+    const program = await getProgramById(supabase, attribution.program_id)
+    const membership = await getMembership(supabase, attribution.membership_id)
+    if (program) {
+      const rules = core.effectiveRules(program, membership, { custom_rules: patch.custom_rules })
+      const until = core.recurringUntil(rules, attribution.first_sale_at)
+      patch.recurring_until = until ? until.toISOString() : null
+    }
+  }
+  const before = { custom_rules: attribution.custom_rules || null, recurring_until: attribution.recurring_until || null }
+  const { data, error } = await supabase.from('affiliate_attributions').update(patch).eq('id', attribution.id).select('*').single()
+  if (error) throw new Error(`attribution commission update failed: ${error.message}`)
+  const membership = await getMembership(supabase, attribution.membership_id)
+  await audit(supabase, { actor, action: 'attribution.commission_set', entityType: 'attribution', entityId: attribution.id, programId: attribution.program_id, affiliateId: membership ? membership.affiliate_id : null, before, after: patch, reason })
+  return data
+}
+
+/**
  * promoCodeForReferral(supabase, programSlug, rawCode) -> string | null
  *
  * The coupon code Stripe should prefill at checkout for a customer who arrived
@@ -587,5 +618,5 @@ module.exports = {
   audit,
   getProgramBySlug, getProgramById, getMembership, getAffiliate, findCode, findVisit, findAttribution, findAttributionByStripe,
   resolveReferralLink, promoCodeForReferral, upsertAttribution, recordConversion, reverseConversion, markSubscriptionEnded, manualAttribute,
-  setAttributionBilling,
+  setAttributionBilling, setAttributionCommission,
 }
