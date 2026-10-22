@@ -59,6 +59,14 @@ and "Plan time paid up front", `affiliate-admin` answers 401 unauthenticated,
 the admin sets it), and getbrandgeo.com `deploy-status.json` reads sha
 `ff51a56`, expected 1, deployed 1, failed empty, rollback false. Still owed,
 Constantin's, in the admin UI: 5 in "Custom services percent" on brandgeo.
+DONE 09:11Z, read back from the row and the public feed: services 500 bps,
+sale 10%, renewals 10% for 12 months, lead 0; summary "10% of every payment
+for the first 12 months, plus 5% once on custom services", `services_percent`
+5. It took four saves: an admin tab opened before the deploy runs the old
+bundle, which has no services box, so the 5 landed first in "Per qualified
+lead" (EUR 5 per lead) and then in "Recurring percent" (5% renewals), both
+reverted the same minutes, no commission written meanwhile. **After a
+dashboard deploy, hard reload (Ctrl+Shift+R) before using a new admin field.**
 
 ### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, PUSHED and LIVE (9a208ee)
 
