@@ -310,7 +310,7 @@ async function main() {
   assert.strictEqual(r.status, 201)
   const attY = () => rows('affiliate_attributions').find((a) => a.external_customer_id === `email:${core.hashEmail('shopper@customer-y.example.com')}`)
   assert.strictEqual(attY().membership_id, mAna1.id)
-  r = await api(KEY1, { idempotency_key: 'order_y1', conversion_type: 'sale', affiliate_code: 'BENSAVE', customer_email: 'shopper@customer-y.example.com', amount: '100.00' })
+  r = await api(KEY1, { idempotency_key: 'order_y1', conversion_type: 'sale', affiliate_code: 'BENSAVE', customer_email: 'shopper@customer-y.example.com', amount: '100.00', occurred_at: clock.toISOString() })
   assert.strictEqual(r.status, 201, JSON.stringify(r.body))
   assert.strictEqual(r.body.conversion.source, 'coupon')
   assert.ok(r.body.conversion.flags.includes('duplicate_customer'))
@@ -329,7 +329,7 @@ async function main() {
   const ridZb = new URL(r.headers.Location).searchParams.get('bg_rid')
   await api(KEY1, { idempotency_key: 'lead:z1', conversion_type: 'lead', referral_id: ridZa, customer_email: 'z@customer-z.example.com' })
   await api(KEY1, { idempotency_key: 'lead:z2', conversion_type: 'lead', referral_id: ridZb, customer_email: 'z@customer-z.example.com' })
-  r = await api(KEY1, { idempotency_key: 'order_z', conversion_type: 'sale', customer_email: 'z@customer-z.example.com', amount: '50.00' })
+  r = await api(KEY1, { idempotency_key: 'order_z', conversion_type: 'sale', customer_email: 'z@customer-z.example.com', amount: '50.00', occurred_at: clock.toISOString() })
   assert.strictEqual(rows('affiliate_commissions').find((c) => c.id === r.body.commission.id).affiliate_id, ben.id)
   ok('last touch (program 1 default): the second link wins the sale')
 
@@ -637,6 +637,34 @@ async function main() {
   assert.strictEqual(r.body.attribution.converted_at, null)
   assert.deepStrictEqual(lookups, [54, 56])
   ok('attaching without a payment writes the attribution only: no conversion, no commission, and Stripe was asked but had no customer')
+
+  section('14. the affiliate sees every referred account, paid or not, with what is earned and what is still to come')
+  r = await portal.handle(env.post({ action: 'me' }, { token: 'ana-jwt' }), { supabase: db, now: () => new Date('2026-10-22T12:00:00Z') }).then(env.parse)
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body))
+  const refs = r.body.referred_accounts
+  assert.ok(Array.isArray(refs) && refs.length >= 3, JSON.stringify(refs))
+  const blue = refs.find((x) => x.customer_ref === 'Blue Harbor Dental')
+  assert.ok(blue, 'the account attached without a payment is visible to the affiliate')
+  assert.strictEqual(blue.status, 'not_paying_yet')
+  assert.strictEqual(blue.plan, 'essentials')
+  assert.strictEqual(blue.earned, '0.00')
+  assert.strictEqual(blue.estimate_basis, 'list_price')
+  assert.strictEqual(blue.estimate, '237.60')
+  assert.strictEqual(blue.payments_left, 12)
+  const north = refs.find((x) => x.customer_ref === 'Northwind Bakery')
+  assert.strictEqual(north.status, 'paying')
+  assert.strictEqual(north.payments_count, 1)
+  assert.strictEqual(north.earned, '50.00')
+  assert.strictEqual(north.payments_left, 10)
+  assert.strictEqual(north.estimate, '198.00')
+  for (const x of refs) {
+    assert.strictEqual(x.client_id, undefined)
+    assert.strictEqual(x.stripe_customer_id, undefined)
+    assert.strictEqual(x.external_customer_id, undefined)
+  }
+  r = await portal.handle(env.post({ action: 'me' }, { token: 'ben-jwt' }), { supabase: db }).then(env.parse)
+  assert.ok(!(r.body.referred_accounts || []).some((x) => x.customer_ref === 'Blue Harbor Dental' || x.customer_ref === 'Northwind Bakery'))
+  ok('Ana sees the unpaid account (12 x 20% of EUR 99 = EUR 237.60 to come) and the paid one (EUR 50 earned, 10 renewals left); no client or Stripe id leaves the server; Ben sees neither')
 
   console.log(`\n${passed} checks passed`)
 }

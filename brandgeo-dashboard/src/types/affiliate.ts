@@ -405,7 +405,34 @@ export interface PortalAffiliate {
   created_at: string
 }
 
+export type ReferredAccountStatus =
+  | 'not_paying_yet' | 'paying' | 'one_time' | 'window_ended' | 'cancelled' | 'complimentary' | 'not_eligible'
+
+/** One account attributed to the affiliate, with what it has earned and an estimate of what is still to come. No client or Stripe id. */
+export interface PortalReferredAccount {
+  id: string
+  program_id: string
+  customer_ref: string | null
+  source: AttributionSource
+  referred_at: string
+  plan: string | null
+  status: ReferredAccountStatus
+  currency: string
+  payments_count: number
+  last_payment_at: string | null
+  first_sale_at: string | null
+  window_ends_at: string | null
+  payments_left: number
+  earned: string
+  paid: string
+  estimate: string | null
+  estimate_cents: number | null
+  monthly_basis: string | null
+  estimate_basis: 'list_price' | 'last_payment' | null
+}
+
 export interface PortalMe {
+  referred_accounts?: PortalReferredAccount[]
   affiliate: PortalAffiliate | null
   memberships: PortalMembership[]
   stats: { clicks: number; leads: number; conversions: number; by_currency: Totals } | null

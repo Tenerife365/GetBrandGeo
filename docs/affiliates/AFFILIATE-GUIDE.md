@@ -31,6 +31,18 @@ password to remember. The link signs you into your dashboard at
   promotional resources we provide. Copy the link with one click.
 - **Stats.** Clicks, leads, sales, and the commission totals per currency by
   status.
+- **Referred accounts.** Every account credited to you, paying or not: its
+  name as we know it, its plan, whether it pays yet, how many payments it
+  made, what it has earned you so far (refunds excluded, with what is already
+  paid out), and an estimate of what is still to come. The estimate assumes
+  the account keeps its plan, pays monthly at list price and stays until your
+  commission window closes (12 months from its first payment for BrandGEO).
+  It is an estimate, not a promise. Accounts on the free plan earn once they
+  upgrade. Below this list, "How you get paid" sets out the four steps from
+  a payment to your transfer. Screenshots:
+  `screenshots/portal-referred-accounts-desktop.png`,
+  `screenshots/portal-referred-accounts-phone.png`,
+  `screenshots/portal-how-you-get-paid.png` (demo data).
 - **Conversions.** Every lead and sale attributed to you: date, type, a
   masked customer reference (never the customer's email or order details),
   amount and status.

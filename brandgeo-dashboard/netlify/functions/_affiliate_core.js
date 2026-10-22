@@ -597,6 +597,102 @@ function csvCell(v) {
   return s
 }
 
+// ── Referred accounts: what an affiliate has earned and can still earn ──────
+
+/**
+ * Monthly list prices in cents, used ONLY to estimate an affiliate's future
+ * commission on an account they referred. Billing never reads this map; Stripe
+ * and the hand invoice are what a customer pays. It mirrors the published
+ * ladder (getbrandgeo.com pricing, PLAN_TIERS in src/pages/Account.tsx).
+ * Radar is at its EUR 29 launch price, Managed at its "from" price. Free,
+ * Enterprise and the legacy Pro have no list price, so no estimate.
+ */
+const PLAN_LIST_PRICE_CENTS = { radar: 2900, essentials: 9900, growth: 29900, growth_pro: 44900, managed: 150000 }
+
+/** Plan sources that are given away, so an account on them pays nothing until it converts. */
+const UNPAID_PLAN_SOURCES = ['comp', 'trial']
+const EARNED_STATUSES = ['pending', 'approved', 'payable', 'paid']
+
+function firstPaymentCommission(rules, basisCents) {
+  if (rules.sale_commission_type === 'fixed') return parseCents(rules.sale_commission_cents) ?? 0
+  if (rules.sale_commission_type === 'percent') return percentOf(basisCents, Number(rules.sale_commission_bps || 0))
+  return 0
+}
+
+/**
+ * projectReferredAccount({ rules, attribution, account, payments, commissions, now })
+ *
+ * One row of the affiliate's "Referred accounts" panel. `payments` are the
+ * confirmed paying conversions on this attribution, `commissions` the
+ * commissions on those conversions, `account` the clients row when the
+ * attribution maps to one ({ plan, plan_source }).
+ *
+ * The estimate is what is STILL to come, never what is already earned, and it
+ * assumes monthly billing at the plan's list price (or at the last payment
+ * when the plan has no list price). It is labelled an estimate everywhere it
+ * is shown: a hand invoice, an annual plan or a discount moves the real figure.
+ */
+function projectReferredAccount({ rules, attribution, account = null, payments = [], commissions = [], now = new Date() }) {
+  const at = new Date(now)
+  const sorted = [...payments].sort((a, b) => new Date(a.occurred_at) - new Date(b.occurred_at))
+  const last = sorted.length ? sorted[sorted.length - 1] : null
+  const sum = (statuses) => commissions.filter((c) => statuses.includes(c.status)).reduce((s, c) => s + Number(c.amount_cents || 0), 0)
+  const plan = account && account.plan ? account.plan : null
+  const out = {
+    plan,
+    payments_count: sorted.length,
+    last_payment_at: last ? new Date(last.occurred_at).toISOString() : null,
+    earned_cents: sum(EARNED_STATUSES),
+    paid_cents: sum(['paid']),
+    first_sale_at: attribution.first_sale_at || (sorted[0] ? new Date(sorted[0].occurred_at).toISOString() : null),
+    window_ends_at: attribution.recurring_until || null,
+    payments_left: 0,
+    estimate_cents: 0,
+    monthly_basis_cents: null,
+    estimate_basis: null,
+    status: 'paying',
+    currency: rules.currency,
+  }
+
+  if (attribution.is_self_referral) return { ...out, status: 'not_eligible' }
+  if (attribution.subscription_ended_at && new Date(attribution.subscription_ended_at) <= at) return { ...out, status: 'cancelled' }
+  if (!sorted.length && account && UNPAID_PLAN_SOURCES.includes(account.plan_source)) return { ...out, status: 'complimentary' }
+
+  if (plan && PLAN_LIST_PRICE_CENTS[plan]) { out.monthly_basis_cents = PLAN_LIST_PRICE_CENTS[plan]; out.estimate_basis = 'list_price' }
+  else if (last && Number(last.amount_cents) > 0) { out.monthly_basis_cents = Number(last.amount_cents); out.estimate_basis = 'last_payment' }
+  const basis = out.monthly_basis_cents
+  const rb = Number(rules.recurring_commission_bps || 0)
+  // An unlimited recurring window is estimated over its first 12 months, so a
+  // number on screen is never "forever".
+  const months = rules.recurring_months === null || rules.recurring_months === undefined ? 12 : Math.max(0, Number(rules.recurring_months))
+
+  if (!out.first_sale_at) {
+    out.status = 'not_paying_yet'
+    if (!basis) return out
+    const renewals = rb > 0 ? Math.max(0, months - 1) : 0
+    out.payments_left = 1 + renewals
+    out.estimate_cents = firstPaymentCommission(rules, basis) + renewals * percentOf(basis, rb)
+    return out
+  }
+
+  if (rb <= 0) return { ...out, status: 'one_time' }
+  const first = new Date(out.first_sale_at)
+  const until = attribution.recurring_until ? new Date(attribution.recurring_until) : addMonths(first, months)
+  out.window_ends_at = until.toISOString()
+  // Renewal m lands on first + m months; it earns while it is still inside
+  // the window (computeCommission refuses one dated after recurring_until).
+  let left = 0
+  for (let m = 1; m <= 600; m++) {
+    const d = addMonths(first, m)
+    if (d >= until) break
+    if (d > at) left++
+  }
+  if (left === 0) return { ...out, status: 'window_ended' }
+  out.payments_left = left
+  out.estimate_cents = basis ? left * percentOf(basis, rb) : 0
+  return out
+}
+
 function toCsv(columns, rows) {
   const lines = [columns.join(',')]
   for (const r of rows) lines.push(columns.map((c) => csvCell(r[c])).join(','))
@@ -611,6 +707,7 @@ module.exports = {
   normalizeCode, isValidCode, isValidSlug, normalizeEmail, isValidEmail, sha256, hashEmail, maskEmail, shortRef,
   randomToken, suggestCode, makeApiKey, hashApiKey, apiKeyPrefix, addDays, addMonths,
   effectiveRules, percentOf, computeCommission, recurringUntil, approveAfter, summarizeRules,
+  PLAN_LIST_PRICE_CENTS, projectReferredAccount,
   decideAttribution, touchIsFresh, isSelfReferral, canTransition, COMMISSION_TRANSITIONS,
   buildRedirectUrl, isSafeDestination,
   validateProgramInput, validateCustomRules, validateApplication, sanitizePayoutDetails, validateConversionInput,

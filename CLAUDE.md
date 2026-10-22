@@ -20,7 +20,30 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-10-18)
+## CURRENT STATE (newest entry 2026-10-22)
+
+### 2026-10-22: affiliate portal shows referred accounts and potential earnings; BUILT, 136 checks green, COMMITTED, NOT pushed
+
+Constantin's ask: attach the recommended accounts to the first affiliates,
+then invite them to see their potential earnings; payouts monthly and by
+hand at first. The portal had no view of attached accounts until they paid.
+Now `affiliate-portal.js` `me` returns `referred_accounts[]` (one per
+attribution: `customer_ref`, plan, status, payments, earned, paid, estimate,
+payments left, window end; never a client id or Stripe id), computed by
+`core.projectReferredAccount` (estimate = plan list price, monthly billing,
+inside the recurring window, from `PLAN_LIST_PRICE_CENTS`; the last payment
+amount when the plan has no list price; comp and trial show as
+complimentary). `AffiliatePortal.tsx` gains `#referred` (summary, desktop
+table, phone cards) and a "How you get paid" block that reads approval days,
+minimum and schedule from the program. Demo fixture corrected from 20% to
+10%. Two extra reads per `me` (attributions, clients), no writes, no cron.
+**Test fix worth knowing:** `affiliate_flow.test.js` section 10 had been red
+since 2026-10-02 at HEAD: two conversions without `occurred_at` took the REAL
+date, so their 30-day approval passed the test's fixed 2026-11-01 clock. They
+now use the fake clock. Owed: push with `$env:BATCH_PUSH=1` (one Netlify
+build; `bbf86b9`, docs only, rides along), then the payout rehearsal before the invites.
+
+## CURRENT STATE (2026-10-18)
 
 ### 2026-10-18: AI Visibility prompt-first brief WRITTEN (ruling owed), OpenRouter outage FOUND, client 57 onboarded
 

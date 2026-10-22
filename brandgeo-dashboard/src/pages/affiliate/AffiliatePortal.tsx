@@ -4,14 +4,19 @@
  * in App.tsx. Every number here is the affiliate's own, served by
  * affiliate-portal.js `me`; customer identities arrive already masked.
  *
- * Hash sections (#programs, #conversions, #commissions, #payouts, #settings)
- * are the targets the transactional emails link to.
+ * Hash sections (#programs, #referred, #conversions, #commissions, #payouts,
+ * #settings) are the targets the transactional emails link to.
+ *
+ * #referred lists every account attributed to the affiliate, paying or not,
+ * with what it has earned and an estimate of what is still to come. The
+ * estimate is computed server side (core.projectReferredAccount) at the plan's
+ * list price, monthly billing, inside the program's recurring window.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertCircle, Loader2, LogOut, Copy, Check, Link2, MousePointerClick, Users, ShoppingCart, Wallet,
-  FileText, Upload, ExternalLink, Handshake, RefreshCw,
+  FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { supabase, isDemoMode } from '../../lib/supabase'
@@ -22,6 +27,7 @@ import { affiliatePost, copyText, fmtDate, StatusPill } from '../../lib/affiliat
 import {
   PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type PortalMe, type PortalMembership, type PortalBatch, type PayoutMethod, type PayoutDetailFields,
+  type PortalProgram, type PortalReferredAccount, type ReferredAccountStatus,
 } from '../../types/affiliate'
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
@@ -44,22 +50,57 @@ const FIELD_LABELS: Record<string, string> = {
 const DEMO_ME: PortalMe = {
   affiliate: { id: 'a1', full_name: 'Demo Affiliate', email: 'demo.affiliate@example.com', company: 'Demo Studio', website: 'https://example.com', social_url: null, country: 'ES', status: 'active', payout_method: 'wise', payout_details: { account_holder: 'Demo Affiliate', email: 'demo.affiliate@example.com' }, terms_accepted_at: '2026-09-01T10:00:00Z', terms_version: '2026-09-12', created_at: '2026-09-01T10:00:00Z' },
   memberships: [
-    { id: 'm1', status: 'active', approved_at: '2026-09-01T10:00:00Z', clicks_total: 148, clicks_last_at: '2026-09-11T14:22:00Z', program: { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: null, logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', currency: 'EUR', commission_summary: '20% of every sale, plus 20% of each renewal for 12 months', attribution_days: 30, approval_days: 30, min_payout: '50.00', payout_schedule: 'Monthly, by the 10th', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, custom_rules: null, referral_link: 'https://app.getbrandgeo.com/r/brandgeo/DEMO10', referral_code: 'DEMO10', coupon_codes: ['DEMOFREE'], leads: 9, sales: 3, resources: [{ id: 1, title: 'Logo pack and screenshots', kind: 'link', url: 'https://getbrandgeo.com/affiliates.html#assets', body: null }] },
+    { id: 'm1', status: 'active', approved_at: '2026-09-01T10:00:00Z', clicks_total: 148, clicks_last_at: '2026-09-11T14:22:00Z', program: { id: 'p1', slug: 'brandgeo', name: 'BrandGEO', tagline: 'AI visibility monitoring for brands', description: null, logo_url: null, brand_color: '#8b5cf6', destination_url: 'https://getbrandgeo.com/', status: 'active', currency: 'EUR', commission_summary: '10% of every sale, plus 10% of each renewal for 12 months', attribution_days: 30, approval_days: 30, min_payout: '50.00', payout_schedule: 'Monthly, within 15 days after month end', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, custom_rules: null, referral_link: 'https://app.getbrandgeo.com/r/brandgeo/DEMO10', referral_code: 'DEMO10', coupon_codes: ['DEMOFREE'], leads: 9, sales: 3, resources: [{ id: 1, title: 'Logo pack and screenshots', kind: 'link', url: 'https://getbrandgeo.com/affiliates.html#assets', body: null }] },
     { id: 'm2', status: 'pending', approved_at: null, clicks_total: 0, clicks_last_at: null, program: { id: 'p2', slug: 'talentwelove', name: 'TalentWeLove Recruiting', tagline: 'Recruitment services for tech teams', description: null, logo_url: null, brand_color: '#0ea5e9', destination_url: 'https://talentwelove.com/', status: 'active', currency: 'EUR', commission_summary: 'EUR 100.00 per qualified lead, EUR 500.00 per sale', attribution_days: 60, approval_days: 45, min_payout: '100.00', payout_schedule: 'Monthly', terms_md: null, terms_url: 'https://getbrandgeo.com/affiliate-terms.html', terms_version: '2026-09-12' }, custom_rules: null, referral_link: null, referral_code: null, coupon_codes: [], leads: 0, sales: 0, resources: [] },
   ],
-  stats: { clicks: 148, leads: 9, conversions: 3, by_currency: { EUR: { pending: '59.80', approved: '119.60', payable: '0.00', paid: '59.80', reversed: '0.00', rejected: '0.00' } } },
+  stats: { clicks: 148, leads: 9, conversions: 3, by_currency: { EUR: { pending: '29.90', approved: '59.80', payable: '0.00', paid: '29.90', reversed: '0.00', rejected: '0.00' } } },
   conversions: [
     { id: 'c1', conversion_type: 'sale', status: 'confirmed', source: 'link', customer_ref: 'a***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-09-10T09:12:00Z', program_id: 'p1', membership_id: 'm1' },
     { id: 'c2', conversion_type: 'lead', status: 'confirmed', source: 'link', customer_ref: 'm***@example.com', amount: '0.00', currency: 'EUR', occurred_at: '2026-09-09T16:40:00Z', program_id: 'p1', membership_id: 'm1' },
     { id: 'c3', conversion_type: 'sale', status: 'refunded', source: 'coupon', customer_ref: 'k***@example.com', amount: '299.00', currency: 'EUR', occurred_at: '2026-08-20T11:00:00Z', program_id: 'p1', membership_id: 'm1' },
   ],
   commissions: [
-    { id: 'k1', conversion_id: 'c1', program_id: 'p1', status: 'pending', amount: '59.80', amount_cents: 5980, currency: 'EUR', approve_after: '2026-10-10T09:12:00Z', approved_at: null, paid_at: null, rule: '20% of sale', created_at: '2026-09-10T09:12:00Z' },
-    { id: 'k2', conversion_id: 'c4', program_id: 'p1', status: 'approved', amount: '119.60', amount_cents: 11960, currency: 'EUR', approve_after: '2026-09-01T00:00:00Z', approved_at: '2026-09-02T00:00:00Z', paid_at: null, rule: '20% of sale', created_at: '2026-08-01T00:00:00Z' },
-    { id: 'k3', conversion_id: 'c5', program_id: 'p1', status: 'paid', amount: '59.80', amount_cents: 5980, currency: 'EUR', approve_after: '2026-08-01T00:00:00Z', approved_at: '2026-08-02T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', rule: '20% of sale', created_at: '2026-07-01T00:00:00Z' },
+    { id: 'k1', conversion_id: 'c1', program_id: 'p1', status: 'pending', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-10-10T09:12:00Z', approved_at: null, paid_at: null, rule: '10% of sale', created_at: '2026-09-10T09:12:00Z' },
+    { id: 'k2', conversion_id: 'c4', program_id: 'p1', status: 'approved', amount: '59.80', amount_cents: 5980, currency: 'EUR', approve_after: '2026-09-01T00:00:00Z', approved_at: '2026-09-02T00:00:00Z', paid_at: null, rule: '10% of sale', created_at: '2026-08-01T00:00:00Z' },
+    { id: 'k3', conversion_id: 'c5', program_id: 'p1', status: 'paid', amount: '29.90', amount_cents: 2990, currency: 'EUR', approve_after: '2026-08-01T00:00:00Z', approved_at: '2026-08-02T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', rule: '10% of sale', created_at: '2026-07-01T00:00:00Z' },
   ],
-  payouts: [{ id: 'b1', status: 'paid', currency: 'EUR', total: '59.80', item_count: 1, payout_method: 'wise', external_reference: 'WISE-48812', created_at: '2026-08-09T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', documents: [] }],
+  payouts: [{ id: 'b1', status: 'paid', currency: 'EUR', total: '29.90', item_count: 1, payout_method: 'wise', external_reference: 'WISE-48812', created_at: '2026-08-09T00:00:00Z', paid_at: '2026-08-10T00:00:00Z', documents: [] }],
   payout_detail_fields: DEFAULT_FIELDS,
+  referred_accounts: [
+    { id: 'r1', program_id: 'p1', customer_ref: 'Northwind Bakery', source: 'manual', referred_at: '2026-08-01T10:00:00Z', plan: 'growth', status: 'paying', currency: 'EUR', payments_count: 3, last_payment_at: '2026-10-05T10:00:00Z', first_sale_at: '2026-08-05T10:00:00Z', window_ends_at: '2027-08-05T10:00:00Z', payments_left: 9, earned: '89.70', paid: '29.90', estimate: '269.10', estimate_cents: 26910, monthly_basis: '299.00', estimate_basis: 'list_price' },
+    { id: 'r2', program_id: 'p1', customer_ref: 'Blue Harbor Dental', source: 'manual', referred_at: '2026-10-12T10:00:00Z', plan: 'essentials', status: 'not_paying_yet', currency: 'EUR', payments_count: 0, last_payment_at: null, first_sale_at: null, window_ends_at: null, payments_left: 12, earned: '0.00', paid: '0.00', estimate: '118.80', estimate_cents: 11880, monthly_basis: '99.00', estimate_basis: 'list_price' },
+    { id: 'r3', program_id: 'p1', customer_ref: 'm***@example.com', source: 'link', referred_at: '2026-09-09T16:40:00Z', plan: 'free', status: 'not_paying_yet', currency: 'EUR', payments_count: 0, last_payment_at: null, first_sale_at: null, window_ends_at: null, payments_left: 12, earned: '0.00', paid: '0.00', estimate: null, estimate_cents: null, monthly_basis: null, estimate_basis: null },
+  ],
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free', radar: 'Radar', essentials: 'Essentials', growth: 'Growth', growth_pro: 'Growth PRO',
+  managed: 'Managed', pro: 'Pro', enterprise: 'Enterprise',
+}
+
+const REFERRED_STATUS: Record<ReferredAccountStatus, { label: string; tone: string; note: string }> = {
+  paying: { label: 'Paying', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', note: 'Each payment earns you a commission until the window closes.' },
+  not_paying_yet: { label: 'Not paying yet', tone: 'bg-amber-500/15 text-amber-300 border-amber-500/30', note: 'Nothing earned until the first payment arrives.' },
+  one_time: { label: 'Paid once', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', note: 'This program pays a single commission per account.' },
+  window_ended: { label: 'Window closed', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'Renewals after the commission window earn nothing.' },
+  cancelled: { label: 'Cancelled', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'The subscription has ended.' },
+  complimentary: { label: 'Complimentary', tone: 'bg-slate-500/15 text-slate-300 border-slate-500/30', note: 'A free or trial plan we gave this account. It earns once they start paying.' },
+  not_eligible: { label: 'Not eligible', tone: 'bg-red-500/15 text-red-300 border-red-500/30', note: 'Purchases by the affiliate themselves earn no commission.' },
+}
+
+function planLabel(plan: string | null) {
+  if (!plan) return ''
+  return PLAN_LABELS[plan] || plan.replace('_', ' ')
+}
+
+function sumByCurrency(rows: PortalReferredAccount[], pick: (r: PortalReferredAccount) => string | null) {
+  const totals = new Map<string, number>()
+  for (const r of rows) {
+    const v = pick(r)
+    if (v === null) continue
+    totals.set(r.currency, (totals.get(r.currency) || 0) + Math.round(Number(v) * 100))
+  }
+  return [...totals.entries()].map(([cur, cents]) => `${cur} ${(cents / 100).toFixed(2)}`).join(' · ')
 }
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -183,6 +224,12 @@ export default function AffiliatePortal() {
               )}
             </section>
 
+            {/* Referred accounts */}
+            <ReferredAccounts rows={me.referred_accounts || []} programsById={programsById} />
+
+            {/* How payouts work */}
+            <HowYouGetPaid program={me.memberships.find((m) => m.status === 'active')?.program || me.memberships[0]?.program || null} />
+
             {/* Conversions */}
             <section id="conversions" className="space-y-3 scroll-mt-20">
               <SectionHeading>Referred leads and sales</SectionHeading>
@@ -267,6 +314,153 @@ export default function AffiliatePortal() {
         <p className="text-xs text-slate-600 text-center pt-6"><Link to="/login" className="hover:text-slate-400">Customer dashboard</Link></p>
       </main>
     </div>
+  )
+}
+
+/** Display strings for one referred account, shared by the phone cards and the desktop table. */
+function referredView(r: PortalReferredAccount) {
+  const st = REFERRED_STATUS[r.status] || REFERRED_STATUS.not_paying_yet
+  const onFree = r.status === 'not_paying_yet' && r.plan === 'free'
+  return {
+    st,
+    note: onFree ? 'On the free plan. It earns once they upgrade to a paid plan.' : st.note,
+    basis: r.monthly_basis ? `${r.currency} ${r.monthly_basis} / month${r.estimate_basis === 'last_payment' ? ', last payment' : ''}` : '',
+    showEstimate: r.estimate !== null && r.payments_left > 0,
+    left: `${r.payments_left} more payment${r.payments_left === 1 ? '' : 's'}${r.window_ends_at ? `, until ${fmtDate(r.window_ends_at)}` : r.status === 'not_paying_yet' ? ' from the first one' : ''}`,
+    noEstimate: onFree ? 'after upgrade' : '0.00',
+  }
+}
+
+function ReferredAccounts({ rows, programsById }: { rows: PortalReferredAccount[]; programsById: Map<string, PortalProgram> }) {
+  const earned = sumByCurrency(rows, (r) => r.earned)
+  const toCome = sumByCurrency(rows.filter((r) => r.payments_left > 0), (r) => r.estimate)
+  const multiProgram = new Set(rows.map((r) => r.program_id)).size > 1
+  return (
+    <section id="referred" className="space-y-3 scroll-mt-20">
+      <SectionHeading>Referred accounts</SectionHeading>
+      <p className="text-xs text-slate-500">Every account credited to you, paying or not. Earned is what your commissions add up to so far, refunds excluded. Still to come is an estimate, not a promise: it assumes the account keeps its current plan, pays monthly at list price and stays until your commission window closes.</p>
+      {rows.length === 0 ? (
+        <EmptyState icon={Building2} title="No referred accounts yet" body="When someone you referred signs up, or we credit an account you introduced to us, it appears here with what it can earn you." />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Stat icon={Building2} label="Referred accounts" value={String(rows.length)} />
+            <Stat icon={Wallet} label="Earned so far" value={earned || '0.00'} />
+            <Stat icon={TrendingUp} label="Still to come (estimate)" value={toCome || '0.00'} />
+          </div>
+          <ul className="md:hidden space-y-3">
+            {rows.map((r) => {
+              const v = referredView(r)
+              return (
+                <li key={r.id} className="rounded-card border border-dark-700 bg-dark-800 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm text-slate-200 truncate">{r.customer_ref || 'Customer'}</div>
+                      <div className="text-xs text-slate-500">{planLabel(r.plan)}{v.basis ? ` · ${v.basis}` : ''}</div>
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${v.st.tone}`}>{v.st.label}</span>
+                  </div>
+                  <p className="text-xs text-slate-500">{v.note}</p>
+                  <dl className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-dark-700/60 px-3 py-2">
+                      <dt className="text-[11px] text-slate-500">Earned</dt>
+                      <dd className="text-sm font-semibold text-white">{r.currency} {r.earned}</dd>
+                      <dd className="text-[11px] text-slate-500">{r.payments_count} payment{r.payments_count === 1 ? '' : 's'}{Number(r.paid) > 0 ? `, ${r.currency} ${r.paid} paid out` : ''}</dd>
+                    </div>
+                    <div className="rounded-lg bg-dark-700/60 px-3 py-2">
+                      <dt className="text-[11px] text-slate-500">Still to come</dt>
+                      <dd className={`text-sm font-semibold ${v.showEstimate ? 'text-brand-300' : 'text-slate-500'}`}>{v.showEstimate ? `up to ${r.currency} ${r.estimate}` : v.noEstimate}</dd>
+                      {v.showEstimate && <dd className="text-[11px] text-slate-500">{v.left}</dd>}
+                    </div>
+                  </dl>
+                  <div className="text-[11px] text-slate-500">Referred {fmtDate(r.referred_at)}{multiProgram ? ` · ${programsById.get(r.program_id)?.name || ''}` : ''}{r.last_payment_at ? ` · last payment ${fmtDate(r.last_payment_at)}` : ''}</div>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden md:block overflow-x-auto rounded-card border border-dark-700 bg-dark-800">
+            <table className="min-w-full text-sm">
+              <thead className="text-xs text-slate-400 uppercase tracking-wider">
+                <tr>
+                  <th className="text-left px-4 py-2">Account</th>
+                  <th className="text-left px-4 py-2">Plan</th>
+                  <th className="text-left px-4 py-2">Status</th>
+                  <th className="text-right px-4 py-2">Payments</th>
+                  <th className="text-right px-4 py-2">Earned</th>
+                  <th className="text-right px-4 py-2">Still to come</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-700">
+                {rows.map((r) => {
+                  const v = referredView(r)
+                  return (
+                    <tr key={r.id} className="align-top">
+                      <td className="px-4 py-2">
+                        <div className="text-slate-200">{r.customer_ref || 'Customer'}</div>
+                        <div className="text-xs text-slate-500">
+                          Referred {fmtDate(r.referred_at)}{multiProgram ? ` · ${programsById.get(r.program_id)?.name || ''}` : ''}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-slate-300 whitespace-nowrap">
+                        {planLabel(r.plan)}
+                        {v.basis && <div className="text-xs text-slate-500">{v.basis}</div>}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${v.st.tone}`}>{v.st.label}</span>
+                        <div className="text-xs text-slate-500 mt-1 max-w-[16rem]">{v.note}</div>
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-300 whitespace-nowrap">
+                        {r.payments_count}
+                        {r.last_payment_at && <div className="text-xs text-slate-500">last {fmtDate(r.last_payment_at)}</div>}
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-200 whitespace-nowrap">
+                        {r.currency} {r.earned}
+                        {Number(r.paid) > 0 && <div className="text-xs text-slate-500">{r.currency} {r.paid} paid out</div>}
+                      </td>
+                      <td className="px-4 py-2 text-right whitespace-nowrap">
+                        {v.showEstimate ? (
+                          <>
+                            <span className="text-brand-300">up to {r.currency} {r.estimate}</span>
+                            <div className="text-xs text-slate-500">{v.left}</div>
+                          </>
+                        ) : <span className="text-slate-500">{v.noEstimate}</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function HowYouGetPaid({ program }: { program: PortalProgram | null }) {
+  if (!program) return null
+  const steps = [
+    { title: 'Your referral pays', body: 'Each payment from an account credited to you creates a commission right away, marked pending. Accounts we invoice by hand are recorded when their payment reaches us.' },
+    { title: `${program.approval_days} days to approve`, body: `After ${program.approval_days} days without a refund the commission becomes approved. A refund in that time cancels it.` },
+    { title: 'Monthly payout', body: `Once a month we group your approved commissions into one payout when they reach ${program.currency} ${program.min_payout}${program.payout_schedule ? ` (${program.payout_schedule.toLowerCase()})` : ''}. A smaller total carries over to the next month.` },
+    { title: 'Invoice and transfer', body: 'You attach your invoice to the payout on this page, we send the transfer to the payout method in your settings and record the reference here.' },
+  ]
+  return (
+    <section id="how-payouts-work" aria-label="How you get paid" className="rounded-card border border-dark-700 bg-dark-800 p-5 space-y-4 scroll-mt-20">
+      <h3 className="text-sm font-semibold text-white">How you get paid</h3>
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((s, i) => (
+          <li key={s.title} className="flex gap-3">
+            <span className="w-6 h-6 rounded-full bg-brand-500/15 text-brand-300 text-xs font-semibold flex items-center justify-center shrink-0">{i + 1}</span>
+            <div>
+              <div className="text-sm font-medium text-slate-200">{s.title}</div>
+              <p className="text-xs text-slate-400 mt-0.5">{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-slate-500">You earn: {program.commission_summary}. Full rules in the <a href={program.terms_url} target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300">program terms</a>.</p>
+    </section>
   )
 }
 

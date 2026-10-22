@@ -7,7 +7,7 @@
  *   join_preview   { token }                        -> { affiliate, programs, terms }
  *   join_accept    { token, payout_method?, payout_details?, terms_accepted, privacy_accepted }
  *                                                   -> { ok, action_link }   (a Supabase magic link; the browser follows it)
- *   me             {}                               -> { affiliate, memberships[], stats, conversions[], commissions[], payouts[] }
+ *   me             {}                               -> { affiliate, memberships[], stats, conversions[], commissions[], payouts[], referred_accounts[] }
  *   update_profile { full_name?, company?, website?, social_url?, country? }
  *   update_payout  { payout_method, payout_details }
  *   apply_program  { program }                      -> membership pending
@@ -17,7 +17,9 @@
  *
  * DATA MINIMISATION. Conversions are returned with customer_ref (a masked
  * label), date, type, status and amount. Never the email, never an order's
- * contents, never Stripe ids.
+ * contents, never Stripe ids. Referred accounts carry the same customer_ref,
+ * the plan (needed for the estimate) and money, never a client id or a
+ * Stripe id.
  */
 
 const { requireAffiliate, serviceClient, jsonResponse } = require('./_affiliate_auth')
@@ -82,6 +84,65 @@ async function programsForAffiliate(db, affiliateId) {
   return out
 }
 
+const PAYING_TYPES = ['sale', 'recurring', 'custom']
+
+/**
+ * Every account attributed to this affiliate, including one attached by an
+ * admin that has not paid yet (it has no conversion, so it is invisible
+ * everywhere else on the page). Two reads beyond what `me` already loads: the
+ * attributions, and the plan of the clients rows they map to. The plan is the
+ * only client field read; the label shown is the attribution's customer_ref,
+ * the same one the conversions table shows.
+ */
+async function referredAccounts(db, pairs, conversions, commissions, now = new Date()) {
+  const byMembership = new Map(pairs.map((p) => [p.membership.id, p]))
+  const ids = [...byMembership.keys()]
+  if (!ids.length) return []
+  const { data: atts } = await db.from('affiliate_attributions').select('*').in('membership_id', ids).order('created_at', { ascending: false }).limit(200)
+  if (!atts || !atts.length) return []
+
+  const clientIds = []
+  const stripeIds = []
+  for (const a of atts) {
+    const m = /^client:(\d+)$/.exec(a.external_customer_id || '')
+    if (m) clientIds.push(Number(m[1]))
+    const s = a.stripe_customer_id || ((/^stripe_customer:(cus_\w+)$/.exec(a.external_customer_id || '') || [])[1])
+    if (s) stripeIds.push(s)
+  }
+  const accounts = []
+  if (clientIds.length) {
+    const { data } = await db.from('clients').select('id, plan, plan_source, stripe_customer_id').in('id', clientIds)
+    accounts.push(...(data || []))
+  }
+  if (stripeIds.length) {
+    const { data } = await db.from('clients').select('id, plan, plan_source, stripe_customer_id').in('stripe_customer_id', stripeIds)
+    accounts.push(...(data || []))
+  }
+  const accountFor = (a) => {
+    const m = /^client:(\d+)$/.exec(a.external_customer_id || '')
+    if (m) return accounts.find((c) => Number(c.id) === Number(m[1])) || null
+    const s = a.stripe_customer_id || ((/^stripe_customer:(cus_\w+)$/.exec(a.external_customer_id || '') || [])[1])
+    return s ? accounts.find((c) => c.stripe_customer_id === s) || null : null
+  }
+
+  return atts.map((a) => {
+    const pair = byMembership.get(a.membership_id)
+    const rules = core.effectiveRules(pair.program, pair.membership)
+    const payments = conversions.filter((c) => c.attribution_id === a.id && c.status === 'confirmed' && PAYING_TYPES.includes(c.conversion_type))
+    const paymentIds = new Set(conversions.filter((c) => c.attribution_id === a.id).map((c) => c.id))
+    const mine = commissions.filter((k) => paymentIds.has(k.conversion_id))
+    const p = core.projectReferredAccount({ rules, attribution: a, account: accountFor(a), payments, commissions: mine, now })
+    return {
+      id: a.id, program_id: pair.program.id, customer_ref: a.customer_ref || 'customer', source: a.source, referred_at: a.created_at,
+      plan: p.plan, status: p.status, currency: p.currency, payments_count: p.payments_count, last_payment_at: p.last_payment_at,
+      first_sale_at: p.first_sale_at, window_ends_at: p.window_ends_at, payments_left: p.payments_left,
+      earned: core.centsToMajor(p.earned_cents), paid: core.centsToMajor(p.paid_cents),
+      estimate: p.estimate_cents === null ? null : core.centsToMajor(p.estimate_cents), estimate_cents: p.estimate_cents,
+      monthly_basis: p.monthly_basis_cents === null ? null : core.centsToMajor(p.monthly_basis_cents), estimate_basis: p.estimate_basis,
+    }
+  })
+}
+
 /** Creates the auth user if needed, links it, and returns a magic sign-in link. */
 async function issueMagicLink(db, affiliate) {
   const redirectTo = `${APP_URL}/affiliate`
@@ -106,7 +167,7 @@ async function issueMagicLink(db, affiliate) {
   return link
 }
 
-async function handle(event, { supabase = null } = {}) {
+async function handle(event, { supabase = null, now = null } = {}) {
   const origin = event.headers['origin'] || event.headers['Origin'] || ''
   const headers = corsHeaders(origin)
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
@@ -171,7 +232,7 @@ async function handle(event, { supabase = null } = {}) {
   const actor = affiliate ? { type: 'affiliate', id: affiliate.id, label: affiliate.email } : { type: 'affiliate', id: user.id, label: user.email }
 
   if (body.action === 'me') {
-    if (!affiliate) return json(200, { affiliate: null, memberships: [], stats: null, conversions: [], commissions: [], payouts: [] })
+    if (!affiliate) return json(200, { affiliate: null, memberships: [], stats: null, conversions: [], commissions: [], payouts: [], referred_accounts: [] })
     const pairs = await programsForAffiliate(db, affiliate.id)
     const membershipIds = pairs.map((p) => p.membership.id)
     const { data: codes } = membershipIds.length ? await db.from('affiliate_codes').select('*').in('membership_id', membershipIds) : { data: [] }
@@ -213,7 +274,10 @@ async function handle(event, { supabase = null } = {}) {
       by_currency: Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([s, cents]) => [s, core.centsToMajor(cents)]))])),
     }
 
+    const referred_accounts = await referredAccounts(db, pairs, conversions || [], commissions || [], now ? now() : new Date())
+
     return json(200, {
+      referred_accounts,
       affiliate: {
         id: affiliate.id, full_name: affiliate.full_name, email: affiliate.email, company: affiliate.company, website: affiliate.website, social_url: affiliate.social_url,
         country: affiliate.country, status: affiliate.status, payout_method: affiliate.payout_method, payout_details: affiliate.payout_details || {},
