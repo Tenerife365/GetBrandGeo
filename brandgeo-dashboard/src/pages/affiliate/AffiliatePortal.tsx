@@ -20,6 +20,12 @@
  * Presentation only: no token is minted, no partner session is created, every
  * save, upload and document link is off, and the amber bar stays on screen.
  *
+ * Sample: /affiliate/demo renders this page publicly with made-up data from
+ * affiliateSample.ts, so a prospective partner sees how it works before
+ * applying. No login, no request to any affiliate function, read only. Only
+ * there does the page state a rate, and only the sample's own (10% on
+ * subscriptions, 5% on custom services), in the sample rules block.
+ *
  * Values, not rates: the page shows commission amounts, what each was earned
  * on, the date it becomes available, and balances (to receive, available
  * now, next to clear). It never shows a commission percentage, because the
@@ -29,7 +35,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertCircle, Loader2, LogOut, Eye, EyeOff, Copy, Check, Link2, MousePointerClick, Users, ShoppingCart, Wallet,
-  FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp, CalendarClock, CheckCircle2,
+  FileText, Upload, ExternalLink, Handshake, RefreshCw, Building2, TrendingUp, CalendarClock, CheckCircle2, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { supabase, isDemoMode } from '../../lib/supabase'
@@ -43,6 +49,7 @@ import {
   type PortalProgram, type PortalReferredAccount, type ReferredAccountStatus,
   type PortalBalance, type PortalCommission,
 } from '../../types/affiliate'
+import { SAMPLE_ME, SAMPLE_RATES } from './affiliateSample'
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
 const btn = 'inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-control text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
@@ -148,9 +155,10 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
   )
 }
 
-export default function AffiliatePortal({ previewId }: { previewId?: string } = {}) {
+export default function AffiliatePortal({ previewId, sample = false }: { previewId?: string; sample?: boolean } = {}) {
   const navigate = useNavigate()
   const preview = !!previewId
+  const readOnly = preview || sample
   const [me, setMe] = useState<PortalMe | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -158,6 +166,7 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
 
   const load = useCallback(async () => {
     setError('')
+    if (sample) { setMe(SAMPLE_ME); setLoading(false); return }
     if (isDemoMode) { setMe(DEMO_ME); setLoading(false); return }
     const res = previewId
       ? await affiliatePost<PortalMe>('affiliate-admin', { action: 'portal.preview', affiliate_id: previewId })
@@ -166,13 +175,13 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
     if (res.error || !res.data) setError(res.error || (previewId ? 'Could not load this partner dashboard.' : 'Could not load your dashboard.'))
     else setMe(res.data)
     setLoading(false)
-  }, [navigate, previewId])
+  }, [navigate, previewId, sample])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    document.title = preview ? `Viewing as ${me?.affiliate?.full_name || 'partner'} · BrandGEO` : 'Affiliate dashboard · BrandGEO'
+    document.title = sample ? 'Sample partner dashboard · BrandGEO' : preview ? `Viewing as ${me?.affiliate?.full_name || 'partner'} · BrandGEO` : 'Affiliate dashboard · BrandGEO'
     return () => { document.title = 'BrandGEO Dashboard' }
-  }, [preview, me])
+  }, [preview, sample, me])
   useEffect(() => {
     if (!loading && window.location.hash) {
       const el = document.getElementById(window.location.hash.slice(1))
@@ -200,14 +209,27 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
       <header className="border-b border-dark-700 bg-dark-800/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <BrandGeoMark href={preview ? '/affiliates' : '/affiliate'} ariaLabel={preview ? 'Affiliates admin' : 'Affiliate dashboard'} />
+            <BrandGeoMark href={sample ? 'https://getbrandgeo.com/affiliates.html' : preview ? '/affiliates' : '/affiliate'} ariaLabel={sample ? 'BrandGEO partner program' : preview ? 'Affiliates admin' : 'Affiliate dashboard'} />
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-brand-300"><Handshake size={12} /> Affiliate</span>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" className={btnGhost} onClick={load} aria-label="Refresh"><RefreshCw size={14} /><span className="hidden sm:inline">Refresh</span></button>
-            {!preview && <button type="button" className={btnGhost} onClick={signOut}><LogOut size={14} /><span className="hidden sm:inline">Sign out</span></button>}
+            {sample ? (
+              <>
+                <Link to="/affiliate/login" className={btnGhost + ' hidden sm:inline-flex'}>Partner sign in</Link>
+                <a href="https://getbrandgeo.com/affiliates.html#apply" className={btnPrimary}>Become a partner</a>
+              </>
+            ) : <button type="button" className={btnGhost} onClick={load} aria-label="Refresh"><RefreshCw size={14} /><span className="hidden sm:inline">Refresh</span></button>}
+            {!preview && !sample && <button type="button" className={btnGhost} onClick={signOut}><LogOut size={14} /><span className="hidden sm:inline">Sign out</span></button>}
           </div>
         </div>
+        {sample && (
+          <div role="status" className="bg-brand-500/15 border-t border-brand-500/30 text-brand-100">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2 text-sm">
+              <Sparkles size={15} className="shrink-0 text-brand-300" />
+              <span>Sample dashboard. The partner, accounts and amounts are made up, and nothing here can be changed.</span>
+            </div>
+          </div>
+        )}
         {preview && (
           <div role="status" className="bg-amber-500/15 border-t border-amber-500/30 text-amber-200">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-sm">
@@ -245,13 +267,15 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
           <>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
-                <PageTitle>Hello, {me.affiliate.full_name.split(' ')[0]}</PageTitle>
-                <p className="text-sm text-slate-400 mt-1">Your referral activity, commissions and payouts, all in one place.</p>
+                <PageTitle>{sample ? 'Sample partner dashboard' : <>Hello, {me.affiliate.full_name.split(' ')[0]}</>}</PageTitle>
+                <p className="text-sm text-slate-400 mt-1">{sample ? 'What a partner sees after signing in: what they have earned, what is still on hold, and when each amount is paid.' : 'Your referral activity, commissions and payouts, all in one place.'}</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span>Account</span> <StatusPill value={me.affiliate.status} />
               </div>
             </div>
+
+            {sample && <SampleRules />}
 
             {/* Earnings */}
             <Earnings balances={me.balances || {}} />
@@ -351,7 +375,7 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
                 <EmptyState icon={FileText} title="No payouts yet" body="A payout is created once your approved commissions reach the program minimum. You can attach your invoice to each payout here." />
               ) : (
                 <div className="space-y-3">
-                  {me.payouts.map((b) => <PayoutCard key={b.id} b={b} onChanged={load} onNotice={setNotice} readOnly={preview} />)}
+                  {me.payouts.map((b) => <PayoutCard key={b.id} b={b} onChanged={load} onNotice={setNotice} readOnly={readOnly} />)}
                 </div>
               )}
             </section>
@@ -359,16 +383,48 @@ export default function AffiliatePortal({ previewId }: { previewId?: string } = 
             {/* Settings */}
             <section id="settings" className="space-y-4 scroll-mt-20">
               <SectionHeading>Profile and payout details</SectionHeading>
-              <SettingsForm me={me} onSaved={(msg) => { setNotice(msg); load() }} readOnly={preview} />
+              <SettingsForm me={me} onSaved={(msg) => { setNotice(msg); load() }} readOnly={readOnly} />
               <p className="text-xs text-slate-500">
                 Terms accepted {fmtDate(me.affiliate.terms_accepted_at)} (version {me.affiliate.terms_version || 'n/a'}). Read the current <a href="https://getbrandgeo.com/affiliate-terms.html" target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300">affiliate terms</a>. Questions: <a href="mailto:support@getbrandgeo.com" className="text-brand-400 hover:text-brand-300">support@getbrandgeo.com</a>.
               </p>
             </section>
           </>
         )}
+        {sample && (
+          <div className="rounded-card border border-brand-500/30 bg-brand-500/10 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-white">Want your own?</div>
+              <p className="text-xs text-slate-400 mt-0.5">Apply once. After approval you get your referral link and this dashboard with your real numbers.</p>
+            </div>
+            <a href="https://getbrandgeo.com/affiliates.html#apply" className={btnPrimary}>Become a partner</a>
+          </div>
+        )}
         <p className="text-xs text-slate-600 text-center pt-6"><Link to="/login" className="hover:text-slate-400">Customer dashboard</Link></p>
       </main>
     </div>
+  )
+}
+
+/** The sample's commission rules, stated with worked examples from its own accounts. */
+function SampleRules() {
+  const { subscriptions, services, months } = SAMPLE_RATES
+  const rules = [
+    { title: `${subscriptions}% of platform subscriptions`, body: `Every payment of a BrandGEO plan by an account you referred, for its first ${months} months. Example below: Northwind Bakery pays EUR 299 a month for Growth, so each payment earns EUR 29.90.` },
+    { title: `${services}% of custom services`, body: 'Work we sell outside the plans, such as a setup, an audit or a content project, earns once when it is paid. Example below: Harbor Clinic paid EUR 1,200 for a GEO setup, which earned EUR 60.00.' },
+  ]
+  return (
+    <section aria-label="How commissions work in this sample" className="rounded-card border border-dark-700 bg-dark-800 p-5 space-y-4">
+      <h3 className="text-sm font-semibold text-white">How commissions work in this sample</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {rules.map((r) => (
+          <div key={r.title} className="rounded-lg bg-dark-700/60 px-4 py-3">
+            <div className="text-sm font-medium text-brand-200">{r.title}</div>
+            <p className="text-xs text-slate-400 mt-1">{r.body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">Each commission waits 30 days in case of a refund, then joins the monthly payout once the available balance reaches EUR 50. A partner's own dashboard shows amounts and dates; their exact terms come with their invitation.</p>
+    </section>
   )
 }
 

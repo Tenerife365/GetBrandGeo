@@ -22,6 +22,28 @@
 
 ## CURRENT STATE (newest entry 2026-10-22)
 
+### 2026-10-22 (fifth): public sample partner dashboard at /affiliate/demo; BUILT, 160 checks green, COMMITTED, NOT pushed
+
+Constantin's ask: "a demo account for users to understand how it works, 10%
+for subscriptions from the platform and 5% from custom services". Built as a
+public sample page, not an account (agents never create accounts):
+`/affiliate/demo` renders `AffiliatePortal` with `sample` set, data from
+`src/pages/affiliate/affiliateSample.ts` (Northwind Bakery on Growth, Harbor
+Clinic with a EUR 1,200 setup at 5% plus Essentials at 10%, Lumen Studio with
+a EUR 800 audit at 5%, one free signup; earned EUR 229.50 = paid 119.80 +
+available 29.90 + on hold 79.80). No login, no call to any affiliate
+function (checked in the preview: zero requests), settings fieldsets
+disabled, no save or upload buttons, a violet "Sample dashboard" bar, a "How
+commissions work in this sample" block, "Partner sign in" and "Become a
+partner" in the header, a "Want your own?" card at the end. Linked from
+`affiliates.html` (what you get, and the FAQ "Where do I see my numbers?")
+and from `AffiliateLogin.tsx`. Build exit 0, 43 core and 66 flow checks
+green, added lines dash-free (positive control fired), phone width 375 has no
+horizontal scroll. **Gap, recorded not fixed:** the program has no "custom
+services" rate; a one-time fee earns the sale rule (10%) unless the fee
+form's percent field is filled, so 5% is typed per fee today. Making it the
+program default, and saying so on the public page, waits on Constantin.
+
 ### 2026-10-22 (fourth): affiliate sidebar, View as partner, unpaid price made visible; BUILT, 160 checks green, PUSHED and LIVE (8ca4b35)
 
 Constantin's report: IMoM showed a commission and client 52 (an account

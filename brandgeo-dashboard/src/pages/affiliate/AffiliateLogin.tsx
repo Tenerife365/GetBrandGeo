@@ -93,7 +93,7 @@ export default function AffiliateLogin() {
                 {loading ? <Loader2 className="animate-spin" size={16} /> : <>Send sign-in link <ArrowRight size={16} /></>}
               </button>
               <p className="text-xs text-slate-500 text-center">
-                Not an affiliate yet? <a href="https://getbrandgeo.com/affiliates.html" className="text-brand-400 hover:text-brand-300">Apply here</a>.
+                Not an affiliate yet? <a href="https://getbrandgeo.com/affiliates.html" className="text-brand-400 hover:text-brand-300">Apply here</a> or <Link to="/affiliate/demo" className="text-brand-400 hover:text-brand-300">see a sample dashboard</Link>.
                 Customer? <Link to="/login" className="text-brand-400 hover:text-brand-300">Dashboard sign in</Link>.
               </p>
             </form>

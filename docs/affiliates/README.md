@@ -51,6 +51,17 @@ pay stay with a human.
 - **Emails.** Invitation, application received, approved, rejected, new
   conversion, commission approved, payout completed. Through the existing
   Resend shell in `_email.js`; without `RESEND_API_KEY` they are silent no-ops.
+- **Sample dashboard.** `https://app.getbrandgeo.com/affiliate/demo` is the
+  partner portal with a made-up partner, accounts and amounts
+  (`src/pages/affiliate/affiliateSample.ts`), public, no login, read only, no
+  request to any affiliate function. It explains a sample rule (10% of
+  platform subscription payments for 12 months, 5% once on custom services
+  such as a setup or an audit) with worked examples, and every total in it
+  adds up. It is the only page that states a rate; a partner's own portal
+  shows amounts and dates only. Linked from `affiliates.html` and the partner
+  sign-in page. The sample rule is illustration: the live program rule is
+  whatever the admin page says, and today a one-time fee earns the sale rate
+  unless the fee form's commission field is filled.
 - **Audit.** Every financial or attribution change writes
   `affiliate_audit_log` with the actor. Conversions, commissions, attributions,
   batches and items are never hard-deleted.

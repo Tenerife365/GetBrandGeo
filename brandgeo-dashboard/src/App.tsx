@@ -144,6 +144,8 @@ export default function App() {
                   rewrites them to the affiliate-redirect function first. */}
               <Route path="/affiliate/login" element={<AffiliateLogin />} />
               <Route path="/affiliate/join/:token" element={<AffiliateJoin />} />
+              {/* Public sample partner dashboard (made-up data, no login, read only) */}
+              <Route path="/affiliate/demo" element={<AffiliatePortal sample />} />
               <Route path="/affiliate" element={<AffiliateRoute><AffiliatePortal /></AffiliateRoute>} />
               <Route path="/" element={<PrivateRoute><OnboardGate><Layout><Dashboard /></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/mentions" element={<PrivateRoute><OnboardGate><Layout><Mentions /></Layout></OnboardGate></PrivateRoute>} />
