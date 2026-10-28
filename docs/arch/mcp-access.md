@@ -997,3 +997,339 @@ client at 5,000 tool calls. A 365-day aggregate scans at most 25,000 rows in
    aggregation code (2.1), so MCP numbers and dashboard numbers come from
    one source.
 6. `key_hash` is also withheld from `authenticated` by column privilege (3.3).
+
+---
+
+## 14. Amendment 2026-09-24: protocol revision 2026-07-28 ruling
+
+Appended by `bg-architect`. Sections 0 to 13 are not rewritten; where this
+section changes what they say, it says so and this section wins. Code
+citations are against the working tree at `03d381f` (stage 1, live since
+2026-09-23). Every web source below was fetched and read on 2026-09-24,
+around 05:20 UTC; copies sit in the session scratchpad, not in the repo.
+
+### 14.1 Ruling
+
+1. **Stay legacy-only for release one (option a).** `mcp-server.js` keeps
+   speaking 2025-03-26, 2025-06-18 and 2025-11-25 only, and does not add
+   2026-07-28 now.
+2. **The legacy signal at step 7 is frozen and gets a regression test.** A
+   modern first request must keep reaching the client as HTTP 400 with a
+   body that is not a recognized modern error, so dual-era clients fall back
+   to `initialize`.
+3. **Modern support is a named Later item (14.7), not a precondition for
+   `mcp.html`.** "Supported" stays limited to clients `bg-verify` connects
+   live (8.1), none of which the sources show to be modern-only.
+
+### 14.2 What 2026-07-28 says about a legacy server
+
+Sources:
+
+- S1 https://modelcontextprotocol.io/specification/versioning (current revision is 2026-07-28)
+- S2 https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning
+- S3 https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
+- S4 https://modelcontextprotocol.io/specification/2026-07-28/server/discover
+- S5 https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- S6 https://modelcontextprotocol.io/specification/2026-07-28/basic/index
+- S7 https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching
+
+Facts, as read:
+
+- Eras (S2 Terminology). Modern means 2026-07-28 and later (per-request
+  `_meta`, no `initialize`). Legacy means 2025-11-25 and earlier (an
+  `initialize` handshake). Dual-era means both. This server is legacy.
+- Compatibility matrix (S2, Backward Compatibility):
+  - A dual-era client against a legacy server works. On HTTP the modern
+    request returns a 4xx without a recognized modern error body and the
+    client falls back to `initialize`.
+  - A modern-only client against a legacy server fails.
+  - A legacy client against any server that speaks legacy works.
+- HTTP fallback rule (S3, Backward Compatibility). On `400 Bad Request` the
+  client SHOULD inspect the body:
+  - a recognized modern JSON-RPC error means a modern server, so the client
+    retries or corrects the request;
+  - an empty body, or one that is not a recognized modern error, means the
+    client falls back to `initialize`.
+- Era caching (S2). Clients SHOULD cache the era verdict per origin for HTTP,
+  and MAY persist it across restarts.
+- Modern servers must also (S3, S4, S6, S7):
+  - implement `server/discover`, which is mandatory;
+  - carry `resultType` on every result;
+  - validate the `_meta` keys `io.modelcontextprotocol/protocolVersion` and
+    `io.modelcontextprotocol/clientCapabilities`, answering -32602 at HTTP
+    400 when one is missing;
+  - validate `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name`, answering
+    -32020 at 400 on a mismatch;
+  - answer an unsupported version with -32022 at 400, carrying
+    `data.supported`;
+  - answer an unknown method with 404 and -32601;
+  - put `ttlMs` and `cacheScope` on cacheable results such as `tools/list`.
+  `ping` and sessions are gone.
+- Error code partition (S6, Error Codes; S5). -32000 to -32019 are legacy:
+  no new codes are allocated there and new implementations SHOULD NOT use
+  them. -32020 to -32099 are reserved for the specification and MUST NOT
+  carry undefined codes. -32002 MUST NOT be emitted under 2026-07-28. This
+  server's application codes (2.6) are -32001, -32002, -32003 and -32029, so
+  every one of them collides with the modern rules. That alone makes modern
+  support a contract change, not an addition (14.7).
+
+### 14.3 Does our answer trigger the fallback? Yes, with a valid key
+
+What the server does to a modern first request, which carries
+`MCP-Protocol-Version: 2026-07-28` and `Mcp-Method: server/discover`:
+
+| Step | Cite | Result |
+|---|---|---|
+| 1 to 5, size, Origin, parse, shape | `mcp-server.js:652` to `:671` | pass (single object with an id) |
+| 6, authentication | `mcp-server.js:681` to `:704` | valid key passes; a bad or missing key gets 401 -32001 |
+| stamp | `mcp-server.js:712` to `:720` | at most one `last_used_at` write a minute |
+| 7, version header | `mcp-server.js:722` to `:727` | `2026-07-28` is not in the list at `:52`, so **HTTP 400, JSON-RPC error -32600** |
+| rate counter | `mcp-server.js:731` | not reached, so the probe costs no rate unit |
+
+How the reference client reads that answer (TypeScript SDK `main`, fetched
+2026-09-24):
+
+- `packages/client/src/client/probeClassifier.ts`:
+  - `classifyRpcError` returns `legacy` for every code except -32022
+    carrying a valid `data.supported` list. The comment names -32601 and
+    unrecognized codes explicitly. -32600 is therefore a legacy signal.
+  - -32001, -32020 and -32021 are "not probe recognized", which also means
+    legacy.
+  - A 401 during the probe (`auth-required`) is a typed error, never a
+    fallback.
+  - An HTTP timeout is a typed error, never a fallback.
+- `packages/client/src/client/versionNegotiation.ts` (around lines 395 to
+  409) routes a non-2xx body into that classifier.
+- `packages/client/src/client/streamableHttp.ts` (around line 1106) delivers
+  a 400 JSON-RPC body on an enveloped request to the same path.
+
+Conclusions:
+
+1. With a valid key, a dual-era client sees 400 with -32600, classifies the
+   server as legacy, sends `initialize`, and gets a legacy session. This is
+   the S3 fallback exactly.
+2. The case without the header also holds. If a probe arrived without
+   `MCP-Protocol-Version`, it would default to 2025-03-26 (`:727`) and
+   `server/discover` would get -32601 at HTTP 200 (`:756` to `:757`). The
+   classifier returns legacy for that too. S3 makes the header mandatory on
+   modern requests, so this case should not occur.
+3. With a missing or bad key, the probe gets 401 and the connection fails.
+   It would fail on `initialize` as well, so nothing is lost. Auth runs
+   before the version check on purpose, and stays there.
+4. What would break the fallback, each of which is now forbidden (14.5):
+   - answering step 7 with -32022, -32020 or -32021;
+   - answering it with a 5xx;
+   - adding `2026-07-28` to `SUPPORTED_PROTOCOL_VERSIONS` without the modern
+     surface behind it.
+
+   A -32022 carrying a legacy-only list would still fall back in this SDK.
+   It is still forbidden, because a modern-only client reads it as a
+   definitive refusal and other SDKs may not be as lenient. -32600 is
+   unambiguous.
+
+Cost of the probe: at most one extra invocation per connect for a dual-era
+client, or once per origin if it caches the era (S2 says SHOULD).
+
+- Each probe costs one key lookup, one `clients` read, and at most one stamp.
+- It uses no rate unit and runs no tool.
+- It fits inside the budget in section 12.
+
+### 14.4 Per-client findings (spec 8.1)
+
+"Speaks" means what the current release sends first to an HTTP server. This
+is the only fact that decides whether it can reach a legacy server.
+
+| Client | What its own source says | Era | Verified? | Source, read 2026-09-24 |
+|---|---|---|---|---|
+| Claude Code | Changelog 2.1.274: the v2 MCP client with "MCP 2026-07-28 negotiation with direct HTTP servers by default, as other installs already do", opt out `MCP_PROTOCOL_NEGOTIATION=legacy`. The same release fixed HTTP servers "failing to connect when they answer the first request with 422 or another 4xx error". 2.1.281 adds a feature "on 2026-07-28 protocol connections". | Dual-era by default: probes modern, falls back to legacy on a 4xx | **Verified**, changelog. Whether the bundled client is byte for byte the SDK classifier in 14.3 is unverified. | https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md (latest entry 2.1.281); https://code.claude.com/docs/en/mcp.md |
+| VS Code (agent mode) | `src/vs/platform/mcp/common/modelContextProtocol.ts:43` sets `LATEST_PROTOCOL_VERSION = "2025-11-25"`. `mcpServerRequestHandler.ts` opens with an `initialize` request carrying that version. The file has no `server/discover`. | Legacy | **Verified for the `main` branch source.** That the current stable release matches `main` is unverified. | https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/platform/mcp/common/modelContextProtocol.ts ; https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/workbench/contrib/mcp/common/mcpServerRequestHandler.ts |
+| Cursor | The MCP docs list Streamable HTTP as a transport, with `url` and `headers`. No protocol revision is named in the docs or the changelog page. | Unknown | **Unverified** | https://cursor.com/docs/context/mcp ; https://cursor.com/changelog |
+| Windsurf | The MCP docs list stdio, Streamable HTTP and SSE. The changelog names Streamable HTTP and OAuth work. No protocol revision is named. | Unknown | **Unverified** | https://docs.windsurf.com/windsurf/cascade/mcp.md ; https://windsurf.com/changelog |
+| Claude Desktop through `mcp-remote` | npm registry `mcp-remote` latest is 0.14.3. It bundles `@modelcontextprotocol/client` `^2.0.0` (listed as a devDependency and bundled by `tsup`). The mode it runs that client in is not stated. | Unknown, likely legacy or dual-era | **Unverified** | https://registry.npmjs.org/mcp-remote/latest (the npmjs.com page answered 403) |
+| claude.ai web connectors | OAuth only | n/a | Out of release one (8.1) | spec 8.1 |
+| ChatGPT connectors | OAuth only | n/a | Out of release one (8.1) | spec 8.1 |
+
+No source shows any named client to be modern-only. For the three unknowns,
+the live connection `bg-verify` already owes under 8.1 is the deciding test,
+and it now records the era negotiated. Section 14.5 says how.
+
+### 14.5 Options and cost
+
+**(a) Legacy-only, the "Supported" claim gated by a live connection (chosen).**
+
+- Builder effort: none to stay correct. The optional hardening in packet 028
+  is one test block plus a one-line parser change.
+- Builds: zero of its own. Packet 028 rides the next dashboard batch build.
+- Risk to the live auth path: nil (no change), or one line (I1, 14.6).
+- What customers lose:
+  - Nothing today, since every verified client reaches us.
+  - One extra round trip per connect for Claude Code.
+  - The risk that a client later ships modern-only. Mitigated by the
+    triggers in 14.7 and by the live connection gate.
+
+**(b) Add 2026-07-28 now, alongside legacy.**
+
+- Builder effort: every item listed under "Modern servers must also" in
+  14.2, plus renumbering the four application error codes on the modern path
+  (14.2, error partition) and a dual dispatch.
+  - The renumbering changes the contract that 2.6 and the stage 2 copy rely
+    on.
+  - The dual dispatch keeps legacy `initialize` and `ping` while routing
+    enveloped requests to modern semantics, all in one stateless function.
+  - Opus `bg-backend`, then an Opus `bg-verify`, because it rewrites
+    dispatch in the file that carries key resolution and the plan gate.
+- Builds: one Netlify build, plus a rebuild for each review round.
+- Risk: a regression on the live auth and plan gate path, for a benefit
+  (skipping one probe for one client) that no customer can see.
+- What customers gain: nothing measurable today.
+
+**(c) Something else, rejected.**
+
+- Emitting -32022 with a legacy-only `supported` list from step 7: it buys
+  nothing over -32600 and is read as a definitive refusal by a modern-only
+  client (14.3).
+- Advertising 2026-07-28 in `initialize`: false.
+
+**Binding on `mcp-server.js` from today, until 14.7 ships:**
+
+1. Step 7 keeps HTTP 400 with -32600 for any `MCP-Protocol-Version` outside
+   the list at `mcp-server.js:52`.
+2. Never -32022, -32020 or -32021, and never a 5xx.
+3. Authentication stays before step 7.
+4. `SUPPORTED_PROTOCOL_VERSIONS` does not gain `2026-07-28` except as part of
+   14.7. This overrides the build-time instruction in 2.5 to "add a newer
+   one after checking the subset": 2026-07-28 is not a subset change.
+5. The stateless GET answer stays 405 (`mcp-server.js:651`). S3 names 405
+   as the right answer for GET on a server without sessions.
+
+**Change to the 8.1 verification rule.** When `bg-verify` connects each
+Supported client, it records three things:
+
+- the client version;
+- whether a `server/discover` probe arrived first (visible in the function
+  log as method `other` at step 7, 400);
+- the protocol version negotiated in `initialize`.
+
+A client that connects is Supported whatever its era. A client that fails
+because it will not fall back moves to "coming", and that failure is
+trigger T1 in 14.7.
+
+### 14.6 I1 and F5
+
+- **I1, lowercase `bearer`, now 401 (`mcp-server.js:92` to `:95`):** relax
+  it. The scheme matches case-insensitively, followed by one or more spaces,
+  and the rest, trimmed, is the key. RFC 7235 section 2.1 makes the scheme
+  case-insensitive, and a client that lowercases it is conformant. This
+  diverges from the "same parsing as `_affiliate_auth.js` `bearer()`" note
+  in 3.4. That helper is not changed here; aligning it is a separate item.
+  - It is an auth-path change, so `bg-verify` reads this ruling before
+    `bg-backend` builds it (packet 028).
+  - It ships with the next dashboard batch build and does not gate
+    `mcp.html`.
+  - Every other 401 stays byte-identical, per the existing test at
+    `tests/mcp_server.test.js:216`.
+- **F5, key cap check-then-insert (`client-api-keys.js:118` to `:122`):**
+  accept and record.
+  - The cap of 5 is a UI courtesy, not an entitlement.
+  - Two concurrent issues can reach 6 keys for one client. Each can be
+    revoked, and there is no cross-client effect.
+  - The per-client daily cap (6.1) bounds total use whatever the key count.
+  - Revisit only if the number of keys ever becomes a priced plan limit,
+    and then as a database constraint.
+
+### 14.7 Later: modern era support (release 1.1 candidate)
+
+This is added to section 11. It builds when any trigger fires:
+
+- **T1.** Any client in 8.1 ships a release that is modern-only.
+- **T2.** The MCP specification deprecates the legacy fallback for HTTP.
+- **T3.** Constantin decides the probe round trip matters.
+
+Scope, to be specified in its own amendment when a trigger fires:
+
+- `server/discover`, with `supportedVersions` listing the legacy versions
+  and `2026-07-28`, and with `ttlMs` and `cacheScope: "private"`, because
+  the answer depends on the key's plan through `tools/list`;
+- `resultType: "complete"` on every modern result;
+- serverInfo in each modern result's `_meta`;
+- `_meta` and header validation with -32602 and -32020;
+- -32022 carrying `data.supported`;
+- 404 with -32601 for an unknown method on the modern path;
+- no `ping` on the modern path;
+- a deterministic `tools/list` order;
+- new application codes outside -32768 to -32000 for the modern path. The
+  legacy path keeps 2.6 unchanged, so no live integration breaks.
+
+Detecting the era of each request is by the `_meta` envelope, not by the
+header alone, so legacy traffic cannot be misrouted.
+
+### 14.8 Constraints on `bg-copy` and `bg-web` (`mcp.html`, snippets, FAQ)
+
+May:
+
+- name as **Supported** only a client that `bg-verify` connected live with a
+  real key against `https://app.getbrandgeo.com/mcp`, per 8.1 and 14.5.
+  Until that record exists, a client appears as "coming" or not at all.
+- describe the transport as "a remote MCP server over Streamable HTTP, with
+  your key in the Authorization header".
+- in one technical line at most, name the supported revisions exactly as
+  `SUPPORTED_PROTOCOL_VERSIONS` lists them (2025-03-26, 2025-06-18,
+  2025-11-25), or name none at all.
+
+Must not:
+
+- claim support for "MCP 2026-07-28", "the latest MCP specification", "the
+  newest protocol", "stateless MCP", or any revision not in that list.
+- claim "works with any MCP client", "every MCP client" or similar. The
+  claim is a list of named clients.
+- put `MCP_PROTOCOL_NEGOTIATION`, `MCP_SDK_GENERATION`, or an
+  `MCP-Protocol-Version` header in any snippet. None is needed, and pinning
+  a version would age badly.
+- show a lowercase `bearer`, or an `x-api-key` header, in any snippet. The
+  canonical form stays `Authorization: Bearer <key>` (8.2) even after I1.
+- present the three unverified clients (Cursor, Windsurf, Claude Desktop
+  through `mcp-remote`) as Supported on the strength of this section. This
+  section rules on the protocol, not on the clients.
+
+Stage 2 copy that already follows 8.1 and 8.2 needs no change beyond these
+lines.
+
+### 14.9 Verified versus unverified
+
+**Verified from primary sources, 2026-09-24:**
+
+- the 2026-07-28 rules in 14.2;
+- the S3 fallback rule;
+- the reference TypeScript SDK classifier behaviour in 14.3;
+- the server's step order, cited in 14.3;
+- Claude Code is dual-era by default for HTTP servers;
+- VS Code `main` source is legacy (`initialize` with 2025-11-25).
+
+**Unverified:**
+
+- the Cursor, Windsurf and `mcp-remote` protocol behaviour;
+- that VS Code stable equals `main`;
+- that Claude Code's bundled client matches the SDK classifier line for
+  line, and whether it caches the era verdict.
+
+All of these are settled by the live connection record in 14.5, not by
+further reading.
+
+### 14.10 File plan and budget for this amendment
+
+| File | Change | Owner |
+|---|---|---|
+| `docs/arch/mcp-access.md` | this section, appended | bg-architect (done) |
+| `brandgeo-dashboard/netlify/functions/mcp-server.js` | I1 only: case-insensitive scheme in `bearer()` | bg-backend, packet 028 |
+| `brandgeo-dashboard/tests/mcp_server.test.js` | I1 cases, plus the frozen step 7 legacy signal (14.5) | bg-backend, packet 028 |
+
+Budget:
+
+- Bundle delta: 0 bytes (server only).
+- Requests per connect: unchanged, 1 extra for a dual-era client that does
+  not cache its era verdict.
+- Supabase round trips: unchanged.
+- Netlify builds: 0 of its own. Packet 028 rides the next batch.
+
+No schema change, no dependency, no inconsistency window, no customer data
+touched, so no human checkpoint is raised.

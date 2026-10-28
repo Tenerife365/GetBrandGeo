@@ -90,8 +90,10 @@ function header(event, name) {
 }
 
 function bearer(event) {
-  const h = header(event, 'authorization') || ''
-  return h.startsWith('Bearer ') ? h.slice(7).trim() : ''
+  const h = header(event, 'authorization')
+  if (typeof h !== 'string') return ''
+  const m = /^bearer +/i.exec(h)
+  return m ? h.slice(m[0].length).trim() : ''
 }
 
 function round(n, places) {

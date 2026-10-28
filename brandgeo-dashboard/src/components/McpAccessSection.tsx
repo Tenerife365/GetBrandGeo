@@ -198,11 +198,11 @@ export default function McpAccessSection({
       const { status, data } = await callKeysFn<ListResponse>({ action: 'list', client_id: clientId })
       if (status === 503) { setUnavailable(true); setLoading(false); return }
       if (!data || data.error || status >= 400) {
-        setLoadError(data?.error || 'Could not load MCP keys.'); setLoading(false); return
+        setLoadError(data?.error || 'Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.'); setLoading(false); return
       }
       setList(data)
     } catch {
-      setLoadError('Could not load MCP keys.')
+      setLoadError('Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.')
     } finally {
       setLoading(false)
     }
@@ -291,13 +291,13 @@ export default function McpAccessSection({
         action: 'issue', client_id: clientId, label: label.trim() || undefined,
       })
       if (!data || data.error || !data.secret) {
-        setIssueError(data?.error || 'Could not issue a key.'); return
+        setIssueError(data?.error || 'Could not issue a key. Try again, and if it keeps happening, contact support@getbrandgeo.com.'); return
       }
       setReveal({ secret: data.secret, row: data.key })
       setLabel('')
       load()
     } catch {
-      setIssueError('Could not issue a key.')
+      setIssueError('Could not issue a key. Try again, and if it keeps happening, contact support@getbrandgeo.com.')
     } finally {
       setIssuing(false)
     }
@@ -308,10 +308,10 @@ export default function McpAccessSection({
     setActionError(null); setRevokingId(row.id)
     try {
       const { data } = await callKeysFn<{ ok: boolean }>({ action: 'revoke', client_id: clientId, id: row.id })
-      if (!data || data.error) { setActionError(data?.error || 'Could not revoke the key.'); return }
+      if (!data || data.error) { setActionError(data?.error || 'Could not revoke the key. Try again, and if it keeps happening, contact support@getbrandgeo.com.'); return }
       load()
     } catch {
-      setActionError('Could not revoke the key.')
+      setActionError('Could not revoke the key. Try again, and if it keeps happening, contact support@getbrandgeo.com.')
     } finally {
       setRevokingId(null)
     }
@@ -398,7 +398,7 @@ export default function McpAccessSection({
       <>
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
-          <p className="text-xs text-slate-500 mt-3">MCP access is not available yet. Check back soon.</p>
+          <p className="text-xs text-slate-500 mt-3">MCP access isn't set up on our side yet. Check back soon, or contact support@getbrandgeo.com if this doesn't clear up.</p>
         </div>
         {revealDialog}
       </>
@@ -412,7 +412,7 @@ export default function McpAccessSection({
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
           <div className="flex items-center gap-3 mt-3 flex-wrap">
-            <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {loadError || 'Could not load MCP keys.'}</span>
+            <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {loadError || 'Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.'}</span>
             <button onClick={load} className={ghostBtn}>Retry</button>
           </div>
         </div>
@@ -425,7 +425,7 @@ export default function McpAccessSection({
   const atCap = keys.length >= max_keys
   // COPY: pending bg-copy. Placeholder explanation line (section 7.2 item 1);
   // final wording from bg-copy.
-  const explanationLine = 'Connect Claude Code, Cursor and other MCP-compatible AI tools to read your BrandGEO visibility data.'
+  const explanationLine = "Give your own AI tools, such as Claude Code or Cursor, direct read access to this account's visibility data. It only reads: it can never start a collection or change your account."
 
   const KeysTable = keys.length > 0 && (
     <div className="mt-4 overflow-x-auto">
@@ -473,7 +473,7 @@ export default function McpAccessSection({
             MCP access is included from the {PLAN_LABELS[unlockPlan ?? 'radar']} plan.
           </p>
           <button onClick={onUpgrade} className={`${primaryBtn} mt-3`}>
-            <Sparkles size={15} /> See plans
+            <Sparkles size={15} /> Upgrade to Radar
           </button>
           {keys.length > 0 && (
             <>

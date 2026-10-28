@@ -204,8 +204,54 @@ async function main() {
 
   section('2. authentication')
   const bodies = []
-  for (const [label, key] of [['missing', null], ['malformed', 'bgmcp_1_nothex'], ['unknown', keys.makeClientApiKey(1)], ['revoked', KREVOKED.secret], ['client id mismatch', KMISMATCH.secret], ['wrong scheme', null]]) {
-    const headers = label === 'wrong scheme' ? { authorization: `Basic ${KA.secret}` } : {}
+
+  // I1 (packet 028): the scheme itself is matched case-insensitively (RFC
+  // 7235), and whitespace around the key is still trimmed. Collected rather
+  // than asserted per-case (and run before the 401 loop below, which
+  // includes a case expected to still fail pre-fix), so a single run
+  // reports exactly how many of these fail against the unmodified bearer()
+  // (packet 028 acceptance criterion). Every case sets `authorization`
+  // directly and passes `key: null` to ev(), since ev()'s key shortcut (the
+  // `if (key) h.authorization = \`Bearer ${key}\`` line) would overwrite a
+  // lowercase/uppercase scheme with the canonical `Bearer <key>` and defeat
+  // the test (pre-read F2, amendment A2).
+  const i1Cases = [
+    ['lowercase scheme', `bearer ${KA.secret}`, 200],
+    ['uppercase scheme', `BEARER ${KA.secret}`, 200],
+    ['two spaces after the scheme', `Bearer  ${KA.secret}`, 200],
+    ['trailing spaces after the key', `Bearer ${KA.secret}   `, 200],
+  ]
+  const i1Failures = []
+  for (const [label, authHeader, want] of i1Cases) {
+    res = await send(ev({ jsonrpc: '2.0', id: 7, method: 'initialize', params: {} }, { key: null, headers: { authorization: authHeader } }))
+    if (res.status !== want) i1Failures.push(`${label}: expected ${want}, got ${res.status}`)
+  }
+  if (i1Failures.length) console.log(`  I1 casing failures observed (${i1Failures.length}/${i1Cases.length}): ${i1Failures.join(' | ')}`)
+  assert.strictEqual(i1Failures.length, 0, `I1 casing cases failed: ${i1Failures.join(' | ')}`)
+  ok('I1: bearer scheme accepted case-insensitively (bearer/BEARER); two spaces after the scheme and trailing spaces after the key still succeed')
+
+  // I1: bearer() must also reject every scheme-smuggling and whitespace-abuse
+  // shape with the identical 401, never a 500 (F4). Added into the existing
+  // 401 loop so the identity assertion and the exact-body assertion below
+  // cover the new cases too (pre-read amendment A3).
+  for (const [label, key, authHeader] of [
+    ['missing', null],
+    ['malformed', 'bgmcp_1_nothex'],
+    ['unknown', keys.makeClientApiKey(1)],
+    ['revoked', KREVOKED.secret],
+    ['client id mismatch', KMISMATCH.secret],
+    ['wrong scheme', null, `Basic ${KA.secret}`],
+    ['bare Bearer, nothing after', null, 'Bearer'],
+    ['tab-only separator', null, `Bearer\t${KA.secret}`],
+    ['no separator', null, `Bearer${KA.secret}`],
+    ['Bearerx run-on scheme', null, `Bearerx ${KA.secret}`],
+    ['spaces only after the scheme', null, 'Bearer   '],
+    ['unknown scheme Token', null, `Token ${KA.secret}`],
+    ['duplicate Bearer values joined by a proxy', null, `Bearer ${KA.secret}, Bearer ${KA.secret}`],
+    ['trailing garbage after the key', null, `Bearer ${KA.secret} extra`],
+    ['array-valued header', null, [`Bearer ${KA.secret}`]],
+  ]) {
+    const headers = authHeader !== undefined ? { authorization: authHeader } : {}
     res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key, headers }))
     assert.strictEqual(res.status, 401, label)
     assert.strictEqual(res.headers['WWW-Authenticate'], 'Bearer realm="brandgeo-mcp"')
@@ -213,7 +259,7 @@ async function main() {
   }
   assert.ok(bodies.every((b) => b === bodies[0]), 'every 401 body must be identical')
   assert.deepStrictEqual(JSON.parse(bodies[0]), { jsonrpc: '2.0', id: 42, error: { code: -32001, message: 'Invalid or missing BrandGEO API key.' } })
-  ok('missing, malformed, unknown, revoked, mismatched and non-Bearer keys: identical 401 bodies with WWW-Authenticate')
+  ok('missing, malformed, unknown, revoked, mismatched, non-Bearer, whitespace/separator-smuggling and array-valued keys: identical 401 bodies with WWW-Authenticate')
   res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'ping' }, { headers: { 'x-api-key': KA.secret } }))
   assert.strictEqual(res.status, 401)
   ok('the x-api-key header is not accepted')
@@ -502,6 +548,47 @@ async function main() {
   assert.strictEqual(pc.featureUnlockPlan('mcp_access'), plans.MCP_MIN_PLAN)
   assert.deepStrictEqual(pc.PLAN_ORDER.filter((p) => plans.mcpAllowedFor(p)), ['radar', 'essentials', 'growth', 'growth_pro', 'managed', 'pro', 'enterprise'])
   ok('mcpAllowedFor(p) === hasFeature(p, "mcp_access") for all eight plans and an unknown string; PLAN_ORDER arrays equal; unlock plan radar')
+
+  section('15. legacy signal pin (protocol version 2026-07-28, packet 028)')
+  // Release one stays legacy-only (spec section 14). A modern-era probe must
+  // fall back to the legacy handshake: 400 -32600, never one of the SDK's
+  // modern-era codes, and it must not touch the per-key rate counter (the
+  // version check, step 7, runs before rateCheck -- spec 14.3/14.5, F6).
+  const modernProbeBody = {
+    jsonrpc: '2.0',
+    id: 43,
+    method: 'server/discover',
+    params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } },
+  }
+  const modernHeaders = { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'server/discover' }
+  const rateCallsBefore = db.calls.filter((c) => c.rpc === 'affiliate_rate_check').length
+  res = await send(ev(modernProbeBody, { key: KA.secret, headers: modernHeaders }))
+  assert.strictEqual(res.status, 400)
+  assert.strictEqual(res.body.error.code, -32600)
+  assert.strictEqual('result' in res.body, false)
+  assert.ok(![-32022, -32020, -32021].includes(res.body.error.code))
+  const rateCallsAfter = db.calls.filter((c) => c.rpc === 'affiliate_rate_check').length
+  assert.strictEqual(rateCallsAfter, rateCallsBefore, 'the modern probe must not spend the per-key rate counter')
+  ok('a modern-era probe (2026-07-28, server/discover, the _meta body) with a valid key: 400 -32600, no result, code is not a modern-era code (-32022/-32020/-32021), and the rate counter is untouched')
+
+  res = await send(ev(modernProbeBody, { key: KA.secret, headers: { 'Mcp-Method': 'server/discover' } }))
+  assert.strictEqual(res.status, 200)
+  assert.strictEqual(res.body.error.code, -32601)
+  assert.strictEqual('result' in res.body, false)
+  ok('the same probe with no MCP-Protocol-Version header: 200 -32601 (falls through to the ordinary unknown-method answer)')
+
+  const callsBeforeUnauth = db.calls.length
+  const unauthProbeBody = { ...modernProbeBody, id: 42 }
+  res = await send(ev(unauthProbeBody, { headers: modernHeaders }))
+  assert.strictEqual(res.status, 401)
+  assert.strictEqual(res.headers['WWW-Authenticate'], 'Bearer realm="brandgeo-mcp"')
+  assert.strictEqual(res.rawBody, bodies[0], 'an unauthenticated modern probe must answer the identical 401 body as section 2')
+  assert.strictEqual(db.calls.length, callsBeforeUnauth, 'a missing key never reaches the database, even for the modern probe')
+  ok('the unauthenticated modern probe: 401, identical body to section 2, auth still runs before the version check, no database call at all')
+
+  assert.deepStrictEqual(mcp.SUPPORTED_PROTOCOL_VERSIONS, ['2025-11-25', '2025-06-18', '2025-03-26'])
+  assert.ok(!mcp.SUPPORTED_PROTOCOL_VERSIONS.includes('2026-07-28'))
+  ok('SUPPORTED_PROTOCOL_VERSIONS is pinned to the three legacy revisions and does not include 2026-07-28')
 
   console.log(`\n${passed} passed`)
 }

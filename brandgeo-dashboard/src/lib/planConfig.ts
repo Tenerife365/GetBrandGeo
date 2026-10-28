@@ -474,7 +474,7 @@ export const FEATURE_META: Record<FeatureId, { label: string; blurb: string }> =
     label: 'MCP access',
     // COPY: pending bg-copy (docs/arch/mcp-access.md section 12, stage 2).
     // Placeholder wording only, not customer-approved copy.
-    blurb: 'Connect your own AI tools, such as Claude Code and Cursor, to read your BrandGEO visibility data over MCP.',
+    blurb: 'Connect Claude Code, Cursor and other AI tools to your BrandGEO account over MCP, so they can read your visibility data directly. Read-only: nothing it does can start a collection or change your account.',
   },
 }
 
