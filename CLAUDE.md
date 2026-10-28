@@ -20,7 +20,49 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-10-22)
+## CURRENT STATE (newest entry 2026-10-28)
+
+### 2026-10-28: daily article routine LIVE, August content block lifted, BG-106 published (51e9d79)
+
+**Ruling, Constantin: "Mergem pe varianta 1."** The August rule "no new
+long-form until the staged backlog is fired" is lifted for one research
+article a day, generated from data already collected, committed and pushed
+automatically. Record: `docs/growth/content/daily-article-routine-2026-10-28.md`;
+`.claude/agents/gtm-content.md` says the same. Before this, the last article
+was BG-105 on 2026-09-03.
+
+**Pieces.** Scheduled task `brandgeo-daily-article` (10:10 local, runs only
+while the Claude app is open, prompt in
+`C:\Users\const\.claude\scheduled-tasks\brandgeo-daily-article\SKILL.md`);
+queue `docs/growth/content/article-queue/topics.md` (15 topics with SQL
+briefs, all on clients 28 to 47); data records in `article-queue/data/`;
+content in `scripts/articles_content_daily.py` (`ARTICLES_DAILY`, merged into
+`build_articles.py`); publisher `scripts/publish_article.py`; log
+`article-queue/publish-log.md`. The routine is read-only on the database,
+publishes nothing on a dull day, and refuses a second article on a day that
+already has a log line.
+
+**How the publisher commits, worth knowing before touching it.** It builds
+the commit in a temporary index from HEAD plus only its own files, with
+`blog.html` and `sitemap.xml` rebuilt from the HEAD blob plus its insertion,
+so another session's dirty hunk (sitemap carries an mcp.html one) never rides
+along. It refuses when local main differs from origin/main, so it never
+pushes another session's held commit, and it never touches
+`brandgeo-dashboard/`, so no Netlify build is spent. Validation: JSON-LD
+parses, internal links exist, no dashes, no raw analytics tag (the template's
+own warning comment mentions googletagmanager; the check matches script tags
+and gtag calls only).
+
+**BG-106 LIVE**, "The Directories AI Engines Name When They Recommend Local
+Professionals": 390 of 591 answers (66%) named a third-party platform,
+immigration 95%, Super Lawyers 125, engines 48% (Perplexity) to 79% (Google
+AI Mode). Commit `51e9d79`, 12 files; `deploy-status.json` read sha
+`51e9d79`, expected 4, deployed 4, failed empty, rollback false; page, OG
+image, sitemap entry and both blog cards serve live. Data record with the
+query that reproduces 390 of 591:
+`docs/growth/content/article-queue/data/bg-106-platform-mentions-2026-10-28.md`.
+
+## CURRENT STATE (2026-10-22)
 
 ### 2026-10-22 (sixth): program rate for custom services (5% once on service fees); BUILT, 167 checks green, COMMITTED (2464c16), migration APPLIED, PUSHED and LIVE (ff51a56)
 
