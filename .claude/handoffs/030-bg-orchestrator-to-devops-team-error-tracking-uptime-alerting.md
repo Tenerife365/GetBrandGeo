@@ -124,6 +124,10 @@ bg-app and bg-web in parallel (disjoint scopes), then bg-verify.
 
 ## Open questions for Constantin (defaults apply if silent)
 
+**RULED 2026-10-28, Constantin: defaults ("Pentru punctul 4, implicit").**
+Sentry free tier, errors only, both surfaces; UptimeRobot free;
+alerts to `ADMIN_ALERT_EMAIL` as set today; no phone push.
+
 1. Sentry free tier yes or no (default yes, errors only, both surfaces).
 2. External pinger: UptimeRobot free (default) or Better Stack free.
 3. Alert recipient: `ADMIN_ALERT_EMAIL` as set today (default) or a new

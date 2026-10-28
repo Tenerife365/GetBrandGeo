@@ -184,6 +184,13 @@ Vendors count differently (Scrunch counts prompt by platform variants, Athena co
 
 ## 8. Open questions for Constantin (defaults apply if silent)
 
+**RULED 2026-10-28, Constantin: "da, de acord".** All four defaults stand:
+best performing first, locked engines as columns (max two), "Not recommended
+yet" for zero mentions, release one is R1 to R5 plus R7 and R8 with R6's
+competitor block in and its rule-based guidance deferred. The OpenRouter outage
+in section 1 is closed the same day: credit topped up, Perplexity read back ok
+on client 54 (3 ok rows, 0 errors in 2 days), Grok ok on 2026-10-27.
+
 1. Default sort: best performing first (default) or needs work first.
 2. Show locked engines as columns (default yes, max two) or keep the chip strip only.
 3. Band label for zero mentions: "Not recommended yet" (default) or keep "Needs Work".

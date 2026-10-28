@@ -110,10 +110,14 @@ edits".
   commit message. The runbook names each variable and where it is set; the
   values are typed by Constantin in the Netlify and Supabase UIs.
 - **Migration rehearsal is the acceptance test.** The runbook's final step
-  is: take the next real migration in the queue (`db/supabase-client-api-keys-migration-2026-09-22.sql`,
-  the MCP stage 1 migration, still unapplied), apply it on staging, run the
-  MCP test file against staging, and only then apply it to production. That
-  rehearsal is the proof the environment works.
+  is: take the next real migration in the queue, apply it on staging, run
+  its tests against staging, and only then apply it to production. That
+  rehearsal is the proof the environment works. **Corrected 2026-10-28:**
+  the MCP stage 1 migration (`db/supabase-client-api-keys-migration-2026-09-22.sql`)
+  is already applied to production, by hand in the SQL Editor (it is not in
+  `schema_migrations`); read back 2026-10-28, table, index, RLS policy and
+  grants match the file. Pick the next unapplied file in `db/` at run time,
+  and list in the runbook how you proved it is unapplied.
 
 ## Allowed production edits
 
@@ -124,6 +128,10 @@ edits".
 Both ride one Netlify build with the next dashboard push.
 
 ## Open questions for Constantin (defaults apply if silent)
+
+**RULED 2026-10-28, Constantin: defaults ("Pentru punctul 4, implicit").**
+Second free Supabase project, branch deploy on the existing Netlify site,
+staging logins for Constantin only.
 
 1. Supabase: second free project (default) or Branching on Pro.
 2. Netlify: branch deploy on the existing site (default) or a second site.
