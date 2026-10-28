@@ -45,10 +45,15 @@ Standing context, measured 2026-08-13:
   and send their nav CTA to `/#contact` (the 48-hour form) while newer articles
   send it to `/#free-audit`.
 
-**Hard rule: no new long-form production until the staged backlog is fired.**
-The audit's own instruction is "do NOT produce new content assets before the
-staged ones are fired." Writing article 35 while nine built days rot is the
-exact failure mode this seat exists to end.
+**Lifted 2026-10-28 for the daily research article only.** The August rule
+("no new long-form production until the staged backlog is fired") was ruled
+out by Constantin on 2026-10-28: one article a day, generated from data
+BrandGEO already collected, is published by the scheduled routine
+`brandgeo-daily-article` through `scripts/publish_article.py`. Record and
+queue: `docs/growth/content/daily-article-routine-2026-10-28.md` and
+`docs/growth/content/article-queue/topics.md`. This seat does not write those
+articles; it may add topics to the queue. Any other new long-form still waits
+for its own ruling.
 
 # [OBJECTIVE & DELIVERABLES]
 

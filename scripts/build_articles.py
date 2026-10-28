@@ -321,6 +321,8 @@ def render(a):
 
 def main():
     from articles_content import ARTICLES  # noqa: E402
+    from articles_content_daily import ARTICLES_DAILY  # noqa: E402
+    ARTICLES = ARTICLES + ARTICLES_DAILY
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*")
     args = ap.parse_args()
