@@ -22,6 +22,40 @@
 
 ## CURRENT STATE (newest entry 2026-10-28)
 
+### 2026-10-28 (second): client 57 terms set, OpenRouter outage closed, packet 028 LIVE (8c99fca), 029/030 ruled
+
+**Client 57 is OralStore.** Constantin, 2026-10-28: a one-time manual
+payment covering the Growth subscription until 2027-01-15, then
+renegotiated. Set from this seat on his terms, BpR pattern:
+`plan_source = 'package'`, `plan_grant_until = 2027-01-15`, plan stays
+`growth`, `plan_grant_note` written, one `client_events` row (2 now), read
+back. `expire-plan-grants` reverts it to Free and emails the client the
+first morning AFTER 2027-01-15 (it selects `plan_grant_until < today`), so
+renegotiate before that or extend the date on the Account page.
+
+**OpenRouter outage CLOSED.** Constantin topped up the credit; read back:
+perplexity ok rows on client 54, 0 errors in 2 days, grok ok 2026-10-27.
+The AI Visibility brief section 8 is ruled ("da, de acord", all defaults)
+and recorded in the brief; the bg-design spec is in progress.
+
+**MCP stage 1 migration was already applied** (by hand in the SQL Editor,
+not in `schema_migrations`); table, index, RLS policy and grants match
+`db/supabase-client-api-keys-migration-2026-09-22.sql`. Nothing was owed.
+
+**Packet 028 was built and reviewed on 2026-09-24 and sat uncommitted for a
+month.** Tests re-run 49 green, committed `6855db0` (4 dashboard files plus
+packet, pre-read, review, copy deck, arch section 14), pushed with
+`BATCH_PUSH=1` together with `8c99fca`; live bundle `index-BKHPf8nK.js`
+carries the new MCP blurb. Review: `docs/qa/mcp-dashboard-batch-review-2026-09-24.md`,
+PASS WITH FINDINGS, two LOW back to bg-app. `brandgeo/web/mcp.html` is
+still NOT published: its stage 3 review (`docs/qa/mcp-web-stage3-review-2026-09-24.md`)
+is FAIL on copy (one MAJOR false claim, three MEDIUM), route bg-copy then bg-web.
+
+**Packets 029 and 030: defaults ruled** ("Pentru punctul 4, implicit"),
+written into both packets (`8c99fca`). 029's rehearsal line corrected (pick
+the next unapplied migration). 030's design runs as one bg-architect pass
+instead of the judge panel, since the ruling fixes the stack.
+
 ### 2026-10-28: daily article routine LIVE, August content block lifted, BG-106 published (51e9d79)
 
 **Ruling, Constantin: "Mergem pe varianta 1."** The August rule "no new
