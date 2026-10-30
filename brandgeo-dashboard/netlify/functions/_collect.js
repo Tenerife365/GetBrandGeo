@@ -155,7 +155,7 @@ async function callGemini(prompt, ctx, opts) {
         const text = geminiText(d)
         if (text) {
           console.log(`[Gemini] ${tag} ok | len:`, text.length, '| preview:', text.slice(0, 200))
-          return { text, errorCode: null, detail: null }
+          return { text, model: tag, errorCode: null, detail: null }
         }
 
         if (d.error) {
@@ -288,7 +288,7 @@ async function callOpenRouter(model, prompt, ctx, opts = {}) {
   } else {
     console.warn(`[OpenRouter:${model}] empty response:`, JSON.stringify(d).slice(0, 300))
   }
-  return { text, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
+  return { text, usage, model: d.model || model, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty response' }
 }
 
 // ─── ChatGPT — OpenAI Responses API, gpt-5.5, web_search_preview + geo ─────────
@@ -412,7 +412,7 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel, plan) {
   } else {
     console.warn('[ChatGPT] empty output — full response:', JSON.stringify(d).slice(0, 500))
   }
-  return { text: text || null, usage, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
+  return { text: text || null, usage, model: modelUsed, errorCode: text ? null : 'empty_response', detail: text ? null : 'empty output from Responses API' }
 }
 
 // ─── Claude — web search ON, streaming with a wall-clock time budget ──────────
@@ -421,6 +421,9 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel, plan) {
 // long note on the anthropic-beta header below is the authority. Web search is
 // ON and must stay on. Time budget is not a char cap. See §8.4 finding 1.4 /
 // §12.3 before touching this.)
+// The Claude model id, also written to ai_results.model on every claude row.
+const CLAUDE_MODEL = 'claude-sonnet-5-5'
+
 async function callClaude(prompt, ctx, opts) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) { console.error('[Claude] ANTHROPIC_API_KEY not set'); return { text: null, errorCode: 'auth_error', detail: 'ANTHROPIC_API_KEY not set' } }
@@ -451,7 +454,7 @@ async function callClaude(prompt, ctx, opts) {
         'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-4-6',
+        model:      CLAUDE_MODEL,
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
@@ -462,7 +465,10 @@ async function callClaude(prompt, ctx, opts) {
     if (!r.ok) {
       const errText = await r.text().catch(() => '')
       console.error('[Claude] HTTP error:', r.status, errText.slice(0, 200))
-      const isQuota = r.status === 429 || r.status === 402
+      // Anthropic answers an empty prepaid balance with HTTP 400 and a "credit
+      // balance is too low" message, not 402, so read the body as well.
+      const isQuota = r.status === 429 || r.status === 402 ||
+        errText.toLowerCase().includes('credit balance')
       return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error', detail: `HTTP ${r.status} ${errText.slice(0, 200)}`.trim() }
     }
 
@@ -879,6 +885,19 @@ const ENGINE_CALLERS = {
   ai_overview: (p, ctx, o) => callGoogleAiOverview(p, ctx, o),
 }
 
+// The model each engine runs when the caller does not report the one that
+// answered (error rows, SerpApi surfaces). gemini and chatgpt are absent on
+// purpose: they choose per call (fallback chain, plan), so a row without a
+// reported model stays null rather than naming a guess.
+const ENGINE_MODEL = {
+  claude:      CLAUDE_MODEL,
+  perplexity:  'perplexity/sonar',
+  meta:        'meta-llama/llama-3.1-70b-instruct',
+  grok:        'x-ai/grok-4.5',
+  google_ai:   'serpapi/google_ai_mode',
+  ai_overview: 'serpapi/google_ai_overview',
+}
+
 // Per-engine outer timeout (ms), CONTEXT-AWARE (CLAUDE.md §12.6).
 //
 // HTTP path (the manual "Refresh this prompt" button → collect-*.js): tight
@@ -958,8 +977,11 @@ const CLAUDE_BUDGET_WORKER_MS = 55000
 // and the three HTTP endpoints agree byte-for-byte. run_id is set only when the
 // caller passes one (the queue worker does; the manual endpoints leave it null,
 // keeping their rows out of the uq_ai_results_run_prompt_llm partial index).
-function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config }) {
-  const base = { prompt_id, llm: engine, client_id, checked_at: new Date().toISOString() }
+function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config, model = null }) {
+  // model: which model produced this row (ai_results.model, added 2026-10-30),
+  // so a model change can be judged on rows that name their model instead of
+  // on dates. Null when the engine did not report one.
+  const base = { prompt_id, llm: engine, client_id, model: model || ENGINE_MODEL[engine] || null, checked_at: new Date().toISOString() }
   if (run_id != null) base.run_id = run_id
 
   if (errorCode) {
@@ -1071,8 +1093,8 @@ async function collectEngines(engines, {
       continue
     }
 
-    const { text, errorCode, detail, usage, citations } = s.value ?? { text: null, errorCode: null }
-    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config })
+    const { text, errorCode, detail, usage, citations, model } = s.value ?? { text: null, errorCode: null }
+    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config, model })
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }

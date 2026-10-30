@@ -107,7 +107,7 @@
 
    PRICES (USD, verified 2026-07-29, converted at USD_TO_EUR):
      gpt-5.5            $5.00 / $30.00 per 1M   + web_search $10/1k, results billed as input
-     claude-sonnet-4-6  $3.00 / $15.00 per 1M   + web_search $10/1k, results billed as input
+     claude-sonnet-5-5  $2.00 / $10.00 per 1M   + web_search $10/1k, results billed as input (was sonnet-4-6 at $3/$15 until 2026-10-30)
      perplexity/sonar   $1.00 /  $1.00 per 1M   search included, no separate fee
      gemini-2.5-flash   $35 per 1k grounded prompts, 1,500/day free, context not billed
      SerpApi            $10-25 per 1k depending on plan tier; fixed monthly commitment
@@ -130,7 +130,7 @@ const MODEL_PRICE_USD = {
   // row is priced with these numbers and will UNDERSTATE the real cost; a run
   // of suspiciously cheap chatgpt rows means the fallback is firing.
   chatgpt:    { in: 0.15, out: 0.60 },   // gpt-4o-mini
-  claude:     { in: 3.00, out: 15.00 },  // claude-sonnet-4-6
+  claude:     { in: 2.00, out: 10.00 },  // claude-sonnet-5-5
   perplexity: { in: 1.00, out:  1.00 },  // perplexity/sonar via OpenRouter
   meta:       { in: 0.35, out:  0.40 },  // llama-3.1-70b, retired — historical rows only
   grok:       { in: 2.00, out:  6.00 },  // x-ai/grok-4.5 via OpenRouter, live 2026-07-29

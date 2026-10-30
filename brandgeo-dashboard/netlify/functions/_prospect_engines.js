@@ -276,7 +276,7 @@ async function callClaude(prompt, ctx) {
         'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-4-6',
+        model:      'claude-sonnet-5-5',
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
@@ -289,7 +289,9 @@ async function callClaude(prompt, ctx) {
       }),
     })
     if (!r.ok) {
-      const isQuota = r.status === 429 || r.status === 402
+      const errText = await r.text().catch(() => '')
+      const isQuota = r.status === 429 || r.status === 402 ||
+        errText.toLowerCase().includes('credit balance')
       return { text: null, errorCode: isQuota ? 'quota_exceeded' : 'api_error' }
     }
 
