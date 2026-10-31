@@ -4,7 +4,7 @@ from: bg-orchestrator
 to: devops team (bg-architect on Opus for the design, bg-backend on Opus for functions, cron and alert routing, bg-app on Sonnet for the SPA client, bg-web on Sonnet for the marketing site tag and CSP, bg-verify on Opus)
 status: READY
 created: 2026-10-14
-scope_write: docs/arch/observability.md, docs/ops/alerting-runbook.md, brandgeo-dashboard/netlify/functions/_observability.js, brandgeo-dashboard/netlify/functions/health.js, brandgeo-dashboard/netlify/functions/_auth.js (one wrap only), brandgeo-dashboard/src/lib/observability.ts, brandgeo-dashboard/src/main.tsx, brandgeo-dashboard/netlify.toml, brandgeo-dashboard/package.json, db/supabase-job-runs-watchdog-<date>.sql, brandgeo/web/.htaccess (CSP line only), brandgeo/web/observability.js, .claude/handoffs/030-*.md (status line only)
+scope_write: docs/arch/observability.md, docs/ops/alerting-runbook.md, brandgeo-dashboard/netlify/functions/_observability.js, brandgeo-dashboard/netlify/functions/health.js, brandgeo-dashboard/netlify/functions/collect-prompt.js, brandgeo-dashboard/netlify/functions/collect-claude.js, brandgeo-dashboard/netlify/functions/collect-chatgpt.js, brandgeo-dashboard/netlify/functions/collection-worker-background.js, brandgeo-dashboard/netlify.toml, brandgeo-dashboard/package.json, brandgeo-dashboard/package-lock.json, brandgeo-dashboard/.gitignore, brandgeo-dashboard/tests/observability.test.js, brandgeo-dashboard/tests/fixtures/observability-pii.json, brandgeo-dashboard/src/lib/observability.ts, brandgeo-dashboard/src/lib/observabilitySentry.ts, brandgeo-dashboard/src/main.tsx, db/supabase-observability-watchdog-2026-10-28.sql, db/supabase-observability-watchdog-proof-2026-10-28.sql, .github/workflows/dashboard-ci.yml (Q1 ruled yes 2026-10-28), .claude/handoffs/030-*.md (status line only). Amended 2026-10-28 by bg-orchestrator per arch section 10 and review finding F1; removed _auth.js, brandgeo/web/.htaccess, brandgeo/web/observability.js
 scope_read: everything under brandgeo-dashboard/, brandgeo/web/, db/, docs/arch/, docs/TECH-STACK.md
 model: opus (design, backend, verify), sonnet (app, web)
 ---
@@ -127,6 +127,8 @@ bg-app and bg-web in parallel (disjoint scopes), then bg-verify.
 **RULED 2026-10-28, Constantin: defaults ("Pentru punctul 4, implicit").**
 Sentry free tier, errors only, both surfaces; UptimeRobot free;
 alerts to `ADMIN_ALERT_EMAIL` as set today; no phone push.
+
+**RULED 2026-10-28 (second), Constantin: the spec's Q1 to Q4 at their defaults ("Q1-Q4 implicit"):** Q1 yes, build `.github/workflows/dashboard-ci.yml`; Q2 Sentry EU region; Q3 keep the getbrandgeo.com root monitor; Q4 alert after 2 consecutive failures.
 
 1. Sentry free tier yes or no (default yes, errors only, both surfaces).
 2. External pinger: UptimeRobot free (default) or Better Stack free.
