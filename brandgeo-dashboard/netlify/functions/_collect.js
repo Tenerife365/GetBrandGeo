@@ -422,7 +422,11 @@ async function callChatGPT(prompt, ctx, marketId, regionLabel, plan) {
 // ON and must stay on. Time budget is not a char cap. See §8.4 finding 1.4 /
 // §12.3 before touching this.)
 // The Claude model id, also written to ai_results.model on every claude row.
-const CLAUDE_MODEL = 'claude-sonnet-5-5'
+// claude-sonnet-5-5 was tried 2026-10-31 and reverted the same day: on 4 of 5
+// OralStore prompts it spent all max_tokens (1000) without emitting a text
+// block (stop_reason=max_tokens, empty_response). Re-try only with a measured
+// max_tokens and a paired test against stored sonnet-4-6 rows.
+const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 async function callClaude(prompt, ctx, opts) {
   const apiKey = process.env.ANTHROPIC_API_KEY

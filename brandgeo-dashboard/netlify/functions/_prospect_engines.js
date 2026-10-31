@@ -276,7 +276,7 @@ async function callClaude(prompt, ctx) {
         'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-5-5',
+        model:      'claude-sonnet-4-6',
         max_tokens: 1000,
         stream:     true,
         system:     ctx,
