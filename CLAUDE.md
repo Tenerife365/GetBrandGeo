@@ -20,6 +20,37 @@
 
 ---
 
+## CURRENT STATE (newest entry 2026-10-31)
+
+### 2026-10-31: Claude stays on claude-sonnet-4-6 (5.5 tested and reverted), ai_results.model LIVE (e1b2740)
+
+**Ruling, Constantin: "Ramanem pe model curent care stim ca functioneaza."**
+Do not re-propose a Claude model change unless he raises it.
+
+**Anthropic credit outage 2026-10-26 to 10-29.** Every Claude call failed
+with HTTP 400 "Your credit balance is too low"; Constantin topped up, calls
+ok again from 2026-10-30 17:10Z. Those rows were `api_error`, metered at the
+flat EUR 0.033 each (about EUR 2, mostly client 54). Since `6aa4454` a body
+containing "credit balance" maps to `quota_exceeded`, which costs 0.
+
+**`ai_results.model` is LIVE.** Migration
+`db/supabase-ai-results-model-column-2026-10-30.sql`, applied on
+Constantin's go as `ai_results_model_column_2026_10_30` and read back
+(text, nullable, no default, RLS and the 3 policies unchanged). Written by
+`buildResultRow` in `_collect.js` for every engine: the reported model
+(Gemini with `/ungrounded`, ChatGPT by plan, OpenRouter's slug), else a
+fixed id per engine in `ENGINE_MODEL`; null for gemini and chatgpt when
+nothing was reported. Rows before 2026-10-30 are null. Judge any future
+model change on this column, never on dates.
+
+**The sonnet-5-5 test.** Pushed `6aa4454` (deploy ready 06:14:20Z), refresh
+on client 57's 5 prompts at 06:17Z: 4 of 5 `empty_response` with
+`stop_reason=max_tokens` (the 1000 output tokens spent before any text
+block), 1 ok at EUR 0.0145. Reverted in `e1b2740` (ready 06:21:51Z); only
+client 57 was hit. Baseline before the test (sonnet-4-6, 5 of 5 ok, EUR
+0.030 a row, answers cut near 2,300 characters) was saved locally only.
+`empty_response` rows are still metered (4 rows, EUR 0.13); left as is.
+
 ## CURRENT STATE (newest entry 2026-10-28)
 
 ### 2026-10-28 (second): client 57 terms set, OpenRouter outage closed, packet 028 LIVE (8c99fca), 029/030 ruled
