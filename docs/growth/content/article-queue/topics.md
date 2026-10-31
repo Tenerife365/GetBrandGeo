@@ -35,9 +35,9 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 | # | Key | Status | Question the article answers |
 |---|---|---|---|
 | 1 | platforms | published bg-106 2026-10-28 | Which third-party platforms engines name for local professionals |
-| 2 | list-length | ready | How many firms does each engine name per answer, by profession |
-| 3 | sources | ready | Which kinds of sites engines cite as sources: firm sites, directories, news, government |
-| 4 | no-firm | ready | How often an engine answers a "best X in city" question without naming a single firm |
+| 2 | list-length | dropped 2026-10-29: competitors_mentioned is not a reliable firm count (stored lists are capped at 10, and 90 of 162 rows stored as empty carry 3 or more bold names, e.g. Gemini and Perplexity bullet lists the parser missed) | How many firms does each engine name per answer, by profession |
+| 3 | sources | dropped 2026-10-30: `citations` is null on all 591 rows for all 5 engines; links inside `response_text` exist for only 2 engines (ChatGPT 119 of 120, Google AI Mode 111 of 111; Claude 7, Gemini 0, Perplexity 0), below the brief's three-engine floor | Which kinds of sites engines cite as sources: firm sites, directories, news, government |
+| 4 | no-firm | published bg-107 2026-10-31 | How often an engine answers a "best X in city" question without naming a single firm |
 | 5 | ratings | ready | How often answers quote star ratings or review counts, by engine |
 | 6 | nap | ready | How often answers give a phone number, street address or website for the firms they name |
 | 7 | fees | ready | What fees engines quote: contingency percentages, management fees, commissions |
@@ -65,6 +65,10 @@ directory (the BG-106 platform list), government (`.gov`), news, the firm's own 
 (everything else). Report shares per engine. Drop if fewer than three engines carry citations.
 
 ### 4 no-firm
+Warning found 2026-10-29 while dropping topic 2: of 162 rows with an empty
+`competitors_mentioned`, 90 carry 3 or more bold names in `response_text`, so most
+"empty" rows are parser misses. Topics 4, 10 and 14 must count firms from the text,
+not from that field, or be dropped.
 Rows where `competitors_mentioned` is empty or `[]`. Read 10 of them by hand before
 publishing to check they are real non-answers and not parser misses; record what you
 found in the data note.

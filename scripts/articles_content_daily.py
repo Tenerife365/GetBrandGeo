@@ -142,3 +142,118 @@ ARTICLES_DAILY.append(dict(
     <p>Check that the facts match your own website: name, address, practice areas, years in business. This study cannot promise that a better profile gets you recommended. It does show that these are the pages engines quote when they explain a recommendation, so an outdated one is the one most likely to be repeated back to a buyer.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-107", bid="BG-107", date="2026-10-31", date_label="October 31, 2026", read=6,
+    tags=["Original Research", "US Cities", "Perplexity"],
+    title="When an AI Engine Names No One: 15 Answers With No Firm in Them",
+    h1="When an AI Engine <em>Names No One</em>",
+    h1_plain="When an AI Engine Names No One",
+    subtitle="We asked five AI engines for the best local professionals in 20 US cities and read every answer that looked empty. Four engines named at least one firm every time. Perplexity named none in 15 of 120 answers, and in half the cities it named no real estate agent at all.",
+    meta_desc="In 591 AI answers to local buyer questions across 20 US cities, Perplexity named no firm in 15 of 120. ChatGPT, Claude, Gemini and Google AI Mode always named one.",
+    og_desc="Four engines named a firm in every answer. Perplexity named none in 15 of 120, including no real estate agent in 10 of 20 cities. What a no-name answer looks like and what it means for local firms.",
+    ld_desc="Original BrandGEO research counting the answers in which ChatGPT, Claude, Gemini, Perplexity and Google AI Mode named no firm at all, across 591 answers to local professional-services questions in 20 US cities.",
+    keywords="perplexity no results local businesses, ai engine refuses to recommend, perplexity real estate agents, ai search no recommendation, local ai visibility perplexity, chatgpt vs perplexity local recommendations",
+    about=["AI Visibility Research", "Local Search", "Perplexity", "Professional Services"],
+    findings=[("15 of 120", "Perplexity answers named no firm, brokerage or individual professional at all"),
+              ("0", "such answers from ChatGPT, Claude, Gemini or Google AI Mode across their 471 answers"),
+              ("10 of 20", "cities where Perplexity named no real estate agent for a home buyer"),
+              ("12", "Perplexity answers said in plain words that its search results were missing or too thin to verify a recommendation")],
+    faq=[("Do AI engines always recommend a business when asked for the best one?",
+          "Not always. In our 591 answers across 20 US cities, ChatGPT, Claude, Gemini and Google AI Mode named at least one firm every time. Perplexity named none in 15 of its 120 answers and gave advice on how to choose instead."),
+         ("Why did Perplexity not name any real estate agents?",
+          "We can only report what it said, not why. In several answers it wrote that it had no search results to verify which agents were best, then offered a checklist or pointed to a ranking list. It did this for real estate agents in 10 of the 20 cities."),
+         ("Which questions were most likely to get no names?",
+          "Real estate agents, by a wide margin: 10 of 20 Perplexity answers named no agent or brokerage. Immigration lawyers and city-specific questions had 2 each, personal injury 1, and property management none."),
+         ("What should a local firm do about answers that name no one?",
+          "Check the same question on more than one engine. An empty answer on one engine is not the same as being absent everywhere: in these cities every other engine that answered named firms for the same questions. Track each engine separately rather than averaging them.")],
+    related=[("/bg-106.html", "BG-106", "The Directories AI Engines Name When They Recommend Local Professionals",
+              "The same 591 answers, read for the platforms engines lean on."),
+             ("/bg-016.html", "BG-016", "Cross-Engine Consensus: When AI Engines Agree, and When They Don't",
+              "How often several engines agree on the same firm in a city."),
+             ("/ai-visibility-for-real-estate.html", "Real estate", "AI Visibility for Real Estate",
+              "What these answers mean for an agent or brokerage.")],
+    cta_h="See which engines name you, and which name no one",
+    cta_p="Run the free audit on your own domain and read each engine's answer separately. No signup and no card.",
+    og=dict(
+        fname="og-bg-107.png",
+        kicker="BG-107 · Original Research",
+        lines=[[("When an AI Engine", "w")], [("Names ", "w"), ("No One", "g")]],
+        sub=["591 answers to local buyer questions,",
+             "20 US cities, 5 engines."],
+        stats=[("15 of 120", "Perplexity answers named no firm at all", "BrandGEO, 20 US cities"),
+               ("0", "such answers from the other four engines", "471 answers"),
+               ("10 of 20", "cities with no real estate agent named", "Perplexity, buyer question"),
+               ("12", "answers said its results were too thin", "Perplexity, 120 answers")],
+        footer="The Empty Answer",
+    ),
+    body="""  <p>Most of what we publish counts which firms AI engines recommend. This one counts the answers where an engine recommended nobody. You ask for the best real estate agent in Seattle and the reply is a checklist: interview three agents, read reviews, ask about local experience. Useful advice, and not a single name in it.</p>
+
+  <p><strong>Across 591 answers in 20 US cities, four engines named at least one firm every time. Perplexity named none in 15 of its 120 answers.</strong> Ten of those fifteen were about real estate agents.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six local buyer questions in each of 20 US cities: a personal injury lawyer, real estate agents for a home buyer, a property management company, an immigration lawyer, and two questions specific to that city's economy. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered each one on July 24 and 25, 2026, and 591 answers came back usable.</p>
+    <p>Our automatic firm extractor came back empty on 162 of those answers, but it misses bullet lists, so we did not trust it. We read all 162 by hand. An answer counts as "named no firm" only if it gives no firm, brokerage or individual professional at all. Pointing to a ranking list or a directory without naming anyone in it still counts as no firm. We report what the engines wrote. We cannot tell you why they wrote it, and one collection run in July is not a statement about how these engines behave on other days.</p>
+  </div>
+
+  <h2>By engine</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Named no firm</th><th>Said its results were missing or too thin</th></tr></thead>
+    <tbody>
+      <tr><td>ChatGPT</td><td>120</td><td>0</td><td>0</td></tr>
+      <tr><td>Claude</td><td>120</td><td>0</td><td>0</td></tr>
+      <tr><td>Gemini</td><td>120</td><td>0</td><td>0</td></tr>
+      <tr><td>Google AI Mode</td><td>111</td><td>0</td><td>0</td></tr>
+      <tr><td>Perplexity</td><td>120</td><td>15</td><td>12</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The other four engines sometimes hedged. One Gemini answer opened by calling a single best list impossible and subjective, then named five firms anyway. That counts as naming a firm. Only Perplexity left answers with nobody in them.</p>
+
+  <p>Perplexity's answers were also short. They averaged 1,341 characters, against 3,111 for Claude and 8,823 for Google AI Mode. Its fifteen no-name answers averaged 1,149.</p>
+
+  <h2>By question: real estate agents stand out</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question type (Perplexity)</th><th>Answers</th><th>Named no firm</th></tr></thead>
+    <tbody>
+      <tr><td>Real estate agents</td><td>20</td><td>10</td></tr>
+      <tr><td>Immigration lawyer</td><td>20</td><td>2</td></tr>
+      <tr><td>City-specific questions</td><td>40</td><td>2</td></tr>
+      <tr><td>Personal injury lawyer</td><td>20</td><td>1</td></tr>
+      <tr><td>Property management</td><td>20</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>For a home buyer looking for an agent, Perplexity named no agent and no brokerage in Chicago, Philadelphia, Atlanta, Washington DC, Boston, Seattle, San Diego, Denver, Minneapolis and Baltimore. In the other ten cities it named agents or teams. For property managers it always named companies. The fifteen empty answers fall in 12 of the 20 cities, so this is not one city's quirk.</p>
+
+  <h2>What an empty answer looks like</h2>
+
+  <p>Twelve Perplexity answers said in plain words that its search results were missing or too thin to recommend anyone, along the lines of not having search results to verify which agents are currently best. Nine of those twelve then named no one. The other three named one or two firms while warning that the results were thin.</p>
+
+  <p>The remaining six empty answers declined without saying so. One pointed to a published ranking of law firms without naming a firm from it. One pointed to a city magazine's list of top agents. One listed agent directories. The others gave criteria and questions to ask in an interview.</p>
+
+  <h2>The near misses</h2>
+
+  <p>Three more Perplexity answers came close. Asked for law firms that handle medical device work in Minneapolis, automotive and manufacturing work in Detroit, and home services in Phoenix, it said the results were too limited and then named one or two firms. In the Detroit answer it added that the one firm it found was a poor match for the question. We counted all three as answers that named a firm, so the 15 is the strict number. A looser reading, counting any answer that warned it could not really recommend anyone, would put Perplexity at 18 of 120.</p>
+
+  <p>The contrast with property management is worth noting. Perplexity named companies in all 20 of those answers, and its property management answers were its longest, averaging 1,947 characters. In the same run, the same engine had no trouble naming companies for that question.</p>
+
+  <p>None of these answers is wrong, exactly. The advice is sensible. But for a local firm the result is the same as not being mentioned, and for a buyer it means a second search somewhere else.</p>
+
+  <h2>Why this matters for how you measure</h2>
+
+  <p>If you average visibility across engines, an empty answer looks like a firm that lost. Here it is an engine that did not pick anyone. In all ten cities where Perplexity named no agent, every other engine that answered named agents or brokerages for the same question. That is 38 answers, because Google AI Mode returned no usable answer in two of those cities. A firm checking only Perplexity would conclude it is invisible in its market. A firm checking only ChatGPT would never see the gap.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Read each engine's answer to your buyers' question separately, and record "named no one" as its own result, not as a miss. If you are a real estate agent or brokerage, check Perplexity in particular, because that is where we saw empty answers most often.</p>
+    <p>An empty answer is not a verdict on your firm. It tells you that, on that day, the engine did not find enough it trusted to name anyone. This study cannot say what would change that. It can say that four other engines answered the same question with names, so the question itself is not unanswerable.</p>
+  </div>""",
+))
