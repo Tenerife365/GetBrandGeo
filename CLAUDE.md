@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-11-01)
 
-### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog SQL NOT applied, AI Visibility prompt focus LIVE (96d1a7c)
+### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog SCHEDULED (cron job 10), AI Visibility prompt focus LIVE (96d1a7c)
 
 **Two Netlify builds today, both by Constantin.** `96d1a7c` (morning): the
 AI Visibility prompt-first page from the 2026-10-18 brief, bundle
@@ -55,19 +55,31 @@ admin; a viewer's `force: true` is dropped and the response carries
 `force_ignored: true` (`tests/enqueue_force_gate.test.js`, 13 checks). Model
 stays claude-sonnet-4-6; none of this touches the collectors' calls.
 
-**NOT applied, Constantin's, in order (runbook `docs/ops/alerting-runbook.md`
-section 3):** Sentry EU project and the two DSN env vars in Netlify
-(`SENTRY_DSN` Functions, `VITE_SENTRY_DSN` Builds, one redeploy), Resend key
-and `alert_email` in Vault (both read 0 of 2 on 2026-11-01), then part A of
-`db/supabase-observability-watchdog-2026-10-28.sql` (lines 1 to 508, schema
-`ops`, idempotent since S1, seeds 9 `watch_expectations` with `obs-watchdog`
-and `poll-inbound-replies` disabled), `select ops.watchdog_send_test();`
-must land a mail before part B `cron.schedule('obs-watchdog', '50 * * * *')`.
+**Watchdog APPLIED and SCHEDULED 2026-11-01, late evening, by Constantin in
+the SQL Editor (runbook `docs/ops/alerting-runbook.md` section 3), read back
+from this seat after each step.** His first paste of part A left nothing
+behind (the editor runs the paste as one batch, one error rolls back all of
+it, and schema `ops` read absent in both projects); the second paste landed.
+Read back: 9 `ops.watch_expectations` rows with `obs-watchdog` and
+`poll-inbound-replies` disabled, 4 functions without SECURITY DEFINER and
+with an empty `search_path`, RLS on both tables, `anon` and `authenticated`
+without usage on `ops` or execute on `watchdog_run()`. Vault holds
+`resend_api_key` and `alert_email`. `select ops.watchdog_send_test();` was
+pg_net request 2534, Resend answered 200 at 23:44Z and the test mail
+arrived. The dry run `ops.watchdog_findings()` returned 0 rows. Part B ran at
+23:46Z: `cron.job` 10 `obs-watchdog`, `50 * * * *`, active, first run due
+00:50Z on 2026-11-02; `job_runs` had 0 `obs-watchdog` rows and `alert_log` 0
+rows at that moment. **Still owed:** V9c, two scheduled runs read back from
+`job_runs` with `ok = true` and `alert_log` still empty (any row there means
+a real finding, read `detail` before touching anything). Sentry (EU project,
+`SENTRY_DSN` Functions and `VITE_SENTRY_DSN` Builds in Netlify, read at the
+next build) is OPTIONAL and not done; the wrapper stays inert without it.
 GitHub secrets `RESEND_API_KEY` and `ALERT_EMAIL` only after
 `tests/package_provisioning.test.js` (red since August, billing file, owed to
 bg-backend on Opus) is fixed or excluded, else every push mails a failure.
-UptimeRobot on `health` is optional. Rollback order: `cron.alter_job` pause,
-`cron.unschedule`, `drop schema ops cascade`, delete the two Vault secrets.
+UptimeRobot on `health` is optional. Rollback order: `cron.alter_job(job_id
+=> 10, active => false)` to pause, `cron.unschedule('obs-watchdog')`,
+`drop schema ops cascade`, delete the two Vault secrets.
 
 **Recorded, not fixed.** S4: main chunk grew 1.81 KB gzip against the 1.5 KB
 budget in `docs/arch/observability.md` section 9, about 0.6 KB of it Vite's
