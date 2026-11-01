@@ -19,6 +19,14 @@ const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { enqueueClientCollection, triggerWorker, checkCollectionCooldown } = require('./_enqueue')
 
+// Only an admin may run the destructive force path (delete, then recollect).
+// A non-admin's force flag is ignored, never honoured, and the response says so
+// with force_ignored: true. The dashboard never sends force for a viewer; this
+// closes the devtools route (docs/qa/ai-visibility-prompt-focus-build-rereview-2026-10-31.md P3).
+function effectiveForceFor(role, force) {
+  return role === 'admin' && force === true
+}
+
 exports.handler = async (event) => {
   const auth = await requireAuth(event)
   if (auth.response) return auth.response
@@ -37,6 +45,9 @@ exports.handler = async (event) => {
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
   }
+
+  const effectiveForce = effectiveForceFor(auth.profile.role, force)
+  const forceIgnored = !!force && !effectiveForce
 
   // PRICING-STRATEGY-2026-07 §6 — Run-Collection cooldown (per-plan frequency
   // limit). Admins bypass (support / testing / managed done-for-you). Applies to
@@ -71,7 +82,7 @@ exports.handler = async (event) => {
 
   const result = await enqueueClientCollection(supabase, {
     clientId:      client_id,
-    force:         !!force,
+    force:         effectiveForce,
     trigger:       'manual',
     createdBy:     auth.user.id,
     market,
@@ -80,16 +91,18 @@ exports.handler = async (event) => {
 
   if (result.skipped) {
     console.log(`[Enqueue] client ${client_id} skipped: ${result.reason}`)
-    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ run_id: null, total_jobs: 0, skipped: true, reason: result.reason }) }
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ run_id: null, total_jobs: 0, skipped: true, reason: result.reason, ...(forceIgnored ? { force_ignored: true } : {}) }) }
   }
 
   // Kick the worker so it starts now instead of waiting for the hourly cron.
   await triggerWorker()
 
-  console.log(`[Enqueue] client ${client_id} run ${result.runId} — ${result.totalJobs} jobs (force=${!!force})`)
+  console.log(`[Enqueue] client ${client_id} run ${result.runId}: ${result.totalJobs} jobs (force=${effectiveForce}${forceIgnored ? ', requested force ignored' : ''})`)
   return {
     statusCode: 200,
     headers: auth.headers,
-    body: JSON.stringify({ run_id: result.runId, total_jobs: result.totalJobs, skipped: false }),
+    body: JSON.stringify({ run_id: result.runId, total_jobs: result.totalJobs, skipped: false, ...(forceIgnored ? { force_ignored: true } : {}) }),
   }
 }
+
+exports.effectiveForceFor = effectiveForceFor
