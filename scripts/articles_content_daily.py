@@ -257,3 +257,125 @@ ARTICLES_DAILY.append(dict(
     <p>An empty answer is not a verdict on your firm. It tells you that, on that day, the engine did not find enough it trusted to name anyone. This study cannot say what would change that. It can say that four other engines answered the same question with names, so the question itself is not unanswerable.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-108", bid="BG-108", date="2026-11-01", date_label="November 1, 2026", read=6,
+    tags=["Original Research", "US Cities", "Reviews"],
+    title="How Often AI Engines Quote Star Ratings When They Recommend Local Firms",
+    h1="How Often AI Engines <em>Quote Star Ratings</em>",
+    h1_plain="How Often AI Engines Quote Star Ratings",
+    subtitle="We read 591 AI answers to local buyer questions across 20 US cities and counted every star rating and review count. One answer in three quoted one. For property managers it was two in three, and the ratings quoted were almost all 4.5 or higher.",
+    meta_desc="In 591 AI answers across 20 US cities, 186 quoted a star rating or review count. Property management answers did so 66% of the time. 86% of quoted ratings were 4.5 or higher.",
+    og_desc="One AI answer in three quoted a star rating or a review count for the firms it named. Property managers two in three, city-specific questions one in eleven. Google AI Mode and Perplexity quoted them most.",
+    ld_desc="Original BrandGEO research counting how often ChatGPT, Claude, Gemini, Perplexity and Google AI Mode quoted star ratings and review counts in 591 answers to local professional-services questions across 20 US cities.",
+    keywords="do ai engines use google reviews, ai search star ratings, chatgpt google reviews local business, perplexity avvo rating, ai recommendations review count, property management ai search reviews",
+    about=["AI Visibility Research", "Local Search", "Online Reviews", "Professional Services"],
+    findings=[("186 of 591", "answers quoted a star rating or a review count for a firm they named"),
+              ("65 of 99", "property management answers quoted one, against 18 of 198 city-specific answers"),
+              ("86%", "of the ratings quoted were 4.5 or higher; 5 of 267 were below 4.0"),
+              ("14 of 20", "Perplexity immigration answers quoted a rating, most of them a 5.0 from a lawyer directory")],
+    faq=[("Do AI engines mention Google reviews when they recommend a business?",
+          "Often, though not always. In 591 answers across 20 US cities, 186 quoted a star rating or a review count. Google was the platform engines tied those numbers to most often, followed by lawyer directories, Zillow and Yelp."),
+         ("Which engine quotes ratings most?",
+          "Google AI Mode quoted a rating or review count in 57 of its 111 answers and Perplexity in 50 of 120. Gemini did so in 31, ChatGPT in 28 and Claude in 20, each out of 120."),
+         ("What ratings do the firms in AI answers have?",
+          "Almost all of the ratings engines quoted were high. Of 267 distinct ratings, 229 were 4.5 or higher, 169 were 4.8 or higher and 74 were a perfect 5.0. Only five were below 4.0. We cannot say whether lower-rated firms were left out or simply described without a number."),
+         ("Does a better rating get a firm recommended by AI?",
+          "This study cannot say. It counts what the engines wrote, not why they picked a firm. It does show that when an engine backs a recommendation with a number, the number is almost always high, and it is usually a Google rating or a directory rating.")],
+    related=[("/bg-106.html", "BG-106", "The Directories AI Engines Name When They Recommend Local Professionals",
+              "The same 591 answers, read for the platforms engines name."),
+             ("/bg-107.html", "BG-107", "When an AI Engine Names No One: 15 Answers With No Firm in Them",
+              "The answers where an engine recommended nobody at all."),
+             ("/ai-visibility-for-real-estate.html", "Real estate", "AI Visibility for Real Estate",
+              "What these answers mean for an agent, brokerage or property manager.")],
+    cta_h="See what AI engines say about your firm",
+    cta_p="Run the free audit on your own domain and read how each engine describes you. No signup and no card.",
+    og=dict(
+        fname="og-bg-108.png",
+        kicker="BG-108 · Original Research",
+        lines=[[("AI Engines Quote", "w")], [("Star Ratings", "g")]],
+        sub=["591 answers to local buyer questions,",
+             "20 US cities, 5 engines."],
+        stats=[("186 of 591", "answers quoted a rating or review count", "BrandGEO, 20 US cities"),
+               ("65 of 99", "property management answers did", "all 5 engines"),
+               ("86%", "of quoted ratings were 4.5 or higher", "267 ratings"),
+               ("5 of 267", "quoted ratings were below 4.0", "all 5 engines")],
+        footer="The Rating in the Answer",
+    ),
+    body="""  <p>When an AI engine recommends a local firm, it usually says why: years in practice, a specialty, an award. Sometimes the reason is a number. A 4.9 rating from 600 reviews. A perfect 5.0 on a lawyer directory. We wanted to know how often that happens, on which engines, and for which kinds of firms.</p>
+
+  <p><strong>Across 591 answers in 20 US cities, 186 quoted a star rating or a review count for a firm they named.</strong> For property managers the share was two in three. For questions about a city's own economy it was about one in eleven. And the ratings that did appear were almost all high.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six local buyer questions in each of 20 US cities: a personal injury lawyer, real estate agents for a home buyer, a property management company, an immigration lawyer, and two questions specific to that city's economy. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered each one on July 24 and 25, 2026, and 591 answers came back usable.</p>
+    <p>We searched the answer text for a star rating (such as 4.8 stars, 4.9/5, 5 out of 5, or a 4.7 Google rating) and for a review count (such as 600 reviews or 1,200+ Google reviews), and read the matches by hand to check the patterns. One Google AI Mode answer was removed because its only match was a hotel class filter in a link title. Our stored copy of a Claude answer stops at about 2,500 characters and of a Google AI Mode answer at 10,000, so a rating quoted late in a long answer can be missed. We did not check whether any quoted rating was correct. We report what the engines wrote, not why they wrote it, and one collection run in July is not a statement about other days.</p>
+  </div>
+
+  <h2>By engine</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Quoted a star rating</th><th>Quoted a review count</th><th>Either</th></tr></thead>
+    <tbody>
+      <tr><td>Google AI Mode</td><td>111</td><td>44</td><td>38</td><td>57 (51%)</td></tr>
+      <tr><td>Perplexity</td><td>120</td><td>47</td><td>22</td><td>50 (42%)</td></tr>
+      <tr><td>Gemini</td><td>120</td><td>25</td><td>17</td><td>31 (26%)</td></tr>
+      <tr><td>ChatGPT</td><td>120</td><td>22</td><td>24</td><td>28 (23%)</td></tr>
+      <tr><td>Claude</td><td>120</td><td>19</td><td>10</td><td>20 (17%)</td></tr>
+      <tr><td><strong>All five</strong></td><td>591</td><td>157</td><td>111</td><td>186 (31%)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Google AI Mode often set the rating out as its own line under each firm, a score followed by a review count. Perplexity quoted a rating more often than a review count, and many of its ratings were a flat 5.0 next to an individual lawyer's listing. Claude, which answered from its own knowledge rather than a live search, quoted numbers least.</p>
+
+  <h2>By question: property managers get rated, city questions do not</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question type</th><th>Answers</th><th>Quoted a rating or review count</th></tr></thead>
+    <tbody>
+      <tr><td>Property management</td><td>99</td><td>65 (66%)</td></tr>
+      <tr><td>Real estate agents</td><td>98</td><td>37 (38%)</td></tr>
+      <tr><td>Personal injury lawyer</td><td>98</td><td>33 (34%)</td></tr>
+      <tr><td>Immigration lawyer</td><td>98</td><td>33 (34%)</td></tr>
+      <tr><td>City-specific questions</td><td>198</td><td>18 (9%)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Property management stands out on every engine. Google AI Mode quoted a rating or review count in 17 of its 19 property management answers, Perplexity in 17 of 20 and ChatGPT in 14 of 20. Even Claude did so in 7 of 20. A landlord choosing a manager gets a score far more often than a buyer choosing a lawyer.</p>
+
+  <p>Immigration lawyers show the biggest gap between engines. Perplexity quoted a rating or review count in 15 of its 20 immigration answers, usually a 5.0 from a lawyer directory listing. ChatGPT did so in 1 of 20. The same question, asked on the same days, came back with a score on one engine and almost never on the other.</p>
+
+  <p>The city-specific questions, about the industries a city is known for, rarely came with ratings at all: 18 of 198 answers. Those answers named firms by what they do, not by what their customers said.</p>
+
+  <h2>The ratings that appear are high</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Rating quoted</th><th>Count</th><th>Share</th></tr></thead>
+    <tbody>
+      <tr><td>Exactly 5.0</td><td>74</td><td>28%</td></tr>
+      <tr><td>4.8 or higher (including 5.0)</td><td>169</td><td>63%</td></tr>
+      <tr><td>4.5 or higher (including the above)</td><td>229</td><td>86%</td></tr>
+      <tr><td>Below 4.0</td><td>5</td><td>2%</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>We pulled every distinct rating out of the 145 answers that quoted a numeric score: 267 in all, with a median of 4.8. Only five were below 4.0, and engines did quote them, such as a 3.5 out of 5 from more than 2,500 reviews.</p>
+
+  <p>That does not prove engines leave out lower-rated firms. A firm with a 4.1 may be named without its score. What it does show is that when an engine reaches for a number to back up a recommendation, that number is almost always 4.5 or above.</p>
+
+  <h2>Where the numbers come from</h2>
+
+  <p>Google was the platform engines tied a rating or review count to most often. Lawyer directories came next for legal questions: twelve Perplexity answers tied a rating to Avvo. Real estate answers leaned on Zillow, and property management answers on Google and Yelp. This overlaps with the platforms we counted in <a href="/bg-106.html">BG-106</a>, but here the platform is not just named, it is quoted as a score.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Look up the rating and review count an engine would find for you on Google and, if you are a lawyer, on the main lawyer directories; if you are an agent, on Zillow. If you manage property, treat this as a priority: two in three answers in your category quoted a number.</p>
+    <p>This study cannot promise that more reviews get you recommended. It does show that a score is one of the facts engines repeat to buyers when they explain a choice, and that the scores they repeat are high. If yours is out of date or thin, that is the number a buyer may read first.</p>
+  </div>""",
+))
