@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import TruncatedText from '../components/TruncatedText'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
-  Play, Loader2, Globe2, Copy, CheckCheck, Check, Minus, Zap, Settings, X, Lock, Clock, Info,
+  Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
@@ -21,7 +20,7 @@ import {
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore, isNoAnswerRow } from '../lib/aiVisibilityScore'
-import { MOTION_BASE, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
+import { MOTION_BASE, MOTION_FAST, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
@@ -31,7 +30,20 @@ import { aggregateCompetitors } from '../lib/competitorFilter'
 import { promptCategoryLabel } from '../lib/promptCategories'
 import { useChartTheme } from '../lib/chartTheme'
 import SharedEmptyState from '../components/EmptyState'
-import { formatDate, formatRelativeOrDate } from '../lib/format'
+import { formatDate, formatRelativeOrDate, formatRatio } from '../lib/format'
+import PromptResultCell from '../components/PromptResultCell'
+import {
+  buildCellViews, summarisePrompt, sortPrompts, promptCompetitors, buildHeadline,
+  engineErrorSince, lockedCandidates, pickLockedColumns, parseRankedCompetitors,
+  parseSortMode, sortStorageKey, SORT_MODES,
+  type CellView, type CellState, type PerfRow, type PromptSummary, type SectionKey, type SortMode,
+} from '../lib/promptPerformance'
+import {
+  AIV_COPY, promptCount, headlineRecommended, headlineNotYet, headlineUncheckedReason,
+  joinEngineLabels, sectionUncheckedExtra, errorSinceChip, ratioNoneChip, enginesNamed, namedByEngines,
+  lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine, fixAppearsLine, fixAllMissingLine, fixAllLowLine,
+  panelNotAnswering, panelLastResult, fixEngineMissingTitle,
+} from '../lib/aiVisibilityCopy'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -66,15 +78,7 @@ type ResultMap = Map<number, Map<LLMName, AIResult>>
 type RankedEntry = { pos: number; name: string }
 
 function parseCompetitors(raw: string | null | undefined): RankedEntry[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.length === 0) return []
-    if (typeof parsed[0] === 'object' && parsed[0] !== null && 'pos' in parsed[0]) {
-      return (parsed as RankedEntry[]).sort((a, b) => a.pos - b.pos)
-    }
-    return (parsed as string[]).map((name, i) => ({ pos: i + 1, name }))
-  } catch { return [] }
+  return parseRankedCompetitors(raw)
 }
 
 // An optional focusable follow-up for a blocked-collection notice (§11 rule 2:
@@ -299,13 +303,6 @@ export default function AIVisibility() {
   // from a dead button. lastAttempt* is the most recent attempt whatever its
   // outcome; lastOkAt is the most recent SUCCESS, which is what "checked" means
   // to a customer reading a number.
-  // `${prompt_id}:${llm}` cells where the engine ran fine but produced no answer
-  // to be present in. Only Google AI Overviews does this: Google renders an
-  // overview for some queries and not others. These are excluded from the score
-  // (see the load loop) but must NOT render as "Not checked", which is what they
-  // did when they were simply dropped, and which reads as our failure rather
-  // than as an absent Google feature.
-  const [noAnswerCells, setNoAnswerCells] = useState<Set<string>>(new Set())
   const [engineHealth, setEngineHealth] = useState<Map<LLMName, {
     lastAttemptAt: string | null
     lastAttemptFailed: boolean
@@ -332,6 +329,20 @@ export default function AIVisibility() {
   const [refreshingEngine, setRefreshingEngine] = useState<EngineId | null>(null)
   const [refreshingCell, setRefreshingCell]     = useState<string | null>(null)  // `${promptId}:${engineId}`
   const [showEngineModal, setShowEngineModal]         = useState(false)
+  // Raw rows for the active engines (every status). The per-cell view model in
+  // promptPerformance.ts is built from these; `results` above stays the newest
+  // OK row per cell and keeps feeding the score and the engine cards.
+  const [rawRows, setRawRows]           = useState<PerfRow[]>([])
+  // The prompt block could not be loaded. Existing data stays on screen.
+  const [loadError, setLoadError]       = useState(false)
+  // Sort mode, persisted per client. Every storage access is guarded: it throws
+  // in private windows and when site data is blocked.
+  const [sortMode, setSortMode]         = useState<SortMode>('best')
+  // Section open state. appear and notYet open, unchecked collapsed; resets on a
+  // client switch. `null` means "not touched yet", so the default can follow data.
+  const [sectionOpen, setSectionOpen]   = useState<Partial<Record<SectionKey, boolean>>>({})
+  // Order and membership frozen while a collection runs.
+  const frozenRef = useRef<{ ids: Record<SectionKey, number[]>; sections: SectionKey[] } | null>(null)
 
   const { collecting, progress: collectProgress, lastCompletedAt, lastBlockReason, clearBlockReason, runCollection: startCollection, runSinglePrompt } = useCollection()
   // Per-action failure flags, distinct from lastBlockReason: they track
@@ -427,20 +438,31 @@ export default function AIVisibility() {
       })
       setPrompts(mockPrompts)
       setResults(map)
+      setRawRows(mockAIResults.filter(r => activeEngines.includes(r.llm as EngineId)) as PerfRow[])
+      setLoadError(false)
       setLastChecked(new Date().toISOString())
       if (!silent) setLoading(false)
       return
     }
 
-    const [{ data: pData }, { data: rData }] = await Promise.all([
+    const [{ data: pData, error: pError }, { data: rData, error: rError }] = await Promise.all([
       supabase.from('prompts').select('*').eq('is_active', true).eq('client_id', activeClientId).order('position'),
       supabase.from('ai_results').select('*').eq('client_id', activeClientId).order('checked_at', { ascending: false }),
     ])
 
+    // A failed read must not look like "no prompts" or "nothing checked yet",
+    // and must not wipe what is already on screen. Flag it and stop; the
+    // prompt area shows a retry card.
+    if (pError || rError) {
+      setLoadError(true)
+      if (!silent) setLoading(false)
+      return
+    }
+    setLoadError(false)
+
     const map: ResultMap = new Map()
     const errEngines = new Set<LLMName>()
     const okEngines  = new Set<LLMName>()
-    const noAnswer   = new Set<string>()
     let latestChecked = lastChecked
     if (rData) {
       rData.forEach((r: AIResult) => {
@@ -454,10 +476,7 @@ export default function AIVisibility() {
         // isNoAnswerRow in aiVisibilityScore.ts. This check used to be inlined
         // here and nowhere else, which is how this page and the Overview
         // headline came to report different numbers for the same client.
-        if (isNoAnswerRow(r)) {
-          noAnswer.add(`${r.prompt_id}:${llm}`)
-          return
-        }
+        if (isNoAnswerRow(r)) return
         if (!llmMap.has(llm)) {
           if (r.status === 'error') {
             // Track error but exclude from analysis — don't count as a real result
@@ -501,10 +520,10 @@ export default function AIVisibility() {
       if (!h.lastOkAt && r.status !== 'error') h.lastOkAt = r.checked_at
     })
     setEngineHealth(health)
+    setRawRows((rData ?? []).filter((r: AIResult) => activeEngines.includes(r.llm as EngineId)) as PerfRow[])
 
     if (pData) setPrompts(pData)
     setResults(map)
-    setNoAnswerCells(noAnswer)
     if (latestChecked) setLastChecked(latestChecked)
     if (!silent) {
       setLoading(false)
@@ -524,6 +543,23 @@ export default function AIVisibility() {
     // switch, so this page has to.
     clearBlockReason()
   }, [activeClientId, activeEngines.join(',')])
+
+  // Client switch: forget section open state, frozen order and the expanded row,
+  // and read this client's saved sort. Separate from the effect above because it
+  // must not re-run when only the engine set changes.
+  useEffect(() => {
+    setSectionOpen({})
+    setExpandedRow(null)
+    frozenRef.current = null
+    let saved: string | null = null
+    try { saved = window.localStorage.getItem(sortStorageKey(activeClientId)) } catch { saved = null }
+    setSortMode(parseSortMode(saved))
+  }, [activeClientId])
+
+  const changeSort = (mode: SortMode) => {
+    setSortMode(mode)
+    try { window.localStorage.setItem(sortStorageKey(activeClientId), mode) } catch { /* storage blocked: the sort still applies for this visit */ }
+  }
   // Silent: this fires roughly every 4s while a collection runs (see
   // collectionContext.tsx) as well as once at the very end. Data is already
   // on screen by the time this can fire, so it must never remount the page
@@ -579,8 +615,6 @@ export default function AIVisibility() {
     loadAllowance()
     return () => { cancelled = true }
   }, [activeClientId, activeClient?.plan, lastCompletedAt])
-
-  const filtered = filterCats.size === 0 ? prompts : prompts.filter(p => filterCats.has(p.category ?? ''))
 
   // ── Stats computed over active engines only ───────────────────────────────
 
@@ -674,21 +708,122 @@ export default function AIVisibility() {
   // A retired engine reads as coming_soon from getEngineStates (so nothing
   // treats it as active) but is not forthcoming, so it renders nowhere here.
   const comingSoonEngines = ALL_ENGINES.filter(e => engineStates[e] === 'coming_soon' && !RETIRED_ENGINES.has(e))
-  const lockedEngines     = ALL_ENGINES.filter(e => engineStates[e] === 'locked')
+
+  // ── Prompt performance (per-cell view model, sections, sort) ───────────────
+  // All hooks here sit before the `if (loading)` early return (Rules of Hooks).
+
+  // 640px and up shows the table layout; below it every row is a card.
+  const [isWide, setIsWide] = useState<boolean>(() => {
+    try { return window.matchMedia('(min-width: 640px)').matches } catch { return true }
+  })
+  useEffect(() => {
+    let mq: MediaQueryList
+    try { mq = window.matchMedia('(min-width: 640px)') } catch { return }
+    const on = () => setIsWide(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+
+  const promptIdKey = prompts.map(p => p.id).join(',')
+  const cellViews = useMemo(
+    () => buildCellViews(rawRows, activeEngines, prompts.map(p => p.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawRows, activeEngines.join(','), promptIdKey],
+  )
+  const summaries = useMemo(() => {
+    const m = new Map<number, PromptSummary>()
+    cellViews.forEach((cells, id) => m.set(id, summarisePrompt(cells)))
+    return m
+  }, [cellViews])
+  const liveOrder = useMemo(
+    () => sortPrompts(prompts.map(p => ({ id: p.id, position: p.position })), summaries, sortMode),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [summaries, sortMode, prompts],
+  )
+  // Freeze order and section membership for the duration of a collection. Cells
+  // keep updating in place; the page re-sorts once when `collecting` goes false.
+  // A change of sort mode takes a fresh snapshot, because the user asked for it.
+  const frozenModeRef = useRef<SortMode>(sortMode)
+  if (!collecting) {
+    frozenRef.current = null
+  } else if (!frozenRef.current || frozenModeRef.current !== sortMode) {
+    frozenRef.current = { ids: liveOrder.ids, sections: liveOrder.sections }
+    frozenModeRef.current = sortMode
+  }
+  const order = collecting && frozenRef.current ? frozenRef.current : liveOrder
+  const orderFrozen = collecting && frozenRef.current !== null
+
+  const headline = useMemo(
+    () => buildHeadline(summaries, cellViews, competitorFreq),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [summaries, cellViews, results],
+  )
+  const errorSinceByEngine = useMemo(() => engineErrorSince(rawRows), [rawRows])
+  const newestErrorAtByEngine = useMemo(() => {
+    const out: Record<string, string> = {}
+    rawRows.forEach(r => {
+      if (r.status === 'error' && (!out[r.llm] || r.checked_at > out[r.llm])) out[r.llm] = r.checked_at
+    })
+    return out
+  }, [rawRows])
+
+  const lockedColumns = pickLockedColumns(engineStates)
+  const lockedChipEngines = (isWide
+    ? lockedCandidates(engineStates).filter(e => !lockedColumns.includes(e))
+    : lockedCandidates(engineStates))
+
+  // Rendered plan: sections in order, filtered by category, with one continuous
+  // 1..N numbering across everything visible (collapsed sections still count).
+  const renderPlan = (() => {
+    const promptById = new Map(prompts.map(p => [p.id, p]))
+    let n = 0
+    return order.sections.map(key => {
+      const rows = order.ids[key]
+        .map(id => promptById.get(id))
+        .filter((p): p is Prompt => !!p)
+        .filter(p => filterCats.size === 0 || filterCats.has(p.category ?? ''))
+        .map(p => ({ prompt: p, num: ++n }))
+      return { key, rows }
+    }).filter(sec => sec.rows.length > 0)
+  })()
+  const visibleCount = renderPlan.reduce((a, s) => a + s.rows.length, 0)
+  const sectionIsOpen = (key: SectionKey): boolean => {
+    const stored = sectionOpen[key]
+    if (stored !== undefined) return stored
+    if (key !== 'unchecked') return true
+    return !renderPlan.some(s => s.key !== 'unchecked')
+  }
 
   // ── Fix This hub ──────────────────────────────────────────────────────────
 
   const fixItems = (() => {
     const items: { priority: 'P0' | 'P1' | 'P2'; title: string; description: string; fix: string }[] = []
 
-    engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0 && !e.isUnavailable).forEach(e => {
+    // Every active engine MISSING reads as one finding, not one P0 per engine:
+    // the same sentence repeated four times says one thing four times.
+    const allMissing = engineStatusCards.length > 0 && engineStatusCards.every(e => e.status === 'MISSING')
+    if (allMissing) {
+      const totalChecked = engineStatusCards.reduce((a, e) => a + e.checked, 0)
+      const totalMentioned = engineStatusCards.reduce((a, e) => a + e.mentioned, 0)
       items.push({
         priority: 'P0',
-        title: `Not found in ${e.label}`,
-        description: `${brandName} appears in 0 of ${e.checked} ${e.label} responses. You have no presence here.`,
-        fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications ${e.label} training data trusts. Ensure your domain has schema.org/Organization structured data with complete fields.`,
+        title: totalMentioned === 0 ? AIV_COPY.fixAllMissingTitle : AIV_COPY.fixAllLowTitle,
+        description: totalMentioned === 0
+          ? fixAllMissingLine(brandName, totalChecked, engineStatusCards.length)
+          : fixAllLowLine(brandName, totalMentioned, totalChecked, engineStatusCards.length),
+        fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications AI engines trust. Ensure your domain has schema.org/Organization structured data with complete fields.`,
       })
-    })
+    } else {
+      engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0 && !e.isUnavailable).forEach(e => {
+        items.push({
+          priority: 'P0',
+          title: fixEngineMissingTitle(e.label, e.mentioned),
+          description: fixAppearsLine(brandName, e.mentioned, e.checked, e.label),
+          fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications ${e.label} training data trusts. Ensure your domain has schema.org/Organization structured data with complete fields.`,
+        })
+      })
+    }
 
     engineStatusCards.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
       items.push({
@@ -778,19 +913,30 @@ export default function AIVisibility() {
         ))}
       </div>
 
-      <div className="bg-dark-800 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[2.75rem_1fr_repeat(3,8rem)] gap-2 border-b border-dark-700 bg-dark-700/50 px-4 py-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-3 w-full" />
-          ))}
+      {/* Prompt block skeleton. Two shapes, because the real block is a table
+          from 640px up and a stack of cards below it. */}
+      <div className="hidden sm:block">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-5 w-2/3 mt-3" />
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-20" />)}
+          <Skeleton className="h-10 w-80" />
         </div>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="grid grid-cols-[2.75rem_1fr_repeat(3,8rem)] gap-2 border-b border-dark-700/50 px-4 py-3">
-            {Array.from({ length: 5 }).map((_, j) => (
-              <Skeleton key={j} className="h-4 w-full" />
-            ))}
-          </div>
-        ))}
+        <Skeleton className="h-5 w-48 mt-6" />
+        <div className="mt-2 flex flex-col gap-2">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+        </div>
+      </div>
+      <div className="sm:hidden">
+        <Skeleton className="h-5 w-full" />
+        <Skeleton className="h-5 w-1/2 mt-2" />
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-20" />)}
+        </div>
+        <Skeleton className="h-11 w-full mt-2" />
+        <div className="mt-4 flex flex-col gap-2">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full rounded-lg" />)}
+        </div>
       </div>
     </div>
   )
@@ -807,6 +953,12 @@ export default function AIVisibility() {
   // appearance: #93979f IS rgba(255,255,255,0.55) composited on --dark-800,
   // and it already passed at 6.09:1.
   const ringTextFillDim = theme === 'light' ? '#556479' : '#93979f'
+
+  // Zero mentions across everything that was answered. Three of the six
+  // dimensions (knowledge, sentiment, accuracy) are defined only when the brand
+  // was mentioned, so they read n/a here rather than a red 0%.
+  const zeroMention = totalChecked > 0 && llmStats.reduce((a, l) => a + l.mentioned, 0) === 0
+  const NEEDS_MENTION_DIMS = ['knowledge', 'sentiment', 'accuracy']
 
   const dimConfig = [
     { key: 'recognition', label: 'Recognition', value: dimensions.recognition, desc: 'Prompt coverage' },
@@ -831,8 +983,415 @@ export default function AIVisibility() {
   // the prompt to three letters while seven 8rem engine columns stay rigid.
   const PROMPT_COL_MIN_REM = 13
   const ENGINE_COL_MIN_REM = 3.5
-  const tableColsTemplate = `2.5rem minmax(${PROMPT_COL_MIN_REM}rem, 1fr) repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))`
-  const tableMinWidth = `${2.5 + PROMPT_COL_MIN_REM + activeLLMs.length * ENGINE_COL_MIN_REM}rem`
+  const LOCKED_COL_MIN_REM = 2.75
+  const lockedTemplate = lockedColumns.length > 0 ? ` repeat(${lockedColumns.length}, minmax(${LOCKED_COL_MIN_REM}rem, 3.5rem))` : ''
+  const tableColsTemplate = `2.5rem minmax(${PROMPT_COL_MIN_REM}rem, 1fr) repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))${lockedTemplate}`
+  const tableMinWidth = `${2.5 + PROMPT_COL_MIN_REM + activeLLMs.length * ENGINE_COL_MIN_REM + lockedColumns.length * LOCKED_COL_MIN_REM}rem`
+
+  // ── Prompt area render helpers ─────────────────────────────────────────────
+  // Plain functions that return JSX (no hooks), so they can read page state.
+  // Spec: docs/design/ai-visibility-prompt-focus-spec-2026-10-28.md section 5.
+
+  const NEUTRAL_CHIP = 'inline-flex shrink-0 items-center rounded-full bg-dark-700 px-2 py-0.5 text-xs text-slate-200 tabular-nums'
+  const AMBER_CHIP = 'inline-flex shrink-0 items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400'
+  const SORT_LABEL: Record<SortMode, string> = {
+    best: AIV_COPY.sortBest,
+    needs_work: AIV_COPY.sortNeedsWork,
+    position: AIV_COPY.sortPosition,
+    recent: AIV_COPY.sortRecent,
+  }
+  const SECTION_TITLE: Record<SectionKey, string> = {
+    appear: AIV_COPY.sectionAppear,
+    notYet: AIV_COPY.sectionNotYet,
+    unchecked: AIV_COPY.sectionUnchecked,
+  }
+
+  const toggleRow = (id: number) => setExpandedRow(prev => (prev === id ? null : id))
+
+  const chevron = (open: boolean) => (
+    <ChevronDown
+      size={16}
+      aria-hidden="true"
+      className={`shrink-0 text-slate-400 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+      style={{ transitionDuration: `${Math.round(MOTION_FAST * 1000)}ms` }}
+    />
+  )
+
+  const categoryChip = (prompt: Prompt) => (
+    <span className={`shrink-0 text-[10px] font-medium px-1.5 leading-[15px] rounded-full ${getCatColor(prompt.category)}`}>
+      {getCatLabel(prompt.category)}
+    </span>
+  )
+
+  const cellOf = (promptId: number, engineId: EngineId, variant: 'grid' | 'tile') => {
+    const cv = cellViews.get(promptId)?.get(engineId)
+    return (
+      <PromptResultCell
+        state={cv?.state ?? 'pending'}
+        engineId={engineId}
+        position={cv?.position ?? null}
+        errorSince={cv?.errorSince ?? null}
+        previousOkAt={cv?.previousOk?.checked_at ?? null}
+        variant={variant}
+      />
+    )
+  }
+
+  const emptyCells = new Map<EngineId, CellView>()
+
+  // The first competitor of a prompt's own aggregate, for the row meta slot.
+  const topCompetitorOf = (promptId: number): string | null => {
+    const list = promptCompetitors(cellViews.get(promptId) ?? emptyCells)
+    return list.length > 0 ? list[0].name : null
+  }
+
+  // Cell strip shown at the top of an expanded notYet or unchecked row.
+  const cellStrip = (promptId: number) => {
+    if (!isWide) {
+      return (
+        <div className="grid grid-cols-4 gap-1.5 mb-3">
+          {activeLLMs.map(llm => <div key={llm.id}>{cellOf(promptId, llm.id, 'tile')}</div>)}
+        </div>
+      )
+    }
+    const template = `repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))`
+    return (
+      <div className="overflow-x-auto mb-3">
+        <div style={{ minWidth: `${activeLLMs.length * ENGINE_COL_MIN_REM}rem` }}>
+          <div className="grid" style={{ gridTemplateColumns: template }}>
+            {activeLLMs.map(llm => (
+              <div key={llm.id} className="px-1 py-1 flex flex-col items-center gap-1">
+                <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain" />
+                <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: template }}>
+            {activeLLMs.map(llm => <div key={llm.id} className="px-1 py-1">{cellOf(promptId, llm.id, 'grid')}</div>)}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Who the engines recommended for this one prompt (notYet rows only).
+  const competitorBlock = (prompt: Prompt) => {
+    const list = promptCompetitors(cellViews.get(prompt.id) ?? emptyCells)
+    const answered = summaries.get(prompt.id)?.answered ?? 0
+    return (
+      <div className="mb-3">
+        <h4 className="text-xs font-semibold text-slate-200 mb-2">{AIV_COPY.competitorHeading}</h4>
+        {list.length === 0 ? (
+          <p className="text-sm text-slate-400">{AIV_COPY.competitorEmpty}</p>
+        ) : (
+          <ol className="space-y-1.5">
+            {list.map(c => (
+              <li key={c.name} className="flex items-baseline gap-2">
+                <span className="text-sm text-slate-200">{c.name}</span>
+                <span className="text-xs text-slate-400">{namedByEngines(c.k, answered)}</span>
+                {c.bestRank != null && <span className="text-xs text-slate-400 tabular-nums">#{c.bestRank}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    )
+  }
+
+  // Top results list, shared by a current ok cell and an error cell's previous ok row.
+  const topResultsOf = (row: { brand_mentioned: boolean; brand_position: number | null; competitors_mentioned?: string | null }) => {
+    const competitors = parseCompetitors(row.competitors_mentioned ?? null)
+    const rankedList: { pos: number; name: string; isBrand: boolean }[] = [
+      ...competitors.map(c => ({ ...c, isBrand: false })),
+      ...(row.brand_mentioned && row.brand_position
+        ? [{ pos: row.brand_position, name: brandName, isBrand: true }]
+        : []),
+    ].sort((a, b) => a.pos - b.pos)
+    if (rankedList.length === 0) return null
+    return (
+      <div className="mb-2">
+        <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">AI Top Results</div>
+        {rankedList.map(entry => (
+          <div key={`${entry.pos}-${entry.name}`}
+            className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}>
+            <span className="font-mono text-slate-600 shrink-0 w-5">#{entry.pos}</span>
+            <span className="leading-tight">{entry.name}{entry.isBrand ? ' ✓' : ''}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Existing per-engine detail panel (engine cards plus the opportunity box).
+  const enginePanel = (prompt: Prompt) => {
+    const rowResults = results.get(prompt.id)
+    const cols = Math.min(activeLLMs.length, 5)
+    const missing = rowResults ? activeLLMs.filter(l => {
+      const r = rowResults.get(l.id)
+      return r && !r.brand_mentioned
+    }) : []
+    return (
+      <>
+        <div
+          className="grid grid-cols-2 gap-3 sm:grid-cols-[var(--aiv-cols)]"
+          style={{ ['--aiv-cols' as string]: `repeat(${cols}, 1fr)` }}
+        >
+          {activeLLMs.map(llm => {
+            const r = rowResults?.get(llm.id)
+            const cv = cellViews.get(prompt.id)?.get(llm.id)
+            const isErrorCell = cv?.state === 'error'
+            const tone = isErrorCell
+              ? 'bg-dark-800 border-dark-700'
+              : r?.brand_mentioned ? 'bg-sentiment-positive-15 border-sentiment-positive-20'
+              : r ? 'bg-sentiment-negative-15 border-sentiment-negative-20'
+              : 'bg-dark-800 border-dark-700'
+            return (
+              <div key={llm.id} className={`rounded-lg p-3 border ${tone}`}>
+                <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                  <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
+                  {llm.label}
+                  {/* QUEUE_ONLY_ENGINES cannot finish inside the 26s Netlify wall
+                      the single-cell refresh posts to, so for them the control
+                      starts the background run for that engine across all
+                      prompts, the same thing the engine card does. */}
+                  {isAdmin && (QUEUE_ONLY_ENGINES.includes(llm.id) ? (
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); handleRefreshEngine(llm.id) }}
+                      disabled={collecting || refreshingEngine !== null}
+                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                      title={`${llm.label} is too slow for an instant re-run, so this starts it in the background across all prompts. It keeps running if you leave the page.`}
+                      aria-label={`Re-run ${llm.label} in the background`}
+                    >
+                      <Clock size={11} className={refreshingEngine === llm.id ? 'animate-spin' : ''} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
+                      disabled={refreshingCell !== null || collecting}
+                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                      title={`Re-run this prompt on ${llm.label} only. Charges for one engine call.`}
+                      aria-label={`Re-run this prompt on ${llm.label} only`}
+                    >
+                      <RotateCcw size={11} className={refreshingCell === `${prompt.id}:${llm.id}` ? 'animate-spin' : ''} />
+                    </button>
+                  ))}
+                </div>
+                {cellRefreshFailed === `${prompt.id}:${llm.id}` && (
+                  <div className="flex items-center gap-1 text-[10px] text-red-400 mb-1.5">
+                    <AlertTriangle size={9} /> Refresh failed, try again
+                  </div>
+                )}
+                {isErrorCell && cv ? (
+                  <>
+                    <div className="text-xs text-amber-400 mb-1">
+                      {panelNotAnswering(formatDate(cv.errorSince ?? cv.current?.checked_at ?? ''))}
+                    </div>
+                    {cv.previousOk && (
+                      <>
+                        <div className="text-xs text-slate-400 mb-2">{panelLastResult(formatDate(cv.previousOk.checked_at))}</div>
+                        {topResultsOf(cv.previousOk)}
+                        {cv.previousOk.response_snippet && (
+                          <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
+                            {cv.previousOk.response_snippet}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : r ? (
+                  <>
+                    <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
+                    </div>
+                    {topResultsOf(r)}
+                    {r.sentiment && r.brand_mentioned && (
+                      <div className={`text-[10px] font-medium mb-1 ${r.sentiment === 'positive' ? 'text-emerald-500' : r.sentiment === 'negative' ? 'text-red-500' : 'text-slate-500'}`}>
+                        {r.sentiment}
+                      </div>
+                    )}
+                    {r.checked_at && (
+                      <div className="text-[10px] text-slate-600 font-mono">
+                        {formatDate(r.checked_at)}
+                      </div>
+                    )}
+                    {r.response_snippet && (
+                      <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
+                        {r.response_snippet}
+                      </p>
+                    )}
+                  </>
+                ) : cv?.state === 'no_answer' ? (
+                  <div className="text-xs text-slate-400">{AIV_COPY.legendNoAnswer}</div>
+                ) : (
+                  <div className="text-xs text-slate-600">{t.aiv_notChecked}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {missing.length > 0 && (
+          <div className="mt-3 px-3 py-2.5 bg-dark-700/40 border border-dark-600 rounded-lg flex items-start gap-2">
+            <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-slate-400" />
+            <div>
+              <div className="text-xs text-slate-200 font-medium mb-0.5">
+                {fmt(t.aiv_opportunity, { brand: brandName, llms: missing.map(l => l.label).join(', ') })}
+              </div>
+              <div className="text-[11px] text-slate-400">{t.aiv_opportunityTip}</div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // Expanded body wrapper. `kind` decides what sits above the existing panel.
+  const expandedBody = (prompt: Prompt, kind: SectionKey) => (
+    <Collapse open={expandedRow === prompt.id}>
+      <div id={`aiv-row-${prompt.id}`} className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
+        {kind !== 'appear' && cellStrip(prompt.id)}
+        {kind === 'notYet' && competitorBlock(prompt)}
+        {enginePanel(prompt)}
+      </div>
+    </Collapse>
+  )
+
+  // One row of any section, at any width.
+  const renderRow = (kind: SectionKey, prompt: Prompt, num: number) => {
+    const isExpanded = expandedRow === prompt.id
+    const sum = summaries.get(prompt.id)
+    const answered = sum?.answered ?? 0
+    const mentions = sum?.mentions ?? 0
+    const topComp = kind === 'notYet' ? topCompetitorOf(prompt.id) : null
+    const cv = cellViews.get(prompt.id)
+    const cellsList = cv ? Array.from(cv.values()) : []
+    const hasError = cellsList.some(c => c.state === 'error')
+    const onlyPending = !hasError && cellsList.every(c => c.state === 'pending')
+
+    const reasonChip = kind === 'unchecked'
+      ? hasError
+        ? <span className={AMBER_CHIP}>{errorSinceChip(formatDate(sum?.oldestErrorSince ?? ''))}</span>
+        : <span className={NEUTRAL_CHIP}>{onlyPending ? AIV_COPY.chipPending : AIV_COPY.chipNoAnswer}</span>
+      : null
+    const ratioChip = kind === 'appear'
+      ? <span className={NEUTRAL_CHIP}>{formatRatio(mentions, answered, 'engines')}</span>
+      : kind === 'notYet'
+        ? <span className={NEUTRAL_CHIP}>{ratioNoneChip(answered)}</span>
+        : null
+
+    if (!isWide) {
+      return (
+        <div>
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={`aiv-row-${prompt.id}`}
+            onClick={() => toggleRow(prompt.id)}
+            className="block w-full text-left rounded-lg border border-dark-700 bg-dark-800 p-3 min-h-[44px]"
+          >
+            <span className="flex items-start gap-2">
+              <span className="text-xs text-slate-400 tabular-nums shrink-0 pt-0.5">{num}</span>
+              <span className="block min-w-0 flex-1 text-sm text-slate-200 line-clamp-2">{prompt.text}</span>
+              {chevron(isExpanded)}
+            </span>
+            <span className="flex flex-wrap items-center gap-2 mt-1.5">
+              {categoryChip(prompt)}
+              {ratioChip}
+              {reasonChip}
+            </span>
+            {kind === 'appear' && (
+              <span className="grid grid-cols-4 gap-1.5 mt-2">
+                {activeLLMs.map(llm => <span key={llm.id} className="block">{cellOf(prompt.id, llm.id, 'tile')}</span>)}
+              </span>
+            )}
+            {kind === 'notYet' && topComp && (
+              <span className="block text-xs text-slate-400 mt-1.5">{enginesNamed(topComp)}</span>
+            )}
+          </button>
+          {expandedBody(prompt, kind)}
+        </div>
+      )
+    }
+
+    if (kind === 'appear') {
+      return (
+        <div className={`border-b border-dark-700 last:border-0 ${num % 2 === 0 ? 'bg-dark-700/15' : ''}`}>
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={`aiv-row-${prompt.id}`}
+            onClick={() => toggleRow(prompt.id)}
+            className="grid w-full text-left transition-colors hover:bg-dark-700/30"
+            style={{ gridTemplateColumns: tableColsTemplate }}
+          >
+            <span className="block px-2 py-2.5 self-center">
+              <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-dark-700 text-[10px] font-semibold text-slate-400 tabular-nums">
+                {/* Sequential across the rendered sections, never the stored
+                    `position` (a sort key with gaps and duplicates). */}
+                {num}
+              </span>
+            </span>
+            <span className="block px-3 py-2.5 self-center min-w-0">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="block truncate flex-1 min-w-0 text-sm text-slate-200" title={prompt.text}>{prompt.text}</span>
+                {chevron(isExpanded)}
+              </span>
+              <span className="flex items-center gap-1.5 mt-1 min-w-0 whitespace-nowrap">
+                {categoryChip(prompt)}
+                {ratioChip}
+                {isAdmin && (
+                  <span className="min-w-0 truncate text-[9px] text-slate-600 hidden lg:inline" title="Expand this row to re-run a single engine">
+                    expand to refresh per engine
+                  </span>
+                )}
+              </span>
+            </span>
+            {activeLLMs.map(llm => (
+              <span key={llm.id} className="block px-1 py-1 self-center">{cellOf(prompt.id, llm.id, 'grid')}</span>
+            ))}
+            {lockedColumns.map(id => (
+              <span key={id} aria-hidden="true" className="block px-1 py-1 self-center">
+                <PromptResultCell state="locked" engineId={id} />
+              </span>
+            ))}
+          </button>
+          {expandedBody(prompt, kind)}
+        </div>
+      )
+    }
+
+    // CalmRow (notYet) and UncheckedRow (unchecked): same four-column grid.
+    return (
+      <div>
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={`aiv-row-${prompt.id}`}
+          onClick={() => toggleRow(prompt.id)}
+          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-dark-700/40 rounded-lg"
+        >
+          <span className="text-xs text-slate-400 tabular-nums">{num}</span>
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="block truncate min-w-0 text-sm text-slate-200" title={prompt.text}>{prompt.text}</span>
+            {categoryChip(prompt)}
+          </span>
+          <span className="flex items-center gap-2 min-w-0">
+            {ratioChip}
+            {reasonChip}
+            {kind === 'notYet' && topComp && (
+              <span className="hidden md:block text-xs text-slate-400 truncate max-w-[14rem]">{enginesNamed(topComp)}</span>
+            )}
+          </span>
+          {chevron(isExpanded)}
+        </button>
+        {expandedBody(prompt, kind)}
+      </div>
+    )
+  }
+
+  const runHeadlineAction = () => { if (isAdmin) forceCollection(); else runCollection() }
+  const headlineEngineLabel = headline.engine ? ENGINE_META[headline.engine].label : null
+  const uncheckedEngineList = joinEngineLabels(headline.errorEngines.map(e => ENGINE_META[e].label))
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
@@ -1171,6 +1730,11 @@ export default function AIVisibility() {
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
                 Not measured yet
               </div>
+            ) : zeroMention ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border bg-dark-700/60 text-slate-400 border-dark-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                {AIV_COPY.bandNotRecommended}
+              </div>
             ) : (
               <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
                 aiScore >= 60 ? 'bg-sentiment-positive-15 text-sentiment-positive border-sentiment-positive-30'
@@ -1185,7 +1749,9 @@ export default function AIVisibility() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-          {dimConfig.map(d => (
+          {dimConfig.map(d => {
+            const notApplicable = zeroMention && NEEDS_MENTION_DIMS.includes(d.key)
+            return (
             <div key={d.key}>
               {/* min-w-0 on the label block and shrink-0 on the value is load-bearing,
                   not tidying. A flex item defaults to `min-width: auto`, so the label
@@ -1196,13 +1762,17 @@ export default function AIVisibility() {
               <div className="flex justify-between items-center gap-2 mb-1">
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-slate-300">{d.label}</span>
-                  <span className="ml-2 text-xs text-slate-600">{d.desc}</span>
+                  {notApplicable
+                    ? <span className="ml-2 text-xs text-slate-400">{AIV_COPY.dimNeedsMention}</span>
+                    : <span className="ml-2 text-xs text-slate-600">{d.desc}</span>}
                 </div>
                 {/* No 0% here when nothing has been checked yet. A zero
                     dimension score would read as a measured failing grade,
                     not as "we have not looked" (§11 rule 1). */}
                 {totalChecked === 0 ? (
                   <span className="shrink-0 text-xs italic text-slate-300">Not measured yet</span>
+                ) : notApplicable ? (
+                  <span className="shrink-0 text-sm font-medium text-slate-400">{AIV_COPY.dimNotApplicable}</span>
                 ) : (
                   <span className={`shrink-0 text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
                     {d.value}%
@@ -1213,7 +1783,7 @@ export default function AIVisibility() {
                 {/* No fill at all when unmeasured, not a fill stuck at 0.
                     An empty track reads as "nothing recorded"; a 0-width
                     animated bar still implies a bar chart with a real zero. */}
-                {totalChecked > 0 && (
+                {totalChecked > 0 && !notApplicable && (
                   <motion.div
                     className="h-full rounded-full bg-brand-500"
                     initial={{ width: 0 }}
@@ -1223,7 +1793,8 @@ export default function AIVisibility() {
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </motion.div>
 
@@ -1292,25 +1863,33 @@ export default function AIVisibility() {
                   <span className={`text-sm font-semibold truncate ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</span>
                   <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
                     {e.isUnavailable
-                      ? <><AlertTriangle size={8} className="mr-0.5" />UNAVAIL</>
+                      ? <><AlertTriangle size={8} className="mr-0.5" />{AIV_COPY.engineNotAnswering}</>
                       : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusStyles.dot}`} />{statusLabel}</>
                     }
                   </span>
                 </div>
 
                 {e.isUnavailable ? (
-                  <div className="text-[10px] text-amber-400/80 mt-1">
-                    Temporarily unavailable ·{' '}
-                    {isAdmin
-                      ? 'Force Refresh to retry'
-                      : collectionAllowance.nextAvailableAt
-                        // A non-admin in cooldown can't press Run Collection to
-                        // retry -- the button is disabled until this date, so
-                        // saying "to retry" next to a disabled control would be
-                        // telling them to do something they cannot do.
-                        ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
-                        : 'Run Collection to retry'}
-                  </div>
+                  <>
+                    <div
+                      className="flex items-center gap-1.5 text-xs text-amber-400 mt-1"
+                      title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
+                    >
+                      <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
+                      {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
+                    </div>
+                    <div className="text-[10px] text-amber-400/80 mt-1">
+                      {isAdmin
+                        ? 'Force Refresh to retry'
+                        : collectionAllowance.nextAvailableAt
+                          // A non-admin in cooldown can't press Run Collection to
+                          // retry -- the button is disabled until this date, so
+                          // saying "to retry" next to a disabled control would be
+                          // telling them to do something they cannot do.
+                          ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
+                          : 'Run Collection to retry'}
+                    </div>
+                  </>
                 ) : e.status === 'NOT_MEASURED' ? (
                   <div className="text-[10px] italic text-slate-300 mt-1">Not measured yet · run a collection to check this engine</div>
                 ) : (
@@ -1332,13 +1911,11 @@ export default function AIVisibility() {
                         because it describes what just happened, not the history. */}
                     {e.lastAttemptFailed && (
                       <div
-                        className="flex items-center gap-1 text-[10px] text-red-400 mt-0.5"
-                        title={isAdmin
-                          ? `The last run of ${e.label} failed${e.lastErrorCode ? ` (${e.lastErrorCode})` : ''}. The figures above come from earlier successful checks. Use the refresh icon to try again.`
-                          : `The last check of ${e.label} did not complete. The figures above come from earlier successful checks.`}
+                        className="flex items-center gap-1.5 text-xs text-amber-400 mt-0.5"
+                        title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
                       >
-                        <AlertTriangle size={9} />
-                        Last run failed{e.lastErrorCode ? ` · ${e.lastErrorCode.replace(/_/g, ' ')}` : ''}
+                        <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
+                        {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
                       </div>
                     )}
                     {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
@@ -1348,7 +1925,7 @@ export default function AIVisibility() {
                           ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
                           : 'Some checks failed to sync, so this percentage is partial.'}
                       >
-                        <AlertTriangle size={9} /> Some checks failed
+                        <AlertTriangle size={9} /> {enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))}
                       </div>
                     )}
                   </>
@@ -1401,12 +1978,12 @@ export default function AIVisibility() {
 
       {/* Locked engines — compact chip strip (least important; keeps the active +
           coming-soon grid to a clean 4-up, and reads as a subtle upgrade prompt). */}
-      {lockedEngines.length > 0 && (
+      {lockedChipEngines.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <span className="text-[10px] font-medium text-slate-600 uppercase tracking-wider mr-0.5 flex items-center gap-1">
             <Lock size={10} /> Locked
           </span>
-          {lockedEngines.map(id => {
+          {lockedChipEngines.map(id => {
             const meta      = ENGINE_META[id]
             const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
             return (
@@ -1514,379 +2091,298 @@ export default function AIVisibility() {
         </div>
       )}
 
-      {/* ── Category filter ──────────────────────────────────────────────────── */}
-      {(() => {
-        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
-        if (activeCats.length === 0) return null
-        return (
-          <div className="flex gap-2 mb-4 flex-wrap">
-            <button
-              onClick={() => setFilterCats(new Set())}
-              aria-pressed={filterCats.size === 0}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                filterCats.size === 0
-                  ? 'bg-brand-500 text-white border-brand-600'
-                  : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
-              }`}
-            >
-              {t.aiv_allCategories}
-            </button>
-            {activeCats.map(cat => {
-              const active = filterCats.has(cat)
-              return (
+      {/* ── Prompt area: headline, toolbar, sections, legend ───────────────── */}
+      <h2 className="text-lg font-semibold text-white mb-3">{AIV_COPY.promptsHeading}</h2>
+
+      {loadError && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dark-700 bg-dark-800 p-3">
+          <AlertTriangle size={16} aria-hidden="true" className="shrink-0 text-amber-400" />
+          <span className="text-sm text-slate-200">{AIV_COPY.promptsLoadError}</span>
+          <button
+            type="button"
+            onClick={() => load()}
+            className="ml-auto min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
+          >
+            {AIV_COPY.promptsLoadRetry}
+          </button>
+        </div>
+      )}
+
+      {prompts.length > 0 && (
+        <div className="mb-4">
+          {headline.variant === 'recommended' && (
+            <p className="text-base font-semibold text-white leading-snug">
+              {headlineRecommended(headline.a, headline.n, headlineEngineLabel, headline.pos)}
+            </p>
+          )}
+          {headline.variant === 'notYet' && (
+            <>
+              <p className="text-base font-semibold text-white leading-snug">{headlineNotYet(headline.n, headline.k)}</p>
+              {headline.chips.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {headline.chips.map(name => (
+                    <span key={name} className="inline-flex items-center rounded-full border border-dark-600 bg-dark-700 px-2.5 py-1 text-xs font-medium text-slate-200">
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {headline.variant === 'unchecked' && (collecting ? (
+            <p className="flex items-center gap-2 text-base font-semibold text-white leading-snug">
+              <Loader2 size={14} aria-hidden="true" className="animate-spin motion-reduce:animate-none shrink-0" />
+              {AIV_COPY.headlineChecking}
+            </p>
+          ) : (
+            <>
+              <p className="text-base font-semibold text-white leading-snug">{AIV_COPY.headlineUncheckedTitle}</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {headlineUncheckedReason(
+                  headline.errorEngines.length > 0 ? uncheckedEngineList : null,
+                  headline.since ? formatDate(headline.since) : null,
+                  headline.errorEngines.length,
+                )}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button
-                  key={cat}
-                  onClick={() => {
-                    setFilterCats(prev => {
-                      const next = new Set(prev)
-                      if (next.has(cat)) next.delete(cat)
-                      else next.add(cat)
-                      return next
-                    })
-                  }}
-                  aria-pressed={active}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                    active
-                      ? 'bg-brand-500 text-white border-brand-600'
-                      : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
-                  }`}
+                  type="button"
+                  onClick={runHeadlineAction}
+                  disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
+                  aria-label={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
+                  title={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
+                  className={isAdmin
+                    ? 'flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed'
+                    : 'flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed'}
                 >
-                  {getCatLabel(cat)}
+                  {isAdmin
+                    ? <><RotateCcw size={14} aria-hidden="true" /> {AIV_COPY.actionForceRefresh}</>
+                    : <><Play size={14} aria-hidden="true" /> {AIV_COPY.actionRunCollection}</>}
                 </button>
-              )
-            })}
+                {!isAdmin && collectionAllowance.nextAvailableAt && (
+                  <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
+                )}
+              </div>
+            </>
+          ))}
+        </div>
+      )}
+
+      {prompts.length > 0 && (() => {
+        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
+        const chipBase = 'px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg text-xs font-medium transition-colors border'
+        const chipOn = 'bg-brand-500 text-white border-brand-600'
+        const chipOff = 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            {activeCats.length > 0 ? (
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setFilterCats(new Set())}
+                  aria-pressed={filterCats.size === 0}
+                  className={`${chipBase} ${filterCats.size === 0 ? chipOn : chipOff}`}
+                >
+                  {t.aiv_allCategories}
+                </button>
+                {activeCats.map(cat => {
+                  const active = filterCats.has(cat)
+                  return (
+                    <button
+                      type="button"
+                      key={cat}
+                      onClick={() => {
+                        setFilterCats(prev => {
+                          const next = new Set(prev)
+                          if (next.has(cat)) next.delete(cat)
+                          else next.add(cat)
+                          return next
+                        })
+                      }}
+                      aria-pressed={active}
+                      className={`${chipBase} ${active ? chipOn : chipOff}`}
+                    >
+                      {getCatLabel(cat)}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : <span />}
+
+            {prompts.length >= 2 && (
+              <>
+                <div
+                  role="group"
+                  aria-label={AIV_COPY.sortGroupLabel}
+                  className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-dark-700 bg-dark-800 p-1"
+                >
+                  <span className="px-2 text-xs text-slate-400">{AIV_COPY.sortLabel}</span>
+                  {SORT_MODES.map(mode => (
+                    <button
+                      type="button"
+                      key={mode}
+                      aria-pressed={sortMode === mode}
+                      onClick={() => changeSort(mode)}
+                      className={`time-pill ${sortMode === mode ? 'is-pressed' : ''}`}
+                    >
+                      {SORT_LABEL[mode]}
+                    </button>
+                  ))}
+                </div>
+                <div className="sm:hidden w-full">
+                  <label htmlFor="aiv-sort" className="text-xs text-slate-400 block mb-1">{AIV_COPY.sortLabel}</label>
+                  <select
+                    id="aiv-sort"
+                    value={sortMode}
+                    onChange={e => changeSort(parseSortMode(e.target.value))}
+                    className="w-full min-h-[44px] rounded-lg border border-dark-700 bg-dark-800 px-3 text-sm text-slate-200"
+                  >
+                    {SORT_MODES.map(mode => <option key={mode} value={mode}>{SORT_LABEL[mode]}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         )
       })()}
 
-      {/* ── Prompt table (active engines only) ──────────────────────────────── */}
-      <div className="bg-dark-800 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-        <div style={{ minWidth: tableMinWidth }}>
-        <div
-          className="grid border-b border-dark-700 bg-dark-700/50"
-          style={{ gridTemplateColumns: tableColsTemplate }}
-        >
-          <div className="px-2 py-2.5 text-[11px] font-medium text-slate-600 uppercase tracking-wide self-center">#</div>
-          <div className="px-3 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
-          {activeLLMs.map(llm => (
-            <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
-              <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-              <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
-            </div>
-          ))}
+      {orderFrozen && prompts.length >= 2 && (
+        <p className="text-xs text-slate-400 mb-3">{AIV_COPY.orderFrozenNote}</p>
+      )}
+
+      {prompts.length === 0 && !loadError && (
+        <div className="bg-dark-800 rounded-xl overflow-hidden">
+          <SharedEmptyState
+            icon={Target}
+            title="No prompts yet"
+            body={t.aiv_noPrompts}
+            actionLabel="Add prompts"
+            actionTo="/prompts"
+          />
         </div>
+      )}
 
-        <AnimatePresence initial={false}>
-        {filtered.map((prompt, i) => {
-          const rowResults = results.get(prompt.id)
-          const isExpanded = expandedRow === prompt.id
-          const mentionCount = activeLLMs.filter(l => rowResults?.get(l.id)?.brand_mentioned).length
-          const hasData = activeLLMs.some(l => rowResults?.has(l.id))
+      {prompts.length > 0 && visibleCount === 0 && (
+        <div className="rounded-lg border border-dashed border-dark-600 p-6 text-center">
+          <p className="text-sm text-slate-300">{AIV_COPY.categoryEmpty}</p>
+          <button
+            type="button"
+            onClick={() => setFilterCats(new Set())}
+            className="mt-3 min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
+          >
+            {AIV_COPY.categoryEmptyAction}
+          </button>
+        </div>
+      )}
 
-          return (
-            <motion.div
-              key={prompt.id}
-              layout="position"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
-              className="border-b border-dark-700 last:border-0"
-            >
-              <div
-                // Alternate row tint so the eye can follow one prompt across
-                // seven engine cells in a long list.
-                className={`w-full grid transition-colors cursor-pointer hover:bg-dark-700/30 ${i % 2 === 1 ? 'bg-dark-700/15' : ''}`}
-                style={{ gridTemplateColumns: tableColsTemplate }}
-                onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
-                role="button"
-                tabIndex={0}
-                aria-expanded={isExpanded}
-                aria-label={`${prompt.text}. Expand for engine-by-engine detail.`}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setExpandedRow(isExpanded ? null : prompt.id)
-                  }
-                }}
+      {renderPlan.map((sec, secIdx) => {
+        const open = sectionIsOpen(sec.key)
+        const failureDates = sec.key === 'unchecked'
+          ? sec.rows.map(r => summaries.get(r.prompt.id)?.oldestErrorSince).filter((d): d is string => !!d).sort()
+          : []
+        return (
+          <section key={sec.key} className={secIdx === 0 ? '' : 'mt-6'}>
+            <h3 className="m-0">
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={`aiv-section-${sec.key}`}
+                onClick={() => setSectionOpen(prev => ({ ...prev, [sec.key]: !open }))}
+                className="flex w-full items-center gap-2 min-h-[44px] py-2 text-left"
               >
-                <div className="px-2 py-2.5 self-center">
-                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-dark-700 text-[10px] font-semibold text-slate-500 tabular-nums">
-                    {/* Sequential, never the stored `position`. That column is a
-                        sort key, not a label: it keeps the gaps left by prompts
-                        that were suggested and never kept, and by deactivated
-                        ones. BpR's six active prompts carried positions 2, 4, 5,
-                        6, 9 and 10 and the list read as though four were
-                        missing. It can also duplicate (two of BpR's sit at 3),
-                        so it is not even unique. The row index always reads
-                        1..n. */}
-                    {i + 1}
-                  </span>
-                </div>
-
-                <div className="px-3 py-2.5 self-center min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <TruncatedText text={prompt.text} className="text-sm text-slate-200 truncate flex-1 min-w-0" />
-                    <span className="shrink-0 text-slate-600" aria-hidden="true">
-                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    </span>
-                  </div>
-                  {/* One line, never wraps: category, coverage, and the admin hint.
-                      The prompt text above is the thing the user reads, so the
-                      metadata stays small and out of its way. */}
-                  <div className="flex items-center gap-1.5 mt-1 min-w-0 whitespace-nowrap">
-                    <span className={`shrink-0 text-[10px] font-medium px-1.5 leading-[15px] rounded-full ${getCatColor(prompt.category)}`}>
-                      {getCatLabel(prompt.category)}
-                    </span>
-                    {hasData && (() => {
-                      const checkedLLMs = activeLLMs.filter(l => rowResults?.has(l.id)).length
-                      const ratio = checkedLLMs > 0 ? mentionCount / checkedLLMs : 0
-                      const cls = ratio >= 0.8 ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                        : ratio >= 0.4 ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                        : 'bg-red-500/10 text-red-300 border-red-500/20'
-                      return (
-                        <span className={`shrink-0 inline-flex items-center text-[10px] font-semibold px-1.5 leading-[13px] rounded-full border tabular-nums ${cls}`}>
-                          {mentionCount}/{checkedLLMs} engines
-                        </span>
-                      )
-                    })()}
-                    {isAdmin && (
-                      <span className="min-w-0 truncate text-[9px] text-slate-600 hidden lg:inline" title="Expand this row to re-run a single engine">
-                        expand to refresh per engine
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {activeLLMs.map(llm => {
-                  const r = rowResults?.get(llm.id)
-                  if (!r) {
-                    // Ran fine, but the engine produced no answer for this query
-                    // at all, so there was nothing for the brand to appear in.
-                    // Distinct from "Not checked", which means we never asked.
-                    // Showing these identically was the bug: a client reads a
-                    // grey dash as our system failing, when it is Google simply
-                    // not rendering an AI Overview for that question.
-                    const noAnswer = noAnswerCells.has(`${prompt.id}:${llm.id}`)
-                    return (
-                      <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center gap-1">
-                        {/* text-slate-700 has no dark-mode remap in index.css, so it
-                            rendered rgb(51,65,85) in BOTH themes: 1.72:1 on this card in
-                            dark, against a 3:1 floor for a non-text indicator. The dashed
-                            ring and the dimmer fill still separate this from Not checked. */}
-                        <span
-                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${noAnswer
-                            ? 'bg-dark-700/20 text-slate-500 ring-1 ring-dashed ring-dark-600/40'
-                            : 'bg-dark-700/40 text-slate-600 ring-1 ring-dark-600/60'}`}
-                          title={noAnswer
-                            ? `${llm.label} showed no answer for this query, so there was nothing to appear in. Not counted for or against you.`
-                            : 'Not checked'}
+                <span className="text-sm font-semibold text-slate-200">{SECTION_TITLE[sec.key]}</span>
+                <span className="text-xs text-slate-400 tabular-nums">{promptCount(sec.rows.length)}</span>
+                {failureDates.length > 0 && (
+                  <span className="text-xs text-slate-400">{sectionUncheckedExtra(formatDate(failureDates[0]))}</span>
+                )}
+                <ChevronDown
+                  size={16}
+                  aria-hidden="true"
+                  className={`ml-auto shrink-0 text-slate-400 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+                  style={{ transitionDuration: `${Math.round(MOTION_FAST * 1000)}ms` }}
+                />
+              </button>
+            </h3>
+            <div id={`aiv-section-${sec.key}`}>
+              <Collapse open={open}>
+                <div className={`mt-2 ${isWide ? 'bg-dark-800 rounded-xl overflow-hidden' : 'space-y-2'}`}>
+                  <div className={isWide && sec.key === 'appear' ? 'overflow-x-auto' : ''}>
+                    <div style={isWide && sec.key === 'appear' ? { minWidth: tableMinWidth } : undefined}>
+                      {isWide && sec.key === 'appear' && (
+                        <div
+                          className="grid border-b border-dark-700 bg-dark-700/50"
+                          style={{ gridTemplateColumns: tableColsTemplate }}
                         >
-                          <Minus size={13} />
-                        </span>
-                        {noAnswer && (
-                          // Real user-facing text, so the 4.5:1 floor applies, not 3:1.
-                          <span className="text-[9px] text-slate-500 leading-none">no answer</span>
-                        )}
-                      </div>
-                    )
-                  }
-                  const competitors = parseCompetitors(r.competitors_mentioned)
-                  const topComp = competitors[0] ?? null
-                  return (
-                    <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center gap-1">
-                      {r.brand_mentioned ? (
-                        <>
-                          <span
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
-                            title={t.aiv_mentioned} aria-label={t.aiv_mentioned}
-                          >
-                            <Check size={14} strokeWidth={2.5} />
-                          </span>
-                          {r.brand_position && (
-                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 leading-4 rounded tabular-nums">
-                              #{r.brand_position}
-                            </span>
-                          )}
-                          {topComp && r.brand_position && topComp.pos < r.brand_position && (
-                            <span className="text-[9px] text-slate-600 text-center leading-tight max-w-full truncate" title={`#${topComp.pos} ${topComp.name} ranks above`}>
-                              #{topComp.pos} above
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <span
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/10 text-red-400/90 ring-1 ring-red-500/25"
-                            title={t.aiv_absent} aria-label={t.aiv_absent}
-                          >
-                            <X size={13} strokeWidth={2.5} />
-                          </span>
-                          {topComp && (
-                            <span className="text-[9px] text-red-400/70 text-center leading-tight max-w-full truncate" title={`#${topComp.pos} ${topComp.name}`}>
-                              #{topComp.pos} {topComp.name}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <Collapse open={isExpanded}>
-                <div className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
-                  <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(activeLLMs.length, 5)}, 1fr)` }}>
-                    {activeLLMs.map(llm => {
-                      const r = rowResults?.get(llm.id)
-                      const competitors = r ? parseCompetitors(r.competitors_mentioned) : []
-                      const rankedList: { pos: number; name: string; isBrand: boolean }[] = [
-                        ...competitors.map(c => ({ ...c, isBrand: false })),
-                        ...(r?.brand_mentioned && r.brand_position
-                          ? [{ pos: r.brand_position, name: brandName, isBrand: true }]
-                          : []),
-                      ].sort((a, b) => a.pos - b.pos)
-
-                      return (
-                        <div key={llm.id} className={`rounded-lg p-3 border ${r?.brand_mentioned ? 'bg-sentiment-positive-15 border-sentiment-positive-20' : r ? 'bg-sentiment-negative-15 border-sentiment-negative-20' : 'bg-dark-800 border-dark-700'}`}>
-                          <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-                            <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
-                            {llm.label}
-                            {/* QUEUE_ONLY_ENGINES cannot finish inside the 26s
-                                Netlify wall this button posts to, so for them it
-                                could only ever spin and fail. Measured, not
-                                assumed: grok timed out at 21s on this exact path
-                                on 2026-07-29. It is disabled and says why, and
-                                points at the engine card refresh, which runs on
-                                the queue with a 15 minute budget. Leaving it
-                                enabled is what produced a repeated cycle of
-                                pressing a button that could not work. */}
-                            {/* A queue-only engine still gets a PRESSABLE control
-                                here. The first version of this showed a dead
-                                clock and told the user to go find another button
-                                at the top of the page, which is a dead end
-                                wearing an explanation. Pressing it now starts
-                                the background run for that engine, the same
-                                thing the engine card does. The clock icon says
-                                it is slow, not that it is broken. */}
-                            {isAdmin && (QUEUE_ONLY_ENGINES.includes(llm.id) ? (
-                              <button
-                                onClick={(ev) => { ev.stopPropagation(); handleRefreshEngine(llm.id) }}
-                                disabled={collecting || refreshingEngine !== null}
-                                className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
-                                title={`${llm.label} is too slow for an instant re-run, so this starts it in the background across all prompts. It keeps running if you leave the page.`}
-                                aria-label={`Re-run ${llm.label} in the background`}
-                              >
-                                <Clock size={11} className={refreshingEngine === llm.id ? 'animate-spin' : ''} />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
-                                disabled={refreshingCell !== null || collecting}
-                                className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
-                                title={`Re-run this prompt on ${llm.label} only. Charges for one engine call.`}
-                                aria-label={`Re-run this prompt on ${llm.label} only`}
-                              >
-                                <RotateCcw size={11} className={refreshingCell === `${prompt.id}:${llm.id}` ? 'animate-spin' : ''} />
-                              </button>
-                            ))}
-                          </div>
-                          {/* The single-cell refresh above came back with
-                              every call rejected (runSinglePrompt's summary
-                              in collectionContext.tsx), same small red
-                              lastAttemptFailed presentation as the engine
-                              grid, so this specific retry is never silent. */}
-                          {cellRefreshFailed === `${prompt.id}:${llm.id}` && (
-                            <div className="flex items-center gap-1 text-[10px] text-red-400 mb-1.5">
-                              <AlertTriangle size={9} /> Refresh failed, try again
+                          <div className="px-2 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">#</div>
+                          <div className="px-3 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
+                          {activeLLMs.map(llm => (
+                            <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
+                              <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
+                              <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
                             </div>
-                          )}
-                          {r ? (
-                            <>
-                              <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
-                              </div>
-                              {rankedList.length > 0 && (
-                                <div className="mb-2">
-                                  <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">AI Top Results</div>
-                                  {rankedList.map(entry => (
-                                    <div key={`${entry.pos}-${entry.name}`}
-                                      className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}>
-                                      <span className="font-mono text-slate-600 shrink-0 w-5">#{entry.pos}</span>
-                                      <span className="leading-tight">{entry.name}{entry.isBrand ? ' ✓' : ''}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {r.sentiment && r.brand_mentioned && (
-                                <div className={`text-[10px] font-medium mb-1 ${r.sentiment === 'positive' ? 'text-emerald-500' : r.sentiment === 'negative' ? 'text-red-500' : 'text-slate-500'}`}>
-                                  {r.sentiment}
-                                </div>
-                              )}
-                              {r.checked_at && (
-                                <div className="text-[10px] text-slate-600 font-mono">
-                                  {formatDate(r.checked_at)}
-                                </div>
-                              )}
-                              {r.response_snippet && (
-                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
-                                  {r.response_snippet}
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-xs text-slate-600">{t.aiv_notChecked}</div>
-                          )}
+                          ))}
+                          {lockedColumns.map(id => (
+                            <Link
+                              key={id}
+                              to="/account"
+                              aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
+                              title={ENGINE_META[id].label}
+                              className="flex flex-col items-center justify-center gap-0.5 min-h-[44px] rounded-md hover:bg-dark-700/40"
+                            >
+                              <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain grayscale" />
+                              <span className="text-[10px] leading-none text-slate-400">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                            </Link>
+                          ))}
                         </div>
-                      )
-                    })}
+                      )}
+                      <AnimatePresence initial={false}>
+                        {sec.rows.map(({ prompt, num }) => (
+                          <motion.div
+                            key={prompt.id}
+                            layout="position"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
+                          >
+                            {renderRow(sec.key, prompt, num)}
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                   </div>
-
-                  {rowResults && (() => {
-                    const missing = activeLLMs.filter(l => {
-                      const r = rowResults.get(l.id)
-                      return r && !r.brand_mentioned
-                    })
-                    if (missing.length === 0) return null
-                    return (
-                      <div className="mt-3 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                        <div className="text-xs text-amber-300 font-medium mb-0.5">
-                          {fmt(t.aiv_opportunity, { brand: brandName, llms: missing.map(l => l.label).join(', ') })}
-                        </div>
-                        <div className="text-[11px] text-slate-500">{t.aiv_opportunityTip}</div>
-                      </div>
-                    )
-                  })()}
                 </div>
               </Collapse>
-            </motion.div>
-          )
-        })}
-        </AnimatePresence>
+            </div>
+          </section>
+        )
+      })}
 
-        {filtered.length === 0 && (
-          prompts.length === 0 ? (
-            <SharedEmptyState
-              icon={Target}
-              title="No prompts yet"
-              body={t.aiv_noPrompts}
-              actionLabel="Add prompts"
-              actionTo="/prompts"
-            />
-          ) : (
-            <div className="text-center py-12 text-slate-500 text-sm">{t.aiv_noPrompts}</div>
-          )
-        )}
-        </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex gap-4 text-xs text-slate-600">
-        <span>{t.aiv_legend1}</span>
-        <span>{t.aiv_legend2}</span>
-        <span>{t.aiv_legend3}</span>
-      </div>
+      {prompts.length > 0 && (
+        <>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
+            {([
+              ['mentioned', AIV_COPY.legendMentioned],
+              ['absent', AIV_COPY.legendAbsent],
+              ['no_answer', AIV_COPY.legendNoAnswer],
+              ['error', AIV_COPY.legendError],
+              ['pending', AIV_COPY.legendPending],
+            ] as [CellState, string][]).map(([state, label]) => (
+              <span key={state} className="inline-flex items-center gap-1.5">
+                <PromptResultCell state={state} engineId={activeLLMs[0]?.id ?? 'chatgpt'} variant="legend" />
+                {label}
+              </span>
+            ))}
+            {lockedColumns.length > 0 && isWide && (
+              <span className="inline-flex items-center gap-1.5">
+                <PromptResultCell state="locked" engineId={lockedColumns[0]} variant="legend" />
+                {AIV_COPY.legendLocked}
+              </span>
+            )}
+          </div>
+          {!isAdmin && <p className="mt-2 text-xs text-slate-400">{AIV_COPY.viewerHint}</p>}
+        </>
+      )}
 
       {/* ── Competitor insights (supplementary — sits below the prompt table) ──── */}
       {competitorFreq.length > 0 && (

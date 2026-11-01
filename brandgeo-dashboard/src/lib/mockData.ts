@@ -210,3 +210,60 @@ export const mockAIResults: AIResult[] = (Object.entries(mentionMatrix) as [stri
     created_at: ts,
   }))
 })
+
+// ── Demo rows for the AI Visibility prompt-focus states (fictional brands) ────
+// Four prompts that exercise the states the original demo never reached: an
+// engine that stopped answering after an earlier good result, a prompt with no
+// answer, a prompt that was never checked, and a prompt where the brand is
+// absent everywhere while competitors are named.
+mockPrompts.push(
+  { id: 21, text: 'best outdoor event caterer for 150 guests', category: 'mid',     is_active: true, position: 21, created_at: '2026-07-01T00:00:00Z' },
+  { id: 22, text: 'event catering with a live cooking station', category: 'general', is_active: true, position: 22, created_at: '2026-07-01T00:00:00Z' },
+  { id: 23, text: 'weekend brunch catering for small offices',  category: 'general', is_active: true, position: 23, created_at: '2026-07-01T00:00:00Z' },
+  { id: 24, text: 'vegan catering for corporate lunches',       category: 'mid',     is_active: true, position: 24, created_at: '2026-07-01T00:00:00Z' },
+)
+
+const demoOk = (id: number, prompt_id: number, llm: AIResult['llm'], m: boolean, pos: number | null, when: string, extra: Partial<AIResult> = {}): AIResult => ({
+  id, prompt_id, llm,
+  brand_mentioned: m,
+  brand_position: pos,
+  response_snippet: extra.response_snippet ?? null,
+  sentiment: (m ? 'positive' : 'neutral') as AIResult['sentiment'],
+  checked_at: when,
+  status: 'ok',
+  ...extra,
+})
+const demoErr = (id: number, prompt_id: number, llm: AIResult['llm'], when: string): AIResult => ({
+  id, prompt_id, llm,
+  brand_mentioned: false,
+  brand_position: null,
+  response_snippet: null,
+  sentiment: 'neutral' as AIResult['sentiment'],
+  checked_at: when,
+  status: 'error',
+  error_code: 'quota_exceeded',
+})
+
+mockAIResults.push(
+  // 21: Gemini answered on 20 June, then failed on 27 June and 1 July.
+  demoOk(9001, 21, 'chatgpt',    true,  2, '2026-07-01T06:00:00Z', { response_snippet: 'Harbor Fork Catering is a strong pick for outdoor events of this size.' }),
+  demoOk(9002, 21, 'claude',     false, null, '2026-07-01T06:00:00Z'),
+  demoOk(9003, 21, 'perplexity', true,  1, '2026-07-01T06:00:00Z'),
+  demoOk(9004, 21, 'gemini',     true,  3, '2026-06-20T06:00:00Z', {
+    response_snippet: 'Harbor Fork Catering handles outdoor events for groups of around 150.',
+    competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Lantern Table Co' }, { pos: 2, name: 'Cedar & Ash Events' }]),
+  }),
+  demoErr(9005, 21, 'gemini', '2026-06-27T06:00:00Z'),
+  demoErr(9006, 21, 'gemini', '2026-07-01T06:00:00Z'),
+  // 22: every engine answered, but Gemini produced no answer at all.
+  demoOk(9011, 22, 'chatgpt',    false, null, '2026-07-01T06:00:00Z', { competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Lantern Table Co' }]) }),
+  demoOk(9012, 22, 'claude',     false, null, '2026-07-01T06:00:00Z'),
+  demoOk(9013, 22, 'perplexity', false, null, '2026-07-01T06:00:00Z'),
+  demoOk(9014, 22, 'gemini',     false, null, '2026-07-01T06:00:00Z', { response_snippet: '[no_ai_overview]' }),
+  // 23: never checked, so no rows on purpose.
+  // 24: absent on every engine, competitors named.
+  demoOk(9031, 24, 'chatgpt',    false, null, '2026-07-01T06:00:00Z', { competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Green Plate Kitchen' }, { pos: 2, name: 'Lantern Table Co' }, { pos: 3, name: 'Cedar & Ash Events' }]) }),
+  demoOk(9032, 24, 'claude',     false, null, '2026-07-01T06:00:00Z', { competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Green Plate Kitchen' }, { pos: 2, name: 'Sprout & Spoon' }]) }),
+  demoOk(9033, 24, 'perplexity', false, null, '2026-07-01T06:00:00Z', { competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Green Plate Kitchen' }]) }),
+  demoOk(9034, 24, 'gemini',     false, null, '2026-07-01T06:00:00Z', { competitors_mentioned: JSON.stringify([{ pos: 1, name: 'Sprout & Spoon' }, { pos: 2, name: 'Green Plate Kitchen' }]) }),
+)
