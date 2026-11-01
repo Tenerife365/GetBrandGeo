@@ -20,7 +20,68 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-10-31)
+## CURRENT STATE (newest entry 2026-11-01)
+
+### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog SQL NOT applied, AI Visibility prompt focus LIVE (96d1a7c)
+
+**Two Netlify builds today, both by Constantin.** `96d1a7c` (morning): the
+AI Visibility prompt-first page from the 2026-10-18 brief, bundle
+`index-CJDvNsis.js`. `b0a6285` (23:26Z): packet 030 plus P3, seven commits
+by pathspec (`d05113a` backend, `3b4110b` SPA, `e2ac727` db, `be4d2c4` ci,
+`30c73f1` P3, `cc63f98` test, `b0a6285` review), bundle `index-raEbAa3N.js`.
+Review `docs/qa/observability-030-review.md`, PASS WITH FINDINGS, no
+blocker, no major. Read from outside after the deploy: `health` answers 200
+with `commit` b0a6285, supabase ok, jobs newest 1098s against 10800s,
+watchdog `ok: null` (schema absent, expected); the main chunk has 0
+`@sentry/browser` and references lazy chunk
+`observabilitySentry-3zOr9TXN.js` (200, 99 KB raw); `enqueue-collection`
+and the three collectors still answer 401 unauthenticated. Zero
+`ai_results` rows written since the deploy, so the wrapped collectors are
+unexercised live until the next due run.
+
+**What shipped.** `netlify/functions/_observability.js` wraps the three
+collectors, the worker and `enqueue-collection` (scrubbed capture to
+Sentry when `SENTRY_DSN` is set, inert otherwise); `health.js` (public GET,
+no secret, reads build info, Supabase, `job_runs` age and the watchdog
+heartbeat); `src/lib/observability.ts` gates on PROD, `VITE_SENTRY_DSN`,
+hostname `app.getbrandgeo.com` and not demo, buffers at most 10 events, then
+imports `observabilitySentry.ts` (the only @sentry/browser importer) after
+load or idle; `tests/observability_spa_scrub.test.js` asserts the scrub
+regexes match across the fixture, the SPA and `_observability.js`.
+`.github/workflows/dashboard-ci.yml` runs tests and build on push and mails
+through Resend on failure once GitHub secrets exist. **P3:**
+`enqueue-collection.js` `effectiveForceFor(role, force)` is true only for an
+admin; a viewer's `force: true` is dropped and the response carries
+`force_ignored: true` (`tests/enqueue_force_gate.test.js`, 13 checks). Model
+stays claude-sonnet-4-6; none of this touches the collectors' calls.
+
+**NOT applied, Constantin's, in order (runbook `docs/ops/alerting-runbook.md`
+section 3):** Sentry EU project and the two DSN env vars in Netlify
+(`SENTRY_DSN` Functions, `VITE_SENTRY_DSN` Builds, one redeploy), Resend key
+and `alert_email` in Vault (both read 0 of 2 on 2026-11-01), then part A of
+`db/supabase-observability-watchdog-2026-10-28.sql` (lines 1 to 508, schema
+`ops`, idempotent since S1, seeds 9 `watch_expectations` with `obs-watchdog`
+and `poll-inbound-replies` disabled), `select ops.watchdog_send_test();`
+must land a mail before part B `cron.schedule('obs-watchdog', '50 * * * *')`.
+GitHub secrets `RESEND_API_KEY` and `ALERT_EMAIL` only after
+`tests/package_provisioning.test.js` (red since August, billing file, owed to
+bg-backend on Opus) is fixed or excluded, else every push mails a failure.
+UptimeRobot on `health` is optional. Rollback order: `cron.alter_job` pause,
+`cron.unschedule`, `drop schema ops cascade`, delete the two Vault secrets.
+
+**Recorded, not fixed.** S4: main chunk grew 1.81 KB gzip against the 1.5 KB
+budget in `docs/arch/observability.md` section 9, about 0.6 KB of it Vite's
+preload helper; bg-architect to raise the budget to 2 KB. S6, pre-existing:
+`collectionContext.tsx:334` sends `force: true` to `collect-prompt.js:101`
+for any owner, so a single-cell refresh still force-deletes that cell. S3:
+no Node test for the 429 path or the fail-open branches in `health.js`.
+Arch section 11 step 9 is stale (names an `engine_down:claude`
+expectation the seed does not carry). Live checks still owed after the
+prerequisites: V6 to V8 need a real viewer token, V9 to V11 need part A.
+
+**Test fix worth knowing:** `tests/affiliate_flow.test.js` section 10 was
+red at HEAD because two conversions without `occurred_at` took the real
+clock past the fixed 2026-11-01 clock; both now pass `clock.toISOString()`.
 
 ### 2026-10-31: Claude stays on claude-sonnet-4-6 (5.5 tested and reverted), ai_results.model LIVE (e1b2740)
 
