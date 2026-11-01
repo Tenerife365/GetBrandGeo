@@ -292,7 +292,7 @@ async function main() {
   assert.strictEqual(rows('affiliate_conversions').filter((c) => c.program_id === P2.id).length, 0)
   ok("program 2's key cannot use program 1's referral id, code or customer attribution")
 
-  r = await api(KEY2, { idempotency_key: 'p2-lead-1', conversion_type: 'qualified_lead', affiliate_code: 'ANAP2', external_customer_id: 'p2-customer-1', customer_ref: 'Company One' })
+  r = await api(KEY2, { idempotency_key: 'p2-lead-1', conversion_type: 'qualified_lead', affiliate_code: 'ANAP2', external_customer_id: 'p2-customer-1', customer_ref: 'Company One', occurred_at: clock.toISOString() })
   assert.strictEqual(r.status, 201, JSON.stringify(r.body))
   assert.strictEqual(r.body.commission.amount_cents, 10000)
   assert.strictEqual(rows('affiliate_commissions').find((c) => c.id === r.body.commission.id).approve_after <= new Date().toISOString(), true, 'approval_days 0 means approvable now')
@@ -342,7 +342,7 @@ async function main() {
   const ridWb = new URL(r.headers.Location).searchParams.get('bg_rid')
   await api(KEY2, { idempotency_key: 'w1', conversion_type: 'lead', referral_id: ridWa, external_customer_id: 'w' })
   await api(KEY2, { idempotency_key: 'w2', conversion_type: 'lead', referral_id: ridWb, external_customer_id: 'w' })
-  r = await api(KEY2, { idempotency_key: 'order_w', conversion_type: 'sale', external_customer_id: 'w', amount: '1200.00' })
+  r = await api(KEY2, { idempotency_key: 'order_w', conversion_type: 'sale', external_customer_id: 'w', amount: '1200.00', occurred_at: clock.toISOString() })
   assert.strictEqual(r.body.commission.amount_cents, 50000)
   assert.strictEqual(rows('affiliate_commissions').find((c) => c.id === r.body.commission.id).affiliate_id, ana.id)
   ok('first touch (program 2): the first link keeps the sale, fixed EUR 500 per sale')
