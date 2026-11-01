@@ -8,3 +8,4 @@ dist/
 # env var, never on disk in the repo. force-index.js reads it from env only.
 service-account.json
 *-service-account.json
+netlify/functions/_build_info.json

@@ -1,0 +1,435 @@
+{
+  "_comment": "Shared scrub fixture for _observability.js and src/lib/observability.ts (docs/arch/observability.md section 7). Each case is an input event and the exact expected output of scrubEvent. \"patterns\" must equal the PATTERNS object in both implementations. Addresses are example.com only.",
+  "patterns": {
+    "denyKey": {
+      "source": "prompt|response|snippet|text|body|brand_|email|token|key|secret|password|authorization|cookie|phone|name|details|hint",
+      "flags": "i"
+    },
+    "url": {
+      "source": "\\bhttps?:\\/\\/[^\\s\"'<>]+",
+      "flags": "g"
+    },
+    "pathToken": {
+      "source": "(\\/(?:audit|affiliate\\/join)\\/)[^/?#\\s\"'<>]+",
+      "flags": "g"
+    },
+    "email": {
+      "source": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+      "flags": "g"
+    },
+    "jwt": {
+      "source": "\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
+      "flags": "g"
+    },
+    "bearer": {
+      "source": "\\bBearer\\s+[^\\s,;\"']+",
+      "flags": "gi"
+    },
+    "mcpKey": {
+      "source": "\\bbgmcp_[A-Za-z0-9_]+",
+      "flags": "g"
+    },
+    "stripe": {
+      "source": "\\b(?:sk|rk|pk|whsec|cus|in|pi|sub|cs)_[A-Za-z0-9_]+",
+      "flags": "g"
+    },
+    "longRun": {
+      "source": "[A-Za-z0-9+/_-]{32,}={0,2}",
+      "flags": "g"
+    }
+  },
+  "cases": [
+    {
+      "name": "rule 1: user, breadcrumbs, server_name, request parts and contexts.device are never sent",
+      "input": {
+        "event_id": "aaaaaaaabbbbbbbbccccccccdddddddd",
+        "user": {
+          "id": "user-1",
+          "email": "jane.doe@example.com"
+        },
+        "breadcrumbs": [
+          {
+            "message": "clicked"
+          }
+        ],
+        "server_name": "host-1",
+        "request": {
+          "url": "https://app.getbrandgeo.com/overview?tab=1#top",
+          "cookies": "sb=1",
+          "headers": {
+            "Referer": "https://app.getbrandgeo.com/"
+          },
+          "data": "{\"a\":1}",
+          "query_string": "tab=1"
+        },
+        "contexts": {
+          "device": {
+            "model": "x"
+          },
+          "runtime": {
+            "version": "22.1.0"
+          }
+        }
+      },
+      "expected": {
+        "event_id": "aaaaaaaabbbbbbbbccccccccdddddddd",
+        "request": {
+          "url": "https://app.getbrandgeo.com/overview"
+        },
+        "contexts": {
+          "runtime": {
+            "version": "22.1.0"
+          }
+        }
+      }
+    },
+    {
+      "name": "rule 2: every URL loses its query and fragment, in message, request.url and frames",
+      "input": {
+        "message": "fetch failed for https://app.getbrandgeo.com/prompts?client=3#row",
+        "exception": {
+          "values": [
+            {
+              "type": "TypeError",
+              "value": "x",
+              "stacktrace": {
+                "frames": [
+                  {
+                    "filename": "https://app.getbrandgeo.com/assets/index-Abc.js?v=2#L1",
+                    "abs_path": "https://app.getbrandgeo.com/assets/index-Abc.js?v=2",
+                    "lineno": 3
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "message": "fetch failed for https://app.getbrandgeo.com/prompts",
+        "exception": {
+          "values": [
+            {
+              "type": "TypeError",
+              "value": "x",
+              "stacktrace": {
+                "frames": [
+                  {
+                    "filename": "https://app.getbrandgeo.com/assets/index-Abc.js",
+                    "abs_path": "https://app.getbrandgeo.com/assets/index-Abc.js",
+                    "lineno": 3
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "rule 2: the path segment after /audit/ and /affiliate/join/ becomes [token]",
+      "input": {
+        "message": "opened https://app.getbrandgeo.com/audit/AbCdEfGhIjKlMnOpQrSt_-12 then https://app.getbrandgeo.com/affiliate/join/AbCdEfGhIjKlMnOpQrStUvWxYz012345?ref=1",
+        "request": {
+          "url": "https://app.getbrandgeo.com/audit/AbCdEfGhIjKlMnOpQrSt_-12?utm_source=x"
+        },
+        "extra": {
+          "route": "/affiliate/join/AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+          "page": "/audit/AbCdEfGhIjKlMnOpQrSt_-12/print"
+        }
+      },
+      "expected": {
+        "message": "opened https://app.getbrandgeo.com/audit/[token] then https://app.getbrandgeo.com/affiliate/join/[token]",
+        "request": {
+          "url": "https://app.getbrandgeo.com/audit/[token]"
+        },
+        "extra": {
+          "route": "/affiliate/join/[token]",
+          "page": "/audit/[token]/print"
+        }
+      }
+    },
+    {
+      "name": "rule 3: denied keys are deleted at any depth in extra, tags and contexts; fn and pg_code survive",
+      "input": {
+        "extra": {
+          "prompt_id": 12,
+          "llm": "claude",
+          "count": 4,
+          "user_email": "jane.doe@example.com",
+          "nested": {
+            "brand_name": "Example Bakery",
+            "engine": "gemini",
+            "details": "Failing row contains (12)",
+            "hint": "Check it"
+          }
+        },
+        "tags": {
+          "fn": "collect-prompt",
+          "pg_code": "23505",
+          "reason": "insert_error",
+          "api_key": "abc",
+          "token_hint": "x",
+          "obj": {
+            "a": 1
+          }
+        },
+        "contexts": {
+          "app": {
+            "app_name": "x",
+            "build": "1"
+          },
+          "secret_ctx": {
+            "a": 1
+          }
+        }
+      },
+      "expected": {
+        "extra": {
+          "llm": "claude",
+          "count": 4,
+          "nested": {
+            "engine": "gemini"
+          }
+        },
+        "tags": {
+          "fn": "collect-prompt",
+          "pg_code": "23505",
+          "reason": "insert_error"
+        },
+        "contexts": {
+          "app": {
+            "build": "1"
+          }
+        }
+      }
+    },
+    {
+      "name": "rule 4: email addresses become [email]",
+      "input": {
+        "message": "notify failed for jane.doe@example.com"
+      },
+      "expected": {
+        "message": "notify failed for [email]"
+      }
+    },
+    {
+      "name": "rule 4: three-segment JWTs become [jwt]",
+      "input": {
+        "message": "bad token eyJhbGciOiJub25lIn0.eyJzdWIiOiJleGFtcGxlIn0.c2lnbmF0dXJl rejected"
+      },
+      "expected": {
+        "message": "bad token [jwt] rejected"
+      }
+    },
+    {
+      "name": "rule 4: Bearer values become Bearer [redacted], including a JWT one",
+      "input": {
+        "message": "header Bearer abc.def-ghi; and Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJleGFtcGxlIn0.c2lnbmF0dXJl"
+      },
+      "expected": {
+        "message": "header Bearer [redacted]; and Bearer [redacted]"
+      }
+    },
+    {
+      "name": "rule 4: Stripe ids and secrets become [stripe]",
+      "input": {
+        "message": "customer cus_EXAMPLE123 invoice in_EXAMPLE456 key sk_example_notakey hook whsec_example"
+      },
+      "expected": {
+        "message": "customer [stripe] invoice [stripe] key [stripe] hook [stripe]"
+      }
+    },
+    {
+      "name": "rule 4: MCP keys become [key]",
+      "input": {
+        "message": "key bgmcp_57_deadbeefcafe used"
+      },
+      "expected": {
+        "message": "key [key] used"
+      }
+    },
+    {
+      "name": "rule 4: a run of 32 or more hex or base64 characters becomes [secret]",
+      "input": {
+        "message": "sha 0123456789abcdef0123456789abcdef01234567 seen"
+      },
+      "expected": {
+        "message": "sha [secret] seen"
+      }
+    },
+    {
+      "name": "rule 4: applies to exception values, extra strings, tag values and contexts, never contexts.trace",
+      "input": {
+        "exception": {
+          "values": [
+            {
+              "type": "Error",
+              "value": "insert failed for ops@example.com"
+            }
+          ]
+        },
+        "extra": {
+          "step": "sent to ops@example.com"
+        },
+        "tags": {
+          "fn": "health",
+          "reason": "from ops@example.com"
+        },
+        "contexts": {
+          "trace": {
+            "trace_id": "0123456789abcdef0123456789abcdef",
+            "span_id": "0123456789abcdef"
+          },
+          "state": {
+            "last": "ops@example.com"
+          }
+        }
+      },
+      "expected": {
+        "exception": {
+          "values": [
+            {
+              "type": "Error",
+              "value": "insert failed for [email]"
+            }
+          ]
+        },
+        "extra": {
+          "step": "sent to [email]"
+        },
+        "tags": {
+          "fn": "health",
+          "reason": "from [email]"
+        },
+        "contexts": {
+          "trace": {
+            "trace_id": "0123456789abcdef0123456789abcdef",
+            "span_id": "0123456789abcdef"
+          },
+          "state": {
+            "last": "[email]"
+          }
+        }
+      }
+    },
+    {
+      "name": "rule 4: event_id, release, environment, timestamp and platform are never rewritten",
+      "input": {
+        "event_id": "aaaaaaaabbbbbbbbccccccccdddddddd",
+        "release": "0123456789abcdef0123456789abcdef01234567",
+        "environment": "production",
+        "timestamp": 1761955200,
+        "platform": "node",
+        "level": "error"
+      },
+      "expected": {
+        "event_id": "aaaaaaaabbbbbbbbccccccccdddddddd",
+        "release": "0123456789abcdef0123456789abcdef01234567",
+        "environment": "production",
+        "timestamp": 1761955200,
+        "platform": "node",
+        "level": "error"
+      }
+    },
+    {
+      "name": "rule 5: strings are cut to 300 characters and an exception value to 500",
+      "input": {
+        "message": "x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.",
+        "exception": {
+          "values": [
+            {
+              "type": "Error",
+              "value": "y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y."
+            }
+          ]
+        }
+      },
+      "expected": {
+        "message": "x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.",
+        "exception": {
+          "values": [
+            {
+              "type": "Error",
+              "value": "y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y.y."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "PostgREST non-Error: details and hint are dropped, the message and pg_code stay",
+      "input": {
+        "exception": {
+          "values": [
+            {
+              "type": "NonError",
+              "value": "duplicate key value violates unique constraint"
+            }
+          ]
+        },
+        "tags": {
+          "fn": "collect-prompt",
+          "pg_code": "23505"
+        },
+        "extra": {
+          "details": "Failing row contains (12, ops@example.com)",
+          "hint": "Check the row"
+        }
+      },
+      "expected": {
+        "exception": {
+          "values": [
+            {
+              "type": "NonError",
+              "value": "duplicate key value violates unique constraint"
+            }
+          ]
+        },
+        "tags": {
+          "fn": "collect-prompt",
+          "pg_code": "23505"
+        },
+        "extra": {}
+      }
+    }
+  ],
+  "server_capture_cases": [
+    {
+      "name": "PostgREST error object: only message and the string code are read",
+      "input": {
+        "message": "duplicate key value violates unique constraint",
+        "details": "Failing row contains (12, ops@example.com)",
+        "hint": "Check the row",
+        "code": "23505"
+      },
+      "expected": {
+        "exception": {
+          "type": "NonError",
+          "value": "duplicate key value violates unique constraint"
+        },
+        "pg_code": "23505"
+      },
+      "must_not_contain": [
+        "Failing row",
+        "Check the row",
+        "ops@example.com"
+      ]
+    },
+    {
+      "name": "non-Error with a numeric code: no pg_code tag",
+      "input": {
+        "message": "upstream said no",
+        "code": 500
+      },
+      "expected": {
+        "exception": {
+          "type": "NonError",
+          "value": "upstream said no"
+        },
+        "pg_code": null
+      },
+      "must_not_contain": []
+    }
+  ]
+}

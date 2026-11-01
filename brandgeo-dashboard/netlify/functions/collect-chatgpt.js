@@ -16,8 +16,9 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
+const { withObservability, captureException } = require('./_observability')
 
-exports.handler = async (event) => {
+exports.handler = withObservability('collect-chatgpt', async (event) => {
   const auth = await requireAuth(event)
   if (auth.response) return auth.response
 
@@ -85,6 +86,7 @@ exports.handler = async (event) => {
   const { error: insErr } = await supabase.from('ai_results').insert([row])
   if (insErr) {
     console.error(`[ChatGPT/${invId}] insert FAILED:`, insErr.message)
+    await captureException(insErr, { fn: 'collect-chatgpt', tags: { reason: 'insert_error', llm: 'chatgpt' } })
     return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ done: false, llm: 'chatgpt', reason: 'insert_error', detail: insErr.message }) }
   }
 
@@ -98,4 +100,4 @@ exports.handler = async (event) => {
     headers: auth.headers,
     body: JSON.stringify({ done: true, llm: 'chatgpt', summary: { brand_mentioned: row.brand_mentioned } }),
   }
-}
+})

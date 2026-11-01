@@ -27,6 +27,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const { collectEngines } = require('./_collect')
+const { withObservability, captureMessage } = require('./_observability')
 
 const BATCH_SIZE     = 5                  // in-flight prompts per claim (SCALE-SPEC §3.3)
 const TIME_BUDGET_MS = 13 * 60 * 1000     // stop before Netlify's 15-min hard limit, leave room to self-chain
@@ -93,6 +94,7 @@ async function processJob(supabase, job, invId) {
         .update({ status: 'failed', finished_at: nowIso(), error: msg })
         .eq('id', job.id)
       console.error(`[Worker/${invId}] job ${job.id} FAILED after ${job.attempts} attempts: ${msg}`)
+      await captureMessage('job_failed', 'error', { fn: 'collection-worker-background', tags: { job_id: job.id, run_id: job.run_id, attempts: job.attempts } })
       return { id: job.id, status: 'failed' }
     }
     // Requeue for another pass (a small delay avoids an instant hot-retry loop).
@@ -118,7 +120,7 @@ async function selfChain() {
   }
 }
 
-exports.handler = async (event) => {
+exports.handler = withObservability('collection-worker-background', async (event) => {
   if (!checkInternalKey(event)) {
     console.warn('[Worker] rejected — bad or missing X-Internal-Key')
     return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
@@ -162,4 +164,4 @@ exports.handler = async (event) => {
   }
 
   return { statusCode: 200, body: JSON.stringify({ processed: totalProcessed, batches, pending }) }
-}
+})

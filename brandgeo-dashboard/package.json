@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node -e \"const fs=require('fs');const c=process.env.COMMIT_REF||'';fs.writeFileSync('netlify/functions/_build_info.json',JSON.stringify({commit:c.length===40&&/[0-9a-f]{40}/.test(c)?c:null,built_at:new Date().toISOString()})+String.fromCharCode(10))\"",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.2",
+    "@sentry/browser": "11.8.0",
     "@supabase/supabase-js": "^2.43.4",
     "googleapis": "^140.0.0",
     "lucide-react": "^0.383.0",

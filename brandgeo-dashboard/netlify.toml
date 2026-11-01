@@ -2,7 +2,8 @@
   directory = "netlify/functions"
 
 [build]
-  command = "npm install && npm run build"
+  # VITE_RELEASE tags browser error events with the commit (docs/arch/observability.md).
+  command = "npm install && VITE_RELEASE=$COMMIT_REF npm run build"
   publish = "dist"
   # Repo is shared with the marketing site (brandgeo/web/) and blog content
   # (brandgeo/*.md). Without this, Netlify rebuilds+redeploys the dashboard on
@@ -21,7 +22,8 @@
   # public (published at https://getbrandgeo.com/<key>.txt), and the literal value also sits
   # in that .txt file inside this repo, which is what the scanner is actually catching. Not a
   # real secret leak, same category of false positive as SUPABASE_URL above.
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,INDEXNOW_KEY"
+  # VITE_SENTRY_DSN is a browser error-reporting DSN, public by design (it ships in the bundle).
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,INDEXNOW_KEY,VITE_SENTRY_DSN"
 
 [[headers]]
   for = "/*"
@@ -51,7 +53,7 @@
     # appears only as a target=_blank footer link, which is navigation and
     # needs no CSP allowance. Note a CSP wildcard does NOT match the apex, so
     # if the vendor ever moves the API there it must be listed explicitly.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com https://*.ingest.de.sentry.io"
 
 # ── Affiliate module (2026-09-12) ─────────────────────────────────────────────
 # Referral links are https://app.getbrandgeo.com/r/<program>/<code>. They MUST
@@ -380,3 +382,9 @@
 # DB ops per call, same shape as promotions-admin.
 [functions."client-api-keys"]
   timeout = 15
+
+# ── Observability (docs/arch/observability.md) ───────────────────────────────
+# Public health endpoint for the external pinger and CI: two job_runs reads
+# under a 4s deadline plus one rate-limit RPC, so the 10s default is the ceiling.
+[functions."health"]
+  timeout = 10

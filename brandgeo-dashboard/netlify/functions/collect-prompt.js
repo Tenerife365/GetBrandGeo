@@ -24,6 +24,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
+const { withObservability, captureException } = require('./_observability')
 const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS } = require('./_cost')
 
 // Engines this endpoint owns. Claude → collect-claude.js, ChatGPT → collect-chatgpt.js.
@@ -37,7 +38,7 @@ const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS } = require('./_cost')
 // than google_ai's.
 const FAST_ENGINES = ['gemini', 'perplexity', 'meta', 'google_ai', 'grok', 'ai_overview']
 
-exports.handler = async (event) => {
+exports.handler = withObservability('collect-prompt', async (event) => {
   // Auth: verify JWT + origin (client ownership checked after body parse)
   const auth = await requireAuth(event)
   if (auth.response) return auth.response
@@ -151,6 +152,7 @@ exports.handler = async (event) => {
     const { error } = await supabase.from('ai_results').insert(rows)
     if (error) {
       console.error('[Insert] FAILED:', error.message)
+      await captureException(error, { fn: 'collect-prompt', tags: { reason: 'insert_error' } })
       insertFailed = true
     } else {
       console.log('[Insert] saved', rows.length, 'row(s)')
@@ -184,4 +186,4 @@ exports.handler = async (event) => {
     headers: auth.headers,
     body: JSON.stringify({ done: true, prompt_id, summary, ctx_geo: ctxGeo }),
   }
-}
+})
