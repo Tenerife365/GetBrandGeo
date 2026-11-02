@@ -96,7 +96,15 @@ from the orchestrator seat, not by a separate bg-verify run. Worth knowing:
 so docs-only pushes run it too, and each failure mails through GitHub
 Actions' own notifications (the four "Run failed: dashboard-ci" mails of
 2026-11-01 and 02 were this test, nothing else failed). The fix touches
-`brandgeo-dashboard/`, so its push spends one Netlify build.
+`brandgeo-dashboard/`, so its push spends one Netlify build. **PUSHED and
+LIVE 2026-11-02 on Constantin's go** (`30c641b` test, `54a25fe` docs, with
+`BATCH_PUSH=1`, one build): `dashboard-ci` run 41404843259 on `54a25fe` is
+`success` (07:12Z), the first green run of the workflow; `health` read from
+outside at 07:15Z answers `commit` 54a25fe, `built_at` 07:13:09Z, supabase
+ok, jobs newest 311s, watchdog ok at 1515s. Judged by the `commit` field,
+not by a bundle string, because a test-only change can build an identical
+bundle. The "Run failed" mails stop from here; the three red runs before it
+stay in the history.
 UptimeRobot on `health` is optional. Rollback order: `cron.alter_job(job_id
 => 10, active => false)` to pause, `cron.unschedule('obs-watchdog')`,
 `drop schema ops cascade`, delete the two Vault secrets.
