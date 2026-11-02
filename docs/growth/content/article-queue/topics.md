@@ -39,7 +39,7 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 | 3 | sources | dropped 2026-10-30: `citations` is null on all 591 rows for all 5 engines; links inside `response_text` exist for only 2 engines (ChatGPT 119 of 120, Google AI Mode 111 of 111; Claude 7, Gemini 0, Perplexity 0), below the brief's three-engine floor | Which kinds of sites engines cite as sources: firm sites, directories, news, government |
 | 4 | no-firm | published bg-107 2026-10-31 | How often an engine answers a "best X in city" question without naming a single firm |
 | 5 | ratings | published bg-108 2026-11-01 | How often answers quote star ratings or review counts, by engine |
-| 6 | nap | ready | How often answers give a phone number, street address or website for the firms they name |
+| 6 | nap | published bg-109 2026-11-02 | How often answers give a phone number, street address or website for the firms they name |
 | 7 | fees | ready | What fees engines quote: contingency percentages, management fees, commissions |
 | 8 | hedges | ready | How often answers tell the buyer to verify, check reviews or consult before choosing |
 | 9 | credentials | ready | Which credentials engines attach to firms: years in business, board certification, awards |
