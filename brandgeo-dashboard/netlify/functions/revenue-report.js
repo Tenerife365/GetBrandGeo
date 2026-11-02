@@ -52,6 +52,7 @@ const {
   sumApiCostByClient,
   aggregateRevenue,
   computeEngagementPipeline,
+  computePendingInvoices,
 } = require('./_revenue')
 
 /**
@@ -320,6 +321,13 @@ exports.handler = async (event) => {
     })
     for (const w of aggWarnings) warn(w)
 
+    // ── Pending invoices (accounts receivable, contract addendum) ───────────
+    // Reuses the SAME `invoices` and `customers` arrays already fetched above
+    // for aggregateRevenue -- no extra Stripe call. Not period-scoped: an open
+    // invoice from last month is still owed today, and that is exactly the one
+    // most overdue for a follow-up.
+    const pendingInvoices = computePendingInvoices({ invoices, customers, clients, now: new Date() })
+
     // ── meta ────────────────────────────────────────────────────────────────
     // The account id is read rather than assumed: this project migrated from a
     // Romanian account to a Spanish one on 2026-08-02, and a report that named
@@ -340,7 +348,7 @@ exports.handler = async (event) => {
     const liveMode = liveModeSource ? liveModeSource.livemode : null
 
     log(`${period.label}: ${invoices.length} invoices, ${refunds.length} refunds, ${customers.length} customers, `
-      + `${costRows.length} cost rows, ${byClient.length} client rows, ${warnings.length} warning(s)`)
+      + `${costRows.length} cost rows, ${byClient.length} client rows, ${pendingInvoices.length} pending invoice(s), ${warnings.length} warning(s)`)
 
     return json(200, {
       period: { start: period.start, end: period.end, label: period.label },
@@ -349,6 +357,7 @@ exports.handler = async (event) => {
       byClient,
       pipeline,
       affiliates,
+      pendingInvoices,
       meta: {
         generatedAt: new Date().toISOString(),
         stripeAccountId,

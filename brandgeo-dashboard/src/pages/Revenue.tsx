@@ -1,5 +1,5 @@
 /**
- * Revenue.tsx — Admin-only Usage / Cost / Revenue page (sprint task S21,
+ * Revenue.tsx: Admin-only Usage / Cost / Revenue page (sprint task S21,
  * docs/growth/SPRINT-100-KICKOFFS-2026-07-31.md; data contract
  * docs/arch/revenue-report-data-contract.md).
  *
@@ -8,18 +8,19 @@
  * "Usage" tab derives from the same fetched rows to show response COUNTS
  * without the EUR column, which used to share one table. "Revenue" is new:
  * it calls the admin-only revenue-report.js function (Stripe-backed) rather
- * than reading ai_results directly — money is Stripe's number, not ours.
+ * than reading ai_results directly, money is Stripe's number, not ours.
  *
  * The Cost tab and the Revenue tab's "estimated API cost" line MUST always
  * agree, because both read the same per-row `cost_eur` (metered) with the
- * same legacy flat-estimate fallback — see the contract §5. Nobody should
+ * same legacy flat-estimate fallback, see the contract §5. Nobody should
  * ever see two different cost figures on the same page.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, Cpu, Receipt, Percent, Users, AlertTriangle, Loader2, Target,
+  ChevronUp, ChevronDown, ChevronsUpDown, Search, Clock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -29,29 +30,29 @@ import { PageTitle, SectionHeading } from '../components/Typography'
 import { useChartTheme } from '../lib/chartTheme'
 
 /**
- * EUR cost per response, per engine — sourced from planConfig.ts's
+ * EUR cost per response, per engine, sourced from planConfig.ts's
  * ENGINE_COST_EUR (SCALE-SPEC.md §2.1), not a local copy. This used to be its
  * own hand-maintained table here, duplicated a second time in
  * _prospect_engines.js, and (until the cost_eur metering work landed
  * 2026-07-13) not applied at all to the actual ai_results rows it estimates
- * from. All three now read the same numbers — see planConfig.ts /
+ * from. All three now read the same numbers, see planConfig.ts /
  * netlify/functions/_cost.js for the full pricing derivation and confidence
  * notes (gemini LOW confidence, chatgpt MEDIUM, the rest HIGH).
  *
  * Re-typed to a plain string-keyed Record here (planConfig.ts's version is
  * keyed by the EngineId union so it can't silently typo an engine name) so
- * every existing lookup/iteration below — which indexes by whatever `llm`
- * string comes back from Supabase — keeps working unchanged.
+ * every existing lookup/iteration below, which indexes by whatever `llm`
+ * string comes back from Supabase, keeps working unchanged.
  */
 const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, number>
 // => 5-engine check ≈ €0.137 at the rebuilt 2026-07-29 prices. Batching
 //    (SCALE-SPEC §1.1b step 4) would reduce it, but that needs the §3 collection
-//    queue first — not built yet.
+//    queue first, not built yet.
 
 // ⚠️ CORRECTION 2026-07-29. This comment block used to claim "the cost_eur
 // column now meters this per row for real". That was not true: costForRow()
 // returned a flat per-engine constant and wrote it to the column, so every row
-// for a given engine carried an identical value (verified in production —
+// for a given engine carried an identical value (verified in production,
 // count(distinct cost_eur) was 1 for all six engines). The database stored the
 // estimate; it did not measure anything.
 //
@@ -65,19 +66,19 @@ const ENGINE_COST: Record<string, number> = ENGINE_COST_EUR as Record<string, nu
 //     grounding is free under 1,500 requests/day and SerpApi is a monthly
 //     subscription whose unused searches expire, so neither has a meaningful
 //     per-call marginal cost. Their figures are accounting allocations.
-//  2. The old per-engine attribution was wrong in both directions — claude 3.3x
-//     under, perplexity 5x over — even though the total was within 8%. Any
+//  2. The old per-engine attribution was wrong in both directions, claude 3.3x
+//     under, perplexity 5x over, even though the total was within 8%. Any
 //     historical per-engine breakdown on this page that predates metering
 //     inherits that error. Read pre-metering rows as an order of magnitude.
 //
 // Platform overhead (Supabase/Netlify/etc.) is deliberately not folded in here:
 // this card is API spend, which is the number that was in dispute.
 
-// ENGINE_META's colour / bg fields no longer exist (dashboard-visual-system.md §8.4 —
+// ENGINE_META's colour / bg fields no longer exist (dashboard-visual-system.md §8.4,
 // engine identity is a swatch in ENGINE_META[id].chartColor, never coloured
 // text). This table cell/legend below reads chartColor directly per row via
 // `engineSwatch()` instead of keeping a second colour lookup. The fallback (an
-// id ENGINE_META doesn't recognise, defensive only — every real id here comes
+// id ENGINE_META doesn't recognise, defensive only, every real id here comes
 // from ENGINE_COST's own keys) resolves from the live chart theme rather than
 // a hand-typed hex, so no engine/sentiment hex sits outside planConfig.ts or
 // the chart-theme module (§17 V5).
@@ -91,7 +92,7 @@ interface ClientUsage {
   byEngine: Record<string, number>
   totalResponses: number
   totalCost: number       // real metered spend: sum(cost_eur), flat estimate only for legacy rows
-  estimatedResponses: number  // rows with a NULL cost_eur (pre-metering) — counted via flat estimate
+  estimatedResponses: number  // rows with a NULL cost_eur (pre-metering), counted via flat estimate
   internal?: boolean      // our own spend, not a customer's. See RESEARCH_ROW_ID.
 }
 
@@ -150,7 +151,7 @@ function collapseResearch(rows: ClientUsage[], clients: { id: number; category?:
     .sort((a, b) => b.totalCost - a.totalCost)
 }
 
-// ── Revenue tab — types match docs/arch/revenue-report-data-contract.md §6b
+// ── Revenue tab: types match docs/arch/revenue-report-data-contract.md §6b
 // exactly. Keep in sync with that file if the contract changes; it is the
 // binding source, this is its TS mirror for the fetch response.
 interface RevenuePeriod { start: string; end: string; label: string }
@@ -166,7 +167,7 @@ interface RevenueTotals {
 interface RevenueByPlan extends RevenueTotals { plan: string; invoiceCount: number }
 // A 4th value beyond contract §6b's stated enum (backend handoff item 1):
 // `null` is a client with API spend and no Stripe customer to even ask the
-// attribution question about (a research study, a free signup) — NOT the
+// attribution question about (a research study, a free signup), NOT the
 // same as `unattributed`, which means Stripe money that could not be
 // matched to a client. Conflating the two would raise a false alarm on
 // every cost-only row.
@@ -193,7 +194,7 @@ interface PipelineClient {
   // the pipeline itself applies, precomputed so the UI can never apply a
   // different bar than the report does. computeEngagementPipeline() returns
   // every free client with ANY activity in the window, not just the engaged
-  // ones — filter on this before showing anything as a campaign target.
+  // ones, filter on this before showing anything as a campaign target.
   engaged: boolean
 }
 interface AffiliateRow {
@@ -202,6 +203,26 @@ interface AffiliateRow {
   attributedClients: number
   commissionAccruedEur: number
 }
+// Additive beyond contract §6b (2026-08-03, Constantin): accounts receivable,
+// so a pending payment has a due date to follow up against instead of just a
+// gross-invoiced number with no timeline attached. Computed server-side by
+// computePendingInvoices() in _revenue.js from the same invoices/customers
+// already fetched for the rest of the report, no extra Stripe call.
+interface PendingInvoice {
+  invoiceId: string | null
+  clientId: number | null
+  clientName: string
+  plan: string | null
+  attribution: Attribution
+  customerId: string | null
+  customerEmail: string | null
+  amountDueEur: number
+  currency: string
+  dueDate: string | null       // ISO, null if Stripe has no due_date on the invoice
+  daysUntilDue: number | null  // negative = overdue; null mirrors dueDate
+  hostedInvoiceUrl: string | null
+  createdAt: string | null
+}
 interface RevenueReport {
   period: RevenuePeriod
   global: RevenueTotals
@@ -209,13 +230,14 @@ interface RevenueReport {
   byClient: RevenueByClient[]
   pipeline: { windowDays: number; engagedThresholdWeeks: number; clients: PipelineClient[] }
   affiliates: AffiliateRow[]
+  pendingInvoices: PendingInvoice[]
   // stripeAccountId / liveMode are null when the account could not be read
   // (revenue-report.js:321-334) -- not always present, per the CQO review.
   meta: { generatedAt: string; stripeAccountId: string | null; liveMode: boolean | null; warnings: string[] }
 }
 
 /** Same authenticated-POST pattern PromotionsPanel.tsx already uses against
- *  its own admin function — one Authorization header shape for every
+ *  its own admin function, one Authorization header shape for every
  *  admin-only Netlify function in this app. */
 async function authedPost<T>(fn: string, body: unknown): Promise<{ status: number; data: T | null }> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -232,7 +254,7 @@ async function authedPost<T>(fn: string, body: unknown): Promise<{ status: numbe
 const eur = (n: number) => `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const planLabel = (p: string | null) => (p && p in PLAN_LABELS ? PLAN_LABELS[p as Plan] : (p ?? 'Unknown'))
 
-/** Function, not an object keyed by Attribution — `null` is a real member of
+/** Function, not an object keyed by Attribution, `null` is a real member of
  *  that union and cannot be an object key, so a lookup table would render a
  *  blank pill for the "cost only, no Stripe customer" case. */
 function attributionLabel(a: Attribution): string {
@@ -254,10 +276,108 @@ function AttributionBadge({ attribution }: { attribution: Attribution }) {
           ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
           : 'bg-dark-700 text-slate-400 border-dark-600',
       ].join(' ')}
-      title={warn ? 'This Stripe money could not be matched to a client row — shown in totals but not attributed to anyone.' : undefined}
+      title={warn ? 'This Stripe money could not be matched to a client row, shown in totals but not attributed to anyone.' : undefined}
     >
       {attributionLabel(attribution)}
     </span>
+  )
+}
+
+// ── Sorting / filtering, shared by every per-client and per-invoice table on
+// this page (2026-08-03, Constantin: "so I can play with the data more",
+// highest cost, highest responses, by engine, on Clients/Research/Usage/Cost;
+// due date on Revenue's pending table). One generic implementation rather than
+// four bespoke ones so a column added to one table does not need re-deriving
+// the sort/filter logic for it.
+type SortDir = 'asc' | 'desc'
+
+/** Nulls sort last in 'asc' and, by symmetry, first once reversed for 'desc' --
+ *  acceptable for this page's columns (a null cost/due-date reads as "least
+ *  urgent", never as zero). */
+function compareValues(a: string | number | null, b: string | number | null): number {
+  if (a === null && b === null) return 0
+  if (a === null) return 1
+  if (b === null) return -1
+  if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b)
+  return (a as number) - (b as number)
+}
+
+/** getValue returns the raw sort value for a column key; getFilterText is what
+ *  the free-text box matches against (client name, by default). Numeric
+ *  columns default to descending on first click ("highest cost" is the ask,
+ *  not "lowest cost"), text columns default to ascending (A→Z). */
+function useSortableRows<T>(
+  rows: T[],
+  getValue: (row: T, key: string) => string | number | null,
+  initialKey: string,
+  getFilterText: (row: T) => string,
+  initialDir: SortDir = 'desc',
+) {
+  const [sortKey, setSortKey] = useState(initialKey)
+  const [sortDir, setSortDir] = useState<SortDir>(initialDir)
+  const [filterText, setFilterText] = useState('')
+
+  const toggleSort = (key: string) => {
+    if (key === sortKey) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    const sample = rows.find(r => getValue(r, key) !== null)
+    setSortDir(sample && typeof getValue(sample, key) === 'string' ? 'asc' : 'desc')
+  }
+
+  const filtered = useMemo(() => {
+    const q = filterText.trim().toLowerCase()
+    return q ? rows.filter(r => getFilterText(r).toLowerCase().includes(q)) : rows
+  }, [rows, filterText]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sorted = useMemo(() => {
+    const copy = [...filtered].sort((a, b) => compareValues(getValue(a, sortKey), getValue(b, sortKey)))
+    return sortDir === 'desc' ? copy.reverse() : copy
+  }, [filtered, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText }
+}
+
+function FilterInput({ value, onChange, placeholder = 'Filter by client…' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string
+}) {
+  return (
+    <div className="relative w-full sm:w-64">
+      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-dark-900 border border-dark-600 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500/50"
+      />
+    </div>
+  )
+}
+
+function SortableTh({ label, sortKey, activeKey, dir, onClick, align = 'left', icon }: {
+  label: React.ReactNode; sortKey: string; activeKey: string; dir: SortDir
+  onClick: (key: string) => void; align?: 'left' | 'center' | 'right'; icon?: React.ReactNode
+}) {
+  const active = activeKey === sortKey
+  const alignText = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+  const alignFlex = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
+  return (
+    <th
+      className={`px-3 py-3 text-xs font-medium cursor-pointer select-none whitespace-nowrap transition-colors ${alignText} ${active ? 'text-slate-200' : 'text-slate-500 hover:text-slate-300'}`}
+      onClick={() => onClick(sortKey)}
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <span className={`inline-flex items-center gap-1 ${alignFlex}`}>
+        {icon}
+        {label}
+        {active
+          ? (dir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
+          : <ChevronsUpDown size={11} className="opacity-30" />}
+      </span>
+    </th>
   )
 }
 
@@ -267,14 +387,24 @@ type Tab = 'clients' | 'research' | 'usage' | 'cost' | 'revenue'
  * Shared table for the Clients and Research tabs (2026-08-03, Constantin):
  * responses AND cost together, one row per client, scoped to one audience.
  * Usage.tsx used to split those two into separate tabs and mix client rows
- * with the collapsed research row in both; this is the opposite split —
+ * with the collapsed research row in both; this is the opposite split,
  * same two numbers, but by AUDIENCE instead of by METRIC. Usage/Cost/Revenue
  * are untouched and still show everyone combined, so their own totals are
  * exactly what they were before this existed.
  */
+function audienceSortValue(r: ClientUsage, key: string): string | number | null {
+  if (key === 'name') return r.clientName.toLowerCase()
+  if (key === 'responses') return r.totalResponses
+  if (key === 'cost') return r.totalCost
+  if (key.startsWith('engine:')) return r.byEngine[key.slice(7)] ?? 0
+  return null
+}
+
 function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsage[]; chart: ReturnType<typeof useChartTheme> }) {
   const totalResponses = rows.reduce((s, r) => s + r.totalResponses, 0)
   const totalCost = rows.reduce((s, r) => s + r.totalCost, 0)
+  const { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText } =
+    useSortableRows(rows, audienceSortValue, 'cost', r => r.clientName)
 
   return (
     <section>
@@ -298,31 +428,38 @@ function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsag
       </div>
 
       <div className="bg-dark-800 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
-          {title}
+        <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{title}</span>
+          {rows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
         </div>
         {rows.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
+        ) : sorted.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No client matches "{filterText}"</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-dark-700/50">
-                  <th className="px-4 py-3 text-left text-xs text-slate-500 font-medium">Client</th>
+                  <SortableTh label="Client" sortKey="name" activeKey={sortKey} dir={sortDir} onClick={toggleSort} />
                   {Object.keys(ENGINE_COST).map(e => (
-                    <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />
-                        {e}
-                      </span>
-                    </th>
+                    <SortableTh
+                      key={e}
+                      sortKey={`engine:${e}`}
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={toggleSort}
+                      align="center"
+                      icon={<span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />}
+                      label={<span className="capitalize">{e}</span>}
+                    />
                   ))}
-                  <th className="px-3 py-3 text-right text-xs text-slate-500 font-medium">Responses</th>
-                  <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Est. Cost</th>
+                  <SortableTh label="Responses" sortKey="responses" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+                  <SortableTh label="Est. Cost" sortKey="cost" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {sorted.map(r => (
                   <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-200">{r.clientName}</td>
                     {Object.keys(ENGINE_COST).map(e => (
@@ -335,14 +472,20 @@ function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsag
               </tbody>
               <tfoot>
                 <tr className="border-t border-dark-700 bg-dark-700/20">
-                  <td className="px-4 py-3 font-semibold text-slate-300">Total</td>
+                  <td className="px-4 py-3 font-semibold text-slate-300">
+                    Total{sorted.length !== rows.length ? ` (${sorted.length} of ${rows.length} shown)` : ''}
+                  </td>
                   {Object.keys(ENGINE_COST).map(e => (
                     <td key={e} className="px-3 py-3 text-center text-slate-400 tabular-nums">
-                      {rows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
+                      {sorted.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
                     </td>
                   ))}
-                  <td className="px-3 py-3 text-right font-semibold text-slate-300 tabular-nums">{totalResponses}</td>
-                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">€{totalCost.toFixed(2)}</td>
+                  <td className="px-3 py-3 text-right font-semibold text-slate-300 tabular-nums">
+                    {sorted.reduce((s, r) => s + r.totalResponses, 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">
+                    €{sorted.reduce((s, r) => s + r.totalCost, 0).toFixed(2)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -350,6 +493,380 @@ function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsag
         )}
       </div>
     </section>
+  )
+}
+
+function usageSortValue(r: ClientUsage, key: string): string | number | null {
+  if (key === 'name') return r.clientName.toLowerCase()
+  if (key === 'total') return r.totalResponses
+  if (key.startsWith('engine:')) return r.byEngine[key.slice(7)] ?? 0
+  return null
+}
+
+/** Usage tab: responses only, no cost column, see the file header on why this
+ *  and Cost stay separate views over the same rows rather than one table. */
+function UsageSection({ displayRows, customerRows, grandResponses, loading, chart }: {
+  displayRows: ClientUsage[]; customerRows: ClientUsage[]; grandResponses: number
+  loading: boolean; chart: ReturnType<typeof useChartTheme>
+}) {
+  const { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText } =
+    useSortableRows(displayRows, usageSortValue, 'total', r => r.clientName)
+
+  return (
+    <section>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu size={15} className="text-blue-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
+          </div>
+          <div className="text-2xl font-bold text-white tabular-nums">{grandResponses.toLocaleString()}</div>
+          <p className="text-xs text-slate-500 mt-1">LLM responses collected</p>
+        </div>
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={15} className="text-brand-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
+          </div>
+          {customerRows.length > 0
+            ? <div className="text-2xl font-bold text-white tabular-nums">
+                {Math.round(customerRows.reduce((s, r) => s + r.totalResponses, 0) / customerRows.length).toLocaleString()}
+              </div>
+            : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">No clients yet</div>}
+          <p className="text-xs text-slate-500 mt-1">{customerRows.length} client{customerRows.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Responses per client, per engine</span>
+          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
+        </div>
+        {loading ? (
+          <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
+        ) : displayRows.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
+        ) : sorted.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No client matches "{filterText}"</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-dark-700/50">
+                  <SortableTh label="Client" sortKey="name" activeKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  {Object.keys(ENGINE_COST).map(e => (
+                    <SortableTh
+                      key={e}
+                      sortKey={`engine:${e}`}
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={toggleSort}
+                      align="center"
+                      icon={<span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />}
+                      label={<span className="capitalize">{e}</span>}
+                    />
+                  ))}
+                  <SortableTh label="Total" sortKey="total" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map(r => (
+                  <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-200">
+                      <span className="inline-flex items-center gap-2 flex-wrap">
+                        {r.clientName}
+                        {r.internal && (
+                          <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-dark-700 text-slate-400 border border-dark-600">
+                            Internal
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    {Object.keys(ENGINE_COST).map(e => (
+                      <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
+                        {r.byEngine[e] ?? 0}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-right font-semibold text-slate-200 tabular-nums">{r.totalResponses}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function costSortValue(r: ClientUsage, key: string): string | number | null {
+  if (key === 'name') return r.clientName.toLowerCase()
+  if (key === 'responses') return r.totalResponses
+  if (key === 'cost') return r.totalCost
+  if (key.startsWith('engine:')) return r.byEngine[key.slice(7)] ?? 0
+  return null
+}
+
+/** Cost tab: responses AND cost together, plus the legend, the original
+ *  Usage.tsx table, unchanged in content, now just sortable/filterable. */
+function CostSection({ displayRows, customerRows, customerTotal, researchTotal, grandTotal, grandResponses, grandEstimated, loading, chart }: {
+  displayRows: ClientUsage[]; customerRows: ClientUsage[]; customerTotal: number; researchTotal: number
+  grandTotal: number; grandResponses: number; grandEstimated: number; loading: boolean
+  chart: ReturnType<typeof useChartTheme>
+}) {
+  const { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText } =
+    useSortableRows(displayRows, costSortValue, 'cost', r => r.clientName)
+
+  return (
+    <section>
+      {/* Summary cards */}
+      <SectionHeading className="sr-only">Spend summary</SectionHeading>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign size={15} className="text-emerald-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">API Cost (metered)</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</div>
+          <p className="text-xs text-slate-500 mt-1">
+            {grandEstimated > 0
+              ? `across all clients · ${grandEstimated.toLocaleString()} legacy row${grandEstimated === 1 ? '' : 's'} estimated`
+              : 'across all clients · fully metered'}
+          </p>
+        </div>
+
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Cpu size={15} className="text-blue-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
+          </div>
+          <div className="text-2xl font-bold text-white tabular-nums">{grandResponses.toLocaleString()}</div>
+          <p className="text-xs text-slate-500 mt-1">LLM responses collected</p>
+        </div>
+
+        <div className="bg-dark-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={15} className="text-brand-400" />
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
+          </div>
+          {/* No clients is an absence, not a dash glyph. Kept in an h-8 box so
+              this card's baseline still lines up with the two beside it. */}
+          {customerRows.length > 0
+            ? <div className="text-2xl font-bold text-white tabular-nums">
+                €{(customerTotal / customerRows.length).toFixed(2)}
+              </div>
+            : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">
+                No clients yet
+              </div>}
+          <p className="text-xs text-slate-500 mt-1">
+            {customerRows.length} client{customerRows.length !== 1 ? 's' : ''}
+            {researchTotal > 0 && (
+              <>, plus €{researchTotal.toFixed(2)} research</>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Per-client table */}
+      <div className="bg-dark-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Per-client breakdown</span>
+          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
+        ) : displayRows.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
+        ) : sorted.length === 0 ? (
+          <div className="py-12 text-center text-slate-500 text-sm">No client matches "{filterText}"</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-dark-700/50">
+                  <SortableTh label="Client" sortKey="name" activeKey={sortKey} dir={sortDir} onClick={toggleSort} />
+                  <SortableTh label="Responses" sortKey="responses" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="center" />
+                  {Object.keys(ENGINE_COST).map(e => (
+                    <SortableTh
+                      key={e}
+                      sortKey={`engine:${e}`}
+                      activeKey={sortKey}
+                      dir={sortDir}
+                      onClick={toggleSort}
+                      align="center"
+                      icon={<span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />}
+                      label={<span className="capitalize">{e}</span>}
+                    />
+                  ))}
+                  <SortableTh label="Est. Cost" sortKey="cost" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map(r => (
+                  <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-200">
+                      <span className="inline-flex items-center gap-2 flex-wrap">
+                        {r.clientName}
+                        {/* Says why this row is not a customer. Without it the
+                            collapsed line reads as one more account and quietly
+                            inflates the client count in the reader's head. */}
+                        {r.internal && (
+                          <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-dark-700 text-slate-400 border border-dark-600">
+                            Internal
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-center text-slate-400 tabular-nums">{r.totalResponses}</td>
+                    {Object.keys(ENGINE_COST).map(e => (
+                      <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
+                        {r.byEngine[e] ?? 0}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-400 tabular-nums">
+                      €{r.totalCost.toFixed(3)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-dark-700 bg-dark-700/20">
+                  <td className="px-4 py-3 font-semibold text-slate-300">
+                    Total{sorted.length !== displayRows.length ? ` (${sorted.length} of ${displayRows.length} shown)` : ''}
+                  </td>
+                  <td className="px-3 py-3 text-center font-semibold text-slate-300 tabular-nums">
+                    {sorted.reduce((s, r) => s + r.totalResponses, 0)}
+                  </td>
+                  {Object.keys(ENGINE_COST).map(e => (
+                    <td key={e} className="px-3 py-3 text-center text-slate-400 tabular-nums">
+                      {sorted.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">
+                    €{sorted.reduce((s, r) => s + r.totalCost, 0).toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Cost legend */}
+      <div className="mt-4 p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
+        <p className="text-xs text-slate-500 mb-2 font-medium">Cost estimates (per response)</p>
+        <div className="flex flex-wrap gap-3">
+          {Object.entries(ENGINE_COST).map(([engine, cost]) => (
+            <div key={engine} className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(engine, chart.sentimentNeutral) }} />
+              <span className="text-xs font-medium capitalize text-slate-300">{engine}</span>
+              <span className="text-xs text-slate-600">€{(cost ?? 0).toFixed(3)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-600 mt-2">
+          EUR, API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Estimates from
+          published rate cards, not invoices. Gemini is the least certain (billed per search query).
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function pendingSortValue(r: PendingInvoice, key: string): string | number | null {
+  if (key === 'name') return r.clientName.toLowerCase()
+  if (key === 'amount') return r.amountDueEur
+  // No due date sorts as "least urgent" in either direction, not as 0/today.
+  if (key === 'due') return r.daysUntilDue ?? Number.POSITIVE_INFINITY
+  return null
+}
+
+function DueBadge({ daysUntilDue }: { daysUntilDue: number | null }) {
+  const cls = 'text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap'
+  if (daysUntilDue === null) {
+    return <span className={`${cls} bg-dark-700 text-slate-500 border-dark-600`}>No due date</span>
+  }
+  if (daysUntilDue < 0) {
+    return <span className={`${cls} bg-rose-500/10 text-rose-400 border-rose-500/30`}>Overdue {Math.abs(daysUntilDue)}d</span>
+  }
+  if (daysUntilDue === 0) {
+    return <span className={`${cls} bg-amber-500/10 text-amber-400 border-amber-500/30`}>Due today</span>
+  }
+  if (daysUntilDue <= 3) {
+    return <span className={`${cls} bg-amber-500/10 text-amber-400 border-amber-500/30`}>Due in {daysUntilDue}d</span>
+  }
+  return <span className={`${cls} bg-dark-700 text-slate-400 border-dark-600`}>Due in {daysUntilDue}d</span>
+}
+
+/**
+ * Accounts receivable, for manual follow-up (2026-08-03, Constantin: "so I can
+ * do follow ups manually, at least for now"). Sorted by due date ascending by
+ * default (most urgent first), the opposite default direction from the other
+ * tables' "highest first", because the ask here is "what needs chasing soonest",
+ * not "what is biggest". Renders nothing when there is nothing pending, so an
+ * account with a clean books stays clean-looking rather than showing an empty
+ * shell every month.
+ */
+function PendingInvoicesSection({ pendingInvoices }: { pendingInvoices: PendingInvoice[] }) {
+  const { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText } =
+    useSortableRows(pendingInvoices, pendingSortValue, 'due', r => r.clientName, 'asc')
+
+  if (pendingInvoices.length === 0) return null
+
+  const totalDue = pendingInvoices.reduce((s, p) => s + p.amountDueEur, 0)
+  const overdueCount = pendingInvoices.filter(p => p.daysUntilDue !== null && p.daysUntilDue < 0).length
+
+  return (
+    <div className="bg-dark-800 rounded-xl overflow-hidden mb-6">
+      <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Clock size={15} className="text-amber-400" />
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Pending, awaiting payment</span>
+          {overdueCount > 0 && (
+            <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30">
+              {overdueCount} overdue
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-slate-500">{eur(totalDue)} outstanding</span>
+          <FilterInput value={filterText} onChange={setFilterText} />
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-dark-700/50">
+              <SortableTh label="Client" sortKey="name" activeKey={sortKey} dir={sortDir} onClick={toggleSort} />
+              <th className="px-3 py-3 text-left text-xs text-slate-500 font-medium">Plan</th>
+              <SortableTh label="Amount due" sortKey="amount" activeKey={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
+              <th className="px-3 py-3 text-left text-xs text-slate-500 font-medium">Due date</th>
+              <SortableTh label="Status" sortKey="due" activeKey={sortKey} dir={sortDir} onClick={toggleSort} />
+              <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Invoice</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(p => (
+              <tr key={p.invoiceId ?? `${p.customerId}-${p.dueDate}`} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
+                <td className="px-4 py-3 font-medium text-slate-200">{p.clientName}</td>
+                <td className="px-3 py-3 text-slate-400">{planLabel(p.plan)}</td>
+                <td className="px-3 py-3 text-right font-semibold text-slate-200 tabular-nums">{eur(p.amountDueEur)}</td>
+                <td className="px-3 py-3 text-slate-400 whitespace-nowrap">
+                  {p.dueDate ? new Date(p.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'n/a'}
+                </td>
+                <td className="px-3 py-3"><DueBadge daysUntilDue={p.daysUntilDue} /></td>
+                <td className="px-4 py-3 text-right">
+                  {p.hostedInvoiceUrl
+                    ? <a href={p.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300 text-xs font-medium">View →</a>
+                    : <span className="text-slate-600 text-xs">n/a</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -361,7 +878,7 @@ export default function Revenue() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('revenue')
 
-  // ── Revenue tab state — the effect below fires on `tab` becoming
+  // ── Revenue tab state: the effect below fires on `tab` becoming
   // 'revenue', not unconditionally on mount, so switching to Usage or Cost
   // instead never pays for a Stripe round trip. That guard does NOT save the
   // round trip on a normal page load, though (CQO review F11): `tab` above
@@ -379,7 +896,7 @@ export default function Revenue() {
       setLoading(true)
       // Real metered spend: cost_eur is written per row at collection time
       // (SCALE-SPEC.md §2.1 / _cost.js), so we SUM it instead of recomputing a flat
-      // estimate × row count — that estimate was the whole reason "the table" read
+      // estimate × row count, that estimate was the whole reason "the table" read
       // lower than the actual bill. Rows collected before metering landed have a NULL
       // cost_eur; those fall back to the flat per-engine estimate and are counted so we
       // can show how much of the total is real vs. estimated.
@@ -443,7 +960,7 @@ export default function Revenue() {
 
   // A viewer who reaches /usage by URL used to get a blank screen. The route is
   // hidden from their sidebar and the data is enforced server-side regardless,
-  // so this is presentation only — it explains and offers a way out, matching
+  // so this is presentation only, it explains and offers a way out, matching
   // Onboard.tsx's handling of the same case.
   if (!isAdmin) return (
     <div className="p-8 text-slate-500 text-sm">
@@ -484,7 +1001,7 @@ export default function Revenue() {
       <div className="mb-6">
         <PageTitle>Revenue</PageTitle>
         <p className="text-sm text-slate-400 mt-0.5">
-          What plans are selling, what has been invoiced and paid, and what it costs to run — usage, cost and revenue in one place
+          What plans are selling, what has been invoiced and paid, and what it costs to run: usage, cost and revenue in one place
         </p>
       </div>
 
@@ -510,13 +1027,13 @@ export default function Revenue() {
 
       {/* ── CLIENTS ───────────────────────────────────────────────────────── */}
       {tab === 'clients' && (
-        <AudienceTable title="Real clients only — research excluded" rows={customerRows} chart={chart} />
+        <AudienceTable title="Real clients only, research excluded" rows={customerRows} chart={chart} />
       )}
 
       {/* ── RESEARCH ──────────────────────────────────────────────────────── */}
       {tab === 'research' && (
         <AudienceTable
-          title="Internal research only — our own city studies, not a customer"
+          title="Internal research only, our own city studies, not a customer"
           rows={displayRows.filter(r => r.internal)}
           chart={chart}
         />
@@ -524,226 +1041,28 @@ export default function Revenue() {
 
       {/* ── USAGE ─────────────────────────────────────────────────────────── */}
       {tab === 'usage' && (
-        <section>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-dark-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Cpu size={15} className="text-blue-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
-              </div>
-              <div className="text-2xl font-bold text-white tabular-nums">{grandResponses.toLocaleString()}</div>
-              <p className="text-xs text-slate-500 mt-1">LLM responses collected</p>
-            </div>
-            <div className="bg-dark-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp size={15} className="text-brand-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
-              </div>
-              {customerRows.length > 0
-                ? <div className="text-2xl font-bold text-white tabular-nums">
-                    {Math.round(customerRows.reduce((s, r) => s + r.totalResponses, 0) / customerRows.length).toLocaleString()}
-                  </div>
-                : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">No clients yet</div>}
-              <p className="text-xs text-slate-500 mt-1">{customerRows.length} client{customerRows.length !== 1 ? 's' : ''}</p>
-            </div>
-          </div>
-
-          <div className="bg-dark-800 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
-              Responses per client, per engine
-            </div>
-            {loading ? (
-              <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
-            ) : displayRows.length === 0 ? (
-              <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-dark-700/50">
-                      <th className="px-4 py-3 text-left text-xs text-slate-500 font-medium">Client</th>
-                      {Object.keys(ENGINE_COST).map(e => (
-                        <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />
-                            {e}
-                          </span>
-                        </th>
-                      ))}
-                      <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayRows.map(r => (
-                      <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-200">
-                          <span className="inline-flex items-center gap-2 flex-wrap">
-                            {r.clientName}
-                            {r.internal && (
-                              <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-dark-700 text-slate-400 border border-dark-600">
-                                Internal
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        {Object.keys(ENGINE_COST).map(e => (
-                          <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
-                            {r.byEngine[e] ?? 0}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-right font-semibold text-slate-200 tabular-nums">{r.totalResponses}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
+        <UsageSection
+          displayRows={displayRows}
+          customerRows={customerRows}
+          grandResponses={grandResponses}
+          loading={loading}
+          chart={chart}
+        />
       )}
 
       {/* ── COST ──────────────────────────────────────────────────────────── */}
       {tab === 'cost' && (
-        <section>
-          {/* Summary cards */}
-          <SectionHeading className="sr-only">Spend summary</SectionHeading>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-dark-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign size={15} className="text-emerald-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">API Cost (metered)</span>
-              </div>
-              <div className="text-2xl font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</div>
-              <p className="text-xs text-slate-500 mt-1">
-                {grandEstimated > 0
-                  ? `across all clients · ${grandEstimated.toLocaleString()} legacy row${grandEstimated === 1 ? '' : 's'} estimated`
-                  : 'across all clients · fully metered'}
-              </p>
-            </div>
-
-            <div className="bg-dark-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Cpu size={15} className="text-blue-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Responses</span>
-              </div>
-              <div className="text-2xl font-bold text-white tabular-nums">{grandResponses.toLocaleString()}</div>
-              <p className="text-xs text-slate-500 mt-1">LLM responses collected</p>
-            </div>
-
-            <div className="bg-dark-800 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp size={15} className="text-brand-400" />
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">Avg per Client</span>
-              </div>
-              {/* No clients is an absence, not a dash glyph. Kept in an h-8 box so
-                  this card's baseline still lines up with the two beside it. */}
-              {customerRows.length > 0
-                ? <div className="text-2xl font-bold text-white tabular-nums">
-                    €{(customerTotal / customerRows.length).toFixed(2)}
-                  </div>
-                : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">
-                    No clients yet
-                  </div>}
-              <p className="text-xs text-slate-500 mt-1">
-                {customerRows.length} client{customerRows.length !== 1 ? 's' : ''}
-                {researchTotal > 0 && (
-                  <>, plus €{researchTotal.toFixed(2)} research</>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Per-client table */}
-          <div className="bg-dark-800 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
-              Per-client breakdown
-            </div>
-
-            {loading ? (
-              <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
-            ) : displayRows.length === 0 ? (
-              <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-dark-700/50">
-                      <th className="px-4 py-3 text-left text-xs text-slate-500 font-medium">Client</th>
-                      <th className="px-3 py-3 text-center text-xs text-slate-500 font-medium">Responses</th>
-                      {Object.keys(ENGINE_COST).map(e => (
-                        <th key={e} className="px-3 py-3 text-center text-xs text-slate-500 font-medium capitalize">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(e, chart.sentimentNeutral) }} />
-                            {e}
-                          </span>
-                        </th>
-                      ))}
-                      <th className="px-4 py-3 text-right text-xs text-slate-500 font-medium">Est. Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayRows.map(r => (
-                      <tr key={r.clientId} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-200">
-                          <span className="inline-flex items-center gap-2 flex-wrap">
-                            {r.clientName}
-                            {/* Says why this row is not a customer. Without it the
-                                collapsed line reads as one more account and quietly
-                                inflates the client count in the reader's head. */}
-                            {r.internal && (
-                              <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-dark-700 text-slate-400 border border-dark-600">
-                                Internal
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-center text-slate-400 tabular-nums">{r.totalResponses}</td>
-                        {Object.keys(ENGINE_COST).map(e => (
-                          <td key={e} className="px-3 py-3 text-center tabular-nums text-slate-400">
-                            {r.byEngine[e] ?? 0}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-right font-semibold text-emerald-400 tabular-nums">
-                          €{r.totalCost.toFixed(3)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t border-dark-700 bg-dark-700/20">
-                      <td className="px-4 py-3 font-semibold text-slate-300">Total</td>
-                      <td className="px-3 py-3 text-center font-semibold text-slate-300 tabular-nums">{grandResponses}</td>
-                      {Object.keys(ENGINE_COST).map(e => (
-                        <td key={e} className="px-3 py-3 text-center text-slate-400 tabular-nums">
-                          {displayRows.reduce((s, r) => s + (r.byEngine[e] ?? 0), 0)}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">€{grandTotal.toFixed(2)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Cost legend */}
-          <div className="mt-4 p-4 bg-dark-800/50 border border-dark-700/50 rounded-xl">
-            <p className="text-xs text-slate-500 mb-2 font-medium">Cost estimates (per response)</p>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(ENGINE_COST).map(([engine, cost]) => (
-                <div key={engine} className="flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: engineSwatch(engine, chart.sentimentNeutral) }} />
-                  <span className="text-xs font-medium capitalize text-slate-300">{engine}</span>
-                  <span className="text-xs text-slate-600">€{(cost ?? 0).toFixed(3)}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-slate-600 mt-2">
-              EUR, API costs × 1.5 overhead (Supabase, Netlify, hosting, Plausible, domain). Estimates from
-              published rate cards, not invoices. Gemini is the least certain (billed per search query).
-            </p>
-          </div>
-        </section>
+        <CostSection
+          displayRows={displayRows}
+          customerRows={customerRows}
+          customerTotal={customerTotal}
+          researchTotal={researchTotal}
+          grandTotal={grandTotal}
+          grandResponses={grandResponses}
+          grandEstimated={grandEstimated}
+          loading={loading}
+          chart={chart}
+        />
       )}
 
       {/* ── REVENUE ───────────────────────────────────────────────────────── */}
@@ -809,7 +1128,7 @@ export default function Revenue() {
                     ['Paid revenue', revenue.global.paidRevenueEur, 'Actually collected'],
                     ['Refunds', -revenue.global.refundsEur, 'Netted out'],
                     ['Discounts / free months', -revenue.global.discountsEur, 'What the ladder gave up'],
-                    ['Affiliate commission (est.)', -revenue.global.affiliateCommissionEstEur, 'Provisional — PromoteKit is system of record'],
+                    ['Affiliate commission (est.)', -revenue.global.affiliateCommissionEstEur, 'Provisional, PromoteKit is system of record'],
                     // CQO review F1: this used to say "Same figure as the Cost
                     // tab", which is false -- the Cost tab reads the global
                     // 7d/30d/90d/All time filter (default 7 days) while this
@@ -830,6 +1149,8 @@ export default function Revenue() {
                   ))}
                 </div>
               </div>
+
+              <PendingInvoicesSection pendingInvoices={revenue.pendingInvoices} />
 
               {/* Per plan */}
               <div className="bg-dark-800 rounded-xl p-5 mb-6">
@@ -909,7 +1230,7 @@ export default function Revenue() {
                   <div className="flex items-start gap-2 mb-3 text-xs text-slate-500">
                     <Percent size={13} className="mt-0.5 shrink-0" />
                     Estimated from Stripe redemptions and the 12-month recurring window. PromoteKit is the
-                    real system of record for payout — treat these as provisional until reconciled (contract §4, §8.2).
+                    real system of record for payout. Treat these as provisional until reconciled (contract §4, §8.2).
                   </div>
                   <div className="grid sm:grid-cols-2 gap-3">
                     {revenue.affiliates.map(a => (
@@ -929,18 +1250,18 @@ export default function Revenue() {
               <div className="bg-dark-800 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-1">
                   <Target size={15} className="text-brand-400" />
-                  <SectionHeading className="mb-0">Pipeline — engaged free clients worth a campaign</SectionHeading>
+                  <SectionHeading className="mb-0">Pipeline: engaged free clients worth a campaign</SectionHeading>
                 </div>
                 <p className="text-xs text-slate-500 mb-4">
                   Free-plan clients active in at least {revenue.pipeline.engagedThresholdWeeks} of the last{' '}
-                  {Math.round(revenue.pipeline.windowDays / 7)} weeks — using the product, not paying for it. A one-time
+                  {Math.round(revenue.pipeline.windowDays / 7)} weeks, using the product, not paying for it. A one-time
                   signup that never returned is excluded on purpose (contract §9). Heuristic, expect it to be tuned.
                 </p>
                 {(() => {
                   // The report returns every free client with ANY activity in
                   // the window (so "used it once, never again" is still
                   // visible for debugging), not just the engaged ones. This
-                  // page's job — Constantin's own framing — is to surface the
+                  // page's job, Constantin's own framing, is to surface the
                   // ones worth campaigning to, so it filters on the
                   // precomputed `engaged` flag rather than showing everyone.
                   const engaged = revenue.pipeline.clients.filter(c => c.engaged)
@@ -977,7 +1298,9 @@ export default function Revenue() {
                                   <td className="px-3 py-2 text-center tabular-nums text-slate-400">{c.distinctActiveWeeks}</td>
                                   <td className="px-3 py-2 text-slate-400">{planLabel(c.nextPlan)}</td>
                                   <td className="px-3 py-2 text-right font-semibold text-emerald-400 tabular-nums">
-                                    {c.opportunityMonthlyEur !== null ? `${eur(c.opportunityMonthlyEur)}/mo` : '—'}
+                                    {c.opportunityMonthlyEur !== null
+                                      ? `${eur(c.opportunityMonthlyEur)}/mo`
+                                      : <span className="italic text-slate-500">n/a</span>}
                                   </td>
                                 </tr>
                               ))}

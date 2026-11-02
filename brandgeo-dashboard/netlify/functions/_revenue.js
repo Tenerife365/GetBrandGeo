@@ -1,5 +1,5 @@
 /**
- * _revenue.js — pure money computation for the admin Revenue page (S21).
+ * _revenue.js: pure money computation for the admin Revenue page (S21).
  *
  * Implements docs/arch/revenue-report-data-contract.md, the RESEARCH-stage
  * artifact approved by Constantin 2026-08-02. Every formula here traces to a
@@ -28,14 +28,14 @@
  *
  * The single exception is estimatedApiCostEur, which arrives as a EUR float
  * because ai_results.cost_eur is stored that way (see _cost.js). It is kept as a
- * float, never converted to cents, and subtracted at the same final step — so
+ * float, never converted to cents, and subtracted at the same final step, so
  * the Cost tab (Usage.tsx, client-side) and the Revenue tab can never disagree
  * about the same number, which contract §5 requires by name.
  *
  * ── WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────────
  * No Stripe object is created, modified or deleted anywhere in S21. Commission
  * is a Stripe-side APPROXIMATION of what PromoteKit computes for payout (§4,
- * decision 2) — it is labelled an estimate and is not the affiliate payout of
+ * decision 2), it is labelled an estimate and is not the affiliate payout of
  * record. No PromoteKit call, no operating_costs table, no true net margin
  * (contract §7).
  */
@@ -61,7 +61,7 @@ const COMMISSION_WINDOW_MONTHS = 12
 
 /**
  * Plan ladder with EUR/month LIST prices, for computeEngagementPipeline's
- * opportunity value only. Nothing on the revenue path reads a price from here —
+ * opportunity value only. Nothing on the revenue path reads a price from here,
  * contract §1 is explicit that Stripe is authoritative for every euro figure
  * that describes money which actually moved. This table describes money that
  * has NOT moved (what an engaged free client would be worth if they upgraded),
@@ -76,7 +76,7 @@ const COMMISSION_WINDOW_MONTHS = 12
  * Hand-mirrored rather than imported for the reason _cost.js's header already
  * gives: Netlify functions are plain CommonJS and cannot import a Vite-bundled
  * .ts module at runtime. planConfig.ts exports PLAN_ORDER but exports no price
- * table at all, so there is nothing to import even in principle — Account.tsx's
+ * table at all, so there is nothing to import even in principle, Account.tsx's
  * array is a page-local const. Keep this in step with it by hand.
  *
  * ⚠️ RADAR IS 39 HERE AND €29 IN Account.tsx, AND THAT IS A REAL DIVERGENCE, NOT
@@ -90,7 +90,7 @@ const COMMISSION_WINDOW_MONTHS = 12
  * this month, this becomes 29 and the contract's example needs amending.
  *
  * `offered: false` marks a tier that is never an UPGRADE TARGET. 'pro' is
- * legacy with no new signups — Account.tsx excludes it from PLAN_TIERS for
+ * legacy with no new signups, Account.tsx excludes it from PLAN_TIERS for
  * exactly this reason and re-appends it (as PRO_TIER_LEGACY) only for a client
  * already on it. A client on Managed must therefore be offered Enterprise, not
  * a sideways move onto a tier nobody can buy.
@@ -205,7 +205,7 @@ function idOf(v) {
 
 /**
  * ISO-8601 week key, 'YYYY-Www'. Uses the Thursday rule, so the last days of
- * December can belong to week 1 of the following ISO year and vice versa —
+ * December can belong to week 1 of the following ISO year and vice versa,
  * which is precisely why the key carries the ISO year and not the calendar one.
  * Without that, a client active on 2026-12-30 and 2027-01-02 would collapse into
  * one "week 1" and read as less engaged than they are.
@@ -234,7 +234,7 @@ function ymd(ms) {
  *
  * Defaults to the current UTC month per contract §6b. `end` is the LAST DAY of
  * the month (inclusive, matching §6b's "2026-08-31"), while `endMsExclusive` is
- * the first instant of the next month — the value every comparison below
+ * the first instant of the next month, the value every comparison below
  * actually uses. Keeping both stops the classic off-by-one where an invoice
  * created at 23:30 on the 31st falls outside its own month.
  */
@@ -275,13 +275,13 @@ function inPeriod(ms, period) {
  * The resolution ORDER is contract §3's, and the order is load-bearing:
  *
  *   1. customer.metadata.client_id, if it parses as a whole number AND matches a
- *      real clients row. This is the hand-invoiced / founding-package path —
+ *      real clients row. This is the hand-invoiced / founding-package path,
  *      BpR's real customer cus_UzwgTPWQfZtXOY carries metadata.client_id "1"
  *      while clients.id = 1 does NOT point back at it, so this is the only key
  *      that resolves the single largest invoice on the account.
  *   2. clients.stripe_customer_id === customer.id. The self-serve webhook path.
  *      Populated for exactly 1 of 38 clients today, and that one is scheduled
- *      for deletion — so this branch is real but currently near-dead, and will
+ *      for deletion, so this branch is real but currently near-dead, and will
  *      become the common case as self-serve subscribers arrive.
  *   3. unattributed. NOT dropped and NOT guessed onto a client. §3 is explicit:
  *      the row still carries its plan and amount and appears in the per-client
@@ -292,7 +292,7 @@ function inPeriod(ms, period) {
  * stripe-webhook.js: Number('') is 0 and parseInt('1 BpR') is 1, and attributing
  * revenue to the wrong client silently is worse than reporting it unattributed.
  * A metadata id that does not match a real client FALLS THROUGH to step 2 rather
- * than failing — the customer may still be linked the other way round.
+ * than failing, the customer may still be linked the other way round.
  */
 function resolveClientForCustomer(stripeCustomer, clientsById, clientsByStripeCustomerId) {
   const miss = { clientId: null, attribution: 'unattributed' }
@@ -320,9 +320,9 @@ function resolveClientForCustomer(stripeCustomer, clientsById, clientsByStripeCu
 /**
  * planForInvoiceLine(line, priceToPlanFallback) -> string|null
  *
- * Mirrors stripe-webhook.js:358's pattern —
+ * Mirrors stripe-webhook.js:358's pattern:
  *   plan = (price?.metadata?.plan) || PRICE_TO_PLAN[priceId]
- * — metadata first, hardcoded price-id map as the fallback for a price whose
+ * Metadata first, hardcoded price-id map as the fallback for a price whose
  * metadata ever goes missing. The webhook's map is the same one the handler
  * passes in, so the two agree by construction rather than by convention.
  *
@@ -407,7 +407,7 @@ function invoicePaidMs(invoice) {
 /**
  * What the invoice ASKED FOR, in cents: `invoice.total`, which is after discount
  * and after tax. An invoice zeroed by a 100% coupon was genuinely invoiced for
- * EUR 0, and the euros given away appear separately as discountsEur — contract
+ * EUR 0, and the euros given away appear separately as discountsEur, contract
  * §4 frames the discount line as "what the ladder would have earned minus what
  * it actually invoiced", which only holds if `total` is the post-discount figure.
  */
@@ -505,13 +505,13 @@ function promotionKeysOnInvoice(invoice) {
  * later paid invoice inherits it for as long as the window holds.
  *
  * `promotionCodesByCode` may be keyed by promotion-code id, by the human code
- * ('BPRFREE'), or by coupon id — all three are tried, so the caller can index
+ * ('BPRFREE'), or by coupon id, all three are tried, so the caller can index
  * however it likes. The attribution key itself is `metadata.affiliate` on the
  * PROMOTION CODE, verified live: BPRFREE -> promo_1U06XY63lspobjfOcXNBKaSI,
  * metadata.affiliate = "bpr".
  *
  * `invoiceId` is returned so computeCommissionForInvoice can recognise the
- * attributing invoice — the free month itself — and pay zero on it.
+ * attributing invoice, the free month itself, and pay zero on it.
  */
 function findAffiliateAttribution(customerInvoices, promotionCodesByCode) {
   const list = (Array.isArray(customerInvoices) ? customerInvoices : []).filter(Boolean)
@@ -542,7 +542,7 @@ function findAffiliateAttribution(customerInvoices, promotionCodesByCode) {
  * means twelve monthly invoices, and treating the thirteenth as inside would
  * accrue a thirteenth commission on a twelve-month term.
  *
- * An invoice dated BEFORE attribution is also out — it predates the referral.
+ * An invoice dated BEFORE attribution is also out, it predates the referral.
  */
 function isWithinCommissionWindow(invoiceDate, attributedAt, months = COMMISSION_WINDOW_MONTHS) {
   const invoiceMs = toMs(invoiceDate)
@@ -620,7 +620,7 @@ function refundTarget(refund) {
  * is NULL (rows written before metering landed 2026-07-29).
  *
  * `estimatedRowsByClientId` carries how many rows in each client's total came
- * from the flat estimate rather than a measured figure — the same "real vs
+ * from the flat estimate rather than a measured figure, the same "real vs
  * estimated" split Usage.tsx already surfaces. A Revenue page whose cost line is
  * mostly estimate should say so.
  *
@@ -674,7 +674,7 @@ function emptyBucket(extra) {
 }
 
 /**
- * netEur — the ONE place contract §5's formula is evaluated:
+ * netEur: the ONE place contract §5's formula is evaluated:
  *
  *   net_revenue = paid_revenue - refunds - affiliate_commission_accrued
  *               - estimated_api_cost
@@ -717,7 +717,7 @@ function shapeMoney(bucket) {
  *   discountsEur           filtered on invoice.created, matching gross (§4)
  *
  * and because affiliate attribution has to walk a customer's ENTIRE history to
- * find the earliest tagged invoice (§4) — an invoice from eight months ago is
+ * find the earliest tagged invoice (§4), an invoice from eight months ago is
  * what makes this month's invoice commissionable. Handing this function one
  * month of invoices would silently zero every commission.
  *
@@ -728,8 +728,8 @@ function shapeMoney(bucket) {
  *
  * ── EVERY CLIENT WITH API SPEND GETS A ROW, even with no Stripe activity ────
  * Otherwise the per-client table would not sum to its own global total, and the
- * clients that cost money while earning none — the 27 research studies, a free
- * signup collecting weekly — would be invisible on the one page whose job is to
+ * clients that cost money while earning none, the 27 research studies, a free
+ * signup collecting weekly, would be invisible on the one page whose job is to
  * show what the business nets. Those rows carry `attribution: null`; see the
  * note on `attribution` below.
  */
@@ -937,7 +937,7 @@ function aggregateRevenue({
 
         // CQO review F9, 2026-08-02: attribution is first-touch by design
         // (contract §4, "the earliest occurrence of the tagged code"), which
-        // is a legitimate model but was previously SILENT about it — a
+        // is a legitimate model but was previously SILENT about it, a
         // second partner whose code a customer later redeems accrues nothing
         // and never appears in `affiliates[]`, with nothing on the page
         // saying why. Warned, not changed: re-attributing to the later code
@@ -1001,7 +1001,7 @@ function aggregateRevenue({
 
   // ── API cost per client (§5) ──────────────────────────────────────────────
   // Applied to whichever bucket already exists for that client, or a fresh one.
-  // A client that only costs money still gets a row — see the header note.
+  // A client that only costs money still gets a row, see the header note.
   const bucketByClientId = new Map()
   for (const bucket of clientBuckets.values()) {
     if (bucket.clientId !== null && bucket.clientId !== undefined) {
@@ -1023,7 +1023,7 @@ function aggregateRevenue({
         clientName: client ? (client.name || `Client ${clientId}`) : `Client ${clientId}`,
         plan: client ? (client.plan || null) : null,
         // NOT 'unattributed'. Contract §6b defines that value as "no client
-        // resolved — clientId: null", and this row HAS a client; it simply has
+        // resolved, clientId: null", and this row HAS a client; it simply has
         // no Stripe customer for the attribution question to be asked about.
         // Reporting it as unattributed would claim a join failure that never
         // happened. Flagged for the CQO review: the contract's enum does not
@@ -1093,7 +1093,7 @@ function aggregateRevenue({
 /**
  * nextOfferedPlan(plan, ladder) -> { plan, listPriceEur } | null
  *
- * The next rung a client could actually be SOLD. Skips `offered: false` tiers —
+ * The next rung a client could actually be SOLD. Skips `offered: false` tiers,
  * 'pro' is legacy with no new signups, so a Managed client's upgrade path is
  * Enterprise, not a sideways move onto a tier that cannot be bought. Returns
  * null at the top of the ladder, and a null listPriceEur for Enterprise, which
@@ -1117,20 +1117,20 @@ function nextOfferedPlan(plan, ladder = PLAN_LADDER) {
  * never came back (not a target).
  *
  * ── WHY DISTINCT WEEKS AND NOT A ROW COUNT ─────────────────────────────────
- * A single burst — the collection that fires the day someone signs up — produces
+ * A single burst, the collection that fires the day someone signs up, produces
  * dozens of ai_results rows in one afternoon. Counted raw, that client reads as
  * the most engaged account on the platform while having opened the product
  * exactly once. Counting DISTINCT ISO weeks with at least one row makes a
  * hundred rows in one week worth the same as one row in one week, which is the
  * distinction §9 asks for. Engaged at >= 3 distinct weeks in the trailing 60
- * days — explicitly a v1 heuristic to retune once real distribution exists, not
+ * days, explicitly a v1 heuristic to retune once real distribution exists, not
  * a fitted threshold.
  *
  * Rows are filtered to the trailing window here as well as in the query, so the
  * function is correct on whatever it is handed. Clients with zero activity in
  * the window are omitted: the table is a campaign target list, and a free signup
  * who has not run anything in 60 days is neither engaged nor "used it once
- * recently" — they are dormant, and a different campaign's problem.
+ * recently", they are dormant, and a different campaign's problem.
  *
  * `engaged` is an ADDITIVE field not named in contract §6b. It is the boolean
  * the threshold implies, precomputed so the UI cannot apply a different rule
@@ -1167,7 +1167,7 @@ function computeEngagementPipeline({
     if (!client || client.id === undefined || client.id === null) continue
     // Defence in depth: §9 excludes research clients from the population, and
     // the handler filters them out. Repeated here so the function is correct on
-    // any input — a research study appearing as an "upgrade opportunity" would
+    // any input, a research study appearing as an "upgrade opportunity" would
     // be a campaign aimed at ourselves.
     if (client.category === 'research') continue
 
@@ -1193,6 +1193,85 @@ function computeEngagementPipeline({
     || a.clientId - b.clientId)
 
   return { windowDays, engagedThresholdWeeks: engagedWeeks, clients: rows }
+}
+
+/**
+ * computePendingInvoices({ invoices, customers, clients, now }) -> PendingInvoice[]
+ *
+ * Every OPEN (finalized, unpaid) invoice on the account, independent of period:
+ * accounts receivable is "what is owed right now", not "what was invoiced in one
+ * calendar month". Reuses the SAME client/customer resolution as aggregateRevenue
+ * (contract §3) so a pending invoice's client name and attribution badge can
+ * never disagree with the per-client table above it.
+ *
+ * `daysUntilDue` is null when Stripe has no due_date on the invoice (an invoice
+ * on `collection_method: charge_automatically` is often due on receipt with no
+ * explicit date), reported as null rather than 0, so the UI can say "no due
+ * date set" instead of implying it is due today.
+ *
+ * Sorted so the most urgent follow-up is first: overdue (most negative
+ * daysUntilDue) before not-yet-due, and invoices with no due date pushed to the
+ * end rather than sorted as if due today.
+ */
+function computePendingInvoices({ invoices = [], customers = [], clients = [], now = new Date() } = {}) {
+  const nowMs = now instanceof Date ? now.getTime() : toMs(now)
+
+  const clientsById = new Map()
+  const clientsByStripeCustomerId = new Map()
+  for (const c of clients || []) {
+    if (!c || c.id === undefined || c.id === null) continue
+    clientsById.set(Number(c.id), c)
+    const scid = metaString(c.stripe_customer_id)
+    if (scid) clientsByStripeCustomerId.set(scid, c)
+  }
+  const customersById = new Map()
+  for (const cust of customers || []) {
+    if (cust && cust.id) customersById.set(cust.id, cust)
+  }
+
+  const rows = []
+  for (const invoice of Array.isArray(invoices) ? invoices : []) {
+    if (!invoice || invoice.status !== 'open') continue
+
+    const custId = idOf(invoice.customer)
+    const customer = custId ? customersById.get(custId) : null
+    const resolution = resolveClientForCustomer(customer, clientsById, clientsByStripeCustomerId)
+    const client = resolution.clientId !== null ? lookup(clientsById, resolution.clientId) : null
+
+    const dueMs = toMs(invoice.due_date)
+    // amount_remaining covers a partially-paid invoice; total - paid is the
+    // fallback for older API versions/objects that do not carry the field.
+    const remainingCents = Number.isFinite(invoice.amount_remaining)
+      ? Math.round(invoice.amount_remaining)
+      : invoiceTotalCents(invoice) - invoicePaidCents(invoice)
+
+    rows.push({
+      invoiceId: invoice.id || null,
+      clientId: resolution.clientId,
+      clientName: client
+        ? (client.name || `Client ${resolution.clientId}`)
+        : (customer ? (customer.name || customer.email || customer.id) : (custId || 'Unknown customer')),
+      plan: client ? (client.plan || null) : null,
+      attribution: resolution.attribution,
+      customerId: custId,
+      customerEmail: customer ? (customer.email || null) : null,
+      amountDueEur: round2(centsToEur(Math.max(0, remainingCents))),
+      currency: String(invoice.currency || 'eur').toUpperCase(),
+      dueDate: dueMs !== null ? new Date(dueMs).toISOString() : null,
+      daysUntilDue: dueMs !== null ? Math.ceil((dueMs - nowMs) / 86400000) : null,
+      hostedInvoiceUrl: invoice.hosted_invoice_url || null,
+      createdAt: invoiceCreatedMs(invoice) !== null ? new Date(invoiceCreatedMs(invoice)).toISOString() : null,
+    })
+  }
+
+  rows.sort((a, b) => {
+    if (a.daysUntilDue === null && b.daysUntilDue === null) return String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+    if (a.daysUntilDue === null) return 1
+    if (b.daysUntilDue === null) return -1
+    return a.daysUntilDue - b.daysUntilDue
+  })
+
+  return rows
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1230,6 +1309,8 @@ module.exports = {
   // pipeline
   nextOfferedPlan,
   computeEngagementPipeline,
+  // pending invoices (accounts receivable)
+  computePendingInvoices,
   // small helpers, exported for the harness
   isoWeekKey,
   addMonthsMs,
