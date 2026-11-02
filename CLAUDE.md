@@ -22,7 +22,7 @@
 
 ## CURRENT STATE (newest entry 2026-11-01)
 
-### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog SCHEDULED (cron job 10), AI Visibility prompt focus LIVE (96d1a7c)
+### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog LIVE and VERIFIED (cron job 10, V9c closed 2026-11-02), AI Visibility prompt focus LIVE (96d1a7c)
 
 **Two Netlify builds today, both by Constantin.** `96d1a7c` (morning): the
 AI Visibility prompt-first page from the 2026-10-18 brief, bundle
@@ -69,9 +69,17 @@ pg_net request 2534, Resend answered 200 at 23:44Z and the test mail
 arrived. The dry run `ops.watchdog_findings()` returned 0 rows. Part B ran at
 23:46Z: `cron.job` 10 `obs-watchdog`, `50 * * * *`, active, first run due
 00:50Z on 2026-11-02; `job_runs` had 0 `obs-watchdog` rows and `alert_log` 0
-rows at that moment. **Still owed:** V9c, two scheduled runs read back from
-`job_runs` with `ok = true` and `alert_log` still empty (any row there means
-a real finding, read `detail` before touching anything). Sentry (EU project,
+rows at that moment. **V9c CLOSED 2026-11-02 06:46Z, read from this seat:**
+the first run fired at 23:50Z, four minutes after scheduling, then hourly;
+7 `job_runs` rows (2490 to 2503), all `ok = true`, each
+`{"sent": 0, "findings": 0, "request_id": null, "prev_unjudged": false}`,
+`cron.job_run_details` 7 `succeeded`, `alert_log` still 0 rows. Record:
+`docs/ops/watchdog-v9c-readback-2026-11-02.md`. The scheduled readback
+task created for this (`brandgeo-watchdog-v9c-readback`) stalled on a
+connector permission prompt at 02:06Z and was stopped; the read above was
+done by hand. **A scheduled task that needs a connector pauses on its
+first permission prompt unless it is run once by hand from the task page
+first.** The alerting chain is live end to end. Sentry (EU project,
 `SENTRY_DSN` Functions and `VITE_SENTRY_DSN` Builds in Netlify, read at the
 next build) is OPTIONAL and not done; the wrapper stays inert without it.
 GitHub secrets `RESEND_API_KEY` and `ALERT_EMAIL` only after
