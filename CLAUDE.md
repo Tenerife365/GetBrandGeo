@@ -82,9 +82,21 @@ first permission prompt unless it is run once by hand from the task page
 first.** The alerting chain is live end to end. Sentry (EU project,
 `SENTRY_DSN` Functions and `VITE_SENTRY_DSN` Builds in Netlify, read at the
 next build) is OPTIONAL and not done; the wrapper stays inert without it.
-GitHub secrets `RESEND_API_KEY` and `ALERT_EMAIL` only after
-`tests/package_provisioning.test.js` (red since August, billing file, owed to
-bg-backend on Opus) is fixed or excluded, else every push mails a failure.
+GitHub secrets `RESEND_API_KEY` and `ALERT_EMAIL` (runbook step 6) are
+UNBLOCKED as of 2026-11-02: `tests/package_provisioning.test.js` is green
+again (63 checks). It had been red since `13bb92d` (2026-08-02) because line
+515 pinned the webhook's grant lookup select byte-exactly and that commit
+legitimately added `stripe_customer_id` to it; bg-backend on Opus changed
+the test only, to capture the `cur` lookup by regex and assert the three
+columns individually (the file's own S6 philosophy). `stripe-webhook.js`
+untouched; the regex matches exactly once in the live file and a mutant
+without `plan_source` fails naming the column. Reviewed by reproduction
+from the orchestrator seat, not by a separate bg-verify run. Worth knowing:
+`dashboard-ci.yml` triggers on every push to `main` with no paths filter,
+so docs-only pushes run it too, and each failure mails through GitHub
+Actions' own notifications (the four "Run failed: dashboard-ci" mails of
+2026-11-01 and 02 were this test, nothing else failed). The fix touches
+`brandgeo-dashboard/`, so its push spends one Netlify build.
 UptimeRobot on `health` is optional. Rollback order: `cron.alter_job(job_id
 => 10, active => false)` to pause, `cron.unschedule('obs-watchdog')`,
 `drop schema ops cascade`, delete the two Vault secrets.
