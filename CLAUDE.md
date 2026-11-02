@@ -22,6 +22,60 @@
 
 ## CURRENT STATE (newest entry 2026-11-02)
 
+### 2026-11-02 (second): retro review findings all CLOSED, pushed as 49c69b9 (one Netlify build), M3 ruled as filtered totals
+
+**Constantin's words: for M3, which is better UX, totals over the visible
+rows as now or over all rows; and "go" on the fix routing.** Ruling, on the
+orchestrator's recommendation and taken as his decision 2026-11-02: footer
+totals keep summing the FILTERED rows (spreadsheet behaviour, the label
+already reads "(N of M shown)"), zero code change, recorded as a comment
+above the Clients and Cost table footers in `Revenue.tsx` and in contract
+section 12.9. Do not re-raise.
+
+**Fix round, three builders in disjoint scopes at concurrency 2, no git by
+any of them:** bg-backend (Opus) on `_revenue.js` (L2 whole-UTC-day
+`daysUntilDue`, never -0; L4 `(amount_due ?? total) - amount_paid` fallback
+clamped at 0), `revenue-report.js` (L3 one warning per distinct non-EUR
+currency; I3 all 12 dashes gone) and `tests/revenue_report.test.js` (M1
+section 15); bg-app (Sonnet) on `Revenue.tsx` (M2 `SortableTh` is a button
+inside the `th` with `aria-sort`, L1 `?? []` guard, L3 non-EUR rows shown with
+their code and left out of the euro total, L5 `aria-label` on the filter and
+"n/a" in `text-slate-400`); bg-architect (Opus) on
+`docs/arch/revenue-report-data-contract.md` section 12 (the pendingInvoices
+addendum) plus the 6b line.
+
+**bg-verify (Opus, read-only) on the combined diff: PASS WITH FINDINGS,
+0 blocker, 0 major, 0 medium, 4 low, 5 info**,
+`docs/qa/s21-pending-invoices-fix-review-2026-11-02.md`. All 11 retro
+findings CLOSED by reproduction: 114 checks, tsc 0, and a mutation proof
+(old `Math.ceil` and the old amount fallback each make section 15 fail).
+Two corrections to the retro review worth keeping: the "n/a" contrast was
+never 2.36:1 (`index.css` remaps slate-500 and slate-600 to 6.96:1 in dark
+mode), and bg-architect's flag that the UI default sort differs from the
+server order is wrong (stable sort, Infinity minus Infinity is NaN which
+sort treats as 0, same six-row order both ways). The four LOW plus one INFO
+were closed from the orchestrator seat before the commit and re-verified:
+N1 focus rings `ring-brand-500/60` measured 2.29:1, now `ring-brand-400`
+(6.56:1); N2 the due date cell rendered in local time next to a UTC day
+badge, now `timeZone: 'UTC'`; N3 two checks the contract required
+("Unknown customer" for an invoice without a customer, missing currency
+reads EUR), suite now 116; N4 contract 12.9 said "Usage", which has no
+footer, now Clients, Research and Cost; N5 the M3 comment also above the
+Cost footer. Amendment in section 6 of the review.
+
+**Commit `49c69b9`**, by pathspec, exactly 6 files (620 insertions, 38
+deletions): the four dashboard files, the contract and the review.
+**PUSHED 09:50:45Z with `BATCH_PUSH=1`** on Constantin's go ("Fa push si
+commit sa fim gata de postari"), so local HEAD equals origin/main before
+the 10:10Z `brandgeo-daily-article` run; `dashboard-ci` run 41423959109
+started 09:50:46Z. Health read at 09:50:57Z still answered the previous
+commit (build in flight). **LIVE, read from outside at 09:51:39Z:** `health`
+answers `commit` 49c69b9, `built_at` 09:50:56Z, supabase ok, jobs and
+watchdog ok; the live bundle `index-CNr0lc-P.js` carries "in other currencies"
+(1 match), a string unique to this batch.
+Not checked by anyone: the focus ring and the badges in a real browser,
+light mode, an invoice carrying real customer credit.
+
 ### 2026-11-02: S21 pending invoices LIVE (7190918), em dashes gone from Revenue.tsx and _revenue.js, bg-verify PASS WITH FINDINGS
 
 **Constantin's words, in order: remove the em dashes from `Revenue.tsx` and
