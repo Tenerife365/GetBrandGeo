@@ -230,7 +230,7 @@ interface RevenueReport {
   byClient: RevenueByClient[]
   pipeline: { windowDays: number; engagedThresholdWeeks: number; clients: PipelineClient[] }
   affiliates: AffiliateRow[]
-  pendingInvoices: PendingInvoice[]
+  pendingInvoices?: PendingInvoice[]
   // stripeAccountId / liveMode are null when the account could not be read
   // (revenue-report.js:321-334) -- not always present, per the CQO review.
   meta: { generatedAt: string; stripeAccountId: string | null; liveMode: boolean | null; warnings: string[] }
@@ -340,8 +340,8 @@ function useSortableRows<T>(
   return { sorted, sortKey, sortDir, toggleSort, filterText, setFilterText }
 }
 
-function FilterInput({ value, onChange, placeholder = 'Filter by client…' }: {
-  value: string; onChange: (v: string) => void; placeholder?: string
+function FilterInput({ value, onChange, placeholder = 'Filter by client…', label = 'Filter rows' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; label?: string
 }) {
   return (
     <div className="relative w-full sm:w-64">
@@ -351,7 +351,8 @@ function FilterInput({ value, onChange, placeholder = 'Filter by client…' }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-dark-900 border border-dark-600 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500/50"
+        aria-label={label}
+        className="w-full bg-dark-900 border border-dark-600 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500/50 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
       />
     </div>
   )
@@ -366,17 +367,21 @@ function SortableTh({ label, sortKey, activeKey, dir, onClick, align = 'left', i
   const alignFlex = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
   return (
     <th
-      className={`px-3 py-3 text-xs font-medium cursor-pointer select-none whitespace-nowrap transition-colors ${alignText} ${active ? 'text-slate-200' : 'text-slate-500 hover:text-slate-300'}`}
-      onClick={() => onClick(sortKey)}
+      className={`px-3 py-3 text-xs font-medium select-none whitespace-nowrap transition-colors ${alignText} ${active ? 'text-slate-200' : 'text-slate-500 hover:text-slate-300'}`}
       aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
-      <span className={`inline-flex items-center gap-1 ${alignFlex}`}>
+      {/* Real button so Tab, Enter and Space work (WCAG 2.1.1). */}
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={`flex w-full items-center gap-1 select-none whitespace-nowrap rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${alignFlex}`}
+      >
         {icon}
         {label}
         {active
           ? (dir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
           : <ChevronsUpDown size={11} className="opacity-30" />}
-      </span>
+      </button>
     </th>
   )
 }
@@ -430,7 +435,7 @@ function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsag
       <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{title}</span>
-          {rows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
+          {rows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} label="Filter by client" />}
         </div>
         {rows.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">No data for selected period</div>
@@ -470,6 +475,8 @@ function AudienceTable({ title, rows, chart }: { title: string; rows: ClientUsag
                   </tr>
                 ))}
               </tbody>
+              {/* Footer totals sum the FILTERED rows on purpose (Constantin, 2026-11-02): this matches
+                  spreadsheet behaviour and the label reads "(N of M shown)". Not a bug. */}
               <tfoot>
                 <tr className="border-t border-dark-700 bg-dark-700/20">
                   <td className="px-4 py-3 font-semibold text-slate-300">
@@ -540,7 +547,7 @@ function UsageSection({ displayRows, customerRows, grandResponses, loading, char
       <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Responses per client, per engine</span>
-          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
+          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} label="Filter by client" />}
         </div>
         {loading ? (
           <div className="py-12 text-center text-slate-500 text-sm animate-pulse">Loading usage data…</div>
@@ -671,7 +678,7 @@ function CostSection({ displayRows, customerRows, customerTotal, researchTotal, 
       <div className="bg-dark-800 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">Per-client breakdown</span>
-          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} />}
+          {displayRows.length > 0 && <FilterInput value={filterText} onChange={setFilterText} label="Filter by client" />}
         </div>
 
         {loading ? (
@@ -730,6 +737,8 @@ function CostSection({ displayRows, customerRows, customerTotal, researchTotal, 
                   </tr>
                 ))}
               </tbody>
+              {/* Footer totals sum the FILTERED rows on purpose (Constantin, 2026-11-02): this matches
+                  spreadsheet behaviour and the label reads "(N of M shown)". Not a bug. */}
               <tfoot>
                 <tr className="border-t border-dark-700 bg-dark-700/20">
                   <td className="px-4 py-3 font-semibold text-slate-300">
@@ -814,7 +823,11 @@ function PendingInvoicesSection({ pendingInvoices }: { pendingInvoices: PendingI
 
   if (pendingInvoices.length === 0) return null
 
-  const totalDue = pendingInvoices.reduce((s, p) => s + p.amountDueEur, 0)
+  // Only EUR rows are summed under the euro sign; other currencies are shown
+  // in their own code and counted separately, never added to the euro total.
+  const isEur = (p: PendingInvoice) => p.currency.toUpperCase() === 'EUR'
+  const totalDue = pendingInvoices.filter(isEur).reduce((s, p) => s + p.amountDueEur, 0)
+  const otherCurrencyCount = pendingInvoices.filter(p => !isEur(p)).length
   const overdueCount = pendingInvoices.filter(p => p.daysUntilDue !== null && p.daysUntilDue < 0).length
 
   return (
@@ -830,8 +843,11 @@ function PendingInvoicesSection({ pendingInvoices }: { pendingInvoices: PendingI
           )}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-slate-500">{eur(totalDue)} outstanding</span>
-          <FilterInput value={filterText} onChange={setFilterText} />
+          <span className="text-xs text-slate-500">
+            {eur(totalDue)} outstanding
+            {otherCurrencyCount > 0 && `, ${otherCurrencyCount} invoice${otherCurrencyCount !== 1 ? 's' : ''} in other currencies not included`}
+          </span>
+          <FilterInput value={filterText} onChange={setFilterText} label="Filter by client" />
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -851,15 +867,19 @@ function PendingInvoicesSection({ pendingInvoices }: { pendingInvoices: PendingI
               <tr key={p.invoiceId ?? `${p.customerId}-${p.dueDate}`} className="border-b border-dark-700/30 hover:bg-dark-700/20 transition-colors">
                 <td className="px-4 py-3 font-medium text-slate-200">{p.clientName}</td>
                 <td className="px-3 py-3 text-slate-400">{planLabel(p.plan)}</td>
-                <td className="px-3 py-3 text-right font-semibold text-slate-200 tabular-nums">{eur(p.amountDueEur)}</td>
+                <td className="px-3 py-3 text-right font-semibold text-slate-200 tabular-nums">
+                  {isEur(p)
+                    ? eur(p.amountDueEur)
+                    : `${p.amountDueEur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${p.currency.toUpperCase()}`}
+                </td>
                 <td className="px-3 py-3 text-slate-400 whitespace-nowrap">
-                  {p.dueDate ? new Date(p.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'n/a'}
+                  {p.dueDate ? new Date(p.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : 'n/a'}
                 </td>
                 <td className="px-3 py-3"><DueBadge daysUntilDue={p.daysUntilDue} /></td>
                 <td className="px-4 py-3 text-right">
                   {p.hostedInvoiceUrl
                     ? <a href={p.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="text-brand-400 hover:text-brand-300 text-xs font-medium">View →</a>
-                    : <span className="text-slate-600 text-xs">n/a</span>}
+                    : <span className="text-slate-400 text-xs">n/a</span>}
                 </td>
               </tr>
             ))}
@@ -1150,7 +1170,7 @@ export default function Revenue() {
                 </div>
               </div>
 
-              <PendingInvoicesSection pendingInvoices={revenue.pendingInvoices} />
+              <PendingInvoicesSection pendingInvoices={revenue.pendingInvoices ?? []} />
 
               {/* Per plan */}
               <div className="bg-dark-800 rounded-xl p-5 mb-6">

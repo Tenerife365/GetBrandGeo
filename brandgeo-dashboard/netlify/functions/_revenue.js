@@ -1195,6 +1195,28 @@ function computeEngagementPipeline({
   return { windowDays, engagedThresholdWeeks: engagedWeeks, clients: rows }
 }
 
+const MS_PER_DAY = 86400000
+
+/** Whole days since the epoch, in UTC. Used only by computePendingInvoices. */
+function utcDayIndex(ms) {
+  return Math.floor(ms / MS_PER_DAY)
+}
+
+/**
+ * Cents still owed on an open invoice. `amount_remaining` is Stripe's own figure
+ * and covers a partial payment. When an object lacks it, Stripe's formula is
+ * applied: amount_due minus amount_paid. `amount_due` already has the customer's
+ * credit balance applied, which `total` does not, so `total` is the fallback
+ * only when `amount_due` is absent too. Never negative.
+ */
+function pendingRemainingCents(invoice) {
+  if (Number.isFinite(invoice.amount_remaining)) return Math.max(0, Math.round(invoice.amount_remaining))
+  const owedCents = Number.isFinite(invoice.amount_due)
+    ? Math.round(invoice.amount_due)
+    : invoiceTotalCents(invoice)
+  return Math.max(0, owedCents - invoicePaidCents(invoice))
+}
+
 /**
  * computePendingInvoices({ invoices, customers, clients, now }) -> PendingInvoice[]
  *
@@ -1204,14 +1226,25 @@ function computeEngagementPipeline({
  * (contract §3) so a pending invoice's client name and attribution badge can
  * never disagree with the per-client table above it.
  *
+ * `daysUntilDue` compares whole UTC calendar days, never elapsed hours: it is
+ * the UTC day of due_date minus the UTC day of `now`. So 0 means due on today's
+ * UTC date, 1 means due tomorrow, and -1 means the due date was yesterday and
+ * the invoice is overdue, even if less than 24 hours have passed since the due
+ * timestamp. The value is never -0, so `< 0` and `=== 0` read the same in
+ * every caller.
+ *
  * `daysUntilDue` is null when Stripe has no due_date on the invoice (an invoice
  * on `collection_method: charge_automatically` is often due on receipt with no
  * explicit date), reported as null rather than 0, so the UI can say "no due
  * date set" instead of implying it is due today.
  *
+ * `amountDueEur` is the amount still owed (see pendingRemainingCents) in the
+ * invoice's OWN currency, despite the field name; `currency` says which. The
+ * caller must not add a non-EUR row to a euro total.
+ *
  * Sorted so the most urgent follow-up is first: overdue (most negative
  * daysUntilDue) before not-yet-due, and invoices with no due date pushed to the
- * end rather than sorted as if due today.
+ * end, oldest createdAt first, rather than sorted as if due today.
  */
 function computePendingInvoices({ invoices = [], customers = [], clients = [], now = new Date() } = {}) {
   const nowMs = now instanceof Date ? now.getTime() : toMs(now)
@@ -1239,11 +1272,9 @@ function computePendingInvoices({ invoices = [], customers = [], clients = [], n
     const client = resolution.clientId !== null ? lookup(clientsById, resolution.clientId) : null
 
     const dueMs = toMs(invoice.due_date)
-    // amount_remaining covers a partially-paid invoice; total - paid is the
-    // fallback for older API versions/objects that do not carry the field.
-    const remainingCents = Number.isFinite(invoice.amount_remaining)
-      ? Math.round(invoice.amount_remaining)
-      : invoiceTotalCents(invoice) - invoicePaidCents(invoice)
+    const remainingCents = pendingRemainingCents(invoice)
+    // `+ 0` turns a -0 into 0 (IEEE: -0 + 0 is +0), see the doc comment.
+    const daysUntilDue = dueMs !== null ? (utcDayIndex(dueMs) - utcDayIndex(nowMs)) + 0 : null
 
     rows.push({
       invoiceId: invoice.id || null,
@@ -1255,10 +1286,10 @@ function computePendingInvoices({ invoices = [], customers = [], clients = [], n
       attribution: resolution.attribution,
       customerId: custId,
       customerEmail: customer ? (customer.email || null) : null,
-      amountDueEur: round2(centsToEur(Math.max(0, remainingCents))),
+      amountDueEur: round2(centsToEur(remainingCents)),
       currency: String(invoice.currency || 'eur').toUpperCase(),
       dueDate: dueMs !== null ? new Date(dueMs).toISOString() : null,
-      daysUntilDue: dueMs !== null ? Math.ceil((dueMs - nowMs) / 86400000) : null,
+      daysUntilDue,
       hostedInvoiceUrl: invoice.hosted_invoice_url || null,
       createdAt: invoiceCreatedMs(invoice) !== null ? new Date(invoiceCreatedMs(invoice)).toISOString() : null,
     })

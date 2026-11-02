@@ -1,5 +1,5 @@
 /**
- * revenue-report.js — admin-only Revenue report for a single month (S21).
+ * revenue-report.js: admin-only Revenue report for a single month (S21).
  *
  * POST /.netlify/functions/revenue-report
  * Body: { period?: 'YYYY-MM' }   defaults to the current UTC month
@@ -20,8 +20,8 @@
  * This function PAGES EVERY INVOICE ON THE ACCOUNT ON EVERY LOAD, and it has to:
  * affiliate attribution (contract §4) can only be read off a customer's earliest
  * tagged invoice, so the whole history is required to compute one month's
- * commission. That is fine at today's volume — 38 clients, 2 invoices, 1 charge,
- * 0 subscriptions (verified 2026-08-02) — and it breaks well before 10,000
+ * commission. That is fine at today's volume (38 clients, 2 invoices, 1 charge,
+ * 0 subscriptions, verified 2026-08-02), and it breaks well before 10,000
  * subscribers. There is no caching and nothing is memoised between calls.
  *
  * The upgrade path is a monthly `revenue_snapshots` table written by a scheduled
@@ -34,8 +34,8 @@
  * rather than a function that times out with no explanation.
  *
  * ── SUBSCRIPTIONS ARE DELIBERATELY NOT FETCHED ──────────────────────────────
- * Contract §2 lists Subscriptions as a source "for MRR", but §6b — the binding
- * response shape — carries no MRR field anywhere, in global, byPlan or byClient.
+ * Contract §2 lists Subscriptions as a source "for MRR", but §6b, the binding
+ * response shape, carries no MRR field anywhere, in global, byPlan or byClient.
  * Fetching a list to compute a number the contract gives nowhere to put would be
  * inventing a field the UI is not being built against. Raised in the handoff
  * rather than resolved here. There are 0 live subscriptions today either way.
@@ -95,7 +95,7 @@ const RESEARCH_CATEGORY = 'research'
 
 /**
  * Hard ceiling per Stripe collection. Reaching it produces a warning ON THE PAGE
- * rather than a silently truncated total — an admin must never read a number
+ * rather than a silently truncated total: an admin must never read a number
  * that is quietly missing half its inputs. See the CSA note above.
  */
 const MAX_STRIPE_OBJECTS = 5000
@@ -127,7 +127,7 @@ async function listAll(label, listResult, cap, warn) {
   for await (const item of listResult) {
     out.push(item)
     if (out.length >= cap) {
-      warn(`More than ${cap} ${label} exist on the account; this report reads only the first ${cap}. Totals are INCOMPLETE — see the scale note in revenue-report.js.`)
+      warn(`More than ${cap} ${label} exist on the account; this report reads only the first ${cap}. Totals are INCOMPLETE. See the scale note in revenue-report.js.`)
       break
     }
   }
@@ -178,7 +178,7 @@ exports.handler = async (event) => {
 
   // periodForMonth falls back to the current UTC month for anything it cannot
   // parse rather than throwing (contract §6b makes the parameter optional). The
-  // fallback is silent by construction, so it is announced here — an admin who
+  // fallback is silent by construction, so it is announced here: an admin who
   // typed '2026-13' must not read August's numbers believing they are
   // December's.
   const period = periodForMonth(body.period)
@@ -226,7 +226,7 @@ exports.handler = async (event) => {
       stripe.invoices.list({ limit: 100, expand: ['data.discounts'] }), MAX_STRIPE_OBJECTS, warn)
 
     // Refunds are period-scoped: contract §5 nets "refunds in the period".
-    // data.charge is expanded because a Refund names a charge, not an invoice —
+    // data.charge is expanded because a Refund names a charge, not an invoice:
     // the refund -> charge -> invoice/customer chain of contract §2.
     const refunds = await listAll('refunds',
       stripe.refunds.list({
@@ -244,8 +244,8 @@ exports.handler = async (event) => {
     const coupons = await listAll('coupons',
       stripe.coupons.list({ limit: 100 }), MAX_STRIPE_OBJECTS, warn)
 
-    // Indexed three ways — by promotion-code id, by human code, and by the
-    // coupon id behind it — so an invoice's discount resolves however deeply
+    // Indexed three ways (by promotion-code id, by human code, and by the
+    // coupon id behind it) so an invoice's discount resolves however deeply
     // Stripe expanded it (a bare `discounts` array gives ids, an expanded one
     // gives objects). findAffiliateAttribution tries all three.
     const promotionCodes = {}
@@ -258,7 +258,7 @@ exports.handler = async (event) => {
     }
 
     // An affiliate coupon with no promotion code carrying metadata.affiliate can
-    // never be attributed — the tag lives on the CODE, not the coupon (§4). That
+    // never be attributed: the tag lives on the CODE, not the coupon (§4). That
     // is a partner whose referrals would silently accrue nothing, so it is said
     // out loud rather than left to be discovered from a zero.
     const taggedCouponIds = new Set(promoCodes
@@ -327,6 +327,22 @@ exports.handler = async (event) => {
     // invoice from last month is still owed today, and that is exactly the one
     // most overdue for a follow-up.
     const pendingInvoices = computePendingInvoices({ invoices, customers, clients, now: new Date() })
+
+    // aggregateRevenue's currency warning covers only invoices counted in the
+    // period, so an open non-EUR invoice from an earlier month would pass with
+    // no warning at all. One warning per distinct non-EUR currency, naming the
+    // invoices, so the admin knows those rows are not euros.
+    const nonEurPendingByCurrency = new Map()
+    for (const row of pendingInvoices) {
+      if (!row || !row.currency || row.currency === 'EUR') continue
+      if (!nonEurPendingByCurrency.has(row.currency)) nonEurPendingByCurrency.set(row.currency, [])
+      nonEurPendingByCurrency.get(row.currency).push(row.invoiceId || '(no id)')
+    }
+    for (const [currency, ids] of nonEurPendingByCurrency) {
+      warn(ids.length === 1
+        ? `Pending invoice ${ids[0]} is in ${currency}; it is listed with its currency and left out of the euro total.`
+        : `Pending invoices ${ids.join(', ')} are in ${currency}; they are listed with their currency and left out of the euro total.`)
+    }
 
     // ── meta ────────────────────────────────────────────────────────────────
     // The account id is read rather than assumed: this project migrated from a

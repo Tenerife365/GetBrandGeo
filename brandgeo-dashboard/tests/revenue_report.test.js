@@ -47,6 +47,7 @@ const {
   nextOfferedPlan,
   computeEngagementPipeline,
   isoWeekKey,
+  computePendingInvoices,
 } = require('../netlify/functions/_revenue')
 
 // The real cost table, so the legacy-NULL fallback below is proven against the
@@ -983,6 +984,201 @@ section('14. CQO review fixes, 2026-08-02 (F2, F7, F9)')
     assert.strictEqual(r.affiliates[0].commissionAccruedEur, 19.8)   // unchanged: first-touch attribution kept
     assert.ok(r.warnings.some((w) => w.includes('partner2') && w.includes('bpr') && w.includes('accrues nothing')))
     ok("a later invoice tagged for 'partner2' does not create a partner2 row (first-touch is kept) but raises a named warning explaining why")
+  }
+}
+
+// 15. Pending invoices (accounts receivable). docs/qa/s21-pending-invoices-retro-review-2026-11-02.md
+// M1 asked for this section; every case is from that review's section 3, plus
+// the L2 (day boundary) and L4 (credit balance fallback) fixes. `now` is fixed
+// at 2026-11-02T12:00:00Z so every day count below can be checked by hand.
+section('15. pending invoices, computePendingInvoices (retro review M1, L2, L4)')
+{
+  const NOW = new Date('2026-11-02T12:00:00Z')
+  /** A minimal open invoice for cus_ACME; each case overrides only what it tests. */
+  const openInvoice = (over = {}) => Object.assign({
+    id: 'in_open', object: 'invoice', customer: 'cus_ACME', currency: 'eur', status: 'open',
+    created: unix('2026-10-20T09:00:00Z'), due_date: unix('2026-11-10T00:00:00Z'),
+    total: 9900, amount_due: 9900, amount_paid: 0, amount_remaining: 9900,
+    hosted_invoice_url: 'https://invoice.stripe.com/i/example',
+  }, over)
+  /** Removes a key outright, so the field is ABSENT rather than undefined. */
+  const without = (obj, ...keys) => { const o = { ...obj }; for (const k of keys) delete o[k]; return o }
+  const pending = (invoices) => computePendingInvoices({ invoices, customers: CUSTOMERS, clients: CLIENTS, now: NOW })
+  const dueIn = (dueIso) => pending([openInvoice({ due_date: unix(dueIso) })])[0].daysUntilDue
+
+  // Not period scoped: created 2026-09-15T12:00Z is 48 days before NOW, well
+  // outside any one-month window, and is still owed today.
+  {
+    const r = pending([openInvoice({ id: 'in_old', created: unix('2026-09-15T12:00:00Z') })])
+    assert.strictEqual(r.length, 1)
+    assert.strictEqual(r[0].invoiceId, 'in_old')
+    assert.strictEqual(r[0].createdAt, '2026-09-15T12:00:00.000Z')
+    ok('an open invoice created 48 days before now is returned (not period scoped)')
+  }
+
+  // Shape pinned: the React page reads exactly these keys.
+  {
+    const r = pending([openInvoice()])
+    assert.deepStrictEqual(Object.keys(r[0]), [
+      'invoiceId', 'clientId', 'clientName', 'plan', 'attribution', 'customerId', 'customerEmail',
+      'amountDueEur', 'currency', 'dueDate', 'daysUntilDue', 'hostedInvoiceUrl', 'createdAt',
+    ])
+    assert.strictEqual(r[0].hostedInvoiceUrl, 'https://invoice.stripe.com/i/example')
+    ok('a pending row carries exactly the 13 keys of the response shape')
+  }
+
+  // L2. Whole UTC days: UTC day of due_date minus UTC day of now.
+  // Due 2026-11-02T00:00Z, now 2026-11-02T12:00Z: both on UTC day Nov 2, so
+  // 0, "due today", and it must be +0. The old Math.ceil(-12h / 24h) gave
+  // ceil(-0.5) = -0, which Object.is(v, 0) rejects, so this fails on the old code.
+  {
+    const v = dueIn('2026-11-02T00:00:00Z')
+    assert.ok(Object.is(v, 0), `expected +0, got ${Object.is(v, -0) ? '-0' : v}`)
+    assert.strictEqual(Object.is(v, -0), false)
+    ok('due 2026-11-02T00:00Z read at 12:00Z the same day is 0 (due today), never -0')
+  }
+  {
+    // Due Nov 3 00:00Z: UTC day Nov 3 minus Nov 2 = 1 (old code: ceil(0.5) = 1).
+    assert.strictEqual(dueIn('2026-11-03T00:00:00Z'), 1)
+    // Due Nov 1 23:59Z: UTC day Nov 1 minus Nov 2 = -1, overdue although only
+    // 12h01m have passed. Old code: ceil(-0.5007) = -0, read as "due today".
+    const late = dueIn('2026-11-01T23:59:00Z')
+    assert.strictEqual(late, -1)
+    assert.ok(late < 0)
+    // Due Nov 2 23:59Z: still UTC day Nov 2, so 0. Old code: ceil(0.4993) = 1.
+    assert.ok(Object.is(dueIn('2026-11-02T23:59:00Z'), 0))
+    ok('due Nov 3 00:00Z is 1, due Nov 1 23:59Z is -1 (overdue), due Nov 2 23:59Z is 0')
+  }
+
+  // Amount still owed, in cents then euros.
+  {
+    // Partial payment: 9900 total, 4950 paid, Stripe says 4950 remain = EUR 49.50.
+    const r = pending([openInvoice({ total: 9900, amount_due: 9900, amount_paid: 4950, amount_remaining: 4950 })])
+    assert.strictEqual(r[0].amountDueEur, 49.5)
+    ok('partially paid: total 9900, paid 4950, amount_remaining 4950 -> 49.50')
+  }
+  {
+    // L4: no amount_remaining. amount_due 800 (a 200 credit balance applied) minus
+    // 0 paid = 800 cents = EUR 8.00. The old fallback used total: 1000 = EUR 10.00.
+    const inv = without(openInvoice({ total: 1000, amount_due: 800, amount_paid: 0 }), 'amount_remaining')
+    assert.strictEqual(pending([inv])[0].amountDueEur, 8)
+    ok('no amount_remaining: amount_due 800 - paid 0 -> 8.00, so the credit balance is honoured (L4)')
+  }
+  {
+    // No amount_remaining and no amount_due: total 1000 - paid 250 = 750 cents = EUR 7.50.
+    const inv = without(openInvoice({ total: 1000, amount_paid: 250 }), 'amount_remaining', 'amount_due')
+    assert.strictEqual(pending([inv])[0].amountDueEur, 7.5)
+    ok('no amount_remaining, no amount_due: total 1000 - paid 250 -> 7.50')
+  }
+  {
+    // Paid more than amount_due (500 - 700 = -200 cents) never shows a negative debt.
+    const inv = without(openInvoice({ total: 500, amount_due: 500, amount_paid: 700 }), 'amount_remaining')
+    assert.ok(Object.is(pending([inv])[0].amountDueEur, 0))
+    ok('an overpaid fallback is clamped to 0.00, never negative')
+  }
+
+  // A non-EUR open invoice keeps its own currency and its own amount.
+  {
+    const r = pending([openInvoice({ id: 'in_usd', currency: 'usd', total: 1000, amount_due: 1000, amount_remaining: 1000 })])
+    assert.strictEqual(r[0].currency, 'USD')
+    assert.strictEqual(r[0].amountDueEur, 10)
+    ok("an open USD invoice keeps currency 'USD' and its amount 10.00 (not converted)")
+  }
+
+  // No due_date: null, never 0.
+  {
+    const r = pending([openInvoice({ due_date: null })])
+    assert.strictEqual(r[0].daysUntilDue, null)
+    assert.strictEqual(r[0].dueDate, null)
+    ok('no due_date -> daysUntilDue null and dueDate null')
+  }
+
+  // Sort: most overdue first, then not yet due, then no due date by createdAt.
+  // Expected by hand from NOW: in_b -13 (Oct 20), in_d -1 (Nov 1), in_f 0 (Nov 2),
+  // in_a 8 (Nov 10), then the undated in_e (created Sep 1) before in_c (Oct 1).
+  {
+    const r = pending([
+      openInvoice({ id: 'in_a', due_date: unix('2026-11-10T00:00:00Z') }),
+      openInvoice({ id: 'in_c', due_date: null, created: unix('2026-10-01T08:00:00Z') }),
+      openInvoice({ id: 'in_b', due_date: unix('2026-10-20T00:00:00Z') }),
+      openInvoice({ id: 'in_e', due_date: null, created: unix('2026-09-01T08:00:00Z') }),
+      openInvoice({ id: 'in_f', due_date: unix('2026-11-02T00:00:00Z') }),
+      openInvoice({ id: 'in_d', due_date: unix('2026-11-01T23:59:00Z') }),
+    ])
+    assert.deepStrictEqual(r.map((x) => x.invoiceId), ['in_b', 'in_d', 'in_f', 'in_a', 'in_e', 'in_c'])
+    assert.deepStrictEqual(r.map((x) => x.daysUntilDue), [-13, -1, 0, 8, null, null])
+    ok('sorted most overdue first, then not yet due, then no due date oldest first')
+  }
+
+  // A customer missing from the customers list: kept, never guessed.
+  {
+    const r = pending([openInvoice({ id: 'in_lost', customer: 'cus_NOT_LISTED' })])
+    assert.strictEqual(r.length, 1)
+    assert.strictEqual(r[0].customerId, 'cus_NOT_LISTED')
+    assert.strictEqual(r[0].clientId, null)
+    assert.strictEqual(r[0].attribution, 'unattributed')
+    assert.strictEqual(r[0].clientName, 'cus_NOT_LISTED')
+    assert.strictEqual(r[0].customerEmail, null)
+    assert.strictEqual(r[0].plan, null)
+    ok("a customer missing from the list -> row kept, customerId set, 'unattributed', name falls back to the customer id")
+  }
+  {
+    // Listed, but linked to no client and with no name: the email stands in.
+    const r = pending([openInvoice({ customer: 'cus_GHOST' })])
+    assert.strictEqual(r[0].attribution, 'unattributed')
+    assert.strictEqual(r[0].clientName, 'someone@nowhere.example')
+    ok('a listed customer with no client and no name -> the email is the name')
+  }
+
+  // Attribution, through the same resolveClientForCustomer as section 2.
+  {
+    const [bpr] = pending([openInvoice({ id: 'in_bpr_open', customer: 'cus_BPR' })])
+    assert.strictEqual(bpr.clientId, 1)
+    assert.strictEqual(bpr.attribution, 'metadata')
+    assert.strictEqual(bpr.clientName, 'Bucate pe Roate')
+    assert.strictEqual(bpr.plan, 'growth_pro')
+    assert.strictEqual(bpr.customerEmail, CUSTOMERS[0].email)
+    ok("cus_BPR -> client 1 via metadata.client_id, attribution 'metadata', plan growth_pro")
+
+    const [acme] = pending([openInvoice({ id: 'in_acme_open', customer: 'cus_ACME' })])
+    assert.strictEqual(acme.clientId, 2)
+    assert.strictEqual(acme.attribution, 'stripe_customer_id')
+    assert.strictEqual(acme.clientName, 'Acme SL')
+    assert.strictEqual(acme.plan, 'growth')
+    ok("cus_ACME -> client 2 via clients.stripe_customer_id, attribution 'stripe_customer_id', plan growth")
+  }
+
+  // Only `open` counts as owed.
+  {
+    const r = pending(['draft', 'void', 'paid', 'uncollectible', 'open']
+      .map((status) => openInvoice({ id: `in_${status}`, status })))
+    assert.deepStrictEqual(r.map((x) => x.invoiceId), ['in_open'])
+    ok('draft, void, paid and uncollectible are excluded; only open is returned')
+  }
+
+  // Contract 12.4 and 12.5 (fix review N3): an invoice with no customer at all
+  // reads 'Unknown customer', and a missing currency reads EUR.
+  {
+    const [orphan] = pending([without(openInvoice({ id: 'in_orphan' }), 'customer')])
+    assert.strictEqual(orphan.customerId, null)
+    assert.strictEqual(orphan.clientId, null)
+    assert.strictEqual(orphan.attribution, 'unattributed')
+    assert.strictEqual(orphan.clientName, 'Unknown customer')
+    ok("an invoice with no customer field -> 'Unknown customer', unattributed")
+
+    const [noCur] = pending([without(openInvoice({ id: 'in_nocur' }), 'currency')])
+    assert.strictEqual(noCur.currency, 'EUR')
+    assert.strictEqual(noCur.amountDueEur, 99)
+    ok("a missing currency reads 'EUR' and the amount is unchanged")
+  }
+
+  // Empty and malformed input.
+  {
+    assert.deepStrictEqual(computePendingInvoices(), [])
+    assert.deepStrictEqual(computePendingInvoices({}), [])
+    assert.deepStrictEqual(computePendingInvoices({ invoices: null }), [])
+    assert.deepStrictEqual(computePendingInvoices({ invoices: [null, undefined, 'in_x'], now: NOW }), [])
+    ok('no args, {}, { invoices: null } and junk entries all return []')
   }
 }
 

@@ -197,6 +197,7 @@ Body: `{ period?: 'YYYY-MM' }`, defaults to the current UTC month.
     { "affiliateCode": "bpr", "redemptions": 0, "attributedClients": 0,
       "commissionAccruedEur": 0 }
   ],
+  "pendingInvoices": [ /* PendingInvoice[], every open invoice, see section 12 */ ],
   "meta": {
     "generatedAt": "2026-08-02T21:00:00Z",
     "stripeAccountId": "acct_1Tzui063lspobjfO", "liveMode": true,
@@ -382,3 +383,177 @@ disagree — they don't today), F13 (the Cost tab's "×1.5 overhead" claim is
 false, but pre-existing and not introduced by S21), F14 (a paid-in-August
 invoice created in July shows `invoiceCount: 0` for that August row, reading
 as a contradiction — cosmetic).
+
+## 12. Pending invoices addendum (2026-11-02)
+
+Shipped in `7190918` without a contract section; this section closes
+bg-verify finding L6 and records I1 (`uncollectible` excluded) of
+`docs/qa/s21-pending-invoices-retro-review-2026-11-02.md`. Binding for both
+`computePendingInvoices` (`_revenue.js`) and `PendingInvoicesSection`
+(`Revenue.tsx`). Where this section and the code disagree, this section wins
+and the code is the defect.
+
+### 12.1 Field and presence
+
+- `pendingInvoices: PendingInvoice[]` is present on every 200 response,
+  `[]` when nothing is open (`revenue-report.js:376`).
+- The UI types it optional (`pendingInvoices?: PendingInvoice[]`) and reads it
+  as `revenue.pendingInvoices ?? []`, so a response from an older function
+  build renders no section instead of crashing. An empty array renders
+  nothing: no heading, no empty state.
+- Error shape is the report's own: a failure anywhere in the report returns
+  the existing 5xx body, never a partial `pendingInvoices`.
+- Loading state is the report's own spinner; the section has no fetch of its
+  own. The fetch is owned by the Revenue tab's single `revenue-report` call.
+
+### 12.2 Source
+
+The SAME `invoices` and `customers` arrays the report already reads, no
+extra Stripe call:
+
+- `invoices`: `stripe.invoices.list({ limit: 100, expand: ['data.discounts'] })`,
+  full history, not period scoped (`revenue-report.js:225-226`).
+- `customers`: `stripe.customers.list({ limit: 100 })` (`revenue-report.js:238-239`).
+- Both drained by `listAll` and capped at `MAX_STRIPE_OBJECTS = 5000`
+  (`revenue-report.js:101`, `:125-135`); hitting the cap raises the existing
+  "Totals are INCOMPLETE" warning. Caveat: Stripe lists newest first, so a
+  truncated list drops the OLDEST invoices, which are the most overdue open
+  ones. Not reachable today; the warning is the only signal.
+- `clients`: the Supabase rows the report already pages for the per-client
+  table.
+- Call site: `computePendingInvoices({ invoices, customers, clients, now: new Date() })`
+  (`revenue-report.js:329`).
+
+### 12.3 Selection
+
+`invoice.status === 'open'` and nothing else.
+
+| Stripe status | Listed | Why |
+|---|---|---|
+| `open` | yes | Finalized and not settled: money owed now. |
+| `draft` | no | Not sent, not a receivable. |
+| `void` | no | Cancelled, nothing is owed. |
+| `paid` | no | Settled. |
+| `uncollectible` | no | Written off. Deliberately excluded (I1): it is no longer a follow-up item, and listing it would inflate the euro total with money already given up on. Collecting it later moves it to `paid`, never back to `open`. |
+
+Not scoped to the report period: an open invoice from any date is listed,
+because accounts receivable is what is owed today, and the oldest open
+invoice is the one most overdue. This is independent of open decision F4
+(section 11), which concerns gross invoiced only.
+
+### 12.4 Row shape
+
+```ts
+type PendingInvoice = {
+  invoiceId: string | null        // Stripe in_ id
+  clientId: number | null         // null when attribution is 'unattributed'
+  clientName: string              // never empty, fallback order below
+  plan: string | null             // clients.plan of the resolved client, else null
+  attribution: 'metadata' | 'stripe_customer_id' | 'unattributed'
+  customerId: string | null       // Stripe cus_ id from invoice.customer
+  customerEmail: string | null    // from the Customer object
+  amountDueEur: number            // NATIVE currency units, 2 decimals, see 12.5
+  currency: string                // ISO 4217, uppercased, 'EUR' when Stripe omits it
+  dueDate: string | null          // ISO 8601 UTC, null when Stripe has no due_date
+  daysUntilDue: number | null     // whole UTC days, see 12.6
+  hostedInvoiceUrl: string | null // Stripe's hosted_invoice_url
+  createdAt: string | null        // ISO 8601 UTC of invoice.created
+}
+```
+
+- `clientName` fallback, first non-empty wins: client name, `Client N`,
+  customer name, customer email, customer id, `Unknown customer`.
+- `attribution` uses `resolveClientForCustomer` (`_revenue.js:297`), the same
+  order as the per-client table (section 3): `metadata.client_id` as strict
+  digits that match a real client, then `clients.stripe_customer_id`, then
+  `unattributed`. A pending row and a `byClient` row for the same customer can
+  therefore never name different clients.
+
+### 12.5 Money
+
+- Integer cents from `amount_remaining`, which already covers a partial
+  payment.
+- When `amount_remaining` is absent: `(amount_due ?? total) - amount_paid`,
+  Stripe's own formula. `amount_due` already has customer credit applied,
+  `total` does not, so `total` is used only when `amount_due` is absent too.
+- Clamped at 0, then converted once to a 2-decimal number
+  (`centsToEur`, `round2`). No other rounding happens on the row.
+- **Caveat on the name.** `amountDueEur` holds the invoice's NATIVE amount
+  divided by 100. There is no FX conversion. For a non-EUR invoice the field
+  name is wrong. Rules that follow from it:
+  - The UI reads `currency` on every row and shows that currency, not the
+    euro sign.
+  - The UI leaves non-EUR rows out of the euro total and says how many it
+    left out.
+  - The function writes a warning into `meta.warnings` for open non-EUR
+    invoices (`revenue-report.js:331-345`), because `aggregateRevenue`'s own
+    currency warning covers only invoices counted in the period.
+- Recommendation, not for now: rename to `amountDue` in a later contract bump,
+  together with the UI type, in one deploy. Renaming today breaks the field
+  for no gain while every live invoice is EUR.
+
+### 12.6 Due date and `daysUntilDue`
+
+- `daysUntilDue = floor(dueMs / 86400000) - floor(nowMs / 86400000)`, whole
+  UTC calendar days, never elapsed hours, and never `-0` (normalized to 0).
+- Negative is overdue, 0 is due today (UTC), positive is days left.
+- `null` when Stripe has no `due_date`. Invoices on
+  `collection_method: charge_automatically` often have none. The UI says
+  "No due date", never "Due today".
+- Timezone: every comparison is epoch based in UTC. No local time is read
+  anywhere on this path, so an admin ahead of UTC can see "Due today" for an
+  invoice whose local date is already the next day, by design.
+
+### 12.7 Sort
+
+Server order, most urgent first:
+
+1. Overdue, most negative `daysUntilDue` first.
+2. Not yet due, `daysUntilDue` ascending (0 before 1).
+3. `daysUntilDue: null` last, ordered by `createdAt` ascending (oldest first).
+
+Equal `daysUntilDue` values keep Stripe's list order (stable sort). The UI
+may re-sort on a header click; its default must be the same order.
+
+### 12.8 Tests
+
+`tests/revenue_report.test.js` carries a `computePendingInvoices` section
+(added 2026-11-02, bg-backend). Cases it must hold, one check each:
+
+- only `open` is listed; `draft`, `void`, `paid`, `uncollectible` are not
+- an open invoice outside the report period is still listed
+- partial payment reads `amount_remaining`
+- fallback without `amount_remaining`: `amount_due - amount_paid`, then
+  `total - amount_paid`, clamped at 0
+- `daysUntilDue` is -1 less than 24 hours after a due date on the previous UTC
+  day, 0 on the same UTC day, never `-0`
+- `null` due date gives `daysUntilDue: null` and sorts last by `createdAt`
+- sort order overdue, then due, then null
+- attribution and `clientName` fallback chain, including `Unknown customer`
+- non-EUR invoice keeps its native amount and uppercased `currency`; missing
+  currency reads `EUR`
+
+### 12.9 UI decisions recorded (Constantin, 2026-11-02)
+
+- Footer totals on the Clients, Research and Cost tables sum the
+  FILTERED rows, on purpose (spreadsheet behaviour). When a filter is active
+  the label reads "(N of M shown)". This closes M3 of the retro review as a
+  ruling, not a defect.
+- Sort headers are real `<button>` elements inside the `th`, so Tab, Enter
+  and Space work (WCAG 2.1.1); `aria-sort` sits on the `th`, `none` when the
+  column is not the active sort. This closes M2.
+
+### 12.10 Security
+
+Admin only, behind `requireAuth(event, { adminOnly: true })`
+(`revenue-report.js:161`). Read only: no Stripe write, no Supabase write.
+`hostedInvoiceUrl` is a Stripe-issued URL, rendered as a link with
+`target="_blank"` and `rel="noreferrer"`. A hosted invoice URL opens the
+customer's invoice page to anyone holding it, so it stays on the admin page:
+never logged, never copied into `meta.warnings`.
+
+### 12.11 Scale note (AUTONOMY rule)
+
+Zero new reads, zero new writes, zero new invocations. One in-memory pass
+over arrays already fetched for the rest of the report, plus one sort.
+Neutral for every other caller.
