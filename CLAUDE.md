@@ -20,7 +20,49 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-01)
+## CURRENT STATE (newest entry 2026-11-02)
+
+### 2026-11-02: S21 pending invoices LIVE (7190918), em dashes gone from Revenue.tsx and _revenue.js, bg-verify PASS WITH FINDINGS
+
+**Constantin's words, in order: remove the em dashes from `Revenue.tsx` and
+`_revenue.js`, commit, push, then "BG verify".** The two files carried
+another session's S21 addendum (pending invoices on the admin Revenue page)
+uncommitted since 2026-08-14, so the dash sweep and that work shipped as one
+commit, `7190918`, with the coupled `revenue-report.js` (it returns the new
+`pendingInvoices` the page reads; the two without the third would have
+rendered an empty section). 62 em dashes replaced (31 per file, comments
+plus about nine admin-facing strings), 0 left; `revenue-report.js`'s 12
+pre-existing dashes in old lines were not touched. `node --check`, `tsc`
+exit 0, `tests/revenue_report.test.js` 97 ok. Pushed with `BATCH_PUSH=1`
+(one Netlify build): `dashboard-ci` run 41412553975 `success`; `health`
+read from outside answers `commit` 7190918, `built_at` 08:22:26Z; the live
+bundle `index-BdWWu1El.js` carries `pendingInvoices`; `revenue-report`
+answers 401 unauthenticated. Earlier the same morning: `30c641b` and
+`54a25fe` pushed (CI 41404843259 green, the first green run of the
+workflow), `8b6e000` docs.
+
+**bg-verify (Opus, read-only) reviewed `7190918` after the fact:**
+`docs/qa/s21-pending-invoices-retro-review-2026-11-02.md`, **PASS WITH
+FINDINGS**, 0 blocker, 0 major, 3 medium, 6 low, 3 info; nothing needs a
+revert or hotfix. Reproduced: 97 of 97 checks, tsc exit 0, dash scan with
+control. Not checked: live Stripe, a browser, light mode, a viewer token,
+Supabase. MEDIUM: M1 `computePendingInvoices` (`_revenue.js:1216-1275`)
+has no test (bg-backend on Opus); M2 `SortableTh` (`Revenue.tsx:360-375`)
+is not keyboard reachable, WCAG 2.1.1 (bg-app); M3 the commit also made the
+Usage, Cost and Research tables sortable and filterable, undisclosed, and
+the footer totals sum the FILTERED rows (`Revenue.tsx:476-487`, `736-747`),
+which needs a ruling on whether that is intended. LOW: L1 no `?? []` guard
+at `Revenue.tsx:1153`; L2 up to 24h overdue reads "Due today" and
+`Math.ceil` yields -0 at `_revenue.js:1261`; L3 a non-EUR open invoice is
+shown with the euro sign and added to the euro total; L4 the
+`amount_remaining` fallback ignores customer credit (unreachable on the
+current API version); L5 "n/a" text at 2.36:1 contrast and an unlabeled
+filter input; L6 `docs/arch/revenue-report-data-contract.md` has no
+pendingInvoices section (bg-architect). Owed, on Constantin's go: M1 with
+L2 and L3 to bg-backend, M2 with L1 and L5 to bg-app, M3 ruling, L6 to
+bg-architect.
+
+## CURRENT STATE (2026-11-01)
 
 ### 2026-11-01: packet 030 observability plus P3 LIVE (b0a6285), watchdog LIVE and VERIFIED (cron job 10, V9c closed 2026-11-02), AI Visibility prompt focus LIVE (96d1a7c)
 
