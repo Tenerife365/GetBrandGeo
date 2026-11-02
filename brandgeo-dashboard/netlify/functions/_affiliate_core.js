@@ -277,6 +277,12 @@ function summarizeRules(program, membership = null, attribution = null) {
   const r = effectiveRules(program, membership, attribution)
   const cur = r.currency
   const parts = []
+  // With a services rate, the sale rule covers subscription payments only and
+  // a service fee earns the services rate INSTEAD. The two are alternatives
+  // per payment, never added, so they are named separately and never joined
+  // with "plus" (Constantin, 2026-11-02).
+  const hasServices = Number(r.services_commission_bps) > 0
+  const payment = hasServices ? 'subscription payment' : 'payment'
   if (r.sale_commission_type === 'percent' && Number(r.sale_commission_bps) > 0) {
     const pct = (Number(r.sale_commission_bps) / 100).toString().replace(/\.0+$/, '')
     if (Number(r.recurring_commission_bps) > 0) {
@@ -284,18 +290,20 @@ function summarizeRules(program, membership = null, attribution = null) {
       const span = r.recurring_months === null || r.recurring_months === undefined
         ? 'for as long as the customer stays subscribed'
         : `for the first ${r.recurring_months} months`
-      parts.push(rpct === pct ? `${pct}% of every payment ${span}` : `${pct}% of the first payment, then ${rpct}% of each renewal ${span}`)
+      parts.push(rpct === pct ? `${pct}% of every ${payment} ${span}` : `${pct}% of the first ${payment}, then ${rpct}% of each renewal ${span}`)
     } else {
-      parts.push(`${pct}% of the first payment`)
+      parts.push(`${pct}% of the first ${payment}`)
     }
   } else if (r.sale_commission_type === 'fixed' && Number(r.sale_commission_cents) > 0) {
-    parts.push(`${formatMoney(r.sale_commission_cents, cur)} per sale`)
-  }
-  if (Number(r.services_commission_bps) > 0) {
-    parts.push(`${(Number(r.services_commission_bps) / 100).toString().replace(/\.0+$/, '')}% once on custom services`)
+    parts.push(`${formatMoney(r.sale_commission_cents, cur)} per ${hasServices ? 'subscription sale' : 'sale'}`)
   }
   if (Number(r.lead_commission_cents) > 0) parts.push(`${formatMoney(r.lead_commission_cents, cur)} per qualified lead`)
-  return parts.length ? parts.join(', plus ') : 'Commission set per agreement'
+  const additive = parts.join(', plus ')
+  const services = hasServices
+    ? `${(Number(r.services_commission_bps) / 100).toString().replace(/\.0+$/, '')}% once on custom services`
+    : ''
+  if (additive && services) return `${additive}; ${services}`
+  return additive || services || 'Commission set per agreement'
 }
 
 // ── Attribution policy ───────────────────────────────────────────────────────

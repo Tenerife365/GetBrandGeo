@@ -841,7 +841,7 @@ async function main() {
   r = await adminPost({ action: 'programs.update', id: P1.id, patch: { services_commission_bps: 400 } })
   assert.strictEqual(r.status, 200, JSON.stringify(r.body))
   assert.strictEqual(r.body.program.services_commission_bps, 400)
-  assert.strictEqual(r.body.program.commission_summary.endsWith('plus 4% once on custom services'), true, r.body.program.commission_summary)
+  assert.strictEqual(r.body.program.commission_summary.endsWith('; 4% once on custom services'), true, r.body.program.commission_summary)
   r = await adminPost({ ...feeBase, reference: 'BH-S1' })
   assert.strictEqual(r.status, 201, JSON.stringify(r.body))
   assert.strictEqual(r.body.commission_amount, '40.00', 'a service fee takes the program services rate over the account payment rate')
