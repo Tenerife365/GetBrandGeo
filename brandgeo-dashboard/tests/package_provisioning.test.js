@@ -512,8 +512,19 @@ section('9. renewal stacking (S2, MEDIUM — Constantin ruled 2026-07-31)')
   const hook = readCode('netlify/functions/stripe-webhook.js')
   assert.match(hook, /const stacked = stackedGrantUntil\(months, cur\?\.plan_grant_until\)/,
     'the existing-client branch must read the current grant and stack onto it')
-  assert.match(hook, /\.select\('plan_grant_until, plan_source'\)/,
-    'the branch must actually read the column it stacks from')
+  // The grant lookup is pinned per COLUMN, not as one byte-exact select string,
+  // for the same reason as S6 above. Commit 13bb92d legitimately added
+  // stripe_customer_id to this select (the branch reads priorCustomerId from
+  // it), and the exact match turned this suite red with nothing wrong. The
+  // capture is anchored on the lookup that produces `cur`, the row stacking
+  // reads, so none of the other selects in the file can satisfy it.
+  const grantLookup = /const \{ data: cur, error: curErr \} = await supabase\s*\.from\('clients'\)\s*\.select\('([^']*)'\)\s*\.eq\('id', targetClientId\)/.exec(hook)
+  assert.ok(grantLookup, 'the existing-client grant lookup (clients by targetClientId into cur) must still be recognisable')
+  const grantColumns = grantLookup[1].split(',').map((c) => c.trim())
+  for (const col of ['plan_grant_until', 'plan_source', 'stripe_customer_id']) {
+    assert.ok(grantColumns.includes(col),
+      `the branch must actually read the column it stacks from: the grant lookup select is missing ${col}`)
+  }
   assert.match(hook, /grantUntil = stacked/, 'the stacked date must reach the update')
   // The admin event reports the date that was WRITTEN. Built as an object
   // literal before the branch, it would freeze the pre-stack value and the feed
