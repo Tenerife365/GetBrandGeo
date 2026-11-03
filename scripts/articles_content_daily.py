@@ -490,3 +490,110 @@ ARTICLES_DAILY.append(dict(
     <p>Do not count on the other engines to carry your contact details. On ChatGPT, Gemini and Perplexity the buyer mostly gets your name, and has to find you from there. That makes your name and your directory listings the parts that have to be easy to find. This study cannot promise that a correct address gets you recommended; it shows where the address appears when you are.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-110", bid="BG-110", date="2026-11-03", date_label="November 3, 2026", read=6,
+    tags=["Original Research", "US Cities", "Pricing"],
+    title="What Fees AI Engines Quote When They Recommend Lawyers, Agents and Property Managers",
+    h1="What Fees AI Engines Quote <em>When They Recommend a Firm</em>",
+    h1_plain="What Fees AI Engines Quote When They Recommend a Firm",
+    subtitle="We read 591 AI answers to local buyer questions across 20 US cities for fees. Engines explain how firms charge far more often than they put a number on it. Property management is the one profession where a percentage shows up regularly.",
+    meta_desc="In 591 AI answers across 20 US cities, 64 of 98 personal injury answers mentioned contingency fees but only 3 quoted a percentage. Property management answers quoted a fee in 20 of 99, usually 8 to 12% of rent.",
+    og_desc="AI engines tell buyers how lawyers and agents charge, but rarely how much. A fee percentage appeared in 25 of 591 answers, 20 of them about property management. Perplexity quoted none.",
+    ld_desc="Original BrandGEO research counting fee mentions and quoted fee percentages in 591 answers from ChatGPT, Claude, Gemini, Perplexity and Google AI Mode to local professional-services questions across 20 US cities.",
+    keywords="ai engines quote fees, chatgpt property management fee, ai contingency fee lawyer, ai real estate commission answer, how ai describes pricing, ai recommendations pricing professional services",
+    about=["AI Visibility Research", "Pricing", "Professional Services", "Local Search"],
+    findings=[("25 of 591", "answers quoted a fee percentage at all, 20 of them about property management"),
+              ("64 vs 3", "personal injury answers that mentioned contingency fees, against those that gave a percentage"),
+              ("15 of 20", "ChatGPT real estate answers told the buyer to ask how the buyer's agent is paid; no other engine did"),
+              ("0", "fee percentages quoted by Perplexity across all 120 of its answers")],
+    faq=[("Do AI engines tell buyers what a lawyer or agent charges?",
+          "They usually describe how a firm charges, not how much. In 98 personal injury answers across 20 US cities, 64 mentioned contingency fees and 63 a free consultation, but only 3 gave a percentage. Real estate answers mentioned commission in 24 of 98 and gave a rate in 2."),
+         ("Which profession do AI engines quote fees for most often?",
+          "Property management. 20 of 99 answers quoted a management fee as a percentage of rent, mostly from ChatGPT and Claude. The general ranges quoted were most often 8 to 10% or 8 to 12% of monthly rent."),
+         ("Which AI engine quotes fees most often?",
+          "ChatGPT and Claude, mainly on property management, with 7 answers each. Gemini quoted a property management fee in 4 answers and Google AI Mode in 2. Perplexity quoted no fee percentage in any of its 120 answers."),
+         ("Are the fees AI engines quote correct?",
+          "This study did not check. It counts what the engines wrote. Several figures were one company's own rate set against a typical range, so a buyer may read your competitor's price next to your name, or a range that does not match yours.")],
+    related=[("/bg-109.html", "BG-109", "How Often AI Engines Give a Street Address or Phone Number for the Firms They Name",
+              "The same 591 answers, read for addresses, phone numbers and links."),
+             ("/bg-108.html", "BG-108", "How Often AI Engines Quote Star Ratings When They Recommend Local Firms",
+              "The same 591 answers, read for ratings and review counts."),
+             ("/ai-visibility-for-law-firms.html", "Law firms", "AI Visibility for Law Firms",
+              "What these answers mean for a personal injury or immigration practice.")],
+    cta_h="See what AI engines say about your firm",
+    cta_p="Run the free audit on your own domain and read how each engine describes you. No signup and no card.",
+    og=dict(
+        fname="og-bg-110.png",
+        kicker="BG-110 · Original Research",
+        lines=[[("Fees in the", "w")], [("AI Answer", "g")]],
+        sub=["591 answers to local buyer questions,",
+             "20 US cities, 5 engines."],
+        stats=[("25 of 591", "answers quoted a fee percentage", "BrandGEO, 20 US cities"),
+               ("20 of 99", "property management answers did", "same questions"),
+               ("3 of 98", "personal injury answers did", "same questions"),
+               ("0 of 120", "Perplexity answers did", "all 5 question types"),],
+        footer="How Much, or Only How",
+    ),
+    body="""  <p>Price is one of the first things a buyer wants to know, and one of the last things a firm puts on its website. So when a buyer asks an AI engine for a personal injury lawyer or a property manager, what does the answer say about money? We read the same 591 answers from our 20 city study for fees.</p>
+
+  <p><strong>The engines explain how firms charge far more often than they say how much.</strong> 64 of 98 personal injury answers mentioned contingency fees, and 3 gave a percentage. Across all 591 answers, 25 quoted a fee percentage, and 20 of those were about property management, the one profession where a number shows up regularly. Perplexity quoted none.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six local buyer questions in each of 20 US cities: a personal injury lawyer, real estate agents for a home buyer, a property management company, an immigration lawyer, and two questions specific to that city's economy. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered each one on July 24 and 25, 2026, and 591 answers came back usable.</p>
+    <p>We searched the answer text for fee words (contingency, commission, management fee, leasing fee, flat fee, free consultation) and for percentages near them, then read every percentage match by hand and dropped the ones that were not fees, such as a rent collection rate or a share of happy clients. We did not check whether any fee was correct, and we name no firm. Google AI Mode answers include page text from the sources they cite, and our stored copy of a Claude answer stops at about 2,500 characters. We report what the engines wrote, not why, and one collection run in July is not a statement about other days.</p>
+  </div>
+
+  <h2>Personal injury: the model, almost never the rate</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Mentioned contingency</th><th>Free consultation</th><th>No win, no fee wording</th><th>Gave a percentage</th></tr></thead>
+    <tbody>
+      <tr><td>Google AI Mode</td><td>18</td><td>16</td><td>14</td><td>11</td><td>0</td></tr>
+      <tr><td>Claude</td><td>20</td><td>14</td><td>16</td><td>7</td><td>2</td></tr>
+      <tr><td>Gemini</td><td>20</td><td>13</td><td>20</td><td>6</td><td>0</td></tr>
+      <tr><td>ChatGPT</td><td>20</td><td>13</td><td>9</td><td>0</td><td>1</td></tr>
+      <tr><td>Perplexity</td><td>20</td><td>8</td><td>4</td><td>0</td><td>0</td></tr>
+      <tr><td><strong>All five</strong></td><td>98</td><td>64 (65%)</td><td>63 (64%)</td><td>24</td><td>3</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two thirds of the answers told the buyer that an injury lawyer is paid out of the settlement, and Gemini mentioned a free consultation in all 20. The rate itself came up three times. ChatGPT gave a general range of about a third to 40%. Claude, twice, set one firm's discounted rate against a standard of about a third. What the answers did quote, often and in dollars, was what firms had won for clients: settlement and verdict totals in the millions and billions.</p>
+
+  <h2>Property management: the one place numbers appear</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Quoted a management fee percentage</th><th>Mentioned a leasing or placement fee</th><th>Mentioned a flat fee</th></tr></thead>
+    <tbody>
+      <tr><td>ChatGPT</td><td>20</td><td>7</td><td>19</td><td>6</td></tr>
+      <tr><td>Claude</td><td>20</td><td>7</td><td>1</td><td>6</td></tr>
+      <tr><td>Gemini</td><td>20</td><td>4</td><td>5</td><td>8</td></tr>
+      <tr><td>Google AI Mode</td><td>19</td><td>2</td><td>3</td><td>8</td></tr>
+      <tr><td>Perplexity</td><td>20</td><td>0</td><td>0</td><td>2</td></tr>
+      <tr><td><strong>All five</strong></td><td>99</td><td>20 (20%)</td><td>28</td><td>30</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The general ranges were close to each other: 8 to 10% of monthly rent in several ChatGPT answers, 8 to 12% in ChatGPT and Claude, 7 to 12% and 4 to 10% in Gemini, 6 to 12% or a flat monthly amount in Google AI Mode. Single company rates ran from 5% to 12.9%. ChatGPT also built a fee checklist into almost every answer: in 19 of 20 it warned about a leasing or placement fee, often put at half to a full month's rent, and in several it asked about a markup on repairs.</p>
+
+  <p>So a landlord asking for a property manager often gets a price frame before any company name, and sometimes a named company's rate beside a typical range. If your rate is in that answer, the buyer compares it there.</p>
+
+  <h2>Real estate: a question to ask, not a rate</h2>
+
+  <p>Real estate answers mentioned commission in 24 of 98, and only 2 gave a percentage. What stood out was ChatGPT: in 15 of its 20 answers it told the buyer to ask how the buyer's agent is paid, or what compensation agreement the agent uses, and several of those answers said the rules on buyer agent pay had changed nationally. No other engine raised the question. Claude used the word commission to say that agents work on commission, so time in the business tells you something.</p>
+
+  <h2>Immigration: flat fee or hourly</h2>
+
+  <p>No immigration answer quoted a percentage, which fits how that work is billed. 23 of 98 answers raised flat fee or hourly billing, 15 of them from ChatGPT, nearly always as a question for the buyer to put to the lawyer. 13 mentioned a free consultation and 4 a paid one; Google AI Mode gave a consultation price in dollars in 2. The city-specific questions brought no fee percentage at all.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>If you manage property, assume the buyer reads a fee range in the AI answer before reading your name, and make your own fee easy to find and easy to compare. If you are a lawyer or an agent, the answers mostly hand the buyer questions to ask about money. Answer those questions on your site in plain words: how you are paid, whether the first meeting is free, what a flat fee covers.</p>
+    <p>This study cannot say that publishing a price gets you recommended. It shows what the buyer is told about money when you are, and which engine says it.</p>
+  </div>""",
+))
