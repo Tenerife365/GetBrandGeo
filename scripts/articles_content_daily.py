@@ -597,3 +597,107 @@ ARTICLES_DAILY.append(dict(
     <p>This study cannot say that publishing a price gets you recommended. It shows what the buyer is told about money when you are, and which engine says it.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-111", bid="BG-111", date="2026-11-04", date_label="November 4, 2026", read=6,
+    tags=["Original Research", "US Cities", "Engine Behavior"],
+    title="How Often AI Engines Tell Buyers to Check a Firm Before Hiring It",
+    h1="How Often AI Engines Tell Buyers <em>to Check a Firm First</em>",
+    h1_plain="How Often AI Engines Tell Buyers to Check a Firm First",
+    subtitle="We read 591 AI answers to local buyer questions across 20 US cities for advice on vetting the firms they name. ChatGPT gave that advice in 83 of its 120 answers. Google AI Mode gave it in 8.",
+    meta_desc="In 591 AI answers across 20 US cities, ChatGPT told the buyer to verify a license, read reviews, interview several firms or ask set questions in 83 of 120 answers. Claude did in 16, Perplexity in 9, Google AI Mode in 8.",
+    og_desc="AI engines differ sharply on whether they tell buyers to vet the firms they recommend. ChatGPT did in 69% of answers, Google AI Mode in 7%. ChatGPT wrote 30 of the 39 answers that said to check a license or bar record.",
+    ld_desc="Original BrandGEO research counting buyer due-diligence advice (license checks, review checks, interviewing several firms, questions to ask) in 591 answers from ChatGPT, Claude, Gemini, Perplexity and Google AI Mode to local professional-services questions across 20 US cities.",
+    keywords="ai engines due diligence advice, chatgpt verify lawyer license, ai recommendations check reviews, ai interview several agents, how ai engines hedge recommendations, ai answer buyer advice",
+    about=["AI Visibility Research", "Engine Behavior", "Professional Services", "Local Search"],
+    findings=[("83 of 120", "ChatGPT answers told the buyer how to vet the firms it named"),
+              ("8 of 111", "Google AI Mode answers did the same"),
+              ("30 of 39", "answers that said to check a license or bar record came from ChatGPT"),
+              ("21", "Gemini answers told the buyer to interview several firms or agents")],
+    faq=[("Do AI engines tell buyers to check a firm before hiring it?",
+          "Some do, much more than others. Across 591 answers in 20 US cities, 145 gave the buyer at least one vetting step: check a license or bar record, read reviews, interview several firms, or ask a set of questions. ChatGPT gave one in 83 of its 120 answers, Google AI Mode in 8 of 111."),
+         ("Which AI engine is most likely to tell a buyer to verify a license?",
+          "ChatGPT. 39 answers told the buyer to check a license, bar status, discipline record or credential, and 30 of them were ChatGPT answers. Immigration questions drew the most of these, 18 of the 39."),
+         ("What vetting advice does Gemini give?",
+          "Mostly to interview more than one professional before choosing. 21 Gemini answers said so, often as interview 2 to 3 agents, and 14 told the buyer to check reviews. Gemini rarely listed questions to ask, 3 answers out of 120."),
+         ("Does this advice affect which firms get recommended?",
+          "This study cannot say. It counts what the engines wrote around the firms they named. It shows that a buyer reading a ChatGPT answer is often told to check your license, your reviews and your answers to set questions before calling you.")],
+    related=[("/bg-110.html", "BG-110", "What Fees AI Engines Quote When They Recommend Lawyers, Agents and Property Managers",
+              "The same 591 answers, read for fees and fee percentages."),
+             ("/bg-108.html", "BG-108", "How Often AI Engines Quote Star Ratings When They Recommend Local Firms",
+              "The same 591 answers, read for ratings and review counts."),
+             ("/bg-107.html", "BG-107", "When an AI Engine Names No One: 15 Answers With No Firm in Them",
+              "The answers that gave the buyer advice instead of names.")],
+    cta_h="See what AI engines say about your firm",
+    cta_p="Run the free audit on your own domain and read how each engine describes you. No signup and no card.",
+    og=dict(
+        fname="og-bg-111.png",
+        kicker="BG-111 · Original Research",
+        lines=[[("Check Them", "w")], [("First", "g")]],
+        sub=["591 answers to local buyer questions,",
+             "20 US cities, 5 engines."],
+        stats=[("83 of 120", "ChatGPT answers gave vetting advice", "BrandGEO, 20 US cities"),
+               ("29 of 120", "Gemini answers did", "same questions"),
+               ("16 of 120", "Claude answers did", "same questions"),
+               ("8 of 111", "Google AI Mode answers did", "same questions"),],
+        footer="Advice Around the Names",
+    ),
+    body="""  <p>An AI answer to "who is the best immigration lawyer in my city" does two things. It names firms, and sometimes it tells the buyer what to do before calling any of them: check the license, read the reviews, talk to more than one. That second part is advice about you, written next to your name. We read the same 591 answers from our 20 city study for it.</p>
+
+  <p><strong>The engines split sharply.</strong> ChatGPT gave the buyer at least one vetting step in 83 of its 120 answers (69%). Gemini did in 29, Claude in 16, Perplexity in 9 and Google AI Mode in 8 of 111. ChatGPT wrote 30 of the 39 answers that told the buyer to check a license or bar record.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six local buyer questions in each of 20 US cities: a personal injury lawyer, real estate agents for a home buyer, a property management company, an immigration lawyer, and two questions specific to that city's economy. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered each one on July 24 and 25, 2026, and 591 answers came back usable.</p>
+    <p>We searched the answer text for four kinds of advice aimed at the buyer: check a license, bar record, discipline history or credential; check or read reviews or references; interview or compare two, three or several firms; and ask the firm set questions. We read samples of every kind by hand and tightened the patterns until descriptive uses ("verified reviews") and phone numbers dropped out. Some false matches remain, mostly where Google AI Mode answers include text from the pages they cite, such as a firm's own "read our reviews". Our stored copy of a Claude answer stops at about 2,500 characters, so advice at the end of a long Claude answer is missed. We report what the engines wrote, not why, and one collection run in July is not a statement about other days.</p>
+  </div>
+
+  <h2>Who tells the buyer to check</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Check a license or bar record</th><th>Check reviews</th><th>Interview several</th><th>Questions to ask</th><th>Any of these</th></tr></thead>
+    <tbody>
+      <tr><td>ChatGPT</td><td>120</td><td>30</td><td>16</td><td>30</td><td>66</td><td>83 (69%)</td></tr>
+      <tr><td>Gemini</td><td>120</td><td>4</td><td>14</td><td>21</td><td>3</td><td>29 (24%)</td></tr>
+      <tr><td>Claude</td><td>120</td><td>1</td><td>7</td><td>2</td><td>8</td><td>16 (13%)</td></tr>
+      <tr><td>Perplexity</td><td>120</td><td>2</td><td>1</td><td>2</td><td>7</td><td>9 (8%)</td></tr>
+      <tr><td>Google AI Mode</td><td>111</td><td>2</td><td>3</td><td>3</td><td>3</td><td>8 (7%)</td></tr>
+      <tr><td><strong>All five</strong></td><td>591</td><td>39</td><td>41</td><td>58</td><td>87</td><td>145 (25%)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>ChatGPT's typical answer ends with a short checklist. It tells the buyer to ask each lawyer whether they have handled this exact type of case, to ask each property manager for the management fee, leasing fee and repair markup, and to ask each agent how many buyer transactions they closed last year. In 66 of its 120 answers it gave questions like these. In 30 it told the buyer to verify a license or discipline record with the state bar or the licensing board. 14 answers across all engines combined three or more of the four kinds of advice, and 8 of those were ChatGPT.</p>
+
+  <p>Gemini's advice is narrower. Its most common line is to interview two or three agents before choosing, which it wrote in 21 answers, most of them about real estate. It told the buyer to check reviews in 14. It almost never listed questions to ask.</p>
+
+  <p>Claude, Perplexity and Google AI Mode mostly name firms and stop. When Claude adds advice, it is usually to check reviews on Google, Yelp or Avvo, or to book free consultations. Perplexity's advice often comes in a different setting: in 19 of its answers it said it had no search results to work from, and some of those offered questions to ask in place of names, the pattern we covered in BG-107.</p>
+
+  <h2>By profession</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Answers</th><th>Any vetting advice</th><th>Check a license or bar record</th><th>ChatGPT answers with advice</th></tr></thead>
+    <tbody>
+      <tr><td>Real estate agents</td><td>98</td><td>53</td><td>3</td><td>19 of 20</td></tr>
+      <tr><td>Property management</td><td>99</td><td>27</td><td>5</td><td>19 of 20</td></tr>
+      <tr><td>Immigration lawyer</td><td>98</td><td>25</td><td>18</td><td>18 of 20</td></tr>
+      <tr><td>Personal injury lawyer</td><td>98</td><td>24</td><td>9</td><td>14 of 20</td></tr>
+      <tr><td>City-specific questions</td><td>198</td><td>16</td><td>4</td><td>13 of 40</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Real estate drew the most advice, because Gemini added its "interview two or three agents" line there as well as ChatGPT's checklist. Immigration drew the most license checks: 18 of the 39 answers that told the buyer to verify a license or bar record were about immigration lawyers. On the four professional questions, ChatGPT gave vetting advice in 70 of its 80 answers. On the city-specific questions, where the buyer asked about a local business sector, every engine gave less.</p>
+
+  <h2>What the buyer reads next to your name</h2>
+
+  <p>When ChatGPT names your firm, the same answer often tells the buyer to look up your license, read your recent reviews and put a list of questions to you before deciding. When Google AI Mode names your firm, the buyer usually gets names and descriptions and nothing more. The same firm can be presented as a finished recommendation in one engine and as a candidate to check in another.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Make the checks the answers suggest easy to pass. Keep your license or bar number and your admission details on your site where a buyer can find them. Keep recent reviews on the profiles buyers are sent to. And answer the usual checklist questions in plain words on your site: what cases you handle, how many transactions you closed last year, what you charge for leasing and repairs.</p>
+    <p>This study cannot say that doing so gets you recommended. It shows what a buyer is told to check after an engine names you, and which engine tells them.</p>
+  </div>""",
+))

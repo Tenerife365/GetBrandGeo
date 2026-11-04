@@ -41,7 +41,7 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 | 5 | ratings | published bg-108 2026-11-01 | How often answers quote star ratings or review counts, by engine |
 | 6 | nap | published bg-109 2026-11-02 | How often answers give a phone number, street address or website for the firms they name |
 | 7 | fees | published bg-110 2026-11-03 | What fees engines quote: contingency percentages, management fees, commissions |
-| 8 | hedges | ready | How often answers tell the buyer to verify, check reviews or consult before choosing |
+| 8 | hedges | published bg-111 2026-11-04 | How often answers tell the buyer to verify, check reviews or consult before choosing |
 | 9 | credentials | ready | Which credentials engines attach to firms: years in business, board certification, awards |
 | 10 | national-vs-local | ready | National brands versus local firms in property management and personal injury answers |
 | 11 | agents-vs-brokerages | ready | Whether real estate answers recommend individual agents or brokerages |
