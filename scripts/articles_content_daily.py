@@ -701,3 +701,134 @@ ARTICLES_DAILY.append(dict(
     <p>This study cannot say that doing so gets you recommended. It shows what a buyer is told to check after an engine names you, and which engine tells them.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-112", bid="BG-112", date="2026-11-05", date_label="November 5, 2026", read=6,
+    tags=["Original Research", "US Cities", "Engine Behavior"],
+    title="The Facts AI Engines Attach to the Local Firms They Recommend",
+    h1="The <em>Facts AI Engines Attach</em> to the Local Firms They Recommend",
+    h1_plain="The Facts AI Engines Attach to the Local Firms They Recommend",
+    subtitle="We read 591 AI answers to local buyer questions across 20 US cities for the plain facts written next to firm names. Years in business came up in 269 of them. Each profession had its own kind of proof, and Perplexity gave almost none.",
+    meta_desc="In 591 AI answers across 20 US cities, 269 said how long a firm has operated. Injury firms were described in dollars recovered, agents in sales counts. Claude stated such facts in 96 of 120 answers, Perplexity in 9.",
+    og_desc="AI engines back local recommendations with plain facts: years in business in 269 of 591 answers, dollars recovered for injury firms, sales counts for agents, ownership for property managers. Perplexity gave almost none.",
+    ld_desc="Original BrandGEO research counting the firm facts (years in business, founding year, dollar track record, sales and unit counts, board certification, ownership) that ChatGPT, Claude, Gemini, Perplexity and Google AI Mode wrote next to the firms they named in 591 answers to local professional-services questions across 20 US cities.",
+    keywords="what ai engines say about law firms, ai recommendations years of experience, chatgpt lawyer credentials, board certified lawyer ai search, ai real estate agent sales record, how ai describes local businesses, ai visibility firm facts",
+    about=["AI Visibility Research", "Engine Behavior", "Professional Services", "Local Search"],
+    findings=[("269 of 591", "answers said how long a firm has operated, as a number of years or a founding year"),
+              ("51 of 98", "personal injury answers quoted a dollar figure for verdicts, settlements or money recovered"),
+              ("46 of 98", "real estate answers quoted a count of sales, transactions or clients"),
+              ("96 vs 9", "Claude answers with at least one such fact against Perplexity answers, out of 120 each")],
+    faq=[("What facts do AI engines give about the firms they recommend?",
+          "Mostly how long the firm has been around. Across 591 answers in 20 US cities, 329 stated at least one plain fact about a firm: 269 gave years of experience or a founding year, 145 a track record in dollars or counts, 58 who owns the firm, and 42 a board certification."),
+         ("Which credentials do AI engines mention for lawyers?",
+          "For personal injury lawyers, money: 51 of 98 answers quoted verdicts, settlements or a total recovered, and 29 of those included a figure in the billions. For immigration lawyers, 53 of 98 answers gave years of practice or a founding year, 24 said board certified and 6 mentioned a former judge, prosecutor or officer on the team."),
+         ("What do AI engines say about real estate agents and property managers?",
+          "Agents are described in counts: 46 of 98 answers quoted sales, transactions or clients helped, 32 quoted sales volume in dollars and 25 used a top 1% style claim. Property managers are described by tenure (55 of 99 answers), ownership such as family owned or locally owned (32) and the number of units or doors they manage (28)."),
+         ("Does publishing these facts make AI engines recommend my firm?",
+          "This study cannot say. It counts what the engines wrote next to the firms they named, not why those firms were picked, and we did not check whether the facts were true. It shows which kind of fact an engine repeats in your category, and which engines repeat one at all.")],
+    related=[("/bg-106.html", "BG-106", "The Directories AI Engines Name When They Recommend Local Professionals",
+              "The same 591 answers, read for directory badges and review sites."),
+             ("/bg-108.html", "BG-108", "How Often AI Engines Quote Star Ratings When They Recommend Local Firms",
+              "The same 591 answers, read for ratings and review counts."),
+             ("/bg-111.html", "BG-111", "How Often AI Engines Tell Buyers to Check a Firm Before Hiring It",
+              "The advice engines give the buyer around the names.")],
+    cta_h="See which facts AI engines repeat about your firm",
+    cta_p="Run the free audit on your own domain and read how each engine describes you. No signup and no card.",
+    og=dict(
+        fname="og-bg-112.png",
+        kicker="BG-112 · Original Research",
+        lines=[[("The Proof", "w")], [("Engines Give", "g")]],
+        sub=["591 answers to local buyer questions,",
+             "20 US cities, 5 engines."],
+        stats=[("269", "answers said how long a firm has operated", "of 591, BrandGEO"),
+               ("51 of 98", "injury answers quoted dollars recovered", "98 answers, 5 engines"),
+               ("46 of 98", "agent answers quoted sales counts", "98 answers, 5 engines"),
+               ("96 vs 9", "Claude vs Perplexity answers with a fact", "120 answers each"),],
+        footer="What Backs the Names",
+    ),
+    body="""  <p>When an AI engine recommends a personal injury firm or a property manager, it usually writes something next to the name to back the pick. Sometimes that is a directory badge, which we counted in BG-106, or a star rating, which we counted in BG-108. Often it is a plain fact about the firm: how long it has been open, how much money it has recovered, how many homes it has sold. We read the same 591 answers from our 20 city study for those facts.</p>
+
+  <p><strong>329 of the 591 answers (56%) stated at least one.</strong> How long a firm has operated came up in 269 answers, more than any other kind of fact we counted. After that, each profession had its own kind of proof. The engines differed even more than the professions did: Claude stated a fact in 96 of its 120 answers, Perplexity in 9.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six local buyer questions in each of 20 US cities: a personal injury lawyer, real estate agents for a home buyer, a property management company, an immigration lawyer, and two questions specific to that city's economy. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered each one on July 24 and 25, 2026, and 591 answers came back usable.</p>
+    <p>We searched the answer text for five kinds of fact: tenure (a number of years, or a founding year), track record (a dollar figure in millions or billions tied to verdicts, settlements or sales, or a count of sales, transactions, units, cases or clients), board certification, ownership (family, locally, veteran, woman or minority owned) and a former judge, prosecutor or officer on the team. We read about 250 matched passages by hand and tightened the patterns until award streaks ("five years in a row"), filing deadlines, home price ranges and lobbying revenue dropped out. Some false matches remain, and vaguer wording such as "decades of experience" is not counted. Our stored copy of a Claude answer is cut short, at under 3,800 characters, so facts late in a long Claude answer are missed. We count what the engines wrote. We did not check whether any of it is true, and we cannot say why an engine picked a firm.</p>
+  </div>
+
+  <h2>What gets written next to a name</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Kind of fact</th><th>Answers (of 591)</th><th>Where it showed up</th></tr></thead>
+    <tbody>
+      <tr><td>Tenure: years of experience or a founding year</td><td>269</td><td>All five question types, all 20 cities</td></tr>
+      <tr><td>Track record in numbers: dollars or counts</td><td>145</td><td>Real estate 54, personal injury 53</td></tr>
+      <tr><td>Ownership: family, locally, veteran or woman owned</td><td>58</td><td>Property management 32</td></tr>
+      <tr><td>Board certification</td><td>42</td><td>Immigration 24, personal injury 14</td></tr>
+      <tr><td>A former judge, prosecutor or officer on the team</td><td>11</td><td>Immigration 6</td></tr>
+      <tr><td><strong>Any of these</strong></td><td>329</td><td>56% of answers</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Tenure came in two forms. 239 answers gave a number of years, such as "over 30 years of experience", and 110 gave a founding year, with some answers doing both. The numbers are large: the median figure quoted was 30 years, and only 9 of the 458 figures we found were under 10. 48 answers quoted combined or collective years, where a firm adds up the careers of its people. 28 answers quoted a figure of 100 years or more, and 22 of those used the word combined or collective.</p>
+
+  <h2>Each profession has its own proof</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Answers</th><th>Tenure</th><th>Dollar figure</th><th>Count of sales, units or cases</th><th>Board certified</th><th>Ownership</th><th>Any fact</th></tr></thead>
+    <tbody>
+      <tr><td>Personal injury lawyer</td><td>98</td><td>58</td><td>51</td><td>14</td><td>14</td><td>4</td><td>67</td></tr>
+      <tr><td>Real estate agents</td><td>98</td><td>40</td><td>32</td><td>46</td><td>1</td><td>5</td><td>63</td></tr>
+      <tr><td>Property management</td><td>99</td><td>55</td><td>0</td><td>28</td><td>0</td><td>32</td><td>67</td></tr>
+      <tr><td>Immigration lawyer</td><td>98</td><td>53</td><td>0</td><td>1</td><td>24</td><td>3</td><td>59</td></tr>
+      <tr><td>City-specific questions</td><td>198</td><td>63</td><td>5</td><td>4</td><td>3</td><td>14</td><td>73</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><strong>Personal injury firms are described in dollars.</strong> 51 of 98 answers quoted a verdict, a settlement or a total recovered for clients, and 29 of those included a figure in the billions. Claude did this in 18 of its 20 personal injury answers, Google AI Mode in 15 of 18 and Gemini in 13 of 20. ChatGPT did in 3 and Perplexity in 2.</p>
+
+  <p><strong>Real estate agents are described in counts.</strong> 46 of 98 answers quoted a count of sales, transactions, homes sold or clients helped, and 32 quoted sales volume in dollars. 25 used a "top 1%" style claim, 12 of them Claude answers.</p>
+
+  <p><strong>Property managers are described by who they are.</strong> 55 of 99 answers gave tenure, 32 gave ownership (family owned in 17, locally owned in 13, veteran owned in 5) and 28 gave the number of units, doors or properties under management. None quoted a dollar track record.</p>
+
+  <p><strong>Immigration lawyers are described by qualification.</strong> 53 of 98 answers gave years of practice or a founding year, 24 said board certified, and 6 mentioned a former judge, prosecutor or immigration officer on the team. No answer quoted dollars and one quoted a case count.</p>
+
+  <h2>Board certification showed up in nine cities</h2>
+
+  <p>All 42 answers that described a lawyer or firm as board certified came from 9 of the 20 cities, and 33 of them from the five Texas and Florida cities in the study: Houston, Dallas, San Antonio, Miami and Tampa. 13 of those answers also named the Texas Board of Legal Specialization and 8 named The Florida Bar. In the other 11 cities no answer described a lawyer that way.</p>
+
+  <h2>The award names we looked for were rare</h2>
+
+  <p>We also searched for four award names. An AV rating from Martindale appeared in 20 answers, a "Top 100" list of some kind in 21, the Million Dollar Advocates Forum in 8 and the Inc. 5000 in 2. Together, 45 answers named at least one of the four, against 269 that stated tenure, and only 7 answers carried one of these awards with no plain fact beside it. Directory recognitions are a separate matter: Super Lawyers alone appeared in 125 answers, as we reported in BG-106.</p>
+
+  <h2>By engine</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Tenure</th><th>Track record</th><th>Any fact</th><th>Two or more kinds</th></tr></thead>
+    <tbody>
+      <tr><td>Claude</td><td>120</td><td>80</td><td>46</td><td>96 (80%)</td><td>45</td></tr>
+      <tr><td>Google AI Mode</td><td>111</td><td>73</td><td>37</td><td>87 (78%)</td><td>46</td></tr>
+      <tr><td>Gemini</td><td>120</td><td>84</td><td>40</td><td>89 (74%)</td><td>53</td></tr>
+      <tr><td>ChatGPT</td><td>120</td><td>26</td><td>19</td><td>48 (40%)</td><td>17</td></tr>
+      <tr><td>Perplexity</td><td>120</td><td>6</td><td>3</td><td>9 (8%)</td><td>1</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Claude, Google AI Mode and Gemini stated at least one fact in about three answers out of four. On the four professional questions the counts were higher: Claude in 75 of 80 answers, Gemini in 71 of 80 and Google AI Mode in 63 of 73, against 38 of 80 for ChatGPT and 9 of 80 for Perplexity.</p>
+
+  <p>ChatGPT did in 48 of its 120 answers, although its stored answers were longer than Claude's or Gemini's (a median near 4,700 characters against about 3,100 and 3,200). In BG-111 it was the engine that most often told the buyer how to vet a firm, in 83 of 120 answers.</p>
+
+  <p>Perplexity stated a fact in 9 answers, and in none of its 40 answers to the city-specific questions. Its answers were the shortest we stored, a median near 1,300 characters. In 19 of them it said it had no search results to work from.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>State your own facts in plain words where they are easy to find: the year you opened, the years your people have practiced, and the numbers your profession is described by. For an injury firm that is money recovered. For an agent it is homes sold, and over what period. For a property manager it is units under management and who owns the company. For an immigration lawyer it is board certification, where your state offers it.</p>
+    <p>Keep the same numbers on your directory and portal profiles. In BG-106, 390 of these 591 answers named a third-party platform. This study cannot say that publishing these facts gets you recommended. It shows what kind of fact an engine writes next to a firm's name in your category, and which engines write one at all.</p>
+  </div>""",
+))
