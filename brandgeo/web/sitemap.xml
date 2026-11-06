@@ -447,6 +447,20 @@
   </url>
 
   <url>
+    <loc>https://getbrandgeo.com/what-is-brandgeo.html</loc>
+    <lastmod>2026-11-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://getbrandgeo.com/brandgeo-vs-brand24.html</loc>
+    <lastmod>2026-11-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
     <loc>https://getbrandgeo.com/brandgeo-vs-peec.html</loc>
     <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
