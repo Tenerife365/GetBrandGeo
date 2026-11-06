@@ -12,7 +12,7 @@
  *   Account.tsx call (savePlan, saveDates, deleteAccount).
  *
  *   action 'list'   body {client_id}            -> 200 { keys: KeyRow[], max_keys: number, allowed: boolean, required_plan: string }
- *   action 'issue'  body {client_id, label?}     -> 200 { key: KeyRow, secret: string } (secret shown once)
+ *   action 'issue'  body {client_id, label?, scope?} -> 200 { key: KeyRow, secret: string } (secret shown once)
  *                                                    403 below plan gate { error, required_plan }
  *                                                    403 research client, not admin-issued { error }
  *                                                    409 at max_keys { error }
@@ -21,7 +21,10 @@
  *                                                    404 no active key with that id+client_id { error }
  *   Any action, table not migrated yet           -> 503 { error }
  *
- *   KeyRow (never includes the secret or its hash): { id, key_prefix, label, created_at, last_used_at }
+ *   KeyRow (never includes the secret or its hash): { id, key_prefix, label, created_at, last_used_at, scope? }
+ *   scope is 'read' | 'read_write' (docs/arch/mcp-stage2-fixes.md 9.3). `issue`
+ *   sends it ('read' is the default choice); `list` and `issue` return it on every
+ *   row. A row without `scope` (older backend) is shown as "Read only".
  *
  * Six required states (AGENT-OS guardrails) plus the 503 case, which the spec
  * calls out separately from the six:
@@ -69,12 +72,15 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { copyText } from '../lib/affiliateApi'
 import { hasFeature, featureUnlockPlan, PLAN_LABELS } from '../lib/planConfig'
 
+type KeyScope = 'read' | 'read_write'
+
 interface KeyRow {
   id: string
   key_prefix: string
   label: string
   created_at: string
   last_used_at: string | null
+  scope?: KeyScope
 }
 
 interface ListResponse {
@@ -135,6 +141,10 @@ function setupSnippets(secret: string) {
   ]
 }
 
+function scopeLabel(scope: KeyScope | undefined): string {
+  return scope === 'read_write' ? 'Read and write' : 'Read only'
+}
+
 function fmtDT(iso: string | null): string {
   if (!iso) return 'never'
   const d = new Date(iso)
@@ -175,6 +185,7 @@ export default function McpAccessSection({
   const [list, setList] = useState<ListResponse | null>(null)
 
   const [label, setLabel] = useState('')
+  const [scope, setScope] = useState<KeyScope>('read')
   const [issuing, setIssuing] = useState(false)
   const [issueError, setIssueError] = useState<string | null>(null)
   const [reveal, setReveal] = useState<{ secret: string; row: KeyRow } | null>(null)
@@ -288,13 +299,14 @@ export default function McpAccessSection({
     setIssueError(null); setIssuing(true)
     try {
       const { data } = await callKeysFn<{ key: KeyRow; secret: string }>({
-        action: 'issue', client_id: clientId, label: label.trim() || undefined,
+        action: 'issue', client_id: clientId, label: label.trim() || undefined, scope,
       })
       if (!data || data.error || !data.secret) {
         setIssueError(data?.error || 'Could not issue a key. Try again, and if it keeps happening, contact support@getbrandgeo.com.'); return
       }
       setReveal({ secret: data.secret, row: data.key })
       setLabel('')
+      setScope('read')
       load()
     } catch {
       setIssueError('Could not issue a key. Try again, and if it keeps happening, contact support@getbrandgeo.com.')
@@ -425,7 +437,7 @@ export default function McpAccessSection({
   const atCap = keys.length >= max_keys
   // COPY: pending bg-copy. Placeholder explanation line (section 7.2 item 1);
   // final wording from bg-copy.
-  const explanationLine = "Give your own AI tools, such as Claude Code or Cursor, direct read access to this account's visibility data. It only reads: it can never start a collection or change your account."
+  const explanationLine = "Give your own AI tools, such as Claude Code or Cursor, direct read access to this account's visibility data. No key can start a collection or change your plan or billing; a read and write key can only mark Fix This items done."
 
   const KeysTable = keys.length > 0 && (
     <div className="mt-4 overflow-x-auto">
@@ -434,6 +446,7 @@ export default function McpAccessSection({
           <tr className="text-left text-slate-500 uppercase tracking-wide text-[10px]">
             <th className="pb-2 pr-4 font-medium">Label</th>
             <th className="pb-2 pr-4 font-medium">Key</th>
+            <th className="pb-2 pr-4 font-medium">Access</th>
             <th className="pb-2 pr-4 font-medium">Created</th>
             <th className="pb-2 pr-4 font-medium">Last used</th>
             <th className="pb-2 font-medium"><span className="sr-only">Actions</span></th>
@@ -444,6 +457,7 @@ export default function McpAccessSection({
             <tr key={k.id} className="border-t border-dark-700">
               <td className="py-2 pr-4 text-slate-200">{k.label || <span className="italic text-slate-500">Untitled</span>}</td>
               <td className="py-2 pr-4"><code className="text-brand-300 font-mono">{k.key_prefix}…</code></td>
+              <td className="py-2 pr-4 text-slate-300">{scopeLabel(k.scope)}</td>
               <td className="py-2 pr-4 text-slate-400">{fmtDT(k.created_at)}</td>
               <td className="py-2 pr-4 text-slate-400">{k.last_used_at ? fmtDT(k.last_used_at) : 'never'}</td>
               <td className="py-2">
@@ -514,6 +528,27 @@ export default function McpAccessSection({
               className={`${inputCls} w-56`}
             />
           </label>
+          <fieldset className="block">
+            <legend className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Access</legend>
+            <div role="radiogroup" aria-label="Access" className="flex flex-col gap-1.5">
+              {([
+                ['read', 'Read only'],
+                ['read_write', 'Read and write (lets an AI agent mark Fix This items done)'],
+              ] as [KeyScope, string][]).map(([v, text]) => (
+                <label key={v} className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mcp-key-scope"
+                    value={v}
+                    checked={scope === v}
+                    onChange={() => setScope(v)}
+                    className="mt-0.5 accent-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                  />
+                  <span>{text}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <button ref={issueBtnRef} onClick={issueKey} disabled={issuing || atCap} className={primaryBtn}>
             {issuing ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Issue key
           </button>

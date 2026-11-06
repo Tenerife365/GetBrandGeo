@@ -10,6 +10,8 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { buildFixPrompt } from '../lib/fixPrompt'
+import { buildFixResultMap, buildFixItems, type FixItem } from '../lib/fixItems'
+import { readAllById } from '../lib/keysetRead'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
@@ -21,7 +23,7 @@ import {
   getPlanLimits, QUEUE_ONLY_ENGINES,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
-import { computeAiVisibilityScore, isNoAnswerRow } from '../lib/aiVisibilityScore'
+import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
 import { MOTION_BASE, MOTION_FAST, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
@@ -43,29 +45,21 @@ import {
 import {
   AIV_COPY, promptCount, headlineRecommended, headlineNotYet, headlineUncheckedReason,
   joinEngineLabels, sectionUncheckedExtra, errorSinceChip, ratioNoneChip, enginesNamed, namedByEngines,
-  lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine, fixAppearsLine, fixAllMissingLine, fixAllLowLine,
-  panelNotAnswering, panelLastResult, fixEngineMissingTitle,
+  lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine,  
+  panelNotAnswering, panelLastResult,
   FIX_COPY, fixDoneWaiting, fixDoneWaitingData, fixVerifiedLine, fixReopenedLine, fixDismissedLine,
-  fixPromptGapTitle, fixPromptGapLine, fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement,
+  fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement, fixByAgent,
 } from '../lib/aiVisibilityCopy'
 import {
-  fixIds, metricKeys, parseMetricKey, metricLabel, measureFix, evaluateFix, verdictCutoff,
-  isOpenState, MAX_PROMPT_GAP_FIXES, type FixStateRow, type FixStatus,
+  parseMetricKey, metricLabel, measureFix, evaluateFix, verdictCutoff,
+  isOpenState, type FixStateRow, type FixStatus,
 } from '../lib/fixStates'
 
-interface FixItem {
-  id: string
-  metricKey: string | null
-  priority: 'P0' | 'P1' | 'P2'
-  title: string
-  description: string
-  fix: string
-  /** Display name and average rank of the rival, outranked fixes only (feed the copied prompt). */
-  competitor?: string
-  competitorAvgRank?: number | null
-}
-
-const FIX_SELECT = 'id, client_id, fix_id, status, title, metric_key, baseline_value, baseline_n, marked_at, checked_at, check_value, check_n'
+const FIX_SELECT_BASE = 'id, client_id, fix_id, status, title, metric_key, baseline_value, baseline_n, marked_at, checked_at, check_value, check_n'
+// marked_by_key arrives with db/supabase-mcp-fix-writes-2026-11-06.sql. If this
+// bundle reaches a database without it, the first read answers 42703 and every
+// later read and write drops the column instead of failing (review L2).
+let fixSelect = `${FIX_SELECT_BASE}, marked_by_key`
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -348,6 +342,8 @@ export default function AIVisibility() {
   // Stored fix states (public.fix_states), keyed by fix_id. No row = open.
   const [fixRows, setFixRows]           = useState<Map<string, FixStateRow>>(new Map())
   const [fixRowsLoaded, setFixRowsLoaded] = useState(false)
+  // client_api_keys id -> label, read once beside fix_states so a fix an AI agent marked can name its key.
+  const [keyLabels, setKeyLabels] = useState<Map<string, string>>(new Map())
   const [fixBusy, setFixBusy]           = useState<string | null>(null)
   const [fixNotice, setFixNotice]       = useState<{ id: string; text: string } | null>(null)
   const [showDoneFixes, setShowDoneFixes] = useState(false)
@@ -485,10 +481,17 @@ export default function AIVisibility() {
       return
     }
 
-    const [{ data: pData, error: pError }, { data: rData, error: rError }] = await Promise.all([
-      supabase.from('prompts').select('*').eq('is_active', true).eq('client_id', activeClientId).order('position'),
-      supabase.from('ai_results').select('*').eq('client_id', activeClientId).order('checked_at', { ascending: false }),
+    // Every answer, not the newest 1,000 PostgREST returns by default: the
+    // MCP server reads them all through the same keyset reader, so the Fix
+    // This list here and from list_fixes is built from the same rows. Sorted
+    // back to checked_at DESC after paging, which the health walk below needs.
+    const [{ data: pData, error: pError }, allResults] = await Promise.all([
+      supabase.from('prompts').select('*').eq('is_active', true).eq('client_id', activeClientId).order('position').order('id'),
+      readAllById<AIResult>(() => supabase.from('ai_results').select('*').eq('client_id', activeClientId)),
     ])
+    const rError = allResults.error
+    const rData: AIResult[] = allResults.rows.slice().sort((x, y) =>
+      x.checked_at < y.checked_at ? 1 : x.checked_at > y.checked_at ? -1 : 0)
 
     // A failed read must not look like "no prompts" or "nothing checked yet",
     // and must not wipe what is already on screen. Flag it and stop; the
@@ -500,39 +503,14 @@ export default function AIVisibility() {
     }
     setLoadError(false)
 
-    const map: ResultMap = new Map()
-    const errEngines = new Set<LLMName>()
-    const okEngines  = new Set<LLMName>()
-    let latestChecked = lastChecked
-    if (rData) {
-      rData.forEach((r: AIResult) => {
-        // Only show results for active engines
-        if (!activeEngines.includes(r.llm as EngineId)) return
-        if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
-        const llmMap = map.get(r.prompt_id)!
-        const llm = r.llm as LLMName
-        // Drops rows where the engine ran but produced no answer, from BOTH
-        // numerator and denominator. Rationale and the measured impact live on
-        // isNoAnswerRow in aiVisibilityScore.ts. This check used to be inlined
-        // here and nowhere else, which is how this page and the Overview
-        // headline came to report different numbers for the same client.
-        if (isNoAnswerRow(r)) return
-        if (!llmMap.has(llm)) {
-          if (r.status === 'error') {
-            // Track error but exclude from analysis — don't count as a real result
-            errEngines.add(llm)
-          } else {
-            llmMap.set(llm, r)
-            okEngines.add(llm)
-            if (!latestChecked || r.checked_at > latestChecked) latestChecked = r.checked_at
-          }
-        }
-      })
-    }
+    const built = buildFixResultMap(rData as AIResult[] | null, activeEngines)
+    const map: ResultMap = built.results
     // Engine is "unavailable" only when it has errors AND zero ok results
-    setErrorEngines(new Set([...errEngines].filter(e => !okEngines.has(e))))
+    setErrorEngines(built.errorEngines)
     // Mixed/partial: engine had at least one failed check AND at least one OK result.
-    setPartialErrorEngines(new Set([...errEngines].filter(e => okEngines.has(e))))
+    setPartialErrorEngines(built.partialErrorEngines)
+    const latestChecked = built.latestChecked && (!lastChecked || built.latestChecked > lastChecked)
+      ? built.latestChecked : lastChecked
 
     // Per-engine health. rData is ordered checked_at DESC, so the FIRST row seen
     // for an engine is its most recent attempt. Deliberately walks every row
@@ -597,10 +575,14 @@ export default function AIVisibility() {
       setFixRowsLoaded(true)
       return
     }
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('fix_states')
-      .select(FIX_SELECT)
+      .select(fixSelect)
       .eq('client_id', cid)
+    if (error && (error as { code?: string }).code === '42703' && fixSelect !== FIX_SELECT_BASE) {
+      fixSelect = FIX_SELECT_BASE
+      ;({ data, error } = await supabase.from('fix_states').select(fixSelect).eq('client_id', cid))
+    }
     // A reply for a client the admin has already switched away from is dropped.
     if (clientRef.current !== cid) return
     if (error) {
@@ -613,7 +595,7 @@ export default function AIVisibility() {
     }
     const m = new Map<string, FixStateRow>()
     ;(data ?? []).forEach(r => {
-      const row = r as FixStateRow
+      const row = r as unknown as FixStateRow
       m.set(row.fix_id, {
         ...row,
         baseline_value: row.baseline_value === null ? null : Number(row.baseline_value),
@@ -622,10 +604,22 @@ export default function AIVisibility() {
     })
     setFixRows(m)
     setFixRowsLoaded(true)
+    // Only needed when an agent marked something; a failed read just drops the label.
+    if (Array.from(m.values()).some(r => r.marked_by_key)) {
+      const { data: keyData, error: keyErr } = await supabase
+        .from('client_api_keys')
+        .select('id, label')
+        .eq('client_id', cid)
+      if (clientRef.current !== cid) return
+      const km = new Map<string, string>()
+      if (!keyErr) (keyData ?? []).forEach(k => { const l = (k as { id: string; label: string | null }); if (l.label) km.set(l.id, l.label) })
+      setKeyLabels(km)
+    }
   }
 
   useEffect(() => {
     setFixRows(new Map())
+    setKeyLabels(new Map())
     setFixRowsLoaded(false)
     setShowDoneFixes(false)
     setFixNotice(null)
@@ -887,122 +881,14 @@ export default function AIVisibility() {
 
   // ── Fix This hub ──────────────────────────────────────────────────────────
 
-  const fixItems = (() => {
-    // `id` is the stable fix id (fixStates.ts) a done mark is stored under;
-    // `metricKey` is the number the re-check compares, null for a manual fix.
-    const items: FixItem[] = []
-
-    // Every active engine MISSING reads as one finding, not one P0 per engine:
-    // the same sentence repeated four times says one thing four times.
-    const allMissing = engineStatusCards.length > 0 && engineStatusCards.every(e => e.status === 'MISSING')
-    if (allMissing) {
-      const totalChecked = engineStatusCards.reduce((a, e) => a + e.checked, 0)
-      const totalMentioned = engineStatusCards.reduce((a, e) => a + e.mentioned, 0)
-      items.push({
-        id: fixIds.visibilityAll(),
-        metricKey: metricKeys.all(),
-        priority: 'P0',
-        title: totalMentioned === 0 ? AIV_COPY.fixAllMissingTitle : AIV_COPY.fixAllLowTitle,
-        description: totalMentioned === 0
-          ? fixAllMissingLine(brandName, totalChecked, engineStatusCards.length)
-          : fixAllLowLine(brandName, totalMentioned, totalChecked, engineStatusCards.length),
-        fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications AI engines trust. Ensure your domain has schema.org/Organization structured data with complete fields.`,
-      })
-    } else {
-      engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0 && !e.isUnavailable).forEach(e => {
-        items.push({
-          id: fixIds.engineMissing(e.id),
-          metricKey: metricKeys.engine(e.id),
-          priority: 'P0',
-          title: fixEngineMissingTitle(e.label, e.mentioned),
-          description: fixAppearsLine(brandName, e.mentioned, e.checked, e.label),
-          fix: `Create a dedicated "${brandName} overview" page answering your most common category queries. Submit it to authoritative directories and request coverage from publications ${e.label} training data trusts. Ensure your domain has schema.org/Organization structured data with complete fields.`,
-        })
-      })
-    }
-
-    engineStatusCards.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
-      items.push({
-        id: fixIds.engineLow(e.id),
-        metricKey: metricKeys.engine(e.id),
-        priority: 'P1',
-        title: `Low visibility in ${e.label} (${e.pct}%)`,
-        description: `Brand appears inconsistently, in ${e.mentioned} of ${e.checked} prompts checked.`,
-        fix: `Strengthen brand authority signals for ${e.label}: publish 3+ long-form pages that directly answer your tracked queries, build backlinks from industry media mentioning ${brandName} in context, and add FAQ schema markup to your site's key landing pages.`,
-      })
-    })
-
-    // "Outranked by" is a claim about RANK, so it now requires a rank on both
-    // sides. It used to fire on `competitorFreq[0] && gapCount > 0`, which never
-    // read a position at all: a name mentioned only in prose, carrying no rank
-    // whatsoever, was announced as outranking the client in the headline P1.
-    // Recommendations.tsx already gated this correctly; this page did not.
-    const topRanked = competitorFreq.find(c => !c.proseOnly && c.avgPos !== null)
-    if (topRanked && gapCount > 0) {
-      items.push({
-        id: fixIds.outranked(topRanked.name),
-        metricKey: metricKeys.competitor(topRanked.name),
-        competitor: topRanked.name,
-        competitorAvgRank: topRanked.avgPos,
-        priority: 'P1',
-        title: `Outranked by ${topRanked.name} (avg #${topRanked.avgPos})`,
-        description: `${topRanked.name} is ranked by an engine in ${topRanked.rankedMentions} of its ${topRanked.count} appearances, while ${brandName} is absent in ${gapCount} checks.`,
-        fix: `Publish a detailed comparison page: "${brandName} vs ${topRanked.name}" covering differentiators, pricing, and use cases. Pitch this page to trade publications and ask clients for case study testimonials published under your domain.`,
-      })
-    }
-
-    if (dimensions.consistency < 40 && overallPct > 0) {
-      items.push({
-        id: fixIds.consistency(),
-        metricKey: metricKeys.consistency(),
-        priority: 'P2',
-        title: 'Inconsistent cross-prompt coverage',
-        description: `Brand appears in only ${dimensions.consistency}% of prompts with consistent multi-engine coverage. AI models know you selectively.`,
-        fix: `Map which prompt topics are missing and create dedicated content for each gap. Ensure every service category and location you serve has a standalone indexed page with your brand name in the H1 and title tag.`,
-      })
-    }
-
-    if (dimensions.knowledge > 0 && dimensions.knowledge < 50) {
-      items.push({
-        id: fixIds.ranking(),
-        metricKey: metricKeys.knowledge(),
-        priority: 'P2',
-        title: 'Improve ranking position',
-        description: `When mentioned, ${brandName} averages a lower position. Competitors rank above you in shared responses.`,
-        fix: `Build topical authority by publishing a content cluster: one pillar page on your main category + 5 supporting posts on subtopics. Internal-link them together. This signals depth of expertise to AI training pipelines.`,
-      })
-    }
-
-    // Per-prompt gaps: every engine that answered left the brand out. These are
-    // the steady supply of next fixes (fix-states.md section 6). Most contested
-    // first (answers that named another brand), then prompt order; at most
-    // MAX_PROMPT_GAP_FIXES open at a time, the next appear as these close.
-    const gaps = prompts.map(p => {
-      const cells = Array.from(results.get(p.id)?.values() ?? [])
-      const withCompetitor = cells.filter(r => {
-        try {
-          const arr = JSON.parse(r.competitors_mentioned ?? '[]')
-          return Array.isArray(arr) && arr.length > 0
-        } catch { return false }
-      }).length
-      return { p, answers: cells.length, mentioned: cells.some(r => r.brand_mentioned), withCompetitor }
-    })
-      .filter(g => g.answers > 0 && !g.mentioned && isOpenState(fixRows.get(fixIds.promptGap(g.p.id))?.status))
-      .sort((a, b) => b.withCompetitor - a.withCompetitor || a.p.position - b.p.position)
-      .slice(0, MAX_PROMPT_GAP_FIXES)
-    gaps.forEach(g => {
-      items.push({
-        id: fixIds.promptGap(g.p.id),
-        metricKey: metricKeys.prompt(g.p.id),
-        priority: 'P2',
-        title: fixPromptGapTitle(g.p.text),
-        description: fixPromptGapLine(brandName, g.answers, g.withCompetitor),
-        fix: FIX_COPY.promptGapFix,
-      })
-    })
-
-    return items
-  })()
+  const fixItems = buildFixItems({
+    brandName,
+    engines: activeLLMs.map(l => ({ id: l.id as string, label: l.label })),
+    prompts: prompts.map(p => ({ id: p.id, text: p.text, position: p.position })),
+    results,
+    errorEngines,
+    stateOf: id => fixRows.get(id)?.status,
+  })
 
   // ── Fix states: open list, done list, mark, reopen, re-check ──────────────
   const fixPromptIds = prompts.map(p => p.id)
@@ -1073,7 +959,7 @@ export default function AIVisibility() {
     const { data, error } = await supabase
       .from('fix_states')
       .upsert(payload, { onConflict: 'client_id,fix_id' })
-      .select(FIX_SELECT)
+      .select(fixSelect)
       .single()
     setFixBusy(null)
     if (clientRef.current !== cid) return
@@ -1082,7 +968,7 @@ export default function AIVisibility() {
       setFixNotice({ id: item.id, text: FIX_COPY.saveFailed })
       return
     }
-    putFixRow(data as FixStateRow)
+    putFixRow(data as unknown as FixStateRow)
     afterFixMoved(announce)
   }
 
@@ -1104,7 +990,7 @@ export default function AIVisibility() {
       .update({ status: 'open' })
       .eq('client_id', cid)
       .eq('fix_id', fixId)
-      .select(FIX_SELECT)
+      .select(fixSelect)
       .single()
     setFixBusy(null)
     if (clientRef.current !== cid) return
@@ -1113,7 +999,7 @@ export default function AIVisibility() {
       setFixNotice({ id: fixId, text: FIX_COPY.saveFailed })
       return
     }
-    putFixRow(data as FixStateRow)
+    putFixRow(data as unknown as FixStateRow)
     afterFixMoved(announce)
   }
 
@@ -1156,7 +1042,7 @@ export default function AIVisibility() {
         .eq('client_id', row.client_id)
         .eq('fix_id', row.fix_id)
         .eq('status', 'done')
-        .select(FIX_SELECT)
+        .select(fixSelect)
         .maybeSingle()
         .then(({ data, error }) => {
           verdictInFlight.current.delete(row.fix_id)
@@ -1169,7 +1055,7 @@ export default function AIVisibility() {
           }
           // No row matched: another tab already moved it. Re-read the truth.
           if (!data) { loadFixRows(); return }
-          putFixRow(data as FixStateRow)
+          putFixRow(data as unknown as FixStateRow)
         })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1185,17 +1071,21 @@ export default function AIVisibility() {
     const scope = parseMetricKey(row.metric_key)
     const label = metricLabel(scope, engineLabelOf, promptTextOf)
     const markedOn = row.marked_at ? formatDate(row.marked_at) : ''
-    if (row.status === 'dismissed') return fixDismissedLine(markedOn)
+    const by = row.marked_by_key ? fixByAgent(keyLabels.get(row.marked_by_key)) : ''
+    if (row.status === 'dismissed') return fixDismissedLine(markedOn, by)
     if (row.status === 'verified' && row.baseline_value !== null && row.check_value !== null) {
-      return fixVerifiedLine(formatDate(row.checked_at ?? row.marked_at ?? ''), label, row.baseline_value, row.check_value)
+      const verified = fixVerifiedLine(formatDate(row.checked_at ?? row.marked_at ?? ''), label, row.baseline_value, row.check_value)
+      return by ? `${fixMarkedOn(markedOn, by)} ${verified}` : verified
     }
-    if (!scope || row.baseline_value === null || !row.marked_at) return FIX_COPY.manual
+    if (!scope || row.baseline_value === null || !row.marked_at) {
+      return by && markedOn ? `${fixMarkedOn(markedOn, by)} ${FIX_COPY.manualTail}` : FIX_COPY.manual
+    }
     const ev = evaluateFix(row, results, fixPromptIds, fixEngineIds)
-    if (ev.state === 'untracked') return `${fixMarkedOn(markedOn)} ${FIX_COPY.untracked}`
+    if (ev.state === 'untracked') return `${fixMarkedOn(markedOn, by)} ${FIX_COPY.untracked}`
     if (ev.state === 'waiting' && Date.now() >= Date.parse(ev.readyAfter)) {
-      return fixDoneWaitingData(markedOn, ev.fresh, ev.needed)
+      return fixDoneWaitingData(markedOn, ev.fresh, ev.needed, by)
     }
-    return fixDoneWaiting(markedOn, formatDate(verdictCutoff(row.marked_at)))
+    return fixDoneWaiting(markedOn, formatDate(verdictCutoff(row.marked_at)), by)
   }
 
   const reopenedFixLine = (row: FixStateRow | undefined): string | null => {

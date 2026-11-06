@@ -8,7 +8,10 @@
  * rows, engine entitlement, caps and cursors, the scan ceiling, both rate
  * limits, the last_used_at throttle, structuredContent parity, and that no key
  * or key hash ever reaches a log line. Ends with the plan-agreement check
- * between _plans.js mcpAllowedFor() and planConfig.ts hasFeature().
+ * between _plans.js mcpAllowedFor() and planConfig.ts hasFeature(). Section 16
+ * covers MCP stage 2 (docs/arch/mcp-stage2-fixes.md 9.4): list_fixes parity
+ * with the dashboard's own builders, the key scope gate, the write plan gate,
+ * refused ids, idempotency, the write counter, the audit row and the log rule.
  *
  * Run: `node tests/mcp_server.test.js` from brandgeo-dashboard/.
  */
@@ -277,7 +280,8 @@ async function main() {
   assert.ok(!db.rows('affiliate_rate_limits').some((x) => x.key === 'mcp:client:3:day'), 'a gated call must not spend the daily counter')
   ok('free: initialize succeeds, tools/list and tools/call get -32002 with required_plan radar; daily counter untouched')
   res = await rpc('tools/list', {}, KB.secret, { headers: V })
-  assert.strictEqual(res.body.result.tools.length, 7)
+  // Stage 2 added list_fixes for every gated key (mcp-stage2-fixes.md 9.4).
+  assert.strictEqual(res.body.result.tools.length, 8)
   ok('radar passes the gate')
   await toolOk('get_brand_overview', {}, KA.secret)
   db.rows('clients').find((c) => c.id === 1).plan = 'free'
@@ -310,7 +314,8 @@ async function main() {
   assert.ok(res.body.result.tools.every((t) => t.outputSchema === undefined))
   res = await rpc('tools/list', {}, KA.secret)
   assert.ok(res.body.result.tools.every((t) => t.outputSchema === undefined))
-  ok('seven tools with read-only annotations; outputSchema on 2025-06-18+, omitted on 2025-03-26 and when no version header is sent')
+  assert.ok(!res.body.result.tools.some((t) => t.name === 'mark_fix_done'), 'a read key is never offered the write tool')
+  ok('eight tools (the seven stage 1 tools plus list_fixes) with read-only annotations, no mark_fix_done for a read key; outputSchema on 2025-06-18+, omitted on 2025-03-26 and when no version header is sent')
   res = await rpc('tools/call', { name: 'delete_everything', arguments: {} }, KA.secret)
   assert.strictEqual(res.body.error.code, -32602); assert.deepStrictEqual(res.body.error.data, { tool: 'delete_everything' })
   ok('unknown tool name -32602 with data.tool')
@@ -481,7 +486,7 @@ async function main() {
     assert.strictEqual(out.content.length, 1); assert.strictEqual(out.content[0].type, 'text')
     assert.ok(out.structuredContent.client_id === 1 && typeof out.structuredContent.generated_at === 'string', name)
   }
-  ok('structuredContent deep-equals JSON.parse(content[0].text), with client_id and generated_at, for all seven tools')
+  ok('structuredContent deep-equals JSON.parse(content[0].text), with client_id and generated_at, for all eight read tools (list_fixes included)')
 
   section('13. failures and logging')
   const boom = { from() { throw new Error(`db exploded near ${KA.secret} hash ${keys.hashClientApiKey(KA.secret)}`) }, rpc() { throw new Error('x') } }
@@ -589,6 +594,449 @@ async function main() {
   assert.deepStrictEqual(mcp.SUPPORTED_PROTOCOL_VERSIONS, ['2025-11-25', '2025-06-18', '2025-03-26'])
   assert.ok(!mcp.SUPPORTED_PROTOCOL_VERSIONS.includes('2026-07-28'))
   ok('SUPPORTED_PROTOCOL_VERSIONS is pinned to the three legacy revisions and does not include 2026-07-28')
+
+  section('16. stage 2: list_fixes and mark_fix_done (mcp-stage2-fixes.md 9.4)')
+  // A separate in-memory database so the fixture is exactly what the oracle
+  // reads. Fictional brands only. Client 61 is the subject, 62 a second
+  // tenant with the same fix ids open, 63 a free client with a read and write key.
+  const fixItemsLib = require(path.join(__dirname, '..', 'src', 'lib', 'fixItems.ts'))
+  const fixStatesLib = require(path.join(__dirname, '..', 'src', 'lib', 'fixStates.ts'))
+  const fixPromptLib = require(path.join(__dirname, '..', 'src', 'lib', 'fixPrompt.ts'))
+  const marketsLib = require(path.join(__dirname, '..', 'src', 'lib', 'markets.ts'))
+  const planLib = require(path.join(__dirname, '..', 'src', 'lib', 'planConfig.ts'))
+
+  const S0 = new Date('2026-11-20T09:00:00Z')
+  clock = new Date(S0)
+  const sAgo = (d) => new Date(S0.getTime() - d * 86400_000).toISOString()
+  const fdb = createFakeSupabase({ now: () => clock })
+  // fix_states_guard() stand-in for the service role (auth.uid() null): stamps
+  // marked_at on the move into done or dismissed, keeps marked_by_key there,
+  // pins it and the baseline on every other update.
+  fdb.triggers.fix_states = (op, old, row, nowIso) => {
+    if (op === 'INSERT') {
+      row.created_at = nowIso; row.updated_at = nowIso
+      row.checked_at = null; row.check_value = null; row.check_n = null
+      if (row.status === 'done' || row.status === 'dismissed') { row.marked_at = nowIso; row.marked_by = null } else { row.marked_at = null; row.marked_by = null; row.marked_by_key = null }
+      if (row.status !== 'done') { row.baseline_value = null; row.baseline_n = null }
+      return row
+    }
+    for (const k of ['id', 'client_id', 'fix_id', 'created_at']) row[k] = old[k]
+    row.updated_at = nowIso
+    if (row.status !== old.status && (row.status === 'done' || row.status === 'dismissed')) {
+      row.marked_at = nowIso; row.marked_by = null
+      row.checked_at = null; row.check_value = null; row.check_n = null
+      if (row.status !== 'done') { row.baseline_value = null; row.baseline_n = null }
+      return row
+    }
+    for (const k of ['marked_at', 'marked_by', 'marked_by_key', 'baseline_value', 'baseline_n', 'checked_at', 'check_value', 'check_n']) row[k] = old[k]
+    return row
+  }
+
+  const OWNER = 'aaaaaaaa-0000-4000-8000-000000000061'
+  fdb.seed('user_profiles', [{ id: OWNER, role: 'viewer', client_id: 61 }])
+  fdb.seed('clients', [
+    { id: 61, name: 'Lumora Studio', brand_aliases: ['Lumora'], brand_website: 'lumora.example', default_market_id: 'RO', plan: 'growth', category: 'active', engines_enabled: null, known_competitors: [] },
+    { id: 62, name: 'Quillfeather Labs', brand_aliases: [], brand_website: null, default_market_id: null, plan: 'growth', category: 'active', engines_enabled: null, known_competitors: [] },
+    { id: 63, name: 'Tinybrook', brand_aliases: [], brand_website: null, default_market_id: null, plan: 'free', category: 'active', engines_enabled: null, known_competitors: [] },
+  ])
+  const SECRETS2 = []
+  function issueKey2(clientId, scope) {
+    const secret = keys.makeClientApiKey(clientId)
+    SECRETS2.push(secret); ALL_SECRETS.push(secret)
+    const row = { id: require('crypto').randomUUID(), client_id: clientId, key_hash: keys.hashClientApiKey(secret), key_prefix: keys.clientApiKeyPrefix(secret), label: `k${clientId}`, created_by: OWNER, last_used_at: null, revoked_at: null }
+    if (scope !== undefined) row.scope = scope
+    fdb.seed('client_api_keys', [row])
+    return { secret, row }
+  }
+  const KS_READ = issueKey2(61, 'read')
+  const KS_RW = issueKey2(61, 'read_write')
+  const KS_LEGACY = issueKey2(61, undefined)
+  fdb.rows('client_api_keys').find((k) => k.id === KS_LEGACY.row.id).scope = undefined
+  const KT_RW = issueKey2(62, 'read_write')
+  const KFREE_RW = issueKey2(63, 'read_write')
+
+  fdb.seed('prompts', [
+    { id: 201, client_id: 61, text: 'best photo studio in Bucharest', category: 'general', is_active: true, position: 1 },
+    { id: 202, client_id: 61, text: 'studio for product photography', category: 'general', is_active: true, position: 2 },
+    { id: 203, client_id: 61, text: 'affordable portrait studio', category: 'general', is_active: true, position: 3 },
+    { id: 204, client_id: 61, text: 'studio rental with lighting', category: 'general', is_active: true, position: 4 },
+    { id: 205, client_id: 61, text: 'wedding photo studio near me', category: 'general', is_active: true, position: 5 },
+    { id: 206, client_id: 61, text: 'headshot studio for teams', category: 'general', is_active: true, position: 6 },
+    { id: 207, client_id: 61, text: 'retired studio question', category: 'general', is_active: false, position: 7 },
+    { id: 301, client_id: 62, text: 'quill pens online', category: 'general', is_active: true, position: 1 },
+    { id: 302, client_id: 62, text: 'best quill brand', category: 'general', is_active: true, position: 2 },
+  ])
+  const NW = (pos) => ({ name: 'Northwind Atelier', pos })
+  const HP = (pos) => ({ name: 'Harbor Pine Imaging', pos })
+  let rid = 5000
+  const rr = (o) => Object.assign({ id: ++rid, status: 'ok', error_code: null, brand_position: null, sentiment: 'neutral', response_snippet: 'an answer', competitors_mentioned: '[]' }, o)
+  const sRows = []
+  for (const pid of [201, 202, 203, 204, 205, 206]) {
+    sRows.push(rr({ client_id: 61, prompt_id: pid, llm: 'chatgpt', brand_mentioned: false, competitors_mentioned: JSON.stringify(pid <= 204 ? [NW(1), HP(2)] : [HP(1)]), checked_at: sAgo(1) }))
+  }
+  // An older chatgpt row that DID mention the brand: superseded, must not count.
+  sRows.push(rr({ client_id: 61, prompt_id: 201, llm: 'chatgpt', brand_mentioned: true, brand_position: 1, sentiment: 'positive', checked_at: sAgo(20) }))
+  for (const pid of [201, 202, 203, 204, 205, 206]) {
+    const m = pid <= 202
+    sRows.push(rr({ client_id: 61, prompt_id: pid, llm: 'gemini', brand_mentioned: m, brand_position: m ? 3 : null, sentiment: m ? 'positive' : 'neutral', competitors_mentioned: JSON.stringify(pid <= 204 ? [NW(1)] : []), checked_at: sAgo(pid === 203 ? 3 : 1) }))
+  }
+  // A newer no-answer row on gemini x 203: skipped, the older ok row stands.
+  sRows.push(rr({ client_id: 61, prompt_id: 203, llm: 'gemini', brand_mentioned: false, response_snippet: '[no_ai_overview] nothing', checked_at: sAgo(1) }))
+  for (const pid of [201, 202, 203, 204, 205, 206]) {
+    const m = pid <= 204
+    sRows.push(rr({ client_id: 61, prompt_id: pid, llm: 'claude', brand_mentioned: m, brand_position: m ? 2 : null, sentiment: m ? 'positive' : 'neutral', competitors_mentioned: JSON.stringify(m ? ['Northwind Atelier'] : [HP(1)]), checked_at: sAgo(1) }))
+  }
+  // google_ai: error rows only (unavailable). grok: not a growth engine.
+  sRows.push(rr({ client_id: 61, prompt_id: 201, llm: 'google_ai', status: 'error', error_code: 'quota_exceeded', brand_mentioned: false, checked_at: sAgo(1) }))
+  sRows.push(rr({ client_id: 61, prompt_id: 202, llm: 'google_ai', status: 'error', error_code: 'quota_exceeded', brand_mentioned: false, checked_at: sAgo(1) }))
+  sRows.push(rr({ client_id: 61, prompt_id: 205, llm: 'grok', brand_mentioned: true, brand_position: 1, competitors_mentioned: JSON.stringify(['Grokonly Partners']), checked_at: sAgo(1) }))
+  // Inactive prompt: stays in the map, as on the page.
+  sRows.push(rr({ client_id: 61, prompt_id: 207, llm: 'chatgpt', brand_mentioned: false, competitors_mentioned: JSON.stringify([NW(1)]), checked_at: sAgo(2) }))
+  // Client 62: the same chatgpt gap, so engine_missing:chatgpt is open there too.
+  for (const pid of [301, 302]) {
+    sRows.push(rr({ client_id: 62, prompt_id: pid, llm: 'chatgpt', brand_mentioned: false, competitors_mentioned: JSON.stringify([{ name: 'Inkwell Rivals', pos: 1 }]), checked_at: sAgo(1) }))
+    sRows.push(rr({ client_id: 62, prompt_id: pid, llm: 'claude', brand_mentioned: true, brand_position: 1, checked_at: sAgo(1) }))
+  }
+  fdb.seed('ai_results', sRows)
+  fdb.seed('fix_states', [
+    { client_id: 61, fix_id: 'prompt_gap:206', status: 'reopened', title: 'Not named for: headshot studio for teams', metric_key: 'rate:prompt:206', baseline_value: 0, baseline_n: 3, marked_at: sAgo(20), checked_at: sAgo(10), check_value: 0, check_n: 3 },
+    { client_id: 61, fix_id: 'visibility:all', status: 'done', title: 'Old overall fix', metric_key: 'rate:all', baseline_value: 10, baseline_n: 12, marked_at: sAgo(9) },
+    { client_id: 61, fix_id: 'engine_missing:perplexity', status: 'done', title: 'Perplexity fix', metric_key: 'rate:engine:perplexity', baseline_value: 0, baseline_n: 4, marked_at: sAgo(3) },
+    { client_id: 61, fix_id: 'engine_missing:claude', status: 'verified', title: 'Claude fix', metric_key: 'rate:engine:claude', baseline_value: 0, baseline_n: 6, marked_at: sAgo(30), checked_at: sAgo(15), check_value: 66.7, check_n: 6 },
+    { client_id: 61, fix_id: 'prompt_gap:205', status: 'dismissed', title: 'Not named for: wedding photo studio near me', marked_at: sAgo(4) },
+  ].map((r) => Object.assign({ marked_by: null, marked_by_key: null, checked_at: null, check_value: null, check_n: null, created_at: sAgo(30), updated_at: sAgo(1) }, r)))
+
+  const CFG2 = { perKeyPerMinute: 100000, perClientPerDay: 100000, perClientWritesPerHour: 100000 }
+  const call2 = (method, params, key, opts = {}) => send(ev({ jsonrpc: '2.0', id: opts.id ?? 9, method, ...(params === undefined ? {} : { params }) }, { key, headers: opts.headers || V }), { supabase: fdb, config: opts.config || CFG2 })
+  async function tool2(name, args, key, opts) {
+    const res = await call2('tools/call', { name, arguments: args }, key, opts)
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body))
+    assert.ok(res.body.result, `expected a result for ${name}: ${JSON.stringify(res.body)}`)
+    if (!res.body.result.isError) assert.deepStrictEqual(res.body.result.structuredContent, JSON.parse(res.body.result.content[0].text))
+    return res.body.result
+  }
+
+  // The page's own path, called directly on the same rows: the oracle.
+  function oracle(clientId) {
+    const client = fdb.rows('clients').find((c) => c.id === clientId)
+    const engineIds = planLib.getActiveEngines(client.plan, client.engines_enabled).map(String)
+    const engines = engineIds.map((id) => ({ id, label: planLib.ENGINE_META[id].label }))
+    const prompts = fdb.rows('prompts').filter((p) => p.client_id === clientId && p.is_active)
+      .sort((a, b) => a.position - b.position).map((p) => ({ id: p.id, text: p.text, position: p.position }))
+    // As the page reads them: select('*'), newest first by checked_at.
+    const rows = fdb.rows('ai_results').filter((x) => x.client_id === clientId).slice().sort((a, b) => (a.checked_at < b.checked_at ? 1 : -1))
+    const built = fixItemsLib.buildFixResultMap(rows, engineIds)
+    const states = new Map(fdb.rows('fix_states').filter((x) => x.client_id === clientId).map((x) => [x.fix_id, x]))
+    const items = fixItemsLib.buildFixItems({ brandName: client.name, engines, prompts, results: built.results, errorEngines: built.errorEngines, stateOf: (id) => states.get(id)?.status })
+    const market = marketsLib.MARKETS.find((m) => m.id === client.default_market_id)?.label ?? null
+    const promptFor = (item) => fixPromptLib.buildFixPrompt(
+      { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
+      { brandName: client.name, website: client.brand_website ?? null, market, engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results: built.results },
+    ) ?? item.fix
+    const open = items.filter((i) => fixStatesLib.isOpenState(states.get(i.id)?.status))
+    return { items, open, promptFor, results: built.results, promptIds: prompts.map((p) => p.id), engineIds, states }
+  }
+
+  // ── list_fixes: parity with the page's builders ──
+  let o = oracle(61)
+  assert.ok(o.open.length >= 4, `fixture should open several fixes, got ${o.open.map((i) => i.id)}`)
+  for (const want of ['engine_missing:chatgpt', 'engine_low:gemini', 'prompt_gap:206']) assert.ok(o.open.some((i) => i.id === want), `fixture lacks ${want}`)
+  assert.ok(o.open.some((i) => i.id.startsWith('outranked:')), 'fixture lacks an outranked fix')
+  assert.ok(!o.open.some((i) => i.id === 'prompt_gap:205'), 'a dismissed gap is not open')
+  let lf = await tool2('list_fixes', {}, KS_READ.secret)
+  assert.ok(!lf.isError, JSON.stringify(lf))
+  let L = lf.structuredContent
+  assert.strictEqual(L.client_id, 61); assert.strictEqual(L.generated_at, S0.toISOString())
+  assert.strictEqual(L.truncated, false); assert.strictEqual(L.closed, undefined)
+  assert.deepStrictEqual(L.open.map((x) => x.fix_id), o.open.map((i) => i.id), 'ids and order')
+  for (let i = 0; i < o.open.length; i++) {
+    const it = o.open[i]; const got = L.open[i]
+    assert.strictEqual(got.prompt, o.promptFor(it), `prompt text of ${it.id}`)
+    assert.deepStrictEqual([got.priority, got.title, got.summary, got.fix], [it.priority, it.title, it.description, it.fix], `copy of ${it.id}`)
+    assert.deepStrictEqual(Object.keys(got).sort(), ['fix', 'fix_id', 'priority', 'prompt', 'reopened', 'status', 'summary', 'title'])
+    // Ids like "consistency" are ordinary words; the compound ids must not leak.
+    if (got.fix_id.includes(':')) assert.ok(!got.prompt.includes(got.fix_id), `the fix id ${got.fix_id} appears inside the prompt text`)
+  }
+  assert.ok(L.open.find((x) => x.fix_id === 'engine_missing:chatgpt').prompt.includes('Romania'), 'market label from markets.ts by default_market_id')
+  ok(`list_fixes: ${L.open.length} open fixes with the same ids, order, priority, title, summary, fix and byte-identical prompt text as buildFixResultMap + buildFixItems + buildFixPrompt on the same rows`)
+  const reo = L.open.find((x) => x.fix_id === 'prompt_gap:206')
+  assert.strictEqual(reo.status, 'reopened')
+  assert.deepStrictEqual(reo.reopened, { marked_at: sAgo(20), checked_at: sAgo(10), before: 0, after: 0, metric: 'Mention rate for "headshot studio for teams"' })
+  assert.ok(L.open.filter((x) => x.fix_id !== 'prompt_gap:206').every((x) => x.status === 'open' && x.reopened === null))
+  ok('a reopened fix is open with status reopened and { marked_at, checked_at, before, after, metric }; the rest are open with reopened null')
+  const allL = JSON.stringify(L)
+  for (const bad of ['Grokonly', 'Inkwell', 'Quillfeather', 'quill pens']) assert.ok(!allL.includes(bad), `${bad} leaked into list_fixes`)
+  ok('list_fixes: no unentitled-engine or other-client content')
+
+  lf = await tool2('list_fixes', { include_closed: true }, KS_READ.secret)
+  L = lf.structuredContent
+  assert.deepStrictEqual(L.closed.map((x) => x.fix_id), ['engine_missing:perplexity', 'prompt_gap:205', 'visibility:all', 'engine_missing:claude'], 'the Done list order: checked_at or marked_at, newest first')
+  const byId = new Map(L.closed.map((x) => [x.fix_id, x]))
+  const evAll = fixStatesLib.evaluateFix(o.states.get('visibility:all'), o.results, o.promptIds, o.engineIds, S0.getTime())
+  assert.strictEqual(evAll.state, 'verdict')
+  assert.deepStrictEqual(byId.get('visibility:all').recheck, { state: 'verdict_due', status: evAll.status, value: evAll.value })
+  assert.deepStrictEqual(byId.get('engine_missing:perplexity').recheck, { state: 'untracked' })
+  assert.deepStrictEqual(byId.get('engine_missing:claude').recheck, { state: 'verified', checked_at: sAgo(15), before: 0, after: 66.7, metric: 'Claude mention rate' })
+  assert.strictEqual(byId.get('prompt_gap:205').recheck, null)
+  assert.strictEqual(fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === 'visibility:all').status, 'done', 'list_fixes records no verdict')
+  assert.ok(!fdb.calls.some((c) => c.table === 'fix_states' && c.op !== 'select'), 'list_fixes wrote nothing to fix_states')
+  ok('include_closed: done, verified and dismissed rows in the Done list order; a due verdict is reported as verdict_due (evaluateFix), never written')
+  lf = await tool2('list_fixes', { limit: 2, include_closed: true }, KS_READ.secret)
+  assert.strictEqual(lf.structuredContent.open.length, 2); assert.strictEqual(lf.structuredContent.closed.length, 2)
+  lf = await tool2('list_fixes', { limit: 999 }, KS_READ.secret)
+  assert.strictEqual(lf.structuredContent.open.length, o.open.length)
+  lf = await tool2('list_fixes', { limit: 'ten' }, KS_READ.secret)
+  assert.strictEqual(lf.isError, true)
+  lf = await tool2('list_fixes', { include_closed: 'yes' }, KS_READ.secret)
+  assert.strictEqual(lf.isError, true)
+  ok('limit clamps to 1..50 per list; wrong-typed limit or include_closed is an isError result')
+  lf = await tool2('list_fixes', {}, KS_READ.secret, { config: { ...CFG2, scanPage: 5, scanCeiling: 5 } })
+  assert.strictEqual(lf.structuredContent.truncated, true)
+  ok('with the scan ceiling injected small, list_fixes says truncated: true')
+
+  // ── tools/list and the scope gate ──
+  let tl = await call2('tools/list', {}, KS_READ.secret)
+  assert.deepStrictEqual(tl.body.result.tools.map((t) => t.name), mcp.TOOL_NAMES)
+  assert.ok(mcp.TOOL_NAMES.includes('list_fixes') && !mcp.TOOL_NAMES.includes('mark_fix_done'))
+  assert.deepStrictEqual(tl.body.result.tools.find((t) => t.name === 'list_fixes').annotations, { readOnlyHint: true, idempotentHint: true, openWorldHint: false })
+  tl = await call2('tools/list', {}, KS_LEGACY.secret)
+  assert.ok(!tl.body.result.tools.some((t) => t.name === 'mark_fix_done'), 'a key row without scope reads as read only')
+  tl = await call2('tools/list', {}, KS_RW.secret)
+  assert.deepStrictEqual(tl.body.result.tools.map((t) => t.name), [...mcp.TOOL_NAMES, 'mark_fix_done'])
+  const mfd = tl.body.result.tools.find((t) => t.name === 'mark_fix_done')
+  assert.deepStrictEqual(mfd.annotations, { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false })
+  assert.deepStrictEqual(mfd.inputSchema.required, ['fix_id'])
+  assert.ok(mfd.outputSchema)
+  tl = await call2('tools/list', {}, KS_RW.secret, { headers: {} })
+  assert.ok(tl.body.result.tools.every((t) => t.outputSchema === undefined))
+  ok('tools/list: list_fixes for every gated key; mark_fix_done only for a read_write key, with readOnly false, destructive false, idempotent true, openWorld false')
+  let init = await call2('initialize', { protocolVersion: '2025-06-18' }, KS_READ.secret)
+  assert.ok(init.body.result.instructions.startsWith('Read-only access'))
+  init = await call2('initialize', { protocolVersion: '2025-06-18' }, KS_RW.secret)
+  assert.ok(!init.body.result.instructions.startsWith('Read-only') && init.body.result.instructions.includes('mark_fix_done') && init.body.result.instructions.includes('never start a collection'))
+  ok('initialize: a read key keeps the stage 1 instructions; a read and write key is not told it is read only')
+
+  const writesKey = (cid) => `mcp:client:${cid}:writes:hour`
+  const writeCount = (cid) => fdb.rows('affiliate_rate_limits').filter((x) => x.key === writesKey(cid)).reduce((a, x) => a + x.count, 0)
+  const fixWrites = () => fdb.calls.filter((c) => c.table === 'fix_states' && c.op !== 'select').length
+  const audits = (cid) => fdb.rows('client_events').filter((x) => x.client_id === cid && x.type === 'mcp_fix_marked')
+  for (const k of [KS_READ, KS_LEGACY]) {
+    const res = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt' }, k.secret)
+    assert.strictEqual(res.isError, true)
+    assert.strictEqual(res.content[0].text, 'This key is read only. Create a read and write key on the BrandGEO Account page to let an agent mark fixes done.')
+  }
+  assert.strictEqual(fixWrites(), 0); assert.strictEqual(audits(61).length, 0); assert.strictEqual(writeCount(61), 0)
+  ok('mark_fix_done with a read key (or a key row without scope): isError with the read-only sentence; no write, no audit, write counter untouched')
+  // Before the scope migration the key select names a missing column (42703):
+  // stage 1 keeps answering and every key is read only.
+  const premig = {
+    from(t) {
+      const q = fdb.from(t)
+      if (t === 'client_api_keys') {
+        const run = q._run.bind(q)
+        q._run = async () => (q.op === 'select' && /\bscope\b/.test(String(q.cols))
+          ? { data: null, error: { code: '42703', message: 'column client_api_keys.scope does not exist' } }
+          : run())
+      }
+      return q
+    },
+    rpc(...a) { return fdb.rpc(...a) },
+  }
+  const callPre = (method, params) => send(ev({ jsonrpc: '2.0', id: 3, method, params }, { key: KS_RW.secret, headers: V }), { supabase: premig, config: CFG2 })
+  let pre = await callPre('tools/list', {})
+  assert.deepStrictEqual(pre.body.result.tools.map((t) => t.name), mcp.TOOL_NAMES)
+  pre = await callPre('tools/call', { name: 'get_brand_overview', arguments: {} })
+  assert.ok(pre.body.result && !pre.body.result.isError && pre.body.result.structuredContent.client_id === 61)
+  pre = await callPre('tools/call', { name: 'mark_fix_done', arguments: { fix_id: 'engine_missing:chatgpt' } })
+  assert.strictEqual(pre.body.result.isError, true)
+  assert.ok(pre.body.result.content[0].text.startsWith('This key is read only.'))
+  assert.strictEqual(fixWrites(), 0)
+  ok('before the scope migration (42703 on the key select): stage 1 tools still answer, tools/list has no mark_fix_done, a write is refused as read only')
+
+  // ── plan gate ──
+  let res2 = await call2('tools/list', {}, KFREE_RW.secret)
+  assert.strictEqual(res2.body.error.code, -32002)
+  res2 = await call2('tools/call', { name: 'mark_fix_done', arguments: { fix_id: 'engine_missing:chatgpt' } }, KFREE_RW.secret)
+  assert.strictEqual(res2.body.error.code, -32002)
+  assert.strictEqual(fixWrites(), 0); assert.strictEqual(writeCount(63), 0)
+  fdb.rows('clients').find((c) => c.id === 61).plan = 'free'
+  res2 = await call2('tools/call', { name: 'mark_fix_done', arguments: { fix_id: 'engine_missing:chatgpt' } }, KS_RW.secret)
+  assert.strictEqual(res2.body.error.code, -32002)
+  fdb.rows('clients').find((c) => c.id === 61).plan = 'growth'
+  assert.strictEqual(fixWrites(), 0); assert.strictEqual(writeCount(61), 0)
+  ok('write plan gate = MCP plan gate: a free client with a read and write key gets -32002, as does a client downgraded on the live row; no write, write counter untouched')
+
+  // ── refused ids ──
+  for (const [fid, msg] of [
+    ['prompt_gap:999999', 'That fix is not open for this brand. Call list_fixes for the current ids.'],
+    ['prompt_gap:205', 'That fix is not open for this brand. Call list_fixes for the current ids.'],
+    ['engine_missing:claude', 'That fix is not open for this brand. Call list_fixes for the current ids.'],
+    ['outranked:somebody we made up', 'That fix is not open for this brand. Call list_fixes for the current ids.'],
+    ['Robert\'); drop table fix_states;--', 'fix_id is required and must be an id returned by list_fixes.'],
+    ['', 'fix_id is required and must be an id returned by list_fixes.'],
+    [42, 'fix_id is required and must be an id returned by list_fixes.'],
+  ]) {
+    const res = await tool2('mark_fix_done', { fix_id: fid }, KS_RW.secret)
+    assert.strictEqual(res.isError, true, String(fid)); assert.strictEqual(res.content[0].text, msg, String(fid))
+  }
+  let rq = await tool2('mark_fix_done', {}, KS_RW.secret)
+  assert.strictEqual(rq.isError, true)
+  rq = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt', note: 7 }, KS_RW.secret)
+  assert.strictEqual(rq.isError, true); assert.strictEqual(rq.content[0].text, 'note must be text.')
+  rq = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt', note: 'n'.repeat(501) }, KS_RW.secret)
+  assert.strictEqual(rq.isError, true); assert.strictEqual(rq.content[0].text, 'note must be 500 characters or fewer.')
+  assert.strictEqual(fixWrites(), 0); assert.strictEqual(audits(61).length, 0)
+  ok('unknown, dismissed, verified and invented ids get "That fix is not open..."; malformed ids, a missing id and a bad note are input errors; nothing written, no audit')
+
+  // ── a real mark ──
+  clock = new Date('2026-11-20T09:01:12Z')
+  o = oracle(61)
+  const target = o.open.find((i) => i.id === 'engine_missing:chatgpt')
+  const base = fixStatesLib.measureFix(fixStatesLib.parseMetricKey(target.metricKey), o.results, o.promptIds, o.engineIds)
+  const SECRET_NOTE = `Rewrote the overview page NOTE-ONLY-IN-AUDIT ${KS_RW.secret}`
+  const wBefore = writeCount(61)
+  let mk = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt', note: SECRET_NOTE }, KS_RW.secret)
+  assert.ok(!mk.isError, JSON.stringify(mk))
+  const M = mk.structuredContent
+  assert.deepStrictEqual(M, {
+    client_id: 61,
+    fix_id: 'engine_missing:chatgpt',
+    status: 'done',
+    marked_at: '2026-11-20T09:01:12.000Z',
+    recheck_after: '2026-11-27T09:01:12.000Z',
+    baseline: { metric: 'ChatGPT mention rate', value: base.value, answers: base.n },
+    message: 'Marked done. BrandGEO checks this again on the first collection after 27 November 2026.',
+  })
+  assert.strictEqual(base.value, 0); assert.strictEqual(base.n, 6)
+  const stored = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === 'engine_missing:chatgpt')
+  assert.deepStrictEqual(
+    [stored.status, stored.title, stored.metric_key, stored.baseline_value, stored.baseline_n, stored.marked_by_key, stored.marked_by],
+    ['done', target.title, target.metricKey, base.value, base.n, KS_RW.row.id, null])
+  assert.strictEqual(writeCount(61) - wBefore, 1)
+  const au = audits(61)
+  assert.strictEqual(au.length, 1)
+  assert.deepStrictEqual({ client_id: au[0].client_id, actor: au[0].actor, type: au[0].type, meta: au[0].meta },
+    { client_id: 61, actor: OWNER, type: 'mcp_fix_marked', meta: { key_id: KS_RW.row.id, fix_id: 'engine_missing:chatgpt', note: SECRET_NOTE } })
+  ok('mark_fix_done: baseline equals measureFix on the same result map; upsert writes status done, title, metric_key, baseline and marked_by_key; recheck_after = marked_at + 7 days; one client_events row (actor = key creator, meta key_id, fix_id, note); write counter +1')
+  assert.ok(!fdb.rows('fix_states').some((x) => x.client_id === 62 && x.fix_id === 'engine_missing:chatgpt'), "client 62's same id is untouched")
+  lf = await tool2('list_fixes', { include_closed: true }, KS_READ.secret)
+  assert.ok(!lf.structuredContent.open.some((x) => x.fix_id === 'engine_missing:chatgpt'))
+  const cl = lf.structuredContent.closed.find((x) => x.fix_id === 'engine_missing:chatgpt')
+  assert.deepStrictEqual(cl.recheck, { state: 'waiting', ready_after: '2026-11-27T09:01:12.000Z' })
+  ok('after the mark: gone from open, in closed with recheck waiting until recheck_after; the other tenant\'s identical id is untouched')
+
+  // ── idempotency ──
+  clock = new Date('2026-11-20T10:00:00Z')
+  const callsBefore2 = fixWrites()
+  const wBefore2 = writeCount(61)
+  const callIdx = fdb.calls.length
+  mk = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt' }, KS_RW.secret)
+  assert.deepStrictEqual(mk.structuredContent, { ...M, already_done: true })
+  assert.strictEqual(fixWrites(), callsBefore2, 'already done: no fix_states write')
+  assert.strictEqual(audits(61).length, 1, 'already done: no audit row')
+  assert.ok(!fdb.calls.slice(callIdx).some((c) => c.table === 'ai_results'), 'already done answers from the stored row, no scan')
+  assert.strictEqual(writeCount(61) - wBefore2, 1, 'the call still counts as a write call')
+  mk = await tool2('mark_fix_done', { fix_id: 'engine_missing:perplexity' }, KS_RW.secret)
+  assert.strictEqual(mk.structuredContent.already_done, true)
+  assert.strictEqual(mk.structuredContent.marked_at, sAgo(3))
+  assert.strictEqual(mk.structuredContent.recheck_after, new Date(Date.parse(sAgo(3)) + 7 * 86400_000).toISOString())
+  assert.strictEqual(audits(61).length, 1)
+  ok('marking a done fix again returns the stored row with already_done: true, writes nothing, adds no audit row, and needs no scan')
+
+  // ── a reopened fix can be marked done again ──
+  o = oracle(61)
+  const gap = o.open.find((i) => i.id === 'prompt_gap:206')
+  const gapBase = fixStatesLib.measureFix(fixStatesLib.parseMetricKey(gap.metricKey), o.results, o.promptIds, o.engineIds)
+  mk = await tool2('mark_fix_done', { fix_id: 'prompt_gap:206' }, KS_RW.secret)
+  assert.ok(!mk.isError)
+  assert.deepStrictEqual(mk.structuredContent.baseline, { metric: 'Mention rate for "headshot studio for teams"', value: gapBase.value, answers: gapBase.n })
+  const g = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === 'prompt_gap:206')
+  assert.deepStrictEqual([g.status, g.marked_at, g.marked_by_key, g.checked_at], ['done', clock.toISOString(), KS_RW.row.id, null])
+  assert.strictEqual(audits(61).length, 2)
+  ok('a reopened fix is marked done again: new marked_at and baseline, marked_by_key set, verdict cleared, one more audit row')
+
+  // ── the write counter ──
+  clock = new Date('2026-11-20T11:00:00Z')
+  const wcfg = { ...CFG2, perClientWritesPerHour: 2 }
+  rq = await tool2('mark_fix_done', { fix_id: 'engine_missing:perplexity' }, KS_RW.secret, { config: wcfg })
+  assert.ok(!rq.isError)
+  rq = await tool2('list_fixes', {}, KS_RW.secret, { config: wcfg })
+  assert.ok(!rq.isError)
+  rq = await tool2('mark_fix_done', { fix_id: 'prompt_gap:999999' }, KS_RW.secret, { config: wcfg })
+  assert.strictEqual(rq.isError, true)
+  res2 = await call2('tools/call', { name: 'mark_fix_done', arguments: { fix_id: 'engine_low:gemini' } }, KS_RW.secret, { config: wcfg })
+  assert.strictEqual(res2.status, 200)
+  assert.strictEqual(res2.body.error.code, -32029)
+  assert.deepStrictEqual(res2.body.error.data, { retry_after: 3600, scope: 'client_write_hour', limit: 2 })
+  assert.strictEqual(res2.headers['Retry-After'], '3600')
+  assert.strictEqual(res2.body.error.message, 'Write limit reached: 2 fix updates an hour for this account. Retry in 3600 seconds.')
+  assert.ok(fdb.rows('affiliate_rate_limits').some((x) => x.key === 'mcp:client:61:writes:hour'))
+  assert.ok(!fdb.rows('fix_states').some((x) => x.client_id === 61 && x.fix_id === 'engine_low:gemini'), 'the limited call wrote nothing')
+  // The counter is per client: another key on the same client shares it.
+  const KS_RW2 = issueKey2(61, 'read_write')
+  res2 = await call2('tools/call', { name: 'mark_fix_done', arguments: { fix_id: 'engine_low:gemini' } }, KS_RW2.secret, { config: wcfg })
+  assert.strictEqual(res2.body.error.code, -32029)
+  ok('write counter mcp:client:<id>:writes:hour (3600 s): every mark_fix_done call after the gates counts, list_fixes does not; over the limit is -32029 scope client_write_hour with Retry-After, shared by every key of the client')
+  assert.strictEqual(mcp.MCP_WRITES_PER_CLIENT_PER_HOUR, 60)
+  clock = new Date('2026-11-20T12:00:05Z')
+  rq = await tool2('mark_fix_done', { fix_id: 'engine_low:gemini' }, KS_RW2.secret, { config: wcfg })
+  assert.ok(!rq.isError, JSON.stringify(rq))
+  ok('the default write limit is 60 an hour; the next hour window opens again')
+
+  // ── audit failure does not undo the mark ──
+  const auditFail = {
+    from(t) { const q = fdb.from(t); if (t === 'client_events') q._run = async () => ({ data: null, error: { code: '23514', message: 'new row violates check constraint "client_events_type_check"' } }); return q },
+    rpc(...a) { return fdb.rpc(...a) },
+  }
+  o = oracle(61)
+  const nextOpen = o.open.find((i) => i.id.startsWith('outranked:'))
+  const errBefore = captured.length
+  let resA = await send(ev({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'mark_fix_done', arguments: { fix_id: nextOpen.id, note: SECRET_NOTE } } }, { key: KS_RW.secret, headers: V }), { supabase: auditFail, config: CFG2 })
+  assert.ok(resA.body.result && !resA.body.result.isError, JSON.stringify(resA.body))
+  assert.strictEqual(fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === nextOpen.id).status, 'done')
+  assert.ok(captured.slice(errBefore).some((l) => l.includes('audit insert failed for client 61')))
+  ok('a failed audit insert is logged and the mark stands')
+
+  // ── isolation: client 62's key marks only client 62 ──
+  mk = await tool2('mark_fix_done', { fix_id: 'engine_missing:chatgpt' }, KT_RW.secret)
+  assert.ok(!mk.isError, JSON.stringify(mk))
+  assert.strictEqual(mk.structuredContent.client_id, 62)
+  const t62 = fdb.rows('fix_states').filter((x) => x.fix_id === 'engine_missing:chatgpt')
+  assert.deepStrictEqual(t62.map((x) => [x.client_id, x.marked_by_key]).sort(), [[61, KS_RW.row.id], [62, KT_RW.row.id]])
+  ok("client 62's key marks client 62's row only; client 61's row keeps its own marked_by_key")
+
+  // ── logging ──
+  const mLines = captured.filter((l) => l.startsWith('[mcp-server/') && / tool=mark_fix_done /.test(l))
+  assert.ok(mLines.some((l) => / fix_id=engine_missing%3Achatgpt ms=\d+ outcome=ok$/.test(l)), 'a mark line carries the encoded fix_id and outcome ok')
+  assert.ok(mLines.some((l) => / outcome=already_done$/.test(l)))
+  assert.ok(mLines.some((l) => / outcome=fix_not_open$/.test(l)))
+  assert.ok(mLines.some((l) => / outcome=read_only_key$/.test(l)))
+  assert.ok(mLines.some((l) => / fix_id=invalid /.test(l)), 'a malformed id is logged as invalid')
+  assert.ok(mLines.every((l) => /^\[mcp-server\/\S{1,8}\] client=\S+ method=tools\/call tool=mark_fix_done fix_id=\S+ ms=\d+ outcome=\S+$/.test(l)), 'one token per field')
+  const hashes2 = SECRETS2.map(keys.hashClientApiKey)
+  const prefixes2 = SECRETS2.map(keys.clientApiKeyPrefix)
+  // Everything the server printed (the test's own "ok -" lines are not server output).
+  for (const l of captured.filter((x) => !x.startsWith('  ok - '))) {
+    assert.ok(!l.includes('bgmcp_'), `a log line contains bgmcp_: ${l.slice(0, 80)}`)
+    assert.ok(!l.includes('NOTE-ONLY-IN-AUDIT') && !l.includes('Rewrote the overview page'), 'a log line contains the note')
+    for (const h of hashes2) assert.ok(!l.includes(h), 'a log line contains a key hash')
+    for (const p of prefixes2) assert.ok(!l.includes(p), 'a log line contains a key prefix')
+  }
+  // A caller cannot smuggle a key into the log through fix_id either.
+  const smuggle = `prompt_gap:${KS_RW.secret}`
+  rq = await tool2('mark_fix_done', { fix_id: smuggle }, KS_RW.secret)
+  assert.strictEqual(rq.isError, true)
+  const last = captured.filter((l) => l.startsWith('[mcp-server/')).slice(-1)[0]
+  assert.ok(!last.includes('bgmcp_') && last.includes('fix_id=prompt_gap%3Aother'), last)
+  // Nor in upper case, nor as the bare 48-hex secret part (review L1).
+  const hexPart = KS_RW.secret.slice(KS_RW.secret.lastIndexOf('_') + 1)
+  for (const sneaky of [`prompt_gap:${KS_RW.secret.toUpperCase()}`, `outranked:${hexPart}`, `engine_low:${hexPart.toUpperCase()}`]) {
+    rq = await tool2('mark_fix_done', { fix_id: sneaky }, KS_RW.secret)
+    assert.strictEqual(rq.isError, true)
+    const ln = captured.filter((l) => l.startsWith('[mcp-server/')).slice(-1)[0]
+    assert.ok(!ln.toLowerCase().includes(hexPart.toLowerCase()) && !/bgmcp/i.test(ln) && /fix_id=\w+%3Aother /.test(ln), ln)
+  }
+  ok('log lines: mark_fix_done lines add one fix_id token and an outcome code (ok, already_done, fix_not_open, read_only_key); never a key, prefix, hash or the note, even when a key is sent as the fix_id or the note')
 
   console.log(`\n${passed} passed`)
 }

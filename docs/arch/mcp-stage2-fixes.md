@@ -1,8 +1,8 @@
 # MCP stage 2: agents work the Fix This list
 
-Status: SPEC ONLY, 2026-11-06. Nothing is built. Build waits on Constantin's
-rulings in section 7; every question there carries the default that applies if
-he says "defaults".
+Status: RULED 2026-11-06, Constantin: "Defaults, build it". All eight
+defaults in section 7 apply. Build contracts are fixed in section 9. The
+migration apply and the Netlify push stay his clicks.
 
 Origin, Constantin 2026-11-06: "this would be a relevant moment to start
 preparing our MCP connection as many users could login via MCP to push the
@@ -225,3 +225,118 @@ make that page more worth publishing.
 Scale: `list_fixes` costs one scan per call (as `get_visibility_summary`
 does today), `mark_fix_done` one scan plus two writes. No cron, no LLM call,
 no collection.
+
+## 9. Build contracts (2026-11-06, after the ruling)
+
+Fixed here so the three builders cannot diverge. Anything not stated follows
+sections 2 to 6.
+
+### 9.1 Shared modules (bg-app)
+
+- `src/lib/keysetRead.ts` (added after review M1): `readAllById(build, opts)`
+  reads every row a query matches in keyset pages of 1,000 by id. The page's
+  `ai_results` read and `mcp-server.js` `scanAllResults` both use it, so both
+  build Fix This from every answer; before, the page saw only PostgREST's
+  newest 1,000 rows and differed from MCP on client 1 (3,543 rows).
+- `src/lib/markets.ts`: the `MARKETS` array (and its `Market` type) moved out
+  of `marketContext.tsx`, which imports React. `marketContext.tsx`
+  re-exports it, so no other import changes. Pure, no React.
+- `src/lib/fixItems.ts`, pure, no React, no Supabase:
+  - `buildFixResultMap(rows, activeEngines)` returns `{ results, errorEngines }`.
+    It is the page's current `load()` logic moved verbatim: rows newest
+    first by `checked_at`, engines outside `activeEngines` skipped,
+    `isNoAnswerRow` rows skipped, first ok row per (prompt_id, engine) wins,
+    an engine with error rows and no ok row goes into `errorEngines`. Rows
+    for inactive prompts stay in the map, as today (the competitor and gap
+    numbers on the cards read them).
+  - `buildFixItems(input)` returns the ordered `FixItem[]` the page renders
+    today, byte for byte. `input` = `{ brandName, engines: {id,label}[],
+    prompts: {id,text,position}[] (active only), results, errorEngines,
+    stateOf: (fixId) => FixStatus | undefined }`. Everything the inline
+    builder derives today (engine status cards, `competitorFreq`,
+    `gapCount`, `dimensions`) is derived inside from `input`.
+  - `FixItem` moves here with `competitor` and `competitorAvgRank`.
+  - Copy stays in `aiVisibilityCopy.ts` (pure), imported by `fixItems.ts`.
+- Engine labels on both sides come from `ENGINE_META` in `planConfig.ts`.
+  `mcp-server.js` requires `planConfig.ts` for this; `_plans.js`
+  `ENGINE_LABELS` is not used for fix text.
+- The page calls `buildFixResultMap` in `load()` and `buildFixItems` for the
+  hub. Visible behaviour unchanged.
+- Test `tests/fix_items.test.js`: fixture rows through `buildFixResultMap`
+  and `buildFixItems` pin ids, order, titles and descriptions for every kind;
+  a parity case asserts the page's old inline result equals the new one on
+  the same fixture (copy the old builder into the test as the oracle).
+
+### 9.2 Database (bg-backend writes the file; Constantin applies it)
+
+`db/supabase-mcp-fix-writes-2026-11-06.sql`, exactly section 4: `scope` on
+`client_api_keys` (default `read`), `marked_by_key uuid` on `fix_states`
+referencing `client_api_keys(id)`, the amended `fix_states_guard()`. Plus
+the read-back queries in the file. Nothing else.
+
+Amended 2026-11-06 (review I4): one more change was needed and is in the
+file. `client_events` carries a CHECK on `type` with eight values and no
+`mcp_fix_marked`, so section 5's audit insert would have been refused; the
+CHECK is rebuilt with the same eight plus `mcp_fix_marked`. No row changes.
+The FK is NO ACTION, as section 4 says, not ON DELETE SET NULL: the guard
+pins `marked_by_key` on update, which would leave a SET NULL row pointing at
+a deleted key.
+
+### 9.3 `client-api-keys.js` (bg-backend)
+
+- `issue` accepts `scope`: `'read'` (default when absent) or
+  `'read_write'`; anything else is 400 "Scope must be read or read_write.".
+- `list` and `issue` return `scope` on every key row. An existing key's
+  scope never changes; a different scope means a new key.
+
+### 9.4 `mcp-server.js` (bg-backend)
+
+- Key resolution also selects `scope` and `created_by`.
+- `tools/list`: `list_fixes` for every gated key; `mark_fix_done` only when
+  the key's scope is `read_write`. Write gate = the MCP plan gate (Radar and
+  up), ruling 2.
+- `tools/call mark_fix_done` with a read key: `isError: true`, "This key is
+  read only. Create a read and write key on the BrandGEO Account page to let
+  an agent mark fixes done."
+- Data path for both tools: the client row (`name, brand_website,
+  default_market_id, plan, engines_enabled, category, known_competitors`),
+  active prompts (`id, text, position`), the client's `ai_results` (no
+  window; newest first, keyset pages of 1,000, stop at 25,000 rows or 18 s,
+  `truncated` in the output), `fix_states` for the client, then
+  `buildFixResultMap`, `buildFixItems`, `buildFixPrompt` (market label from
+  `markets.ts`), `evaluateFix`, `measureFix`. No fix sentence, id rule or
+  metric is written in `netlify/functions/`.
+- Write counter `mcp:client:<id>:writes:hour`, 3,600 s, 60, counted on
+  `mark_fix_done` calls after the scope and plan gates.
+- Upsert as the page does (`onConflict: 'client_id,fix_id'`, `status:
+  'done'`, `title`, `metric_key`, `baseline_value`, `baseline_n`) plus
+  `marked_by_key: key.id`. Already done: return the row with
+  `already_done: true`, no write, no audit.
+- Audit: `client_events` insert `{ client_id, actor: key.created_by, type:
+  'mcp_fix_marked', meta: { key_id, fix_id, note } }`. A failed audit insert
+  is logged and does not undo the mark.
+- Log line adds `fix_id` to the loggable arguments; still never a key,
+  prefix, hash, header, body or `note`.
+- Tests in `tests/mcp_server.test.js` style with the in-memory fake: list
+  parity with `buildFixItems` on a fixture, prompt text identical to
+  `buildFixPrompt`, scope gate, plan gate, refused unknown or closed id,
+  idempotency, write counter, audit row, log never contains `bgmcp_` or the
+  note.
+
+### 9.5 UI (bg-app, after 9.1)
+
+- `McpAccessSection.tsx`: on issue, a choice "Read only" (default) or "Read
+  and write (lets an agent mark fixes done)"; the key list shows each key's
+  access. Existing keys read "Read only".
+- AI Visibility Done list: when `marked_by_key` is set, "Marked done <date>
+  by an AI agent (<key label>)"; the label is read from the client's own
+  `client_api_keys` row (RLS already allows it), "an AI agent" alone when it
+  cannot be read. `FIX_SELECT` gains `marked_by_key`.
+
+### 9.6 Order
+
+9.1, then 9.2 to 9.4 and 9.5 in parallel (disjoint files), then bg-verify,
+then Constantin applies the migration (read back here), then one push with
+`BATCH_PUSH=1` on his word. The page tolerates the migration not being
+applied yet (a missing `marked_by_key` column fails the fix_states read,
+which falls back to all open), but the push still waits for the migration.

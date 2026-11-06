@@ -16,12 +16,14 @@
  * the three collectors as of 2026-07-15 (post the §12.3 cost fixes + the §12.3b
  * Gemini revert + the #109 never-fail-silently rewrite):
  *   - callChatGPT  ← collect-chatgpt.js (gpt-5.5, reasoning:low, web_search_preview)
- *   - callClaude   ← collect-claude.js  (training-data mode, wall-clock time budget)
+ *   - callClaude   ← collect-claude.js  (web_search_20250305 with max_uses 1, wall-clock time budget)
  *   - callGemini   ← collect-prompt.js  (2.5-flash + 3.1-flash-lite fallback,
  *                    per-attempt AbortController, never returns a null errorCode)
  *   - callOpenRouter (perplexity/sonar, meta llama) ← collect-prompt.js
- * Do NOT re-add web search to Claude or switch Gemini to a 3.x reasoning model
- * here without re-reading the cost/latency notes in those files (§12.3 / §12.3b).
+ * Claude runs WITH web search (see the comment in callClaude: it was removed as a
+ * cost cut once and that broke what the engine measures; do NOT remove it). Do
+ * NOT switch Gemini to a 3.x reasoning model here without re-reading the
+ * cost/latency notes in those files (§12.3 / §12.3b).
  */
 
 const { analyseResponse } = require('./_analysis')

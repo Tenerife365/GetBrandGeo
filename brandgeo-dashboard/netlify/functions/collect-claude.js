@@ -4,7 +4,7 @@
  * "Refresh this prompt" path still uses it.
  *
  * Now a THIN WRAPPER over _collect.js (SCALE-SPEC.md §3.3): the Claude caller
- * (training-data mode, wall-clock time budget) + row building live in the shared
+ * (web_search tool with max_uses 1, wall-clock time budget) + row building live in the shared
  * module so the collection worker runs the exact same code. This file keeps only
  * the HTTP concerns — auth, ownership, rate/budget limits, the non-force
  * monthly-skip check, and the insert.

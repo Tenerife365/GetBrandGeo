@@ -199,16 +199,21 @@ export const FIX_COPY = {
   doneHeading: 'Done',
   allDone: 'All current fixes are done. New ones appear here as your results change.',
   manual: 'Marked done. This one cannot be measured, so there is nothing to check.',
+  manualTail: 'This one cannot be measured, so there is nothing to check.',
   untracked: 'The prompt or engine this fix measured is no longer tracked, so it cannot be checked.',
   saveFailed: 'Could not save that change. Please try again.',
   promptGapFix: 'Publish a page that answers this question directly, with your brand name in the title and the H1, and link it from your main service page. Ask one trusted publication or directory in your field to reference it.',
 }
 
-export function fixDoneWaiting(markedOn: string, readyAfter: string): string {
-  return `Marked done ${markedOn}. We check the number on the first collection after ${readyAfter}.`
+/** Suffix for a line about a fix an AI agent marked through MCP; keyLabel is empty when the key cannot be read. */
+export function fixByAgent(keyLabel?: string | null): string {
+  return keyLabel ? ` by an AI agent (${keyLabel})` : ' by an AI agent'
 }
-export function fixDoneWaitingData(markedOn: string, fresh: number, needed: number): string {
-  return `Marked done ${markedOn}. Waiting for newer answers: ${fresh} of ${needed} needed so far.`
+export function fixDoneWaiting(markedOn: string, readyAfter: string, by = ''): string {
+  return `Marked done ${markedOn}${by}. We check the number on the first collection after ${readyAfter}.`
+}
+export function fixDoneWaitingData(markedOn: string, fresh: number, needed: number, by = ''): string {
+  return `Marked done ${markedOn}${by}. Waiting for newer answers: ${fresh} of ${needed} needed so far.`
 }
 export function fixVerifiedLine(on: string, metric: string, before: number, after: number): string {
   return `Verified ${on}: ${metric} went from ${before}% to ${after}%.`
@@ -216,8 +221,8 @@ export function fixVerifiedLine(on: string, metric: string, before: number, afte
 export function fixReopenedLine(markedOn: string, checkedOn: string, metric: string, before: number, after: number): string {
   return `You marked this done ${markedOn}. After the answers collected by ${checkedOn}, ${metric} is ${after}% (was ${before}%). Mark it done again once you have changed more.`
 }
-export function fixDismissedLine(on: string): string {
-  return `Set aside ${on}.`
+export function fixDismissedLine(on: string, by = ''): string {
+  return `Set aside ${on}${by}.`
 }
 export function fixPromptGapTitle(prompt: string): string {
   const t = prompt.length > 90 ? prompt.slice(0, 87) + '...' : prompt
@@ -232,8 +237,8 @@ export function fixPromptGapLine(brand: string, answers: number, withCompetitor:
 export function fixCheckNowWaiting(readyAfter: string): string {
   return `Nothing to check yet. The check needs answers collected after ${readyAfter}, so it runs on your first collection after that date, scheduled or run by hand.`
 }
-export function fixMarkedOn(on: string): string {
-  return `Marked done ${on}.`
+export function fixMarkedOn(on: string, by = ''): string {
+  return `Marked done ${on}${by}.`
 }
 /** Screen reader announcement when a fix leaves or returns to the open list. */
 export function fixMovedAnnouncement(status: 'done' | 'dismissed' | 'open', title: string): string {

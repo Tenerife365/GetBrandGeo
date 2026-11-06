@@ -1,6 +1,8 @@
 /**
- * mcp-server.js -- remote MCP (Model Context Protocol) server, read-only.
- * Contract: docs/arch/mcp-access.md (sections 2, 3.4, 4.3, 4.4, 5, 6).
+ * mcp-server.js -- remote MCP (Model Context Protocol) server.
+ * Contract: docs/arch/mcp-access.md (sections 2, 3.4, 4.3, 4.4, 5, 6), and
+ * docs/arch/mcp-stage2-fixes.md (sections 3, 5, 6, 9.4) for list_fixes and
+ * the one write tool, mark_fix_done.
  *
  * POST https://app.getbrandgeo.com/mcp   (netlify.toml rewrites /mcp here)
  * Authorization: Bearer bgmcp_<client_id>_<48 hex>
@@ -11,23 +13,31 @@
  *
  * AUTHORITY. The client id comes from the client_api_keys row found by the
  * sha256 of the key, never from tool arguments. Plan gate: mcpAllowedFor() in
- * _plans.js, on the live clients row, on tools/list and tools/call only.
+ * _plans.js, on the live clients row, on tools/list and tools/call only. The
+ * write gate is the same plan gate (stage 2 ruling 2) plus the key's own
+ * scope: mark_fix_done is listed and runs only for a 'read_write' key.
  *
- * WRITES. The only writes an MCP request can cause are the rate counter
- * upserts (affiliate_rate_check with an `mcp:` namespace) and the throttled
- * client_api_keys.last_used_at stamp. No tool calls an LLM, enqueues a
- * collection or writes a row.
+ * WRITES. Every request can cause the rate counter upserts
+ * (affiliate_rate_check with an `mcp:` namespace) and the throttled
+ * client_api_keys.last_used_at stamp. Only mark_fix_done writes rows: one
+ * fix_states upsert (status done, baseline, marked_by_key) and one
+ * client_events audit row (type mcp_fix_marked). No tool calls an LLM or
+ * enqueues a collection, and list_fixes never records a verdict (ruling 7).
  *
  * LOGGING. One line per request (section 6.4). Never logged: the key, its
- * prefix, its hash, the Authorization header, the raw body, or tool arguments
- * other than prompt_id, window_days, limit. The method and tool name are only
- * logged when they are one this server knows, so a caller cannot smuggle text
- * into the log through them.
+ * prefix, its hash, the Authorization header, the raw body, mark_fix_done's
+ * note, or tool arguments other than prompt_id, window_days, limit and fix_id.
+ * Only fix_id is printed (on mark_fix_done lines), URI-encoded and scrubbed so
+ * it stays one token and can never carry a key. The method and tool name are
+ * only logged when they are one this server knows, so a caller cannot smuggle
+ * text into the log through them.
  *
  * BUNDLING. netlify.toml sets node_bundler = "esbuild" for this one function so
- * the two .ts requires below are bundled from the dashboard's own source:
- * MCP numbers and dashboard numbers come from one implementation. Under plain
- * node (tests) tests/helpers/ts_require.js registers the .ts loader.
+ * the .ts requires below are bundled from the dashboard's own source: MCP
+ * numbers, fix ids, fix copy and the agent prompt come from the same
+ * implementation as the dashboard. No fix sentence, id rule or metric is
+ * written in this file. Under plain node (tests) tests/helpers/ts_require.js
+ * registers the .ts loader.
  */
 
 const { createClient } = require('@supabase/supabase-js')
@@ -37,10 +47,18 @@ const { PLAN_LABELS, ENGINE_LABELS, MCP_MIN_PLAN, mcpAllowedFor } = require('./_
 const { CLIENT_API_KEY_RE, hashClientApiKey, clientIdFromKey } = require('./_client_api_key')
 const { isNoAnswerRow } = require('../../src/lib/aiVisibilityScore.ts')
 const { aggregateCompetitors, cleanCompetitorName, isLikelyCompanyName } = require('../../src/lib/competitorFilter.ts')
+const { buildFixResultMap, buildFixItems } = require('../../src/lib/fixItems.ts')
+const { readAllById } = require('../../src/lib/keysetRead.ts')
+const { parseMetricKey, metricLabel, measureFix, evaluateFix, verdictCutoff, isOpenState } = require('../../src/lib/fixStates.ts')
+const { buildFixPrompt, formatDay } = require('../../src/lib/fixPrompt.ts')
+const { MARKETS } = require('../../src/lib/markets.ts')
+const { ENGINE_META, getActiveEngines } = require('../../src/lib/planConfig.ts')
 
 // ── Limits (section 6.1; ruling 6 changes only these two) ────────────────────
 const MCP_PER_KEY_PER_MINUTE = 60
 const MCP_PER_CLIENT_PER_DAY = 5000
+// Stage 2 ruling 3: writes an hour per client, on top of the two limits above.
+const MCP_WRITES_PER_CLIENT_PER_HOUR = 60
 
 const MAX_BODY_BYTES = 65536
 const SCAN_PAGE = 1000
@@ -60,6 +78,7 @@ const OUTPUT_SCHEMA_SINCE = '2025-06-18'
 const DEFAULT_CONFIG = {
   perKeyPerMinute: MCP_PER_KEY_PER_MINUTE,
   perClientPerDay: MCP_PER_CLIENT_PER_DAY,
+  perClientWritesPerHour: MCP_WRITES_PER_CLIENT_PER_HOUR,
   maxBodyBytes: MAX_BODY_BYTES,
   scanPage: SCAN_PAGE,
   scanCeiling: SCAN_CEILING,
@@ -73,6 +92,17 @@ const KNOWN_METHODS = new Set(['initialize', 'ping', 'tools/list', 'tools/call']
 
 const SERVER_INFO = { name: 'brandgeo', title: 'BrandGEO', version: '1.0.0' }
 const INSTRUCTIONS = "Read-only access to one BrandGEO account's AI visibility data: how often AI engines mention the brand, for which prompts, next to which competitors, with what sentiment, plus the latest recommendations. Data is refreshed by BrandGEO's own collection runs; these tools never start a collection."
+// Served instead of INSTRUCTIONS to a read and write key, which is not read only.
+const INSTRUCTIONS_READ_WRITE = "Access to one BrandGEO account's AI visibility data: how often AI engines mention the brand, for which prompts, next to which competitors, with what sentiment, plus the latest recommendations and the Fix This list (list_fixes). This key can also mark a fix done (mark_fix_done) after the work is finished; BrandGEO then re-checks it on its own schedule. Data is refreshed by BrandGEO's own collection runs; these tools never start a collection."
+const READ_ONLY_KEY_MESSAGE = 'This key is read only. Create a read and write key on the BrandGEO Account page to let an agent mark fixes done.'
+const FIX_NOT_OPEN_MESSAGE = 'That fix is not open for this brand. Call list_fixes for the current ids.'
+// The CHECK on fix_states.fix_id (db/supabase-fix-states-migration-2026-11-06.sql).
+const FIX_ID_RE = /^[a-z_]{1,40}(:.{1,150})?$/
+const MAX_NOTE = 500
+const FIX_COLS = 'id, client_id, fix_id, status, title, metric_key, baseline_value, baseline_n, marked_at, checked_at, check_value, check_n'
+// Every column the shared fix builders read (fixItems, fixStates, fixPrompt,
+// aiVisibilityScore, competitorFilter); the parity test feeds them full rows.
+const FIX_RESULT_COLS = 'id, prompt_id, llm, status, error_code, brand_mentioned, brand_position, sentiment, response_snippet, competitors_mentioned, checked_at'
 
 const BASE_HEADERS = {
   'Content-Type': 'application/json',
@@ -105,7 +135,7 @@ function rate(num, den) { return den > 0 ? round(num / den, 4) : null }
 
 /** Strip anything shaped like a key or a sha256 hex from a message before it is logged. */
 function scrub(msg) {
-  return String(msg || '').replace(/bgmcp_\S*/g, '[redacted]').replace(/[a-f0-9]{64}/gi, '[redacted]')
+  return String(msg || '').replace(/bgmcp_\S*/gi, '[redacted]').replace(/[a-f0-9]{64}/gi, '[redacted]')
 }
 
 function rpcResult(id, result) {
@@ -126,7 +156,34 @@ function unauthorized(id) {
   return rpcError(401, id, -32001, UNAUTHORIZED_MESSAGE, undefined, { 'WWW-Authenticate': 'Bearer realm="brandgeo-mcp"' })
 }
 
-class ToolInputError extends Error {}
+class ToolInputError extends Error {
+  /** code is the log outcome; a refused write is logged by its code, never stored. */
+  constructor(message, code = 'tool_input_error') { super(message); this.code = code }
+}
+
+/** Postgres 42703 = undefined_column (PostgREST passes the code through). */
+function isMissingColumn(error, column) {
+  return !!error && (error.code === '42703' || new RegExp(`column .*${column}.* does not exist`, 'i').test(error.message || ''))
+}
+
+/** A stored key scope; anything but 'read_write' (including a missing column) is read only. */
+function keyScope(row) { return row && row.scope === 'read_write' ? 'read_write' : 'read' }
+
+/** fix_id for the log line: one URI-encoded token, key-shaped text removed. */
+function loggableFixId(v) {
+  if (typeof v !== 'string' || !FIX_ID_RE.test(v)) return 'invalid'
+  // Only strictly shaped ids reach the log (review L1): a known kind, and a
+  // parameter of plain lowercase words, digits and separators with no long
+  // hex run and no key prefix. Anything else logs as "<kind>:other".
+  const i = v.indexOf(':')
+  const kind = i < 0 ? v : v.slice(0, i)
+  if (!LOGGABLE_FIX_KINDS.has(kind)) return 'other'
+  if (i < 0) return kind
+  const p = v.slice(i + 1)
+  if (!/^[a-z0-9 ._-]{1,80}$/.test(p) || /[a-f0-9]{24}/.test(p) || /bgmcp/.test(p)) return encodeURIComponent(kind + ':other')
+  return encodeURIComponent(kind + ':' + p)
+}
+const LOGGABLE_FIX_KINDS = new Set(['visibility', 'engine_missing', 'engine_low', 'outranked', 'consistency', 'ranking', 'prompt_gap'])
 
 function encodeCursor(id) { return Buffer.from(JSON.stringify({ id })).toString('base64url') }
 
@@ -464,6 +521,235 @@ async function toolRecommendations(ctx, args) {
   }
 }
 
+// ── Fix This tools (mcp-stage2-fixes.md sections 3 and 9.4) ──────────────────
+
+/**
+ * Every ai_results row of the client on an active engine, error rows included
+ * (the page reads them to tell an unavailable engine), newest first by id in
+ * keyset pages, no date window: the page has none, and a window would change
+ * which answer is "latest" and so the list. Stops at the row ceiling or the
+ * time budget and says so.
+ */
+async function scanAllResults(sb, cfg, clientId, engines) {
+  const r = await readAllById(
+    () => sb.from('ai_results').select(FIX_RESULT_COLS).eq('client_id', clientId).in('llm', engines),
+    { page: cfg.scanPage, ceiling: cfg.scanCeiling, budgetMs: cfg.scanBudgetMs },
+  )
+  if (r.error) throw r.error
+  return { rows: r.rows, truncated: r.truncated }
+}
+
+/** Active prompts in the page's order (position, then id so ties are stable), keyset-paged by id. */
+async function activePrompts(sb, cfg, clientId) {
+  const out = []
+  let last = null
+  const page = Math.min(1000, cfg.promptIdCeiling)
+  while (out.length < cfg.promptIdCeiling) {
+    let q = sb.from('prompts').select('id, text, position').eq('client_id', clientId).eq('is_active', true)
+    if (last !== null) q = q.gt('id', last)
+    const { data, error } = await q.order('id', { ascending: true }).limit(page)
+    if (error) throw error
+    for (const p of data || []) out.push({ id: Number(p.id), text: typeof p.text === 'string' ? p.text : '', position: Number(p.position ?? 0) })
+    if (!data || data.length < page) break
+    last = data[data.length - 1].id
+  }
+  return out.sort((a, b) => a.position - b.position || a.id - b.id)
+}
+
+function normalizeFixRow(r) {
+  return {
+    ...r,
+    baseline_value: r.baseline_value === null || r.baseline_value === undefined ? null : Number(r.baseline_value),
+    check_value: r.check_value === null || r.check_value === undefined ? null : Number(r.check_value),
+  }
+}
+
+/** The client's fix_states rows by fix_id, numerics as numbers (as the page reads them). */
+async function fixStateRows(sb, clientId) {
+  const { data, error } = await sb.from('fix_states').select(FIX_COLS).eq('client_id', clientId)
+  if (error) throw error
+  const m = new Map()
+  for (const r of data || []) m.set(r.fix_id, normalizeFixRow(r))
+  return m
+}
+
+/**
+ * The fix tools' shared context: engines and labels as the page derives them
+ * (planConfig.ts getActiveEngines, ENGINE_META), active prompts, fix states,
+ * and, unless skipped, the result map from the full scan and the fix list.
+ */
+async function loadFixContext(ctx, { withResults = true } = {}) {
+  const { sb, cfg, client, clientId } = ctx
+  const engineIds = getActiveEngines(client.plan, client.engines_enabled).map(String)
+  const labelOf = (id) => (ENGINE_META[id] && ENGINE_META[id].label) || id
+  const engines = engineIds.map((id) => ({ id, label: labelOf(id) }))
+  const prompts = await activePrompts(sb, cfg, clientId)
+  const states = await fixStateRows(sb, clientId)
+  let results = new Map()
+  let errorEngines = new Set()
+  let truncated = false
+  if (withResults && engineIds.length > 0) {
+    const scan = await scanAllResults(sb, cfg, clientId, engineIds)
+    const built = buildFixResultMap(scan.rows, engineIds)
+    results = built.results
+    errorEngines = built.errorEngines
+    truncated = scan.truncated
+  }
+  const brandName = client.name ?? 'your brand'
+  const marketRow = MARKETS.find((m) => m.id === client.default_market_id)
+  const market = marketRow ? marketRow.label : null
+  const promptIds = prompts.map((p) => p.id)
+  const promptTextOf = (pid) => { const p = prompts.find((x) => x.id === pid); return p ? p.text : undefined }
+  const items = withResults ? buildFixItems({
+    brandName,
+    engines,
+    prompts,
+    results,
+    errorEngines,
+    stateOf: (fid) => { const r = states.get(fid); return r ? r.status : undefined },
+  }) : []
+  const promptFor = (item) => buildFixPrompt(
+    { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
+    { brandName, website: client.brand_website ?? null, market, engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results },
+  ) ?? item.fix
+  return { engineIds, engines, prompts, promptIds, states, results, truncated, items, promptFor, labelOf, promptTextOf }
+}
+
+function metricText(fx, metricKey) {
+  return metricLabel(parseMetricKey(metricKey), fx.labelOf, fx.promptTextOf)
+}
+
+function stateOfRow(fx, fixId) {
+  const r = fx.states.get(fixId)
+  return r ? r.status : undefined
+}
+
+/** The closed list's re-check, computed with evaluateFix and never written (ruling 7). */
+function recheckOf(fx, row, nowMs) {
+  if (row.status === 'dismissed') return null
+  if (row.status === 'verified') {
+    return { state: 'verified', checked_at: row.checked_at ?? null, before: row.baseline_value, after: row.check_value, metric: metricText(fx, row.metric_key) }
+  }
+  const ev = evaluateFix(row, fx.results, fx.promptIds, fx.engineIds, nowMs)
+  if (ev.state === 'waiting') return { state: 'waiting', ready_after: ev.readyAfter }
+  if (ev.state === 'verdict') return { state: 'verdict_due', status: ev.status, value: ev.value }
+  if (ev.state === 'untracked') return { state: 'untracked' }
+  return { state: 'manual' }
+}
+
+async function toolListFixes(ctx, args) {
+  const { clientId, nowIso, nowMs } = ctx
+  const includeClosed = boolArg(args, 'include_closed', false)
+  const limit = intArg(args, 'limit', { min: 1, max: 50, def: 20 })
+  const fx = await loadFixContext(ctx)
+  const open = fx.items.filter((i) => isOpenState(stateOfRow(fx, i.id))).slice(0, limit).map((item) => {
+    const row = fx.states.get(item.id)
+    const isReopened = !!row && row.status === 'reopened'
+    return {
+      fix_id: item.id,
+      priority: item.priority,
+      status: isReopened ? 'reopened' : 'open',
+      title: item.title,
+      summary: item.description,
+      fix: item.fix,
+      prompt: fx.promptFor(item),
+      reopened: isReopened
+        ? { marked_at: row.marked_at ?? null, checked_at: row.checked_at ?? null, before: row.baseline_value, after: row.check_value, metric: metricText(fx, row.metric_key) }
+        : null,
+    }
+  })
+  const out = { client_id: clientId, generated_at: nowIso, open }
+  if (includeClosed) {
+    // The same rows in the same order as the page's Done list.
+    out.closed = Array.from(fx.states.values())
+      .filter((r) => r.status === 'done' || r.status === 'verified' || r.status === 'dismissed')
+      .sort((a, b) => (b.checked_at ?? b.marked_at ?? '').localeCompare(a.checked_at ?? a.marked_at ?? ''))
+      .slice(0, limit)
+      .map((r) => ({ fix_id: r.fix_id, status: r.status, title: r.title ?? null, marked_at: r.marked_at ?? null, recheck: recheckOf(fx, r, nowMs) }))
+  }
+  out.truncated = fx.truncated
+  return out
+}
+
+/** The mark's answer, from the stored row: the same shape fresh or already done. */
+function markResult(fx, clientId, row, nowIso) {
+  const markedAt = row.marked_at || nowIso
+  const measurable = !!parseMetricKey(row.metric_key) && row.baseline_value !== null && row.baseline_value !== undefined
+  const recheckAfter = measurable ? verdictCutoff(markedAt) : null
+  return {
+    client_id: clientId,
+    fix_id: row.fix_id,
+    status: 'done',
+    marked_at: markedAt,
+    recheck_after: recheckAfter,
+    baseline: measurable ? { metric: metricText(fx, row.metric_key), value: row.baseline_value, answers: row.baseline_n ?? 0 } : null,
+    message: measurable
+      ? `Marked done. BrandGEO checks this again on the first collection after ${formatDay(recheckAfter)}.`
+      : 'Marked done. BrandGEO has no answers to measure this fix on yet, so it is not re-checked.',
+  }
+}
+
+async function toolMarkFixDone(ctx, args) {
+  const { sb, clientId, nowIso, key, invId } = ctx
+  const fixId = args.fix_id
+  if (typeof fixId !== 'string' || !FIX_ID_RE.test(fixId)) {
+    throw new ToolInputError('fix_id is required and must be an id returned by list_fixes.')
+  }
+  const note = args.note
+  if (note !== undefined && note !== null && typeof note !== 'string') throw new ToolInputError('note must be text.')
+  if (typeof note === 'string' && note.length > MAX_NOTE) throw new ToolInputError(`note must be ${MAX_NOTE} characters or fewer.`)
+
+  // Already done: answer from the stored row. No scan, no write, no audit.
+  const pre = await loadFixContext(ctx, { withResults: false })
+  const existing = pre.states.get(fixId)
+  if (existing && existing.status === 'done') {
+    ctx.outcome = 'already_done'
+    return { ...markResult(pre, clientId, existing, nowIso), already_done: true }
+  }
+
+  // Step 2: only an id on the current OPEN list (ruling 8).
+  const fx = await loadFixContext(ctx)
+  const item = fx.items.find((i) => i.id === fixId && isOpenState(stateOfRow(fx, i.id)))
+  if (!item) throw new ToolInputError(FIX_NOT_OPEN_MESSAGE, 'fix_not_open')
+
+  // Step 3: the baseline exactly as the page's markFix takes it.
+  const scope = parseMetricKey(item.metricKey)
+  const m = scope ? measureFix(scope, fx.results, fx.promptIds, fx.engineIds) : { value: null, n: 0 }
+  const measurable = scope !== null && m.value !== null
+
+  // Step 4: the page's upsert plus marked_by_key. The trigger stamps marked_at.
+  const { data, error } = await sb.from('fix_states')
+    .upsert({
+      client_id: clientId,
+      fix_id: item.id,
+      status: 'done',
+      title: item.title.slice(0, 500),
+      metric_key: measurable ? item.metricKey : null,
+      baseline_value: measurable ? m.value : null,
+      baseline_n: measurable ? m.n : null,
+      marked_by_key: key.id,
+    }, { onConflict: 'client_id,fix_id' })
+    .select(FIX_COLS)
+    .single()
+  if (error) throw error
+  const row = normalizeFixRow(data)
+
+  // Step 5: one audit row. A failure is logged and does not undo the mark.
+  try {
+    const audit = await sb.from('client_events').insert({
+      client_id: clientId,
+      actor: key.created_by ?? null,
+      type: 'mcp_fix_marked',
+      meta: { key_id: key.id, fix_id: item.id, note: typeof note === 'string' ? note : null },
+    })
+    if (audit && audit.error) console.error(`[mcp-server/${invId}] audit insert failed for client ${clientId}: ${scrub(audit.error.message)}`)
+  } catch (e) {
+    console.error(`[mcp-server/${invId}] audit insert failed for client ${clientId}: ${scrub(e && e.message)}`)
+  }
+
+  return markResult(fx, clientId, row, nowIso)
+}
+
 // ── Tool definitions for tools/list ──────────────────────────────────────────
 
 const T = {
@@ -483,6 +769,8 @@ const STATS = { checks: T.int, no_answer: T.int, answered: T.int, mentioned: T.i
 const SENT = { total: T.int, positive: T.int, neutral: T.int, negative: T.int, unclassified: T.int }
 const HEAD = { client_id: T.int, generated_at: T.str }
 const ANNOTATIONS = { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+const N_OBJ = (properties) => ({ type: ['object', 'null'], properties })
 
 const TOOLS = [
   {
@@ -618,14 +906,72 @@ const TOOLS = [
     }),
     run: toolRecommendations,
   },
+  {
+    name: 'list_fixes',
+    title: 'Fix This list',
+    description: "The brand's Fix This list as the BrandGEO dashboard shows it on AI Visibility: open fixes in priority order, each with its fix_id, a summary of what was measured, the short fix, and prompt, an agent-ready brief identical to the dashboard's Copy as AI prompt. reopened is set when a fix marked done did not move its number. With include_closed, closed lists done, verified and dismissed fixes with their re-check state; verdict_due means the dashboard records the verdict on its next load.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        include_closed: { type: 'boolean', default: false },
+        limit: { type: 'integer', minimum: 1, maximum: 50, default: 20, description: 'Most items per list. Clamped to 1..50.' },
+      },
+      additionalProperties: false,
+    },
+    outputSchema: obj({
+      ...HEAD,
+      open: arr(obj({
+        fix_id: T.str, priority: T.str, status: T.str, title: T.str, summary: T.str, fix: T.str, prompt: T.str,
+        reopened: N_OBJ({ marked_at: T.nStr, checked_at: T.nStr, before: T.nNum, after: T.nNum, metric: T.str }),
+      })),
+      closed: arr(obj({
+        fix_id: T.str, status: T.str, title: T.nStr, marked_at: T.nStr,
+        recheck: N_OBJ({ state: T.str, ready_after: T.str, status: T.str, value: T.num, checked_at: T.nStr, before: T.nNum, after: T.nNum, metric: T.str }),
+      })),
+      truncated: T.bool,
+    }, ['client_id', 'generated_at', 'open', 'truncated']),
+    run: toolListFixes,
+  },
 ]
-const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]))
 
-function toolsListResult(version) {
+const WRITE_TOOLS = [
+  {
+    name: 'mark_fix_done',
+    title: 'Mark a fix done',
+    description: "Mark one open fix from list_fixes as done, as the dashboard's Mark as done does, after the work is finished. BrandGEO stores the fix's current number as the baseline and re-checks it on the first collection 7 days or more later (recheck_after). Only ids on the current open list are accepted; marking a fix that is already done changes nothing and answers already_done: true. note is kept in the account's audit log only.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fix_id: { type: 'string', minLength: 1, maxLength: 191, pattern: '^[a-z_]{1,40}(:.{1,150})?$', description: 'A fix_id returned by list_fixes.' },
+        note: { type: 'string', maxLength: MAX_NOTE, description: 'What was done. Stored in the audit log only.' },
+      },
+      required: ['fix_id'],
+      additionalProperties: false,
+    },
+    outputSchema: obj({
+      client_id: T.int,
+      fix_id: T.str,
+      status: T.str,
+      marked_at: T.str,
+      recheck_after: T.nStr,
+      baseline: N_OBJ({ metric: T.str, value: T.num, answers: T.int }),
+      message: T.str,
+      already_done: T.bool,
+    }, ['client_id', 'fix_id', 'status', 'marked_at', 'recheck_after', 'baseline', 'message']),
+    annotations: WRITE_ANNOTATIONS,
+    write: true,
+    run: toolMarkFixDone,
+  },
+]
+const TOOL_BY_NAME = new Map([...TOOLS, ...WRITE_TOOLS].map((t) => [t.name, t]))
+
+/** Every gated key sees TOOLS; mark_fix_done is listed only for a read and write key. */
+function toolsListResult(version, scope = 'read') {
   const withOutput = version >= OUTPUT_SCHEMA_SINCE
+  const visible = scope === 'read_write' ? [...TOOLS, ...WRITE_TOOLS] : TOOLS
   return {
-    tools: TOOLS.map((t) => {
-      const def = { name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema, annotations: ANNOTATIONS }
+    tools: visible.map((t) => {
+      const def = { name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations || ANNOTATIONS }
       if (withOutput) def.outputSchema = t.outputSchema
       return def
     }),
@@ -643,9 +989,10 @@ async function handle(event, context = {}, opts = {}) {
   const cfg = { ...DEFAULT_CONFIG, ...(opts.config || {}) }
   const nowFn = opts.now || (() => new Date())
   const invId = String((context && context.awsRequestId) || '-').slice(0, 8)
-  const log = { client: '-', method: '-', tool: '-' }
+  const log = { client: '-', method: '-', tool: '-', fixId: null }
   const finish = (res, outcome) => {
-    console.log(`[mcp-server/${invId}] client=${log.client} method=${log.method} tool=${log.tool} ms=${Date.now() - t0} outcome=${outcome}`)
+    const fix = log.fixId === null ? '' : ` fix_id=${log.fixId}`
+    console.log(`[mcp-server/${invId}] client=${log.client} method=${log.method} tool=${log.tool}${fix} ms=${Date.now() - t0} outcome=${outcome}`)
     return res
   }
 
@@ -684,9 +1031,16 @@ async function handle(event, context = {}, opts = {}) {
     const key = bearer(event)
     if (!CLIENT_API_KEY_RE.test(key)) return finish(unauthorized(id), '-32001')
     const sb = opts.supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-    const keyRes = await sb.from('client_api_keys')
-      .select('id, client_id, created_by, last_used_at, revoked_at')
-      .eq('key_hash', hashClientApiKey(key)).maybeSingle()
+    const keyHash = hashClientApiKey(key)
+    const readKey = (cols) => sb.from('client_api_keys').select(cols).eq('key_hash', keyHash).maybeSingle()
+    let keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at, scope')
+    // Before db/supabase-mcp-fix-writes-2026-11-06.sql is applied the scope
+    // column does not exist. Every key is then read only, and the stage 1 tools
+    // must keep answering instead of failing every request on the select.
+    if (keyRes.error && isMissingColumn(keyRes.error, 'scope')) {
+      console.warn(`[mcp-server/${invId}] client_api_keys.scope missing; migration not applied, every key read only`)
+      keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at')
+    }
     if (keyRes.error) throw keyRes.error
     const row = keyRes.data
     if (!row || row.revoked_at) return finish(unauthorized(id), '-32001')
@@ -699,7 +1053,7 @@ async function handle(event, context = {}, opts = {}) {
     // goes to the catch below as 500 -32603, never to 401, so a customer is not
     // told a working key is invalid.
     const clientRes = await sb.from('clients')
-      .select('id, name, brand_aliases, brand_website, plan, category, engines_enabled, known_competitors')
+      .select('id, name, brand_aliases, brand_website, default_market_id, plan, category, engines_enabled, known_competitors')
       .eq('id', row.client_id).maybeSingle()
     if (clientRes.error) throw clientRes.error
     const client = clientRes.data
@@ -736,7 +1090,9 @@ async function handle(event, context = {}, opts = {}) {
       const retryAfter = rateRetryAfter(nowMs, windowSeconds)
       const message = scope === 'client_day'
         ? 'Daily MCP limit reached. It resets at 00:00 UTC.'
-        : `Rate limit reached: ${limit} calls a minute per key. Retry in ${retryAfter} seconds.`
+        : scope === 'client_write_hour'
+          ? `Write limit reached: ${limit} fix updates an hour for this account. Retry in ${retryAfter} seconds.`
+          : `Rate limit reached: ${limit} calls a minute per key. Retry in ${retryAfter} seconds.`
       return finish(rpcError(200, id, -32029, message, { retry_after: retryAfter, scope, limit }, { 'Retry-After': String(retryAfter) }), '-32029')
     }
     const limited = await rateCheck(`mcp:key:${row.id}`, cfg.perKeyPerMinute, 60, 'key_minute')
@@ -751,7 +1107,7 @@ async function handle(event, context = {}, opts = {}) {
         protocolVersion: negotiated,
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
-        instructions: INSTRUCTIONS,
+        instructions: keyScope(row) === 'read_write' ? INSTRUCTIONS_READ_WRITE : INSTRUCTIONS,
       }), 'ok')
     }
     if (method === 'ping') return finish(rpcResult(id, {}), 'ok')
@@ -775,7 +1131,7 @@ async function handle(event, context = {}, opts = {}) {
       if (!isAdminKey) return finish(rpcError(200, id, -32003, 'This account is not available over MCP.'), '-32003')
     }
 
-    if (method === 'tools/list') return finish(rpcResult(id, toolsListResult(version)), 'ok')
+    if (method === 'tools/list') return finish(rpcResult(id, toolsListResult(version, keyScope(row))), 'ok')
 
     // tools/call
     const params = msg.params && typeof msg.params === 'object' && !Array.isArray(msg.params) ? msg.params : {}
@@ -785,24 +1141,33 @@ async function handle(event, context = {}, opts = {}) {
       return finish(rpcError(200, id, -32602, 'Unknown tool', { tool: typeof params.name === 'string' ? params.name : null }), '-32602')
     }
     log.tool = tool.name
+    if (tool.write) log.fixId = loggableFixId(params.arguments && typeof params.arguments === 'object' ? params.arguments.fix_id : undefined)
 
     const dayLimited = await rateCheck(`mcp:client:${clientId}:day`, cfg.perClientPerDay, 86400, 'client_day')
     if (dayLimited) return dayLimited
 
     const args = params.arguments === undefined || params.arguments === null ? {} : params.arguments
-    const inputError = (text) => finish(rpcResult(id, { content: [{ type: 'text', text }], isError: true }), 'tool_input_error')
+    const inputError = (text, code = 'tool_input_error') => finish(rpcResult(id, { content: [{ type: 'text', text }], isError: true }), code)
     if (typeof args !== 'object' || Array.isArray(args)) return inputError('arguments must be an object')
 
+    // Write gate (stage 2): the key's scope, then the per-client write counter.
+    // The plan gate above is the write plan gate too (ruling 2).
+    if (tool.write) {
+      if (keyScope(row) !== 'read_write') return inputError(READ_ONLY_KEY_MESSAGE, 'read_only_key')
+      const writeLimited = await rateCheck(`mcp:client:${clientId}:writes:hour`, cfg.perClientWritesPerHour, 3600, 'client_write_hour')
+      if (writeLimited) return writeLimited
+    }
+
     const engines = activeEnginesFor(client.plan, client.engines_enabled)
-    const ctx = { sb, cfg, client, clientId, engines, nowMs, nowIso }
+    const ctx = { sb, cfg, client, clientId, engines, nowMs, nowIso, key: row, invId, outcome: null }
     let out
     try {
       out = await tool.run(ctx, args)
     } catch (e) {
-      if (e instanceof ToolInputError) return inputError(e.message)
+      if (e instanceof ToolInputError) return inputError(e.message, e.code)
       throw e
     }
-    return finish(rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(out) }], structuredContent: out }), 'ok')
+    return finish(rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(out) }], structuredContent: out }), ctx.outcome || 'ok')
   } catch (e) {
     console.error(`[mcp-server/${invId}] failed: ${scrub(e && e.message)}`)
     return finish(rpcError(500, id, -32603, 'Internal error'), '-32603')
@@ -815,4 +1180,8 @@ exports.SUPPORTED_PROTOCOL_VERSIONS = SUPPORTED_PROTOCOL_VERSIONS
 exports.LATEST_PROTOCOL_VERSION = LATEST_PROTOCOL_VERSION
 exports.MCP_PER_KEY_PER_MINUTE = MCP_PER_KEY_PER_MINUTE
 exports.MCP_PER_CLIENT_PER_DAY = MCP_PER_CLIENT_PER_DAY
+exports.MCP_WRITES_PER_CLIENT_PER_HOUR = MCP_WRITES_PER_CLIENT_PER_HOUR
+/** Tools every gated key sees: the seven stage 1 tools plus list_fixes. */
 exports.TOOL_NAMES = TOOLS.map((t) => t.name)
+/** Tools listed only for a read and write key. */
+exports.WRITE_TOOL_NAMES = WRITE_TOOLS.map((t) => t.name)

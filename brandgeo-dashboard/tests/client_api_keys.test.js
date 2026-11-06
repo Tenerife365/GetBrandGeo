@@ -1,7 +1,8 @@
 /**
  * client_api_keys.test.js: MCP key management (netlify/functions/client-api-keys.js)
  * against the in-memory Supabase fake. Contract: docs/arch/mcp-access.md
- * sections 7.1 and 10.
+ * sections 7.1 and 10, plus the per-key write scope of
+ * docs/arch/mcp-stage2-fixes.md section 9.3 (section 7 below).
  *
  * _auth.js is replaced in require.cache with a scripted requireAuth that keeps
  * the real contract this handler depends on: 204 preflight, 403 foreign
@@ -95,7 +96,7 @@ async function main() {
   const secret = r.body.secret
   assert.match(secret, CLIENT_API_KEY_RE)
   assert.ok(secret.startsWith('bgmcp_1_'))
-  assert.deepStrictEqual(Object.keys(r.body.key).sort(), ['created_at', 'id', 'key_prefix', 'label'])
+  assert.deepStrictEqual(Object.keys(r.body.key).sort(), ['created_at', 'id', 'key_prefix', 'label', 'scope'])
   assert.strictEqual(r.body.key.label, 'Cursor, laptop')
   assert.strictEqual(r.body.key.key_prefix, clientApiKeyPrefix(secret))
   const stored = db.rows('client_api_keys').find((k) => k.id === r.body.key.id)
@@ -123,7 +124,7 @@ async function main() {
   assert.strictEqual(r.status, 200)
   assert.strictEqual(r.body.keys.length, 2)
   assert.strictEqual(r.body.max_keys, 5); assert.strictEqual(r.body.allowed, true); assert.strictEqual(r.body.required_plan, 'radar')
-  for (const k of r.body.keys) assert.deepStrictEqual(Object.keys(k).sort(), ['created_at', 'id', 'key_prefix', 'label', 'last_used_at'])
+  for (const k of r.body.keys) assert.deepStrictEqual(Object.keys(k).sort(), ['created_at', 'id', 'key_prefix', 'label', 'last_used_at', 'scope'])
   assert.ok(!r.raw.includes('key_hash') && !r.raw.includes(hashClientApiKey(secret)) && !r.raw.includes(secret))
   ok('list returns named columns only: no key_hash, no hash value, no secret')
 
@@ -220,7 +221,77 @@ async function main() {
   }
   ok('42P01 answers 503 "MCP keys are not available yet" on list, issue and revoke')
 
-  section('7. logging')
+  section('7. write scope (mcp-stage2-fixes.md 9.3)')
+  // Client 2 (radar) has one active key here; viewer B acts on its own client.
+  r = await call({ action: 'issue', client_id: 2, label: 'default scope' }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body))
+  assert.strictEqual(r.body.key.scope, 'read')
+  assert.strictEqual(db.rows('client_api_keys').find((k) => k.id === r.body.key.id).scope, 'read')
+  const readKeyId = r.body.key.id
+  r = await call({ action: 'issue', client_id: 2, label: 'explicit read', scope: 'read' }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.key.scope, 'read')
+  r = await call({ action: 'issue', client_id: 2, label: 'null scope', scope: null }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.key.scope, 'read')
+  ok('issue without scope, with "read" and with null: scope read, in the response and on the row')
+  r = await call({ action: 'issue', client_id: 2, label: 'agent', scope: 'read_write' }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body))
+  assert.strictEqual(r.body.key.scope, 'read_write')
+  assert.strictEqual(db.rows('client_api_keys').find((k) => k.id === r.body.key.id).scope, 'read_write')
+  const rwKeyId = r.body.key.id
+  ok('issue with scope read_write: the key row and the response carry read_write')
+  const rowsBefore = db.rows('client_api_keys').length
+  for (const bad of ['write', 'READ', 'read write', '', 1, true, ['read'], { scope: 'read' }]) {
+    r = await call({ action: 'issue', client_id: 2, label: 'bad', scope: bad }, { token: 'viewer-b-jwt' })
+    assert.strictEqual(r.status, 400, JSON.stringify(bad))
+    assert.deepStrictEqual(r.body, { error: 'Scope must be read or read_write.' })
+  }
+  assert.strictEqual(db.rows('client_api_keys').length, rowsBefore, 'a refused scope writes no row')
+  ok('any other scope (other words, wrong case, empty, number, boolean, array, object): 400 "Scope must be read or read_write.", no row written')
+  r = await call({ action: 'list', client_id: 2 }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.status, 200)
+  assert.ok(r.body.keys.length >= 4)
+  for (const k of r.body.keys) assert.ok(k.scope === 'read' || k.scope === 'read_write', JSON.stringify(k))
+  assert.strictEqual(r.body.keys.find((k) => k.id === rwKeyId).scope, 'read_write')
+  assert.strictEqual(r.body.keys.find((k) => k.id === readKeyId).scope, 'read')
+  assert.strictEqual(r.body.keys.find((k) => k.id === bKeyId).scope, 'read', 'a key issued before scope existed reads read')
+  ok('list carries scope on every key row; older keys read "read"')
+  // A key row without the column value (a pre-migration row in the fake) reads as read only.
+  db.rows('client_api_keys').find((k) => k.id === bKeyId).scope = undefined
+  r = await call({ action: 'list', client_id: 2 }, { token: 'viewer-b-jwt' })
+  assert.strictEqual(r.body.keys.find((k) => k.id === bKeyId).scope, 'read')
+  db.rows('client_api_keys').find((k) => k.id === bKeyId).scope = 'read'
+  ok('a missing or unexpected stored scope is reported as read, never as read_write')
+  // Before the scope migration: the select names the column 42703, the
+  // insert gets PGRST204. List and read keys keep working; read_write is 503.
+  const premig = createFakeSupabase({ now: () => clock })
+  premig.seed('clients', [{ id: 1, plan: 'growth', category: 'active' }])
+  premig.seed('client_api_keys', [{ id: crypto.randomUUID(), client_id: 1, key_hash: 'h'.repeat(64), key_prefix: 'bgmcp_1_aaaaaa', label: 'old', created_by: 'u-viewer-a' }])
+  for (const row of premig.rows('client_api_keys')) delete row.scope
+  const premigFrom = premig.from.bind(premig)
+  premig.from = (t) => {
+    const q = premigFrom(t)
+    if (t !== 'client_api_keys') return q
+    const run = q._run.bind(q)
+    q._run = async () => {
+      if (q.op === 'insert' && q.payload.some((x) => 'scope' in x)) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'scope' column of 'client_api_keys' in the schema cache" } }
+      if (/\bscope\b/.test(String(q.cols))) return { data: null, error: { code: '42703', message: 'column client_api_keys.scope does not exist' } }
+      return run()
+    }
+    return q
+  }
+  r = await call({ action: 'list', client_id: 1 }, { supabase: premig })
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body))
+  assert.deepStrictEqual(r.body.keys.map((k) => [k.label, k.scope]), [['old', 'read']])
+  r = await call({ action: 'issue', client_id: 1, label: 'new read' }, { supabase: premig })
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.strictEqual(r.body.key.scope, 'read')
+  const premigCount = premig.rows('client_api_keys').length
+  assert.strictEqual(premigCount, 2)
+  r = await call({ action: 'issue', client_id: 1, label: 'agent', scope: 'read_write' }, { supabase: premig })
+  assert.strictEqual(r.status, 503); assert.deepStrictEqual(r.body, { error: 'Read and write keys are not available yet.' })
+  assert.strictEqual(premig.rows('client_api_keys').length, premigCount, 'no row for a refused read_write issue')
+  ok('before the scope migration: list answers with every key read, a read key is still issued, a read_write issue is 503 and writes no row')
+
+  section('8. logging')
   const secrets = db.rows('client_api_keys').map((k) => k.key_hash)
   for (const l of captured) {
     assert.ok(!l.includes('bgmcp_'), 'a log line contains bgmcp_')

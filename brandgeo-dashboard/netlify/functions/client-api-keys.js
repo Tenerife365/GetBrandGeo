@@ -1,13 +1,22 @@
 /**
  * client-api-keys.js -- list, issue and revoke a client's MCP API keys.
- * Contract: docs/arch/mcp-access.md section 7.1. Backend of the Account page
+ * Contract: docs/arch/mcp-access.md section 7.1, plus the write scope of
+ * docs/arch/mcp-stage2-fixes.md section 9.3. Backend of the Account page
  * "MCP access" section.
  *
  * POST body, one of:
  *   { action: 'list', client_id }
- *     -> { keys: [{ id, key_prefix, label, created_at, last_used_at }], max_keys: 5, allowed, required_plan }
- *   { action: 'issue', client_id, label? }
- *     -> { key: { id, key_prefix, label, created_at }, secret: 'bgmcp_...' }   the secret is returned HERE ONLY
+ *     -> { keys: [{ id, key_prefix, label, scope, created_at, last_used_at }], max_keys: 5, allowed, required_plan }
+ *   { action: 'issue', client_id, label?, scope? }
+ *     -> { key: { id, key_prefix, label, scope, created_at }, secret: 'bgmcp_...' }   the secret is returned HERE ONLY
+ *
+ * SCOPE. 'read' (the default when absent) or 'read_write'; anything else is
+ * 400 "Scope must be read or read_write.". read_write lets an agent call the
+ * MCP write tool mark_fix_done. A key's scope never changes after issue: a
+ * different scope means a new key. Every key row in list and issue carries it.
+ * Until db/supabase-mcp-fix-writes-2026-11-06.sql is applied the column does
+ * not exist: list reports every key as read, a read key is still issued, and a
+ * read_write issue answers 503 "Read and write keys are not available yet.".
  *   { action: 'revoke', client_id, id }
  *     -> { ok: true, id }
  *
@@ -32,11 +41,28 @@ const { makeClientApiKey, hashClientApiKey, clientApiKeyPrefix } = require('./_c
 
 const MAX_KEYS = 5
 const MAX_LABEL = 60
-const LIST_COLS = 'id, key_prefix, label, created_at, last_used_at'
+const LIST_COLS = 'id, key_prefix, label, scope, created_at, last_used_at'
+const LIST_COLS_NO_SCOPE = 'id, key_prefix, label, created_at, last_used_at'
+const SCOPES = ['read', 'read_write']
+const DEFAULT_SCOPE = 'read'
+
+/** The stored scope as the API reports it; anything unexpected reads as read only. */
+function scopeOf(v) { return v === 'read_write' ? 'read_write' : 'read' }
 
 /** Postgres 42P01 = undefined_table: the migration has not been applied. */
 function isMissingTable(error) {
   return !!error && (error.code === '42P01' || /relation .*client_api_keys.* does not exist/i.test(error.message || ''))
+}
+
+/**
+ * The scope column is missing: db/supabase-mcp-fix-writes-2026-11-06.sql is
+ * not applied yet. A select names it 42703; an insert gets PostgREST's
+ * PGRST204 (column not in the schema cache).
+ */
+function isMissingScope(error) {
+  if (!error) return false
+  if (error.code === '42703' || error.code === 'PGRST204') return true
+  return /column .*scope.* does not exist|could not find the 'scope' column/i.test(error.message || '')
 }
 
 function parseClientId(v) {
@@ -85,12 +111,18 @@ async function handle(event, { supabase = null, now = () => new Date() } = {}) {
     const { client, error: cErr } = await loadClient()
     if (cErr) return fail('list', cErr)
     if (!client) return json(404, { error: 'Client not found.' })
-    const { data, error } = await sb.from('client_api_keys').select(LIST_COLS)
+    const listKeys = (cols) => sb.from('client_api_keys').select(cols)
       .eq('client_id', clientId).is('revoked_at', null)
       .order('created_at', { ascending: false })
+    let { data, error } = await listKeys(LIST_COLS)
+    // Before the scope migration every key is read only; the list still answers.
+    if (error && isMissingScope(error)) {
+      console.log('[client-api-keys] client_api_keys.scope missing; migration not applied yet, keys listed as read')
+      ;({ data, error } = await listKeys(LIST_COLS_NO_SCOPE))
+    }
     if (error) return fail('list', error)
     return json(200, {
-      keys: (data || []).map((k) => ({ id: k.id, key_prefix: k.key_prefix, label: k.label, created_at: k.created_at, last_used_at: k.last_used_at ?? null })),
+      keys: (data || []).map((k) => ({ id: k.id, key_prefix: k.key_prefix, label: k.label, scope: scopeOf(k.scope), created_at: k.created_at, last_used_at: k.last_used_at ?? null })),
       max_keys: MAX_KEYS,
       allowed: mcpAllowedFor(client.plan),
       required_plan: MCP_MIN_PLAN,
@@ -104,6 +136,8 @@ async function handle(event, { supabase = null, now = () => new Date() } = {}) {
     }
     let label = typeof body.label === 'string' ? body.label.trim() : ''
     if (label.length > MAX_LABEL) return json(400, { error: `Label must be ${MAX_LABEL} characters or fewer.` })
+    const scope = body.scope === undefined || body.scope === null ? DEFAULT_SCOPE : body.scope
+    if (!SCOPES.includes(scope)) return json(400, { error: 'Scope must be read or read_write.' })
 
     const { client, error: cErr } = await loadClient()
     if (cErr) return fail('issue', cErr)
@@ -123,17 +157,29 @@ async function handle(event, { supabase = null, now = () => new Date() } = {}) {
     if (!label) label = `Key ${(count || 0) + 1}`
 
     const secret = makeClientApiKey(clientId)
-    const { data, error } = await sb.from('client_api_keys').insert({
+    const keyRow = {
       client_id: clientId,
       key_hash: hashClientApiKey(secret),
       key_prefix: clientApiKeyPrefix(secret),
       label,
       created_by: auth.user.id,
-    }).select('id, key_prefix, label, created_at').single()
+    }
+    let { data, error } = await sb.from('client_api_keys').insert({ ...keyRow, scope })
+      .select('id, key_prefix, label, scope, created_at').single()
+    if (error && isMissingScope(error)) {
+      // Before the scope migration only a read key can exist. Nothing was
+      // inserted (the statement failed as a whole), so the retry is the only row.
+      if (scope !== 'read') {
+        console.log('[client-api-keys] client_api_keys.scope missing; a read_write key cannot be issued yet')
+        return json(503, { error: 'Read and write keys are not available yet.' })
+      }
+      ;({ data, error } = await sb.from('client_api_keys').insert(keyRow)
+        .select('id, key_prefix, label, created_at').single())
+    }
     if (error) return fail('issue', error)
 
-    console.log(`[client-api-keys] issued key row ${data.id} for client ${clientId} by ${auth.user.id}`)
-    return json(200, { key: { id: data.id, key_prefix: data.key_prefix, label: data.label, created_at: data.created_at }, secret })
+    console.log(`[client-api-keys] issued key row ${data.id} (${scopeOf(data.scope)}) for client ${clientId} by ${auth.user.id}`)
+    return json(200, { key: { id: data.id, key_prefix: data.key_prefix, label: data.label, scope: scopeOf(data.scope), created_at: data.created_at }, secret })
   }
 
   // ── revoke ────────────────────────────────────────────────────────────────

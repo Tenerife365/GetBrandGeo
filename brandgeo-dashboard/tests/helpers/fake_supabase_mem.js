@@ -7,6 +7,12 @@
  * constraints that the handlers rely on for idempotency, auth.getUser,
  * auth.admin.* and storage signed URLs.
  *
+ * upsert(rows, { onConflict }) (added for MCP stage 2, mark_fix_done) merges
+ * into the row matching the onConflict columns or inserts, and runs an
+ * optional per-table trigger stand-in, db.triggers[table](op, oldRow, newRow,
+ * nowIso), which returns the row to store or throws to refuse it. A test sets
+ * it to model what a real trigger stamps (fix_states_guard's marked_at).
+ *
  * It proves control flow and data flow, NOT Postgres semantics: RLS,
  * transactions and the real RPC bodies are verified against production after
  * the migration is applied (docs/affiliates/TEST-RESULTS.md).
@@ -27,11 +33,12 @@ const UNIQUE = {
   terms_acceptances: [['reference']],
   user_profiles: [['id']],
   client_api_keys: [['key_hash']],
+  fix_states: [['client_id', 'fix_id']],
 }
 
 const HAS_UPDATED_AT = new Set(['affiliate_programs', 'affiliates', 'affiliate_memberships', 'affiliate_attributions', 'affiliate_conversions', 'affiliate_commissions', 'affiliate_payout_batches'])
 
-const SERIAL = new Set(['affiliate_applications', 'affiliate_visits', 'affiliate_resources', 'affiliate_audit_log', 'affiliate_rate_limits', 'terms_acceptances', 'clients', 'client_events'])
+const SERIAL = new Set(['affiliate_applications', 'affiliate_visits', 'affiliate_resources', 'affiliate_audit_log', 'affiliate_rate_limits', 'terms_acceptances', 'clients', 'client_events', 'fix_states'])
 
 const DEFAULTS = {
   affiliate_programs: () => ({ status: 'draft', is_public: true, currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 0, recurring_commission_bps: 0, recurring_months: null, attribution_days: 30, attribution_mode: 'last_touch', approval_days: 30, min_payout_cents: 5000, payout_schedule: 'Monthly, within 15 days after month end', tagline: null, description: null, logo_url: null, brand_color: null, terms_md: null, terms_url: null, terms_version: null, api_key_hash: null, api_key_prefix: null, api_key_created_at: null, archived_at: null }),
@@ -53,7 +60,8 @@ const DEFAULTS = {
   clients: () => ({ stripe_customer_id: null, stripe_subscription_id: null }),
   user_profiles: () => ({}),
   client_events: () => ({}),
-  client_api_keys: () => ({ label: '', created_by: null, last_used_at: null, revoked_at: null }),
+  fix_states: () => ({ status: 'open', title: null, metric_key: null, baseline_value: null, baseline_n: null, marked_at: null, marked_by: null, marked_by_key: null, checked_at: null, check_value: null, check_n: null }),
+  client_api_keys: () => ({ label: '', scope: 'read', created_by: null, last_used_at: null, revoked_at: null }),
 }
 
 function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)) }
@@ -89,6 +97,12 @@ class Query {
     return this
   }
   insert(rows) { this.op = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this }
+  upsert(rows, { onConflict = '' } = {}) {
+    this.op = 'upsert'
+    this.payload = Array.isArray(rows) ? rows : [rows]
+    this.conflict = String(onConflict).split(',').map((c) => c.trim()).filter(Boolean)
+    return this
+  }
   update(patch) { this.op = 'update'; this.payload = patch; return this }
   delete() { this.op = 'delete'; return this }
   eq(c, v) { this.filters.push((r) => r[c] === v || (r[c] != null && v != null && String(r[c]) === String(v))); return this }
@@ -162,6 +176,28 @@ class Query {
       }
       return this.returning || this.mode !== 'many' ? this._finish(inserted) : { data: null, error: null }
     }
+    if (this.op === 'upsert') {
+      const trigger = db.triggers[this.table]
+      const cols = this.conflict.length ? this.conflict : ['id']
+      const written = []
+      for (const input of this.payload) {
+        const existing = rows.find((r) => cols.every((c) => r[c] != null && input[c] != null && String(r[c]) === String(input[c])))
+        let next = existing
+          ? Object.assign({}, existing, clone(input))
+          : Object.assign({}, (DEFAULTS[this.table] || (() => ({})))(), clone(input))
+        if (!existing) {
+          if (next.id === undefined) next.id = SERIAL.has(this.table) ? (db.serial[this.table] = (db.serial[this.table] || 0) + 1) : uuid()
+          if (next.created_at === undefined) next.created_at = now
+        }
+        if (trigger) {
+          try { next = trigger(existing ? 'UPDATE' : 'INSERT', existing ? clone(existing) : null, next, now) } catch (e) { return { data: null, error: { message: e.message } } }
+        }
+        const err = this._checkUnique(next, existing || null)
+        if (err) return { data: null, error: err }
+        if (existing) { Object.assign(existing, next); written.push(existing) } else { rows.push(next); written.push(next) }
+      }
+      return this.returning || this.mode !== 'many' ? this._finish(written) : { data: null, error: null }
+    }
     if (this.op === 'update') {
       const targets = this._match(rows)
       for (const r of targets) {
@@ -187,6 +223,7 @@ function createFakeSupabase({ now = () => new Date(), users = [] } = {}) {
     tables: {},
     serial: {},
     calls: [],
+    triggers: {},                // table -> (op, oldRow, newRow, nowIso) => row, upsert only
     now,
     users: new Map(),            // token -> user
     usersById: new Map(),        // id -> user
