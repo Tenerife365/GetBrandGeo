@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
+  CircleCheck, Undo2, EyeOff,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
@@ -43,7 +44,24 @@ import {
   joinEngineLabels, sectionUncheckedExtra, errorSinceChip, ratioNoneChip, enginesNamed, namedByEngines,
   lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine, fixAppearsLine, fixAllMissingLine, fixAllLowLine,
   panelNotAnswering, panelLastResult, fixEngineMissingTitle,
+  FIX_COPY, fixDoneWaiting, fixDoneWaitingData, fixVerifiedLine, fixReopenedLine, fixDismissedLine,
+  fixPromptGapTitle, fixPromptGapLine, fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement,
 } from '../lib/aiVisibilityCopy'
+import {
+  fixIds, metricKeys, parseMetricKey, metricLabel, measureFix, evaluateFix, verdictCutoff,
+  isOpenState, MAX_PROMPT_GAP_FIXES, type FixStateRow, type FixStatus,
+} from '../lib/fixStates'
+
+interface FixItem {
+  id: string
+  metricKey: string | null
+  priority: 'P0' | 'P1' | 'P2'
+  title: string
+  description: string
+  fix: string
+}
+
+const FIX_SELECT = 'id, client_id, fix_id, status, title, metric_key, baseline_value, baseline_n, marked_at, checked_at, check_value, check_n'
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -322,7 +340,23 @@ export default function AIVisibility() {
   // have no hover state, can reach the same content.
   const [scoreInfoOpen, setScoreInfoOpen] = useState(false)
   const [showFixHub, setShowFixHub]     = useState(true)
-  const [copiedFix, setCopiedFix]       = useState<number | null>(null)
+  const [copiedFix, setCopiedFix]       = useState<string | null>(null)
+  // Stored fix states (public.fix_states), keyed by fix_id. No row = open.
+  const [fixRows, setFixRows]           = useState<Map<string, FixStateRow>>(new Map())
+  const [fixRowsLoaded, setFixRowsLoaded] = useState(false)
+  const [fixBusy, setFixBusy]           = useState<string | null>(null)
+  const [fixNotice, setFixNotice]       = useState<{ id: string; text: string } | null>(null)
+  const [showDoneFixes, setShowDoneFixes] = useState(false)
+  const verdictInFlight = useRef<Set<string>>(new Set())
+  // The client the page is showing right now, readable from async callbacks
+  // that started under a different one; and the client `results` was loaded for.
+  const clientRef = useRef<number | null>(null)
+  clientRef.current = activeClientId ?? null
+  const [resultsClientId, setResultsClientId] = useState<number | null>(null)
+  // Focus target after a fix leaves the list, and a polite announcement of what
+  // happened (WCAG 2.4.3 / 4.1.3; fix-states review L4).
+  const fixHubToggleRef = useRef<HTMLButtonElement | null>(null)
+  const [fixAnnounce, setFixAnnounce] = useState('')
   const [refreshed, setRefreshed]       = useState(false)
   // Granular refresh state (admin, cost-control): re-run one engine across all
   // prompts, or one (prompt, engine) cell — instead of paying for all 5 engines.
@@ -429,8 +463,10 @@ export default function AIVisibility() {
   // Reload button is reserved for that button's own non-silent call.
   const load = async (opts: { silent?: boolean } = {}) => {
     const silent = opts.silent === true
+    const cid = activeClientId
     if (!silent) setLoading(true)
     if (isDemoMode) {
+      setResultsClientId(cid)
       const map: ResultMap = new Map()
       mockAIResults.forEach(r => {
         if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
@@ -524,6 +560,10 @@ export default function AIVisibility() {
 
     if (pData) setPrompts(pData)
     setResults(map)
+    // Which client these results belong to. The fix verdict reads it, so a
+    // done fix is never judged against the previous client's answers during an
+    // admin client switch (fix-states review M1).
+    setResultsClientId(cid)
     if (latestChecked) setLastChecked(latestChecked)
     if (!silent) {
       setLoading(false)
@@ -543,6 +583,52 @@ export default function AIVisibility() {
     // switch, so this page has to.
     clearBlockReason()
   }, [activeClientId, activeEngines.join(',')])
+
+  // Stored Fix This states for this client (docs/arch/fix-states.md). One small
+  // read per load; demo mode keeps them in memory only.
+  const loadFixRows = async () => {
+    const cid = activeClientId
+    if (isDemoMode || !cid) {
+      setFixRows(new Map())
+      setFixRowsLoaded(true)
+      return
+    }
+    const { data, error } = await supabase
+      .from('fix_states')
+      .select(FIX_SELECT)
+      .eq('client_id', cid)
+    // A reply for a client the admin has already switched away from is dropped.
+    if (clientRef.current !== cid) return
+    if (error) {
+      // A missing table (migration not applied) or a failed read must not
+      // break the page: the hub falls back to today's behaviour, all open.
+      console.error('[FixStates] load failed:', error.message)
+      setFixRows(new Map())
+      setFixRowsLoaded(true)
+      return
+    }
+    const m = new Map<string, FixStateRow>()
+    ;(data ?? []).forEach(r => {
+      const row = r as FixStateRow
+      m.set(row.fix_id, {
+        ...row,
+        baseline_value: row.baseline_value === null ? null : Number(row.baseline_value),
+        check_value: row.check_value === null ? null : Number(row.check_value),
+      })
+    })
+    setFixRows(m)
+    setFixRowsLoaded(true)
+  }
+
+  useEffect(() => {
+    setFixRows(new Map())
+    setFixRowsLoaded(false)
+    setShowDoneFixes(false)
+    setFixNotice(null)
+    verdictInFlight.current = new Set()
+    loadFixRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId])
 
   // Client switch: forget section open state, frozen order and the expanded row,
   // and read this client's saved sort. Separate from the effect above because it
@@ -798,7 +884,9 @@ export default function AIVisibility() {
   // ── Fix This hub ──────────────────────────────────────────────────────────
 
   const fixItems = (() => {
-    const items: { priority: 'P0' | 'P1' | 'P2'; title: string; description: string; fix: string }[] = []
+    // `id` is the stable fix id (fixStates.ts) a done mark is stored under;
+    // `metricKey` is the number the re-check compares, null for a manual fix.
+    const items: FixItem[] = []
 
     // Every active engine MISSING reads as one finding, not one P0 per engine:
     // the same sentence repeated four times says one thing four times.
@@ -807,6 +895,8 @@ export default function AIVisibility() {
       const totalChecked = engineStatusCards.reduce((a, e) => a + e.checked, 0)
       const totalMentioned = engineStatusCards.reduce((a, e) => a + e.mentioned, 0)
       items.push({
+        id: fixIds.visibilityAll(),
+        metricKey: metricKeys.all(),
         priority: 'P0',
         title: totalMentioned === 0 ? AIV_COPY.fixAllMissingTitle : AIV_COPY.fixAllLowTitle,
         description: totalMentioned === 0
@@ -817,6 +907,8 @@ export default function AIVisibility() {
     } else {
       engineStatusCards.filter(e => e.status === 'MISSING' && e.checked > 0 && !e.isUnavailable).forEach(e => {
         items.push({
+          id: fixIds.engineMissing(e.id),
+          metricKey: metricKeys.engine(e.id),
           priority: 'P0',
           title: fixEngineMissingTitle(e.label, e.mentioned),
           description: fixAppearsLine(brandName, e.mentioned, e.checked, e.label),
@@ -827,6 +919,8 @@ export default function AIVisibility() {
 
     engineStatusCards.filter(e => e.status === 'PARTIAL' && e.checked > 0).forEach(e => {
       items.push({
+        id: fixIds.engineLow(e.id),
+        metricKey: metricKeys.engine(e.id),
         priority: 'P1',
         title: `Low visibility in ${e.label} (${e.pct}%)`,
         description: `Brand appears inconsistently, in ${e.mentioned} of ${e.checked} prompts checked.`,
@@ -842,6 +936,8 @@ export default function AIVisibility() {
     const topRanked = competitorFreq.find(c => !c.proseOnly && c.avgPos !== null)
     if (topRanked && gapCount > 0) {
       items.push({
+        id: fixIds.outranked(topRanked.name),
+        metricKey: metricKeys.competitor(topRanked.name),
         priority: 'P1',
         title: `Outranked by ${topRanked.name} (avg #${topRanked.avgPos})`,
         description: `${topRanked.name} is ranked by an engine in ${topRanked.rankedMentions} of its ${topRanked.count} appearances, while ${brandName} is absent in ${gapCount} checks.`,
@@ -851,6 +947,8 @@ export default function AIVisibility() {
 
     if (dimensions.consistency < 40 && overallPct > 0) {
       items.push({
+        id: fixIds.consistency(),
+        metricKey: metricKeys.consistency(),
         priority: 'P2',
         title: 'Inconsistent cross-prompt coverage',
         description: `Brand appears in only ${dimensions.consistency}% of prompts with consistent multi-engine coverage. AI models know you selectively.`,
@@ -860,6 +958,8 @@ export default function AIVisibility() {
 
     if (dimensions.knowledge > 0 && dimensions.knowledge < 50) {
       items.push({
+        id: fixIds.ranking(),
+        metricKey: metricKeys.knowledge(),
         priority: 'P2',
         title: 'Improve ranking position',
         description: `When mentioned, ${brandName} averages a lower position. Competitors rank above you in shared responses.`,
@@ -867,8 +967,227 @@ export default function AIVisibility() {
       })
     }
 
+    // Per-prompt gaps: every engine that answered left the brand out. These are
+    // the steady supply of next fixes (fix-states.md section 6). Most contested
+    // first (answers that named another brand), then prompt order; at most
+    // MAX_PROMPT_GAP_FIXES open at a time, the next appear as these close.
+    const gaps = prompts.map(p => {
+      const cells = Array.from(results.get(p.id)?.values() ?? [])
+      const withCompetitor = cells.filter(r => {
+        try {
+          const arr = JSON.parse(r.competitors_mentioned ?? '[]')
+          return Array.isArray(arr) && arr.length > 0
+        } catch { return false }
+      }).length
+      return { p, answers: cells.length, mentioned: cells.some(r => r.brand_mentioned), withCompetitor }
+    })
+      .filter(g => g.answers > 0 && !g.mentioned && isOpenState(fixRows.get(fixIds.promptGap(g.p.id))?.status))
+      .sort((a, b) => b.withCompetitor - a.withCompetitor || a.p.position - b.p.position)
+      .slice(0, MAX_PROMPT_GAP_FIXES)
+    gaps.forEach(g => {
+      items.push({
+        id: fixIds.promptGap(g.p.id),
+        metricKey: metricKeys.prompt(g.p.id),
+        priority: 'P2',
+        title: fixPromptGapTitle(g.p.text),
+        description: fixPromptGapLine(brandName, g.answers, g.withCompetitor),
+        fix: FIX_COPY.promptGapFix,
+      })
+    })
+
     return items
   })()
+
+  // ── Fix states: open list, done list, mark, reopen, re-check ──────────────
+  const fixPromptIds = prompts.map(p => p.id)
+  const fixEngineIds = activeLLMs.map(l => l.id as string)
+  const engineLabelOf = (id: string) => ENGINE_META[id as EngineId]?.label ?? id
+  const promptTextOf = (id: number) => prompts.find(p => p.id === id)?.text
+  const openFixItems = fixItems.filter(i => isOpenState(fixRows.get(i.id)?.status))
+  const doneFixRows = Array.from(fixRows.values())
+    .filter(r => r.status === 'done' || r.status === 'verified' || r.status === 'dismissed')
+    .sort((a, b) => (b.checked_at ?? b.marked_at ?? '').localeCompare(a.checked_at ?? a.marked_at ?? ''))
+
+  const putFixRow = (row: FixStateRow) => {
+    setFixRows(prev => {
+      const next = new Map(prev)
+      next.set(row.fix_id, {
+        ...row,
+        baseline_value: row.baseline_value === null ? null : Number(row.baseline_value),
+        check_value: row.check_value === null ? null : Number(row.check_value),
+      })
+      return next
+    })
+  }
+
+  // After a fix leaves the open list its buttons unmount, so focus would fall
+  // to <body>. Move it to the hub's own toggle and say what happened.
+  const afterFixMoved = (text: string) => {
+    setFixAnnounce(text)
+    setTimeout(() => fixHubToggleRef.current?.focus(), 0)
+  }
+
+  const markFix = async (item: FixItem, status: 'done' | 'dismissed') => {
+    const cid = activeClientId
+    // Never take a baseline from another client's answers mid-switch.
+    if (!cid || fixBusy || resultsClientId !== cid) return
+    const scope = status === 'done' ? parseMetricKey(item.metricKey) : null
+    const m = scope ? measureFix(scope, results, fixPromptIds, fixEngineIds) : { value: null, n: 0 }
+    const measurable = scope !== null && m.value !== null
+    const payload = {
+      client_id: cid,
+      fix_id: item.id,
+      status: status as FixStatus,
+      title: item.title.slice(0, 500),
+      metric_key: measurable ? item.metricKey : null,
+      baseline_value: measurable ? m.value : null,
+      baseline_n: measurable ? m.n : null,
+    }
+    setFixNotice(null)
+    const announce = fixMovedAnnouncement(status, item.title)
+    if (isDemoMode) {
+      putFixRow({ ...payload, marked_at: new Date().toISOString(), checked_at: null, check_value: null, check_n: null })
+      afterFixMoved(announce)
+      return
+    }
+    setFixBusy(item.id)
+    const { data, error } = await supabase
+      .from('fix_states')
+      .upsert(payload, { onConflict: 'client_id,fix_id' })
+      .select(FIX_SELECT)
+      .single()
+    setFixBusy(null)
+    if (clientRef.current !== cid) return
+    if (error || !data) {
+      console.error('[FixStates] mark failed:', error?.message)
+      setFixNotice({ id: item.id, text: FIX_COPY.saveFailed })
+      return
+    }
+    putFixRow(data as FixStateRow)
+    afterFixMoved(announce)
+  }
+
+  const reopenFix = async (fixId: string) => {
+    const cid = activeClientId
+    if (!cid || fixBusy) return
+    const row = fixRows.get(fixId)
+    if (!row || row.client_id !== cid) return
+    setFixNotice(null)
+    const announce = fixMovedAnnouncement('open', row.title ?? fixId)
+    if (isDemoMode) {
+      putFixRow({ ...row, status: 'open' })
+      afterFixMoved(announce)
+      return
+    }
+    setFixBusy(fixId)
+    const { data, error } = await supabase
+      .from('fix_states')
+      .update({ status: 'open' })
+      .eq('client_id', cid)
+      .eq('fix_id', fixId)
+      .select(FIX_SELECT)
+      .single()
+    setFixBusy(null)
+    if (clientRef.current !== cid) return
+    if (error || !data) {
+      console.error('[FixStates] reopen failed:', error?.message)
+      setFixNotice({ id: fixId, text: FIX_COPY.saveFailed })
+      return
+    }
+    putFixRow(data as FixStateRow)
+    afterFixMoved(announce)
+  }
+
+  // Re-check on load and after every reload: a done fix whose scope has fresh
+  // answers (7 days or more after marking) gets its verdict written once. The
+  // database repeats the 7-day rule and only accepts a verdict from done.
+  const [checkRequested, setCheckRequested] = useState<string | null>(null)
+  const resultsKey = `${rawRows.length}:${lastChecked ?? ''}`
+  useEffect(() => {
+    // Rows and results must both belong to the client on screen (review M1):
+    // during an admin client switch one render still holds the previous
+    // client's rows or answers with the new activeClientId.
+    if (loading || !fixRowsLoaded || !activeClientId || resultsClientId !== activeClientId) return
+    fixRows.forEach(row => {
+      if (row.status !== 'done' || row.client_id !== activeClientId) return
+      const ev = evaluateFix(row, results, fixPromptIds, fixEngineIds)
+      if (ev.state !== 'verdict') {
+        if (checkRequested === row.fix_id) {
+          setFixNotice({
+            id: row.fix_id,
+            text: ev.state === 'waiting'
+              ? fixCheckNowWaiting(formatDate(ev.readyAfter))
+              : ev.state === 'untracked' ? FIX_COPY.untracked : FIX_COPY.manual,
+          })
+          setCheckRequested(null)
+        }
+        return
+      }
+      if (checkRequested === row.fix_id) setCheckRequested(null)
+      if (verdictInFlight.current.has(row.fix_id)) return
+      verdictInFlight.current.add(row.fix_id)
+      if (isDemoMode) {
+        putFixRow({ ...row, status: ev.status, check_value: ev.value, check_n: ev.n, checked_at: new Date().toISOString() })
+        verdictInFlight.current.delete(row.fix_id)
+        return
+      }
+      supabase
+        .from('fix_states')
+        .update({ status: ev.status, check_value: ev.value, check_n: ev.n })
+        .eq('client_id', row.client_id)
+        .eq('fix_id', row.fix_id)
+        .eq('status', 'done')
+        .select(FIX_SELECT)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          verdictInFlight.current.delete(row.fix_id)
+          if (clientRef.current !== row.client_id) return
+          if (error) {
+            // A browser clock ahead of the server lands here (the trigger
+            // refuses a verdict before 7 days). Leave it done; a later load retries.
+            console.error('[FixStates] verdict failed:', error.message)
+            return
+          }
+          // No row matched: another tab already moved it. Re-read the truth.
+          if (!data) { loadFixRows(); return }
+          putFixRow(data as FixStateRow)
+        })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, fixRowsLoaded, fixRows, resultsKey, resultsClientId, checkRequested, activeClientId])
+
+  const checkFixNow = async (fixId: string) => {
+    setFixNotice(null)
+    await load({ silent: true })
+    setCheckRequested(fixId)
+  }
+
+  const doneFixLine = (row: FixStateRow): string => {
+    const scope = parseMetricKey(row.metric_key)
+    const label = metricLabel(scope, engineLabelOf, promptTextOf)
+    const markedOn = row.marked_at ? formatDate(row.marked_at) : ''
+    if (row.status === 'dismissed') return fixDismissedLine(markedOn)
+    if (row.status === 'verified' && row.baseline_value !== null && row.check_value !== null) {
+      return fixVerifiedLine(formatDate(row.checked_at ?? row.marked_at ?? ''), label, row.baseline_value, row.check_value)
+    }
+    if (!scope || row.baseline_value === null || !row.marked_at) return FIX_COPY.manual
+    const ev = evaluateFix(row, results, fixPromptIds, fixEngineIds)
+    if (ev.state === 'untracked') return `${fixMarkedOn(markedOn)} ${FIX_COPY.untracked}`
+    if (ev.state === 'waiting' && Date.now() >= Date.parse(ev.readyAfter)) {
+      return fixDoneWaitingData(markedOn, ev.fresh, ev.needed)
+    }
+    return fixDoneWaiting(markedOn, formatDate(verdictCutoff(row.marked_at)))
+  }
+
+  const reopenedFixLine = (row: FixStateRow | undefined): string | null => {
+    if (!row || row.status !== 'reopened' || row.baseline_value === null || row.check_value === null) return null
+    const label = metricLabel(parseMetricKey(row.metric_key), engineLabelOf, promptTextOf)
+    return fixReopenedLine(
+      row.marked_at ? formatDate(row.marked_at) : '',
+      row.checked_at ? formatDate(row.checked_at) : '',
+      label, row.baseline_value, row.check_value,
+    )
+  }
 
   // Content-shaped skeleton (DASHBOARD-UX-2026.md §6 Phase C, same pattern as
   // Dashboard.tsx's Overview skeleton) -- mirrors this page's real layout
@@ -969,9 +1288,9 @@ export default function AIVisibility() {
     { key: 'consistency', label: 'Consistency', value: dimensions.consistency, desc: 'Cross-prompt rate' },
   ] as const
 
-  const copyFix = (idx: number, text: string) => {
+  const copyFix = (id: string, text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedFix(idx)
+      setCopiedFix(id)
       setTimeout(() => setCopiedFix(null), 2000)
     })
   }
@@ -2004,10 +2323,13 @@ export default function AIVisibility() {
       )}
 
       {/* ── Fix This hub ─────────────────────────────────────────────────────── */}
-      {fixItems.length > 0 && (
+      {/* Always mounted, so the announcement survives the hub re-rendering. */}
+      <div className="sr-only" role="status" aria-live="polite">{fixAnnounce}</div>
+      {(openFixItems.length > 0 || doneFixRows.length > 0) && (
         <div className="mb-4 bg-dark-800 rounded-xl overflow-hidden">
           <button
-            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors"
+            ref={fixHubToggleRef}
+            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
             onClick={() => setShowFixHub(v => !v)}
             aria-expanded={showFixHub}
           >
@@ -2019,10 +2341,10 @@ export default function AIVisibility() {
               {/* The separator here used to be a leading em dash. The parent row is
                   already `flex items-center gap-2`, so the 8px gap does the separating
                   and the dash was carrying no information the layout did not. */}
-              <span className="text-xs text-slate-500">{fixItems.length} action{fixItems.length !== 1 ? 's' : ''} to improve your score</span>
+              <span className="text-xs text-slate-500">{openFixItems.length} action{openFixItems.length !== 1 ? 's' : ''} to improve your score</span>
               <div className="flex items-center gap-1 ml-1">
                 {(['P0','P1','P2'] as const).map(p => {
-                  const count = fixItems.filter(i => i.priority === p).length
+                  const count = openFixItems.filter(i => i.priority === p).length
                   if (!count) return null
                   const cls = p === 'P0' ? 'bg-red-500/20 text-red-300' : p === 'P1' ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'
                   return <span key={p} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{count} {p}</span>
@@ -2034,57 +2356,157 @@ export default function AIVisibility() {
 
           <Collapse open={showFixHub}>
             <div className="border-t border-dark-700/50">
-              {/* Workflow explainer — the Nielsen audit flagged that the intended
-                  action was ambiguous. State it plainly rather than add a non-functional
-                  "Apply Fix" button (these are content actions, no in-app automation). */}
+              {/* Workflow explainer: the Nielsen audit flagged that the intended
+                  action was ambiguous. The fix itself is a content action outside
+                  the app; marking it done is what the app tracks and re-checks
+                  (docs/arch/fix-states.md). */}
               <div className="px-5 py-2.5 text-[11px] text-slate-500 bg-dark-700/20 border-b border-dark-700/50">
-                Copy each recommended fix and apply it to your site or content. P0 items move your score the most.
+                {FIX_COPY.explainer}
               </div>
+              {openFixItems.length === 0 && (
+                <div className="px-5 py-4 text-xs text-slate-400 flex items-center gap-2">
+                  <CircleCheck size={14} className="text-emerald-400 shrink-0" aria-hidden="true" />
+                  {FIX_COPY.allDone}
+                </div>
+              )}
               <div className="divide-y divide-dark-700/50">
-              {(showAllFixes ? fixItems : fixItems.slice(0, 3)).map((item, idx) => {
+              {(showAllFixes ? openFixItems : openFixItems.slice(0, 3)).map(item => {
+                const row = fixRows.get(item.id)
+                const reopenedLine = reopenedFixLine(row)
+                const busy = fixBusy === item.id
                 const pStyles = {
                   P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'   },
                   P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300' },
                   P2: { border: 'border-l-4 border-l-purple-500', badge: 'bg-purple-500/20 text-purple-300', title: 'text-slate-200' },
                 }[item.priority]
                 return (
-                  <div key={idx} className={`px-5 py-4 ${pStyles.border}`}>
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={item.id} className={`px-5 py-4 ${pStyles.border}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
                         <span className={`mt-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${pStyles.badge}`}>
                           {item.priority}
                         </span>
                         <div className="min-w-0">
-                          <div className={`text-sm font-semibold ${pStyles.title} mb-0.5`}>{item.title}</div>
+                          <div className={`text-sm font-semibold ${pStyles.title} mb-0.5 break-words`}>{item.title}</div>
                           <div className="text-xs text-slate-500 mb-2">{item.description}</div>
+                          {reopenedLine && (
+                            <div className="mb-2 flex items-start gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                              <RotateCcw size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
+                              <span>{reopenedLine}</span>
+                            </div>
+                          )}
                           <div className="text-xs text-slate-400 leading-relaxed bg-dark-700/40 rounded-lg px-3 py-2">
                             <span className="text-slate-600 font-medium uppercase tracking-wide text-[9px] block mb-1">Recommended fix</span>
                             {item.fix}
                           </div>
+                          {fixNotice?.id === item.id && (
+                            <div role="status" className="mt-2 text-xs text-amber-300">{fixNotice.text}</div>
+                          )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => copyFix(idx, item.fix)}
-                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-dark-600 text-slate-400 hover:text-slate-200 hover:border-dark-500 transition-colors"
-                      >
-                        {copiedFix === idx
-                          ? <><CheckCheck size={12} className="text-emerald-400" /> Copied</>
-                          : <><Copy size={12} /> Copy fix</>
-                        }
-                      </button>
+                      <div className="flex flex-row flex-wrap sm:flex-col sm:flex-nowrap gap-2 shrink-0 pl-9 sm:pl-0">
+                        <button
+                          onClick={() => copyFix(item.id, item.fix)}
+                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs border border-dark-600 text-slate-400 hover:text-slate-200 hover:border-dark-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          {copiedFix === item.id
+                            ? <><CheckCheck size={12} className="text-emerald-400" /> Copied</>
+                            : <><Copy size={12} /> Copy fix</>
+                          }
+                        </button>
+                        <button
+                          onClick={() => markFix(item, 'done')}
+                          disabled={busy}
+                          aria-label={`${FIX_COPY.markDone}: ${item.title}`}
+                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          {busy ? <Loader2 size={12} className="animate-spin" /> : <CircleCheck size={12} />} {FIX_COPY.markDone}
+                        </button>
+                        <button
+                          onClick={() => markFix(item, 'dismissed')}
+                          disabled={busy}
+                          aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
+                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700/50 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          <EyeOff size={12} /> {FIX_COPY.dismiss}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
               })}
               </div>
-              {/* Pagination (Nielsen audit edge case): only top 3 shown by default. */}
-              {fixItems.length > 3 && (
+              {/* Pagination (Nielsen audit edge case): only top 3 shown by default.
+                  Done and set-aside fixes leave this list, so the next ones move up. */}
+              {openFixItems.length > 3 && (
                 <button
                   onClick={() => setShowAllFixes(v => !v)}
                   className="w-full px-5 py-2.5 text-xs font-medium text-brand-400 hover:text-brand-300 hover:bg-dark-700/30 border-t border-dark-700/50 transition-colors"
                 >
-                  {showAllFixes ? 'Show fewer' : `Show all ${fixItems.length} actions`}
+                  {showAllFixes ? 'Show fewer' : `Show all ${openFixItems.length} actions`}
                 </button>
+              )}
+              {doneFixRows.length > 0 && (
+                <div className="border-t border-dark-700/50">
+                  <button
+                    onClick={() => setShowDoneFixes(v => !v)}
+                    aria-expanded={showDoneFixes}
+                    className="w-full flex items-center justify-between px-5 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-dark-700/30 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <CircleCheck size={13} className="text-emerald-400" aria-hidden="true" />
+                      {FIX_COPY.doneHeading} ({doneFixRows.length})
+                    </span>
+                    {showDoneFixes ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+                  <Collapse open={showDoneFixes}>
+                    <ul className="divide-y divide-dark-700/40 bg-dark-700/10">
+                      {doneFixRows.map(row => {
+                        const busy = fixBusy === row.fix_id
+                        const tone = row.status === 'verified'
+                          ? 'text-emerald-300'
+                          : row.status === 'dismissed' ? 'text-slate-500' : 'text-slate-300'
+                        const measurable = row.status === 'done' && parseMetricKey(row.metric_key) !== null && row.baseline_value !== null
+                          && evaluateFix(row, results, fixPromptIds, fixEngineIds).state !== 'untracked'
+                        return (
+                          <li key={row.fix_id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className={`text-xs font-semibold ${tone} break-words`}>
+                                {row.status === 'verified' && <CheckCheck size={12} className="inline mr-1 -mt-0.5" aria-hidden="true" />}
+                                {row.title ?? row.fix_id}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5">{doneFixLine(row)}</div>
+                              {fixNotice?.id === row.fix_id && (
+                                <div role="status" className="mt-1 text-xs text-amber-300">{fixNotice.text}</div>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              {measurable && (
+                                <button
+                                  onClick={() => checkFixNow(row.fix_id)}
+                                  disabled={busy || checkRequested === row.fix_id}
+                                  aria-label={`${FIX_COPY.checkNow}: ${row.title ?? row.fix_id}`}
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border border-dark-600 text-slate-300 hover:text-white hover:border-dark-500 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                                >
+                                  {checkRequested === row.fix_id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} {FIX_COPY.checkNow}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => reopenFix(row.fix_id)}
+                                disabled={busy}
+                                aria-label={`${row.status === 'dismissed' ? FIX_COPY.restore : FIX_COPY.reopen}: ${row.title ?? row.fix_id}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-dark-700/50 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                              >
+                                {busy ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                                {row.status === 'dismissed' ? FIX_COPY.restore : FIX_COPY.reopen}
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </Collapse>
+                </div>
               )}
             </div>
           </Collapse>

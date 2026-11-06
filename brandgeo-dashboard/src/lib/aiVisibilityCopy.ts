@@ -184,3 +184,57 @@ export function fixAllLowLine(brand: string, mentioned: number, checked: number,
 // Expanded panel, error cell
 export function panelNotAnswering(since: string): string { return `Not answering since ${since}` }
 export function panelLastResult(date: string): string { return `Last result, ${date}:` }
+
+// Fix This: done, re-check and next fixes (docs/arch/fix-states.md)
+export const FIX_COPY = {
+  explainer: 'Copy each recommended fix and apply it to your site or content. Mark it done when you have, and we check the number after a later collection. P0 items move your score the most.',
+  markDone: 'Mark as done',
+  dismiss: 'Not for us',
+  reopen: 'Reopen',
+  restore: 'Restore',
+  checkNow: 'Check now',
+  doneHeading: 'Done',
+  allDone: 'All current fixes are done. New ones appear here as your results change.',
+  manual: 'Marked done. This one cannot be measured, so there is nothing to check.',
+  untracked: 'The prompt or engine this fix measured is no longer tracked, so it cannot be checked.',
+  saveFailed: 'Could not save that change. Please try again.',
+  promptGapFix: 'Publish a page that answers this question directly, with your brand name in the title and the H1, and link it from your main service page. Ask one trusted publication or directory in your field to reference it.',
+}
+
+export function fixDoneWaiting(markedOn: string, readyAfter: string): string {
+  return `Marked done ${markedOn}. We check the number on the first collection after ${readyAfter}.`
+}
+export function fixDoneWaitingData(markedOn: string, fresh: number, needed: number): string {
+  return `Marked done ${markedOn}. Waiting for newer answers: ${fresh} of ${needed} needed so far.`
+}
+export function fixVerifiedLine(on: string, metric: string, before: number, after: number): string {
+  return `Verified ${on}: ${metric} went from ${before}% to ${after}%.`
+}
+export function fixReopenedLine(markedOn: string, checkedOn: string, metric: string, before: number, after: number): string {
+  return `You marked this done ${markedOn}. After the answers collected by ${checkedOn}, ${metric} is ${after}% (was ${before}%). Mark it done again once you have changed more.`
+}
+export function fixDismissedLine(on: string): string {
+  return `Set aside ${on}.`
+}
+export function fixPromptGapTitle(prompt: string): string {
+  const t = prompt.length > 90 ? prompt.slice(0, 87) + '...' : prompt
+  return `Not named for: ${t}`
+}
+export function fixPromptGapLine(brand: string, answers: number, withCompetitor: number): string {
+  const base = `No engine named ${brand} in ${answers} ${plural(answers, 'answer', 'answers')}`
+  return withCompetitor > 0
+    ? `${base}; ${withCompetitor} of them named another brand instead.`
+    : `${base}.`
+}
+export function fixCheckNowWaiting(readyAfter: string): string {
+  return `Nothing to check yet. The check needs answers collected after ${readyAfter}, so it runs on your first collection after that date, scheduled or run by hand.`
+}
+export function fixMarkedOn(on: string): string {
+  return `Marked done ${on}.`
+}
+/** Screen reader announcement when a fix leaves or returns to the open list. */
+export function fixMovedAnnouncement(status: 'done' | 'dismissed' | 'open', title: string): string {
+  if (status === 'done') return `Marked as done: ${title}. Moved to the Done list.`
+  if (status === 'dismissed') return `Set aside: ${title}. Moved to the Done list.`
+  return `Back in the list: ${title}.`
+}
