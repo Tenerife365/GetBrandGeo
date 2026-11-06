@@ -434,3 +434,34 @@ e) the service path keeps the key and leaves `marked_by` null; f) the
 references its key succeeds and the key row goes with it; h) deleting a
 referenced key on its own is refused (NO ACTION, I7). Counts after: 16 events
 (0 `mcp_fix_marked`), 0 keys, 51 clients, 13 fix rows, no probe rows.
+
+## 12. Live probe after the deploy, 2026-11-06
+
+Pushed `7d9c859` 17:36:47Z with `BATCH_PUSH=1`; `health` answered `commit`
+7d9c859, `built_at` 17:37:06Z. Probe on client 2 (BrandGEO's own account,
+managed) with two temporary keys inserted by hash from this seat, one read
+and one read_write; the secrets lived in a scratch file only and were never
+printed.
+
+- Unauthenticated `tools/list`: 401, -32001.
+- Read key: 8 tools ending in `list_fixes`; read_write key: 9, plus
+  `mark_fix_done`.
+- `list_fixes`: 5 open (`consistency`, four `prompt_gap`), `truncated` false;
+  with `include_closed` the two stored done rows come back with
+  `recheck.state` waiting until 2026-11-13, as the spec says.
+- Read key `mark_fix_done`: refused with the read-only message.
+- Read_write key `mark_fix_done` on `prompt_gap:59`: done, baseline 0% over 7
+  answers, recheck after 2026-11-13. Row: `marked_by` null, `marked_by_key`
+  the key, metric `rate:prompt:59`. One `mcp_fix_marked` event with the note
+  and key id. A second call returned the same state and wrote no second
+  event. An id not on the open list was refused.
+- Cleanup, all read back: the fix row, the event and both keys deleted;
+  counts back to 16 events (0 `mcp_fix_marked`), 0 keys, 13 fix rows;
+  client 2 keeps its two earlier done rows untouched.
+
+Not checked live: the function log lines (the Netlify observability API
+returned nothing even for a `mark_fix_done` positive control, so log text is
+not searchable there; the no-key rule rests on the 70-check suite), page
+versus MCP parity on client 1 (needs a key on a paying client's account;
+covered by the shared reader and the 3,543-row test), and the Account page
+UI in a browser (needs an admin login).
