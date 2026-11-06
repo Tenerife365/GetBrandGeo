@@ -5,14 +5,18 @@
  * the one write tool, mark_fix_done.
  *
  * POST https://app.getbrandgeo.com/mcp   (netlify.toml rewrites /mcp here)
- * Authorization: Bearer bgmcp_<client_id>_<48 hex>
+ * Authorization: Bearer bgmcp_<client_id>_<48 hex>   (an API key), or
+ * Authorization: Bearer bgmat_<48 hex>                (an OAuth access token,
+ *   docs/arch/mcp-stage3-oauth.md section 5: the shape picks the branch)
  *
  * Transport: Streamable HTTP, stateless, JSON responses only. One JSON-RPC
  * message per POST, no batching, no SSE, no Mcp-Session-Id. GET, DELETE,
  * OPTIONS and anything else: 405 with Allow: POST.
  *
  * AUTHORITY. The client id comes from the client_api_keys row found by the
- * sha256 of the key, never from tool arguments. Plan gate: mcpAllowedFor() in
+ * sha256 of the key, or for OAuth from the oauth_grants row behind the
+ * oauth_tokens row found by the sha256 of the token, with the grant's user
+ * still a viewer of that client; never from tool arguments. Plan gate: mcpAllowedFor() in
  * _plans.js, on the live clients row, on tools/list and tools/call only. The
  * write gate is the same plan gate (stage 2 ruling 2) plus the key's own
  * scope: mark_fix_done is listed and runs only for a 'read_write' key.
@@ -24,8 +28,8 @@
  * client_events audit row (type mcp_fix_marked). No tool calls an LLM or
  * enqueues a collection, and list_fixes never records a verdict (ruling 7).
  *
- * LOGGING. One line per request (section 6.4). Never logged: the key, its
- * prefix, its hash, the Authorization header, the raw body, mark_fix_done's
+ * LOGGING. One line per request (section 6.4), with cred=key|oauth (stage 3).
+ * Never logged: the key or OAuth token, its prefix, its hash, the Authorization header, the raw body, mark_fix_done's
  * note, or tool arguments other than prompt_id, window_days, limit and fix_id.
  * Only fix_id is printed (on mark_fix_done lines), URI-encoded and scrubbed so
  * it stays one token and can never carry a key. The method and tool name are
@@ -45,6 +49,7 @@ const { ALLOWED_ORIGINS } = require('./_auth')
 const { activeEnginesFor, RESEARCH_CATEGORY } = require('./_cost')
 const { PLAN_LABELS, ENGINE_LABELS, MCP_MIN_PLAN, mcpAllowedFor } = require('./_plans')
 const { CLIENT_API_KEY_RE, hashClientApiKey, clientIdFromKey } = require('./_client_api_key')
+const oauth = require('./_oauth')
 const { isNoAnswerRow } = require('../../src/lib/aiVisibilityScore.ts')
 const { aggregateCompetitors, cleanCompetitorName, isLikelyCompanyName } = require('../../src/lib/competitorFilter.ts')
 const { buildFixResultMap, buildFixItems } = require('../../src/lib/fixItems.ts')
@@ -87,14 +92,18 @@ const DEFAULT_CONFIG = {
 }
 
 const UPGRADE_URL = 'https://app.getbrandgeo.com/account'
-const UNAUTHORIZED_MESSAGE = 'Invalid or missing BrandGEO API key.'
+// Stage 3 section 3.1: "API key" misled an OAuth user, so one wording for both.
+const UNAUTHORIZED_MESSAGE = 'Invalid or missing BrandGEO credentials.'
 const KNOWN_METHODS = new Set(['initialize', 'ping', 'tools/list', 'tools/call'])
 
 const SERVER_INFO = { name: 'brandgeo', title: 'BrandGEO', version: '1.0.0' }
 const INSTRUCTIONS = "Read-only access to one BrandGEO account's AI visibility data: how often AI engines mention the brand, for which prompts, next to which competitors, with what sentiment, plus the latest recommendations. Data is refreshed by BrandGEO's own collection runs; these tools never start a collection."
 // Served instead of INSTRUCTIONS to a read and write key, which is not read only.
 const INSTRUCTIONS_READ_WRITE = "Access to one BrandGEO account's AI visibility data: how often AI engines mention the brand, for which prompts, next to which competitors, with what sentiment, plus the latest recommendations and the Fix This list (list_fixes). This key can also mark a fix done (mark_fix_done) after the work is finished; BrandGEO then re-checks it on its own schedule. Data is refreshed by BrandGEO's own collection runs; these tools never start a collection."
+// Served to a read and write OAuth connection (stage 3 section 5).
+const INSTRUCTIONS_READ_WRITE_OAUTH = "Access to one BrandGEO account's AI visibility data: how often AI engines mention the brand, for which prompts, next to which competitors, with what sentiment, plus the latest recommendations and the Fix This list (list_fixes). This connection can also mark a fix done (mark_fix_done) after the work is finished; BrandGEO then re-checks it on its own schedule. Data is refreshed by BrandGEO's own collection runs; these tools never start a collection."
 const READ_ONLY_KEY_MESSAGE = 'This key is read only. Create a read and write key on the BrandGEO Account page to let an agent mark fixes done.'
+const READ_ONLY_OAUTH_MESSAGE = "This connection has read access only. Disconnect and connect again, ticking 'Also let it mark Fix This items done'."
 const FIX_NOT_OPEN_MESSAGE = 'That fix is not open for this brand. Call list_fixes for the current ids.'
 // The CHECK on fix_states.fix_id (db/supabase-fix-states-migration-2026-11-06.sql).
 const FIX_ID_RE = /^[a-z_]{1,40}(:.{1,150})?$/
@@ -133,9 +142,12 @@ function round(n, places) {
 
 function rate(num, den) { return den > 0 ? round(num / den, 4) : null }
 
-/** Strip anything shaped like a key or a sha256 hex from a message before it is logged. */
+/**
+ * Strip anything shaped like a key, an OAuth token or client secret, or a long
+ * hex run (a sha256, or a token's secret part) from a message before it is logged.
+ */
 function scrub(msg) {
-  return String(msg || '').replace(/bgmcp_\S*/gi, '[redacted]').replace(/[a-f0-9]{64}/gi, '[redacted]')
+  return String(msg || '').replace(/bg(mcp|mat|mrt|ocs)_\S*/gi, '[redacted]').replace(/[a-f0-9]{48,}/gi, '[redacted]')
 }
 
 function rpcResult(id, result) {
@@ -152,8 +164,14 @@ function methodNotAllowed() {
   return { statusCode: 405, headers: { Allow: 'POST', 'X-Content-Type-Options': 'nosniff' }, body: '' }
 }
 
-function unauthorized(id) {
-  return rpcError(401, id, -32001, UNAUTHORIZED_MESSAGE, undefined, { 'WWW-Authenticate': 'Bearer realm="brandgeo-mcp"' })
+/**
+ * Stage 3 section 3.1: the 401 points at the protected resource metadata for
+ * both credential types, with the scope Claude should request. A dead OAuth
+ * access token adds error="invalid_token", which makes Claude refresh. The
+ * body is the same in every case.
+ */
+function unauthorized(id, invalidToken = false) {
+  return rpcError(401, id, -32001, UNAUTHORIZED_MESSAGE, undefined, { 'WWW-Authenticate': oauth.wwwAuthenticate(invalidToken) })
 }
 
 class ToolInputError extends Error {
@@ -168,6 +186,20 @@ function isMissingColumn(error, column) {
 
 /** A stored key scope; anything but 'read_write' (including a missing column) is read only. */
 function keyScope(row) { return row && row.scope === 'read_write' ? 'read_write' : 'read' }
+
+/**
+ * An OAuth connection's scope (stage 3 section 5): mcp:write in BOTH the
+ * token and its grant gives read_write; anything else is read. The grant side
+ * means a later consent that narrows the grant narrows older tokens at once.
+ */
+function oauthScope(tokenScope, grantScope) {
+  return oauth.hasScope(oauth.intersectScope(tokenScope, grantScope), oauth.SCOPE_WRITE) ? 'read_write' : 'read'
+}
+
+/** Postgres 42P01 = undefined_table. */
+function isMissingTable(error) {
+  return !!error && (error.code === '42P01' || /relation .* does not exist/i.test(error.message || ''))
+}
 
 /** fix_id for the log line: one URI-encoded token, key-shaped text removed. */
 function loggableFixId(v) {
@@ -690,7 +722,7 @@ function markResult(fx, clientId, row, nowIso) {
 }
 
 async function toolMarkFixDone(ctx, args) {
-  const { sb, clientId, nowIso, key, invId } = ctx
+  const { sb, clientId, nowIso, cred, invId } = ctx
   const fixId = args.fix_id
   if (typeof fixId !== 'string' || !FIX_ID_RE.test(fixId)) {
     throw new ToolInputError('fix_id is required and must be an id returned by list_fixes.')
@@ -717,30 +749,43 @@ async function toolMarkFixDone(ctx, args) {
   const m = scope ? measureFix(scope, fx.results, fx.promptIds, fx.engineIds) : { value: null, n: 0 }
   const measurable = scope !== null && m.value !== null
 
-  // Step 4: the page's upsert plus marked_by_key. The trigger stamps marked_at.
-  const { data, error } = await sb.from('fix_states')
-    .upsert({
-      client_id: clientId,
-      fix_id: item.id,
-      status: 'done',
-      title: item.title.slice(0, 500),
-      metric_key: measurable ? item.metricKey : null,
-      baseline_value: measurable ? m.value : null,
-      baseline_n: measurable ? m.n : null,
-      marked_by_key: key.id,
-    }, { onConflict: 'client_id,fix_id' })
-    .select(FIX_COLS)
-    .single()
+  // Step 4: the page's upsert plus the marker of the credential that marked
+  // it: marked_by_key for a key, marked_by_grant for an OAuth connection
+  // (stage 3 section 5). The other marker is written null, so a row marked
+  // again never keeps a stale marker from an earlier mark. The trigger stamps
+  // marked_at.
+  const payload = {
+    client_id: clientId,
+    fix_id: item.id,
+    status: 'done',
+    title: item.title.slice(0, 500),
+    metric_key: measurable ? item.metricKey : null,
+    baseline_value: measurable ? m.value : null,
+    baseline_n: measurable ? m.n : null,
+    marked_by_key: cred.kind === 'key' ? cred.id : null,
+    marked_by_grant: cred.kind === 'oauth' ? cred.id : null,
+  }
+  const upsert = (p) => sb.from('fix_states').upsert(p, { onConflict: 'client_id,fix_id' }).select(FIX_COLS).single()
+  let { data, error } = await upsert(payload)
+  // Before db/supabase-mcp-oauth-2026-11-06.sql the column does not exist. A
+  // key mark still works without it (an OAuth credential cannot exist then).
+  if (error && cred.kind === 'key' && (isMissingColumn(error, 'marked_by_grant') || (error.code === 'PGRST204' && /marked_by_grant/.test(error.message || '')))) {
+    console.warn(`[mcp-server/${invId}] fix_states.marked_by_grant missing; migration not applied, key mark written without it`)
+    const withoutGrant = { ...payload }
+    delete withoutGrant.marked_by_grant
+    ;({ data, error } = await upsert(withoutGrant))
+  }
   if (error) throw error
   const row = normalizeFixRow(data)
 
   // Step 5: one audit row. A failure is logged and does not undo the mark.
   try {
+    const who = cred.kind === 'oauth' ? { grant_id: cred.id } : { key_id: cred.id }
     const audit = await sb.from('client_events').insert({
       client_id: clientId,
-      actor: key.created_by ?? null,
+      actor: cred.actor ?? null,
       type: 'mcp_fix_marked',
-      meta: { key_id: key.id, fix_id: item.id, note: typeof note === 'string' ? note : null },
+      meta: { ...who, fix_id: item.id, note: typeof note === 'string' ? note : null },
     })
     if (audit && audit.error) console.error(`[mcp-server/${invId}] audit insert failed for client ${clientId}: ${scrub(audit.error.message)}`)
   } catch (e) {
@@ -978,6 +1023,118 @@ function toolsListResult(version, scope = 'read') {
   }
 }
 
+// ── Credential resolution (section 3.4; stage 3 section 5) ───────────────────
+
+const CLIENT_COLS = 'id, name, brand_aliases, brand_website, default_market_id, plan, category, engines_enabled, known_competitors'
+
+/**
+ * maybeSingle(): a missing row is data null with no error, so it answers the
+ * same 401 as an unknown credential. Any error here is a real read failure
+ * (F4) and goes to the handler's catch as 500 -32603, never to 401, so a
+ * customer is not told a working credential is invalid.
+ */
+async function readClient(sb, clientId) {
+  const clientRes = await sb.from('clients').select(CLIENT_COLS).eq('id', clientId).maybeSingle()
+  if (clientRes.error) throw clientRes.error
+  return clientRes.data
+}
+
+/**
+ * The stage 1 and 2 key path, unchanged in behaviour. Returns { cred } or
+ * { cred: null } for a 401 (no invalid_token: a key is not an OAuth token).
+ * cred = { kind, id, client, scope, actor, lastUsedAt, rateKey, stamp, actorIsAdmin }.
+ */
+async function resolveKey(sb, key, invId) {
+  const keyHash = hashClientApiKey(key)
+  const readKey = (cols) => sb.from('client_api_keys').select(cols).eq('key_hash', keyHash).maybeSingle()
+  let keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at, scope')
+  // Before db/supabase-mcp-fix-writes-2026-11-06.sql is applied the scope
+  // column does not exist. Every key is then read only, and the stage 1 tools
+  // must keep answering instead of failing every request on the select.
+  if (keyRes.error && isMissingColumn(keyRes.error, 'scope')) {
+    console.warn(`[mcp-server/${invId}] client_api_keys.scope missing; migration not applied, every key read only`)
+    keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at')
+  }
+  if (keyRes.error) throw keyRes.error
+  const row = keyRes.data
+  if (!row || row.revoked_at) return { cred: null }
+  if (String(row.client_id) !== clientIdFromKey(key)) {
+    console.warn(`[mcp-server/${invId}] key row ${row.id} client id does not match the key`)
+    return { cred: null }
+  }
+  const client = await readClient(sb, row.client_id)
+  if (!client) return { cred: null }
+  return {
+    cred: {
+      kind: 'key',
+      id: row.id,
+      client,
+      scope: keyScope(row),
+      actor: row.created_by ?? null,
+      lastUsedAt: row.last_used_at,
+      rateKey: `mcp:key:${row.id}`,
+      stamp: (db, now) => db.from('client_api_keys').update({ last_used_at: now.toISOString() }).eq('id', row.id).is('revoked_at', null),
+      // Research clients (4.4): allowed only for a key an admin created.
+      actorIsAdmin: async (db) => {
+        if (!row.created_by) return false
+        const prof = await db.from('user_profiles').select('role').eq('id', row.created_by).maybeSingle()
+        if (prof.error) throw prof.error
+        return !!(prof.data && prof.data.role === 'admin')
+      },
+    },
+  }
+}
+
+/**
+ * The OAuth path (stage 3 section 5). The access token row by sha256 (kind
+ * access), then its grant, then the grant's user, who must still be a viewer
+ * of the grant's BrandGEO client, then the same clients read as a key. Any
+ * dead link answers 401 with error="invalid_token" so Claude refreshes or
+ * reconnects. The oauth tables missing (migration not applied) is the same
+ * 401: no bgmat_ token can exist yet.
+ */
+async function resolveOAuth(sb, token, nowMs, invId) {
+  const dead = { cred: null, invalidToken: true }
+  const t = await sb.from('oauth_tokens').select('id, grant_id, kind, scope, expires_at, revoked_at')
+    .eq('token_hash', oauth.sha256Hex(token)).eq('kind', 'access').maybeSingle()
+  if (t.error) {
+    if (isMissingTable(t.error)) { console.warn(`[mcp-server/${invId}] oauth tables missing; migration not applied`); return dead }
+    throw t.error
+  }
+  const tok = t.data
+  if (!tok || tok.revoked_at || !(Date.parse(tok.expires_at) > nowMs)) return dead
+  const g = await sb.from('oauth_grants').select('id, client_id, user_id, scope, last_used_at, revoked_at, expires_at').eq('id', tok.grant_id).maybeSingle()
+  if (g.error) throw g.error
+  const grant = g.data
+  if (!grant || grant.revoked_at || !(Date.parse(grant.expires_at) > nowMs)) return dead
+  const p = await sb.from('user_profiles').select('role, client_id').eq('id', grant.user_id).maybeSingle()
+  if (p.error) throw p.error
+  const profile = p.data
+  // R6 on every call, as the token endpoint does (review L3): a viewer later
+  // promoted to admin loses the connection at once instead of for up to an hour.
+  if (!profile || profile.role === 'admin' || profile.client_id === null || profile.client_id === undefined || String(profile.client_id) !== String(grant.client_id)) return dead
+  const client = await readClient(sb, grant.client_id)
+  if (!client) return dead
+  return {
+    cred: {
+      kind: 'oauth',
+      id: grant.id,
+      client,
+      scope: oauthScope(tok.scope, grant.scope),
+      actor: grant.user_id ?? null,
+      lastUsedAt: grant.last_used_at,
+      rateKey: `mcp:grant:${grant.id}`,
+      // Use keeps the grant alive: idle expiry (R5) runs from the last use.
+      stamp: (db, now) => db.from('oauth_grants')
+        .update({ last_used_at: now.toISOString(), expires_at: oauth.isoAfter(now, oauth.GRANT_IDLE_S) })
+        .eq('id', grant.id).is('revoked_at', null),
+      // The profile is never admin here (refused above), so research-client
+      // and admin-only paths stay closed to an OAuth caller.
+      actorIsAdmin: async () => false,
+    },
+  }
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 /**
@@ -989,10 +1146,10 @@ async function handle(event, context = {}, opts = {}) {
   const cfg = { ...DEFAULT_CONFIG, ...(opts.config || {}) }
   const nowFn = opts.now || (() => new Date())
   const invId = String((context && context.awsRequestId) || '-').slice(0, 8)
-  const log = { client: '-', method: '-', tool: '-', fixId: null }
+  const log = { client: '-', cred: '-', method: '-', tool: '-', fixId: null }
   const finish = (res, outcome) => {
     const fix = log.fixId === null ? '' : ` fix_id=${log.fixId}`
-    console.log(`[mcp-server/${invId}] client=${log.client} method=${log.method} tool=${log.tool}${fix} ms=${Date.now() - t0} outcome=${outcome}`)
+    console.log(`[mcp-server/${invId}] client=${log.client} cred=${log.cred} method=${log.method} tool=${log.tool}${fix} ms=${Date.now() - t0} outcome=${outcome}`)
     return res
   }
 
@@ -1027,51 +1184,33 @@ async function handle(event, context = {}, opts = {}) {
   log.method = KNOWN_METHODS.has(method) ? method : 'other'
 
   try {
-    // 6. Authentication (section 3.4).
-    const key = bearer(event)
-    if (!CLIENT_API_KEY_RE.test(key)) return finish(unauthorized(id), '-32001')
-    const sb = opts.supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-    const keyHash = hashClientApiKey(key)
-    const readKey = (cols) => sb.from('client_api_keys').select(cols).eq('key_hash', keyHash).maybeSingle()
-    let keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at, scope')
-    // Before db/supabase-mcp-fix-writes-2026-11-06.sql is applied the scope
-    // column does not exist. Every key is then read only, and the stage 1 tools
-    // must keep answering instead of failing every request on the select.
-    if (keyRes.error && isMissingColumn(keyRes.error, 'scope')) {
-      console.warn(`[mcp-server/${invId}] client_api_keys.scope missing; migration not applied, every key read only`)
-      keyRes = await readKey('id, client_id, created_by, last_used_at, revoked_at')
-    }
-    if (keyRes.error) throw keyRes.error
-    const row = keyRes.data
-    if (!row || row.revoked_at) return finish(unauthorized(id), '-32001')
-    if (String(row.client_id) !== clientIdFromKey(key)) {
-      console.warn(`[mcp-server/${invId}] key row ${row.id} client id does not match the key`)
-      return finish(unauthorized(id), '-32001')
-    }
-    // maybeSingle(): a missing row is data null with no error, so it answers the
-    // same 401 as an unknown key. Any error here is a real read failure (F4) and
-    // goes to the catch below as 500 -32603, never to 401, so a customer is not
-    // told a working key is invalid.
-    const clientRes = await sb.from('clients')
-      .select('id, name, brand_aliases, brand_website, default_market_id, plan, category, engines_enabled, known_competitors')
-      .eq('id', row.client_id).maybeSingle()
-    if (clientRes.error) throw clientRes.error
-    const client = clientRes.data
-    if (!client) return finish(unauthorized(id), '-32001')
-    const clientId = Number(client.id)
-    log.client = String(clientId)
-
     const now = nowFn()
     const nowMs = now.getTime()
     const nowIso = now.toISOString()
 
+    // 6. Authentication (section 3.4), routed by shape (stage 3 section 5):
+    // bgmcp_ is the key path, unchanged; bgmat_ is an OAuth access token.
+    // Anything else answers 401 before the database is touched.
+    const token = bearer(event)
+    const isKey = CLIENT_API_KEY_RE.test(token)
+    const isOAuth = !isKey && oauth.ACCESS_TOKEN_RE.test(token)
+    if (!isKey && !isOAuth) return finish(unauthorized(id), '-32001')
+    log.cred = isKey ? 'key' : 'oauth'
+    const sb = opts.supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+    const resolved = isKey ? await resolveKey(sb, token, invId) : await resolveOAuth(sb, token, nowMs, invId)
+    if (!resolved.cred) return finish(unauthorized(id, resolved.invalidToken === true), '-32001')
+    const cred = resolved.cred
+    const client = cred.client
+    const clientId = Number(client.id)
+    log.client = String(clientId)
+
     // last_used_at, throttled to once a minute, awaited, never fatal.
-    if (!row.last_used_at || nowMs - Date.parse(row.last_used_at) >= LAST_USED_THROTTLE_MS) {
+    if (!cred.lastUsedAt || nowMs - Date.parse(cred.lastUsedAt) >= LAST_USED_THROTTLE_MS) {
       try {
-        const up = await sb.from('client_api_keys').update({ last_used_at: nowIso }).eq('id', row.id).is('revoked_at', null)
-        if (up && up.error) console.warn(`[mcp-server/${invId}] last_used_at stamp failed for key row ${row.id}: ${scrub(up.error.message)}`)
+        const up = await cred.stamp(sb, now)
+        if (up && up.error) console.warn(`[mcp-server/${invId}] last_used_at stamp failed for ${cred.kind} row ${cred.id}: ${scrub(up.error.message)}`)
       } catch (e) {
-        console.warn(`[mcp-server/${invId}] last_used_at stamp failed for key row ${row.id}: ${scrub(e.message)}`)
+        console.warn(`[mcp-server/${invId}] last_used_at stamp failed for ${cred.kind} row ${cred.id}: ${scrub(e.message)}`)
       }
     }
 
@@ -1092,10 +1231,15 @@ async function handle(event, context = {}, opts = {}) {
         ? 'Daily MCP limit reached. It resets at 00:00 UTC.'
         : scope === 'client_write_hour'
           ? `Write limit reached: ${limit} fix updates an hour for this account. Retry in ${retryAfter} seconds.`
-          : `Rate limit reached: ${limit} calls a minute per key. Retry in ${retryAfter} seconds.`
+          : scope === 'grant_minute'
+            ? `Rate limit reached: ${limit} calls a minute per connection. Retry in ${retryAfter} seconds.`
+            : `Rate limit reached: ${limit} calls a minute per key. Retry in ${retryAfter} seconds.`
       return finish(rpcError(200, id, -32029, message, { retry_after: retryAfter, scope, limit }, { 'Retry-After': String(retryAfter) }), '-32029')
     }
-    const limited = await rateCheck(`mcp:key:${row.id}`, cfg.perKeyPerMinute, 60, 'key_minute')
+    // Per credential: mcp:key:<id> for a key, mcp:grant:<id> for an OAuth
+    // connection (stage 3 section 5). The daily and write counters below are
+    // per client and shared by both, so mixing credentials doubles nothing.
+    const limited = await rateCheck(cred.rateKey, cfg.perKeyPerMinute, 60, cred.kind === 'oauth' ? 'grant_minute' : 'key_minute')
     if (limited) return limited
 
     // 8. Dispatch.
@@ -1107,7 +1251,7 @@ async function handle(event, context = {}, opts = {}) {
         protocolVersion: negotiated,
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
-        instructions: keyScope(row) === 'read_write' ? INSTRUCTIONS_READ_WRITE : INSTRUCTIONS,
+        instructions: cred.scope !== 'read_write' ? INSTRUCTIONS : cred.kind === 'oauth' ? INSTRUCTIONS_READ_WRITE_OAUTH : INSTRUCTIONS_READ_WRITE,
       }), 'ok')
     }
     if (method === 'ping') return finish(rpcResult(id, {}), 'ok')
@@ -1122,16 +1266,10 @@ async function handle(event, context = {}, opts = {}) {
         { required_plan: MCP_MIN_PLAN, current_plan: client.plan ?? null, upgrade_url: UPGRADE_URL }), '-32002')
     }
     if (client.category === RESEARCH_CATEGORY) {
-      let isAdminKey = false
-      if (row.created_by) {
-        const prof = await sb.from('user_profiles').select('role').eq('id', row.created_by).maybeSingle()
-        if (prof.error) throw prof.error
-        isAdminKey = !!(prof.data && prof.data.role === 'admin')
-      }
-      if (!isAdminKey) return finish(rpcError(200, id, -32003, 'This account is not available over MCP.'), '-32003')
+      if (!(await cred.actorIsAdmin(sb))) return finish(rpcError(200, id, -32003, 'This account is not available over MCP.'), '-32003')
     }
 
-    if (method === 'tools/list') return finish(rpcResult(id, toolsListResult(version, keyScope(row))), 'ok')
+    if (method === 'tools/list') return finish(rpcResult(id, toolsListResult(version, cred.scope)), 'ok')
 
     // tools/call
     const params = msg.params && typeof msg.params === 'object' && !Array.isArray(msg.params) ? msg.params : {}
@@ -1153,13 +1291,15 @@ async function handle(event, context = {}, opts = {}) {
     // Write gate (stage 2): the key's scope, then the per-client write counter.
     // The plan gate above is the write plan gate too (ruling 2).
     if (tool.write) {
-      if (keyScope(row) !== 'read_write') return inputError(READ_ONLY_KEY_MESSAGE, 'read_only_key')
+      if (cred.scope !== 'read_write') {
+        return cred.kind === 'oauth' ? inputError(READ_ONLY_OAUTH_MESSAGE, 'read_only_grant') : inputError(READ_ONLY_KEY_MESSAGE, 'read_only_key')
+      }
       const writeLimited = await rateCheck(`mcp:client:${clientId}:writes:hour`, cfg.perClientWritesPerHour, 3600, 'client_write_hour')
       if (writeLimited) return writeLimited
     }
 
     const engines = activeEnginesFor(client.plan, client.engines_enabled)
-    const ctx = { sb, cfg, client, clientId, engines, nowMs, nowIso, key: row, invId, outcome: null }
+    const ctx = { sb, cfg, client, clientId, engines, nowMs, nowIso, cred, invId, outcome: null }
     let out
     try {
       out = await tool.run(ctx, args)

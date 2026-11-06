@@ -31,6 +31,11 @@ const FN = path.join(__dirname, '..', 'netlify', 'functions')
 const mcp = require(path.join(FN, 'mcp-server.js'))
 const keys = require(path.join(FN, '_client_api_key.js'))
 const plans = require(path.join(FN, '_plans.js'))
+const oauthLib = require(path.join(FN, '_oauth.js'))
+// Stage 3 section 3.1: the 401 header for both credential types, and the
+// variant a dead OAuth access token gets.
+const WWW_401 = 'Bearer resource_metadata="https://app.getbrandgeo.com/.well-known/oauth-protected-resource/mcp", scope="mcp:read mcp:write"'
+const WWW_401_INVALID = `${WWW_401}, error="invalid_token"`
 
 let passed = 0
 const ok = (n) => { passed++; console.log('  ok -', n) }
@@ -257,11 +262,11 @@ async function main() {
     const headers = authHeader !== undefined ? { authorization: authHeader } : {}
     res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key, headers }))
     assert.strictEqual(res.status, 401, label)
-    assert.strictEqual(res.headers['WWW-Authenticate'], 'Bearer realm="brandgeo-mcp"')
+    assert.strictEqual(res.headers['WWW-Authenticate'], WWW_401)
     bodies.push(res.rawBody)
   }
   assert.ok(bodies.every((b) => b === bodies[0]), 'every 401 body must be identical')
-  assert.deepStrictEqual(JSON.parse(bodies[0]), { jsonrpc: '2.0', id: 42, error: { code: -32001, message: 'Invalid or missing BrandGEO API key.' } })
+  assert.deepStrictEqual(JSON.parse(bodies[0]), { jsonrpc: '2.0', id: 42, error: { code: -32001, message: 'Invalid or missing BrandGEO credentials.' } })
   ok('missing, malformed, unknown, revoked, mismatched, non-Bearer, whitespace/separator-smuggling and array-valued keys: identical 401 bodies with WWW-Authenticate')
   res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'ping' }, { headers: { 'x-api-key': KA.secret } }))
   assert.strictEqual(res.status, 401)
@@ -522,7 +527,7 @@ async function main() {
   }])
   res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: orphanSecret }), { supabase: orphanDb })
   assert.strictEqual(res.status, 401)
-  assert.strictEqual(res.headers['WWW-Authenticate'], 'Bearer realm="brandgeo-mcp"')
+  assert.strictEqual(res.headers['WWW-Authenticate'], WWW_401)
   assert.strictEqual(res.rawBody, bodies[0], 'a missing clients row must answer the same body as an unknown key')
   ok('F4: a clients read error answers 500 -32603; a missing clients row answers the identical 401 as an unknown key')
   res = await rpc(KA.secret, {}, KA.secret)
@@ -532,7 +537,8 @@ async function main() {
   const lines = captured.filter((l) => l.startsWith('[mcp-server/'))
   assert.ok(lines.length > 100, 'expected one log line per request')
   assert.ok(lines.some((l) => / method=other /.test(l)) && lines.some((l) => / tool=unknown /.test(l)))
-  assert.ok(lines.every((l) => /^\[mcp-server\/\S{1,8}\] (client=\S+ method=\S+ tool=\S+ ms=\d+ outcome=\S+|.+)$/.test(l)))
+  assert.ok(lines.every((l) => /^\[mcp-server\/\S{1,8}\] (client=\S+ cred=(key|oauth|-) method=\S+ tool=\S+ ms=\d+ outcome=\S+|.+)$/.test(l)))
+  assert.ok(lines.some((l) => / cred=key method=/.test(l)) && lines.some((l) => / cred=- method=/.test(l)), 'request lines carry cred=key, or cred=- before a credential shape is seen')
   const hashes = ALL_SECRETS.map(keys.hashClientApiKey)
   const prefixes = ALL_SECRETS.map(keys.clientApiKeyPrefix)
   for (const l of captured) {
@@ -586,7 +592,7 @@ async function main() {
   const unauthProbeBody = { ...modernProbeBody, id: 42 }
   res = await send(ev(unauthProbeBody, { headers: modernHeaders }))
   assert.strictEqual(res.status, 401)
-  assert.strictEqual(res.headers['WWW-Authenticate'], 'Bearer realm="brandgeo-mcp"')
+  assert.strictEqual(res.headers['WWW-Authenticate'], WWW_401)
   assert.strictEqual(res.rawBody, bodies[0], 'an unauthenticated modern probe must answer the identical 401 body as section 2')
   assert.strictEqual(db.calls.length, callsBeforeUnauth, 'a missing key never reaches the database, even for the modern probe')
   ok('the unauthenticated modern probe: 401, identical body to section 2, auth still runs before the version check, no database call at all')
@@ -610,13 +616,14 @@ async function main() {
   const sAgo = (d) => new Date(S0.getTime() - d * 86400_000).toISOString()
   const fdb = createFakeSupabase({ now: () => clock })
   // fix_states_guard() stand-in for the service role (auth.uid() null): stamps
-  // marked_at on the move into done or dismissed, keeps marked_by_key there,
-  // pins it and the baseline on every other update.
+  // marked_at on the move into done or dismissed, keeps marked_by_key and
+  // (stage 3) marked_by_grant there, pins them and the baseline on every
+  // other update.
   fdb.triggers.fix_states = (op, old, row, nowIso) => {
     if (op === 'INSERT') {
       row.created_at = nowIso; row.updated_at = nowIso
       row.checked_at = null; row.check_value = null; row.check_n = null
-      if (row.status === 'done' || row.status === 'dismissed') { row.marked_at = nowIso; row.marked_by = null } else { row.marked_at = null; row.marked_by = null; row.marked_by_key = null }
+      if (row.status === 'done' || row.status === 'dismissed') { row.marked_at = nowIso; row.marked_by = null } else { row.marked_at = null; row.marked_by = null; row.marked_by_key = null; row.marked_by_grant = null }
       if (row.status !== 'done') { row.baseline_value = null; row.baseline_n = null }
       return row
     }
@@ -628,7 +635,7 @@ async function main() {
       if (row.status !== 'done') { row.baseline_value = null; row.baseline_n = null }
       return row
     }
-    for (const k of ['marked_at', 'marked_by', 'marked_by_key', 'baseline_value', 'baseline_n', 'checked_at', 'check_value', 'check_n']) row[k] = old[k]
+    for (const k of ['marked_at', 'marked_by', 'marked_by_key', 'marked_by_grant', 'baseline_value', 'baseline_n', 'checked_at', 'check_value', 'check_n']) row[k] = old[k]
     return row
   }
 
@@ -1012,7 +1019,7 @@ async function main() {
   assert.ok(mLines.some((l) => / outcome=fix_not_open$/.test(l)))
   assert.ok(mLines.some((l) => / outcome=read_only_key$/.test(l)))
   assert.ok(mLines.some((l) => / fix_id=invalid /.test(l)), 'a malformed id is logged as invalid')
-  assert.ok(mLines.every((l) => /^\[mcp-server\/\S{1,8}\] client=\S+ method=tools\/call tool=mark_fix_done fix_id=\S+ ms=\d+ outcome=\S+$/.test(l)), 'one token per field')
+  assert.ok(mLines.every((l) => /^\[mcp-server\/\S{1,8}\] client=\S+ cred=(key|oauth) method=tools\/call tool=mark_fix_done fix_id=\S+ ms=\d+ outcome=\S+$/.test(l)), 'one token per field')
   const hashes2 = SECRETS2.map(keys.hashClientApiKey)
   const prefixes2 = SECRETS2.map(keys.clientApiKeyPrefix)
   // Everything the server printed (the test's own "ok -" lines are not server output).
@@ -1037,6 +1044,208 @@ async function main() {
     assert.ok(!ln.toLowerCase().includes(hexPart.toLowerCase()) && !/bgmcp/i.test(ln) && /fix_id=\w+%3Aother /.test(ln), ln)
   }
   ok('log lines: mark_fix_done lines add one fix_id token and an outcome code (ok, already_done, fix_not_open, read_only_key); never a key, prefix, hash or the note, even when a key is sent as the fix_id or the note')
+
+  section('17. stage 3: the OAuth branch (mcp-stage3-oauth.md section 5)')
+  // Same in-memory database as section 16. Grants and access tokens are
+  // seeded directly here; the authorize and token endpoints that mint them are
+  // covered end to end in tests/oauth_flow.test.js.
+  clock = new Date('2026-11-21T09:00:00Z')
+  const CONF = 'bgoc_' + 'e'.repeat(24)
+  fdb.seed('oauth_clients', [{ id: CONF, kind: 'confidential', name: 'Claude', redirect_uris: [oauthLib.ANTHROPIC_REDIRECT_URI], secret_hash: 'f'.repeat(64) }])
+  const OAUTH_SECRETS = []
+  // Each grant gets its own viewer of the client unless a user is given, as
+  // the one-live-grant index (user, OAuth client, BrandGEO client) requires.
+  let viewerN = 0
+  function issueGrant(clientId, { scope = 'mcp:read offline_access', tokenScope = scope, userId = null, grantExpires = 90, tokenExpiresS = 3600 } = {}) {
+    if (userId === null) {
+      userId = `dddddddd-0000-4000-8000-${String(++viewerN).padStart(12, '0')}`
+      fdb.seed('user_profiles', [{ id: userId, role: 'viewer', client_id: clientId }])
+    }
+    const [grant] = fdb.seed('oauth_grants', [{
+      id: require('crypto').randomUUID(), client_id: clientId, user_id: userId, oauth_client_id: CONF, client_name: 'Claude', redirect_host: 'claude.ai',
+      scope, last_used_at: null, revoked_at: null, expires_at: new Date(clock.getTime() + grantExpires * 86400_000).toISOString(),
+    }]).slice(-1)
+    const at = oauthLib.makeAccessToken()
+    OAUTH_SECRETS.push(at)
+    const [tok] = fdb.seed('oauth_tokens', [{ id: require('crypto').randomUUID(), grant_id: grant.id, kind: 'access', token_hash: oauthLib.sha256Hex(at), scope: tokenScope, expires_at: new Date(clock.getTime() + tokenExpiresS * 1000).toISOString() }]).slice(-1)
+    return { at, grant, tok }
+  }
+  const G_READ = issueGrant(61)
+  const G_RW = issueGrant(61, { scope: 'mcp:read mcp:write offline_access', userId: OWNER })
+
+  // ── the shape router and the 401s ──
+  const callsBefore17 = fdb.calls.length
+  let r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: 'bgmrt_' + 'a'.repeat(64) }), { supabase: fdb })
+  assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401); assert.strictEqual(r17.rawBody, bodies[0])
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: 'bgmat_' + 'a'.repeat(47) }), { supabase: fdb })
+  assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401)
+  assert.strictEqual(fdb.calls.length, callsBefore17, 'a refresh token or a malformed access token never reaches the database')
+  ok('a bgmrt_ refresh token or a malformed bgmat_ sent as a bearer: the plain 401 (no invalid_token), identical body, no database call')
+  const hexOf = (s) => s.slice(s.lastIndexOf('_') + 1)
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: `bgmcp_61_${hexOf(G_RW.at)}` }), { supabase: fdb })
+  assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401)
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: `bgmat_${hexOf(KS_RW.secret)}` }), { supabase: fdb })
+  assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401_INVALID); assert.strictEqual(r17.rawBody, bodies[0])
+  ok('a bgmat_ token rewritten as a bgmcp_ key is an unknown key (plain 401); a key rewritten as bgmat_ is an unknown token (401 invalid_token); the body is the same as every other 401')
+  const dead = []
+  { const g = issueGrant(61); fdb.rows('oauth_tokens').find((x) => x.id === g.tok.id).revoked_at = clock.toISOString(); dead.push(['revoked token', g.at]) }
+  { const g = issueGrant(61, { tokenExpiresS: -1 }); dead.push(['expired token', g.at]) }
+  { const g = issueGrant(61); fdb.rows('oauth_grants').find((x) => x.id === g.grant.id).revoked_at = clock.toISOString(); dead.push(['revoked grant', g.at]) }
+  { const g = issueGrant(61, { grantExpires: -1 }); dead.push(['idle-expired grant', g.at]) }
+  { const g = issueGrant(61, { userId: 'cccccccc-0000-4000-8000-000000000099' }); dead.push(['user without a profile', g.at]) }
+  { const MOVED = 'cccccccc-0000-4000-8000-000000000062'; fdb.seed('user_profiles', [{ id: MOVED, role: 'viewer', client_id: 62 }]); const g = issueGrant(61, { userId: MOVED }); dead.push(['user now on another client', g.at]) }
+  { const g = issueGrant(77); dead.push(['client row missing', g.at]) }
+  { const g = issueGrant(61); fdb.rows('oauth_tokens').find((x) => x.id === g.tok.id).kind = 'refresh'; dead.push(['a refresh row with an access-shaped token', g.at]) }
+  for (const [label, at] of dead) {
+    r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: at }), { supabase: fdb })
+    assert.strictEqual(r17.status, 401, label); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401_INVALID, label); assert.strictEqual(r17.rawBody, bodies[0], label)
+  }
+  ok(`${dead.length} dead links (revoked or expired token, revoked or idle-expired grant, user without a profile or moved to another client, missing client, wrong kind): 401 with error="invalid_token", identical body`)
+  const noTables = {
+    from(t) { const q = fdb.from(t); if (t.startsWith('oauth_')) q._run = async () => ({ data: null, error: { code: '42P01', message: 'relation "public.oauth_tokens" does not exist' } }); return q },
+    rpc(...a) { return fdb.rpc(...a) },
+  }
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: G_READ.at }), { supabase: noTables })
+  assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401_INVALID)
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: KS_RW.secret }), { supabase: noTables })
+  assert.strictEqual(r17.status, 200, 'keys keep working without the OAuth tables')
+  ok('before the OAuth migration: a bgmat_ token is 401 invalid_token (none can exist), keys answer as before')
+
+  // ── scope ──
+  let tl17 = await call2('tools/list', {}, G_READ.at)
+  assert.deepStrictEqual(tl17.body.result.tools.map((x) => x.name), mcp.TOOL_NAMES)
+  tl17 = await call2('initialize', { protocolVersion: '2025-06-18' }, G_READ.at)
+  assert.ok(tl17.body.result.instructions.startsWith('Read-only access'))
+  let rq17 = await tool2('mark_fix_done', { fix_id: 'engine_low:gemini' }, G_READ.at)
+  assert.strictEqual(rq17.isError, true)
+  assert.strictEqual(rq17.content[0].text, "This connection has read access only. Disconnect and connect again, ticking 'Also let it mark Fix This items done'.")
+  const narrowTok = issueGrant(61, { scope: 'mcp:read offline_access', tokenScope: 'mcp:read mcp:write offline_access' })
+  tl17 = await call2('tools/list', {}, narrowTok.at)
+  assert.ok(!tl17.body.result.tools.some((x) => x.name === 'mark_fix_done'), 'a write token under a read grant reads only')
+  const narrowGrant = issueGrant(61, { scope: 'mcp:read mcp:write offline_access', tokenScope: 'mcp:read offline_access' })
+  tl17 = await call2('tools/list', {}, narrowGrant.at)
+  assert.ok(!tl17.body.result.tools.some((x) => x.name === 'mark_fix_done'), 'a read token under a write grant reads only')
+  tl17 = await call2('tools/list', {}, G_RW.at)
+  assert.deepStrictEqual(tl17.body.result.tools.map((x) => x.name), [...mcp.TOOL_NAMES, ...mcp.WRITE_TOOL_NAMES])
+  tl17 = await call2('initialize', { protocolVersion: '2025-06-18' }, G_RW.at)
+  assert.ok(tl17.body.result.instructions.includes('This connection can also mark a fix done'))
+  ok('scope: read sees the eight tools and gets the OAuth wording of the read-only refusal; mcp:write in BOTH token and grant lists mark_fix_done (with the OAuth instructions); a mismatch either way reads only')
+
+  // ── the write through OAuth ──
+  let o17 = oracle(61)
+  const oauthTarget = o17.open.find((i) => !fdb.rows('fix_states').some((x) => x.client_id === 61 && x.fix_id === i.id))
+  assert.ok(oauthTarget, 'an open fix with no row yet')
+  const auditBefore17 = fdb.rows('client_events').length
+  const writesBefore17 = (fdb.rows('affiliate_rate_limits').find((x) => x.key === 'mcp:client:61:writes:hour' && x.window_start === new Date(Math.floor(clock.getTime() / 3600000) * 3600000).toISOString()) || { count: 0 }).count
+  const NOTE17 = 'Added a comparison page'
+  rq17 = await tool2('mark_fix_done', { fix_id: oauthTarget.id, note: NOTE17 }, G_RW.at)
+  assert.ok(!rq17.isError, JSON.stringify(rq17))
+  assert.strictEqual(rq17.structuredContent.client_id, 61)
+  const st17 = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === oauthTarget.id)
+  assert.deepStrictEqual([st17.status, st17.marked_by_grant, st17.marked_by_key, st17.marked_by], ['done', G_RW.grant.id, null, null])
+  const ev17 = fdb.rows('client_events').slice(auditBefore17)
+  assert.strictEqual(ev17.length, 1)
+  assert.deepStrictEqual([ev17[0].client_id, ev17[0].actor, ev17[0].type, ev17[0].meta], [61, OWNER, 'mcp_fix_marked', { grant_id: G_RW.grant.id, fix_id: oauthTarget.id, note: NOTE17 }])
+  const writesAfter17 = fdb.rows('affiliate_rate_limits').find((x) => x.key === 'mcp:client:61:writes:hour' && x.window_start === new Date(Math.floor(clock.getTime() / 3600000) * 3600000).toISOString()).count
+  assert.strictEqual(writesAfter17, writesBefore17 + 1)
+  ok('mark_fix_done through OAuth: marked_by_grant = the grant, marked_by_key null; one mcp_fix_marked event with grant_id in meta (no key_id) and the grant user as actor; the shared write counter +1')
+  rq17 = await tool2('mark_fix_done', { fix_id: oauthTarget.id }, G_RW.at)
+  assert.strictEqual(rq17.structuredContent.already_done, true)
+  assert.strictEqual(fdb.rows('client_events').length, auditBefore17 + 1)
+  ok('marking it again through OAuth is already_done: no write, no audit')
+
+  // ── a key mark clears a stale grant marker; pre-migration fallback ──
+  // Both reuse the fix just marked through OAuth: its row is set back to
+  // reopened (an open state, so the id is on the open list again).
+  const reopenTarget = () => {
+    const row = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === oauthTarget.id)
+    Object.assign(row, { status: 'reopened', marked_by_grant: G_RW.grant.id, marked_by_key: null, marked_at: new Date(clock.getTime() - 9 * 86400_000).toISOString() })
+    assert.ok(oracle(61).open.some((i) => i.id === oauthTarget.id), 'the reopened fix is open again')
+  }
+  reopenTarget()
+  rq17 = await tool2('mark_fix_done', { fix_id: oauthTarget.id }, KS_RW.secret)
+  assert.ok(!rq17.isError, JSON.stringify(rq17))
+  const kst = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === oauthTarget.id)
+  assert.deepStrictEqual([kst.status, kst.marked_by_key, kst.marked_by_grant], ['done', KS_RW.row.id, null])
+  ok('a key mark on a row last marked by a grant writes marked_by_grant null, as an OAuth mark writes marked_by_key null: never two markers at once')
+  const preMig = {
+    from(t) {
+      const q = fdb.from(t)
+      if (t === 'fix_states') {
+        const run = q._run.bind(q)
+        q._run = async () => (q.op === 'upsert' && q.payload.some((x) => 'marked_by_grant' in x)
+          ? { data: null, error: { code: 'PGRST204', message: "Could not find the 'marked_by_grant' column of 'fix_states' in the schema cache" } }
+          : run())
+      }
+      return q
+    },
+    rpc(...a) { return fdb.rpc(...a) },
+  }
+  reopenTarget()
+  const preTarget = oauthTarget
+  const pre17 = await send(ev({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'mark_fix_done', arguments: { fix_id: preTarget.id } } }, { key: KS_RW.secret, headers: V }), { supabase: preMig, config: CFG2 })
+  assert.ok(pre17.body.result && !pre17.body.result.isError, JSON.stringify(pre17.body))
+  const pst = fdb.rows('fix_states').find((x) => x.client_id === 61 && x.fix_id === preTarget.id)
+  assert.deepStrictEqual([pst.status, pst.marked_by_key], ['done', KS_RW.row.id])
+  ok('before the OAuth migration (no marked_by_grant column): a key mark retries without it and stands')
+
+  // ── gates and counters ──
+  fdb.rows('clients').find((c) => c.id === 61).plan = 'free'
+  r17 = await call2('tools/list', {}, G_RW.at)
+  assert.strictEqual(r17.body.error.code, -32002)
+  fdb.rows('clients').find((c) => c.id === 61).plan = 'growth'
+  fdb.rows('clients').find((c) => c.id === 61).category = 'research'
+  r17 = await call2('tools/list', {}, G_RW.at)
+  assert.strictEqual(r17.body.error.code, -32003)
+  fdb.rows('clients').find((c) => c.id === 61).category = 'active'
+  r17 = await call2('tools/list', {}, G_RW.at)
+  assert.ok(r17.body.result)
+  ok('a downgrade to Free closes the OAuth connection on the next call (-32002), a research client refuses it (-32003); restoring reopens it')
+  const dayKey = `mcp:client:61:day`
+  const dayCount = () => fdb.rows('affiliate_rate_limits').filter((x) => x.key === dayKey).reduce((a, x) => a + x.count, 0)
+  const d0 = dayCount()
+  await tool2('get_brand_overview', {}, G_READ.at)
+  await tool2('get_brand_overview', {}, KS_READ.secret)
+  assert.strictEqual(dayCount(), d0 + 2, 'one daily counter for keys and OAuth together')
+  assert.ok(fdb.rows('affiliate_rate_limits').some((x) => x.key === `mcp:grant:${G_READ.grant.id}`))
+  assert.ok(!fdb.rows('affiliate_rate_limits').some((x) => x.key === `mcp:key:${G_READ.grant.id}`))
+  const lim = await call2('tools/list', {}, issueGrant(61).at, { config: { ...CFG2, perKeyPerMinute: 0 } })
+  assert.strictEqual(lim.body.error.code, -32029); assert.strictEqual(lim.body.error.data.scope, 'grant_minute')
+  assert.match(lim.body.error.message, /calls a minute per connection/)
+  ok('the per-connection minute counter is mcp:grant:<id> (scope grant_minute, "per connection"); the daily counter is shared with keys')
+  const stampGrant = issueGrant(61)
+  await call2('ping', undefined, stampGrant.at)
+  let sg = fdb.rows('oauth_grants').find((g) => g.id === stampGrant.grant.id)
+  assert.strictEqual(sg.last_used_at, clock.toISOString())
+  assert.strictEqual(sg.expires_at, new Date(clock.getTime() + 90 * 86400_000).toISOString())
+  const firstStamp = sg.last_used_at
+  clock = new Date(clock.getTime() + 30_000)
+  await call2('ping', undefined, stampGrant.at)
+  assert.strictEqual(fdb.rows('oauth_grants').find((g) => g.id === stampGrant.grant.id).last_used_at, firstStamp)
+  clock = new Date(clock.getTime() + 31_000)
+  await call2('ping', undefined, stampGrant.at)
+  sg = fdb.rows('oauth_grants').find((g) => g.id === stampGrant.grant.id)
+  assert.strictEqual(sg.last_used_at, clock.toISOString())
+  ok('grant last_used_at is stamped at most once a minute, and each stamp moves the 90-day idle expiry')
+
+  // ── logging ──
+  const boom17 = {
+    from(t) { const q = fdb.from(t); if (t === 'oauth_grants') q._run = async () => ({ data: null, error: { code: '08006', message: `reset near ${G_RW.at} and ${G_RW.at.toUpperCase()} hash ${oauthLib.sha256Hex(G_RW.at)} and bgmrt_${'d'.repeat(64)}` } }); return q },
+    rpc(...a) { return fdb.rpc(...a) },
+  }
+  r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: G_RW.at }), { supabase: boom17 })
+  assert.strictEqual(r17.status, 500)
+  const oLines = captured.filter((l) => l.startsWith('[mcp-server/') && / cred=oauth /.test(l))
+  assert.ok(oLines.length > 10)
+  assert.ok(oLines.some((l) => / cred=oauth method=tools\/call tool=mark_fix_done fix_id=\S+ ms=\d+ outcome=read_only_grant$/.test(l)))
+  const oHashes = OAUTH_SECRETS.map(oauthLib.sha256Hex)
+  for (const l of captured.filter((x) => !x.startsWith('  ok - '))) {
+    assert.ok(!/bgmat_|bgmrt_/i.test(l), `a log line contains an OAuth token prefix: ${l.slice(0, 80)}`)
+    for (const s of OAUTH_SECRETS) assert.ok(!l.toLowerCase().includes(hexOf(s)), 'a log line contains a token secret part')
+    for (const h of oHashes) assert.ok(!l.includes(h), 'a log line contains a token hash')
+    assert.ok(!l.includes(NOTE17), 'a log line contains the note')
+  }
+  ok('OAuth lines carry cred=oauth (read_only_grant as the refusal outcome); no line holds a bgmat_ or bgmrt_ token in any case, its secret part, its hash or the note, even when an error message carries them')
 
   console.log(`\n${passed} passed`)
 }

@@ -5,6 +5,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import SocialAuthButtons from '../components/SocialAuthButtons'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { humanizeError } from '../lib/errors'
+import { safeOauthNext } from '../lib/oauthNext'
 
 type Mode = 'login' | 'forgot' | 'sent'
 
@@ -23,6 +24,8 @@ function BrandGeoLogo() {
 
 export default function Login() {
   const navigate = useNavigate()
+  // `next` is honoured ONLY when it is an /oauth/authorize? path (no open redirect).
+  const nextPath = safeOauthNext(new URLSearchParams(window.location.search).get('next'))
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +49,7 @@ export default function Login() {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (err) setError(humanizeError(err, 'Could not sign in. Please try again.'))
-    else navigate('/')
+    else navigate(nextPath ?? '/')
   }
 
   const handleForgot = async (e: React.FormEvent) => {
@@ -102,7 +105,7 @@ export default function Login() {
               {isDemoMode && <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">Demo mode</div>}
               {!isDemoMode && (
                 <>
-                  <SocialAuthButtons onError={setError} />
+                  <SocialAuthButtons onError={setError} next={nextPath} />
                   <div className="flex items-center gap-3 my-5">
                     <div className="h-px flex-1 bg-dark-600" />
                     <span className="text-xs text-slate-600">or</span>

@@ -209,6 +209,10 @@ export const FIX_COPY = {
 export function fixByAgent(keyLabel?: string | null): string {
   return keyLabel ? ` by an AI agent (${keyLabel})` : ' by an AI agent'
 }
+/** Suffix for a line about a fix an app connected through OAuth marked; appName is empty when it cannot be read. */
+export function fixByApp(appName?: string | null): string {
+  return appName ? ` by ${appName}` : ' by an AI agent'
+}
 export function fixDoneWaiting(markedOn: string, readyAfter: string, by = ''): string {
   return `Marked done ${markedOn}${by}. We check the number on the first collection after ${readyAfter}.`
 }

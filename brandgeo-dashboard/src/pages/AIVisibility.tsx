@@ -48,7 +48,7 @@ import {
   lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine,  
   panelNotAnswering, panelLastResult,
   FIX_COPY, fixDoneWaiting, fixDoneWaitingData, fixVerifiedLine, fixReopenedLine, fixDismissedLine,
-  fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement, fixByAgent,
+  fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement, fixByAgent, fixByApp,
 } from '../lib/aiVisibilityCopy'
 import {
   parseMetricKey, metricLabel, measureFix, evaluateFix, verdictCutoff,
@@ -59,7 +59,15 @@ const FIX_SELECT_BASE = 'id, client_id, fix_id, status, title, metric_key, basel
 // marked_by_key arrives with db/supabase-mcp-fix-writes-2026-11-06.sql. If this
 // bundle reaches a database without it, the first read answers 42703 and every
 // later read and write drops the column instead of failing (review L2).
-let fixSelect = `${FIX_SELECT_BASE}, marked_by_key`
+// marked_by_grant arrives with db/supabase-mcp-oauth-2026-11-06.sql and is one
+// step above marked_by_key, so a database that has the first but not the second
+// drops only the grant column (stage 3 spec, 11.3).
+const FIX_SELECT_WITH_KEY = `${FIX_SELECT_BASE}, marked_by_key`
+const FIX_SELECT_FULL = `${FIX_SELECT_WITH_KEY}, marked_by_grant`
+let fixSelect = FIX_SELECT_FULL
+function fixSelectStepDown(cur: string): string {
+  return cur === FIX_SELECT_FULL ? FIX_SELECT_WITH_KEY : FIX_SELECT_BASE
+}
 
 // ── Category display helpers ──────────────────────────────────────────────────
 
@@ -344,6 +352,7 @@ export default function AIVisibility() {
   const [fixRowsLoaded, setFixRowsLoaded] = useState(false)
   // client_api_keys id -> label, read once beside fix_states so a fix an AI agent marked can name its key.
   const [keyLabels, setKeyLabels] = useState<Map<string, string>>(new Map())
+  const [grantNames, setGrantNames] = useState<Map<string, string>>(new Map())
   const [fixBusy, setFixBusy]           = useState<string | null>(null)
   const [fixNotice, setFixNotice]       = useState<{ id: string; text: string } | null>(null)
   const [showDoneFixes, setShowDoneFixes] = useState(false)
@@ -579,8 +588,10 @@ export default function AIVisibility() {
       .from('fix_states')
       .select(fixSelect)
       .eq('client_id', cid)
-    if (error && (error as { code?: string }).code === '42703' && fixSelect !== FIX_SELECT_BASE) {
-      fixSelect = FIX_SELECT_BASE
+    // Step down one rung per 42703: full, then key only, then base.
+    for (let step = 0; step < 2; step++) {
+      if (!(error && (error as { code?: string }).code === '42703' && fixSelect !== FIX_SELECT_BASE)) break
+      fixSelect = fixSelectStepDown(fixSelect)
       ;({ data, error } = await supabase.from('fix_states').select(fixSelect).eq('client_id', cid))
     }
     // A reply for a client the admin has already switched away from is dropped.
@@ -615,11 +626,25 @@ export default function AIVisibility() {
       if (!keyErr) (keyData ?? []).forEach(k => { const l = (k as { id: string; label: string | null }); if (l.label) km.set(l.id, l.label) })
       setKeyLabels(km)
     }
+    // Same for apps: read the name straight from oauth_grants (RLS allows the
+    // client's own rows, revoked ones included), so "by Claude" survives a disconnect.
+    const grantIds = Array.from(new Set(Array.from(m.values()).map(r => r.marked_by_grant).filter((g): g is string => !!g)))
+    if (grantIds.length > 0) {
+      const { data: grantData, error: grantErr } = await supabase
+        .from('oauth_grants')
+        .select('id, client_name')
+        .in('id', grantIds)
+      if (clientRef.current !== cid) return
+      const gm = new Map<string, string>()
+      if (!grantErr) (grantData ?? []).forEach(g => { const l = (g as { id: string; client_name: string | null }); if (l.client_name) gm.set(l.id, l.client_name) })
+      setGrantNames(gm)
+    }
   }
 
   useEffect(() => {
     setFixRows(new Map())
     setKeyLabels(new Map())
+    setGrantNames(new Map())
     setFixRowsLoaded(false)
     setShowDoneFixes(false)
     setFixNotice(null)
@@ -1071,7 +1096,9 @@ export default function AIVisibility() {
     const scope = parseMetricKey(row.metric_key)
     const label = metricLabel(scope, engineLabelOf, promptTextOf)
     const markedOn = row.marked_at ? formatDate(row.marked_at) : ''
-    const by = row.marked_by_key ? fixByAgent(keyLabels.get(row.marked_by_key)) : ''
+    const by = row.marked_by_grant
+      ? fixByApp(grantNames.get(row.marked_by_grant))
+      : row.marked_by_key ? fixByAgent(keyLabels.get(row.marked_by_key)) : ''
     if (row.status === 'dismissed') return fixDismissedLine(markedOn, by)
     if (row.status === 'verified' && row.baseline_value !== null && row.check_value !== null) {
       const verified = fixVerifiedLine(formatDate(row.checked_at ?? row.marked_at ?? ''), label, row.baseline_value, row.check_value)

@@ -33,6 +33,8 @@ import AffiliatesAdmin from './pages/AffiliatesAdmin'
 import AffiliateLogin from './pages/affiliate/AffiliateLogin'
 import AffiliateJoin from './pages/affiliate/AffiliateJoin'
 import AffiliatePortal from './pages/affiliate/AffiliatePortal'
+import OAuthAuthorize from './pages/OAuthAuthorize'
+import { peekOauthNext } from './lib/oauthNext'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -52,7 +54,14 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }, [])
 
   if (authed === null) return null
-  return authed ? <>{children}</> : <Navigate to="/login" replace />
+  if (!authed) return <Navigate to="/login" replace />
+  // Returning from a Google sign-in that began on the OAuth consent flow: the
+  // provider drops the user on "/", so resume the stashed consent path (only
+  // ever a safe /oauth/authorize? path, see lib/oauthNext.ts). Read only here;
+  // OAuthAuthorize clears the stash when it mounts.
+  const resume = window.location.pathname === '/' ? peekOauthNext() : null
+  if (resume) return <Navigate to={resume} replace />
+  return <>{children}</>
 }
 
 // Affiliate portal gate: same session check as PrivateRoute but bounces to the
@@ -135,6 +144,9 @@ export default function App() {
               <Route path="/welcome" element={<PrivateRoute><Welcome /></PrivateRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Public, unauthenticated — Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10) */}
+              {/* MCP stage 3 consent page. Own session check (sends to
+                  /login?next=...), so NOT behind PrivateRoute, OnboardGate or Layout. */}
+              <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
               <Route path="/audit" element={<AuditRequest />} />
               <Route path="/audit/:token" element={<AuditReport />} />
               {/* Affiliate module (docs/affiliates/README.md). The portal has its

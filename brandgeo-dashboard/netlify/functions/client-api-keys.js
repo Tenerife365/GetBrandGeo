@@ -20,6 +20,21 @@
  *   { action: 'revoke', client_id, id }
  *     -> { ok: true, id }
  *
+ * MCP stage 3 (docs/arch/mcp-stage3-oauth.md sections 6.1, 7 item 8, 11):
+ *   { action: 'list_grants', client_id }
+ *     -> { grants: [{ id, client_name, redirect_host, access, created_at, last_used_at }], available }
+ *        live grants only (not revoked, not expired); not plan gated, like list.
+ *   { action: 'revoke_grant', client_id, id }
+ *     -> { ok: true, id }   the grant's revoked_at is the authority (mcp-server
+ *        and the token endpoint read it on every use); its live tokens are
+ *        revoked right after for the record. Same owner checks as revoke.
+ *   { action: 'create_anthropic_client', name? }   ADMIN ONLY, no client_id
+ *     -> { client: { id, name, redirect_uris, created_at }, client_secret }
+ *        a confidential OAuth client whose only redirect is
+ *        https://claude.ai/api/mcp/auth_callback. The secret is returned HERE
+ *        ONLY and stored as sha256. Constantin runs it and pastes id and
+ *        secret into the Claude directory portal; agents never run it.
+ *
  * AUTH. requireAuth({ clientId: body.client_id }): admins act on any client,
  * viewers only on their own. Every write uses the service-role client.
  *
@@ -38,6 +53,10 @@ const { requireAuth } = require('./_auth')
 const { RESEARCH_CATEGORY } = require('./_cost')
 const { MCP_MIN_PLAN, PLAN_LABELS, mcpAllowedFor } = require('./_plans')
 const { makeClientApiKey, hashClientApiKey, clientApiKeyPrefix } = require('./_client_api_key')
+const oauth = require('./_oauth')
+
+const GRANT_LIST_COLS = 'id, client_name, redirect_host, scope, created_at, last_used_at, expires_at'
+const MAX_CLIENT_NAME = 60
 
 const MAX_KEYS = 5
 const MAX_LABEL = 60
@@ -50,8 +69,8 @@ const DEFAULT_SCOPE = 'read'
 function scopeOf(v) { return v === 'read_write' ? 'read_write' : 'read' }
 
 /** Postgres 42P01 = undefined_table: the migration has not been applied. */
-function isMissingTable(error) {
-  return !!error && (error.code === '42P01' || /relation .*client_api_keys.* does not exist/i.test(error.message || ''))
+function isMissingTable(error, table = 'client_api_keys') {
+  return !!error && (error.code === '42P01' || new RegExp(`relation .*${table}.* does not exist`, 'i').test(error.message || ''))
 }
 
 /**
@@ -86,11 +105,41 @@ async function handle(event, { supabase = null, now = () => new Date() } = {}) {
 
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' })
   if (!body || typeof body !== 'object' || Array.isArray(body)) return json(400, { error: 'Invalid JSON' })
-  if (clientId === null) return json(400, { error: 'Missing or invalid client_id.' })
 
   const role = auth.profile && auth.profile.role
   const isAdmin = role === 'admin'
   const sb = supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+
+  // ── create_anthropic_client (admin only, not tied to a BrandGEO client) ────
+  if (body.action === 'create_anthropic_client') {
+    if (!isAdmin) return json(403, { error: 'Forbidden: admin access required' })
+    if (body.name !== undefined && body.name !== null && typeof body.name !== 'string') return json(400, { error: 'Name must be text.' })
+    const name = oauth.cleanClientName(typeof body.name === 'string' ? body.name : '') || 'Claude'
+    if (typeof body.name === 'string' && body.name.trim().length > MAX_CLIENT_NAME) return json(400, { error: `Name must be ${MAX_CLIENT_NAME} characters or fewer.` })
+    const id = oauth.makeConfidentialClientId()
+    const secret = oauth.makeClientSecret()
+    const { data, error } = await sb.from('oauth_clients').insert({
+      id,
+      kind: 'confidential',
+      name,
+      redirect_uris: [oauth.ANTHROPIC_REDIRECT_URI],
+      secret_hash: oauth.sha256Hex(secret),
+      metadata: null,
+      fetched_at: null,
+    }).select('id, name, redirect_uris, created_at').single()
+    if (error) {
+      if (isMissingTable(error, 'oauth_clients')) {
+        console.log('[client-api-keys] oauth_clients table missing; migration not applied yet')
+        return json(503, { error: 'OAuth clients are not available yet.' })
+      }
+      console.error(`[client-api-keys] create_anthropic_client failed: ${error.message}`)
+      return json(500, { error: 'Could not create the OAuth client.' })
+    }
+    console.log(`[client-api-keys] created confidential OAuth client ${data.id} by ${auth.user.id}`)
+    return json(200, { client: { id: data.id, name: data.name, redirect_uris: data.redirect_uris, created_at: data.created_at }, client_secret: secret })
+  }
+
+  if (clientId === null) return json(400, { error: 'Missing or invalid client_id.' })
   const unavailable = () => json(503, { error: 'MCP keys are not available yet.' })
   const fail = (what, error) => {
     if (isMissingTable(error)) {
@@ -193,6 +242,60 @@ async function handle(event, { supabase = null, now = () => new Date() } = {}) {
     if (error) return fail('revoke', error)
     if (!data || data.length === 0) return json(404, { error: 'No active key with that id.' })
     console.log(`[client-api-keys] revoked key row ${id} for client ${clientId} by ${auth.user.id}`)
+    return json(200, { ok: true, id })
+  }
+
+  // ── list_grants (stage 3, Connected apps) ─────────────────────────────────
+  if (body.action === 'list_grants') {
+    const { client, error: cErr } = await loadClient()
+    if (cErr) return fail('list', cErr)
+    if (!client) return json(404, { error: 'Client not found.' })
+    const { data, error } = await sb.from('oauth_grants').select(GRANT_LIST_COLS)
+      .eq('client_id', clientId).is('revoked_at', null)
+      .order('created_at', { ascending: false })
+    if (error) {
+      // Before db/supabase-mcp-oauth-2026-11-06.sql: nothing can be connected yet.
+      if (isMissingTable(error, 'oauth_grants')) {
+        console.log('[client-api-keys] oauth_grants table missing; migration not applied yet')
+        return json(200, { grants: [], available: false })
+      }
+      console.error(`[client-api-keys] list_grants failed for client ${clientId}: ${error.message}`)
+      return json(500, { error: 'Could not list connected apps.' })
+    }
+    const nowMs = now().getTime()
+    const live = (data || []).filter((g) => g.expires_at && Date.parse(g.expires_at) > nowMs)
+    return json(200, {
+      grants: live.map((g) => ({
+        id: g.id,
+        client_name: g.client_name || '',
+        redirect_host: g.redirect_host || '',
+        access: oauth.hasScope(g.scope, oauth.SCOPE_WRITE) ? 'read_write' : 'read',
+        created_at: g.created_at,
+        last_used_at: g.last_used_at ?? null,
+      })),
+      available: true,
+    })
+  }
+
+  // ── revoke_grant (stage 3, Disconnect) ────────────────────────────────────
+  if (body.action === 'revoke_grant') {
+    const id = typeof body.id === 'string' ? body.id.trim() : ''
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json(404, { error: 'No connected app with that id.' })
+    const nowIso = now().toISOString()
+    // The grant row is the authority; the token update below is for the record.
+    const { data, error } = await sb.from('oauth_grants')
+      .update({ revoked_at: nowIso })
+      .eq('id', id).eq('client_id', clientId).is('revoked_at', null)
+      .select('id')
+    if (error) {
+      if (isMissingTable(error, 'oauth_grants')) return json(404, { error: 'No connected app with that id.' })
+      console.error(`[client-api-keys] revoke_grant failed for client ${clientId}: ${error.message}`)
+      return json(500, { error: 'Could not disconnect the app.' })
+    }
+    if (!data || data.length === 0) return json(404, { error: 'No connected app with that id.' })
+    const t = await sb.from('oauth_tokens').update({ revoked_at: nowIso }).eq('grant_id', id).is('revoked_at', null)
+    if (t && t.error) console.error(`[client-api-keys] token revoke after grant ${id} failed for client ${clientId}: ${t.error.message}`)
+    console.log(`[client-api-keys] revoked grant ${id} for client ${clientId} by ${auth.user.id}`)
     return json(200, { ok: true, id })
   }
 

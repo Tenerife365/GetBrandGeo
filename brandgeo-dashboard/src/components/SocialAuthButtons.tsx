@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Linkedin, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { humanizeError } from '../lib/errors'
+import { stashOauthNext } from '../lib/oauthNext'
 
 /**
  * SocialAuthButtons — "Continue with Google / LinkedIn" for both Signup and Login.
@@ -36,12 +37,15 @@ const btn =
   'bg-dark-700 border border-dark-600 text-slate-200 hover:bg-dark-600 hover:border-dark-500 ' +
   'transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
 
-export default function SocialAuthButtons({ onError }: { onError?: (msg: string) => void }) {
+export default function SocialAuthButtons({ onError, next }: { onError?: (msg: string) => void; next?: string | null }) {
   const [busy, setBusy] = useState<'google' | 'linkedin_oidc' | null>(null)
 
   async function signInWith(provider: 'google' | 'linkedin_oidc') {
     if (busy) return
     setBusy(provider)
+    // The provider returns to the app origin and drops any query string, so keep
+    // the consent path (already validated by the caller) for PrivateRoute to resume.
+    stashOauthNext(next ?? null)
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,

@@ -82,6 +82,44 @@
   status = 200
   force = true
 
+# MCP stage 3, OAuth sign-in for the Claude connector directory
+# (docs/arch/mcp-stage3-oauth.md section 3). Rewrites, above the /* fallback,
+# or the SPA answers the well-known paths with index.html (measured live
+# 2026-11-06: 200 text/html). Each route has its own entry function
+# (oauth-prm, oauth-as-metadata, oauth-token, oauth-revoke), so nothing depends
+# on the path Netlify reports after a rewrite (review L6). /oauth/authorize is
+# deliberately NOT here: it is the SPA consent route (OAuthAuthorize.tsx) and
+# falls through to /*. No /oauth/register: DCR is off (ruling R3).
+[[redirects]]
+  from = "/.well-known/oauth-protected-resource/mcp"
+  to = "/.netlify/functions/oauth-prm"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-protected-resource"
+  to = "/.netlify/functions/oauth-prm"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/.well-known/oauth-authorization-server"
+  to = "/.netlify/functions/oauth-as-metadata"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/token"
+  to = "/.netlify/functions/oauth-token"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/oauth/revoke"
+  to = "/.netlify/functions/oauth-revoke"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -382,6 +420,11 @@
 # DB ops per call, same shape as promotions-admin.
 [functions."client-api-keys"]
   timeout = 15
+
+# MCP stage 3 OAuth (docs/arch/mcp-stage3-oauth.md). No entries on purpose:
+# oauth-metadata (static JSON), oauth-token (a few indexed reads and writes,
+# Claude allows 10 s, refresh 30 s) and oauth-authorize (at most one CIMD
+# fetch capped at 3 s) all keep the 10 s default (section 4.3).
 
 # ── Observability (docs/arch/observability.md) ───────────────────────────────
 # Public health endpoint for the external pinger and CI: two job_runs reads

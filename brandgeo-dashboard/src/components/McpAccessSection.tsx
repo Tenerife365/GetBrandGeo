@@ -64,13 +64,15 @@
  * button labels, and the revoke confirm text. bg-copy owns a pass over all of
  * it per section 12 stage 2.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   KeyRound, Loader2, Check, Copy, Plus, Lock, AlertTriangle, Terminal, Trash2, Sparkles,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { copyText } from '../lib/affiliateApi'
 import { hasFeature, featureUnlockPlan, PLAN_LABELS } from '../lib/planConfig'
+import { APPS } from '../lib/mcpOauthCopy'
+import Skeleton from './Skeleton'
 
 type KeyScope = 'read' | 'read_write'
 
@@ -170,6 +172,243 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
+// ── Connected apps (stage 3, docs/arch/mcp-stage3-oauth.md 11.2) ──────────────
+// The grants state is hoisted into McpAccessSection (not the block) so the key
+// list reloading, which swaps the whole card between branches, never resets the
+// confirm state or flashes the skeleton again.
+interface GrantRow {
+  id: string
+  client_name: string | null
+  redirect_host: string | null
+  access: 'read' | 'read_write'
+  created_at: string
+  last_used_at: string | null
+}
+
+type AppsState = 'loading' | 'ready' | 'error' | 'hidden'
+
+function isLoopbackHost(h: string | null): boolean {
+  return h === 'localhost' || h === '127.0.0.1'
+}
+
+/** Focus the first matching element that is actually rendered (the table and the cards both exist in the DOM). */
+function focusVisible(selector: string) {
+  const els = Array.from(document.querySelectorAll<HTMLElement>(selector))
+  const el = els.find(e => e.offsetParent !== null) ?? els[0]
+  el?.focus()
+}
+
+function useConnectedApps(clientId: number) {
+  const [state, setState] = useState<AppsState>('loading')
+  const [grants, setGrants] = useState<GrantRow[]>([])
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
+  const [failure, setFailure] = useState<{ id: string; text: string } | null>(null)
+  const [announce, setAnnounce] = useState('')
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  const load = useCallback(async () => {
+    setState('loading')
+    try {
+      const { status, data } = await callKeysFn<{ grants: GrantRow[]; available: boolean }>({ action: 'list_grants', client_id: clientId })
+      if (status === 503) { setState('hidden'); return }
+      if (!data || data.error || status >= 400) { setState('error'); setAnnounce(APPS.loadError); return }
+      if (data.available === false) { setGrants([]); setState('hidden'); return }
+      setGrants(Array.isArray(data.grants) ? data.grants : [])
+      setState('ready')
+    } catch {
+      setState('error'); setAnnounce(APPS.loadError)
+    }
+  }, [clientId])
+
+  useEffect(() => {
+    setGrants([]); setConfirmId(null); setFailure(null); setAnnounce('')
+    if (!isDemoMode && clientId) load()
+  }, [clientId, load])
+
+  const disconnect = async (g: GrantRow) => {
+    const name = g.client_name || APPS.nameFallback
+    setFailure(null); setDisconnectingId(g.id); setAnnounce(APPS.disconnecting(name))
+    try {
+      const { status, data } = await callKeysFn<{ ok: boolean }>({ action: 'revoke_grant', client_id: clientId, id: g.id })
+      if (!data || data.error || status >= 400 || !data.ok) throw new Error('revoke failed')
+      setGrants(prev => prev.filter(x => x.id !== g.id))
+      setConfirmId(null)
+      setAnnounce(APPS.success(name))
+      setTimeout(() => headingRef.current?.focus(), 0)
+    } catch {
+      setConfirmId(null)
+      setFailure({ id: g.id, text: APPS.failure(name) })
+      setAnnounce(APPS.failure(name))
+      setTimeout(() => focusVisible(`[data-disc="${g.id}"]`), 0)
+    } finally {
+      setDisconnectingId(null)
+    }
+  }
+
+  return { state, grants, confirmId, setConfirmId, disconnectingId, failure, announce, headingRef, load, disconnect }
+}
+
+function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnectedApps>; gated: boolean }) {
+  const { state, grants, confirmId, setConfirmId, disconnectingId, failure, announce, headingRef, load, disconnect } = apps
+
+  useEffect(() => {
+    if (confirmId) focusVisible(`[data-keep="${confirmId}"]`)
+  }, [confirmId])
+
+  // Locked by plan with nothing to disconnect, or the migration is not applied: render nothing.
+  if (state === 'hidden') return null
+  if (state === 'ready' && !gated && grants.length === 0) return null
+
+  const nameOf = (g: GrantRow) => g.client_name || APPS.nameFallback
+  const hostCell = (g: GrantRow) => isLoopbackHost(g.redirect_host)
+    ? APPS.redirectLoopback
+    : <span className="font-mono text-[11px] break-all">{g.redirect_host || ''}</span>
+  const accessText = (g: GrantRow) => g.access === 'read_write' ? APPS.accessWrite : APPS.accessRead
+  const lastUsed = (g: GrantRow) => g.last_used_at ? fmtDT(g.last_used_at) : APPS.neverUsed
+
+  const onConfirmKey = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Escape') {
+      e.preventDefault(); e.stopPropagation()
+      setConfirmId(null)
+      setTimeout(() => focusVisible(`[data-disc="${id}"]`), 0)
+    }
+  }
+
+  const disconnectBtn = (g: GrantRow, phone: boolean) => (
+    <button
+      type="button"
+      data-disc={g.id}
+      aria-label={APPS.disconnectAria(nameOf(g))}
+      onClick={() => setConfirmId(g.id)}
+      disabled={disconnectingId !== null}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 hover:bg-dark-600 text-red-400 border border-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed max-md:min-h-[44px] ${phone ? 'w-full justify-center mt-3' : ''}`}
+    >
+      <Trash2 size={12} /> {APPS.disconnect}
+    </button>
+  )
+
+  const confirmBlock = (g: GrantRow, phone: boolean) => (
+    <div
+      onKeyDown={e => onConfirmKey(e, g.id)}
+      className={`bg-red-500/10 border border-red-500/20 rounded-lg p-3 ${phone ? 'mt-3' : ''}`}
+    >
+      <p className="text-xs text-slate-300 break-words">{APPS.confirm(nameOf(g))}</p>
+      <div className={`mt-2 flex gap-2 ${phone ? 'flex-col' : ''}`}>
+        <button
+          type="button"
+          onClick={() => disconnect(g)}
+          disabled={disconnectingId !== null}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed max-md:min-h-[44px]"
+        >
+          {disconnectingId === g.id && <Loader2 size={12} className="animate-spin motion-reduce:animate-none" />} {APPS.confirmYes}
+        </button>
+        <button
+          type="button"
+          data-keep={g.id}
+          onClick={() => { setConfirmId(null); setTimeout(() => focusVisible(`[data-disc="${g.id}"]`), 0) }}
+          disabled={disconnectingId !== null}
+          className={`${ghostBtn} justify-center max-md:min-h-[44px]`}
+        >
+          {APPS.confirmNo}
+        </button>
+      </div>
+    </div>
+  )
+
+  const failureLine = (g: GrantRow) => failure && failure.id === g.id
+    ? <p className="text-xs text-red-400 mt-1 break-words">{failure.text}</p>
+    : null
+
+  let body: React.ReactNode = null
+  if (state === 'loading') {
+    body = (
+      <>
+        <div className="hidden md:block mt-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
+        <div className="md:hidden mt-4 space-y-3"><Skeleton className="h-28 w-full rounded-lg" /><Skeleton className="h-28 w-full rounded-lg" /></div>
+      </>
+    )
+  } else if (state === 'error') {
+    body = (
+      <div className="flex items-center gap-3 mt-3 flex-wrap">
+        <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {APPS.loadError}</span>
+        <button type="button" onClick={load} className={ghostBtn}>{APPS.retry}</button>
+      </div>
+    )
+  } else if (grants.length === 0) {
+    body = (
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span>{APPS.emptyBefore}<span className="font-mono text-slate-300 break-all">{MCP_ENDPOINT}</span>{APPS.emptyAfter}</span>
+        <CopyBtn text={MCP_ENDPOINT} />
+      </div>
+    )
+  } else {
+    body = (
+      <>
+        {!gated && <p className="text-[11px] text-slate-600 mt-4">{APPS.partialNote}</p>}
+        <div className="hidden md:block mt-4 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500 uppercase tracking-wide text-[10px]">
+                <th className="pb-2 pr-4 font-medium">{APPS.colApp}</th>
+                <th className="pb-2 pr-4 font-medium">{APPS.colRedirect}</th>
+                <th className="pb-2 pr-4 font-medium">{APPS.colAccess}</th>
+                <th className="pb-2 pr-4 font-medium">{APPS.colConnected}</th>
+                <th className="pb-2 pr-4 font-medium">{APPS.colLastUsed}</th>
+                <th className="pb-2 font-medium"><span className="sr-only">{APPS.colActions}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {grants.map(g => (
+                <Fragment key={g.id}>
+                  <tr className="border-t border-dark-700">
+                    <td className="py-2 pr-4 text-slate-200 break-words">{nameOf(g)}</td>
+                    <td className="py-2 pr-4 text-slate-400">{hostCell(g)}</td>
+                    <td className="py-2 pr-4 text-slate-300">{accessText(g)}</td>
+                    <td className="py-2 pr-4 text-slate-400">{fmtDT(g.created_at)}</td>
+                    <td className="py-2 pr-4 text-slate-400">{lastUsed(g)}</td>
+                    <td className="py-2">{confirmId === g.id ? null : disconnectBtn(g, false)}</td>
+                  </tr>
+                  {confirmId === g.id && (
+                    <tr><td colSpan={6} className="pb-2">{confirmBlock(g, false)}</td></tr>
+                  )}
+                  {failure && failure.id === g.id && (
+                    <tr><td colSpan={6} className="pb-2">{failureLine(g)}</td></tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="md:hidden mt-4 space-y-3">
+          {grants.map(g => (
+            <li key={g.id} className="rounded-lg border border-dark-700 bg-dark-700/30 p-3">
+              <p className="text-sm font-medium text-slate-200 break-words">{nameOf(g)}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs mt-2">
+                <dt className="text-slate-500">{APPS.colRedirect}</dt><dd className="text-slate-400">{hostCell(g)}</dd>
+                <dt className="text-slate-500">{APPS.colAccess}</dt><dd className="text-slate-300">{accessText(g)}</dd>
+                <dt className="text-slate-500">{APPS.colConnected}</dt><dd className="text-slate-400">{fmtDT(g.created_at)}</dd>
+                <dt className="text-slate-500">{APPS.colLastUsed}</dt><dd className="text-slate-400">{lastUsed(g)}</dd>
+              </dl>
+              {confirmId === g.id ? confirmBlock(g, true) : disconnectBtn(g, true)}
+              {failureLine(g)}
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t border-dark-700">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
+      <h3 ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-slate-300 mb-1 outline-none">{APPS.heading}</h3>
+      <p className="text-xs text-slate-500 mb-3">{APPS.helper}</p>
+      {body}
+    </div>
+  )
+}
+
 export default function McpAccessSection({
   clientId, plan, isAdmin, onUpgrade,
 }: {
@@ -202,6 +441,8 @@ export default function McpAccessSection({
   const secretInputRef = useRef<HTMLInputElement>(null)
   const issueBtnRef = useRef<HTMLButtonElement>(null)
   const headerRef = useRef<HTMLHeadingElement>(null)
+
+  const apps = useConnectedApps(clientId)
 
   const load = useCallback(async () => {
     setLoading(true); setUnavailable(false); setLoadError(null)
@@ -427,6 +668,7 @@ export default function McpAccessSection({
             <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {loadError || 'Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.'}</span>
             <button onClick={load} className={ghostBtn}>Retry</button>
           </div>
+          <ConnectedAppsBlock apps={apps} gated={gated} />
         </div>
         {revealDialog}
       </>
@@ -497,6 +739,7 @@ export default function McpAccessSection({
               {KeysTable}
             </>
           )}
+          <ConnectedAppsBlock apps={apps} gated={gated} />
         </div>
         {revealDialog}
       </>
@@ -559,6 +802,7 @@ export default function McpAccessSection({
         {keys.length === 0 ? (
           <p className="text-xs text-slate-500 mt-4">No keys yet. Issue one to connect your first AI tool.</p>
         ) : KeysTable}
+        <ConnectedAppsBlock apps={apps} gated={gated} />
       </div>
       {revealDialog}
     </>

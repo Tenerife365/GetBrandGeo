@@ -1,6 +1,7 @@
 # MCP stage 3: OAuth sign-in and the Claude connector directory
 
-**Status:** SPEC, rulings owed (section 9). Nothing is built.
+**Status:** RULED 2026-11-06, Constantin: "Defaults, build it". Every
+default in section 9 applies. Build in progress (section 10 steps 1 to 5).
 **Date:** 2026-11-06.
 **Asked by Constantin, verbatim:** "now next stage is to have the MCP listed in
 claude connectors first, can we do that?", then "Yes, spec it there".
@@ -443,7 +444,10 @@ single use, rotation and reuse, loopback match table, CIMD validation
 (allowlist, mismatch, oversize), scope narrowing, the shape router in
 `mcp-server.js`, the 401 header, and the extended no-secret log check.
 
-## 9. Decision 7: rulings owed (defaults apply on "defaults")
+## 9. Decision 7: rulings (all defaults, ruled 2026-11-06)
+
+Constantin, 2026-11-06: "Defaults, build it". The Default column below is the
+ruling for each row. Do not re-raise.
 
 | # | Question | Default |
 |---|---|---|
@@ -492,3 +496,213 @@ Docs first, then one migration, then one Netlify build, then the listing.
 **Scale note:** no new cron besides the optional pruning; new invocations
 only on sign-in, hourly refresh per connected user, and the MCP calls that
 exist already. Every endpoint is a handful of indexed reads and writes.
+
+## 11. Build contracts (2026-11-06, bg-backend, after the ruling)
+
+Written by bg-backend with the backend half (section 10 step 3). bg-app
+builds the SPA half from this section verbatim. Anything not stated here
+follows sections 3 to 6. Files: `netlify/functions/_oauth.js`,
+`oauth-metadata.js`, `oauth-authorize.js`, `oauth-token.js`, the edited
+`mcp-server.js` and `client-api-keys.js`, `netlify.toml`, and
+`db/supabase-mcp-oauth-2026-11-06.sql`.
+
+### 11.1 `oauth-authorize.js` (the consent page's server)
+
+`POST /.netlify/functions/oauth-authorize`, header `Authorization: Bearer
+<the signed-in user's Supabase access token>`, body JSON. Every response is
+JSON with `Cache-Control: no-store`.
+
+Responses that come from `requireAuth` itself carry no `ok` field:
+`401 { error: 'Unauthorized: ...' }` (no or expired session: send the user to
+`/login?next=<this full URL>`, section 4.2 step 2), `403 { error: 'Forbidden:
+...' }` (foreign origin or no profile: show the generic error). Every
+response the function writes itself carries `ok`.
+
+**`check`.** The page sends the eight query parameters exactly as it read
+them from its own URL; an absent parameter is sent as `null` or left out,
+never as an empty string.
+
+```json
+{ "action": "check", "response_type": "code", "client_id": "...", "redirect_uri": "...",
+  "scope": "mcp:read mcp:write offline_access", "state": "...", "code_challenge": "...",
+  "code_challenge_method": "S256", "resource": "https://app.getbrandgeo.com/mcp" }
+```
+
+Success, `200`:
+
+```json
+{ "ok": true, "request_id": "<43 characters>", "client_name": "Claude", "client_kind": "confidential",
+  "redirect_host": "claude.ai", "loopback": false, "brand_name": "<clients.name>",
+  "write_requested": true, "offline_requested": true, "expires_at": "<ISO, 5 minutes>" }
+```
+
+| Field | What the consent screen does with it |
+|---|---|
+| `client_name` | The app asking, rendered as text (never HTML). Clipped to 60 characters server side. "Claude" for the Anthropic-held client, the CIMD `client_name` otherwise (Claude Code reads "Claude Code"). |
+| `client_kind` | `confidential` or `cimd`. Not shown; available for copy that differs. |
+| `redirect_host` | "will be sent back to <redirect_host>". `claude.ai`, or `localhost` / `127.0.0.1` for Claude Code. |
+| `loopback` | `true`: show "an app on this computer" and the loopback warning (section 4.2 step 6) instead of the host line. |
+| `brand_name` | The BrandGEO brand being connected. |
+| `write_requested` | Show the checkbox "Also let it mark Fix This items done" only when `true`; it starts unticked (R2). |
+| `offline_requested` | Not shown. |
+| `request_id` | Kept in memory only, sent back with `decide`. Never in the URL, never in storage. |
+| `expires_at` | After it, `decide` answers `request_expired`; the page may say "This request expired. Start the connection again from Claude." |
+
+Redirect-borne failure, `200`, after the redirect was proven:
+`{ "ok": false, "error": "<code>", "redirect": "<redirect_uri>?error=<code>&state=<state>" }`.
+The page navigates to `redirect` at once (`window.location.assign`), shows
+nothing of its own, and never edits the URL. Codes: `unsupported_response_type`,
+`invalid_request` (challenge method not S256, challenge missing or not 43 to
+128 unreserved characters, or a state over 1,024 characters, which is then not
+echoed), `invalid_target` (resource present and not exactly
+`https://app.getbrandgeo.com/mcp`), `invalid_scope` (a non-string scope only;
+unknown scope words are dropped, not refused).
+
+Page errors, shown on the page, never a redirect: `{ "ok": false, "error":
+"<code>", ...extra }`. The page must word every one of these:
+
+| Code | HTTP | When | Extra fields |
+|---|---|---|---|
+| `invalid_client` | 400 | `client_id` missing, unknown, disabled, a URL outside the allowlist (R4: `https://claude.ai/<path>` only), or a CIMD document that is wrong | none |
+| `client_metadata_unavailable` | 503 | the CIMD document could not be fetched (network, timeout 3 s, non-200, redirect) | none |
+| `invalid_redirect_uri` | 400 | `redirect_uri` missing or not registered for that client | none |
+| `admin_account` | 403 | the signed-in login is an admin (R6, every admin login, with or without a client) | none |
+| `no_account` | 403 | the login has no BrandGEO client, or its client row is gone | none |
+| `plan_required` | 403 | the client's plan is below Radar (R8) | `required_plan: "radar"`, `required_plan_label: "Radar"`, `current_plan`, `upgrade_url: "https://app.getbrandgeo.com/account"` |
+| `account_unavailable` | 403 | a research client | none |
+| `request_expired` | 400 | `decide` only: unknown, already decided, expired, another user's request, or the login now belongs to another client | none |
+| `invalid_request` | 400 | malformed body, unknown `action`, or on `decide` a non-boolean `allow` or `write` | none |
+| `server_error` | 500 | anything unexpected | none |
+
+Order of checks, binding: client, then redirect (both page errors), then the
+redirect-borne checks, then the account checks (page errors). So a request
+with a bad redirect AND a bad `response_type` is `invalid_redirect_uri`.
+
+**`decide`.** `{ "action": "decide", "request_id": "...", "allow": true|false, "write": true|false }`.
+`write` is the checkbox; send `false` when it was not shown. The server reads
+only the stored request: the client and redirect are checked again, the
+account checks run again for the same user and client, and the request is
+claimed once. Write is granted only when the client requested `mcp:write`
+AND `write` is `true`. Success, both for Allow and Cancel, `200`:
+`{ "ok": true, "redirect": "<redirect_uri>?code=...&state=..." }` or
+`"<redirect_uri>?error=access_denied&state=..."`; the page navigates to it at
+once. Failures are the page errors above. A double click sends one request:
+the second answers `request_expired`, so the page disables both buttons after
+the first click.
+
+### 11.2 `client-api-keys.js` additions (Account page, Connected apps)
+
+Same endpoint and auth as the key actions (`requireAuth` with
+`client_id`: admins any client, viewers their own).
+
+`{ "action": "list_grants", "client_id": 11 }`, `200`:
+
+```json
+{ "grants": [ { "id": "<uuid>", "client_name": "Claude", "redirect_host": "claude.ai",
+                "access": "read" | "read_write", "created_at": "<ISO>", "last_used_at": "<ISO>" | null } ],
+  "available": true }
+```
+
+Live grants only (not revoked, not expired), newest first. Not plan gated, so
+a downgraded client still sees and can disconnect old connections. Row copy:
+`client_name`, `redirect_host`, "Read only" for `read` and "Read and write"
+for `read_write`, connected on `created_at`, last used `last_used_at` ("never"
+when null), and **Disconnect**. Before the migration is applied the answer is
+`200 { "grants": [], "available": false }`; the page shows nothing extra.
+Errors: `403` (another client), `404 { error: 'Client not found.' }`,
+`500 { error: 'Could not list connected apps.' }`.
+
+`{ "action": "revoke_grant", "client_id": 11, "id": "<grant uuid>" }`, `200
+{ "ok": true, "id": "<uuid>" }`. `404 { error: 'No connected app with that
+id.' }` for an unknown, malformed, already revoked or other client's id;
+`500 { error: 'Could not disconnect the app.' }`. After it, Claude's next call
+gets 401 `invalid_token` and its refresh `invalid_grant`.
+
+`{ "action": "create_anthropic_client", "name": "Claude" }` (name optional,
+default "Claude", at most 60 characters; no `client_id`). Admin only (`403`
+otherwise). `200 { "client": { "id": "bgoc_<24 hex>", "name", "redirect_uris":
+["https://claude.ai/api/mcp/auth_callback"], "created_at" }, "client_secret":
+"bgocs_<64 hex>" }`, the secret shown once and stored as sha256. `503 { error:
+'OAuth clients are not available yet.' }` before the migration. Not for the
+SPA: Constantin runs it once (section 7 item 8), from the browser console of
+an admin session or by curl with his own session token.
+
+### 11.3 What the browser may read from `oauth_grants`
+
+RLS `is_admin() or client_id = get_my_client_id()`, SELECT only on: `id`,
+`client_id`, `oauth_client_id`, `client_name`, `redirect_host`, `scope`,
+`created_at`, `last_used_at`, `revoked_at`, `expires_at`. Never `user_id`
+(withheld by privilege). Nothing at all from `oauth_clients`, `oauth_codes`,
+`oauth_tokens`.
+
+The hub's done line: `FIX_SELECT` gains `marked_by_grant`. When it is set,
+read `oauth_grants.client_name` for that id (one select on the client's own
+rows, RLS allows it) and render "Marked done <date> by <client_name>" ("by
+Claude"); "by an AI agent" alone when the read fails. A fix row carries at
+most one of `marked_by_key` and `marked_by_grant` (the server writes the other
+as null). Before the migration the column is missing and the page's existing
+fallback applies (section 9.6 of the stage 2 spec).
+
+### 11.4 Server facts the other seats rely on
+
+- **Token endpoint** answers RFC 6749 codes: `invalid_request`,
+  `invalid_client` (401; with `WWW-Authenticate: Basic realm="brandgeo-oauth"`
+  when Basic was used), `invalid_grant`, `unsupported_grant_type`,
+  `invalid_scope`, plus `invalid_target` (RFC 8707) for a foreign `resource`.
+  `415` for any body that is not form-urlencoded. `/oauth/revoke` answers
+  `200` with an empty body for any token once the client authenticated, and
+  `401 invalid_client` when it did not (RFC 7009 section 2.2.1).
+- **The 401 on `/mcp`**: `WWW-Authenticate: Bearer resource_metadata="https://app.getbrandgeo.com/.well-known/oauth-protected-resource/mcp", scope="mcp:read mcp:write"`,
+  plus `, error="invalid_token"` for a well-formed `bgmat_` token that is dead.
+  Body for every 401: `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32001,"message":"Invalid or missing BrandGEO credentials."}}`.
+  This changes the stage 1 header (`Bearer realm="brandgeo-mcp"`) and message
+  for keys too, as section 3.1 says.
+- **Read-only refusal over OAuth**: "This connection has read access only.
+  Disconnect and connect again, ticking 'Also let it mark Fix This items
+  done'." (`isError: true`, log outcome `read_only_grant`).
+- **Effective scope** of an OAuth call is the token's scope intersected with
+  its grant's scope, so a later consent that drops write narrows older tokens
+  at once; a later consent that adds write does not widen them.
+- **Logs**: every `/mcp` line reads `client=<id> cred=key|oauth|- method=...`.
+
+### 11.5 Decisions taken while building (for bg-verify, none changes a ruling)
+
+1. **Refresh rotation is not one database transaction.** PostgREST has none
+   across statements. The presented refresh token is claimed by one
+   conditional update (`used_at is null`), then the new pair is inserted. A
+   failed insert after the claim answers `server_error` and the client must
+   connect again: fails closed, never issues twice.
+2. **Reuse detection is strict.** Two refreshes with the same token at the
+   same moment (one wins the claim) revoke the grant. If Claude ever sends a
+   proactive and a reactive refresh together, the user reconnects. Flagged
+   for Fable (section 10 step 5) and the live test of section 8 item 4.
+3. **`revoke_grant` is two statements**, grant then tokens. The grant's
+   `revoked_at` is the authority: `mcp-server.js` and the token endpoint read
+   it on every use, so the tokens' own `revoked_at` is for the record.
+4. **CIMD cache.** A row younger than 24 h is used without fetching; an older
+   one is refetched and a failed refetch is refused (no stale fallback). The
+   token endpoint never fetches: it accepts the row cached at consent, of any
+   age, unless disabled.
+5. **CIMD URL in canonical form only**: no query, no fragment, no explicit
+   `:443`, no upper-case host; the parsed URL must give back the same string.
+6. **A disabled OAuth client** is refused at authorize, token and refresh;
+   `/mcp` does not read `oauth_clients` per call, so its live access tokens
+   lapse within the hour.
+7. **One live grant per user, OAuth client and BrandGEO client.** A new
+   consent reuses it and replaces its scope without revoking its older
+   tokens (two machines running Claude Code share one CIMD client id and so
+   one grant). An expired live grant is revoked and replaced.
+8. **The plan gate is not checked at the token endpoint**; the user's
+   profile mapping is (code exchange and refresh). `/mcp` gates every call.
+9. **Each `/mcp` stamp of `last_used_at` (once a minute) and each refresh
+   move the grant's `expires_at` to 90 days ahead** (idle expiry, R5).
+10. **No rate limit on the OAuth endpoints**: codes, tokens and the client
+    secret carry 192 to 256 random bits. Revisit if logs show abuse.
+11. **The key path's `mark_fix_done` upsert now writes `marked_by_grant:
+    null`**, so a row re-marked by a key never keeps a grant marker. Before
+    the migration the column is missing and the key mark retries without it.
+12. **The metadata documents** carry `Access-Control-Allow-Origin: *`
+    (public, static). Not in section 3; harmless, and needed by browser MCP
+    clients.
+13. **Pruning job** (R9, run on his go): `mcp-oauth-prune`, `45 4 * * *`,
+    after the affiliate jobs at 04:35 and 04:40.

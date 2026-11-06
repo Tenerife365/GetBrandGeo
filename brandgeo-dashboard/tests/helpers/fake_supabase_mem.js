@@ -13,6 +13,10 @@
  * nowIso), which returns the row to store or throws to refuse it. A test sets
  * it to model what a real trigger stamps (fix_states_guard's marked_at).
  *
+ * MCP stage 3 added the four oauth_* tables. A UNIQUE entry may be
+ * { cols, where } to model a partial unique index (oauth_grants_one_live:
+ * one live grant per user, OAuth client and BrandGEO client).
+ *
  * It proves control flow and data flow, NOT Postgres semantics: RLS,
  * transactions and the real RPC bodies are verified against production after
  * the migration is applied (docs/affiliates/TEST-RESULTS.md).
@@ -34,6 +38,13 @@ const UNIQUE = {
   user_profiles: [['id']],
   client_api_keys: [['key_hash']],
   fix_states: [['client_id', 'fix_id']],
+  // MCP stage 3 (db/supabase-mcp-oauth-2026-11-06.sql). A key may be an
+  // object { cols, where } for a partial unique index: one live grant per
+  // (user, OAuth client, BrandGEO client), where revoked_at is null.
+  oauth_clients: [['id']],
+  oauth_grants: [{ cols: ['user_id', 'oauth_client_id', 'client_id'], where: (r) => r.revoked_at === null || r.revoked_at === undefined }],
+  oauth_codes: [['code_hash'], ['request_id_hash']],
+  oauth_tokens: [['token_hash']],
 }
 
 const HAS_UPDATED_AT = new Set(['affiliate_programs', 'affiliates', 'affiliate_memberships', 'affiliate_attributions', 'affiliate_conversions', 'affiliate_commissions', 'affiliate_payout_batches'])
@@ -60,8 +71,12 @@ const DEFAULTS = {
   clients: () => ({ stripe_customer_id: null, stripe_subscription_id: null }),
   user_profiles: () => ({}),
   client_events: () => ({}),
-  fix_states: () => ({ status: 'open', title: null, metric_key: null, baseline_value: null, baseline_n: null, marked_at: null, marked_by: null, marked_by_key: null, checked_at: null, check_value: null, check_n: null }),
+  fix_states: () => ({ status: 'open', title: null, metric_key: null, baseline_value: null, baseline_n: null, marked_at: null, marked_by: null, marked_by_key: null, marked_by_grant: null, checked_at: null, check_value: null, check_n: null }),
   client_api_keys: () => ({ label: '', scope: 'read', created_by: null, last_used_at: null, revoked_at: null }),
+  oauth_clients: () => ({ name: '', redirect_uris: [], secret_hash: null, metadata: null, fetched_at: null, disabled_at: null }),
+  oauth_grants: () => ({ client_name: '', redirect_host: '', scope: 'mcp:read', last_used_at: null, revoked_at: null, expires_at: null }),
+  oauth_codes: () => ({ code_hash: null, request_id_hash: null, scope_requested: null, scope_granted: null, resource: null, state: null, used_at: null, grant_id: null }),
+  oauth_tokens: () => ({ scope: 'mcp:read', used_at: null, revoked_at: null, rotated_from: null }),
 }
 
 function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)) }
@@ -126,10 +141,13 @@ class Query {
     return rows.map((r) => { const o = {}; for (const n of names) o[n] = clone(r[n]); return o })
   }
   _checkUnique(row, exclude) {
-    for (const key of UNIQUE[this.table] || []) {
+    for (const spec of UNIQUE[this.table] || []) {
+      const key = Array.isArray(spec) ? spec : spec.cols
+      const where = Array.isArray(spec) ? null : spec.where
+      if (where && !where(row)) continue
       const vals = key.map((k) => { const [col, fn] = k.split(':'); const v = row[col]; return fn === 'upper' && typeof v === 'string' ? v.toUpperCase() : v })
       if (vals.some((v) => v === null || v === undefined)) continue
-      const clash = this._rows().find((r) => r !== exclude && key.every((k, i) => { const [col, fn] = k.split(':'); const v = r[col]; return (fn === 'upper' && typeof v === 'string' ? v.toUpperCase() : v) === vals[i] }))
+      const clash = this._rows().find((r) => r !== exclude && (!where || where(r)) && key.every((k, i) => { const [col, fn] = k.split(':'); const v = r[col]; return (fn === 'upper' && typeof v === 'string' ? v.toUpperCase() : v) === vals[i] }))
       if (clash) return { code: '23505', message: `duplicate key value violates unique constraint (${this.table}: ${key.join(',')})` }
     }
     return null

@@ -34,6 +34,7 @@ export interface FixStateRow {
   check_n: number | null
   /** client_api_keys.id when an AI agent marked this done through MCP (docs/arch/mcp-stage2-fixes.md). */
   marked_by_key?: string | null
+  marked_by_grant?: string | null
 }
 
 /** A verdict waits for answers collected at least this long after marking done. */
