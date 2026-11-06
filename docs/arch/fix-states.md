@@ -12,8 +12,8 @@ The Fix This hub on AI Visibility (`src/pages/AIVisibility.tsx`, `fixItems`,
 around line 800) is rebuilt from `ai_results` on every page load and stored
 nowhere. It can produce at most six kinds of item, the page shows the first
 three, and the only control is "Copy fix". So a client who did the work sees
-the same three cards until the underlying number moves, which for a
-training-data engine like Claude can take months, and never learns whether
+the same three cards until the underlying number moves, which can take
+weeks, and never learns whether
 what they did helped.
 
 ## 2. A stable id for each fix
@@ -148,7 +148,8 @@ same table with a `rec:` id prefix.
 ## 8. Open questions, with the default that applies if silent
 
 1. **Wait before the verdict.** Search-grounded engines need days to re-crawl
-   and Claude answers from training data, so a check the next morning will
+   and Claude runs one web search at most per answer and otherwise relies on
+   training (corrected 2026-11-06, see section 12), so a check the next morning will
    almost always reopen. Default: the verdict waits for the first collection
    at least **7 days** after marking done; Check now respects the same wait.
 2. **Improvement threshold.** Default: **+10 points**, or any mention where
@@ -185,3 +186,108 @@ same table with a `rec:` id prefix.
 - I6: a verdict that matched no row re-reads the rows.
 - Not changed, accepted: I1 (title and metric_key writable on the client's
   own row), I3 (one save at a time), I4, I5.
+
+## 11. Copy as AI prompt (Constantin, 2026-11-06, after ebb79e3)
+
+Constantin: the copied fix "has no information for the reason its applied".
+The card keeps its short fix line; the clipboard gets a full prompt that
+stands alone when pasted into ChatGPT, Claude, Cursor or a coding agent with
+no other context.
+
+**One builder.** `src/lib/fixPrompt.ts`, pure, no React, no Supabase. It
+holds both halves: `buildFixEvidence()` derives the evidence for one fix from
+the same cell map the page already has, and `buildFixPrompt()` renders the
+text. `mcp-server.js` already bundles `src/lib/*.ts` through esbuild
+(netlify.toml `node_bundler = "esbuild"`), so MCP stage 2 imports this file
+and returns byte-identical text. No second copy anywhere.
+`tests/fix_prompt.test.js` pins the full output for fixtures, Constantin's
+example included.
+
+**Blocks, in order** (Markdown headings, plain text inside):
+1. Title line naming the goal for this one fix.
+2. Role and goal: a GEO and content specialist working for the brand, on
+   true facts only, asking the reader for missing facts.
+3. The brand: name, website, market (each line only when known).
+4. What BrandGEO measured: the exact question or questions, the engines
+   checked, the answer count, how many named the brand, how many named
+   another brand, up to five brands named instead, the date of the newest
+   answer. Per kind: one question (prompt gap); one engine with up to five
+   questions it left the brand out of (engine fixes); all engines (overall
+   visibility); the rival with its average rank and up to five questions it
+   took (outranked); questions covered versus not (consistency); questions
+   where the brand was named below the top three, with its rank (ranking).
+5. Why this fix: the mechanism stated as a cause the reader can act on,
+   without claiming anything BrandGEO did not measure (it never read the
+   client's site, so it never says "you have no page"). Engine fixes add how
+   that engine answers as BrandGEO collects it (ChatGPT can search the web,
+   Gemini usually grounds in Google Search, Google AI Mode reads Google
+   results, Perplexity searches and cites, Claude can run one web search and
+   otherwise relies on training), for those engines only.
+6. Steps, numbered and concrete, starting with "check whether a page
+   already answers this; improve it rather than add a second one".
+7. Rules: true facts only, ask instead of inventing; never invent reviews,
+   testimonials, statistics, awards, prices, clients or credentials; the
+   brand name spelled exactly; no attacks on the brands named instead; the
+   language buyers use for the question.
+8. Done when, plus how BrandGEO re-checks, exactly as `evaluateFix` does:
+   starting 7 days after the fix is marked done, once at least 80 percent of
+   the answers in the fix's scope (every tracked question in it, not only
+   the listed ones) have been collected again, the fix's own number is
+   measured over the new answers and compared with the number taken when it
+   was marked done.
+9. Report back: URL or draft, title and H1, the facts used and their source,
+   the outlet suggested and the pitch.
+
+**Never in the payload:** euro costs, plan names, internal ids (client,
+prompt, fix ids), status codes, other clients. **No em or en dash:** every
+interpolated value passes through `clean()`, which turns both into a plain
+hyphen and folds newlines, so a client's own prompt text cannot carry one in.
+Dates are rendered by the builder itself in UTC ("6 November 2026"), not by
+the browser locale, so the text is the same everywhere.
+
+**Button:** "Copy as AI prompt", with "Copied" feedback as today. The short
+fix line on the card is unchanged.
+
+**Built 2026-11-06.** `src/lib/fixPrompt.ts` (`buildFixEvidence`,
+`buildFixPrompt`, `clean`, `formatDay`), `tests/fix_prompt.test.js` (14
+checks, Constantin's example pinned byte for byte), "Copy as AI prompt" in
+`AIVisibility.tsx`. The outranked card passes its own average rank
+(`competitorAvgRank`) so the prompt repeats the number on the card; the card
+averages over every stored answer, the builder's own fallback over the
+active prompts only. A per-prompt fix whose prompt is no longer active
+returns null and the button falls back to the short fix line. "Done when" names the fix's own re-check number: the mention count
+for question, engine and overall fixes, the head to head share for
+outranked, the dashboard score for consistency and ranking.
+
+## 12. Review of the AI prompt build, closed (2026-11-06)
+
+`docs/qa/fix-prompt-review-2026-11-06.md` returned FAIL on one BLOCKER: the
+prompt said Claude answers without web search and moves only after a model
+update. `_collect.js` `callClaude` gives Claude the `web_search_20250305`
+tool with `max_uses: 1` and says web search must stay on; the older comments
+in `collect-claude.js` and the top of `_collect.js` that say otherwise are
+stale (comment-only chip for bg-backend). The same false claim was in this
+design note (sections 1 and 8) and is corrected above. Also closed: M1
+(consistency lists questions under the card's 60 percent rule), M2 (ranking
+uses the average rank, as the card's score does), M3 (outranked counts a
+question where the rival is ranked above the brand, not only where the brand
+is absent), L1, L2 ("Done when" states the 80 percent rule, every tracked
+question in scope, and the baseline taken at mark-done time), L3 (a rule
+against outlets that cannot be linked), L4 (copy outcome announced in the
+live region), L5 (missing vs low wording), I1, I2 (ChatGPT "can" search,
+Gemini "usually" grounds), I6 (ranking mechanism stated as a tendency), I7
+(a refused clipboard write says so). Accepted, not changed: I3 (a brand
+alias could be listed as a brand named instead; aliases are not in the
+page's client select), I4 (Market is the client's default market), I5 (MCP
+byte identity needs the shared fix list, which is MCP stage 2 section 2).
+
+Re-check of that review (same report, section "Re-check 2026-11-06") left
+X1 and X2 open, both now closed: the consistency prompt counts every active
+question, answered or not, as the card's score does; and when no question
+qualifies for a list, no sentence points "above" (role, why and steps fall
+back to the brand's own buyer questions, and a zero-question result
+sentence is dropped). Also closed: N1 (a second copy is announced again),
+N2 (a successful copy clears an earlier copy-failed notice), N3 (a question
+with no answers reads "no engine has answered this question yet"), N4 (this
+section's point 8), N6 ("what share of the new answers"). N5 stays: a browser
+that refuses the clipboard leaves only the short fix line.

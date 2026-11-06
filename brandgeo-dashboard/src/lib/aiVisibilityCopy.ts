@@ -188,6 +188,9 @@ export function panelLastResult(date: string): string { return `Last result, ${d
 // Fix This: done, re-check and next fixes (docs/arch/fix-states.md)
 export const FIX_COPY = {
   explainer: 'Copy each recommended fix and apply it to your site or content. Mark it done when you have, and we check the number after a later collection. P0 items move your score the most.',
+  copyPrompt: 'Copy as AI prompt',
+  copiedAnnounce: 'Prompt copied. Paste it into your AI assistant.',
+  copyFailed: 'Your browser did not allow copying. Select the fix text and copy it by hand.',
   markDone: 'Mark as done',
   dismiss: 'Not for us',
   reopen: 'Reopen',

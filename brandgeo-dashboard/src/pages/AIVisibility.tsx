@@ -8,7 +8,8 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockPrompts, mockAIResults } from '../lib/mockData'
-import { useMarket } from '../lib/marketContext'
+import { useMarket, MARKETS } from '../lib/marketContext'
+import { buildFixPrompt } from '../lib/fixPrompt'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
@@ -59,6 +60,9 @@ interface FixItem {
   title: string
   description: string
   fix: string
+  /** Display name and average rank of the rival, outranked fixes only (feed the copied prompt). */
+  competitor?: string
+  competitorAvgRank?: number | null
 }
 
 const FIX_SELECT = 'id, client_id, fix_id, status, title, metric_key, baseline_value, baseline_n, marked_at, checked_at, check_value, check_n'
@@ -938,6 +942,8 @@ export default function AIVisibility() {
       items.push({
         id: fixIds.outranked(topRanked.name),
         metricKey: metricKeys.competitor(topRanked.name),
+        competitor: topRanked.name,
+        competitorAvgRank: topRanked.avgPos,
         priority: 'P1',
         title: `Outranked by ${topRanked.name} (avg #${topRanked.avgPos})`,
         description: `${topRanked.name} is ranked by an engine in ${topRanked.rankedMentions} of its ${topRanked.count} appearances, while ${brandName} is absent in ${gapCount} checks.`,
@@ -1002,6 +1008,19 @@ export default function AIVisibility() {
   const fixPromptIds = prompts.map(p => p.id)
   const fixEngineIds = activeLLMs.map(l => l.id as string)
   const engineLabelOf = (id: string) => ENGINE_META[id as EngineId]?.label ?? id
+  // Clipboard payload for "Copy as AI prompt" (fix-states.md section 11). The
+  // builder is shared with MCP; this page only supplies the context.
+  const fixPromptFor = (item: FixItem): string => buildFixPrompt(
+    { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
+    {
+      brandName,
+      website: activeClient?.brand_website ?? null,
+      market: MARKETS.find(m => m.id === activeClient?.default_market_id)?.label ?? null,
+      engines: activeLLMs.map(l => ({ id: l.id as string, label: l.label })),
+      prompts: prompts.map(p => ({ id: p.id, text: p.text })),
+      results,
+    },
+  ) ?? item.fix
   const promptTextOf = (id: number) => prompts.find(p => p.id === id)?.text
   const openFixItems = fixItems.filter(i => isOpenState(fixRows.get(i.id)?.status))
   const doneFixRows = Array.from(fixRows.values())
@@ -1288,10 +1307,22 @@ export default function AIVisibility() {
     { key: 'consistency', label: 'Consistency', value: dimensions.consistency, desc: 'Cross-prompt rate' },
   ] as const
 
+  // The button's accessible name stays fixed, so the outcome is announced
+  // through the hub's polite live region (fix-prompt review L4), and a
+  // refused clipboard write says so instead of doing nothing (I7).
   const copyFix = (id: string, text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedFix(id)
+      // Clear an earlier "could not copy" notice for this fix (review N2).
+      setFixNotice(n => (n?.id === id ? null : n))
+      // Empty first, then the text: an identical string set twice is not a
+      // change, so a second copy would never be announced (review N1).
+      setFixAnnounce('')
+      setTimeout(() => setFixAnnounce(FIX_COPY.copiedAnnounce), 50)
       setTimeout(() => setCopiedFix(null), 2000)
+    }).catch(() => {
+      setFixNotice({ id, text: FIX_COPY.copyFailed })
+      setFixAnnounce(FIX_COPY.copyFailed)
     })
   }
 
@@ -2406,12 +2437,13 @@ export default function AIVisibility() {
                       </div>
                       <div className="flex flex-row flex-wrap sm:flex-col sm:flex-nowrap gap-2 shrink-0 pl-9 sm:pl-0">
                         <button
-                          onClick={() => copyFix(item.id, item.fix)}
+                          onClick={() => copyFix(item.id, fixPromptFor(item))}
+                          aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
                           className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs border border-dark-600 text-slate-400 hover:text-slate-200 hover:border-dark-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                         >
                           {copiedFix === item.id
                             ? <><CheckCheck size={12} className="text-emerald-400" /> Copied</>
-                            : <><Copy size={12} /> Copy fix</>
+                            : <><Copy size={12} /> {FIX_COPY.copyPrompt}</>
                           }
                         </button>
                         <button
