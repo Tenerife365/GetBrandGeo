@@ -832,3 +832,127 @@ ARTICLES_DAILY.append(dict(
     <p>Keep the same numbers on your directory and portal profiles. In BG-106, 390 of these 591 answers named a third-party platform. This study cannot say that publishing these facts gets you recommended. It shows what kind of fact an engine writes next to a firm's name in your category, and which engines write one at all.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-113", bid="BG-113", date="2026-11-06", date_label="November 6, 2026", read=6,
+    tags=["Original Research", "US Cities", "Property Management"],
+    title="How Often AI Engines Put a National Brand Next to Local Property Managers",
+    h1="How Often AI Engines Put a <em>National Brand</em> Next to Local Property Managers",
+    h1_plain="How Often AI Engines Put a National Brand Next to Local Property Managers",
+    subtitle="We read 99 AI answers to property management questions in 20 US cities. 63 of them named at least one national brand next to the local firms. One franchise name accounted for most of it.",
+    meta_desc="In 99 AI answers about property managers in 20 US cities, 63 named a national brand. Real Property Management came up in 42, Mynd and Evernest in 17 each. Perplexity named one in 15 of 20 answers, ChatGPT in 10.",
+    og_desc="63 of 99 AI answers about property managers named a national brand next to the local firms. Real Property Management alone came up in 42. Perplexity did it in 15 of 20 answers, ChatGPT in 10.",
+    ld_desc="Original BrandGEO research counting how often ChatGPT, Claude, Gemini, Perplexity and Google AI Mode named a national property management brand (Real Property Management, Mynd, Evernest, FirstService, Greystar, Associa, Renters Warehouse) in 99 answers to a property management question across 20 US cities.",
+    keywords="ai property management recommendations, chatgpt property manager national brand, local property management ai search, real property management ai visibility, mynd evernest ai answers, local vs national property manager ai",
+    about=["AI Visibility Research", "Property Management", "Local Search", "Engine Behavior"],
+    findings=[("63 of 99", "property management answers named at least one national brand next to the local firms"),
+              ("42 of 99", "named Real Property Management, the most common brand by a wide margin"),
+              ("17 of 20", "cities had at least one answer naming a national brand; 3 cities had none"),
+              ("15 vs 10", "Perplexity answers against ChatGPT answers naming one, out of 20 each")],
+    faq=[("Do AI engines recommend national property management brands or local ones?",
+          "Both, in the same answer. Of 99 answers to a property management question across 20 US cities, 63 named at least one national brand from our list, and 36 named none. Most answers still named local firms beside the brand."),
+         ("Which national property management brand do AI engines name most?",
+          "Real Property Management, a franchise name that is usually followed by a city, appeared in 42 of 99 answers. Mynd and Evernest each appeared in 17, FirstService in 6, Greystar in 3, Renters Warehouse in 2 and Associa in 1."),
+         ("Does every engine name national property managers equally?",
+          "No. Perplexity named one in 15 of 20 answers, Gemini and Google AI Mode in 13 of 20 and 13 of 19, Claude in 12 of 20 and ChatGPT in 10 of 20. With about 20 answers per engine, treat gaps of a few answers as small."),
+         ("Does this study show why an engine names a national brand?",
+          "No. It counts what the engines wrote. It does not show why a brand was picked, whether it is a ranking factor, or whether the brand has a real office in that city.")],
+    related=[("/bg-106.html", "BG-106", "The Directories AI Engines Name When They Recommend Local Professionals",
+              "The same answers, read for directory and review sites."),
+             ("/bg-110.html", "BG-110", "What Fees AI Engines Quote When They Recommend Lawyers, Agents and Property Managers",
+              "The fees engines quoted for property management."),
+             ("/bg-112.html", "BG-112", "The Facts AI Engines Attach to the Local Firms They Recommend",
+              "Ownership, tenure and units managed, from the same answers.")],
+    cta_h="See whether AI engines name you or a national brand",
+    cta_p="Run the free audit on your own domain and read which firms each engine puts next to yours. No signup and no card.",
+    og=dict(
+        fname="og-bg-113.png",
+        kicker="BG-113 · Original Research",
+        lines=[[("National Brands", "w")], [("Beside Local Firms", "g")]],
+        sub=["99 property management answers,",
+             "20 US cities, 5 engines."],
+        stats=[("63 of 99", "answers named a national brand", "BrandGEO, July 2026"),
+               ("42", "named Real Property Management", "of 99 answers"),
+               ("17 of 20", "cities had at least one such answer", "3 cities had none"),
+               ("15 vs 10", "Perplexity vs ChatGPT, answers with one", "20 answers each"),],
+        footer="Local Firm or National Name",
+    ),
+    body="""  <p>Ask an AI engine for the best property management company in your city and you get a short list. We wanted to know how many of those lists put a national brand next to the local firms. A landlord comparing the list sees one set of names. A local manager reading it learns whether the competition includes a franchise with a marketing budget.</p>
+
+  <p><strong>63 of 99 answers (64%) named at least one national brand.</strong> 36 named none from our list. The count is dominated by one name: Real Property Management, a franchise whose offices carry a city after the brand, appeared in 42 answers. The next two brands appeared in 17 answers each.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked one property management question in each of 20 US cities, and ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered it on July 24 and 25, 2026. 99 usable answers came back (one Google AI Mode answer was not usable). We searched the answer text, with links removed, for seven national names: Real Property Management, Mynd, Evernest, FirstService, Greystar, Associa and Renters Warehouse. We also looked for Invitation Homes and Progress Residential and found neither.</p>
+    <p>We read 45 matched passages by hand. Two hits were false and are removed: a truncated name that only looked like Associa, and an answer that mentioned Belong only as a site that publishes roundups. Belong is a rental management company that also publishes lists, so it is left out of every count here. The list is ours and short. Other national or regional operators exist and are not counted, so the real share is higher. Stored Claude answers are cut at under 3,800 characters and Google AI Mode answers at 10,000, so brands late in a long answer are missed. We count what the engines wrote. We did not check whether a brand has an office in the city, and we cannot say why an engine named it.</p>
+  </div>
+
+  <h2>Which brands came up</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Brand</th><th>Answers (of 99)</th></tr></thead>
+    <tbody>
+      <tr><td>Real Property Management</td><td>42</td></tr>
+      <tr><td>Mynd</td><td>17</td></tr>
+      <tr><td>Evernest</td><td>17</td></tr>
+      <tr><td>FirstService</td><td>6</td></tr>
+      <tr><td>Greystar</td><td>3</td></tr>
+      <tr><td>Renters Warehouse</td><td>2</td></tr>
+      <tr><td>Associa</td><td>1</td></tr>
+      <tr><td><strong>At least one of these</strong></td><td>63</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Most answers that named a national brand named only one: 42 named one brand, 17 named two and 4 named three. In the 20 passages we read for the three biggest names, each one recommended the brand as a manager, not as a passing word. The wording was often a city office, such as the franchise name followed by a city or a metro area.</p>
+
+  <p>Two of the smaller names came with a different job. Where ChatGPT named FirstService or Greystar, it described them as large operators for condo towers, associations and apartment buildings. A landlord with a single rental house was not necessarily being pointed to them.</p>
+
+  <h2>By engine</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Named a national brand</th><th>Real Property Management</th><th>Mynd</th><th>Evernest</th></tr></thead>
+    <tbody>
+      <tr><td>Perplexity</td><td>20</td><td>15</td><td>12</td><td>1</td><td>5</td></tr>
+      <tr><td>Gemini</td><td>20</td><td>13</td><td>9</td><td>7</td><td>5</td></tr>
+      <tr><td>Google AI Mode</td><td>19</td><td>13</td><td>10</td><td>4</td><td>3</td></tr>
+      <tr><td>Claude</td><td>20</td><td>12</td><td>4</td><td>4</td><td>2</td></tr>
+      <tr><td>ChatGPT</td><td>20</td><td>10</td><td>7</td><td>1</td><td>2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The spread between engines is five answers, from 10 of 20 to 15 of 20. With about 20 answers per engine that is a small gap, and we would not build a plan on it. The brand mix is clearer. Perplexity leaned on the franchise name (12 answers) and rarely named Mynd (1). Gemini spread its picks, with Mynd in 7 answers, more than any other engine. Claude named the franchise in 4 answers, fewer than the others.</p>
+
+  <h2>The 36 answers with none of the seven</h2>
+
+  <p>36 answers named none of our seven brands: ChatGPT 10, Claude 8, Gemini 7, Google AI Mode 6 and Perplexity 5. These are not necessarily all local lists. Our brand list is short, so an answer in this group may still name a regional or national operator we did not search for. What we can say is that in these 36 answers, none of the seven names we counted came up, and that a local firm competing for the same question did not face them.</p>
+
+  <p>One detail on the franchise name matters for local managers. Real Property Management is a national network, but the answers usually wrote it with a city or a metro area, and often listed it as one entry among several in a numbered or bulleted list. To a reader it looks like another local company. Counting the brand, as we did, is the only way to see how common that is.</p>
+
+  <h2>By city</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Answers in the city naming a national brand (of 5)</th><th>Cities</th></tr></thead>
+    <tbody>
+      <tr><td>5</td><td>4</td></tr>
+      <tr><td>4</td><td>7</td></tr>
+      <tr><td>3</td><td>4</td></tr>
+      <tr><td>2</td><td>1</td></tr>
+      <tr><td>1</td><td>1</td></tr>
+      <tr><td>0</td><td>3</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The brands are not spread evenly. In 11 of the 20 cities, at least four of the five answers named a national brand from our list. In 3 cities none did, so no engine put one of our seven names in the answer. In one more city only one answer did. For a local manager, the practical question is which of these two kinds of city you work in.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>If you manage property locally, expect a national or franchise name to appear next to yours in about two answers out of three. Search your own city on the five engines and see which names sit beside you. The brand does not need to be large in your city to be listed.</p>
+    <p>Then give the engines something specific that a franchise page does not carry: who owns the company, how long you have managed rentals in the city, how many homes you manage, and what you charge. BG-112 found that tenure, ownership and units under management were the facts engines most often wrote next to property managers. This study cannot say that publishing them keeps a national name off the list. It shows how often the name is there.</p>
+  </div>""",
+))

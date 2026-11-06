@@ -9,3 +9,4 @@ One line per published article, newest last.
 - 2026-11-03 BG-110 https://getbrandgeo.com/bg-110.html What Fees AI Engines Quote When They Recommend Lawyers, Agents and Property Managers
 - 2026-11-04 BG-111 https://getbrandgeo.com/bg-111.html How Often AI Engines Tell Buyers to Check a Firm Before Hiring It
 - 2026-11-05 BG-112 https://getbrandgeo.com/bg-112.html The Facts AI Engines Attach to the Local Firms They Recommend
+- 2026-11-06 BG-113 https://getbrandgeo.com/bg-113.html How Often AI Engines Put a National Brand Next to Local Property Managers
