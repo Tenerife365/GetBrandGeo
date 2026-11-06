@@ -311,7 +311,26 @@ export default function AffiliatePortal({ previewId, sample = false }: { preview
               {me.conversions.length === 0 ? (
                 <EmptyState icon={ShoppingCart} title="Nothing referred yet" body="Share your link. Leads and sales attributed to you show up here within minutes." />
               ) : (
-                <div className="overflow-x-auto rounded-card border border-dark-700 bg-dark-800">
+                <>
+                <ul className="md:hidden space-y-3">
+                  {me.conversions.map((c) => (
+                    <li key={c.id} className="rounded-card border border-dark-700 bg-dark-800 p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-200 truncate">{c.customer_ref || 'Customer'}</div>
+                          <div className="text-xs text-slate-500">{[c.one_time_fee ? 'one-time fee' : c.conversion_type.replace('_', ' '), programsById.get(c.program_id)?.name || ''].filter(Boolean).join(' · ')}</div>
+                        </div>
+                        <span className="shrink-0"><StatusPill value={c.status} /></span>
+                      </div>
+                      {c.one_time_fee && c.description && <p className="text-xs text-slate-500">{c.description}</p>}
+                      <div className="flex items-baseline justify-between gap-3 text-xs">
+                        <span className="text-slate-400">{fmtDate(c.occurred_at)}{c.source ? ` · ${c.source}` : ''}</span>
+                        {Number(c.amount) > 0 && <span className="text-sm text-slate-200 whitespace-nowrap">{c.currency} {c.amount}</span>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="hidden md:block overflow-x-auto rounded-card border border-dark-700 bg-dark-800">
                   <table className="min-w-full text-sm">
                     <thead className="text-xs text-slate-400 uppercase tracking-wider">
                       <tr><th className="text-left px-4 py-2">Date</th><th className="text-left px-4 py-2">Program</th><th className="text-left px-4 py-2">Type</th><th className="text-left px-4 py-2">Customer</th><th className="text-right px-4 py-2">Amount</th><th className="text-left px-4 py-2">Source</th><th className="text-left px-4 py-2">Status</th></tr>
@@ -331,6 +350,7 @@ export default function AffiliatePortal({ previewId, sample = false }: { preview
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </section>
 
