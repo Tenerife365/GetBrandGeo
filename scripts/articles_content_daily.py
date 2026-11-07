@@ -956,3 +956,126 @@ ARTICLES_DAILY.append(dict(
     <p>Then give the engines something specific that a franchise page does not carry: who owns the company, how long you have managed rentals in the city, how many homes you manage, and what you charge. BG-112 found that tenure, ownership and units under management were the facts engines most often wrote next to property managers. This study cannot say that publishing them keeps a national name off the list. It shows how often the name is there.</p>
   </div>""",
 ))
+
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-114", bid="BG-114", date="2026-11-07", date_label="November 7, 2026", read=6,
+    tags=["Original Research", "US Cities", "Real Estate"],
+    title="Which National Brokerage Names AI Engines Put Beside Real Estate Agents",
+    h1="Which <em>National Brokerage</em> Names AI Engines Put Beside Real Estate Agents",
+    h1_plain="Which National Brokerage Names AI Engines Put Beside Real Estate Agents",
+    subtitle="We read 97 AI answers to a home buyer question in 20 US cities. 77 of them named a national brokerage brand next to the agents. One engine almost never did.",
+    meta_desc="In 97 AI answers about real estate agents in 20 US cities, 77 named a national brokerage brand. Compass came up in 38 and Keller Williams in 37. Perplexity named one in 4 of 20 answers, Gemini in 20 of 20.",
+    og_desc="77 of 97 AI answers about real estate agents named a national brokerage brand. Compass appeared in 38, Keller Williams in 37. Gemini did it in 20 of 20 answers, Perplexity in 4 of 20.",
+    ld_desc="Original BrandGEO research counting how often ChatGPT, Claude, Gemini, Perplexity and Google AI Mode named a national brokerage brand (Compass, Keller Williams, RE/MAX, eXp Realty, Coldwell Banker, Sotheby's International Realty, Redfin, Berkshire Hathaway HomeServices, Douglas Elliman, Century 21) in 97 answers to a real estate agent question across 20 US cities.",
+    keywords="ai real estate agent recommendations, chatgpt best realtor national brokerage, compass keller williams ai answers, ai search real estate agents, brokerage brand ai visibility, real estate agent ai search",
+    about=["AI Visibility Research", "Real Estate", "Local Search", "Engine Behavior"],
+    findings=[("77 of 97", "real estate answers named at least one national brokerage brand next to the agents"),
+              ("38 and 37", "answers named Compass and Keller Williams, the two most common brands"),
+              ("20 of 20", "Gemini answers named one, against 4 of 20 for Perplexity"),
+              ("28 of 97", "answers named three or more different brokerage brands")],
+    faq=[("Do AI engines recommend real estate agents or brokerages?",
+          "Mostly agents, with a brokerage brand attached. In the 22 passages we read by hand, the brand was the company the named agent works under. Of 97 answers across 20 US cities, 77 named at least one national brokerage brand."),
+         ("Which brokerage brand do AI engines name most for real estate agents?",
+          "Compass appeared in 38 of 97 answers and Keller Williams in 37. RE/MAX appeared in 19, eXp Realty in 17, Coldwell Banker and Sotheby's International Realty in 16 each, Redfin in 15, Berkshire Hathaway HomeServices in 12, Douglas Elliman in 7 and Century 21 in 2."),
+         ("Do all AI engines name national brokerages equally?",
+          "No. Gemini named one in all 20 of its answers, Claude in 19 of 20, ChatGPT in 18 of 19, Google AI Mode in 16 of 18 and Perplexity in 4 of 20. With about 20 answers per engine, treat gaps of a few answers as small, but the Perplexity gap is large."),
+         ("Does this study show why an engine names a brokerage?",
+          "No. It counts what the engines wrote. It does not show why an agent or brand was picked, whether the brand is a ranking factor, or whether the agent is any good.")],
+    related=[("/bg-113.html", "BG-113", "How Often AI Engines Put a National Brand Next to Local Property Managers",
+              "The same check for property managers instead of agents."),
+             ("/bg-107.html", "BG-107", "When an AI Engine Names No One: 15 Answers With No Firm in Them",
+              "The answers where an engine named no firm at all."),
+             ("/bg-106.html", "BG-106", "The Directories AI Engines Name When They Recommend Local Professionals",
+              "The listing and review sites engines name for the same questions.")],
+    cta_h="See which brokerage names AI engines put beside yours",
+    cta_p="Run the free audit on your own domain and read which firms each engine names in your market. No signup and no card.",
+    og=dict(
+        fname="og-bg-114.png",
+        kicker="BG-114 · Original Research",
+        lines=[[("National Brokerages", "w")], [("Beside the Agents", "g")]],
+        sub=["97 real estate answers,",
+             "20 US cities, 5 engines."],
+        stats=[("77 of 97", "answers named a national brokerage", "BrandGEO, July 2026"),
+               ("38", "named Compass", "37 named Keller Williams"),
+               ("20 of 20", "Gemini answers named one", "Perplexity: 4 of 20"),
+               ("28 of 97", "named three or more brands", "different brokerages"),],
+        footer="Agent or Brokerage Name",
+    ),
+    body="""  <p>Ask an AI engine for the best real estate agents for a home buyer in your city and you get a list of people. Next to most of those people sits the name of the company they work under. We wanted to count how often that company is a national brokerage brand, and which brands. A local agent reading the list learns whether the engines frame the competition as individual agents or as agents carrying a large brand.</p>
+
+  <p><strong>77 of 97 answers (79%) named at least one national brokerage brand.</strong> 20 named none from our list. Two names dominate: Compass appeared in 38 answers and Keller Williams in 37. In 28 answers, three or more different brands appeared together.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked one real estate agent question for home buyers in each of 20 US cities. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered it on July 24 and 25, 2026, and 97 usable answers came back. We searched the answer text, with links removed, for ten national brand names: Compass, Keller Williams, RE/MAX, eXp Realty, Coldwell Banker, Sotheby's International Realty, Redfin, Berkshire Hathaway HomeServices, Douglas Elliman and Century 21. We also searched for Howard Hanna and Weichert and found neither.</p>
+    <p>We read 22 matched passages by hand, spread over all five engines. All 22 were real: the brand was the company the named agent works under, or, for Redfin, a brokerage the engine recommended directly. Our list is short, so other national or regional brands exist and are not counted, which means the real share is higher. Stored Claude answers are cut at about 3,800 characters and Google AI Mode answers at 10,000, so brands late in a long answer are missed. We count what the engines wrote. We did not check whether any agent or brand is good, and we cannot say why an engine named it. No agent is named in this article.</p>
+  </div>
+
+  <h2>Which brands came up</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Brand</th><th>Answers (of 97)</th></tr></thead>
+    <tbody>
+      <tr><td>Compass</td><td>38</td></tr>
+      <tr><td>Keller Williams</td><td>37</td></tr>
+      <tr><td>RE/MAX</td><td>19</td></tr>
+      <tr><td>eXp Realty</td><td>17</td></tr>
+      <tr><td>Coldwell Banker</td><td>16</td></tr>
+      <tr><td>Sotheby's International Realty</td><td>16</td></tr>
+      <tr><td>Redfin</td><td>15</td></tr>
+      <tr><td>Berkshire Hathaway HomeServices</td><td>12</td></tr>
+      <tr><td>Douglas Elliman</td><td>7</td></tr>
+      <tr><td>Century 21</td><td>2</td></tr>
+      <tr><td><strong>At least one of these</strong></td><td>77</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Few answers stopped at one brand. 25 named exactly one, 24 named two, 18 named three, and 10 named four to six. A buyer comparing the list is looking at agents from several competing national networks side by side, each shown with its badge.</p>
+
+  <h2>By engine</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Named a national brokerage</th><th>Compass</th><th>Keller Williams</th><th>Redfin</th></tr></thead>
+    <tbody>
+      <tr><td>Gemini</td><td>20</td><td>20</td><td>9</td><td>11</td><td>4</td></tr>
+      <tr><td>Claude</td><td>20</td><td>19</td><td>9</td><td>8</td><td>0</td></tr>
+      <tr><td>ChatGPT</td><td>19</td><td>18</td><td>7</td><td>8</td><td>10</td></tr>
+      <tr><td>Google AI Mode</td><td>18</td><td>16</td><td>11</td><td>10</td><td>1</td></tr>
+      <tr><td>Perplexity</td><td>20</td><td>4</td><td>2</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Four engines name a brokerage in nearly every answer, from 16 of 18 to 20 of 20. Perplexity is the outlier at 4 of 20, and the gap is too large to blame on a small sample. BG-107 covers answers where an engine named no firm at all, and that is part of the reason Perplexity's count is low here. We did not recount it for this article.</p>
+
+  <p>The engines also differ in who they put beside the agents. ChatGPT named Redfin in 10 of 19 answers, as a brokerage to consider directly. Claude named it in none. Gemini and Google AI Mode leaned on the franchise networks, with Keller Williams in 11 of 20 and 10 of 18 answers. Gemini also gave the longest brand lists: 11 of its 20 answers named three or more different brokerages.</p>
+
+  <h2>By city</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Answers in the city naming a national brokerage (each city has 4 or 5)</th><th>Cities</th></tr></thead>
+    <tbody>
+      <tr><td>5</td><td>2</td></tr>
+      <tr><td>4</td><td>13</td></tr>
+      <tr><td>3</td><td>5</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Unlike property management, where 3 cities had no national brand at all, no city here escaped. In every one of the 20 cities, at least 3 of the answers carried a national brokerage name. For a local agent, the question is not whether a national brand will appear in the answer, but which ones.</p>
+
+  <h2>What else shares the answer</h2>
+
+  <p>36 of the 97 answers also named a property portal such as Zillow or Realtor.com. That overlaps with BG-106, which counted the directories and review sites engines name, so we only note it here. A buyer reading these answers often meets an agent, a brokerage badge and a portal in the same list.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>If you are an independent agent or a small brokerage, expect to be listed beside agents who carry a national badge in about four answers out of five. Run your own city on the five engines and write down which brands sit next to you, and whether your own firm name appears in the same answer.</p>
+    <p>Then check what an engine can read about you. Your firm name, years in the market, the neighborhoods you work and how many homes you sold are the facts these answers quote beside a name. This study cannot say that publishing them changes the list. It shows how often the national names are there.</p>
+  </div>""",
+))

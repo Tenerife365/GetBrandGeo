@@ -6,18 +6,80 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 
 ## How the routine uses this file
 
-1. Take the first topic whose status is `ready`.
+1. Take the first topic whose status is `ready` and whose `from` date, if it has one
+   (`ready from YYYY-MM-DD`), is today or earlier. A topic with a later `from` date is
+   skipped, not taken early.
+   Order among eligible topics (added 2026-11-06, so every dated row keeps its day): a
+   topic whose `from` date is exactly today goes first. Only when no topic is dated today
+   take the first eligible topic in table order. So a dated row missed on its day (the
+   app was closed) waits for the next day that has no row of its own, and never pushes a
+   city study or another dated row off its date. A row marked `not after YYYY-MM-DD` that
+   is still unpublished after that date is set to `held <date>: past its not-after date`
+   and reported, not published.
+   Cadence ruled by Constantin on 2026-11-06: at most 2 city studies (keys `city-*`) per
+   week, Monday to Sunday, alternating with other kinds of article (trending topics,
+   comparisons, research team suggestions). Never publish a third city study in the same
+   week, and never a city study on the day after another one, even when its `from` date
+   has passed. If no other topic is eligible, publish nothing that day.
+   His words: "I want to do 2 cities maximum per week, and then we alternate with
+   something else." So the queue is no longer filled only with articles generated from
+   platform data: do not add platform-data topics under STEP 2b of the routine while
+   this paragraph stands; report the empty day instead. The days without a city study
+   wait for topics from the research team.
 2. Run its SQL, read-only, against `duiyifepitvugyulobqm`. Never collect, never call an engine.
 3. If the numbers do not carry a clear finding, set the topic to `dropped` with one line
    saying why, and stop for the day. A dull day is better than a padded article.
 4. Otherwise write the article, record the queries and numbers in
    `data/<slug>-<topic-key>-<date>.md`, set the status to `published <slug> <date>`.
+5. Draft rows (key `draft-*`, added 2026-11-06 on Constantin's ruling that the non-city
+   articles are written in a separate session, not by widening the routine). The article
+   is already written, in `drafts/<YYYY-MM-DD>-<key>.md`, from sources that session read
+   on the day it wrote it. For a draft row, steps 2 to 4 do not apply: no SQL, no new
+   writing. Instead:
+   a. Run the "Check before publishing" line in the draft (a curl status per source URL).
+      A 404 or 410 on any source: set the row to `held <date>: source <n> gone` and
+      publish nothing that day. Any other non-200 (403, timeout): note it in the report
+      and go on, because some publishers refuse automated clients.
+   b. Copy the draft's python block, unchanged, to the end of
+      `scripts/articles_content_daily.py`. Replace every `bg-NNN` and `BG-NNN` with the
+      day's slug, and set `date` and `date_label` to today. Change nothing else; if the
+      publisher's validation rejects something, fix only that and say what in the report.
+   c. Publish with the draft file in `--extra` in place of a data record (it lists the
+      sources and figures, and is committed with the article), and set the row to
+      `published <slug> <date>`.
+   d. Never take a draft row early, and never copy a draft into
+      `scripts/articles_content_daily.py` before its day: the routine's STEP 1 treats the
+      last entry there as unfinished work and would publish it at once.
+   The routine's own instructions (its SKILL.md, STEP 2 and STEP 4) allow finished drafts
+   since 2026-11-06, approved by Constantin ("Yes, apply them"); the edits are recorded in
+   `drafts/PROPOSED-SKILL-CHANGE-2026-11-06.md`.
 
 ## Rules every topic inherits
 
 - Default basis: the 20 US city accounts, clients 28 to 47, 5 engines, `status = 'ok'`,
   591 answers. Prompt type is the prompt's order inside its client: 1 personal injury,
   2 real estate agents, 3 property management, 4 immigration, 5 and 6 city-specific.
+- Default basis, correction 2026-11-06: it is now 585 ok answers, not 591. An admin
+  engine-card refresh on Los Angeles (client 28) deleted its 6 July ChatGPT rows that
+  day. Every published data record from BG-106 to BG-113 queries clients 28 to 47 on all
+  engines, so its reproduction query now returns a denominator lower by up to 6 and a
+  numerator lower wherever a deleted row matched. The published articles stay as they
+  are; a new article says 585 and, if it compares with an older one, says why.
+- Third basis, allowed since 2026-11-06 (Constantin: "Go, 3 engines", then new cities
+  instead of re-running old ones): the November 2026 collection. Clients 58 to 67 (Austin,
+  San Jose, Jacksonville, Columbus, Indianapolis, Nashville, Las Vegas, Portland Oregon,
+  Orlando, Sacramento), 18 ok answers each, 180 in total, collected 2026-11-06, plus Los
+  Angeles (client 28) rows with `checked_at >= '2026-11-01'`, 18 more. Engines chatgpt
+  (gpt-5.5), claude (claude-sonnet-4-6) and gemini (gemini-2.5-flash), read from
+  `ai_results.model`. Prompts 1 to 4 are the standard four word for word, 5 and 6 are
+  city-specific. Never pool November with July into one percentage: the dates differ by
+  four months, the July rows have no recorded model, and Claude's answers changed
+  character (a 2026 year appears in 33 of 120 July Claude answers and 37 of 66 November
+  ones), so a July to November difference may measure the instrument, not the market.
+  Put the two side by side, dated, if at all. Bold markup (`**name**`) is reliable on
+  this basis: all three engines use it (average 27, 16 and 16 bold spans per answer for
+  chatgpt, claude and gemini), and the strings it carries are firm names, checked by
+  hand on the all-three lists below; headings in bold end with a colon and are excluded.
 - Second basis, allowed since 2026-11-06 (Constantin: "A and B"): the 2026-07-10 research
   accounts, clients 10 to 16, 255 ok answers. London (10), New York (13) and Dublin (16)
   ask 8 English questions each; London and Dublin ask the same 8. Berlin (11), Madrid (12),
@@ -48,6 +110,12 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 
 ## Queue
 
+Research team suggestions for the days without a city study (12 to 30 November) are in
+`research-suggestions-2026-11-06.md`. Constantin ruled on 2026-11-06 that they are written
+in a separate session. That session wrote 12 of the 13 as finished drafts in `drafts/`
+(rows 33 to 45 below, rule 5 above); the 21 November brief failed its check and is
+dropped. 21 November has no row, so it takes any eligible topic left over (rule 1).
+
 | # | Key | Status | Question the article answers |
 |---|---|---|---|
 | 1 | platforms | published bg-106 2026-10-28 | Which third-party platforms engines name for local professionals |
@@ -60,7 +128,7 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 | 8 | hedges | published bg-111 2026-11-04 | How often answers tell the buyer to verify, check reviews or consult before choosing |
 | 9 | credentials | published bg-112 2026-11-05 | Which credentials engines attach to firms: years in business, board certification, awards |
 | 10 | national-vs-local | published bg-113 2026-11-06 | How often property management answers name a national brand next to local firms |
-| 11 | agents-vs-brokerages | ready (brief reworked 2026-11-06 to count from text) | Which national brokerage brands real estate answers name, and how that differs by engine |
+| 11 | agents-vs-brokerages | published bg-114 2026-11-07 | Which national brokerage brands real estate answers name, and how that differs by engine |
 | 12 | city-economy | dropped 2026-11-06: counting named businesses needs `competitors_mentioned` (unreliable) or bold markup, and google_ai answers carry no bold at all (0.0 per answer), so no count works across engines | Which city-specific questions produced the most and fewest named businesses |
 | 13 | dates | ready | How often answers mention a year or "as of", a sign of how current they claim to be |
 | 14 | answer-length | dropped 2026-11-06: stored text is capped (chatgpt and google_ai at 10,000 characters, google_ai median 9,821; claude at about 3,800), so length measures the cap, not the answer; the list-length side needed topic 2, also dropped | Answer length by engine, and whether longer answers name more firms |
@@ -73,6 +141,28 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
 | 21 | notario-warnings | dropped 2026-11-06: 9 of 98 immigration answers warn about notarios or scams, too few to split by engine | How often immigration answers warn about notario fraud |
 | 22 | closing-offers | dropped 2026-11-06: 116 answers end with an offer to help further, but perplexity alone is 70 and gemini and google_ai are 0, the ends of capped answers are cut, and the perplexity side overlaps BG-107 | How often answers end by offering more help |
 | 23 | legal-aid | dropped 2026-11-06: 22 immigration answers name legal aid or nonprofit options, partly reported in BG-109, too thin alone | How often immigration answers point to free or low cost legal help |
+| 24 | city-austin | ready from 2026-11-12 (pre-checked 2026-11-06, third basis) | What ChatGPT, Claude and Gemini recommend in Austin, and which firms all three agree on |
+| 25 | city-portland | ready from 2026-11-14 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Portland, Oregon, and where they agree |
+| 26 | city-lasvegas | ready from 2026-11-17 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Las Vegas, and where they agree |
+| 27 | city-orlando | ready from 2026-11-20 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Orlando, and where they agree |
+| 28 | city-nashville | ready from 2026-11-24 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Nashville, and where they agree |
+| 29 | city-sacramento | ready from 2026-11-27 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Sacramento, and where they agree |
+| 30 | city-later | held 2026-11-06 for December: Indianapolis, Columbus, Jacksonville, San Jose (fewest firms named by all three engines: 1, 1, 1 and 2), at the same cadence | City studies after November |
+| 31 | agreement-by-trade | dropped 2026-11-06: on the November basis the 28 firms named by all three engines are 9 property managers, 6 home builders, 4 breweries and 3 lobbying firms against 6 law firms, but BG-016 already reports when engines agree and when they do not | Which kinds of business all three engines agree on |
+| 32 | la-four-months | dropped 2026-11-06: same 6 Los Angeles questions in July and November, but bold markup differs between months (Gemini bolds no names on 2 July prompts and 2 November ones) and Claude's answers changed character, so a churn count would measure the instrument; ChatGPT's July rows were deleted | How much an engine's recommendations change in four months |
+| 33 | draft-chatgpt-search-share | ready from 2026-11-13 (draft, rule 5) | What OpenAI's "a fifth of Google" claim does and does not tell a local business |
+| 34 | draft-search-console-ai | ready from 2026-11-15, not after 2026-12-02 (draft, rule 5) | What Search Console's AI report shows today, before the UK deadline of 3 December |
+| 35 | draft-engine-scorecard | ready from 2026-11-16 (draft, rule 5) | What each engine tells a buyer about a local firm, from BG-106 to BG-113 |
+| 36 | draft-safegeo | ready from 2026-11-18 (draft, rule 5) | What the SafeGEO paper at EMNLP 2026 measured about gaming AI recommendations |
+| 37 | draft-consumers-ask-ai | ready from 2026-11-19 (draft, rule 5) | 45% of US consumers ask AI for a local business, and almost all double check |
+| 38 | draft-soci-index | dropped 2026-11-06: SOCi's own release gives only ChatGPT 1.2% and the 35.9% local 3-pack figure, with no definition of a recommendation; the Gemini 11% and Perplexity 7.4% rates could not be read at source (report PDF unreadable, Search Engine Land refused the request) | SOCi's 2026 Local Visibility Index next to our city data |
+| 39 | draft-tool-agents | ready from 2026-11-22 (draft, rule 5) | What the agent features in Peec, Scrunch and Profound say they do |
+| 40 | draft-geo-survey | ready from 2026-11-23 (draft, rule 5) | What a 2026 survey of 45 GEO studies finds well supported, and what thin |
+| 41 | draft-aio-local-studies | ready from 2026-11-25 (draft, rule 5) | Why two studies put AI Overviews on 68% and 40% of local searches |
+| 42 | draft-ai-mode-booking | ready from 2026-11-26 (draft, rule 5) | What a local business needs for Google AI Mode to book it |
+| 43 | draft-tool-ownership | ready from 2026-11-28 (draft, rule 5) | Who owns the main AI visibility tools after the past year's deals |
+| 44 | draft-roundup-oct-nov | ready from 2026-11-29 (draft, rule 5) | What changed in AI search from 1 October to 6 November 2026 |
+| 45 | draft-year-end-checks | ready from 2026-11-30 (draft, rule 5) | Five things a local firm should check in AI answers before the new year |
 
 ## Briefs
 
@@ -261,3 +351,66 @@ of 20 against perplexity 0 of 20.
 
 ### 19 to 23
 Dropped 2026-11-06, see the queue table.
+
+### 24 to 29 city studies (third basis, one city per article)
+Format: a BG article, not an `ai-visibility-for-<city>.html` page (the routine only
+builds BG articles; none of these ten cities has a city page). Read
+`ai-visibility-for-losangeles.html` and one more city page for the angle and headline
+style ("AI Visibility in <City>: ..."), and BG-016 so the article does not repeat its
+cross-engine argument: here the agreement is one city's evidence, not the thesis.
+Basis: the city's 18 ok rows (6 questions x chatgpt, claude, gemini), collected
+2026-11-06. Prompt order 1 personal injury, 2 real estate agents, 3 property management,
+4 immigration, 5 and 6 city-specific (read the prompt text from `prompts`).
+Measure: firms named in bold, normalised, counted per question by how many of the three
+engines named them.
+
+```sql
+with b as (
+  select r.prompt_id, r.llm,
+         lower(regexp_replace(trim(both ' :.' from m[1]),
+               ',? (llp|pllc|p\.a\.|pc|inc\.?|llc)$', '')) as name
+  from ai_results r, regexp_matches(r.response_text, '\*\*([^*\n]{3,80})\*\*', 'g') m
+  where r.client_id = <id> and r.status = 'ok' and m[1] !~ ':\s*$'),
+d as (select distinct prompt_id, llm, name from b),
+agg as (select prompt_id, name, count(distinct llm) as engines from d group by 1, 2)
+select p.position, p.text, count(*) as bold_names,
+       count(*) filter (where engines >= 2) as two_or_more,
+       count(*) filter (where engines = 3) as all_three
+from agg join prompts p on p.id = agg.prompt_id
+group by 1, 2 order by 1;
+```
+
+`bold_names` also catches a few bold labels that are not firms (for example "free
+consultation" without a colon), so read every answer by hand before stating how many
+firms an engine named, and state counts of firms, not of bold spans. The `two_or_more`
+and `all_three` lists are short; read each name. Naming: a company name may appear when
+it is clearly a company (a brewery, a home builder, a management company); a firm named
+after a person is reported as a count only. No person's name anywhere.
+Pre-check 2026-11-06 (bold spans, before the hand read; all-three names checked as firms):
+
+| # | City | client | bold names | named by 2 or more | named by all 3 | where all three agree |
+|---|---|---|---|---|---|---|
+| 24 | Austin | 58 | 280 | 23 | 6 | 6 home builders (question 6) |
+| 25 | Portland, Oregon | 65 | 258 | 29 | 5 | 4 breweries (question 6), 1 property manager |
+| 26 | Las Vegas | 64 | 244 | 23 | 3 | 2 property managers, 1 gaming law firm |
+| 27 | Orlando | 66 | 281 | 19 | 3 | 2 property managers, 1 personal injury firm |
+| 28 | Nashville | 63 | 233 | 20 | 3 | 1 personal injury firm, 1 property manager (a national brand, see BG-113), 1 music law firm |
+| 29 | Sacramento | 67 | 223 | 13 | 3 | 3 lobbying firms (question 5) |
+
+Clear enough for each city: of 200 to 280 bold names, at most 6 are named by all three
+engines, and across the ten cities the 28 firms named by all three are mostly property managers,
+home builders, breweries and lobbying firms (22), not law firms (6). Say what
+a business in that city should do. Drop a city if the hand read leaves fewer than 2
+firms named by all three. Never compare a city's numbers with a July city as a trend.
+
+### 33 to 45 drafts (non-city days, 13 to 30 November)
+Written 2026-11-06 in a separate session from `research-suggestions-2026-11-06.md`. Each
+draft file in `drafts/` carries its own source table (URL, grade, what was read, all read
+on 2026-11-06), the curl check, and the finished `ARTICLES_DAILY.append(dict(...))` block
+with `bg-NNN` placeholders. Publish by rule 5; do not rewrite. Briefs that needed one
+check: 39 passed on the vendor's own launch post and docs (the GlobeNewswire release
+refused automated reads); 40 passed on the arXiv abstract page (full text not read, the
+article says so); 41 passed on both originals; 42 passed with Google's two pages
+disagreeing on access, which the article reports; 43 passed on Sitecore's, HubSpot's and
+Profound's own pages; 38 failed and is dropped. 44 covers 1 October to 6 November only;
+a session, not the routine, refreshes it if the rest of November is wanted.
