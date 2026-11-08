@@ -130,7 +130,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 10 | national-vs-local | published bg-113 2026-11-06 | How often property management answers name a national brand next to local firms |
 | 11 | agents-vs-brokerages | published bg-114 2026-11-07 | Which national brokerage brands real estate answers name, and how that differs by engine |
 | 12 | city-economy | dropped 2026-11-06: counting named businesses needs `competitors_mentioned` (unreliable) or bold markup, and google_ai answers carry no bold at all (0.0 per answer), so no count works across engines | Which city-specific questions produced the most and fewest named businesses |
-| 13 | dates | ready | How often answers mention a year or "as of", a sign of how current they claim to be |
+| 13 | dates | published bg-115 2026-11-08 | How often answers mention a year or "as of", a sign of how current they claim to be |
 | 14 | answer-length | dropped 2026-11-06: stored text is capped (chatgpt and google_ai at 10,000 characters, google_ai median 9,821; claude at about 3,800), so length measures the cap, not the answer; the list-length side needed topic 2, also dropped | Answer length by engine, and whether longer answers name more firms |
 | 15 | bilingual-followup | held 2026-11-06: ruling owed by Constantin. 31 of 63 English questions were answered in the local language, which touches how BG-027 to BG-034 read; see the brief | A bilingual angle not covered by BG-027 to BG-034; read those first, drop if covered |
 | 16 | london-vs-dublin | ready (pre-checked 2026-11-06, banking and software measured, law and advice still to read by hand) | London and Dublin were asked the same 8 questions: where the engines named the same companies and where they did not |

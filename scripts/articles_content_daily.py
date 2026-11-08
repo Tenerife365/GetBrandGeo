@@ -1079,3 +1079,109 @@ ARTICLES_DAILY.append(dict(
     <p>Then check what an engine can read about you. Your firm name, years in the market, the neighborhoods you work and how many homes you sold are the facts these answers quote beside a name. This study cannot say that publishing them changes the list. It shows how often the national names are there.</p>
   </div>""",
 ))
+
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-115", bid="BG-115", date="2026-11-08", date_label="November 8, 2026", read=6,
+    tags=["Original Research", "US Cities", "Engine Behavior"],
+    title="Which Year AI Engines Say Their Local Recommendations Are For",
+    h1="Which <em>Year</em> AI Engines Say Their Local Recommendations Are For",
+    h1_plain="Which Year AI Engines Say Their Local Recommendations Are For",
+    subtitle="We read 585 AI answers about local firms, collected in July 2026. Half carried a year. When Claude put a year on its list, it was 2025 in 19 of 20 answers. Google AI Mode said 2026.",
+    meta_desc="In 585 AI answers about local professionals collected in July 2026, 293 mentioned a year. Claude framed 20 answers by year and 19 of them said 2025. Google AI Mode framed 8, and 7 said 2026. None warned the answer could be out of date.",
+    og_desc="293 of 585 AI answers about local firms carried a year. Claude labelled 20 of its lists by year, 19 of them 2025, in July 2026. Google AI Mode labelled 8, 7 of them 2026.",
+    ld_desc="Original BrandGEO research counting how often ChatGPT, Claude, Gemini, Perplexity and Google AI Mode mention a year or say 'as of' in 585 answers about local professionals across 20 US cities, collected on July 24 and 25, 2026, and which year each engine puts on its list.",
+    keywords="ai answers out of date, chatgpt local recommendations year, claude 2025 list, how current are ai recommendations, ai search freshness local business, google ai mode as of 2026",
+    about=["AI Visibility Research", "Local Search", "Engine Behavior", "Freshness"],
+    findings=[("293 of 585", "answers mentioned a year somewhere in the text"),
+              ("19 of 20", "Claude answers that labelled their list by year named 2025, alone or as 2025 to 2026, in July 2026"),
+              ("7 of 8", "Google AI Mode answers that labelled their list by year said 2026"),
+              ("0", "answers warned that the information itself might be out of date")],
+    faq=[("How often do AI engines say which year their recommendations are for?",
+          "Rarely in so many words. Of 585 answers about local professionals in 20 US cities, 29 opened by placing the list in a year, such as 'for 2025' or 'as of 2026'. 293 mentioned a year somewhere, mostly as the edition of an award or a ranking."),
+         ("Do AI engines give out of date local recommendations?",
+          "Some label them with last year. The answers were collected on July 24 and 25, 2026. When Claude put a year on its list, it said 2025 or '2025 to 2026' in 19 of 20 answers. Google AI Mode said 2026 in 7 of 8. This study does not check whether the firms named were current."),
+         ("Do AI answers warn that the information may be outdated?",
+          "Not in this sample. None of the 585 answers said its own information might be out of date. 'As of' appeared in 11 answers."),
+         ("Does this study show why an engine picks a year?",
+          "No. It counts what the engines wrote. It does not show why an engine labelled a list with a given year, or whether the year affects which firms it names.")],
+    related=[("/bg-112.html", "BG-112", "The Facts AI Engines Attach to the Local Firms They Recommend",
+              "Award years and years in business, counted as credentials."),
+             ("/bg-111.html", "BG-111", "How Often AI Engines Tell Buyers to Check a Firm Before Hiring It",
+              "The other caveats engines give, and how often."),
+             ("/bg-107.html", "BG-107", "When an AI Engine Names No One: 15 Answers With No Firm in Them",
+              "The answers that named no firm at all.")],
+    cta_h="See which year AI engines put on your market",
+    cta_p="Run the free audit on your own domain and read what each engine says about your market today. No signup and no card.",
+    og=dict(
+        fname="og-bg-115.png",
+        kicker="BG-115 · Original Research",
+        lines=[[("Which Year Is", "w")], [("This List For?", "g")]],
+        sub=["585 answers, July 2026,",
+             "20 US cities, 5 engines."],
+        stats=[("293 of 585", "answers mentioned a year", "BrandGEO, July 2026"),
+               ("19 of 20", "Claude year labels named 2025", "alone or as 2025 to 2026"),
+               ("7 of 8", "Google AI Mode labels said 2026", "as of, for, based on"),
+               ("0", "warned it may be out of date", "of 585 answers"),],
+        footer="Year Labels in AI Answers",
+    ),
+    body="""  <p>When a buyer asks an AI engine for the best personal injury lawyer or property manager in their city, the answer often comes with a date attached: "top firms for 2025", "as of July 2026", "the 2026 Best Law Firms list". A date tells the reader how current the list claims to be. We wanted to count how often engines attach one, and which year they pick.</p>
+
+  <p><strong>293 of 585 answers (50%) mentioned a year somewhere.</strong> Most of those years belong to an award or a ranking edition. Far fewer answers put the list itself in a year, and here the engines split. The answers were collected on July 24 and 25, 2026. When Claude labelled its list with a year, it said 2025, alone or as "2025 to 2026", in 19 of 20 answers. When Google AI Mode did, it said 2026 in 7 of 8.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked six questions in each of 20 US cities: personal injury lawyers, real estate agents, property managers, immigration lawyers and two questions specific to the city. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered on July 24 and 25, 2026, and 585 usable answers came back. We searched the answer text, with links removed so years inside web addresses do not count, for the years 2010 to 2026 and for "as of".</p>
+    <p>For the year an answer puts on itself, we looked at the first 400 characters, where the heading or lead sentence sits, and read every match by hand. A year that belongs to an award edition or a source's ranking was not counted as a label. Stored Claude answers are cut at about 3,800 characters and ChatGPT and Google AI Mode answers at 10,000, so the counts of years anywhere in the text are lower bounds for those engines. The opening counts are not affected. We count what the engines wrote. We did not check whether the firms named were still current, and we cannot say why an engine chose a year.</p>
+  </div>
+
+  <h2>A year anywhere in the answer</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Any year</th><th>2026</th><th>2025</th><th>2024 or earlier</th></tr></thead>
+    <tbody>
+      <tr><td>Google AI Mode</td><td>111</td><td>85</td><td>60</td><td>29</td><td>46</td></tr>
+      <tr><td>Claude</td><td>120</td><td>84</td><td>33</td><td>61</td><td>45</td></tr>
+      <tr><td>ChatGPT</td><td>114</td><td>65</td><td>57</td><td>14</td><td>12</td></tr>
+      <tr><td>Gemini</td><td>120</td><td>30</td><td>11</td><td>10</td><td>23</td></tr>
+      <tr><td>Perplexity</td><td>120</td><td>29</td><td>16</td><td>12</td><td>9</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>An answer can carry more than one year, so the year columns do not add up to the total. Three engines carry a year in more than half their answers, and two in about a quarter. The year most often written also differs. ChatGPT and Google AI Mode lean on 2026, mostly as the edition of a list: "Best Law Firms 2026", "Chambers USA 2026". Claude names 2025 in 61 answers, nearly twice as often as 2026.</p>
+
+  <p>Two uses of a year account for most of these. A year next to an award, a ranking or a list showed up in 166 answers, and a founding year ("since 2005", "established in") in 162. BG-112 covered both as credentials, so we only count them here.</p>
+
+  <h2>The year an answer puts on itself</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers that label the list with a year</th><th>Said 2026</th><th>Said 2025 to 2026</th><th>Said 2025</th></tr></thead>
+    <tbody>
+      <tr><td>Claude</td><td>20 of 120</td><td>1</td><td>10</td><td>9</td></tr>
+      <tr><td>Google AI Mode</td><td>8 of 111</td><td>7</td><td>1</td><td>0</td></tr>
+      <tr><td>Gemini</td><td>1 of 120</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><td>ChatGPT</td><td>0 of 114</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>Perplexity</td><td>0 of 120</td><td>0</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Claude's labels look like headings: a list of property managers "for 2025", real estate agents "in 2025 to 2026", a section titled with the year in brackets. It used them most on real estate agents (8 answers) and property management (7), then personal injury (3), immigration (1) and one city question about home builders. Only one of the 20 said 2026 alone. In July 2026, a reader of 9 of those answers was handed a list labelled with the year before.</p>
+
+  <p>Google AI Mode's labels read as a timestamp instead: "as of July 2026", "based on 2026 data", "for 2026". ChatGPT and Perplexity never labelled the list itself. They put years on the evidence instead, the edition of the ranking or the year of the award they cite. That is a different signal to a reader: it says where a claim came from, not when the list was made.</p>
+
+  <h2>Hedges about freshness</h2>
+
+  <p>"As of" appeared in 11 answers: Google AI Mode 5, ChatGPT 3, Claude 3, and none from Gemini or Perplexity. None of the 585 answers warned that its own information might be out of date. One Perplexity answer declined to name agents at all because it might give outdated picks, which is one of the answers BG-107 counted. BG-111 counted the other caveats engines add, such as checking reviews and asking for a consultation; a caveat about the age of the list itself did not show up.</p>
+
+  <p>So a buyer gets a list and, at most, a year on it, and the year depends on which engine they asked. In the same two days of July, one engine labelled its lists 2025 and another labelled its lists 2026.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Ask the five engines about your own trade in your own city and note the year each one puts on its answer, and the year of every award or ranking it quotes beside your name and your competitors'. If an engine credits a competitor with this year's list and you with an edition from three years ago, that is what a buyer reads.</p>
+    <p>Then make the current facts easy to find: the edition year of each award on your site, a dated "last updated" line on your service and pricing pages, and current figures in your business profiles. This study cannot say that dated pages change which year an engine picks. It shows how often the year is there, and how much it varies.</p>
+  </div>""",
+))
