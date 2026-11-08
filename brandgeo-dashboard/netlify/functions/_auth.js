@@ -163,6 +163,54 @@ async function requireAuth(event, { adminOnly = false, clientId = null } = {}) {
 
 const PLATFORM_MONTHLY_API_BUDGET_EUR = Number(process.env.PLATFORM_MONTHLY_API_BUDGET_EUR || 12000)
 
+// ── Monthly cost_eur sum, one server-side aggregate ──
+//
+// History: the original one-shot `.select('cost_eur')` summed only the first
+// 1,000 rows (PostgREST's default cap) and read a query error as zero spend,
+// so the gate failed OPEN. The 2026-11-08 fix paged the rows instead, which
+// was exact but linear in volume (one round trip per 1,000 rows on every
+// collect call) and carried a 50 page ceiling that blocked ALL collection
+// platform-wide once a month passed 50,000 rows. Both are gone: the sum is now
+// one call to public.sum_cost_eur(p_since, p_client_id), a LANGUAGE sql
+// function executable by service_role only, from
+// db/supabase-sum-cost-eur-rpc-2026-11-08.sql. That migration MUST be applied
+// before this file deploys: without the function every call errors and this
+// gate blocks all collection, by design. One round trip, no row cap, no
+// ceiling.
+//
+// Do NOT replace this with `.select('cost_eur.sum()')`: PostgREST aggregates
+// are disabled on this project (no pgrst.db_aggregates_enabled on the
+// authenticator role), so that call errors every time, and the fail-closed
+// contract below would turn it into a total collection outage.
+//
+// clientId null or undefined means the whole platform.
+//
+// Returns { ok: true, sum } or { ok: false, reason: 'query_error', error }.
+// The caller blocks on ok: false with reason 'budget_unverifiable': a budget
+// gate that cannot read the spend must not open. A null, missing, empty or
+// non-numeric result is an error, never zero.
+async function sumCostEur(supabase, { since, clientId = null } = {}) {
+  let result
+  try {
+    result = await supabase.rpc('sum_cost_eur', { p_since: since, p_client_id: clientId ?? null })
+  } catch (e) {
+    return { ok: false, reason: 'query_error', error: e && e.message ? e.message : String(e) }
+  }
+  const { data, error } = result || {}
+  if (error) return { ok: false, reason: 'query_error', error: error.message || String(error) }
+  const numeric = typeof data === 'number' || (typeof data === 'string' && data.trim() !== '')
+  const n = numeric ? Number(data) : NaN
+  if (!Number.isFinite(n)) return { ok: false, reason: 'query_error', error: `non-numeric result: ${JSON.stringify(data)}` }
+  return { ok: true, sum: n }
+}
+
+const BUDGET_UNVERIFIABLE_MESSAGE = 'Collection is temporarily unavailable while usage is being verified. Try again shortly.'
+
+function budgetUnverifiable(scope, clientId, res) {
+  console.error(`[Auth] ${scope} spend could not be verified for client ${clientId}: ${res.reason}${res.error ? ` (${res.error})` : ''}, blocking`)
+  return { blocked: true, reason: 'budget_unverifiable', message: BUDGET_UNVERIFIABLE_MESSAGE }
+}
+
 function monthStartIso() {
   const d = new Date()
   d.setDate(1)
@@ -176,8 +224,15 @@ function monthStartIso() {
  * clientId: the CONFIRMED target client for this collection call (from the
  * request body, after the caller's own ownership check has already passed —
  * this function does not re-verify ownership, only spend/volume).
+ *
+ * options.platformSpent: optional. A caller that gates many clients in one
+ * invocation (schedule-collections) computes the platform sum ONCE with
+ * sumCostEur(supabase, { since: monthStartIso() }) and passes the number here,
+ * so the platform query is not repeated per client. Only a finite number is
+ * accepted; anything else falls back to querying, so a bad value can never
+ * open the gate.
  */
-async function checkCollectionLimits(supabase, clientId) {
+async function checkCollectionLimits(supabase, clientId, { platformSpent: suppliedPlatformSpent } = {}) {
   if (!clientId) return { blocked: false }
 
   const { data: client } = await supabase
@@ -220,13 +275,10 @@ async function checkCollectionLimits(supabase, clientId) {
 
   // ── 2. Per-client monthly EUR budget ──
   const monthStart = monthStartIso()
-  const { data: clientRows } = await supabase
-    .from('ai_results')
-    .select('cost_eur')
-    .eq('client_id', clientId)
-    .gte('checked_at', monthStart)
+  const clientSum = await sumCostEur(supabase, { since: monthStart, clientId })
+  if (!clientSum.ok) return budgetUnverifiable('client', clientId, clientSum)
 
-  const clientSpent = (clientRows || []).reduce((sum, r) => sum + (r.cost_eur || 0), 0)
+  const clientSpent = clientSum.sum
   // FAIL CLOSED ON AN UNMAPPED PLAN. Without the fallback this lookup returns
   // undefined, `clientSpent >= undefined` is false (the comparison coerces to
   // NaN), and the plan collects with NO SPEND CAP AT ALL. The only remaining
@@ -278,12 +330,14 @@ async function checkCollectionLimits(supabase, clientId) {
   }
 
   // ── 3. Platform-wide monthly EUR ceiling ──
-  const { data: platformRows } = await supabase
-    .from('ai_results')
-    .select('cost_eur')
-    .gte('checked_at', monthStart)
-
-  const platformSpent = (platformRows || []).reduce((sum, r) => sum + (r.cost_eur || 0), 0)
+  let platformSpent
+  if (typeof suppliedPlatformSpent === 'number' && Number.isFinite(suppliedPlatformSpent)) {
+    platformSpent = suppliedPlatformSpent
+  } else {
+    const platformSum = await sumCostEur(supabase, { since: monthStart, clientId: null })
+    if (!platformSum.ok) return budgetUnverifiable('platform', clientId, platformSum)
+    platformSpent = platformSum.sum
+  }
 
   if (platformSpent >= PLATFORM_MONTHLY_API_BUDGET_EUR) {
     console.error(`[Auth] PLATFORM-WIDE monthly budget hit: EUR ${platformSpent.toFixed(2)} of EUR ${PLATFORM_MONTHLY_API_BUDGET_EUR} — blocking client ${clientId}`)
@@ -297,4 +351,4 @@ async function checkCollectionLimits(supabase, clientId) {
   return { blocked: false, detail: { plan, hourlyCeiling, hourlyCount: hourlyCount || 0, clientSpent, clientBudget, platformSpent } }
 }
 
-module.exports = { requireAuth, corsHeaders, ALLOWED_ORIGINS, checkCollectionLimits }
+module.exports = { requireAuth, corsHeaders, ALLOWED_ORIGINS, checkCollectionLimits, sumCostEur, monthStartIso }

@@ -18,14 +18,18 @@
  * market_id — ISO 3166-1 alpha-2 country code (unused by the 3 fast engines here,
  *   accepted for payload symmetry with the ChatGPT endpoint).
  * client_config: { brand_aliases, brand_website, known_competitors }
- * active_engines — subset of {gemini, perplexity, meta} to run for this client.
+ * active_engines: optional NARROWING of the fast engines to run. It can only
+ *   narrow: the server computes the allowed set from the client's own plan and
+ *   engines_enabled (resolveEngines below) and intersects the body with it.
+ * force: honoured for admins only (effectiveForce below); a non-admin's force
+ *   is treated as false and the 200 body carries force_ignored: true.
  */
 
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
 const { withObservability, captureException } = require('./_observability')
-const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS } = require('./_cost')
+const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS, activeEnginesFor } = require('./_cost')
 
 // Engines this endpoint owns. Claude → collect-claude.js, ChatGPT → collect-chatgpt.js.
 // google_ai (Google AI Mode via SerpApi) is handled here too — it's a fast HTTP
@@ -37,6 +41,29 @@ const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS } = require('./_cost')
 // a page_token, which is why its ENGINE_TIMEOUT_MS in _collect.js is higher
 // than google_ai's.
 const FAST_ENGINES = ['gemini', 'perplexity', 'meta', 'google_ai', 'grok', 'ai_overview']
+
+// The engines this call may run, computed on the server. Until 2026-11-08 the
+// endpoint trusted body.active_engines and, when the body sent none, ran ALL
+// fast engines, so a free client could call google_ai or perplexity from
+// devtools. Now: the client's plan set (activeEnginesFor over the clients row,
+// the same function the worker path uses) intersected with FAST_ENGINES, then
+// intersected with the body's active_engines when it sends a non-empty array.
+// The body can only narrow, never widen. Order follows FAST_ENGINES.
+function resolveEngines(plan, enginesEnabled, requested) {
+  const planSet = new Set(activeEnginesFor(plan, enginesEnabled))
+  let allowed = FAST_ENGINES.filter(e => planSet.has(e))
+  if (Array.isArray(requested) && requested.length > 0) {
+    const req = new Set(requested)
+    allowed = allowed.filter(e => req.has(e))
+  }
+  return allowed
+}
+
+// Same rule as enqueue-collection.js effectiveForceFor: only an admin's
+// force: true runs the destructive path (delete, then recollect).
+function effectiveForce(role, force) {
+  return role === 'admin' && force === true
+}
 
 exports.handler = withObservability('collect-prompt', async (event) => {
   // Auth: verify JWT + origin (client ownership checked after body parse)
@@ -51,13 +78,38 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' } }
 
-  const { prompt_id, prompt_text, client_id, client_config, force, market_label, region_label, market_id, active_engines } = body
+  const { prompt_id, prompt_text, client_id, client_config, market_label, region_label, market_id, active_engines } = body
   if (!prompt_id || !prompt_text || !client_id || !client_config)
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
 
   // Viewers may only collect for their own client
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
     return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  }
+
+  const force = effectiveForce(auth.profile.role, body.force)
+  const forceIgnored = !!body.force && !force
+  const forceFlag = forceIgnored ? { force_ignored: true } : {}
+
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+
+  // Plan and engine overrides come from the clients row, never from the body.
+  const { data: clientRow, error: clientErr } = await supabase
+    .from('clients')
+    .select('plan, engines_enabled')
+    .eq('id', client_id)
+    .maybeSingle()
+  if (clientErr) {
+    console.error(`[${invId}] client lookup failed:`, clientErr.message)
+    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: 'Client lookup failed' }) }
+  }
+  if (!clientRow) {
+    return { statusCode: 404, headers: auth.headers, body: JSON.stringify({ error: 'Client not found' }) }
+  }
+
+  const allowed = resolveEngines(clientRow.plan, clientRow.engines_enabled, active_engines)
+  if (allowed.length === 0) {
+    return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, prompt_id, reason: 'no_engines_for_plan', ...forceFlag }) }
   }
 
   // SCALE-SPEC.md §2 — hourly ceiling + monthly EUR budget + platform-wide
@@ -68,14 +120,7 @@ exports.handler = withObservability('collect-prompt', async (event) => {
     return { statusCode: 429, headers: auth.headers, body: JSON.stringify({ error: limitCheck.message, reason: limitCheck.reason }) }
   }
 
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-  console.log(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force} user:${auth.user.id}`)
-
-  // active_engines filters which of the 3 fast engines this call should run.
-  // If not provided, run all 3 (backwards-compatible with direct API calls).
-  const allowedEngines = Array.isArray(active_engines) && active_engines.length > 0
-    ? new Set(active_engines)
-    : null   // null = all allowed
+  console.log(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} force:${force}${forceIgnored ? ' (ignored for non-admin)' : ''} engines:${allowed.join(',')} user:${auth.user.id}`)
 
   // Monthly cap (e.g. google_ai/SerpApi): if a capped engine already ran for this
   // (client, prompt) within MONTHLY_CAP_DAYS, it's excluded here — from BOTH the
@@ -101,10 +146,7 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   if (force) {
     // On force, only delete rows for the engines we're about to re-run — never a
     // capped engine that already ran this week (excluded from delete AND run).
-    const enginesForDelete = (allowedEngines
-      ? FAST_ENGINES.filter(e => allowedEngines.has(e))
-      : FAST_ENGINES.slice()
-    ).filter(e => !cappedNow(e))
+    const enginesForDelete = allowed.filter(e => !cappedNow(e))
     if (enginesForDelete.length > 0) {
       const { error: delErr } = await supabase
         .from('ai_results')
@@ -127,14 +169,13 @@ exports.handler = withObservability('collect-prompt', async (event) => {
       .neq('status', 'error')
       .gte('checked_at', monthStart.toISOString())
     const done = new Set((existing || []).map(r => r.llm))
-    toRun = FAST_ENGINES.filter(llm => {
+    toRun = allowed.filter(llm => {
       if (done.has(llm)) return false
-      if (allowedEngines && !allowedEngines.has(llm)) return false
       if (cappedNow(llm)) return false   // monthly cap (SerpApi) already ran this month
       return true
     })
     if (toRun.length === 0)
-      return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, prompt_id }) }
+      return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, prompt_id, ...forceFlag }) }
   }
 
   // Run the fast engines via the shared module. It returns exactly one row per
@@ -177,13 +218,17 @@ exports.handler = withObservability('collect-prompt', async (event) => {
     return {
       statusCode: 200,
       headers: auth.headers,
-      body: JSON.stringify({ done: false, prompt_id, reason: 'insert_error', summary, ctx_geo: ctxGeo }),
+      body: JSON.stringify({ done: false, prompt_id, reason: 'insert_error', summary, ctx_geo: ctxGeo, ...forceFlag }),
     }
   }
 
   return {
     statusCode: 200,
     headers: auth.headers,
-    body: JSON.stringify({ done: true, prompt_id, summary, ctx_geo: ctxGeo }),
+    body: JSON.stringify({ done: true, prompt_id, summary, ctx_geo: ctxGeo, ...forceFlag }),
   }
 })
+
+exports.resolveEngines = resolveEngines
+exports.effectiveForce = effectiveForce
+exports.FAST_ENGINES = FAST_ENGINES

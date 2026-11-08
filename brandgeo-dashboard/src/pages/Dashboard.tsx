@@ -23,6 +23,8 @@ import MotionCard from '../components/MotionCard'
 import Skeleton from '../components/Skeleton'
 import Collapse from '../components/Collapse'
 import { PageTitle } from '../components/Typography'
+import LoadErrorCard from '../components/LoadErrorCard'
+import { readAllById } from '../lib/keysetRead'
 import ChartTooltip from '../components/ChartTooltip'
 import SharedEmptyState from '../components/EmptyState'
 import { formatDate, formatOrdinal } from '../lib/format'
@@ -57,6 +59,9 @@ function joinEngineNames(ids: EngineId[]): string {
   if (names.length === 2) return `${names[0]} and ${names[1]}`
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
+
+// Score query row: ScoreInputRow plus the id readAllById pages on.
+type ScoreQueryRow = ScoreInputRow & { id: number }
 
 interface AIResultRow {
   id: number
@@ -155,6 +160,9 @@ function buildKpiSparklines(rows: AIResultRow[]): {
 
 export default function Dashboard() {
   const { activeClientId, activeClient, activeEngines } = useClient()
+  // clientContext rebuilds this array on every render, so effects depend on a
+  // stable string key instead of the array identity (no render loop).
+  const activeEnginesKey = activeEngines.join(',')
   const { t } = useI18n()
   const { getStartDate, timeRange, setTimeRange } = useTimeFilter()
   const { lastCompletedAt } = useCollection()
@@ -195,11 +203,23 @@ export default function Dashboard() {
   // ring vanishes and gets replaced by a first-run verdict every time their
   // last check falls outside the window (e.g. day 8 of a monthly cadence).
   const [hasAnyRows, setHasAnyRows] = useState(false)
+  // True when a read failed. Never let a failed read look like an empty account.
+  const [loadError, setLoadError] = useState(false)
+
+  // Sequence guard: overlapping loads (client switch, engine toggle, a mid-run
+  // bump while the paged score read is still in flight) must not let an older
+  // load write its data back over a newer one.
+  const loadSeqRef = useRef(0)
 
   const load = async (quiet = false) => {
+    const seq = ++loadSeqRef.current
     if (!quiet) setLoading(true)
+    // A quiet reload keeps the error banner mounted until it resolves, so a
+    // role="alert" node is not re-announced on every background bump.
+    if (!quiet) setLoadError(false)
 
     if (isDemoMode) {
+      setLoadError(false)
       const demoRows: AIResultRow[] = mockAIResults.map((r: AIResult) => {
         const p = mockPrompts.find((mp: Prompt) => mp.id === r.prompt_id)
         return {
@@ -235,40 +255,59 @@ export default function Dashboard() {
       .limit(1000)
     if (startDate) query = query.gte('checked_at', startDate.toISOString())
 
-    const [{ data, error }, { data: pData }, { data: scoreRows }] = await Promise.all([
+    const [{ data, error }, { data: pData, error: pError }, scoreRead] = await Promise.all([
       query,
       supabase.from('prompts').select('id').eq('is_active', true).eq('client_id', activeClientId),
       // Score query: deliberately all-time (no startDate) so the headline number
-      // never disagrees with AI Visibility's. Now also ordered + error-filtered +
-      // carrying checked_at/status, so buildScoreResultMap can enforce
-      // newest-non-error-wins itself rather than trusting this query's shape.
+      // never disagrees with AI Visibility's. Read through readAllById (keyset
+      // pages, same as AIVisibility.tsx) so a client with more than 1,000 rows
+      // gets the same score on both pages. Error rows are excluded here and
+      // buildScoreResultMap also skips them, then keeps the newest row per
+      // prompt and engine by checked_at, so the page order does not matter.
       // Doubles as the all-time "has this client ever been measured" signal
       // (hasAnyRows below), so no extra query is needed for that.
-      supabase.from('ai_results')
+      readAllById<ScoreQueryRow>(() => supabase.from('ai_results')
         // response_snippet is selected ONLY so buildScoreResultMap can spot the
         // `[no_ai_overview]` marker. Drop it and the exclusion silently stops
         // working: every row arrives with response_snippet undefined, the
         // predicate returns false for all of them, and the score quietly goes
         // back to counting unanswerable queries as misses.
-        .select('prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status, response_snippet')
+        .select('id, prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status, response_snippet')
         .eq('client_id', activeClientId)
-        .neq('status', 'error')
-        .order('checked_at', { ascending: false }),
+        .neq('status', 'error')),
     ])
 
-    if (!error && data) {
+    // A newer load has started: drop this stale response.
+    if (seq !== loadSeqRef.current) return
+
+    // A failed read must not look like "no data yet". On a fresh load or client
+    // switch drop what is on screen (it may belong to another client); on a
+    // quiet background reload keep the last good data and show the banner.
+    if (error || pError || scoreRead.error) {
+      if (!quiet) {
+        setRows([])
+        setStats(null)
+        setScoreData(null)
+        setHasAnyRows(false)
+        setPromptCount(0)
+      }
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+
+    setLoadError(false)
+    const scoreRows = scoreRead.rows
+    if (data) {
       const r = data as AIResultRow[]
       setRows(r)
       setStats(computeStats(r))
     }
 
     setPromptCount(pData?.length ?? 0)
-    // Only a query that answered may move this flag. A failed reload after a
-    // successful one must not flip it false and put the "Not measured yet"
-    // hero over real data that is still on screen.
-    if (scoreRows) setHasAnyRows(scoreRows.some(r => !isNoAnswerRow(r)))
+    setHasAnyRows(scoreRows.some(r => !isNoAnswerRow(r)))
 
-    if (pData && scoreRows) {
+    if (pData) {
       const scoreMap = buildScoreResultMap(scoreRows as unknown as ScoreInputRow[], activeEngines)
       setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
     }
@@ -288,7 +327,7 @@ export default function Dashboard() {
     const quiet = key === loadKeyRef.current
     loadKeyRef.current = key
     load(quiet)
-  }, [activeClientId, timeRange, lastCompletedAt])
+  }, [activeClientId, timeRange, lastCompletedAt, activeEnginesKey])
 
   // "What to do next" — reads the SAME persisted advice Recommendations.tsx
   // shows (recommendation_runs/recommendations, CLAUDE.md §14), it does not
@@ -427,6 +466,16 @@ export default function Dashboard() {
     </div>
   )
 
+  // Nothing usable on screen and the read failed: say so, never the empty state.
+  if (loadError && !stats) return (
+    <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <PageTitle>{greeting}, {brandName}</PageTitle>
+      </div>
+      <LoadErrorCard onRetry={() => load()} />
+    </div>
+  )
+
   return (
     <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-10">
@@ -438,6 +487,8 @@ export default function Dashboard() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
           <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
+
+      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => load(true)} />}
 
       {/* Zero-data first run (dashboard-visual-system.md §11 rule 1 / audit F-02,
           the single worst moment in the product per the audit's verdict): a

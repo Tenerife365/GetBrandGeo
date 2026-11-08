@@ -5,8 +5,11 @@ import { useEffect, useRef } from 'react'
 // uses this also loads on mount from its own client/filter effect, so reacting
 // to the initial value fired a second, identical query set on every visit once
 // any collection had happened in the session (verifier note, 2026-09-03).
-// `lastCompletedAt` bumps incrementally as jobs land (collectionContext.tsx),
-// so the callback must never assume a single final bump.
+// During a run `lastCompletedAt` bumps at most once every 25 seconds
+// (MID_RUN_BUMP_MIN_INTERVAL_MS in collectionContext.tsx, trailing so a change
+// is never lost), and once more immediately when the run ends. Single-prompt
+// refreshes bump at 0s, 15s and 40s. The callback must never assume a single
+// final bump.
 export function useCollectionLanded(lastCompletedAt: number, onLanded: () => void) {
   const seen = useRef(lastCompletedAt)
   const cb = useRef(onLanded)

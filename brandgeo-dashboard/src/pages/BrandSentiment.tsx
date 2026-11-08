@@ -16,7 +16,6 @@ import { motion } from 'motion/react'
 import { Smile, Meh, Frown, ChevronDown, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockAIResults, mockPrompts } from '../lib/mockData'
-import { useMarket } from '../lib/marketContext'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
 import { useCollectionLanded } from '../lib/useCollectionLanded'
@@ -31,6 +30,7 @@ import { PageTitle } from '../components/Typography'
 import ChartTooltip from '../components/ChartTooltip'
 import ChartLegend from '../components/ChartLegend'
 import SharedEmptyState from '../components/EmptyState'
+import LoadErrorCard from '../components/LoadErrorCard'
 import { formatDate } from '../lib/format'
 import type { LLMName, Sentiment } from '../types'
 
@@ -165,7 +165,6 @@ type SentimentFilter = Sentiment | 'all'
 type EngineFilter = LLMName | 'all'
 
 export default function BrandSentiment() {
-  const { primaryMarket } = useMarket()
   const { activeClientId, activeClient, activeEngines } = useClient()
   const { lastCompletedAt } = useCollection()
   const { getStartDate, timeRange } = useTimeFilter()
@@ -174,6 +173,7 @@ export default function BrandSentiment() {
 
   const [events, setEvents] = useState<SentimentEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
   const [filterSentiment, setFilterSentiment] = useState<SentimentFilter>('all')
   const [filterEngine, setFilterEngine] = useState<EngineFilter>('all')
@@ -185,6 +185,9 @@ export default function BrandSentiment() {
     // page back to the loading skeleton mid-view (same reasoning as
     // AIVisibility.tsx's load({ silent: true })).
     if (!opts.silent) setLoading(true)
+    // A silent reload keeps the banner mounted until it resolves, so the
+    // role="alert" node is not re-announced on every background bump.
+    if (!opts.silent) setLoadError(false)
 
     if (isDemoMode) {
       const demo: SentimentEvent[] = mockAIResults
@@ -211,6 +214,7 @@ export default function BrandSentiment() {
         })
         .filter(e => activeEngines.includes(e.llm))
       setEvents(demo)
+      setLoadError(false)
       setLoading(false)
       return
     }
@@ -222,7 +226,17 @@ export default function BrandSentiment() {
     const startDate = getStartDate()
     if (startDate) q = q.gte('checked_at', startDate.toISOString())
 
-    const { data } = await q.order('checked_at', { ascending: false })
+    const { data, error } = await q.order('checked_at', { ascending: false })
+
+    if (error) {
+      // Keep whatever is on screen for a silent reload; either way show the
+      // retry card instead of an empty "no data" state.
+      console.error('[BrandSentiment] load failed:', error)
+      setLoadError(true)
+      if (!opts.silent) setEvents([])
+      setLoading(false)
+      return
+    }
 
     const mapped: SentimentEvent[] = (data ?? []).map((r: any) => ({
       id: r.id,
@@ -236,6 +250,7 @@ export default function BrandSentiment() {
     })).filter(e => activeEngines.includes(e.llm))
 
     setEvents(mapped)
+    setLoadError(false)
     setLoading(false)
   }
 
@@ -247,6 +262,15 @@ export default function BrandSentiment() {
   useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading sentiment data…</div>
+
+  if (loadError && events.length === 0) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
+        <div className="mb-6"><PageTitle>Brand Sentiment</PageTitle></div>
+        <LoadErrorCard onRetry={() => load()} />
+      </div>
+    )
+  }
 
   const { total, counts, byEngine, score } = computeStats(events)
   const { label: scoreLabel, color: scoreColor } = scoreMeta(score)
@@ -267,11 +291,6 @@ export default function BrandSentiment() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-0.5">
           <PageTitle>Brand Sentiment</PageTitle>
-          {primaryMarket && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50">
-              {primaryMarket.flag} {primaryMarket.id} results
-            </span>
-          )}
         </div>
         {/* The em dash is gone (audit F4) and so is the second {brandName}: the
             old string named the brand twice, which reads badly for anything
@@ -284,6 +303,8 @@ export default function BrandSentiment() {
               {' '}mention{total === 1 ? 's' : ''} it</>}
         </p>
       </div>
+
+      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => load({ silent: true })} />}
 
       {/* Summary cards. Every card carries a border: the score card previously had
           border-brand-500/30 while the other three had none at all, so the row read

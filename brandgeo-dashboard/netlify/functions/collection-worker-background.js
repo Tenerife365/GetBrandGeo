@@ -25,6 +25,7 @@
  * the same secret run-full-audit-background.js already uses).
  */
 
+const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 const { collectEngines } = require('./_collect')
 const { withObservability, captureMessage } = require('./_observability')
@@ -33,14 +34,34 @@ const BATCH_SIZE     = 5                  // in-flight prompts per claim (SCALE-
 const TIME_BUDGET_MS = 13 * 60 * 1000     // stop before Netlify's 15-min hard limit, leave room to self-chain
 const MAX_ATTEMPTS   = 3                   // per job, before it's marked failed
 
+// FAIL CLOSED (2026-11-08), same contract as _cron_auth.js. Until then an
+// unset INTERNAL_AUDIT_KEY ACCEPTED every caller and only warned to a log, so a
+// missing env var turned this background function into a public endpoint that
+// spends LLM budget. Returns null on pass, or a response to return at once:
+//   503  INTERNAL_AUDIT_KEY unset or empty
+//   401  X-Internal-Key missing or wrong (was 403 before 2026-11-08; the only
+//        callers fire and forget and never read the status, and Netlify answers
+//        202 to the caller of a background function regardless)
 function checkInternalKey(event) {
   const configured = process.env.INTERNAL_AUDIT_KEY
   if (!configured) {
-    console.warn('[Worker] INTERNAL_AUDIT_KEY not set — accepting unauthenticated trigger. Set this env var in Netlify.')
-    return true
+    console.error('[Worker] INTERNAL_AUDIT_KEY is not set, refusing all requests')
+    return { statusCode: 503, body: JSON.stringify({ error: 'internal auth not configured' }) }
   }
-  const provided = event.headers['x-internal-key'] || event.headers['X-Internal-Key']
-  return provided === configured
+  const headers = (event && event.headers) || {}
+  const provided = headers['x-internal-key'] || headers['X-Internal-Key']
+  if (!provided) {
+    console.warn('[Worker] rejected, missing X-Internal-Key')
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) }
+  }
+  // timingSafeEqual throws on unequal lengths, so the length check comes first.
+  const a = Buffer.from(String(provided))
+  const b = Buffer.from(configured)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    console.warn('[Worker] rejected, wrong X-Internal-Key')
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) }
+  }
+  return null
 }
 
 async function processJob(supabase, job, invId) {
@@ -121,10 +142,9 @@ async function selfChain() {
 }
 
 exports.handler = withObservability('collection-worker-background', async (event) => {
-  if (!checkInternalKey(event)) {
-    console.warn('[Worker] rejected — bad or missing X-Internal-Key')
-    return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
-  }
+  // Before ANY database read or engine call.
+  const denied = checkInternalKey(event)
+  if (denied) return denied
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   const invId = Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -165,3 +185,5 @@ exports.handler = withObservability('collection-worker-background', async (event
 
   return { statusCode: 200, body: JSON.stringify({ processed: totalProcessed, batches, pending }) }
 })
+
+exports.checkInternalKey = checkInternalKey

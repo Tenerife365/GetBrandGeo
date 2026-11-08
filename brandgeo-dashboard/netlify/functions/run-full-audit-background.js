@@ -19,6 +19,7 @@
  * CLAUDE.md §10 handoff notes) before relying on FULL depth in production.
  */
 
+const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 const { analyseResponse } = require('./_analysis')
 const { classifyCompetitors } = require('./_competitor_filter')
@@ -27,21 +28,40 @@ const { computeAuditScore, buildResultMap, computeEngineStates, computeGapsAndFl
 
 const PER_CALL_TIMEOUT = 60000   // generous — background functions aren't racing a 26s wall
 
+// FAIL CLOSED (2026-11-08), same contract as _cron_auth.js. Until then an
+// unset INTERNAL_AUDIT_KEY ACCEPTED every caller and only warned to a log, so a
+// missing env var turned this background function into a public endpoint that
+// spends LLM budget. Returns null on pass, or a response to return at once:
+//   503  INTERNAL_AUDIT_KEY unset or empty
+//   401  X-Internal-Key missing or wrong (was 403 before 2026-11-08; the only
+//        callers fire and forget and never read the status, and Netlify answers
+//        202 to the caller of a background function regardless)
 function checkInternalKey(event) {
   const configured = process.env.INTERNAL_AUDIT_KEY
   if (!configured) {
-    console.warn('[FullAudit] INTERNAL_AUDIT_KEY not set — accepting unauthenticated trigger. Set this env var in Netlify.')
-    return true
+    console.error('[FullAudit] INTERNAL_AUDIT_KEY is not set, refusing all requests')
+    return { statusCode: 503, body: JSON.stringify({ error: 'internal auth not configured' }) }
   }
-  const provided = event.headers['x-internal-key'] || event.headers['X-Internal-Key']
-  return provided === configured
+  const headers = (event && event.headers) || {}
+  const provided = headers['x-internal-key'] || headers['X-Internal-Key']
+  if (!provided) {
+    console.warn('[FullAudit] rejected, missing X-Internal-Key')
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) }
+  }
+  // timingSafeEqual throws on unequal lengths, so the length check comes first.
+  const a = Buffer.from(String(provided))
+  const b = Buffer.from(configured)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    console.warn('[FullAudit] rejected, wrong X-Internal-Key')
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) }
+  }
+  return null
 }
 
 exports.handler = async (event) => {
-  if (!checkInternalKey(event)) {
-    console.warn('[FullAudit] rejected — bad or missing X-Internal-Key')
-    return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
-  }
+  // Before ANY database read or engine call.
+  const denied = checkInternalKey(event)
+  if (denied) return denied
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch { body = {} }
@@ -201,3 +221,5 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) }
   }
 }
+
+exports.checkInternalKey = checkInternalKey

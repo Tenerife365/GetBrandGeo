@@ -258,14 +258,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const dismissRunNotice = () => setDismissedRunAt(lastRunOutcome?.at ?? null)
 
   // Mobile bottom nav keeps this flat order — space-constrained icon bar, grouping doesn't apply.
-  // Nav order: AI Visibility → Brand Sentiment → Recommendations → Competitors → AI Mentions → Overview → Prompts
+  // Nav order matches the desktop sidebar: Overview → AI Visibility → Sentiment → Mentions → Competitors → Recommendations → Prompts
   const nav = [
+    { to: '/',                icon: LayoutDashboard, label: t.nav_overview        },
     { to: '/ai-visibility',   icon: Bot,             label: t.nav_aiVisibility    },
     { to: '/sentiment',       icon: Smile,           label: t.nav_sentiment       },
-    { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
-    { to: '/competitors',     icon: Users,           label: t.nav_competitors     },
     { to: '/mentions',        icon: MessageSquare,   label: t.nav_mentions        },
-    { to: '/',                icon: LayoutDashboard, label: t.nav_overview        },
+    { to: '/competitors',     icon: Users,           label: t.nav_competitors     },
+    { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
     { to: '/prompts',         icon: BookText,        label: t.nav_prompts         },
   ]
 
@@ -832,7 +832,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {!affiliateMode && (
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs text-slate-600 uppercase tracking-wider">{t.sidebar_market}</span>
+            {/* Literal string, not t.sidebar_market: that key reads "MARKET" and i18nContext.tsx is outside this change's scope. Same classes as the neighbouring labels, so CSS uppercases it. */}
+            <span className="text-xs text-slate-600 uppercase tracking-wider">Collection market</span>
             {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
                 text button so there is no padding to grow without moving the
                 MARKET header row it shares (this row is deliberately compact,
@@ -843,6 +844,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
               className="relative flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
               aria-expanded={showMarketEditor}
+              aria-label={showMarketEditor ? 'Done editing collection market' : 'Edit collection market. Used for collections you start from this browser; scheduled refreshes use the account default.'}
             >
               {showMarketEditor ? 'Done' : 'Edit'}
               <ChevronDown size={11} className={`transition-transform ${showMarketEditor ? 'rotate-180' : ''}`} />

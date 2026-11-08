@@ -10,22 +10,43 @@
 //
 // Body: { client_id, crawl_id, domain, max_pages }
 // ============================================================================
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { crawlSite } = require('./_seo_crawl');
 
+// FAIL CLOSED (2026-11-08), same contract as collection-worker-background.js
+// and _cron_auth.js. Until then an unset INTERNAL_AUDIT_KEY accepted every
+// caller. Returns null on pass, or a response to return at once:
+//   503  INTERNAL_AUDIT_KEY unset or empty
+//   401  X-Internal-Key missing or wrong
 function checkInternalKey(event) {
   const configured = process.env.INTERNAL_AUDIT_KEY;
   if (!configured) {
-    console.warn('[SeoCrawlBg] INTERNAL_AUDIT_KEY not set — accepting unauthenticated trigger. Set this env var in Netlify.');
-    return true;
+    console.error('[SeoCrawlBg] INTERNAL_AUDIT_KEY is not set, refusing all requests');
+    return { statusCode: 503, body: JSON.stringify({ error: 'internal auth not configured' }) };
   }
-  const provided = event.headers['x-internal-key'] || event.headers['X-Internal-Key'];
-  return provided === configured;
+  const headers = (event && event.headers) || {};
+  const provided = headers['x-internal-key'] || headers['X-Internal-Key'];
+  if (!provided) {
+    console.warn('[SeoCrawlBg] rejected, missing X-Internal-Key');
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) };
+  }
+  // timingSafeEqual throws on unequal lengths, so the length check comes first.
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(configured);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    console.warn('[SeoCrawlBg] rejected, wrong X-Internal-Key');
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) };
+  }
+  return null;
 }
+
+exports.checkInternalKey = checkInternalKey;
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-  if (!checkInternalKey(event)) return { statusCode: 401, body: 'Unauthorized' };
+  const denied = checkInternalKey(event);
+  if (denied) return denied;
 
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return { statusCode: 400, body: 'Invalid JSON' }; }

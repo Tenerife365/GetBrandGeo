@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { supabase, isDemoMode } from './lib/supabase'
 import { MarketProvider } from './lib/marketContext'
@@ -10,31 +10,160 @@ import { CollectionProvider } from './lib/collectionContext'
 import { TimeFilterProvider } from './lib/timeFilterContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import ResetPassword from './pages/ResetPassword'
-import Signup from './pages/Signup'
-import Welcome from './pages/Welcome'
-import Dashboard from './pages/Dashboard'
-import Mentions from './pages/Mentions'
-import Competitors from './pages/Competitors'
-import Prompts from './pages/Prompts'
-import AIVisibility from './pages/AIVisibility'
-import BrandSentiment from './pages/BrandSentiment'
-import Recommendations from './pages/Recommendations'
-import Onboard from './pages/Onboard'
-import Revenue from './pages/Revenue'
-import Prospects from './pages/Prospects'
-import Social from './pages/Social'
-import SEO from './pages/SEO'
-import Account from './pages/Account'
-import Tickets from './pages/Tickets'
-import AuditRequest from './pages/AuditRequest'
-import AuditReport from './pages/AuditReport'
-import AffiliatesAdmin from './pages/AffiliatesAdmin'
-import AffiliateLogin from './pages/affiliate/AffiliateLogin'
-import AffiliateJoin from './pages/affiliate/AffiliateJoin'
-import AffiliatePortal from './pages/affiliate/AffiliatePortal'
-import OAuthAuthorize from './pages/OAuthAuthorize'
+import RouteSkeleton from './components/RouteSkeleton'
 import { peekOauthNext } from './lib/oauthNext'
+
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Signup = lazy(() => import('./pages/Signup'))
+const Welcome = lazy(() => import('./pages/Welcome'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Mentions = lazy(() => import('./pages/Mentions'))
+const Competitors = lazy(() => import('./pages/Competitors'))
+const Prompts = lazy(() => import('./pages/Prompts'))
+const AIVisibility = lazy(() => import('./pages/AIVisibility'))
+const BrandSentiment = lazy(() => import('./pages/BrandSentiment'))
+const Recommendations = lazy(() => import('./pages/Recommendations'))
+const Onboard = lazy(() => import('./pages/Onboard'))
+const Revenue = lazy(() => import('./pages/Revenue'))
+const Prospects = lazy(() => import('./pages/Prospects'))
+const Social = lazy(() => import('./pages/Social'))
+const SEO = lazy(() => import('./pages/SEO'))
+const Account = lazy(() => import('./pages/Account'))
+const Tickets = lazy(() => import('./pages/Tickets'))
+const AuditRequest = lazy(() => import('./pages/AuditRequest'))
+const AuditReport = lazy(() => import('./pages/AuditReport'))
+const AffiliatesAdmin = lazy(() => import('./pages/AffiliatesAdmin'))
+const AffiliateLogin = lazy(() => import('./pages/affiliate/AffiliateLogin'))
+const AffiliateJoin = lazy(() => import('./pages/affiliate/AffiliateJoin'))
+const AffiliatePortal = lazy(() => import('./pages/affiliate/AffiliatePortal'))
+const OAuthAuthorize = lazy(() => import('./pages/OAuthAuthorize'))
+
+// ---------------------------------------------------------------------------
+// Stale chunk recovery (review finding R1). Every page is a lazy chunk with a
+// hashed filename. After a deploy, a tab opened on the previous bundle asks for
+// a chunk that no longer exists: the SPA fallback answers with index.html (or a
+// 404), the dynamic import rejects, React.lazy throws on render, and without a
+// boundary React 18 unmounts the whole root. Suspense does not catch rejected
+// imports. So: catch it, reload ONCE (guarded by a sessionStorage flag so it can
+// never loop), and otherwise show a card with a Reload button.
+// ---------------------------------------------------------------------------
+const CHUNK_RELOAD_FLAG = 'bg_chunk_reload'
+const CHUNK_ERROR_RE = /dynamically imported module|Importing a module script failed|Failed to fetch|ChunkLoadError|error loading dynamically imported/i
+
+function isChunkLoadError(err: unknown): boolean {
+  const msg = err instanceof Error ? `${err.name} ${err.message}` : String(err ?? '')
+  return CHUNK_ERROR_RE.test(msg)
+}
+
+// Reloads the page once per stale-tab event. Returns true when a reload was
+// started, false when one was already tried (or storage is unavailable, in
+// which case we refuse to reload rather than risk a loop).
+function reloadOnce(): boolean {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_FLAG)) return false
+    sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(Date.now()))
+  } catch {
+    return false
+  }
+  window.location.reload()
+  return true
+}
+
+function clearReloadFlag() {
+  try { sessionStorage.removeItem(CHUNK_RELOAD_FLAG) } catch { /* storage blocked: nothing to clear */ }
+}
+
+// Vite fires this when a preload (dependency chunk or CSS) fails. Reload once;
+// if that was already tried, let the error propagate to the boundary below.
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    if (reloadOnce()) e.preventDefault()
+  })
+}
+
+interface BoundaryProps {
+  children: React.ReactNode
+  /** Inline card inside the layout (sidebar survives) instead of a full page. */
+  compact?: boolean
+  /** When this value changes, a previously caught error is cleared. */
+  resetKey?: string
+}
+
+class ChunkErrorBoundary extends Component<BoundaryProps, { error: unknown | null }> {
+  state: { error: unknown | null } = { error: null }
+  private clearTimer: number | undefined
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error }
+  }
+
+  componentDidCatch(error: unknown) {
+    if (isChunkLoadError(error)) reloadOnce()
+  }
+
+  componentDidMount() {
+    // A page that has stayed up for a few seconds without a chunk failure
+    // counts as a successful load: re-arm the one-shot reload for the next deploy.
+    this.clearTimer = window.setTimeout(clearReloadFlag, 5000)
+  }
+
+  componentDidUpdate(prev: BoundaryProps) {
+    if (this.state.error !== null && prev.resetKey !== this.props.resetKey) {
+      this.setState({ error: null })
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.clearTimer !== undefined) window.clearTimeout(this.clearTimer)
+  }
+
+  render() {
+    const { error } = this.state
+    if (error === null) return this.props.children
+    const stale = isChunkLoadError(error)
+    return (
+      <div
+        role="alert"
+        className={this.props.compact ? 'w-full p-4 md:p-6' : 'min-h-screen flex items-center justify-center p-6 bg-dark-900'}
+      >
+        <div className="max-w-md mx-auto rounded-xl border border-dark-700 bg-dark-800 p-6 text-center space-y-3">
+          <h2 className="text-lg font-semibold text-white">
+            {stale ? 'A new version is available' : 'This page hit a problem'}
+          </h2>
+          <p className="text-sm text-slate-300">
+            {stale
+              ? 'BrandGEO was updated while this tab was open. Reload to continue.'
+              : 'Reload the page to try again. If it keeps happening, contact support.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    )
+  }
+}
+
+// Boundary that resets when the route changes, so a failed page does not keep
+// the error card after the user navigates elsewhere. Must render inside the router.
+function RouteBoundary({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
+  const { pathname } = useLocation()
+  return <ChunkErrorBoundary compact={compact} resetKey={pathname}>{children}</ChunkErrorBoundary>
+}
+
+// Per-route wrapper used inside Layout: the sidebar and providers survive a
+// failed chunk, only the page area shows the card.
+function RouteView({ children }: { children: React.ReactNode }) {
+  return (
+    <RouteBoundary compact>
+      <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
+    </RouteBoundary>
+  )
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -136,6 +265,7 @@ export default function App() {
           <CollectionProvider>
           <TimeFilterProvider>
           <BrowserRouter>
+            <RouteBoundary><Suspense fallback={<RouteSkeleton />}>
             <Routes>
               <Route path="/login" element={<DemoLoginInterceptor />} />
               <Route path="/signup" element={<Signup />} />
@@ -159,27 +289,28 @@ export default function App() {
               {/* Public sample partner dashboard (made-up data, no login, read only) */}
               <Route path="/affiliate/demo" element={<AffiliatePortal sample />} />
               <Route path="/affiliate" element={<AffiliateRoute><AffiliatePortal /></AffiliateRoute>} />
-              <Route path="/" element={<PrivateRoute><OnboardGate><Layout><Dashboard /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/mentions" element={<PrivateRoute><OnboardGate><Layout><Mentions /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/competitors" element={<PrivateRoute><OnboardGate><Layout><Competitors /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/prompts" element={<PrivateRoute><OnboardGate><Layout><Prompts /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/ai-visibility" element={<PrivateRoute><OnboardGate><Layout><AIVisibility /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/sentiment" element={<PrivateRoute><OnboardGate><Layout><BrandSentiment /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/recommendations" element={<PrivateRoute><OnboardGate><Layout><Recommendations /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/onboard" element={<PrivateRoute><OnboardGate><Layout><Onboard /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/social" element={<PrivateRoute><OnboardGate><Layout><Social /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><SEO /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><Revenue /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/prospects" element={<PrivateRoute><OnboardGate><Layout><Prospects /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/" element={<PrivateRoute><OnboardGate><Layout><RouteView><Dashboard /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/mentions" element={<PrivateRoute><OnboardGate><Layout><RouteView><Mentions /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/competitors" element={<PrivateRoute><OnboardGate><Layout><RouteView><Competitors /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/prompts" element={<PrivateRoute><OnboardGate><Layout><RouteView><Prompts /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/ai-visibility" element={<PrivateRoute><OnboardGate><Layout><RouteView><AIVisibility /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/sentiment" element={<PrivateRoute><OnboardGate><Layout><RouteView><BrandSentiment /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/recommendations" element={<PrivateRoute><OnboardGate><Layout><RouteView><Recommendations /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/onboard" element={<PrivateRoute><OnboardGate><Layout><RouteView><Onboard /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/social" element={<PrivateRoute><OnboardGate><Layout><RouteView><Social /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><RouteView><SEO /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><RouteView><Revenue /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/prospects" element={<PrivateRoute><OnboardGate><Layout><RouteView><Prospects /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/affiliates/preview/:affiliateId" element={<PrivateRoute><OnboardGate><AffiliatePreviewRoute /></OnboardGate></PrivateRoute>} />
-              <Route path="/affiliates" element={<PrivateRoute><OnboardGate><Layout><AffiliatesAdmin /></Layout></OnboardGate></PrivateRoute>} />
-              <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><Account /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/affiliates" element={<PrivateRoute><OnboardGate><Layout><RouteView><AffiliatesAdmin /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><RouteView><Account /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               {/* One route, two views. Admins get the triage queue (customer
                   requests plus BrandGEO's own internal work); everyone else
                   gets their own requests. The split is inside Tickets.tsx. */}
-              <Route path="/tickets" element={<PrivateRoute><OnboardGate><Layout><Tickets /></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/tickets" element={<PrivateRoute><OnboardGate><Layout><RouteView><Tickets /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense></RouteBoundary>
           </BrowserRouter>
           </TimeFilterProvider>
           </CollectionProvider>

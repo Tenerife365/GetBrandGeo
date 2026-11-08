@@ -152,6 +152,11 @@ function describeCollectionBlock(block: CollectionBlockReason): { title: string;
       }
     case 'platform_budget':
       return { title: 'Paused for everyone', body: 'Collection is paused platform-wide right now. Try again later.' }
+    // budget_unverifiable (2026-11-08): _auth.js could not read this month's
+    // spend, so the gate stays shut. Its server message carries no euro figure,
+    // but this copy is fixed here like the three cases above.
+    case 'budget_unverifiable':
+      return { title: 'Temporarily unavailable', body: 'We could not confirm your collection allowance just now. Try again in a few minutes.' }
     case 'no active prompts':
       return {
         title: 'Nothing to collect',

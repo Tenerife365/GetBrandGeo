@@ -9,15 +9,27 @@ const Stripe = require('stripe')
 const { createClient } = require('@supabase/supabase-js')
 
 exports.handler = async (event) => {
+  // A CORS preflight goes to requireAuth, which answers it (204) before any
+  // token check. Everything else must be a POST.
+  if (event.httpMethod === 'OPTIONS') {
+    const pre = await requireAuth(event)
+    return pre.response
+  }
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' })
 
-  const auth = await requireAuth(event)
-  if (auth && auth.response) return auth.response
-
+  // The body is parsed BEFORE auth so the target client is known when
+  // requireAuth runs. Until 2026-11-08 requireAuth ran with no clientId and
+  // the service key then read body.client_id, so any signed-in viewer could
+  // read any client's subscription status (IDOR). Passing clientId makes
+  // _auth.js answer 403 "Forbidden: client mismatch" to a non-admin whose
+  // profile.client_id differs; admins may read any client.
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return json(400, { error: 'Bad JSON' }) }
-  const clientId = body.client_id
+  const clientId = body && typeof body === 'object' ? body.client_id : null
   if (!clientId) return json(400, { error: 'client_id required' })
+
+  const auth = await requireAuth(event, { clientId })
+  if (auth && auth.response) return auth.response
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   const { data: client } = await supabase

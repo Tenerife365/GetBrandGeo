@@ -34,6 +34,7 @@ import { useChartTheme } from '../lib/chartTheme'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import SharedEmptyState from '../components/EmptyState'
 import Skeleton from '../components/Skeleton'
+import LoadErrorCard from '../components/LoadErrorCard'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -658,6 +659,8 @@ export default function Recommendations() {
   const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
   const [recs, setRecs]       = useState<Rec[]>([])
   const [loading, setLoading] = useState(true)
+  // True when a read failed. A failed read must never look like "no data yet".
+  const [loadError, setLoadError] = useState(false)
 
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError]     = useState<string | null>(null)
@@ -673,8 +676,9 @@ export default function Recommendations() {
   const [rawPrompts, setRawPrompts] = useState<any[]>([])
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const loadHistory = async () => {
-    const { data: runRows } = await supabase
+  // Returns false when a read failed, so load() can flag it. Other callers ignore it.
+  const loadHistory = async (): Promise<boolean> => {
+    const { data: runRows, error: runError } = await supabase
       .from('recommendation_runs')
       .select('id, generated_at, model, rec_count')
       .eq('client_id', activeClientId)
@@ -684,15 +688,18 @@ export default function Recommendations() {
     const runIds = (runRows ?? []).map(r => r.id)
     let itemRows: StoredRec[] = []
     if (runIds.length > 0) {
-      const { data } = await supabase
+      const { data, error: itemError } = await supabase
         .from('recommendations')
         .select('id, run_id, position, title, insight, action, engines, priority, status, actioned_at, notes')
         .in('run_id', runIds)
         .order('position', { ascending: true })
+      if (itemError) return false
       itemRows = (data ?? []) as StoredRec[]
     }
+    if (runError) return false
     setRuns((runRows ?? []) as StoredRun[])
     setStoredRecs(itemRows)
+    return true
   }
 
   const load = async (opts: { silent?: boolean } = {}) => {
@@ -700,8 +707,11 @@ export default function Recommendations() {
     // page open or an explicit Refresh click. Data is already on screen, so
     // this must never bounce the page back to the full-page skeleton.
     if (!opts.silent) setLoading(true)
+    // A silent reload keeps the banner mounted until it resolves, so the
+    // role="alert" node is not re-announced on every background bump.
+    if (!opts.silent) setLoadError(false)
 
-    const [{ data: okResults }, { data: errRows }, { data: prompts }] = await Promise.all([
+    const [{ data: okResults, error: okError }, { data: errRows, error: errError }, { data: prompts, error: promptError }] = await Promise.all([
       // status='error' rows are API failures (quota, auth, network). They are NOT
       // non-mentions and must never reach a stat or the model. CLAUDE.md §4.8.
       supabase
@@ -722,6 +732,24 @@ export default function Recommendations() {
         .eq('is_active', true),
     ])
 
+    // A failed read must not render as "Not measured yet". On a fresh load or a
+    // client switch drop what is on screen (it may belong to another client);
+    // on a silent background reload keep the last good data and show the banner.
+    if (okError || errError || promptError) {
+      if (!opts.silent) {
+        setStats(null)
+        setRecs([])
+        setEngineErrors([])
+        setRawOk([])
+        setRawPrompts([])
+        setRuns([])
+        setStoredRecs([])
+      }
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+
     // Only surface engines that produced errors AND no usable rows — a partial failure
     // is already reflected correctly in the stats.
     const okEngines = new Set((okResults ?? []).map(r => r.llm))
@@ -738,7 +766,17 @@ export default function Recommendations() {
     setStats(computed)
     setRecs(generateRecs(computed))
 
-    await loadHistory()
+    const historyOk = await loadHistory()
+    if (!historyOk) {
+      // A fresh load or client switch must never keep another client's saved
+      // history on screen (its status buttons would write to that client's
+      // rows). A silent same-client reload keeps its last good history.
+      if (!opts.silent) {
+        setRuns([])
+        setStoredRecs([])
+      }
+    }
+    setLoadError(!historyOk)
     setLoading(false)
   }
 
@@ -887,7 +925,7 @@ export default function Recommendations() {
           </div>
           {loading ? (
             <Skeleton className="h-5 w-[26rem] max-w-full motion-reduce:animate-none" />
-          ) : (stats?.totalChecks ?? 0) === 0 ? (
+          ) : loadError && !stats ? null : (stats?.totalChecks ?? 0) === 0 ? (
             <p className="text-sm text-slate-400">No responses measured yet.</p>
           ) : (
             <p className="text-sm text-slate-400">
@@ -933,7 +971,14 @@ export default function Recommendations() {
         </div>
       )}
 
-      {loading ? null : (stats?.totalChecks ?? 0) === 0 ? (
+      {!loading && loadError && (
+        <LoadErrorCard
+          message={stats ? "Couldn't refresh these results. What you see may be out of date." : undefined}
+          onRetry={() => load(stats ? { silent: true } : {})}
+        />
+      )}
+
+      {loading ? null : loadError && !stats ? null : (stats?.totalChecks ?? 0) === 0 ? (
         <SharedEmptyState
           icon={Target}
           title="Not measured yet"

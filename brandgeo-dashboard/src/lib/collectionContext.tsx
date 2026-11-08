@@ -13,7 +13,7 @@
  *                         directly — a fast, immediate, single-prompt path.
  */
 
-import { createContext, useContext, useRef, useState, useCallback } from 'react'
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react'
 import { supabase } from './supabase'
 import type { MarketSelection } from './marketContext'
 import type { EngineId } from './planConfig'
@@ -106,6 +106,11 @@ const CollectionContext = createContext<CollectionCtx>({
 })
 
 const POLL_INTERVAL_MS = 4000
+// While a run is in progress, lastCompletedAt (the reload signal every page
+// watches through useCollectionLanded) moves at most once per this window.
+// A change inside the window is delivered at its end (trailing), never lost.
+// The end of a run flushes immediately and cancels any pending trailing bump.
+const MID_RUN_BUMP_MIN_INTERVAL_MS = 25000
 
 export type RunOutcome = {
   outcome: 'completed' | 'stopped' | 'blocked'
@@ -132,6 +137,37 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   // landed can resolve after the next run has already reset the abort flag;
   // the flag alone cannot tell that tick apart, the sequence number can.
   const runSeqRef = useRef(0)
+  // Mid-run throttle state: when lastCompletedAt last moved, and the pending
+  // trailing bump, if any.
+  const lastBumpAtRef = useRef(0)
+  const trailingBumpRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cancelTrailingBump = useCallback(() => {
+    if (trailingBumpRef.current) { clearTimeout(trailingBumpRef.current); trailingBumpRef.current = null }
+  }, [])
+
+  // Immediate bump. Cancels a pending trailing one so a stale reload cannot
+  // follow the final one.
+  const bumpNow = useCallback(() => {
+    cancelTrailingBump()
+    lastBumpAtRef.current = Date.now()
+    setLastCompletedAt(lastBumpAtRef.current)
+  }, [cancelTrailingBump])
+
+  // Mid-run bump: leading when the window is open, otherwise one trailing
+  // bump at the end of the window (further changes inside it coalesce).
+  const bumpThrottled = useCallback(() => {
+    if (trailingBumpRef.current) return
+    const wait = MID_RUN_BUMP_MIN_INTERVAL_MS - (Date.now() - lastBumpAtRef.current)
+    if (wait <= 0) { bumpNow(); return }
+    trailingBumpRef.current = setTimeout(() => {
+      trailingBumpRef.current = null
+      bumpNow()
+    }, wait)
+  }, [bumpNow])
+
+  // Provider unmount: no timer may outlive it.
+  useEffect(() => () => { cancelTrailingBump() }, [cancelTrailingBump])
 
   // Stops the LOCAL poll / progress UI. It does NOT stop the server-side worker —
   // jobs already enqueued keep running (the whole point: the tab is just a
@@ -208,13 +244,14 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           nextAvailableAt: resp?.next_available_at,
         }
         setLastBlockReason(blockReason)
-        setLastCompletedAt(Date.now())
+        bumpNow()
         outcome = { outcome: 'blocked', done: 0, total: 0, failed: 0, clientId }
         return { blocked: true, blockReason }
       }
 
       setLastBlockReason(null)
 
+      lastBumpAtRef.current = 0   // a new run's first change may bump at once
       const runId = resp.run_id as number
       const total = (resp.total_jobs as number) ?? 0
       console.log(`[Collection] run ${runId} enqueued, ${total} jobs. Worker is running server-side; you can close this tab.`)
@@ -248,7 +285,7 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
           setProgress({ done, total, clientId, clientName })
           if (done !== prevDone) {
             prevDone = done
-            setLastCompletedAt(Date.now())
+            bumpThrottled()
           }
           if (total > 0 && done >= total) { resolve(); return }
           pollRef.current = setTimeout(tick, POLL_INTERVAL_MS)
@@ -284,9 +321,9 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       setLastRunOutcome(outcome ? { ...outcome, at: Date.now() } : null)
       setCollecting(false)
       setProgress(null)
-      setLastCompletedAt(Date.now())
+      bumpNow()   // run over (completed, stopped, failed or refused): flush now, drop any trailing bump
     }
-  }, [])
+  }, [bumpNow, bumpThrottled])
 
   // Manual "Refresh this prompt" — unchanged: hits the 3 HTTP endpoints directly
   // for an immediate single-prompt re-collect (force). These endpoints are thin
