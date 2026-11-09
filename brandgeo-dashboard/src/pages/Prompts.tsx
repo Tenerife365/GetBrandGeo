@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X, Bot, Send, PlusCircle, Lock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Archive, Check, X, Bot, Send, PlusCircle, Lock } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
@@ -7,6 +7,7 @@ import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
 import { PageTitle, SectionHeading } from '../components/Typography'
+import { removalMode, removalVerb, removalConfirm, removalFailure, removalWrite } from '../lib/promptRemoval'
 import { PLAN_PROMPTS, PLAN_LABELS, type Plan } from '../lib/planConfig'
 
 // Category is a grouping, not an alert — one quiet neutral chip everywhere, and
@@ -189,6 +190,7 @@ export default function Prompts() {
   // through too). isAdmin is false while an admin is viewing-as-customer, which
   // is correct: that mode exists to show what the customer sees.
   const capBlocks = atCap && !isAdmin
+  const verb = removalVerb(removalMode(isAdmin))
   const remaining = cap === null ? Infinity : Math.max(0, cap - used)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, suggestions])
 
@@ -231,12 +233,19 @@ export default function Prompts() {
     // always succeeds and always takes the collected history with it. The
     // confirm says that plainly rather than the milder, and wrong, claim
     // that a constraint could stop it.
-    if (!window.confirm('Delete this prompt? Every AI answer already collected for it is deleted too, and that cannot be undone.')) return
+    // A viewer never hard deletes (the DELETE policy is admin only, so it
+    // would silently affect 0 rows): the same control archives instead, an
+    // update of is_active, and the list drops it the way load() already does.
+    const mode = removalMode(isAdmin)
+    if (!window.confirm(removalConfirm(mode))) return
     if (!isDemoMode) {
-      const { error } = await supabase.from('prompts').delete().eq('id', id)
+      const write = removalWrite(mode)
+      const { error } = write.op === 'delete'
+        ? await supabase.from('prompts').delete().eq('id', id)
+        : await supabase.from('prompts').update(write.patch).eq('id', id)
       if (error) {
-        console.error('[Prompts] deletePrompt failed', error)
-        showNotice('Could not delete that prompt. Try again, and if it keeps failing, contact support.')
+        console.error('[Prompts] removePrompt failed', error)
+        showNotice(removalFailure(mode))
         return
       }
     }
@@ -251,7 +260,7 @@ export default function Prompts() {
     // enforce_prompt_cap() trigger, which is why the insert error below is
     // handled rather than assumed away.
     if (capBlocks) {
-      showNotice(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`)
+      showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`)
       return false
     }
     // Category is auto-assigned from the prompt text (general taxonomy), not
@@ -278,8 +287,8 @@ export default function Prompts() {
           !error.message.includes('prompt_cap_reached')
             ? `Could not add prompt: ${error.message}`
             : cap != null
-              ? `Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`
-              : 'You have reached your plan\'s active prompt limit. Delete one to add another, or upgrade.'
+              ? `Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`
+              : 'You have reached your plan\'s active prompt limit. ' + verb + ' one to add another, or upgrade.'
         )
         setSaving(false)
         return false
@@ -428,7 +437,7 @@ export default function Prompts() {
             {t.pr_aiDiscover}
           </button>
           <button
-            onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. Delete one to add another, or upgrade.`) : setShowAdd(true))}
+            onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`) : setShowAdd(true))}
             aria-disabled={capBlocks}
             title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
             className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors border ${
@@ -455,7 +464,7 @@ export default function Prompts() {
           {capBlocks ? (
             <>
               <strong>You have used all {cap} prompts on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}.</strong>{' '}
-              Delete a prompt you no longer track to add a new one, or upgrade for more.
+              {verb} a prompt you no longer track to add a new one, or upgrade for more.
             </>
           ) : (
             <>
@@ -686,7 +695,7 @@ export default function Prompts() {
                          so a bare focus-within: would lose to md:opacity-0). */}
                   <div className="flex gap-5 flex-shrink-0 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
                     <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} aria-label={`Delete prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Trash2 size={14} /></button>
+                    <button onClick={() => deletePrompt(p.id)} aria-label={`${verb} prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors after:absolute after:content-[''] after:[inset:-9px]">{isAdmin ? <Trash2 size={14} /> : <Archive size={14} />}</button>
                   </div>
                 </>
               )}

@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, TrendingUp, Award, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
 import { useCollectionLanded } from '../lib/useCollectionLanded'
-import { mockAIResults, mockPrompts } from '../lib/mockData'
+import { useResults } from '../lib/resultsContext'
+import { readResultHistory } from '../lib/historyRead'
+import { formatAvgPosition } from '../lib/metrics'
+import { buildMentionsView, MENTIONS_HISTORY_COLUMNS, type MentionsHistoryRow } from '../lib/views/mentionsView'
+import { mockAIResults } from '../lib/mockData'
+import RouteSkeleton from '../components/RouteSkeleton'
+import Skeleton from '../components/Skeleton'
+import { ownRows, nextSeq, isStale } from '../lib/resultsGuards'
+import LoadErrorCard from '../components/LoadErrorCard'
 import { SentimentDot } from '../components/ScoreBadge'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import EngineChip from '../components/EngineChip'
@@ -14,33 +22,6 @@ import { formatDate } from '../lib/format'
 import type { LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { promptCategoryLabel } from '../lib/promptCategories'
-
-interface MentionEvent {
-  id: number
-  prompt_id: number
-  promptText: string
-  category: PromptCategory
-  llm: LLMName
-  brand_position: number | null
-  sentiment: string
-  response_snippet: string | null
-  checked_at: string
-}
-
-// Shape of the raw Supabase row for the joined ai_results + prompts select below.
-// `engine` is a legacy/fallback field some older rows may carry; current schema
-// column is `llm` (see CLAUDE.md §3) — preserved as-is, just typed instead of `any`.
-interface RawMentionRow {
-  id: number
-  prompt_id: number
-  llm: LLMName
-  engine?: LLMName
-  brand_position: number | null
-  sentiment: string
-  response_snippet: string | null
-  checked_at: string
-  prompts?: { text: string; category: string; position: number } | null
-}
 
 // Engine identity is now ENGINE_META + EngineChip (dashboard-visual-system.md
 // §8.4) — this file used to carry its OWN independent copy of engine label +
@@ -78,97 +59,90 @@ type FilterCat = PromptCategory | 'all'
 
 export default function Mentions() {
   const { t } = useI18n()
-  const { activeClientId, activeClient } = useClient()
+  const { activeClientId, activeClient, activeEngines } = useClient()
   const { lastCompletedAt } = useCollection()
+  const { snapshot, status, loadError, reload } = useResults()
   const brandName = activeClient?.name ?? 'your brand'
-  const [mentions, setMentions] = useState<MentionEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [historyState, setHistoryState] = useState<{ rows: MentionsHistoryRow[] | null; clientId: number }>({ rows: null, clientId: activeClientId })
+  // Rows of another client are never shown, not even for one render.
+  const history = ownRows(historyState, activeClientId, null)
+  const historySeq = useRef(0)
+  const [historyFailed, setHistoryFailed] = useState(false)
   const [filterLLM, setFilterLLM] = useState<FilterLLM>('all')
   const [filterCat, setFilterCat] = useState<FilterCat>('all')
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  const load = async (opts: { silent?: boolean } = {}) => {
-    // Silent: a background reload triggered by lastCompletedAt, not a fresh
-    // page open. Data is already on screen, so this must never bounce the
-    // page back to the full-page loading state.
-    if (!opts.silent) setLoading(true)
-
+  // The feed is every mention on record, so it reads paged history (all time).
+  // A quiet reload keeps the rows on screen; only a client change clears them.
+  const loadHistory = useCallback(async (quiet: boolean) => {
+    const mine = nextSeq(historySeq)
+    if (!quiet) {
+      setHistoryState(prev => (prev.clientId === activeClientId ? prev : { rows: null, clientId: activeClientId }))
+      setHistoryFailed(false)
+    }
     if (isDemoMode) {
-      const events: MentionEvent[] = mockAIResults
+      setHistoryState({ clientId: activeClientId, rows: mockAIResults
         .filter(r => r.brand_mentioned)
-        .map(r => {
-          const prompt = mockPrompts.find(p => p.id === r.prompt_id)
-          return {
-            id: r.id,
-            prompt_id: r.prompt_id,
-            promptText: prompt?.text ?? '',
-            category: (prompt?.category ?? 'general') as PromptCategory,
-            llm: r.llm as LLMName,
-            brand_position: r.brand_position,
-            sentiment: r.sentiment,
-            response_snippet: r.response_snippet,
-            checked_at: r.checked_at,
-          }
-        })
-        .sort((a, b) => (a.brand_position ?? 99) - (b.brand_position ?? 99))
-      setMentions(events)
-      setLoading(false)
+        .map(r => ({
+          id: r.id, prompt_id: r.prompt_id, llm: r.llm, brand_position: r.brand_position,
+          sentiment: r.sentiment, response_snippet: r.response_snippet, checked_at: r.checked_at,
+        }))
+        .sort((a, b) => (a.brand_position ?? 99) - (b.brand_position ?? 99)) })
       return
     }
+    const res = await readResultHistory<MentionsHistoryRow>(supabase, {
+      clientId: activeClientId, sinceIso: null, columns: MENTIONS_HISTORY_COLUMNS, mentionedOnly: true,
+    })
+    if (isStale(historySeq, mine)) return
+    if (res.error) { setHistoryFailed(true); return }
+    setHistoryFailed(false)
+    setHistoryState({ rows: res.rows, clientId: activeClientId })
+  }, [activeClientId])
 
-    const { data } = await supabase
-      .from('ai_results')
-      .select('*, prompts(text, category, position)')
-      .eq('brand_mentioned', true)
-      .eq('client_id', activeClientId)
-      .order('checked_at', { ascending: false })
+  useEffect(() => { void loadHistory(false) }, [loadHistory])
 
-    if (data) {
-      setMentions((data as RawMentionRow[]).map(r => ({
-        id: r.id,
-        prompt_id: r.prompt_id,
-        promptText: r.prompts?.text ?? '',
-        category: (r.prompts?.category ?? 'general') as PromptCategory,
-        llm: r.engine ?? r.llm,
-        brand_position: r.brand_position,
-        sentiment: r.sentiment,
-        response_snippet: r.response_snippet,
-        checked_at: r.checked_at,
-      })))
+  // The snapshot reloads itself on lastCompletedAt (resultsContext); the paged
+  // feed does not, so re-read it quietly.
+  useCollectionLanded(lastCompletedAt, () => { void loadHistory(true) })
+
+  const view = useMemo(() => snapshot
+    ? buildMentionsView({
+        rows: snapshot.rows,
+        activePrompts: snapshot.activePrompts,
+        prompts: snapshot.prompts,
+        activeEngines,
+        history: history ?? [],
+      })
+    : null, [snapshot, activeEngines, history])
+
+  if (!snapshot || !view) {
+    if (status === 'error') {
+      return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
+          <PageTitle>{t.men_title}</PageTitle>
+          <div className="mt-4"><LoadErrorCard onRetry={() => reload()} /></div>
+        </div>
+      )
     }
-    setLoading(false)
+    return <RouteSkeleton />
   }
 
-  useEffect(() => { load() }, [activeClientId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reload quietly every time a collection run completes -- lastCompletedAt
-  // bumps incrementally as jobs land (collectionContext.tsx), so this must
-  // never assume a single final bump.
-  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
-
+  const mentions = view.feed
   const filtered = mentions.filter(m => {
     if (filterLLM !== 'all' && m.llm !== filterLLM) return false
     if (filterCat !== 'all' && m.category !== filterCat) return false
     return true
   })
 
-  const totalMentions = mentions.length
-  const noMentions = totalMentions === 0
-  const positionedMentions = mentions.filter(m => m.brand_position)
-  // null, not 0, when nothing is ranked yet, so the card below can tell "no
-  // positioned mention exists" apart from a real average, and never has to
-  // spell the two the same way (the old fallback built the string "#-").
-  const avgPosition = positionedMentions.length
-    ? Math.round(positionedMentions.reduce((s, m) => s + (m.brand_position ?? 0), 0) / positionedMentions.length)
-    : null
-  const positiveSentiment = mentions.filter(m => m.sentiment === 'positive').length
-
-  const engineCounts = (Object.keys(ENGINE_META) as EngineId[]).map(llm => ({
-    llm: llm as LLMName,
-    count: mentions.filter(m => m.llm === llm).length,
-  })).sort((a, b) => b.count - a.count)
-
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.men_loading}</div>
+  const totalMentions = view.summary.mentions
+  // N2: until the history arrives (and has not failed) the feed is a skeleton
+  // and the All engines chip carries no count.
+  const historyLoading = history === null && !historyFailed
+  const allEnginesLabel = t.men_allEngines.replace(/\s*\(\{n\}\)/, '')
+  const noMentions = totalMentions === 0 && mentions.length === 0
+  const avgPositionLabel = formatAvgPosition(view.summary.avgPosition)
+  const positiveSentiment = view.summary.positive
+  const engineCounts = view.engineCounts
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
@@ -178,6 +152,13 @@ export default function Mentions() {
           {fmt(t.men_subtitle, { brandName })}
         </p>
       </div>
+
+      {loadError && (
+        <LoadErrorCard
+          message="These numbers may be out of date. We could not refresh them."
+          onRetry={() => reload({ quiet: true })}
+        />
+      )}
 
       <SectionHeading className="sr-only">Mention summary</SectionHeading>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -191,8 +172,8 @@ export default function Mentions() {
         <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
           <Award size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-amber-400 shrink-0'} />
           <div>
-            {avgPosition !== null ? (
-              <div className="text-2xl font-bold text-white tabular-nums">#{avgPosition}</div>
+            {avgPositionLabel !== null ? (
+              <div className="text-2xl font-bold text-white tabular-nums">{avgPositionLabel}</div>
             ) : (
               <div className="text-sm font-medium text-slate-500 mt-1.5">Not ranked yet</div>
             )}
@@ -208,6 +189,10 @@ export default function Mentions() {
         </div>
       </div>
 
+      <p className="text-xs text-slate-500 -mt-3 mb-6">
+        Latest answer per prompt and engine. The list below is every mention on record.
+      </p>
+
       <SectionHeading className="sr-only">Filter mentions</SectionHeading>
       <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setFilterLLM('all')}
@@ -217,7 +202,7 @@ export default function Mentions() {
               ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
               : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
           }`}>
-          {fmt(t.men_allEngines, { n: totalMentions })}
+          {historyLoading ? allEnginesLabel : fmt(t.men_allEngines, { n: mentions.length })}
         </button>
         {engineCounts.map(({ llm, count }) => {
           if (count === 0) return null
@@ -226,7 +211,7 @@ export default function Mentions() {
               key={llm}
               id={llm as EngineId}
               selected={filterLLM === llm}
-              onClick={() => setFilterLLM(llm === filterLLM ? 'all' : llm)}
+              onClick={() => setFilterLLM(llm === filterLLM ? 'all' : (llm as LLMName))}
             >
               {' '}({count})
             </EngineChip>
@@ -248,6 +233,14 @@ export default function Mentions() {
         ))}
       </div>
 
+      {historyFailed && (
+        <LoadErrorCard
+          message="Couldn't load the list of mentions."
+          onRetry={() => { void loadHistory(false) }}
+        />
+      )}
+
+      {historyLoading && <Skeleton className="h-[220px] w-full rounded-lg" />}
       <div className="space-y-2">
         {filtered.map(m => {
           const engineId = (ENGINE_META[m.llm as EngineId] ? m.llm : 'chatgpt') as EngineId
@@ -307,8 +300,8 @@ export default function Mentions() {
         })}
       </div>
 
-      {filtered.length === 0 && (
-        totalMentions === 0 ? (
+      {filtered.length === 0 && !historyFailed && history !== null && (
+        noMentions ? (
           <SharedEmptyState
             icon={Bot}
             title="Not measured yet"

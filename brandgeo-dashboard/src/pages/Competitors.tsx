@@ -5,33 +5,41 @@
  * Radar chart: 5 axes = 5 AI engines, showing visibility profile per entity.
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
-import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown } from 'lucide-react'
+import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown, Download } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { mockCompetitors } from '../lib/mockData'
+import { mockCompetitors, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
+import { ownRows, nextSeq, isStale } from '../lib/resultsGuards'
 import { useCollection } from '../lib/collectionContext'
 import { useCollectionLanded } from '../lib/useCollectionLanded'
-import { ENGINE_META, LIVE_ENGINES } from '../lib/planConfig'
-import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
+import { useTimeFilter } from '../lib/timeFilterContext'
+import { useResults } from '../lib/resultsContext'
+import { buildSnapshotView } from '../lib/metrics'
+import { readResultHistory } from '../lib/historyRead'
+import { downloadCsv, csvFilename } from '../lib/csv'
+import {
+  buildCompetitorsView, buildEngineGroupData, samplePromptFor, computeTrend, trendEligibleRows, buildCompetitorsCsv,
+  type TrendPeriod, type TrendRow,
+} from '../lib/views/competitorsView'
+import { ENGINE_META } from '../lib/planConfig'
+import type { CompetitorAggregate } from '../lib/competitorFilter'
 import { useChartTheme } from '../lib/chartTheme'
 import ChartTooltip from '../components/ChartTooltip'
 import ChartLegend from '../components/ChartLegend'
-import { PageTitle, SectionHeading } from '../components/Typography'
+import { PageTitle } from '../components/Typography'
 import SharedEmptyState from '../components/EmptyState'
 import LoadErrorCard from '../components/LoadErrorCard'
+import RouteSkeleton from '../components/RouteSkeleton'
+import Skeleton from '../components/Skeleton'
 import type { LLMName } from '../types'
 
 // --- Types -------------------------------------------------------------------
 
-// ENGINES is kept for display-only fallback; runtime filtering uses activeEngines from context
-// Derived, never hand-listed — see LIVE_ENGINES in planConfig.ts. The old
-// hardcoded five-engine array was already stale for grok and ai_overview.
-const ENGINES = LIVE_ENGINES as LLMName[]
 // Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
 // file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
 // ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.
@@ -41,8 +49,6 @@ const ENGINE_LABEL: Record<string, string> = Object.fromEntries(
 const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
   Object.entries(ENGINE_META).map(([id, meta]) => [id, meta.chartColor])
 )
-
-interface EngineRow { total: number; mentioned: number; positions: number[] }
 
 /**
  * The noise filter (GENERIC_TOKENS / isLikelyCompanyName / toDisplayName) and the
@@ -59,92 +65,6 @@ interface EngineRow { total: number; mentioned: number; positions: number[] }
  * second, parallel loop to rebuild them.
  */
 type CompetitorStat = CompetitorAggregate
-
-// --- Data computation --------------------------------------------------------
-
-function computeData(
-  aiResults: any[],
-  prompts: any[],
-  brandName: string,
-) {
-  const engineStats: Partial<Record<LLMName, EngineRow>> = {}
-
-  for (const row of aiResults) {
-    const llm = row.llm as LLMName
-    if (!engineStats[llm]) engineStats[llm] = { total: 0, mentioned: 0, positions: [] }
-    const es = engineStats[llm]!
-    es.total++
-    if (row.brand_mentioned) {
-      es.mentioned++
-      if (row.brand_position) es.positions.push(row.brand_position)
-    }
-  }
-
-  // Top 5 competitors — one shared implementation (lib/competitorFilter.ts).
-  // Already sorts genuinely-ranked competitors first (raw mentions only break
-  // ties) and excludes the pos:99 prose sentinel from avgPos — not re-derived here.
-  const topCompetitors: CompetitorStat[] = aggregateCompetitors(aiResults, 5)
-
-  // Brand overall stats
-  const brandMentions = Object.values(engineStats).reduce((s, e) => s + (e?.mentioned ?? 0), 0)
-  const brandPositions = Object.values(engineStats).flatMap(e => e?.positions ?? [])
-  const brandAvgPos = brandPositions.length > 0
-    ? Math.round(brandPositions.reduce((a, b) => a + b, 0) / brandPositions.length * 10) / 10
-    : null
-
-  const promptMap = new Map(prompts.map((p: any) => [p.id, p.text]))
-
-  return { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap }
-}
-
-// --- Trend computation -------------------------------------------------------
-
-type TrendPeriod = 'weekly' | 'monthly' | 'quarterly'
-
-function computeTrend(
-  aiResults: any[],
-  brandName: string,
-  topCompetitors: CompetitorStat[],
-  period: TrendPeriod,
-): Record<string, string | number>[] {
-  if (!aiResults.length) return []
-
-  const getPeriodKey = (date: Date): string => {
-    if (period === 'weekly') {
-      const d = new Date(date)
-      d.setDate(d.getDate() - d.getDay())
-      return d.toISOString().slice(0, 10)
-    } else if (period === 'monthly') {
-      return date.toISOString().slice(0, 7)
-    } else {
-      const q = Math.floor(date.getMonth() / 3) + 1
-      return `${date.getFullYear()} Q${q}`
-    }
-  }
-
-  const compNames = topCompetitors.slice(0, 4).map(c => c.name)
-  const buckets: Record<string, Record<string, number>> = {}
-
-  for (const row of aiResults) {
-    const key = getPeriodKey(new Date(row.checked_at))
-    if (!buckets[key]) {
-      buckets[key] = { [brandName]: 0 }
-      for (const n of compNames) buckets[key][n] = 0
-    }
-    if (row.brand_mentioned) buckets[key][brandName]++
-    let comps: any[] = []
-    try { comps = JSON.parse(row.competitors_mentioned || '[]') } catch {}
-    for (const c of comps) {
-      const n = typeof c === 'string' ? c : c?.name
-      const match = compNames.find(cn => cn.toLowerCase() === n?.toLowerCase())
-      if (match) buckets[key][match]++
-    }
-  }
-
-  return Object.entries(buckets)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([p, counts]) => ({ period: p, ...counts }))
-}
 
 // --- Charts ------------------------------------------------------------------
 
@@ -249,111 +169,120 @@ function buildBarData(brandName: string, brandMentions: number, topCompetitors: 
   ]
 }
 
-/** One row per active engine; columns = brand + top 3 competitors (% of prompts) */
-function buildEngineGroupData(
-  brandName: string,
-  engineStats: Partial<Record<LLMName, EngineRow>>,
-  topCompetitors: CompetitorStat[],
-  activeEngines: LLMName[],
-): Record<string, string | number>[] {
-  return activeEngines
-    .filter(e => (engineStats[e]?.total ?? 0) > 0)
-    .map(engine => {
-      const es = engineStats[engine]!
-      const row: Record<string, string | number> = { engine: ENGINE_LABEL[engine] }
-      row[brandName] = es.total > 0 ? Math.round(es.mentioned / es.total * 100) : 0
-      for (const comp of topCompetitors.slice(0, 3)) {
-        row[comp.name] = es.total > 0 ? Math.round((comp.byEngine[engine] ?? 0) / es.total * 100) : 0
-      }
-      return row
-    })
-}
-
 // --- Main component ----------------------------------------------------------
+
+const TREND_COLUMNS = 'id, prompt_id, llm, brand_mentioned, competitors_mentioned, response_snippet, checked_at'
+
+interface TrendHistoryRow extends TrendRow {
+  id: number; prompt_id: number; llm: string; response_snippet?: string | null
+}
 
 export default function Competitors() {
   const { activeClientId, activeClient, activeEngines } = useClient()
   const { lastCompletedAt } = useCollection()
+  const { getStartDate, timeRange } = useTimeFilter()
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
+  const { snapshot, status, loadError, reload } = useResults()
 
-  const [data, setData] = useState<ReturnType<typeof computeData> | null>(null)
-  const [allResults, setAllResults] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [newWebsite, setNewWebsite] = useState('')
   const [saving, setSaving] = useState(false)
-  const [manualComps, setManualComps] = useState<any[]>([])
+  // Tagged with its client: an admin switch never shows another client's manual competitors.
+  const [manualState, setManualState] = useState<{ rows: any[]; clientId: number }>({ rows: [], clientId: activeClientId })
+  const manualComps = ownRows(manualState, activeClientId, [] as any[])
+  const setManualComps = (next: any[] | ((prev: any[]) => any[])) => {
+    setManualState(s => {
+      const base = ownRows(s, activeClientId, [] as any[])
+      return { clientId: activeClientId, rows: typeof next === 'function' ? next(base) : next }
+    })
+  }
+  const [manualFailed, setManualFailed] = useState(false)
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
   // Mirrors the capError banner in Prompts.tsx: one visible notice for a
   // write that failed, shown next to the row it happened to rather than
   // discarded.
   const [competitorError, setCompetitorError] = useState<string | null>(null)
 
-  const load = async (opts: { silent?: boolean } = {}) => {
-    // Silent: a background reload triggered by lastCompletedAt, not a fresh
-    // page open. Data is already on screen, so this must never bounce the
-    // page back to the loading state mid-view.
-    if (!opts.silent) setLoading(true)
-    // A silent reload keeps the banner mounted until it resolves, so the
-    // role="alert" node is not re-announced on every background bump.
-    if (!opts.silent) setLoadError(false)
+  // Snapshot numbers: one shared population over the provider's rows.
+  const snap = useMemo(() => {
+    if (!snapshot) return null
+    const activeIds = snapshot.activePrompts.map(pr => pr.id)
+    const view = buildSnapshotView(snapshot.rows, activeIds, activeEngines)
+    return { view, cv: buildCompetitorsView(view, snapshot.activePrompts) }
+  }, [snapshot, activeEngines])
 
+  // Trend: paged, windowed history. Reads only the columns the trend needs and
+  // follows the top competitor names from the snapshot. Each reload carries its
+  // own sequence number so a slow earlier read cannot overwrite a newer one.
+  const sinceIso = useMemo(
+    () => getStartDate()?.toISOString() ?? null,
+    [timeRange], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const [trendState, setTrendState] = useState<{ rows: TrendHistoryRow[]; clientId: number }>({ rows: [], clientId: activeClientId })
+  // Rows of another client are never shown (switch race, spec 3.4).
+  const trendRowsRaw = ownRows(trendState, activeClientId, [] as TrendHistoryRow[])
+  const [trendStatus, setTrendStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const trendSeq = useRef(0)
+
+  const loadTrend = useCallback(async (quiet: boolean) => {
+    const mine = nextSeq(trendSeq)
+    if (!quiet) {
+      setTrendStatus('loading')
+      setTrendState(prev => (prev.clientId === activeClientId ? prev : { rows: [], clientId: activeClientId }))
+    }
     if (isDemoMode) {
-      setData({
-        engineStats: {},
-        topCompetitors: mockCompetitors.slice(0, 5).map((c, i) => ({
-          name: c.name, totalMentions: 8 - i * 1.5 | 0, rankedMentions: 2,
-          proseOnly: false,
-          byEngine: { chatgpt: 2, gemini: 2, claude: 1 },
-          positions: [2, 3], promptIds: [], avgPos: 2.5,
-        })),
-        brandMentions: 8, brandAvgPos: 2,
-        promptMap: new Map(),
-      })
-      setLoadError(false)
-      setLoading(false)
+      const since = sinceIso ? new Date(sinceIso).getTime() : null
+      const rows = mockAIResults
+        .filter(r => since === null || new Date(r.checked_at).getTime() >= since)
+        .map(r => ({
+          id: r.id, prompt_id: r.prompt_id, llm: r.llm as string,
+          brand_mentioned: r.brand_mentioned, competitors_mentioned: r.competitors_mentioned ?? null,
+          response_snippet: r.response_snippet ?? null,
+          checked_at: r.checked_at,
+        }))
+      if (!isStale(trendSeq, mine)) { setTrendState({ rows, clientId: activeClientId }); setTrendStatus('ready') }
       return
     }
-
-    const [
-      { data: aiResults, error: aiError },
-      { data: prompts, error: promptsError },
-      { data: manual, error: manualError },
-    ] = await Promise.all([
-      supabase.from('ai_results')
-        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, checked_at')
-        .eq('client_id', activeClientId),
-      supabase.from('prompts').select('id, text').eq('client_id', activeClientId).eq('is_active', true),
-      supabase.from('competitors').select('*').eq('client_id', activeClientId).eq('source', 'manual'),
-    ])
-
-    if (aiError || promptsError || manualError) {
-      // Never fall through to the empty "no responses" state on a failed read.
-      console.error('[Competitors] load failed:', aiError ?? promptsError ?? manualError)
-      setLoadError(true)
-      if (!opts.silent) { setData(null); setAllResults([]); setManualComps([]) }
-      setLoading(false)
+    const res = await readResultHistory<TrendHistoryRow>(supabase, {
+      clientId: activeClientId, sinceIso, columns: TREND_COLUMNS,
+    })
+    if (isStale(trendSeq, mine)) return
+    if (res.error) {
+      console.error('[Competitors] trend load failed:', res.error)
+      setTrendStatus('error')
       return
     }
+    setTrendState({ rows: res.rows, clientId: activeClientId })
+    setTrendStatus('ready')
+  }, [activeClientId, sinceIso])
 
-    // Filter to active engines only before computing
-    const filtered = (aiResults ?? []).filter(r => activeEngines.includes(r.llm))
-    setData(computeData(filtered, prompts ?? [], brandName))
-    setAllResults(filtered)
-    setManualComps(manual ?? [])
-    setLoadError(false)
-    setLoading(false)
-  }
+  useEffect(() => { void loadTrend(false) }, [loadTrend])
 
-  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Manual competitors are page-local and not part of the results snapshot.
+  const manualSeq = useRef(0)
+  const loadManual = useCallback(async () => {
+    const mine = nextSeq(manualSeq)
+    if (isDemoMode) { setManualFailed(false); return }
+    const { data: manual, error } = await supabase
+      .from('competitors').select('*').eq('client_id', activeClientId).eq('source', 'manual')
+    if (isStale(manualSeq, mine)) return
+    if (error) {
+      console.error('[Competitors] manual load failed:', error)
+      setManualFailed(true)
+      return
+    }
+    setManualState({ rows: manual ?? [], clientId: activeClientId })
+    setManualFailed(false)
+  }, [activeClientId])
+
+  useEffect(() => { void loadManual() }, [loadManual])
 
   // Reload quietly every time a collection run completes -- lastCompletedAt
   // bumps incrementally as jobs land (collectionContext.tsx), so this must
-  // never assume a single final bump.
-  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
+  // never assume a single final bump. The snapshot reloads itself in the provider.
+  useCollectionLanded(lastCompletedAt, () => { void loadTrend(true) })
 
   const addCompetitor = async () => {
     if (!newName.trim()) return
@@ -404,23 +333,50 @@ export default function Competitors() {
     setCompetitorError(null)
   }
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading competitors…</div>
-
-  if (!data) {
-    return (
-      <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
-        <div className="mb-6"><PageTitle>Competitors</PageTitle></div>
-        <LoadErrorCard onRetry={() => load()} />
-      </div>
-    )
+  if (snapshot === null || snap === null) {
+    if (status === 'error') {
+      return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
+          <div className="mb-6"><PageTitle>Competitors</PageTitle></div>
+          <LoadErrorCard onRetry={() => reload()} />
+        </div>
+      )
+    }
+    return <RouteSkeleton />
   }
 
-  const { engineStats, topCompetitors, brandMentions, brandAvgPos, promptMap } = data
-  const totalResponses = Object.values(engineStats).reduce((s, e) => s + (e?.total ?? 0), 0)
+  const { view } = snap
+  let { cv } = snap
+  // Demo: when the demo snapshot yields no competitor names, fall back to the
+  // mock competitor list so the demo page still shows a populated table.
+  if (isDemoMode && cv.topCompetitors.length === 0) {
+    cv = {
+      ...cv,
+      topCompetitors: mockCompetitors.slice(0, 5).map((c, i) => ({
+        name: c.name, totalMentions: 8 - i * 1.5 | 0, rankedMentions: 2,
+        proseOnly: false,
+        byEngine: { chatgpt: 2, gemini: 2, claude: 1 },
+        positions: [2, 3], promptIds: [], avgPos: 2.5,
+      })),
+    }
+  }
+  const { topCompetitors, brandMentions, brandAvgPos, totalResponses, promptText } = cv
+  const brandEngineIds = view.population.engineIds.filter(e =>
+    view.population.cells.some(c => c.llm === e && c.brand_mentioned))
   const barData         = buildBarData(brandName, brandMentions, topCompetitors)
-  const engineGroupData = buildEngineGroupData(brandName, engineStats, topCompetitors, activeEngines as LLMName[])
+  const engineGroupData = buildEngineGroupData(brandName, cv.engineShare)
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
-  const trendData       = computeTrend(allResults, brandName, topCompetitors, trendPeriod)
+  const trendRows       = trendEligibleRows(trendRowsRaw, activeEngines)
+  const trendData       = computeTrend(trendRows, brandName, topCompetitors, trendPeriod)
+  const trendLoading    = (trendStatus === 'loading' || trendState.clientId !== activeClientId) && trendRows.length === 0
+  const trendFailed     = trendStatus === 'error'
+  const exportDisabled  = view.population.cells.length === 0
+  const onExport = () => {
+    downloadCsv(
+      csvFilename('competitors', activeClient?.slug, activeClientId, new Date()),
+      buildCompetitorsCsv(view, brandName, snapshot.activePrompts),
+    )
+  }
   // "You vs. the field" (§9.5) — resolved from the live chart theme, never a
   // hand-picked hex, and never an array index (that's what F-22 was).
   const colorForKey = (key: string) => key === brandName ? chart.railActive : chart.sentimentNeutral
@@ -455,7 +411,9 @@ export default function Competitors() {
         </button>
       </div>
 
-      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => load({ silent: true })} />}
+      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
+
+      {manualFailed && <LoadErrorCard message="Couldn't load your manually tracked competitors." onRetry={() => { void loadManual() }} />}
 
       {competitorError && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
@@ -584,6 +542,16 @@ export default function Competitors() {
         </div>
       )}
 
+      <div className="flex justify-end mb-2">
+        <button type="button" onClick={onExport} disabled={exportDisabled}
+          aria-label="Export competitors as CSV"
+          title={exportDisabled ? 'Nothing to export yet' : undefined}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 text-slate-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          <Download className="w-3.5 h-3.5" aria-hidden="true" />
+          Export CSV
+        </button>
+      </div>
+
       {/* Competitors table. A real table so screen readers get row and column
           context; the wrapper scrolls sideways on a phone instead of the page. */}
       <div className="bg-dark-800 rounded-xl overflow-x-auto mb-4">
@@ -620,7 +588,7 @@ export default function Competitors() {
               </td>
               <td className="px-3 py-3">
                 <div className="flex items-center justify-center gap-1 flex-wrap">
-                  {activeEngines.filter(e => (engineStats[e]?.mentioned ?? 0) > 0).map(e => (
+                  {brandEngineIds.map(e => (
                     <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={ENGINE_LABEL[e]} />
                   ))}
                 </div>
@@ -642,8 +610,8 @@ export default function Competitors() {
               </tr>
             ) : (
               topCompetitors.map((c, idx) => {
-                const engineDots = activeEngines.filter(e => (c.byEngine[e] ?? 0) > 0)
-                const samplePrompt = c.promptIds[0] ? promptMap.get(c.promptIds[0]) : null
+                const engineDots = view.population.engineIds.filter(e => (c.byEngine[e] ?? 0) > 0)
+                const samplePrompt = samplePromptFor(c, promptText) || null
                 const sampleText = samplePrompt
                   ? (samplePrompt.length > 60 ? samplePrompt.slice(0, 58) + '…' : samplePrompt)
                   : null
@@ -741,7 +709,11 @@ export default function Competitors() {
           </div>
         </div>
 
-        {trendData.length < 2 ? (
+        {trendLoading ? (
+          <Skeleton className="h-[220px] w-full rounded-lg" />
+        ) : trendFailed && trendRows.length === 0 ? (
+          <LoadErrorCard message="Couldn't load the trend." onRetry={() => { void loadTrend(false) }} />
+        ) : trendData.length < 2 ? (
           <div className="py-12 text-center">
             <p className="text-sm text-slate-500">Not enough data yet</p>
             <p className="text-xs text-slate-600 mt-1">

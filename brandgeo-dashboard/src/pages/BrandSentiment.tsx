@@ -1,13 +1,13 @@
 /**
  * BrandSentiment.tsx
- * Driven entirely from ai_results (brand_mentioned = true rows) -- sentiment is only
- * meaningful once the brand actually appears in a response (see collect-prompt.js:
- * sentiment stays 'neutral' by default and is only scored positive/negative when mentioned).
- * Shows an overall sentiment score, positive/neutral/negative breakdown, per-engine
- * breakdown, a trend over time, and a filterable feed of the underlying AI responses.
+ * Snapshot numbers (score, counts, per-engine chart) come from the shared results
+ * layer: useResults() plus metrics.ts over the newest usable cell per active
+ * prompt and engine. The trend and the signals feed come from paged, time-windowed
+ * history (readResultHistory), so neither is cut at the 1,000-row cap.
+ * Pure logic lives in lib/views/sentimentView.ts.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
@@ -15,11 +15,19 @@ import {
 import { motion } from 'motion/react'
 import { Smile, Meh, Frown, ChevronDown, Sparkles } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { mockAIResults, mockPrompts } from '../lib/mockData'
+import { mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
 import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { useTimeFilter } from '../lib/timeFilterContext'
+import { useResults } from '../lib/resultsContext'
+import { isOwn, ownRows, nextSeq, isStale } from '../lib/resultsGuards'
+import { buildSnapshotView } from '../lib/metrics'
+import { readResultHistory } from '../lib/historyRead'
+import {
+  buildSentimentView, buildEngineSentimentData, computeTrend, scoreMeta, feedRows, feedCounts, filterFeed,
+  type SentimentHistoryRow, type TrendPeriod, type SentimentKey,
+} from '../lib/views/sentimentView'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
 import { staggerContainer } from '../lib/motion'
@@ -31,96 +39,10 @@ import ChartTooltip from '../components/ChartTooltip'
 import ChartLegend from '../components/ChartLegend'
 import SharedEmptyState from '../components/EmptyState'
 import LoadErrorCard from '../components/LoadErrorCard'
+import RouteSkeleton from '../components/RouteSkeleton'
+import Skeleton from '../components/Skeleton'
 import { formatDate } from '../lib/format'
-import type { LLMName, Sentiment } from '../types'
-
-// --- Types -------------------------------------------------------------------
-
-interface SentimentEvent {
-  id: number
-  prompt_id: number
-  promptText: string
-  llm: LLMName
-  sentiment: Sentiment
-  brand_position: number | null
-  response_snippet: string | null
-  checked_at: string
-}
-
-interface SentimentCounts { positive: number; neutral: number; negative: number }
-
-const emptyCounts = (): SentimentCounts => ({ positive: 0, neutral: 0, negative: 0 })
-
-// --- Data computation --------------------------------------------------------
-
-function computeStats(events: SentimentEvent[]) {
-  const total = events.length
-  const counts = emptyCounts()
-  const byEngine: Partial<Record<LLMName, SentimentCounts & { total: number }>> = {}
-
-  for (const e of events) {
-    if (e.sentiment === 'positive' || e.sentiment === 'neutral' || e.sentiment === 'negative') {
-      counts[e.sentiment]++
-    }
-    if (!byEngine[e.llm]) byEngine[e.llm] = { ...emptyCounts(), total: 0 }
-    const eng = byEngine[e.llm]!
-    eng.total++
-    if (e.sentiment === 'positive' || e.sentiment === 'neutral' || e.sentiment === 'negative') {
-      eng[e.sentiment]++
-    }
-  }
-
-  // 0-100 weighted score: positive=100pts, neutral=50pts, negative=0pts
-  const score = total > 0
-    ? Math.round((counts.positive * 100 + counts.neutral * 50) / total)
-    : null
-
-  return { total, counts, byEngine, score }
-}
-
-// Sentiment tokens (dashboard-visual-system.md §8.5) carry the two unambiguous
-// ends; "Mixed / Neutral" now uses the neutral token too (was blue — Gemini's
-// engine hue, a direct F-14-class collision). Amber stays for the one band
-// with no defined token ("Needs Attention" sits between neutral and negative).
-function scoreMeta(score: number | null) {
-  if (score === null) return { label: 'No data yet', color: 'text-slate-500' }
-  if (score >= 75) return { label: 'Mostly Positive', color: 'text-sentiment-positive' }
-  if (score >= 50) return { label: 'Mixed / Neutral', color: 'text-sentiment-neutral' }
-  if (score >= 25) return { label: 'Needs Attention', color: 'text-amber-400' }
-  return { label: 'Mostly Negative', color: 'text-sentiment-negative' }
-}
-
-type TrendPeriod = 'weekly' | 'monthly' | 'quarterly'
-
-function computeTrend(events: SentimentEvent[], period: TrendPeriod) {
-  if (!events.length) return []
-
-  const getPeriodKey = (date: Date): string => {
-    if (period === 'weekly') {
-      const d = new Date(date)
-      d.setDate(d.getDate() - d.getDay())
-      return d.toISOString().slice(0, 10)
-    } else if (period === 'monthly') {
-      return date.toISOString().slice(0, 7)
-    } else {
-      const q = Math.floor(date.getMonth() / 3) + 1
-      return `${date.getFullYear()} Q${q}`
-    }
-  }
-
-  const buckets: Record<string, SentimentCounts> = {}
-  for (const e of events) {
-    const key = getPeriodKey(new Date(e.checked_at))
-    if (!buckets[key]) buckets[key] = emptyCounts()
-    if (e.sentiment === 'positive' || e.sentiment === 'neutral' || e.sentiment === 'negative') {
-      buckets[key][e.sentiment]++
-    }
-  }
-
-  return Object.entries(buckets)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([p, c]) => ({ period: p, Positive: c.positive, Neutral: c.neutral, Negative: c.negative }))
-}
+import type { Sentiment } from '../types'
 
 /**
  * Same segmented-control hit-area treatment as Competitors.tsx, and the same
@@ -142,27 +64,76 @@ const TREND_CHIP_TARGET =
   "after:content-[''] after:absolute after:-inset-1.5"
 const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
 
-function buildEngineSentimentData(
-  byEngine: Partial<Record<LLMName, SentimentCounts & { total: number }>>,
-  activeEngines: EngineId[],
+type SentimentFilter = SentimentKey | 'all'
+type EngineFilter = string
+
+const HISTORY_COLUMNS = 'id, prompt_id, llm, sentiment, brand_position, response_snippet, checked_at'
+
+interface HistoryState {
+  status: 'loading' | 'ready' | 'error'
+  rows: SentimentHistoryRow[]
+  /** The client the rows belong to; rows of another client are never shown. */
+  clientId: number
+}
+
+/**
+ * Paged, windowed history of mentioned rows for the trend and the feed. Reloads
+ * on client change, window change and every collection landing, each guarded by
+ * a sequence number so a slow earlier read can never overwrite a newer one.
+ */
+function useSentimentHistory(
+  clientId: number,
+  sinceIso: string | null,
+  lastCompletedAt: number,
 ) {
-  return activeEngines
-    .filter(e => (byEngine[e]?.total ?? 0) > 0)
-    .map(engine => {
-      const eng = byEngine[engine]!
-      return {
-        engine: ENGINE_META[engine].label,
-        Positive: Math.round(eng.positive / eng.total * 100),
-        Neutral: Math.round(eng.neutral / eng.total * 100),
-        Negative: Math.round(eng.negative / eng.total * 100),
-      }
+  const [state, setState] = useState<HistoryState>({ status: 'loading', rows: [], clientId })
+  const seq = useRef(0)
+
+  const load = useCallback(async (quiet: boolean) => {
+    const mine = nextSeq(seq)
+    if (!quiet) setState(prev => ({ status: 'loading', rows: prev.clientId === clientId ? prev.rows : [], clientId }))
+    if (isDemoMode) {
+      const since = sinceIso ? new Date(sinceIso).getTime() : null
+      const rows: SentimentHistoryRow[] = mockAIResults
+        .filter(r => r.brand_mentioned && (since === null || new Date(r.checked_at).getTime() >= since))
+        .map(r => ({
+          id: r.id,
+          prompt_id: r.prompt_id,
+          llm: r.llm as string,
+          sentiment: r.sentiment as string,
+          brand_position: r.brand_position,
+          response_snippet: r.response_snippet,
+          checked_at: r.checked_at,
+        }))
+        .sort((a, b) => b.checked_at.localeCompare(a.checked_at))
+      if (!isStale(seq, mine)) setState({ status: 'ready', rows, clientId })
+      return
+    }
+    const res = await readResultHistory<SentimentHistoryRow>(supabase, {
+      clientId, sinceIso, columns: HISTORY_COLUMNS, mentionedOnly: true,
     })
+    if (isStale(seq, mine)) return
+    if (res.error) {
+      console.error('[BrandSentiment] history load failed:', res.error)
+      setState(prev => ({ status: 'error', rows: quiet && prev.clientId === clientId ? prev.rows : [], clientId }))
+      return
+    }
+    setState({ status: 'ready', rows: res.rows, clientId })
+  }, [clientId, sinceIso])
+
+  useEffect(() => { void load(false) }, [load])
+  useCollectionLanded(lastCompletedAt, () => { void load(true) })
+  // On the render right after a client switch the state still holds the old
+  // client's rows; expose none of them.
+  const mineNow = isOwn(state, clientId)
+  return {
+    status: mineNow ? state.status : 'loading' as const,
+    rows: ownRows(state, clientId, [] as SentimentHistoryRow[]),
+    reload: () => { void load(false) },
+  }
 }
 
 // --- Main component ----------------------------------------------------------
-
-type SentimentFilter = Sentiment | 'all'
-type EngineFilter = LLMName | 'all'
 
 export default function BrandSentiment() {
   const { activeClientId, activeClient, activeEngines } = useClient()
@@ -170,119 +141,64 @@ export default function BrandSentiment() {
   const { getStartDate, timeRange } = useTimeFilter()
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'Your brand'
+  const { snapshot, status, loadError, reload } = useResults()
 
-  const [events, setEvents] = useState<SentimentEvent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
+  // timeRange is the dependency that changes the window; getStartDate reads it.
+  const sinceIso = useMemo(
+    () => getStartDate()?.toISOString() ?? null,
+    [timeRange], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const history = useSentimentHistory(activeClientId, sinceIso, lastCompletedAt)
+
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('weekly')
   const [filterSentiment, setFilterSentiment] = useState<SentimentFilter>('all')
   const [filterEngine, setFilterEngine] = useState<EngineFilter>('all')
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  const load = async (opts: { silent?: boolean } = {}) => {
-    // Silent: a background reload triggered by lastCompletedAt, not a fresh
-    // page open. Data is already on screen, so this must never bounce the
-    // page back to the loading skeleton mid-view (same reasoning as
-    // AIVisibility.tsx's load({ silent: true })).
-    if (!opts.silent) setLoading(true)
-    // A silent reload keeps the banner mounted until it resolves, so the
-    // role="alert" node is not re-announced on every background bump.
-    if (!opts.silent) setLoadError(false)
+  const snap = useMemo(() => {
+    if (!snapshot) return null
+    const activeIds = snapshot.activePrompts.map(pr => pr.id)
+    const view = buildSnapshotView(snapshot.rows, activeIds, activeEngines)
+    return { view, sv: buildSentimentView(view) }
+  }, [snapshot, activeEngines])
 
-    if (isDemoMode) {
-      const demo: SentimentEvent[] = mockAIResults
-        .filter(r => r.brand_mentioned)
-        .map(r => {
-          const prompt = mockPrompts.find(p => p.id === r.prompt_id)
-          // Demo data only stores 'positive'/'neutral' — derive a bit of realistic
-          // variety (incl. negative) from position so the demo isn't 100% positive.
-          const pos = r.brand_position
-          const demoSentiment: Sentiment =
-            pos !== null && pos <= 2 ? 'positive' :
-            pos !== null && pos === 3 ? 'neutral' :
-            pos !== null && pos >= 4 ? 'negative' : 'positive'
-          return {
-            id: r.id,
-            prompt_id: r.prompt_id,
-            promptText: prompt?.text ?? '',
-            llm: r.llm as LLMName,
-            sentiment: demoSentiment,
-            brand_position: r.brand_position,
-            response_snippet: r.response_snippet,
-            checked_at: r.checked_at,
-          }
-        })
-        .filter(e => activeEngines.includes(e.llm))
-      setEvents(demo)
-      setLoadError(false)
-      setLoading(false)
-      return
+  const promptText = useMemo(
+    () => new Map((snapshot?.prompts ?? []).map(pr => [pr.id, pr.text] as [number, string])),
+    [snapshot],
+  )
+
+  const feed = useMemo(
+    () => feedRows(history.rows).filter(r => activeEngines.includes(r.llm as EngineId)),
+    [history.rows, activeEngines],
+  )
+  const trendData = useMemo(() => computeTrend(feed, trendPeriod), [feed, trendPeriod])
+  const feedTotals = useMemo(() => feedCounts(feed), [feed])
+  const filtered = useMemo(
+    () => filterFeed(feed, filterSentiment, filterEngine),
+    [feed, filterSentiment, filterEngine],
+  )
+
+  if (snapshot === null || snap === null) {
+    if (status === 'error') {
+      return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
+          <div className="mb-6"><PageTitle>Brand Sentiment</PageTitle></div>
+          <LoadErrorCard onRetry={() => reload()} />
+        </div>
+      )
     }
-
-    let q = supabase.from('ai_results')
-      .select('id, prompt_id, llm, sentiment, brand_position, response_snippet, checked_at, prompts(text)')
-      .eq('client_id', activeClientId)
-      .eq('brand_mentioned', true)
-    const startDate = getStartDate()
-    if (startDate) q = q.gte('checked_at', startDate.toISOString())
-
-    const { data, error } = await q.order('checked_at', { ascending: false })
-
-    if (error) {
-      // Keep whatever is on screen for a silent reload; either way show the
-      // retry card instead of an empty "no data" state.
-      console.error('[BrandSentiment] load failed:', error)
-      setLoadError(true)
-      if (!opts.silent) setEvents([])
-      setLoading(false)
-      return
-    }
-
-    const mapped: SentimentEvent[] = (data ?? []).map((r: any) => ({
-      id: r.id,
-      prompt_id: r.prompt_id,
-      promptText: r.prompts?.text ?? '',
-      llm: r.llm,
-      sentiment: r.sentiment,
-      brand_position: r.brand_position,
-      response_snippet: r.response_snippet,
-      checked_at: r.checked_at,
-    })).filter(e => activeEngines.includes(e.llm))
-
-    setEvents(mapped)
-    setLoadError(false)
-    setLoading(false)
+    return <RouteSkeleton />
   }
 
-  useEffect(() => { load() }, [activeClientId, activeEngines.join(','), timeRange]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reload quietly every time a collection run completes, not just once at
-  // the very end -- lastCompletedAt bumps incrementally as jobs land (see
-  // collectionContext.tsx), so this must never assume a single final bump.
-  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
-
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">Loading sentiment data…</div>
-
-  if (loadError && events.length === 0) {
-    return (
-      <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
-        <div className="mb-6"><PageTitle>Brand Sentiment</PageTitle></div>
-        <LoadErrorCard onRetry={() => load()} />
-      </div>
-    )
-  }
-
-  const { total, counts, byEngine, score } = computeStats(events)
+  const { summary, byEngine } = snap.sv
+  const total = summary.total
+  const score = total > 0 ? summary.score : null
   const { label: scoreLabel, color: scoreColor } = scoreMeta(score)
-  const pct = (n: number) => total > 0 ? Math.round(n / total * 100) : 0
-  const trendData = computeTrend(events, trendPeriod)
-  const engineData = buildEngineSentimentData(byEngine, activeEngines)
-
-  const filtered = events.filter(e => {
-    if (filterSentiment !== 'all' && e.sentiment !== filterSentiment) return false
-    if (filterEngine !== 'all' && e.llm !== filterEngine) return false
-    return true
-  })
+  const pct = summary.pct
+  const engineData = buildEngineSentimentData(byEngine, snap.view.population.engineIds)
+  const counts = { positive: summary.positive, neutral: summary.neutral, negative: summary.negative }
+  const historyLoading = history.status === 'loading' && history.rows.length === 0
+  const historyFailed = history.status === 'error'
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
@@ -304,7 +220,7 @@ export default function BrandSentiment() {
         </p>
       </div>
 
-      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => load({ silent: true })} />}
+      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
 
       {/* Summary cards. Every card carries a border: the score card previously had
           border-brand-500/30 while the other three had none at all, so the row read
@@ -343,7 +259,7 @@ export default function BrandSentiment() {
           {/* No "% of mentions" caption at total 0 -- a percentage of zero
               measurements is not a measurement (same reasoning as the score
               card's null branch just above). */}
-          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.positive)}% of mentions</div>}
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct.positive}% of mentions</div>}
         </MotionCard>
         <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
@@ -351,7 +267,7 @@ export default function BrandSentiment() {
             <span className="text-xs text-slate-500">Neutral</span>
           </div>
           <div className={`text-2xl font-bold tabular-nums ${total === 0 ? 'text-slate-500' : 'text-slate-300'}`}>{counts.neutral}</div>
-          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.neutral)}% of mentions</div>}
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct.neutral}% of mentions</div>}
         </MotionCard>
         <MotionCard stagger hoverLift={false} className="bg-dark-800 border border-dark-700 rounded-xl p-4">
           <div className="flex items-center gap-1.5 mb-1">
@@ -359,7 +275,7 @@ export default function BrandSentiment() {
             <span className="text-xs text-slate-500">Negative</span>
           </div>
           <div className={`text-2xl font-bold tabular-nums ${total === 0 ? 'text-slate-500' : 'text-sentiment-negative'}`}>{counts.negative}</div>
-          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct(counts.negative)}% of mentions</div>}
+          {total > 0 && <div className="text-xs text-slate-500 mt-0.5">{pct.negative}% of mentions</div>}
         </MotionCard>
       </motion.div>
 
@@ -384,14 +300,14 @@ export default function BrandSentiment() {
             {/* Fixed order, positive-neutral-negative, left to right — position
                 also encodes polarity, per §8.5's mandatory secondary encoding. */}
             <div className="h-3 w-full rounded-full overflow-hidden flex bg-dark-700">
-              {counts.positive > 0 && <div className="h-full bg-sentiment-positive" style={{ width: `${pct(counts.positive)}%` }} title={`Positive ${pct(counts.positive)}%`} />}
-              {counts.neutral > 0 && <div className="h-full bg-sentiment-neutral" style={{ width: `${pct(counts.neutral)}%` }} title={`Neutral ${pct(counts.neutral)}%`} />}
-              {counts.negative > 0 && <div className="h-full bg-sentiment-negative" style={{ width: `${pct(counts.negative)}%` }} title={`Negative ${pct(counts.negative)}%`} />}
+              {counts.positive > 0 && <div className="h-full bg-sentiment-positive" style={{ width: `${pct.positive}%` }} title={`Positive ${pct.positive}%`} />}
+              {counts.neutral > 0 && <div className="h-full bg-sentiment-neutral" style={{ width: `${pct.neutral}%` }} title={`Neutral ${pct.neutral}%`} />}
+              {counts.negative > 0 && <div className="h-full bg-sentiment-negative" style={{ width: `${pct.negative}%` }} title={`Negative ${pct.negative}%`} />}
             </div>
             <div className="flex items-center gap-4 mt-3">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-positive" />Positive {pct(counts.positive)}%</span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-neutral" />Neutral {pct(counts.neutral)}%</span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-negative" />Negative {pct(counts.negative)}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-positive" />Positive {pct.positive}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-neutral" />Neutral {pct.neutral}%</span>
+              <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-2 h-2 rounded-full bg-sentiment-negative" />Negative {pct.negative}%</span>
             </div>
           </div>
 
@@ -446,7 +362,11 @@ export default function BrandSentiment() {
                   ))}
                 </div>
               </div>
-              {trendData.length < 2 ? (
+              {historyLoading ? (
+                <Skeleton className="h-[220px] w-full rounded-lg" />
+              ) : historyFailed ? (
+                <LoadErrorCard onRetry={history.reload} />
+              ) : trendData.length < 2 ? (
                 <div className="py-12 text-center">
                   <p className="text-sm text-slate-500">Not enough data yet</p>
                   <p className="text-xs text-slate-600 mt-1">Trend fills in as collections accumulate</p>
@@ -480,99 +400,107 @@ export default function BrandSentiment() {
                 the same screen were text-xs/uppercase/slate-400. */}
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Recent Sentiment Signals</h2>
 
-            <div className="flex flex-wrap gap-2 mb-3">
-              {(['all', 'positive', 'neutral', 'negative'] as const).map(s => (
-                <button key={s} onClick={() => setFilterSentiment(s)}
-                  aria-pressed={filterSentiment === s}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                    filterSentiment === s
-                      ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
-                      : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
-                  }`}>
-                  {s !== 'all' && <SentimentDot value={s} />}
-                  {s === 'all' ? `All (${total})` : `${s[0].toUpperCase()}${s.slice(1)} (${counts[s as keyof SentimentCounts]})`}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              <button onClick={() => setFilterEngine('all')}
-                aria-pressed={filterEngine === 'all'}
-                className={`px-2.5 py-1 rounded-lg text-xs transition-colors border ${
-                  filterEngine === 'all' ? 'bg-brand-500/30 text-brand-300 border-brand-500/40' : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
-                }`}>
-                All engines
-              </button>
-              {activeEngines.filter(e => (byEngine[e]?.total ?? 0) > 0).map(e => (
-                <EngineChip
-                  key={e}
-                  id={e as EngineId}
-                  selected={filterEngine === e}
-                  onClick={() => setFilterEngine(e === filterEngine ? 'all' : e)}
-                />
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              {filtered.map(e => {
-                const engineId = (ENGINE_META[e.llm as EngineId] ? e.llm : 'chatgpt') as EngineId
-                const isOpen = expanded === e.id
-                return (
-                  <div key={e.id} className="bg-dark-800 rounded-xl overflow-hidden">
-                    <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
-                      onClick={() => setExpanded(isOpen ? null : e.id)}
-                      aria-expanded={isOpen}>
-                      <div className="flex items-start gap-4">
-                        <div className="shrink-0 w-10 text-center mt-0.5">
-                          {e.brand_position ? (
-                            <>
-                              <div className="text-lg font-bold text-sentiment-positive tabular-nums">#{e.brand_position}</div>
-                              <div className="text-[10px] text-slate-600">pos</div>
-                            </>
-                          ) : (
-                            <div className="text-sm text-slate-600 mt-1">-</div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                            <EngineChip id={engineId} interactive={false} />
-                            <span className="flex items-center gap-1 text-xs text-slate-400 capitalize">
-                              <SentimentDot value={e.sentiment} />{e.sentiment}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-200 truncate">{e.promptText}</p>
-                        </div>
-                        <ChevronDown size={15}
-                          className={`shrink-0 text-slate-600 transition-transform mt-1 ${isOpen ? 'rotate-180' : ''}`} />
-                      </div>
+            {historyLoading ? (
+              <Skeleton className="h-[220px] w-full rounded-lg" />
+            ) : historyFailed ? (
+              <LoadErrorCard onRetry={history.reload} />
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {(['all', 'positive', 'neutral', 'negative'] as const).map(s => (
+                    <button key={s} onClick={() => setFilterSentiment(s)}
+                      aria-pressed={filterSentiment === s}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                        filterSentiment === s
+                          ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
+                          : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
+                      }`}>
+                      {s !== 'all' && <SentimentDot value={s} />}
+                      {s === 'all' ? `All (${feedTotals.total})` : `${s[0].toUpperCase()}${s.slice(1)} (${feedTotals[s]})`}
                     </button>
-                    {isOpen && e.response_snippet && (
-                      <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
-                        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Response snippet</div>
-                        <blockquote className={`text-sm text-slate-300 italic leading-relaxed border-l-2 pl-3 ${
-                          e.sentiment === 'positive' ? 'border-sentiment-positive' : e.sentiment === 'negative' ? 'border-sentiment-negative' : 'border-sentiment-neutral'
-                        }`}>
-                          "{e.response_snippet}"
-                        </blockquote>
-                        <div className="mt-3 text-xs text-slate-600">
-                          Checked {formatDate(e.checked_at)}
-                        </div>
-                      </div>
-                    )}
-                    {isOpen && !e.response_snippet && (
-                      <div className="border-t border-dark-700 px-5 py-3 bg-dark-700/20 text-xs text-slate-600 italic">
-                        No response snippet captured for this mention.
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                  ))}
+                </div>
 
-            {filtered.length === 0 && (
-              <div className="text-center py-16 text-slate-500 text-sm">
-                No signals match this filter.
-              </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button onClick={() => setFilterEngine('all')}
+                    aria-pressed={filterEngine === 'all'}
+                    className={`px-2.5 py-1 rounded-lg text-xs transition-colors border ${
+                      filterEngine === 'all' ? 'bg-brand-500/30 text-brand-300 border-brand-500/40' : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
+                    }`}>
+                    All engines
+                  </button>
+                  {activeEngines.filter(e => (byEngine[e]?.total ?? 0) > 0).map(e => (
+                    <EngineChip
+                      key={e}
+                      id={e as EngineId}
+                      selected={filterEngine === e}
+                      onClick={() => setFilterEngine(e === filterEngine ? 'all' : e)}
+                    />
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  {filtered.map(e => {
+                    const engineId = (ENGINE_META[e.llm as EngineId] ? e.llm : 'chatgpt') as EngineId
+                    const isOpen = expanded === e.id
+                    return (
+                      <div key={e.id} className="bg-dark-800 rounded-xl overflow-hidden">
+                        <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
+                          onClick={() => setExpanded(isOpen ? null : e.id)}
+                          aria-expanded={isOpen}>
+                          <div className="flex items-start gap-4">
+                            <div className="shrink-0 w-10 text-center mt-0.5">
+                              {e.brand_position ? (
+                                <>
+                                  <div className="text-lg font-bold text-sentiment-positive tabular-nums">#{e.brand_position}</div>
+                                  <div className="text-[10px] text-slate-600">pos</div>
+                                </>
+                              ) : (
+                                <div className="text-sm text-slate-600 mt-1">-</div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                <EngineChip id={engineId} interactive={false} />
+                                <span className="flex items-center gap-1 text-xs text-slate-400 capitalize">
+                                  <SentimentDot value={e.sentiment as Sentiment} />{e.sentiment}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-200 truncate">{promptText.get(e.prompt_id) ?? ''}</p>
+                            </div>
+                            <ChevronDown size={15}
+                              className={`shrink-0 text-slate-600 transition-transform mt-1 ${isOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {isOpen && e.response_snippet && (
+                          <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Response snippet</div>
+                            <blockquote className={`text-sm text-slate-300 italic leading-relaxed border-l-2 pl-3 ${
+                              e.sentiment === 'positive' ? 'border-sentiment-positive' : e.sentiment === 'negative' ? 'border-sentiment-negative' : 'border-sentiment-neutral'
+                            }`}>
+                              "{e.response_snippet}"
+                            </blockquote>
+                            <div className="mt-3 text-xs text-slate-600">
+                              Checked {formatDate(e.checked_at)}
+                            </div>
+                          </div>
+                        )}
+                        {isOpen && !e.response_snippet && (
+                          <div className="border-t border-dark-700 px-5 py-3 bg-dark-700/20 text-xs text-slate-600 italic">
+                            No response snippet captured for this mention.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {filtered.length === 0 && (
+                  <div className="text-center py-16 text-slate-500 text-sm">
+                    No signals match this filter.
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>

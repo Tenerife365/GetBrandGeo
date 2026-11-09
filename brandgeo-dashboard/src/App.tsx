@@ -7,6 +7,7 @@ import { ThemeProvider } from './lib/themeContext'
 import { ClientProvider, useClient } from './lib/clientContext'
 import { I18nProvider } from './lib/i18nContext'
 import { CollectionProvider } from './lib/collectionContext'
+import { ResultsProvider } from './lib/resultsContext'
 import { TimeFilterProvider } from './lib/timeFilterContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -263,6 +264,7 @@ export default function App() {
       <ClientProvider>
         <MarketProvider>
           <CollectionProvider>
+          <ResultsProvider>
           <TimeFilterProvider>
           <BrowserRouter>
             <RouteBoundary><Suspense fallback={<RouteSkeleton />}>
@@ -313,6 +315,7 @@ export default function App() {
             </Suspense></RouteBoundary>
           </BrowserRouter>
           </TimeFilterProvider>
+          </ResultsProvider>
           </CollectionProvider>
         </MarketProvider>
       </ClientProvider>

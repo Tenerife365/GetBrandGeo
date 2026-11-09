@@ -19,16 +19,19 @@
  *    what a client was told, and when, and from what evidence, survives the page reload.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target,
   TrendingUp, RefreshCw, Sparkles, Lightbulb, History, Check, X, CircleSlash,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { useCollection } from '../lib/collectionContext'
-import { useCollectionLanded } from '../lib/useCollectionLanded'
-import { aggregateCompetitors, type CompetitorAggregate } from '../lib/competitorFilter'
+import { useResults } from '../lib/resultsContext'
+import { nextSeq, isStale } from '../lib/resultsGuards'
+import { buildSnapshotView } from '../lib/metrics'
+import {
+  buildRecommendationsStats, buildEngineErrors, buildAiSnippets, type RecommendationsStats,
+} from '../lib/views/recommendationsView'
 import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
 import { useChartTheme } from '../lib/chartTheme'
 import { PageTitle, SectionHeading } from '../components/Typography'
@@ -82,28 +85,6 @@ interface Rec {
   how: string[]
   fixes: LLMName[]
   timeEst: string
-}
-
-interface LLMStat {
-  llm: LLMName
-  total: number
-  mentioned: number
-  rate: number
-  avgPos: number | null
-}
-
-interface CatStat {
-  cat: string
-  label: string
-  total: number
-  mentioned: number
-  rate: number
-}
-
-/** Engines whose only rows were API failures — our outage, not the brand's absence. */
-interface EngineError {
-  engine: string
-  count: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -249,81 +230,9 @@ const fmtDate = (iso: string) =>
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 
-// ─── Stats computation ────────────────────────────────────────────────────────
-
-/**
- * `okResults` MUST already exclude status='error' rows — see load(). An API failure is
- * not a non-mention, and treating it as one is how a "0% on ChatGPT" recommendation
- * about an unpaid bill gets written to a paying client.
- */
-function computeStats(okResults: any[], prompts: any[], brandName: string, activeLLMs: LLMName[]) {
-  const filtered = okResults.filter(r => activeLLMs.includes(r.llm as LLMName))
-
-  // Per-LLM
-  const llmMap: Record<string, { total: number; mentioned: number; positions: number[] }> = {}
-  for (const r of filtered) {
-    if (!llmMap[r.llm]) llmMap[r.llm] = { total: 0, mentioned: 0, positions: [] }
-    llmMap[r.llm].total++
-    if (r.brand_mentioned) {
-      llmMap[r.llm].mentioned++
-      if (r.brand_position) llmMap[r.llm].positions.push(r.brand_position)
-    }
-  }
-  const llmStats: LLMStat[] = activeLLMs
-    .map(llm => {
-      const s = llmMap[llm] ?? { total: 0, mentioned: 0, positions: [] }
-      const avgPos = s.positions.length > 0
-        ? Math.round(s.positions.reduce((a: number, b: number) => a + b, 0) / s.positions.length * 10) / 10
-        : null
-      return { llm, ...s, rate: s.total > 0 ? s.mentioned / s.total : 0, avgPos }
-    })
-    .filter(s => s.total > 0)
-
-  // Per-category
-  const promptMap = new Map(prompts.map((p: any) => [p.id, p]))
-  const catMap: Record<string, { total: number; mentioned: number }> = {}
-  for (const r of filtered) {
-    const prompt: any = promptMap.get(r.prompt_id)
-    if (!prompt?.category) continue
-    const cat = prompt.category
-    if (!catMap[cat]) catMap[cat] = { total: 0, mentioned: 0 }
-    catMap[cat].total++
-    if (r.brand_mentioned) catMap[cat].mentioned++
-  }
-  const catStats: CatStat[] = Object.entries(catMap)
-    .map(([cat, { total, mentioned }]) => ({
-      cat,
-      label: CATEGORY_LABEL[cat] ?? cat,
-      total,
-      mentioned,
-      rate: total > 0 ? mentioned / total : 0,
-    }))
-    .sort((a, b) => a.rate - b.rate)
-
-  // Competitors — one shared implementation (lib/competitorFilter.ts). Ranked
-  // appearances drive the order; pos:99 prose/seed-list matches are flagged, not counted
-  // as wins. This page used to have its own third copy of the filter and its own sort by
-  // raw mention count.
-  const competitors: CompetitorAggregate[] = aggregateCompetitors(filtered, 6)
-
-  // Overall brand position
-  const allPositions = filtered
-    .filter(r => r.brand_mentioned && r.brand_position)
-    .map(r => r.brand_position as number)
-  const avgBrandPos = allPositions.length > 0
-    ? Math.round(allPositions.reduce((a, b) => a + b, 0) / allPositions.length * 10) / 10
-    : null
-
-  const totalChecks    = filtered.length
-  const totalMentioned = filtered.filter(r => r.brand_mentioned).length
-  const overallRate    = totalChecks > 0 ? totalMentioned / totalChecks : 0
-
-  return { llmStats, catStats, competitors, avgBrandPos, totalChecks, totalMentioned, overallRate, brandName }
-}
-
 // ─── Rec generators ───────────────────────────────────────────────────────────
 
-function generateRecs(data: ReturnType<typeof computeStats>): Rec[] {
+function generateRecs(data: RecommendationsStats): Rec[] {
   const { llmStats, catStats, competitors, avgBrandPos, brandName, totalChecks } = data
   if (totalChecks === 0) return []
 
@@ -653,14 +562,8 @@ function RecommendationsSkeleton() {
 
 export default function Recommendations() {
   const { activeClientId, activeClient, activeEngines, isAdmin } = useClient()
-  const { lastCompletedAt } = useCollection()
   const brandName = activeClient?.name ?? 'Your brand'
-
-  const [stats, setStats]     = useState<ReturnType<typeof computeStats> | null>(null)
-  const [recs, setRecs]       = useState<Rec[]>([])
-  const [loading, setLoading] = useState(true)
-  // True when a read failed. A failed read must never look like "no data yet".
-  const [loadError, setLoadError] = useState(false)
+  const { snapshot, status, loadError: snapshotError, reload } = useResults()
 
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError]     = useState<string | null>(null)
@@ -670,119 +573,81 @@ export default function Recommendations() {
   const [runs, setRuns]           = useState<StoredRun[]>([])
   const [storedRecs, setStoredRecs] = useState<StoredRec[]>([])
   const [showAllRuns, setShowAllRuns] = useState(false)
+  // True when the saved-history read failed. A failed read must never look like "no history".
+  const [historyError, setHistoryError] = useState(false)
 
-  const [engineErrors, setEngineErrors] = useState<EngineError[]>([])
-  const [rawOk, setRawOk]           = useState<any[]>([])
-  const [rawPrompts, setRawPrompts] = useState<any[]>([])
+  // Snapshot numbers: one shared population over the provider's rows.
+  const derived = useMemo(() => {
+    if (!snapshot) return null
+    const activeIds = snapshot.activePrompts.map(pr => pr.id)
+    const view = buildSnapshotView(snapshot.rows, activeIds, activeEngines)
+    const stats = buildRecommendationsStats(view, snapshot.activePrompts, brandName)
+    return {
+      view,
+      stats,
+      recs: generateRecs(stats),
+      engineErrors: buildEngineErrors(snapshot.rows, activeEngines),
+      snippets: buildAiSnippets(view, snapshot.activePrompts),
+    }
+  }, [snapshot, activeEngines, brandName])
 
-  // ── Load ──────────────────────────────────────────────────────────────────
-  // Returns false when a read failed, so load() can flag it. Other callers ignore it.
-  const loadHistory = async (): Promise<boolean> => {
-    const { data: runRows, error: runError } = await supabase
+  const stats = derived?.stats ?? null
+  const recs = derived?.recs ?? []
+  const engineErrors = derived?.engineErrors ?? []
+  const loading = snapshot === null && status !== 'error'
+  const loadFailedNoData = snapshot === null && status === 'error'
+  const loadError = loadFailedNoData || !!snapshotError || historyError
+  const hasResults = (stats?.totalChecks ?? 0) > 0
+
+  // ── Saved advice history ──────────────────────────────────────────────────
+  // One read: runs with their items embedded, so there is no second round trip.
+  // Each call carries a sequence number so a slow earlier read cannot overwrite
+  // a newer one.
+  const historySeq = useRef(0)
+  const loadHistory = useCallback(async (): Promise<boolean> => {
+    const mine = nextSeq(historySeq)
+    if (isDemoMode) {
+      if (!isStale(historySeq, mine)) { setRuns([]); setStoredRecs([]); setHistoryError(false) }
+      return true
+    }
+    const { data, error } = await supabase
       .from('recommendation_runs')
-      .select('id, generated_at, model, rec_count')
+      .select('id, generated_at, model, rec_count, recommendations(id, run_id, position, title, insight, action, engines, priority, status, actioned_at, notes)')
       .eq('client_id', activeClientId)
       .order('generated_at', { ascending: false })
       .limit(20)
-
-    const runIds = (runRows ?? []).map(r => r.id)
-    let itemRows: StoredRec[] = []
-    if (runIds.length > 0) {
-      const { data, error: itemError } = await supabase
-        .from('recommendations')
-        .select('id, run_id, position, title, insight, action, engines, priority, status, actioned_at, notes')
-        .in('run_id', runIds)
-        .order('position', { ascending: true })
-      if (itemError) return false
-      itemRows = (data ?? []) as StoredRec[]
+    if (isStale(historySeq, mine)) return true
+    if (error) {
+      console.error('[Recs] history load failed:', error.message)
+      setHistoryError(true)
+      return false
     }
-    if (runError) return false
-    setRuns((runRows ?? []) as StoredRun[])
-    setStoredRecs(itemRows)
+    const rows = (data ?? []) as Array<StoredRun & { recommendations: StoredRec[] | null }>
+    setRuns(rows.map(r => ({ id: r.id, generated_at: r.generated_at, model: r.model, rec_count: r.rec_count })))
+    setStoredRecs(
+      rows.flatMap(r => r.recommendations ?? []).sort((a, b) => a.position - b.position),
+    )
+    setHistoryError(false)
     return true
-  }
+  }, [activeClientId])
 
-  const load = async (opts: { silent?: boolean } = {}) => {
-    // Silent: a background reload triggered by lastCompletedAt, not a fresh
-    // page open or an explicit Refresh click. Data is already on screen, so
-    // this must never bounce the page back to the full-page skeleton.
-    if (!opts.silent) setLoading(true)
-    // A silent reload keeps the banner mounted until it resolves, so the
-    // role="alert" node is not re-announced on every background bump.
-    if (!opts.silent) setLoadError(false)
+  useEffect(() => {
+    // A client switch must never keep another client's saved history on screen
+    // (its status buttons would write to that client's rows).
+    setRuns([])
+    setStoredRecs([])
+    setHistoryError(false)
+    void loadHistory()
+  }, [loadHistory])
 
-    const [{ data: okResults, error: okError }, { data: errRows, error: errError }, { data: prompts, error: promptError }] = await Promise.all([
-      // status='error' rows are API failures (quota, auth, network). They are NOT
-      // non-mentions and must never reach a stat or the model. CLAUDE.md §4.8.
-      supabase
-        .from('ai_results')
-        .select('llm, brand_mentioned, brand_position, competitors_mentioned, prompt_id, response_snippet, status, checked_at')
-        .eq('client_id', activeClientId)
-        .neq('status', 'error')
-        .order('checked_at', { ascending: false }),
-      supabase
-        .from('ai_results')
-        .select('llm, error_code')
-        .eq('client_id', activeClientId)
-        .eq('status', 'error'),
-      supabase
-        .from('prompts')
-        .select('id, category, text')
-        .eq('client_id', activeClientId)
-        .eq('is_active', true),
-    ])
-
-    // A failed read must not render as "Not measured yet". On a fresh load or a
-    // client switch drop what is on screen (it may belong to another client);
-    // on a silent background reload keep the last good data and show the banner.
-    if (okError || errError || promptError) {
-      if (!opts.silent) {
-        setStats(null)
-        setRecs([])
-        setEngineErrors([])
-        setRawOk([])
-        setRawPrompts([])
-        setRuns([])
-        setStoredRecs([])
-      }
-      setLoadError(true)
-      setLoading(false)
-      return
-    }
-
-    // Only surface engines that produced errors AND no usable rows — a partial failure
-    // is already reflected correctly in the stats.
-    const okEngines = new Set((okResults ?? []).map(r => r.llm))
-    const errCount: Record<string, number> = {}
-    for (const r of errRows ?? []) {
-      if (okEngines.has(r.llm)) continue
-      errCount[r.llm] = (errCount[r.llm] ?? 0) + 1
-    }
-    setEngineErrors(Object.entries(errCount).map(([engine, count]) => ({ engine, count })))
-
-    setRawOk(okResults ?? [])
-    setRawPrompts(prompts ?? [])
-    const computed = computeStats(okResults ?? [], prompts ?? [], brandName, activeEngines as LLMName[])
-    setStats(computed)
-    setRecs(generateRecs(computed))
-
-    const historyOk = await loadHistory()
-    if (!historyOk) {
-      // A fresh load or client switch must never keep another client's saved
-      // history on screen (its status buttons would write to that client's
-      // rows). A silent same-client reload keeps its last good history.
-      if (!opts.silent) {
-        setRuns([])
-        setStoredRecs([])
-      }
-    }
-    setLoadError(!historyOk)
-    setLoading(false)
+  const retryAll = () => {
+    reload(snapshot ? { quiet: true } : undefined)
+    void loadHistory()
   }
 
   // ── Generate ──────────────────────────────────────────────────────────────
   const generateAiInsights = async () => {
-    if (!stats || rawOk.length === 0 || !activeClientId) return
+    if (!derived || !stats || stats.totalChecks === 0 || !activeClientId || !snapshot || snapshot.clientId !== activeClientId) return
     setAiLoading(true)
     setAiError(null)
     setUnsavedRecs([])
@@ -792,36 +657,15 @@ export default function Recommendations() {
       engineStats[s.llm] = { total: s.total, mentioned: s.mentioned, rate: s.rate, avgPos: s.avgPos }
     }
 
-    const mentionedSnippets = rawOk
-      .filter(r => r.brand_mentioned && r.response_snippet)
-      .slice(0, 4)
-      .map(r => {
-        const prompt = rawPrompts.find((p: any) => p.id === r.prompt_id)
-        return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet }
-      })
-
-    const absentSnippets = rawOk
-      .filter(r => !r.brand_mentioned && r.response_snippet)
-      .slice(0, 5)
-      .map(r => {
-        const prompt = rawPrompts.find((p: any) => p.id === r.prompt_id)
-        let topComp: string | null = null
-        try {
-          const comps = JSON.parse(r.competitors_mentioned || '[]')
-          topComp = comps[0]?.name ?? comps[0] ?? null
-        } catch { /* malformed */ }
-        return { engine: r.llm, prompt: prompt?.text ?? '', snippet: r.response_snippet, topComp }
-      })
-
     const payload = {
       client_id:           activeClientId,
       brand_name:          brandName,
       engine_stats:        engineStats,
       engines_with_errors: engineErrors,
       top_competitors:     stats.competitors,   // carries rankedMentions + proseOnly
-      mentioned_snippets:  mentionedSnippets,
-      absent_snippets:     absentSnippets,
-      prompts:             rawPrompts.map((p: any) => ({ text: p.text, category: p.category })),
+      mentioned_snippets:  derived.snippets.mentioned,
+      absent_snippets:     derived.snippets.absent,
+      prompts:             snapshot.activePrompts.map(p => ({ text: p.text, category: p.category })),
     }
 
     try {
@@ -885,12 +729,6 @@ export default function Recommendations() {
     await loadHistory()
   }
 
-  useEffect(() => { load() }, [activeClientId, brandName, activeEngines.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reload quietly every time a collection run completes -- lastCompletedAt
-  // bumps incrementally as jobs land (collectionContext.tsx), so this must
-  // never assume a single final bump.
-  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
 
   const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
@@ -942,7 +780,7 @@ export default function Recommendations() {
             screen below legibility undoes the reason for keeping it focusable. The
             busy state is carried by aria-disabled and the spinning icon. */}
         <button
-          onClick={() => { if (!loading) load() }}
+          onClick={() => { if (!loading) retryAll() }}
           aria-disabled={loading}
           aria-label="Refresh recommendations"
           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 text-slate-400 transition-colors ${loading ? 'cursor-default' : 'hover:text-slate-200 hover:bg-dark-700'}`}
@@ -963,7 +801,7 @@ export default function Recommendations() {
               No usable data from {engineErrors.map(e => LLM_LABEL[e.engine] ?? e.engine).join(', ')}
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed calls),
+              These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed prompt checks),
               so they are excluded from every score and from the AI analysis below. This is a collection
               failure, not a visibility failure. It does not mean these engines ignore your brand.
             </p>
@@ -974,7 +812,7 @@ export default function Recommendations() {
       {!loading && loadError && (
         <LoadErrorCard
           message={stats ? "Couldn't refresh these results. What you see may be out of date." : undefined}
-          onRetry={() => load(stats ? { silent: true } : {})}
+          onRetry={retryAll}
         />
       )}
 
@@ -1107,7 +945,7 @@ export default function Recommendations() {
               </div>
               <button
                 onClick={generateAiInsights}
-                disabled={aiLoading || rawOk.length === 0}
+                disabled={aiLoading || !hasResults}
                 aria-label="Generate AI insights"
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 transition-colors disabled:opacity-50"
               >
@@ -1117,8 +955,10 @@ export default function Recommendations() {
             </div>
 
             {aiLoading && (
-              <div className="bg-dark-800 border border-violet-500/20 rounded-xl p-5 text-sm text-slate-400 animate-pulse">
-                Claude is reading your actual AI responses and competitor data…
+              <div role="status" className="bg-dark-800 border border-violet-500/20 rounded-xl p-5 space-y-3">
+                <p className="text-sm text-slate-400">Claude is reading your actual AI responses and competitor data…</p>
+                <Skeleton className="h-3 w-full motion-reduce:animate-none" />
+                <Skeleton className="h-3 w-5/6 motion-reduce:animate-none" />
               </div>
             )}
 
@@ -1127,7 +967,7 @@ export default function Recommendations() {
                 <p className="text-xs text-red-400">{aiError}</p>
                 <button
                   onClick={generateAiInsights}
-                  disabled={rawOk.length === 0}
+                  disabled={!hasResults}
                   className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
                 >
                   <RefreshCw size={11} /> Retry

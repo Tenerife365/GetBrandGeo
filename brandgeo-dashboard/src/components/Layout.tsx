@@ -405,15 +405,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const affiliateMode = pathname === '/affiliates' || pathname.startsWith('/affiliates/')
   const affiliateTab = affiliateTabOf(hash)
   const affiliateOverview = useAffiliateOverview()
-  // Allowlist, not a blocklist. Of Layout's 14 routes, only these three pages
-  // actually read useTimeFilter today: Dashboard.tsx ('/'), BrandSentiment.tsx
-  // ('/sentiment'), and Revenue.tsx ('/usage', which the App.tsx route still
-  // calls Usage; App.tsx:118). Every other route showed a pill row that
-  // changed nothing on screen when pressed -- a control with no effect reads
-  // worse than no control. A page that gains real time-filtered data later
-  // adds itself here deliberately, rather than silently inheriting a
-  // live-looking bar it has never wired up.
-  const TIME_FILTER_ROUTES = ['/', '/sentiment', '/usage']
+  // Allowlist, not a blocklist. A route is listed only when its page really
+  // changes with the window: Dashboard ('/', the Checks tile, sparklines and
+  // recent lists), BrandSentiment ('/sentiment'), Competitors ('/competitors',
+  // the trend chart) and Revenue ('/usage'). The snapshot-based numbers on
+  // those pages are not windowed, so the label beside the pills names what the
+  // window actually changes. A page that gains real time-filtered data later
+  // adds itself here and to TIME_FILTER_LABEL deliberately.
+  const TIME_FILTER_ROUTES = ['/', '/sentiment', '/competitors', '/usage']
+  const TIME_FILTER_LABEL: Record<string, string> = {
+    '/': 'Trends and activity',
+    '/sentiment': 'Trends and signals',
+    '/competitors': 'Trend',
+    '/usage': 'Period',
+  }
   const hideTimeFilter = !TIME_FILTER_ROUTES.includes(pathname)
 
   // Scroll resets to the top on every route change. <main> is the scroll
@@ -1093,6 +1098,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             the sidebar's, not this strip's (§4.4). */}
         {!hideTimeFilter && (
         <div className="flex-shrink-0 border-b border-nav-40 bg-surface-bar backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
+          <span id="time-filter-label" className="text-xs text-slate-400 mr-2">{TIME_FILTER_LABEL[pathname]}</span>
+          <div role="group" aria-labelledby="time-filter-label" className="flex items-center gap-1">
           {((['7d', '30d', '90d', 'all'] as const)).map(r => (
             <button
               key={r}
@@ -1103,6 +1110,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {TIME_LABELS[r]}
             </button>
           ))}
+          </div>
         </div>
         )}
 

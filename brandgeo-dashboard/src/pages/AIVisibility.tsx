@@ -4,19 +4,17 @@ import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
-  CircleCheck, Undo2, EyeOff,
+  CircleCheck, Undo2, EyeOff, Download,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { mockPrompts, mockAIResults } from '../lib/mockData'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { buildFixPrompt } from '../lib/fixPrompt'
-import { buildFixResultMap, buildFixItems, type FixItem } from '../lib/fixItems'
+import { buildFixItems, type FixItem } from '../lib/fixItems'
 import { readAllById } from '../lib/keysetRead'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection, type CollectionBlockReason } from '../lib/collectionContext'
-import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, RETIRED_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
@@ -30,7 +28,12 @@ import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
 import Skeleton from '../components/Skeleton'
 import { PageTitle, SectionHeading } from '../components/Typography'
-import { aggregateCompetitors } from '../lib/competitorFilter'
+import LoadErrorCard from '../components/LoadErrorCard'
+import { useResults } from '../lib/resultsContext'
+import { shouldReportReloadFailure } from '../lib/resultsGuards'
+import type { EngineBand } from '../lib/metrics'
+import { buildAiVisibilityData, buildAiVisibilityCsvRows, AI_VISIBILITY_CSV_HEADER } from '../lib/views/aiVisibilityView'
+import { toCsv, csvFilename, downloadCsv } from '../lib/csv'
 import { promptCategoryLabel } from '../lib/promptCategories'
 import { useChartTheme } from '../lib/chartTheme'
 import SharedEmptyState from '../components/EmptyState'
@@ -38,7 +41,7 @@ import { formatDate, formatRelativeOrDate, formatRatio } from '../lib/format'
 import PromptResultCell from '../components/PromptResultCell'
 import {
   buildCellViews, summarisePrompt, sortPrompts, promptCompetitors, buildHeadline,
-  engineErrorSince, lockedCandidates, pickLockedColumns, parseRankedCompetitors,
+  lockedCandidates, pickLockedColumns, parseRankedCompetitors,
   parseSortMode, sortStorageKey, SORT_MODES,
   type CellView, type CellState, type PerfRow, type PromptSummary, type SectionKey, type SortMode,
 } from '../lib/promptPerformance'
@@ -293,6 +296,15 @@ function EngineToggleModal({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+const NO_PROMPTS: Prompt[] = []
+const NO_ROWS: PerfRow[] = []
+const EMPTY_RESULTS: ResultMap = new Map()
+const EMPTY_ENGINE_SET = new Set<LLMName>()
+const EMPTY_HEALTH = new Map<LLMName, { lastAttemptAt: string | null; lastAttemptFailed: boolean; lastErrorCode: string | null; lastOkAt: string | null }>()
+const EMPTY_BY_ENGINE: Record<string, string> = {}
+const EMPTY_SINCE: Record<string, string | null> = {}
+const ZERO_SCORE = computeAiVisibilityScore([], new Map(), [])
+
 export default function AIVisibility() {
   const { selections } = useMarket()
   const { activeClientId, activeClient, isAdmin, activeEngines, engineStates, setClientEngineOverride } = useClient()
@@ -317,34 +329,42 @@ export default function AIVisibility() {
     return { label: 'Monthly' }
   })()
 
-  const [prompts, setPrompts]           = useState<Prompt[]>([])
-  const [results, setResults]           = useState<ResultMap>(new Map())
-  const [errorEngines, setErrorEngines] = useState<Set<LLMName>>(new Set())
-  // Engines that had SOME failed checks but also some OK results (mixed case) —
-  // distinct from errorEngines (fully-failed only). Nielsen audit: the mixed case
-  // silently showed a percentage with no hint that anything failed to sync.
-  const [partialErrorEngines, setPartialErrorEngines] = useState<Set<LLMName>>(new Set())
-  // Per-engine health, added 2026-07-29 after a real report of "the refresh
-  // button does nothing". It DID run: it wrote an error row. But `isUnavailable`
-  // requires checked === 0, so an engine holding older successful rows kept
-  // rendering its old percentage and the failed attempt was invisible. The
-  // spinner stopped and the card did not change, which is indistinguishable
-  // from a dead button. lastAttempt* is the most recent attempt whatever its
-  // outcome; lastOkAt is the most recent SUCCESS, which is what "checked" means
-  // to a customer reading a number.
-  const [engineHealth, setEngineHealth] = useState<Map<LLMName, {
-    lastAttemptAt: string | null
-    lastAttemptFailed: boolean
-    lastErrorCode: string | null
-    lastOkAt: string | null
-  }>>(new Map())
+  // Results come from the shared snapshot (ResultsProvider), one read for every
+  // results page. The numbers are derived from it by aiVisibilityView.ts, which
+  // calls metrics.ts; this page no longer reads ai_results for any total or rate.
+  const { snapshot, status, loadError: staleError, reload } = useResults()
+  const activeEnginesKey = activeEngines.join(',')
+  const data = useMemo(
+    () => snapshot
+      ? buildAiVisibilityData({ rows: snapshot.rows, activePrompts: snapshot.activePrompts, activeEngines, clientId: snapshot.clientId })
+      : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [snapshot, activeEnginesKey],
+  )
+  const prompts: Prompt[] = snapshot?.activePrompts ?? NO_PROMPTS
+  const results: ResultMap = data?.results ?? EMPTY_RESULTS
+  // Engine is "unavailable" only when it has errors AND zero ok results.
+  const errorEngines = data?.errorEngines ?? EMPTY_ENGINE_SET
+  // Engines that had SOME failed checks but also some OK results (mixed case).
+  const partialErrorEngines = data?.partialErrorEngines ?? EMPTY_ENGINE_SET
+  // Per-engine health: the most recent attempt whatever its outcome, and the
+  // most recent success (see metrics.engineHealth).
+  const engineHealth = data?.engineHealth ?? EMPTY_HEALTH
+  // Raw rows for the active engines and prompts. The per-cell view model in
+  // promptPerformance.ts is built from these.
+  const rawRows: PerfRow[] = data?.cellRows ?? NO_ROWS
+  const lastChecked = data?.latestChecked ?? null
+  const resultsClientId = snapshot?.clientId ?? null
+  // First mount or client switch only: a quiet reload keeps the snapshot.
+  const loading = !snapshot && status !== 'error'
+  // The snapshot could not be loaded (or a refresh failed). Existing data stays on screen.
+  const loadError = status === 'error' || staleError
+  const [reloading, setReloading] = useState(false)
   // Fix This hub: show top 3 by default, reveal the rest on demand (Nielsen audit
   // edge case: "add a Show all when there are more than 3 items").
   const [showAllFixes, setShowAllFixes] = useState(false)
-  const [loading, setLoading]           = useState(true)
   const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
-  const [lastChecked, setLastChecked]   = useState<string | null>(null)
   const [showInsights, setShowInsights] = useState(true)
   // Click-toggle state for the score-weighting help popup. Hover and keyboard focus
   // still reveal it via the CSS `group` pattern; this exists so touch users, who
@@ -366,7 +386,6 @@ export default function AIVisibility() {
   // that started under a different one; and the client `results` was loaded for.
   const clientRef = useRef<number | null>(null)
   clientRef.current = activeClientId ?? null
-  const [resultsClientId, setResultsClientId] = useState<number | null>(null)
   // Focus target after a fix leaves the list, and a polite announcement of what
   // happened (WCAG 2.4.3 / 4.1.3; fix-states review L4).
   const fixHubToggleRef = useRef<HTMLButtonElement | null>(null)
@@ -377,12 +396,6 @@ export default function AIVisibility() {
   const [refreshingEngine, setRefreshingEngine] = useState<EngineId | null>(null)
   const [refreshingCell, setRefreshingCell]     = useState<string | null>(null)  // `${promptId}:${engineId}`
   const [showEngineModal, setShowEngineModal]         = useState(false)
-  // Raw rows for the active engines (every status). The per-cell view model in
-  // promptPerformance.ts is built from these; `results` above stays the newest
-  // OK row per cell and keeps feeding the score and the engine cards.
-  const [rawRows, setRawRows]           = useState<PerfRow[]>([])
-  // The prompt block could not be loaded. Existing data stays on screen.
-  const [loadError, setLoadError]       = useState(false)
   // Sort mode, persisted per client. Every storage access is guarded: it throws
   // in private windows and when site data is blocked.
   const [sortMode, setSortMode]         = useState<SortMode>('best')
@@ -414,18 +427,16 @@ export default function AIVisibility() {
     setEngineRefreshFailed(null)
     setCellRefreshFailed(null)
     await startCollection(activeClientId, false, selections, activeEngines)
-    // Silent: this is a background completion of a run the user already saw
-    // progress for (via the lastCompletedAt effect below, also silent), not a
-    // fresh page open. A non-silent reload here would remount the whole page
-    // to the loading skeleton right after live data had already appeared.
-    load({ silent: true })
+    // Quiet: a background completion of a run the user already saw progress
+    // for, so the page updates in place and never returns to the skeleton.
+    reload({ quiet: true })
   }
 
   const forceCollection = async () => {
     setEngineRefreshFailed(null)
     setCellRefreshFailed(null)
     await startCollection(activeClientId, true, selections, activeEngines)
-    load({ silent: true })
+    reload({ quiet: true })
   }
 
   // Per-engine force refresh: re-run ALL prompts for ONE engine only (admin,
@@ -445,7 +456,7 @@ export default function AIVisibility() {
       if (result.blocked) setEngineRefreshFailed(engineId)
     } finally {
       setRefreshingEngine(null)
-      load({ silent: true })
+      reload({ quiet: true })
     }
   }
 
@@ -462,114 +473,13 @@ export default function AIVisibility() {
       // non-2xx status), so the reload below will not show a new result.
       // Say so rather than leaving the spinner's stop as the only signal.
       if (!result.ok) setCellRefreshFailed(cellKey)
-      await load({ silent: true })
+      reload({ quiet: true })
     } finally {
       setRefreshingCell(null)
     }
   }
 
-  // `silent` distinguishes a background reload (data already on screen, from
-  // a collection in progress, a completed run, or a per-engine/per-cell refresh)
-  // from a first-mount or user-pressed-Reload load. A silent call never
-  // touches `loading` or `refreshed`, so the score card, engine grid and
-  // table stay mounted and simply update in place instead of the whole page
-  // flashing back to the loading skeleton. The "Refreshed!" flash next to the
-  // Reload button is reserved for that button's own non-silent call.
-  const load = async (opts: { silent?: boolean } = {}) => {
-    const silent = opts.silent === true
-    const cid = activeClientId
-    if (!silent) setLoading(true)
-    if (isDemoMode) {
-      setResultsClientId(cid)
-      const map: ResultMap = new Map()
-      mockAIResults.forEach(r => {
-        if (!map.has(r.prompt_id)) map.set(r.prompt_id, new Map())
-        map.get(r.prompt_id)!.set(r.llm as LLMName, r)
-      })
-      setPrompts(mockPrompts)
-      setResults(map)
-      setRawRows(mockAIResults.filter(r => activeEngines.includes(r.llm as EngineId)) as PerfRow[])
-      setLoadError(false)
-      setLastChecked(new Date().toISOString())
-      if (!silent) setLoading(false)
-      return
-    }
-
-    // Every answer, not the newest 1,000 PostgREST returns by default: the
-    // MCP server reads them all through the same keyset reader, so the Fix
-    // This list here and from list_fixes is built from the same rows. Sorted
-    // back to checked_at DESC after paging, which the health walk below needs.
-    const [{ data: pData, error: pError }, allResults] = await Promise.all([
-      supabase.from('prompts').select('*').eq('is_active', true).eq('client_id', activeClientId).order('position').order('id'),
-      readAllById<AIResult>(() => supabase.from('ai_results').select('*').eq('client_id', activeClientId)),
-    ])
-    const rError = allResults.error
-    const rData: AIResult[] = allResults.rows.slice().sort((x, y) =>
-      x.checked_at < y.checked_at ? 1 : x.checked_at > y.checked_at ? -1 : 0)
-
-    // A failed read must not look like "no prompts" or "nothing checked yet",
-    // and must not wipe what is already on screen. Flag it and stop; the
-    // prompt area shows a retry card.
-    if (pError || rError) {
-      setLoadError(true)
-      if (!silent) setLoading(false)
-      return
-    }
-    setLoadError(false)
-
-    const built = buildFixResultMap(rData as AIResult[] | null, activeEngines)
-    const map: ResultMap = built.results
-    // Engine is "unavailable" only when it has errors AND zero ok results
-    setErrorEngines(built.errorEngines)
-    // Mixed/partial: engine had at least one failed check AND at least one OK result.
-    setPartialErrorEngines(built.partialErrorEngines)
-    const latestChecked = built.latestChecked && (!lastChecked || built.latestChecked > lastChecked)
-      ? built.latestChecked : lastChecked
-
-    // Per-engine health. rData is ordered checked_at DESC, so the FIRST row seen
-    // for an engine is its most recent attempt. Deliberately walks every row
-    // rather than the per-prompt map above, because that map skips error rows
-    // entirely — which is exactly how a failed refresh became invisible.
-    const health = new Map<LLMName, {
-      lastAttemptAt: string | null
-      lastAttemptFailed: boolean
-      lastErrorCode: string | null
-      lastOkAt: string | null
-    }>()
-    rData?.forEach((r: AIResult) => {
-      const llm = r.llm as LLMName
-      if (!activeEngines.includes(llm as EngineId)) return
-      let h = health.get(llm)
-      if (!h) {
-        h = { lastAttemptAt: null, lastAttemptFailed: false, lastErrorCode: null, lastOkAt: null }
-        health.set(llm, h)
-      }
-      if (!h.lastAttemptAt) {
-        h.lastAttemptAt     = r.checked_at
-        h.lastAttemptFailed = r.status === 'error'
-        h.lastErrorCode     = r.error_code ?? null
-      }
-      if (!h.lastOkAt && r.status !== 'error') h.lastOkAt = r.checked_at
-    })
-    setEngineHealth(health)
-    setRawRows((rData ?? []).filter((r: AIResult) => activeEngines.includes(r.llm as EngineId)) as PerfRow[])
-
-    if (pData) setPrompts(pData)
-    setResults(map)
-    // Which client these results belong to. The fix verdict reads it, so a
-    // done fix is never judged against the previous client's answers during an
-    // admin client switch (fix-states review M1).
-    setResultsClientId(cid)
-    if (latestChecked) setLastChecked(latestChecked)
-    if (!silent) {
-      setLoading(false)
-      setRefreshed(true)
-      setTimeout(() => setRefreshed(false), 2500)
-    }
-  }
-
   useEffect(() => {
-    load()
     setEngineRefreshFailed(null)
     setCellRefreshFailed(null)
     // lastBlockReason lives in CollectionContext, which is app-level and
@@ -578,7 +488,42 @@ export default function AIVisibility() {
     // that has never been blocked at all. Nothing else clears it on a client
     // switch, so this page has to.
     clearBlockReason()
-  }, [activeClientId, activeEngines.join(',')])
+  }, [activeClientId, activeEnginesKey])
+
+  // R2: the reload notice and a pending Check now belong to the client they were
+  // started on; a switch clears both, and a result for the old client is ignored.
+  const activeClientRef = useRef(activeClientId)
+  activeClientRef.current = activeClientId
+  useEffect(() => {
+    setReloadFailed(false)
+    setCheckAwaiting(null)
+  }, [activeClientId])
+
+  // The Reload button: quiet reload of the shared snapshot, then the short
+  // "Refreshed!" flash once the new snapshot (or an error) has landed.
+  const reloadFromVersion = useRef<number | null>(null)
+  const [reloadFailed, setReloadFailed] = useState(false)
+  const onReloadClick = async () => {
+    reloadFromVersion.current = snapshot?.version ?? -1
+    const startedFor = activeClientId
+    setReloadFailed(false)
+    setReloading(true)
+    const ok = await reload({ quiet: true })
+    // A failed quiet reload keeps the snapshot (same version, status ready), so
+    // the landing effect below would never release the button: do it here.
+    if (!ok) { setReloading(false); setReloadFailed(shouldReportReloadFailure(ok, startedFor, activeClientRef.current)) }
+  }
+  useEffect(() => {
+    if (!reloading) return
+    const landed = status === 'error' || (snapshot !== null && snapshot.version !== reloadFromVersion.current)
+    if (!landed) return
+    setReloading(false)
+    if (status !== 'error') {
+      setRefreshed(true)
+      const tm = setTimeout(() => setRefreshed(false), 2500)
+      return () => clearTimeout(tm)
+    }
+  }, [reloading, status, snapshot])
 
   // Stored Fix This states for this client (docs/arch/fix-states.md). One small
   // read per load; demo mode keeps them in memory only.
@@ -589,16 +534,26 @@ export default function AIVisibility() {
       setFixRowsLoaded(true)
       return
     }
-    let { data, error } = await supabase
-      .from('fix_states')
-      .select(fixSelect)
-      .eq('client_id', cid)
-    // Step down one rung per 42703: full, then key only, then base.
-    for (let step = 0; step < 2; step++) {
-      if (!(error && (error as { code?: string }).code === '42703' && fixSelect !== FIX_SELECT_BASE)) break
-      fixSelect = fixSelectStepDown(fixSelect)
-      ;({ data, error } = await supabase.from('fix_states').select(fixSelect).eq('client_id', cid))
+    // The three reads run together (spec 6.1): fix_states with its step-down
+    // loop, and the two tiny label tables by client_id, unconditionally.
+    const readFixStates = async () => {
+      let { data, error } = await supabase
+        .from('fix_states')
+        .select(fixSelect)
+        .eq('client_id', cid)
+      // Step down one rung per 42703: full, then key only, then base.
+      for (let step = 0; step < 2; step++) {
+        if (!(error && (error as { code?: string }).code === '42703' && fixSelect !== FIX_SELECT_BASE)) break
+        fixSelect = fixSelectStepDown(fixSelect)
+        ;({ data, error } = await supabase.from('fix_states').select(fixSelect).eq('client_id', cid))
+      }
+      return { data, error }
     }
+    const [{ data, error }, keyRes, grantRes] = await Promise.all([
+      readFixStates(),
+      supabase.from('client_api_keys').select('id, label').eq('client_id', cid),
+      supabase.from('oauth_grants').select('id, client_name').eq('client_id', cid),
+    ])
     // A reply for a client the admin has already switched away from is dropped.
     if (clientRef.current !== cid) return
     if (error) {
@@ -620,30 +575,15 @@ export default function AIVisibility() {
     })
     setFixRows(m)
     setFixRowsLoaded(true)
-    // Only needed when an agent marked something; a failed read just drops the label.
-    if (Array.from(m.values()).some(r => r.marked_by_key)) {
-      const { data: keyData, error: keyErr } = await supabase
-        .from('client_api_keys')
-        .select('id, label')
-        .eq('client_id', cid)
-      if (clientRef.current !== cid) return
-      const km = new Map<string, string>()
-      if (!keyErr) (keyData ?? []).forEach(k => { const l = (k as { id: string; label: string | null }); if (l.label) km.set(l.id, l.label) })
-      setKeyLabels(km)
-    }
-    // Same for apps: read the name straight from oauth_grants (RLS allows the
-    // client's own rows, revoked ones included), so "by Claude" survives a disconnect.
-    const grantIds = Array.from(new Set(Array.from(m.values()).map(r => r.marked_by_grant).filter((g): g is string => !!g)))
-    if (grantIds.length > 0) {
-      const { data: grantData, error: grantErr } = await supabase
-        .from('oauth_grants')
-        .select('id, client_name')
-        .in('id', grantIds)
-      if (clientRef.current !== cid) return
-      const gm = new Map<string, string>()
-      if (!grantErr) (grantData ?? []).forEach(g => { const l = (g as { id: string; client_name: string | null }); if (l.client_name) gm.set(l.id, l.client_name) })
-      setGrantNames(gm)
-    }
+    // A failed side read just drops the labels.
+    const km = new Map<string, string>()
+    if (!keyRes.error) (keyRes.data ?? []).forEach(k => { const l = (k as { id: string; label: string | null }); if (l.label) km.set(l.id, l.label) })
+    setKeyLabels(km)
+    // Read the name straight from oauth_grants (RLS allows the client's own
+    // rows, revoked ones included), so "by Claude" survives a disconnect.
+    const gm = new Map<string, string>()
+    if (!grantRes.error) (grantRes.data ?? []).forEach(g => { const l = (g as { id: string; client_name: string | null }); if (l.client_name) gm.set(l.id, l.client_name) })
+    setGrantNames(gm)
   }
 
   useEffect(() => {
@@ -674,12 +614,8 @@ export default function AIVisibility() {
     setSortMode(mode)
     try { window.localStorage.setItem(sortStorageKey(activeClientId), mode) } catch { /* storage blocked: the sort still applies for this visit */ }
   }
-  // Silent: this fires roughly every 4s while a collection runs (see
-  // collectionContext.tsx) as well as once at the very end. Data is already
-  // on screen by the time this can fire, so it must never remount the page
-  // to the loading skeleton or flash "Refreshed!" -- it should just update
-  // the numbers in place as results land.
-  useCollectionLanded(lastCompletedAt, () => load({ silent: true }))
+  // No lastCompletedAt listener here: ResultsProvider already reloads the shared
+  // snapshot quietly when a run lands, and this page re-derives from it.
 
   // ── Collection allowance (PRICING-STRATEGY-2026-07 §12 T2a) ─────────────────
   // Mirrors, client-side, the exact checks enqueue-collection.js enforces
@@ -703,18 +639,22 @@ export default function AIVisibility() {
       const monthStart = new Date()
       monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
 
-      const [{ data: lastRun }, { data: costRows }] = await Promise.all([
+      const [{ data: lastRun }, costRes] = await Promise.all([
         collectionCooldownH > 0
           ? supabase.from('collection_runs')
               .select('created_at')
               .eq('client_id', activeClientId).eq('trigger', 'manual')
               .order('created_at', { ascending: false }).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from('ai_results')
-          .select('cost_eur')
-          .eq('client_id', activeClientId)
-          .gte('checked_at', monthStart.toISOString()),
+        // Paged: a month of rows can pass the 1,000-row default, which made the
+        // meter under-report spend.
+        readAllById<{ id: number; cost_eur: number | null }>(() =>
+          supabase.from('ai_results')
+            .select('id, cost_eur')
+            .eq('client_id', activeClientId)
+            .gte('checked_at', monthStart.toISOString())),
       ])
+      const costRows = costRes.rows
       if (cancelled) return
 
       let nextAvailableAt: string | null = null
@@ -722,7 +662,7 @@ export default function AIVisibility() {
         const next = new Date(new Date(lastRun.created_at).getTime() + collectionCooldownH * 3_600_000)
         if (next.getTime() > Date.now()) nextAvailableAt = next.toISOString()
       }
-      const budgetSpentEur = (costRows || []).reduce((s, r) => s + ((r as { cost_eur: number | null }).cost_eur || 0), 0)
+      const budgetSpentEur = costRows.reduce((s, r) => s + (r.cost_eur || 0), 0)
 
       setCollectionAllowance({ nextAvailableAt, budgetSpentEur, budgetCapEur: apiBudgetEur })
     }
@@ -733,18 +673,18 @@ export default function AIVisibility() {
   // ── Stats computed over active engines only ───────────────────────────────
 
   const llmStats = activeLLMs.map(llm => {
-    const mentioned = prompts.filter(p => results.get(p.id)?.get(llm.id)?.brand_mentioned).length
-    const checked   = prompts.filter(p => results.get(p.id)?.has(llm.id)).length
-    return { ...llm, mentioned, checked, pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0 }
+    const r = data?.rates.find(x => x.engine === llm.id)
+    return {
+      ...llm,
+      mentioned: r?.mentioned ?? 0, checked: r?.checked ?? 0, pct: r?.pct ?? 0,
+      band: r?.band ?? 'NOT_MEASURED' as EngineBand,
+      bestPosition: r?.bestPosition ?? null,
+    }
   })
 
-  // AI Visibility Score + its 6 dimensions — shared with Dashboard.tsx's Overview hero
-  // via aiVisibilityScore.ts so both pages always show the identical number (§7.4 Phase 3.1).
-  const { dimensions, aiScore } = computeAiVisibilityScore(
-    prompts.map(p => p.id),
-    results,
-    activeLLMs.map(l => l.id),
-  )
+  // AI Visibility Score + its 6 dimensions, from metrics.visibilityScore, the
+  // same function the Overview hero uses, so both pages show the identical number.
+  const { dimensions, aiScore } = data?.score ?? ZERO_SCORE
   const overallPct = dimensions.recognition
 
   // Score count-up (0 → aiScore) once data has loaded — matches the Overview hero's
@@ -753,62 +693,21 @@ export default function AIVisibility() {
   // (Rules of Hooks).
   const displayedScore = useCountUp(aiScore, !loading)
 
-  // Uses the SHARED aggregator now. This page carried its own copy that averaged
-  // the pos:99 prose sentinel into the displayed rank, which is not a rank at all
-  // but the marker _analysis.js writes for a name found in prose by
-  // scanForKnownCompetitors. Competitors.tsx and Recommendations.tsx were both
-  // migrated onto competitorFilter.ts on 2026-07-13 precisely to kill this; this
-  // page was missed and kept publishing the wrong number for two weeks.
-  //
-  // Measured on Bucate pe Roate the day this was fixed: "elegant catering" showed
-  // avg #61.3 against a true #2.1, "royal catering" #20.6 against #3.2. Those are
-  // not slightly-off numbers, they are arithmetic on a sentinel, and one of them
-  // was being printed into the headline Fix This card as the competitor beating
-  // the client.
-  const competitorFreq = aggregateCompetitors(
-    Array.from(results.values()).flatMap(llmMap => Array.from(llmMap.values())),
-    8,
-  ).map(c => ({
-    name: c.name,
-    count: c.totalMentions,
-    // Genuine ranks only. Null when an engine has never once ranked this name,
-    // which the UI must render as "no rank" rather than inventing one.
-    avgPos: c.avgPos,
-    rankedMentions: c.rankedMentions,
-    proseOnly: c.proseOnly,
-  }))
-
-  const totalChecked = (() => {
-    let n = 0
-    results.forEach(m => { n += m.size })
-    return n
-  })()
-
-  const gapCount = totalChecked - (() => {
-    let n = 0
-    results.forEach(m => { m.forEach(r => { if (r.brand_mentioned) n++ }) })
-    return n
-  })()
+  // Competitors, the absent count and the check total all read the same
+  // population (active prompts, active engines, newest usable answer per cell).
+  // The shared aggregator ignores the pos:99 prose sentinel when averaging ranks.
+  const competitorFreq = data?.competitorFreq ?? []
+  const totalChecked = data?.totalChecked ?? 0
+  const gapCount = data?.gapCount ?? 0
 
   // ── Engine status (active engines only, for KNOW/PARTIAL/MISSING/UNAVAILABLE) ─
 
   const engineStatusCards = llmStats.map(s => {
-    const isUnavailable = errorEngines.has(s.id) && s.checked === 0
-    // Zero checks with no error is an absence of data, not a verdict: a red
-    // MISSING card reading "0/0 prompts" told the customer they had failed
-    // at something nobody had ever tried. dashboard-visual-system.md §11's
-    // rule against rendering a zero as a measurement applies here too.
-    const status: 'KNOW' | 'PARTIAL' | 'MISSING' | 'UNAVAILABLE' | 'NOT_MEASURED' = isUnavailable
-      ? 'UNAVAILABLE'
-      : s.checked === 0 ? 'NOT_MEASURED'
-      : s.pct >= 50 ? 'KNOW' : s.pct >= 25 ? 'PARTIAL' : 'MISSING'
-    let bestPos: number | null = null
-    prompts.forEach(p => {
-      const r = results.get(p.id)?.get(s.id)
-      if (r?.brand_mentioned && r.brand_position) {
-        if (bestPos === null || r.brand_position < bestPos) bestPos = r.brand_position
-      }
-    })
+    // Band and best position come from metrics.engineRates. Zero checks with no
+    // error is NOT_MEASURED, not a verdict (dashboard-visual-system.md section 11).
+    const status: EngineBand = s.band
+    const isUnavailable = status === 'UNAVAILABLE'
+    const bestPos: number | null = s.bestPosition
     const health = engineHealth.get(s.id as LLMName)
     return {
       ...s, status, bestPos, isUnavailable,
@@ -873,14 +772,8 @@ export default function AIVisibility() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [summaries, cellViews, results],
   )
-  const errorSinceByEngine = useMemo(() => engineErrorSince(rawRows), [rawRows])
-  const newestErrorAtByEngine = useMemo(() => {
-    const out: Record<string, string> = {}
-    rawRows.forEach(r => {
-      if (r.status === 'error' && (!out[r.llm] || r.checked_at > out[r.llm])) out[r.llm] = r.checked_at
-    })
-    return out
-  }, [rawRows])
+  const errorSinceByEngine = data?.errorSinceByEngine ?? EMPTY_SINCE
+  const newestErrorAtByEngine = data?.newestErrorAtByEngine ?? EMPTY_BY_ENGINE
 
   const lockedColumns = pickLockedColumns(engineStates)
   const lockedChipEngines = (isWide
@@ -902,6 +795,22 @@ export default function AIVisibility() {
     }).filter(sec => sec.rows.length > 0)
   })()
   const visibleCount = renderPlan.reduce((a, s) => a + s.rows.length, 0)
+  // Export: one row per visible prompt (rendered order, category filter applied)
+  // and active engine. Built from the same cell views the table reads.
+  const exportCsv = () => {
+    if (visibleCount === 0 || !activeClientId) return
+    const visiblePrompts = renderPlan.flatMap(sec => sec.rows.map(r => r.prompt))
+    const csv = toCsv(
+      AI_VISIBILITY_CSV_HEADER,
+      buildAiVisibilityCsvRows({
+        prompts: visiblePrompts,
+        engines: activeLLMs.map(l => ({ id: l.id as string, label: l.label })),
+        cellViews,
+        results,
+      }),
+    )
+    downloadCsv(csvFilename('ai-visibility', activeClient?.slug, activeClientId, new Date()), csv)
+  }
   const sectionIsOpen = (key: SectionKey): boolean => {
     const stored = sectionOpen[key]
     if (stored !== undefined) return stored
@@ -1037,7 +946,7 @@ export default function AIVisibility() {
   // answers (7 days or more after marking) gets its verdict written once. The
   // database repeats the 7-day rule and only accepts a verdict from done.
   const [checkRequested, setCheckRequested] = useState<string | null>(null)
-  const resultsKey = `${rawRows.length}:${lastChecked ?? ''}`
+  const resultsKey = String(snapshot?.version ?? '')
   useEffect(() => {
     // Rows and results must both belong to the client on screen (review M1):
     // during an admin client switch one render still holds the previous
@@ -1091,11 +1000,26 @@ export default function AIVisibility() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, fixRowsLoaded, fixRows, resultsKey, resultsClientId, checkRequested, activeClientId])
 
+  const [checkAwaiting, setCheckAwaiting] = useState<{ id: string; version: number } | null>(null)
   const checkFixNow = async (fixId: string) => {
     setFixNotice(null)
-    await load({ silent: true })
-    setCheckRequested(fixId)
+    setReloadFailed(false)
+    const startedFor = activeClientId
+    setCheckAwaiting({ id: fixId, version: snapshot?.version ?? -1 })
+    const ok = await reload({ quiet: true })
+    // Same as the Reload button: a failed quiet reload never raises the version.
+    if (!ok) { setCheckAwaiting(null); setReloadFailed(shouldReportReloadFailure(ok, startedFor, activeClientRef.current)) }
   }
+  // The re-check judges the answers that exist after the reload, so it starts
+  // only once a newer snapshot has landed (or the reload failed).
+  useEffect(() => {
+    if (!checkAwaiting) return
+    if (status === 'error') { setCheckAwaiting(null); return }
+    if (snapshot && snapshot.version > checkAwaiting.version) {
+      setCheckRequested(checkAwaiting.id)
+      setCheckAwaiting(null)
+    }
+  }, [checkAwaiting, snapshot, status])
 
   const doneFixLine = (row: FixStateRow): string => {
     const scope = parseMetricKey(row.metric_key)
@@ -1136,6 +1060,15 @@ export default function AIVisibility() {
   // jump from a bare text line to the full page (CLS), and only ever renders
   // on a true first mount or a client switch (see the `silent` load() param
   // above), never during an in-progress or completed collection run.
+  if (!snapshot && status === 'error') return (
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-6">
+        <PageTitle>{t.aiv_title}</PageTitle>
+      </div>
+      <LoadErrorCard onRetry={() => reload()} />
+    </div>
+  )
+
   if (loading) return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
@@ -1757,15 +1690,21 @@ export default function AIVisibility() {
           )}
           {/* Secondary/neutral outlined — same base as Engines + Force Refresh. */}
           <button
-            onClick={() => load()}
-            disabled={loading}
+            onClick={onReloadClick}
+            disabled={loading || reloading}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading || reloading ? 'animate-spin' : ''} />
             {refreshed ? <span className="text-emerald-400">{t.aiv_refreshed}</span> : t.aiv_reload}
           </button>
         </div>
       </div>
+      {reloadFailed && (
+        <div role="status" className="mb-4 flex items-center gap-2 text-xs text-amber-300">
+          <AlertTriangle size={14} aria-hidden="true" className="shrink-0 text-amber-400" />
+          {AIV_COPY.promptsLoadError}
+        </div>
+      )}
 
       {/* Blocked-collection notice. Covers every button that goes through
           startCollection (Run Collection, Force Refresh, and per-engine
@@ -2476,7 +2415,7 @@ export default function AIVisibility() {
           <span className="text-sm text-slate-200">{AIV_COPY.promptsLoadError}</span>
           <button
             type="button"
-            onClick={() => load()}
+            onClick={() => reload({ quiet: true })}
             className="ml-auto min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
           >
             {AIV_COPY.promptsLoadRetry}
@@ -2618,6 +2557,18 @@ export default function AIVisibility() {
                 </div>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={visibleCount === 0}
+              title={visibleCount === 0 ? 'Nothing to export yet' : undefined}
+              aria-label="Export AI Visibility results as CSV"
+              className="ml-auto inline-flex items-center gap-2 min-h-[44px] sm:min-h-0 px-3 py-1.5 rounded-lg text-xs font-medium border border-dark-600 bg-dark-700/50 text-slate-300 hover:text-slate-100 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={14} aria-hidden="true" />
+              Export CSV
+            </button>
           </div>
         )
       })()}
@@ -2804,18 +2755,13 @@ export default function AIVisibility() {
 
       {/* ── Category breakdown (supplementary — sits below the prompt table) ───── */}
       {(() => {
-        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
-        const catStats = activeCats.map(cat => {
-          const catPrompts = prompts.filter(p => p.category === cat)
-          let mentioned = 0, checked = 0
-          catPrompts.forEach(p => {
-            activeLLMs.forEach(llm => {
-              const r = results.get(p.id)?.get(llm.id)
-              if (r) { checked++; if (r.brand_mentioned) mentioned++ }
-            })
-          })
-          return { cat, label: getCatLabel(cat), pct: checked > 0 ? Math.round((mentioned / checked) * 100) : 0, checked, mentioned }
-        }).sort((a, b) => b.pct - a.pct)
+        const catStats = (data?.categoryStats ?? []).map(c => ({
+          cat: c.category,
+          label: getCatLabel(c.category),
+          pct: Math.round(c.rate * 100),
+          checked: c.checked,
+          mentioned: c.mentioned,
+        })).sort((a, b) => b.pct - a.pct)
 
         // Nothing measured yet means every category would show 0%, which is
         // not a comparison, it is a placeholder pretending to be data (§11

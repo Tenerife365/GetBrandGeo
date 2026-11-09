@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
@@ -6,41 +6,33 @@ import {
 } from 'recharts'
 import { RefreshCw, Sparkles, ChevronDown, ChevronUp, TrendingUp, Target, Hash, Eye } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { mockPrompts, mockAIResults } from '../lib/mockData'
+import { mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
 import { useCollection } from '../lib/collectionContext'
+import { useCollectionLanded } from '../lib/useCollectionLanded'
 import { useTheme } from '../lib/themeContext'
-import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
-import {
-  computeAiVisibilityScore, buildScoreResultMap, isNoAnswerRow,
-  type AiVisibilityDimensions, type ScoreInputRow,
-} from '../lib/aiVisibilityScore'
+import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import type { AiVisibilityDimensions } from '../lib/aiVisibilityScore'
 import { staggerContainer, heroReveal, useCountUp, EASE_OUT } from '../lib/motion'
 import { useChartTheme } from '../lib/chartTheme'
+import { useResults } from '../lib/resultsContext'
+import { nextSeq, isStale } from '../lib/resultsGuards'
+import { readResultHistory } from '../lib/historyRead'
+import { formatAvgPosition } from '../lib/metrics'
+import {
+  buildDashboardView, DASHBOARD_HISTORY_COLUMNS,
+  type DashboardHistoryRow, type RecentEntry, type SparkPoint,
+} from '../lib/views/dashboardView'
 import MotionCard from '../components/MotionCard'
 import Skeleton from '../components/Skeleton'
 import Collapse from '../components/Collapse'
 import { PageTitle } from '../components/Typography'
 import LoadErrorCard from '../components/LoadErrorCard'
-import { readAllById } from '../lib/keysetRead'
 import ChartTooltip from '../components/ChartTooltip'
 import SharedEmptyState from '../components/EmptyState'
 import { formatDate, formatOrdinal } from '../lib/format'
-import type { LLMName, Sentiment, Prompt, AIResult } from '../types'
-
-// Chart colors sourced from ENGINE_META (planConfig.ts), not hardcoded here — keeps this
-// page's palette from drifting out of sync with AIVisibility.tsx (DESIGN-SYSTEM.md §1/§5).
-// Derived, never hand-listed. This array was hardcoded to five engines and was
-// already missing grok and ai_overview within hours of each shipping, so the
-// chart quietly under-reported what the product collects. See LIVE_ENGINES.
-const LLM_IDS = LIVE_ENGINES as LLMName[]
-const LLMS = LLM_IDS.map(id => ({
-  id,
-  label: ENGINE_META[id].label,
-  chartColor: ENGINE_META[id].chartColor,
-}))
 
 const DIMENSION_LABELS: [keyof AiVisibilityDimensions, string][] = [
   ['recognition', 'Recognition'], ['knowledge', 'Knowledge'], ['sentiment', 'Sentiment'],
@@ -60,108 +52,23 @@ function joinEngineNames(ids: EngineId[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
-// Score query row: ScoreInputRow plus the id readAllById pages on.
-type ScoreQueryRow = ScoreInputRow & { id: number }
-
-interface AIResultRow {
-  id: number
-  prompt_id: number
-  llm: LLMName
-  response_snippet: string | null
-  brand_mentioned: boolean
-  brand_position: number | null
-  sentiment: Sentiment
-  checked_at: string
-  competitors_mentioned: string | null
-  prompts?: { text: string; category: string } | null
-}
-
-interface OverviewStats {
-  totalChecks: number
-  mentionRate: number
-  avgPosition: number | null
-}
-
 /**
- * Top-of-page "what to do next" callout — DASHBOARD-UX-2026.md §6 Phase B.
- * Sourced from the persisted recommendation_runs/recommendations tables
- * (CLAUDE.md §14, Recommendations.tsx's loadHistory pattern), not recomputed
- * here — this reads the SAME advice a client would see on /recommendations,
- * it doesn't run its own rule-based generator.
+ * Top-of-page "what to do next" callout, DASHBOARD-UX-2026.md section 6 Phase B.
+ * Sourced from the persisted recommendation_runs/recommendations tables, not
+ * recomputed here. One embedded read (run plus its recommendations).
  */
 interface TopRec {
   id: number
   title: string
   priority: 'critical' | 'high' | 'medium'
-}
-
-function computeStats(allRows: AIResultRow[]): OverviewStats {
-  // Drop rows where the engine ran but produced no answer at all (Google
-  // declining to render an AI Overview). They are not failures, so they arrive
-  // with status 'ok' and are indistinguishable from a real absence unless you
-  // check the marker. Counting them sank Mention Rate for something that was
-  // never winnable. Excluded from the denominator AND from Total Checks, so
-  // this card cannot disagree with the AI Visibility Score below it, which
-  // excludes them in buildScoreResultMap.
-  const rows = allRows.filter(r => !isNoAnswerRow(r))
-  const mentionCount = rows.filter(r => r.brand_mentioned).length
-  const posRows = rows.filter(r => r.brand_mentioned && r.brand_position != null)
-  const avgPos = posRows.length > 0
-    ? Math.round(posRows.reduce((s, r) => s + (r.brand_position ?? 0), 0) / posRows.length * 10) / 10
-    : null
-  return {
-    totalChecks: rows.length,
-    mentionRate: rows.length > 0 ? Math.round((mentionCount / rows.length) * 100) : 0,
-    avgPosition: avgPos,
-  }
-}
-
-// A single sparkline point. avg-position buckets can be null (a bucket with no
-// ranked mentions) — Sparkline's <Line connectNulls> draws across those gaps
-// rather than dipping the line to a fake "position #0".
-interface SparkPoint { v: number | null }
-
-/**
- * KPI trend sparklines (DASHBOARD-UX-2026.md §9.4) — bucket the SAME rows already
- * fetched for the page into ~8 chronological slices (no new query) and derive a
- * per-bucket series for each KPI card that carries one: mention-rate %, avg
- * ranked position (nullable), and check volume. `rows` arrive newest-first, so
- * we sort ascending here for a left-to-right (oldest→newest) sparkline.
- */
-function buildKpiSparklines(rows: AIResultRow[]): {
-  mentionRate: SparkPoint[]
-  avgPosition: SparkPoint[]
-  volume: SparkPoint[]
-} {
-  const BUCKETS = 8
-  const sorted = [...rows].sort(
-    (a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime()
-  )
-  const mentionRate: SparkPoint[] = []
-  const avgPosition: SparkPoint[] = []
-  const volume: SparkPoint[] = []
-  if (sorted.length === 0) return { mentionRate, avgPosition, volume }
-
-  const size = Math.max(1, Math.ceil(sorted.length / BUCKETS))
-  for (let i = 0; i < sorted.length; i += size) {
-    const chunk = sorted.slice(i, i + size)
-    const mentions = chunk.filter(r => r.brand_mentioned).length
-    mentionRate.push({ v: Math.round((mentions / chunk.length) * 100) })
-    const posRows = chunk.filter(r => r.brand_mentioned && r.brand_position != null)
-    avgPosition.push({
-      v: posRows.length > 0
-        ? posRows.reduce((s, r) => s + (r.brand_position ?? 0), 0) / posRows.length
-        : null,
-    })
-    volume.push({ v: chunk.length })
-  }
-  return { mentionRate, avgPosition, volume }
+  status?: string
+  position?: number | null
 }
 
 export default function Dashboard() {
   const { activeClientId, activeClient, activeEngines } = useClient()
-  // clientContext rebuilds this array on every render, so effects depend on a
-  // stable string key instead of the array identity (no render loop).
+  // clientContext rebuilds this array on every render, so memo deps use a
+  // stable string key instead of the array identity.
   const activeEnginesKey = activeEngines.join(',')
   const { t } = useI18n()
   const { getStartDate, timeRange, setTimeRange } = useTimeFilter()
@@ -179,163 +86,63 @@ export default function Dashboard() {
   // same reason useCountUp checks this itself in motion.ts.
   const prefersReducedMotion = useReducedMotion()
 
-  const [rows, setRows]           = useState<AIResultRow[]>([])
-  const [stats, setStats]         = useState<OverviewStats | null>(null)
-  const [scoreData, setScoreData] = useState<{ dimensions: AiVisibilityDimensions; aiScore: number } | null>(null)
-  const [loading, setLoading]     = useState(true)
+  const { snapshot, status, loadError, reload } = useResults()
+  const [history, setHistory] = useState<DashboardHistoryRow[] | null>(null)
+  const [historyFailed, setHistoryFailed] = useState(false)
   const [topRecs, setTopRecs]     = useState<TopRec[]>([])
   const [recsLoaded, setRecsLoaded] = useState(false)
-  // Progressive disclosure (Hick's Law) — detail charts/lists start hidden.
+  // Progressive disclosure (Hick's Law): detail charts/lists start hidden.
   const [showDetails, setShowDetails] = useState(false)
-  // Active prompt count, sourced from the SAME `prompts` query already fired
-  // in the Promise.all below (pData), never from the ai_results rows this
-  // page happens to have on hand. A brand-new client who added prompts but
-  // has 0 ai_results was reading promptCount off a Set of ai_results.prompt_id,
-  // which is empty until the first collection runs, so the zero-data hero
-  // told them to "Add a prompt" a second time even though prompts already
-  // existed. This is the one number that has to come from the prompts table.
-  const [promptCount, setPromptCount] = useState(0)
-  // Whether the client has EVER had a real (answered) ai_results row, sourced
-  // from the all-time scoreRows query below, never from the time-filtered
-  // `stats.totalChecks`. Gates the "Not measured yet" verdict hero, since that
-  // hero has to mean "no measurement exists", not "no measurement exists in
-  // the currently selected 7/30/90-day window", or a free client's score
-  // ring vanishes and gets replaced by a first-run verdict every time their
-  // last check falls outside the window (e.g. day 8 of a monthly cadence).
-  const [hasAnyRows, setHasAnyRows] = useState(false)
-  // True when a read failed. Never let a failed read look like an empty account.
-  const [loadError, setLoadError] = useState(false)
 
-  // Sequence guard: overlapping loads (client switch, engine toggle, a mid-run
-  // bump while the paged score read is still in flight) must not let an older
-  // load write its data back over a newer one.
-  const loadSeqRef = useRef(0)
-
-  const load = async (quiet = false) => {
-    const seq = ++loadSeqRef.current
-    if (!quiet) setLoading(true)
-    // A quiet reload keeps the error banner mounted until it resolves, so a
-    // role="alert" node is not re-announced on every background bump.
-    if (!quiet) setLoadError(false)
-
+  // Window history: only the Checks tile, the sparklines and the two recent
+  // lists read it. Paged (readResultHistory) so a long window is never cut at
+  // 1,000 rows. A sequence guard drops an older response that lands late.
+  const historySeq = useRef(0)
+  const loadHistory = useCallback(async (quiet: boolean) => {
+    const seq = nextSeq(historySeq)
+    if (!quiet) { setHistory(null); setHistoryFailed(false) }
     if (isDemoMode) {
-      setLoadError(false)
-      const demoRows: AIResultRow[] = mockAIResults.map((r: AIResult) => {
-        const p = mockPrompts.find((mp: Prompt) => mp.id === r.prompt_id)
-        return {
-          ...r,
-          competitors_mentioned: r.competitors_mentioned ?? null,
-          prompts: p ? { text: p.text, category: p.category } : null,
-        }
+      setHistory(mockAIResults
+        .map(r => ({
+          id: r.id, prompt_id: r.prompt_id, llm: r.llm, brand_mentioned: r.brand_mentioned,
+          brand_position: r.brand_position, checked_at: r.checked_at, response_snippet: r.response_snippet,
+        }))
+        .sort((a, b) => b.checked_at.localeCompare(a.checked_at) || b.id - a.id))
+      return
+    }
+    const res = await readResultHistory<DashboardHistoryRow>(supabase, {
+      clientId: activeClientId,
+      sinceIso: getStartDate()?.toISOString() ?? null,
+      columns: DASHBOARD_HISTORY_COLUMNS,
+    })
+    if (isStale(historySeq, seq)) return
+    if (res.error) { setHistoryFailed(true); return }
+    setHistoryFailed(false)
+    setHistory(res.rows)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClientId, timeRange])
+
+  useEffect(() => { void loadHistory(false) }, [loadHistory])
+
+  // The snapshot reloads itself on lastCompletedAt (resultsContext); the window
+  // history does not, so re-read it quietly (rows stay on screen).
+  useCollectionLanded(lastCompletedAt, () => { void loadHistory(true) })
+
+  const view = useMemo(() => snapshot
+    ? buildDashboardView({
+        rows: snapshot.rows,
+        activePrompts: snapshot.activePrompts,
+        prompts: snapshot.prompts,
+        activeEngines,
+        history,
       })
-      setRows(demoRows)
-      setStats(computeStats(demoRows))
-      setPromptCount(mockPrompts.filter((p: Prompt) => p.is_active).length)
-      setHasAnyRows(mockAIResults.some((r: AIResult) => !isNoAnswerRow(r)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    : null, [snapshot, activeEnginesKey, history])
 
-      // AI Visibility Score — same shared computation as AIVisibility.tsx, deliberately
-      // all-time (not time-filtered) so both pages always show the identical headline number.
-      const scoreMap = buildScoreResultMap(mockAIResults, activeEngines)
-      setScoreData(computeAiVisibilityScore(mockPrompts.map(p => p.id), scoreMap, activeEngines))
-
-      setLoading(false)
-      return
-    }
-
-    const startDate = getStartDate()
-    // .neq('status','error') — API-failure rows are not real "not mentioned"
-    // results; counting them tanked every KPI/chart on this page (CLAUDE.md §4.8,
-    // CLIENT-HEALTH-BPR.md §4.6). AIVisibility.tsx already excluded them.
-    let query = supabase
-      .from('ai_results')
-      .select('*, prompts(text, category)')
-      .eq('client_id', activeClientId)
-      .neq('status', 'error')
-      .order('checked_at', { ascending: false })
-      .limit(1000)
-    if (startDate) query = query.gte('checked_at', startDate.toISOString())
-
-    const [{ data, error }, { data: pData, error: pError }, scoreRead] = await Promise.all([
-      query,
-      supabase.from('prompts').select('id').eq('is_active', true).eq('client_id', activeClientId),
-      // Score query: deliberately all-time (no startDate) so the headline number
-      // never disagrees with AI Visibility's. Read through readAllById (keyset
-      // pages, same as AIVisibility.tsx) so a client with more than 1,000 rows
-      // gets the same score on both pages. Error rows are excluded here and
-      // buildScoreResultMap also skips them, then keeps the newest row per
-      // prompt and engine by checked_at, so the page order does not matter.
-      // Doubles as the all-time "has this client ever been measured" signal
-      // (hasAnyRows below), so no extra query is needed for that.
-      readAllById<ScoreQueryRow>(() => supabase.from('ai_results')
-        // response_snippet is selected ONLY so buildScoreResultMap can spot the
-        // `[no_ai_overview]` marker. Drop it and the exclusion silently stops
-        // working: every row arrives with response_snippet undefined, the
-        // predicate returns false for all of them, and the score quietly goes
-        // back to counting unanswerable queries as misses.
-        .select('id, prompt_id, llm, brand_mentioned, brand_position, sentiment, checked_at, status, response_snippet')
-        .eq('client_id', activeClientId)
-        .neq('status', 'error')),
-    ])
-
-    // A newer load has started: drop this stale response.
-    if (seq !== loadSeqRef.current) return
-
-    // A failed read must not look like "no data yet". On a fresh load or client
-    // switch drop what is on screen (it may belong to another client); on a
-    // quiet background reload keep the last good data and show the banner.
-    if (error || pError || scoreRead.error) {
-      if (!quiet) {
-        setRows([])
-        setStats(null)
-        setScoreData(null)
-        setHasAnyRows(false)
-        setPromptCount(0)
-      }
-      setLoadError(true)
-      setLoading(false)
-      return
-    }
-
-    setLoadError(false)
-    const scoreRows = scoreRead.rows
-    if (data) {
-      const r = data as AIResultRow[]
-      setRows(r)
-      setStats(computeStats(r))
-    }
-
-    setPromptCount(pData?.length ?? 0)
-    setHasAnyRows(scoreRows.some(r => !isNoAnswerRow(r)))
-
-    if (pData) {
-      const scoreMap = buildScoreResultMap(scoreRows as unknown as ScoreInputRow[], activeEngines)
-      setScoreData(computeAiVisibilityScore(pData.map((p: { id: number }) => p.id), scoreMap, activeEngines))
-    }
-
-    setLoading(false)
-  }
-
-  // Reload on client switch, time-window change, or a background collection
-  // run finishing (lastCompletedAt, from CollectionContext, bumped once or
-  // several times per run; every bump must be handled, not just a presumed
-  // final one). A bump that leaves the client and window unchanged is a quiet
-  // background refresh: rows are already on screen, so it must not flip
-  // `loading` back to true and swap the real content out for the skeleton.
-  const loadKeyRef = useRef('')
-  useEffect(() => {
-    const key = `${activeClientId}|${timeRange}`
-    const quiet = key === loadKeyRef.current
-    loadKeyRef.current = key
-    load(quiet)
-  }, [activeClientId, timeRange, lastCompletedAt, activeEnginesKey])
-
-  // "What to do next" — reads the SAME persisted advice Recommendations.tsx
-  // shows (recommendation_runs/recommendations, CLAUDE.md §14), it does not
-  // generate its own. Independent of the main load() above so a slower
-  // recs fetch never delays the rest of the page — DASHBOARD-UX-2026.md §7's
-  // "never delay already-loaded data for the sake of an effect" cuts both
-  // ways: this data loading a beat later than the rest is fine, since the
-  // callout only renders once it has real data (recsLoaded && topRecs.length).
+  // "What to do next": reads the SAME persisted advice Recommendations.tsx
+  // shows. One embedded read (the run and its recommendations together), so
+  // there is no second round trip. Independent of the snapshot so a slower
+  // read never delays the rest of the page.
   useEffect(() => {
     if (isDemoMode || !activeClientId) { setTopRecs([]); setRecsLoaded(true); return }
     let cancelled = false
@@ -343,75 +150,65 @@ export default function Dashboard() {
       setRecsLoaded(false)
       const { data: runRows } = await supabase
         .from('recommendation_runs')
-        .select('id')
+        .select('id, generated_at, recommendations(id, title, priority, status, position)')
         .eq('client_id', activeClientId)
         .order('generated_at', { ascending: false })
         .limit(1)
-      const runId = runRows?.[0]?.id
-      if (!runId) {
-        if (!cancelled) { setTopRecs([]); setRecsLoaded(true) }
-        return
-      }
-      const { data } = await supabase
-        .from('recommendations')
-        .select('id, title, priority, status')
-        .eq('run_id', runId)
-        .neq('status', 'dismissed')
-        .order('position', { ascending: true })
-        .limit(2)
-      if (!cancelled) {
-        setTopRecs((data ?? []) as TopRec[])
-        setRecsLoaded(true)
-      }
+      const recs = ((runRows?.[0] as { recommendations?: TopRec[] } | undefined)?.recommendations ?? [])
+        .filter(r => r.status !== 'dismissed')
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .slice(0, 2)
+      if (!cancelled) { setTopRecs(recs); setRecsLoaded(true) }
     })()
     return () => { cancelled = true }
   }, [activeClientId])
 
-  // Count-up target is real, already-loaded scoreData — active flips true only
-  // once the fetch has resolved, so this animates the display, never the data.
+  // Count-up target is the real, already-loaded score; active flips true only
+  // once the snapshot has resolved, so this animates the display, never the data.
+  const scoreData: { dimensions: AiVisibilityDimensions; aiScore: number } | null = view?.score ?? null
   const displayedScore = useCountUp(scoreData?.aiScore ?? 0, !!scoreData)
 
-  const llmData = LLMS.map(l => {
-    const lRows     = rows.filter(r => r.llm === l.id)
-    const lMentions = lRows.filter(r => r.brand_mentioned).length
-    return {
-      id:        l.id,
-      label:     l.label,
-      rate:      lRows.length > 0 ? Math.round((lMentions / lRows.length) * 100) : 0,
-      count:     lRows.length,
-      color:     l.chartColor,
-    }
-  }).filter(d => d.count > 0)
+  const win = view?.window ?? null
+  const llmData = view?.engineBars ?? []
+  const recentMentioned = win?.recentMentioned ?? []
+  const recentNotMentioned = win?.recentNotMentioned ?? []
 
-  const recentMentioned   = rows.filter(r => r.brand_mentioned).slice(0, 5)
-  const recentNotMentioned = rows.filter(r => !r.brand_mentioned).slice(0, 5)
-
-  // KPI trend sparklines — DASHBOARD-UX-2026.md §9.4. Built from the SAME rows
-  // already fetched (no new query). Avg-position only gets a sparkline when it
-  // has ≥2 real (non-null) buckets, so a brand that's never ranked doesn't show
-  // an empty 32px gap.
-  const spark = buildKpiSparklines(rows)
-  const avgPosSpark = spark.avgPosition.filter(p => p.v != null).length >= 2
+  // KPI trend sparklines. Avg-position only gets a sparkline when it has at
+  // least 2 real (non-null) buckets, so a brand that is never ranked does not
+  // show an empty 32px gap.
+  const spark = win?.sparks ?? null
+  const avgPosSpark = spark && spark.avgPosition.filter(p => p.v != null).length >= 2
     ? spark.avgPosition
     : undefined
 
-  // Ring sweep math — DASHBOARD-UX-2026.md §6 Phase B. RING_R must match the
-  // SVG circles' r="54" below (kept as one constant so the two never drift).
-  // Human-readable window length for the "no checks in this window" line
-  // below, mirroring timeFilterContext.tsx's own 7d/30d/90d/all day counts.
+  // Human-readable window length for the "no checks in this window" line below,
+  // mirroring timeFilterContext.tsx's own 7d/30d/90d/all day counts.
   const windowDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : null
 
+  // Ring sweep math. RING_R must match the SVG circles' r="54" below.
   const RING_R = 54
   const RING_CIRC = 2 * Math.PI * RING_R
   const ringOffset = scoreData
     ? RING_CIRC - (scoreData.aiScore / 100) * RING_CIRC
     : RING_CIRC
 
+  const mentionPct = view?.mention.pct ?? 0
+  const checkedCount = view?.mention.checked ?? 0
+
   // Content-shaped skeleton (DASHBOARD-UX-2026.md §6 Phase C) — mirrors the real
   // page's layout below (header / hero score card / KPI grid / two chart cards)
   // so the page doesn't visually jump/reflow once data arrives (CLS). Replaces
   // the old centered "pulsing text" spinner.
-  if (loading) return (
+  if (!snapshot || !view) {
+    if (status === 'error') return (
+      <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <PageTitle>{greeting}, {brandName}</PageTitle>
+        </div>
+        <LoadErrorCard onRetry={() => reload()} />
+      </div>
+    )
+    return (
     <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-10">
         <div className="space-y-2">
@@ -464,17 +261,8 @@ export default function Dashboard() {
         ))}
       </div>
     </div>
-  )
-
-  // Nothing usable on screen and the read failed: say so, never the empty state.
-  if (loadError && !stats) return (
-    <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <PageTitle>{greeting}, {brandName}</PageTitle>
-      </div>
-      <LoadErrorCard onRetry={() => load()} />
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="p-5 sm:p-8 md:p-10 max-w-6xl mx-auto">
@@ -483,12 +271,12 @@ export default function Dashboard() {
           <PageTitle>{greeting}, {brandName}</PageTitle>
           <p className="text-sm text-slate-400 mt-0.5">Here&apos;s your AI visibility snapshot.</p>
         </div>
-        <button onClick={() => load()}
+        <button onClick={() => { void reload({ quiet: true }); void loadHistory(true) }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm text-slate-300 transition-colors border border-dark-600">
           <RefreshCw size={15} />{t.dash_refresh}</button>
       </div>
 
-      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => load(true)} />}
+      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
 
       {/* Zero-data first run (dashboard-visual-system.md §11 rule 1 / audit F-02,
           the single worst moment in the product per the audit's verdict): a
@@ -496,7 +284,7 @@ export default function Dashboard() {
           dimensions — a verdict, not an absence of measurement. Never render a
           zero as though it were a measurement. Routes to /prompts when there are
           no prompts yet, otherwise to /ai-visibility to run the first collection. */}
-      {scoreData && stats && !hasAnyRows && (
+      {scoreData && !view.hasAnyMeasurement && (
         <motion.div
           className="bg-dark-800 rounded-xl mb-6"
           variants={heroReveal} initial="hidden" animate="show"
@@ -505,18 +293,18 @@ export default function Dashboard() {
             icon={Target}
             title="Not measured yet"
             body={
-              promptCount === 0
+              view.promptCount === 0
                 ? `BrandGEO measures how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} real buyer questions about ${brandName}. Add a prompt to start.`
-                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${promptCount} tracked prompt${promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
+                : `BrandGEO is about to check how ${joinEngineNames(activeEngines)} ${activeEngines.length === 1 ? 'answers' : 'answer'} ${view.promptCount} tracked prompt${view.promptCount === 1 ? '' : 's'} about ${brandName}. Run the first collection to see your score.`
             }
-            actionLabel={promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
-            actionTo={promptCount === 0 ? '/prompts' : '/ai-visibility'}
+            actionLabel={view.promptCount === 0 ? 'Add a prompt' : 'Run first collection'}
+            actionTo={view.promptCount === 0 ? '/prompts' : '/ai-visibility'}
             minHeight={220}
           />
         </motion.div>
       )}
 
-      {scoreData && stats && hasAnyRows && (
+      {scoreData && view.hasAnyMeasurement && (
         <motion.div
           className="bg-dark-800 rounded-card p-card-feature mb-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-10"
           variants={heroReveal} initial="hidden" animate="show"
@@ -617,7 +405,7 @@ export default function Dashboard() {
       {/* Island 3 — KPI strip. One card, four quiet stats (Hick's Law: one island,
           not four separate cards). Values stay neutral; color appears only on a
           genuine anomaly (Gestalt Focal-Point Law). */}
-      {stats && (
+      {(
         <motion.div
           className="bg-dark-800 rounded-card p-card-feature mb-6"
           variants={heroReveal} initial="hidden" animate="show"
@@ -630,7 +418,7 @@ export default function Dashboard() {
               four. This line is what explains the gap between "there is a
               score" and "these window-scoped stats read zero", with a control
               that removes the gap instead of just naming it. */}
-          {hasAnyRows && stats.totalChecks === 0 && timeRange !== 'all' && windowDays != null && (
+          {view.hasAnyMeasurement && win && win.checks === 0 && timeRange !== 'all' && windowDays != null && (
             <div className="flex flex-wrap items-center gap-2 mb-4 text-xs text-slate-500">
               <span className="italic">No checks in the last {windowDays} days.</span>
               <button
@@ -641,6 +429,12 @@ export default function Dashboard() {
               </button>
             </div>
           )}
+          {historyFailed && (
+            <LoadErrorCard
+              message="Couldn't load recent activity."
+              onRetry={() => { void loadHistory(false) }}
+            />
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
             <Stat
               icon={<TrendingUp size={15} />}
@@ -650,26 +444,34 @@ export default function Dashboard() {
               // to Stat's own "Not measured yet" branch instead of a red 0 percent,
               // which used to sit directly under the "Not measured yet" hero above
               // and contradict it on the same screen.
-              value={stats.totalChecks === 0 ? null : `${stats.mentionRate}%`}
+              value={view.mention.pct === null ? null : `${view.mention.pct}%`}
               sub={t.dash_statMentionRateSub}
               tone={
-                stats.totalChecks === 0
+                view.mention.pct === null
                   ? 'neutral'
-                  : stats.mentionRate < 25 ? 'alert' : stats.mentionRate < 50 ? 'warn' : 'neutral'
+                  : view.mention.pct < 25 ? 'alert' : view.mention.pct < 50 ? 'warn' : 'neutral'
               }
-              spark={spark.mentionRate}
+              spark={spark?.mentionRate}
             />
             <Stat
               icon={<Target size={15} />}
               label={t.dash_statAvgPos}
-              value={stats.avgPosition != null ? `#${stats.avgPosition}` : null}
+              value={formatAvgPosition(view.avgPosition)}
               sub={t.dash_statAvgPosSub}
-              tone={stats.avgPosition != null && stats.avgPosition > 6 ? 'warn' : 'neutral'}
+              tone={view.avgPosition != null && view.avgPosition > 6 ? 'warn' : 'neutral'}
               spark={avgPosSpark}
               connectNulls
             />
-            <Stat icon={<Hash size={15} />} label={t.dash_statPrompts} value={String(promptCount)} sub={t.dash_statPromptsSub} />
-            <Stat icon={<Eye size={15} />} label={t.dash_statChecks} value={String(stats.totalChecks)} sub={t.dash_statChecksDesc} spark={spark.volume} />
+            <Stat icon={<Hash size={15} />} label={t.dash_statPrompts} value={String(view.promptCount)} sub={t.dash_statPromptsSub} />
+            <Stat
+              icon={<Eye size={15} />}
+              label={t.dash_statChecks}
+              value={win ? String(win.checks) : null}
+              pending={!win && !historyFailed}
+              emptyLabel="Unavailable"
+              sub="In the selected window"
+              spark={spark?.volume}
+            />
           </div>
         </motion.div>
       )}
@@ -733,17 +535,17 @@ export default function Dashboard() {
 
         <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-4">{t.dash_brandVisibility}</h2>
-          {stats && stats.totalChecks > 0 ? (
+          {checkedCount > 0 ? (
             <>
               <div className="mb-6">
                 <div className="flex justify-between text-xs text-slate-500 mb-1.5">
                   <span>{brandName} mentioned</span>
-                  <span>{Math.round(stats.mentionRate)}%</span>
+                  <span>{mentionPct}%</span>
                 </div>
                 <div className="w-full bg-dark-700 rounded-full h-3 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${stats.mentionRate >= 50 ? 'bg-emerald-500' : stats.mentionRate >= 25 ? 'bg-amber-500' : 'bg-red-500'}`}
-                    style={{ width: `${stats.mentionRate}%` }}
+                    className={`h-full rounded-full transition-all ${mentionPct >= 50 ? 'bg-emerald-500' : mentionPct >= 25 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${mentionPct}%` }}
                   />
                 </div>
               </div>
@@ -772,8 +574,12 @@ export default function Dashboard() {
         <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentMentions}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_mentionsDesc, { brand: brandName })}</p>
-          {recentMentioned.length === 0 ? (
-            (stats?.totalChecks ?? 0) === 0 ? (
+          {!win ? (
+            historyFailed
+              ? <LoadErrorCard message="Couldn't load recent activity." onRetry={() => { void loadHistory(false) }} />
+              : <Skeleton className="h-24 w-full rounded-lg" />
+          ) : recentMentioned.length === 0 ? (
+            checkedCount === 0 ? (
               <EmptyState text={t.dash_noDataYet} ctaText={t.dash_noDataCta} to="/ai-visibility" />
             ) : (
               <EmptyState text={t.dash_noMentions} ctaText={t.dash_noMentionsCta} to="/recommendations" />
@@ -790,8 +596,12 @@ export default function Dashboard() {
         <MotionCard stagger hoverLift={false} className="bg-dark-800 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.dash_recentGaps}</h2>
           <p className="text-xs text-slate-500 mb-4">{fmt(t.dash_gapsDesc, { brand: brandName })}</p>
-          {recentNotMentioned.length === 0 ? (
-            (stats?.totalChecks ?? 0) === 0 ? (
+          {!win ? (
+            historyFailed
+              ? <LoadErrorCard message="Couldn't load recent activity." onRetry={() => { void loadHistory(false) }} />
+              : <Skeleton className="h-24 w-full rounded-lg" />
+          ) : recentNotMentioned.length === 0 ? (
+            checkedCount === 0 ? (
               /* Brand-new client with no data at all — NOT "great visibility!".
                  Fixes the false-positive celebratory state (DASHBOARD-UX-2026.md §9 step 7). */
               <EmptyState text={t.dash_noDataYet} ctaText={t.dash_noDataCta} to="/ai-visibility" />
@@ -839,14 +649,14 @@ function EngineTag({ id }: { id: string }) {
   )
 }
 
-function ResultRow({ row, mentioned }: { row: AIResultRow; mentioned: boolean }) {
+function ResultRow({ row, mentioned }: { row: RecentEntry; mentioned: boolean }) {
   const { t } = useI18n()
   return (
     <div className="flex items-start gap-3">
       <EngineTag id={row.llm} />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-300 truncate">
-          {row.prompts?.text ?? `Prompt #${row.prompt_id}`}
+          {row.text ?? `Prompt #${row.prompt_id}`}
         </p>
         <p className="text-[10px] text-slate-600 mt-0.5">
           {formatDate(row.checked_at)}
@@ -901,10 +711,10 @@ function Sparkline({ data, color, connectNulls = false }: {
 // Rendered inside ONE shared KPI card (Hick's Law — one island, not four). The
 // muted icon + one-line descriptor keep each number self-explanatory for a
 // first-time reader without adding color noise.
-function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls, emptyLabel = 'Not measured yet' }: {
+function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls, emptyLabel = 'Not measured yet', pending = false }: {
   icon: React.ReactNode; label: string; value: string | null; sub: string
   tone?: 'neutral' | 'warn' | 'alert'; spark?: SparkPoint[]; connectNulls?: boolean
-  emptyLabel?: string
+  emptyLabel?: string; pending?: boolean
 }) {
   const valueColor = tone === 'alert' ? 'text-red-400' : tone === 'warn' ? 'text-amber-400' : 'text-white'
   // The sparkline stroke was hardcoded #94a3b8, which measures 2.56:1 against a
@@ -922,7 +732,9 @@ function Stat({ icon, label, value, sub, tone = 'neutral', spark, connectNulls, 
           besides breaking the no-dash content rule. The empty label sits in a
           fixed h-8 box so it occupies the same 32px line box as a real value and
           the four KPI columns stay on the same baseline grid. */}
-      {value !== null
+      {pending
+        ? <Skeleton className="h-8 w-16" />
+        : value !== null
         ? <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{value}</div>
         : <div className="h-8 flex items-end text-sm italic text-slate-300 leading-snug">{emptyLabel}</div>}
       {spark && spark.length >= 2 && (

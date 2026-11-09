@@ -256,6 +256,7 @@ function filterVal(st, op, key) {
   // clientsRow: the clients lookup answer. alreadyRan: llm ids with an ok row this month.
   function promptDb({ clientsRow, alreadyRan = [], clientErr = null }) {
     return (st) => {
+      if (st.table === 'prompts') return { data: { id: 7, text: 'best dentist near me', client_id: 42, is_active: true }, error: null }
       if (st.table === 'clients') return { data: clientsRow, error: clientErr }
       if (st.table === 'ai_results' && st.op === 'select') {
         if (filterVal(st, 'in', 'llm')) return { data: [], error: null }  // monthly cap read

@@ -72,6 +72,56 @@ function isDue(cadence, lastRefreshAt) {
   return elapsedMs >= days * 24 * 60 * 60 * 1000
 }
 
+// ── WORKER KICK FOR DUE PENDING JOBS (ruling 2 of 2026-11-09) ───────────────
+// F2 of docs/qa/phase2-server-review-2026-11-08.md. The worker used to be
+// started here only when THIS run enqueued work. A job left 'pending' and due
+// by anything else (the stuck-job reaper's requeue, which sets
+// scheduled_for = now(); the worker's own retry at now + 60 s on its last
+// batch, which its self-chain does not count) waited for the next manual
+// enqueue, so its run never closed and the dashboard poll spun. Now every
+// hourly run reads whether ANY pending job is due and starts the worker if so.
+//
+// Once per run: the trigger fires at most once whether the reason is new work,
+// due leftovers, or both. Best effort: a failed read or a failed trigger is
+// logged and recorded in job_runs.detail, never thrown, so the scheduling work
+// above it is never reported as failed because of it. Reuses triggerWorker
+// from _enqueue.js (the same call enqueue-collection.js makes), so the key
+// handling lives in one place. No new secret, zero model calls; one read on
+// the partial index idx_collection_jobs_claim (status, scheduled_for) where
+// status = 'pending'. A redundant trigger is harmless: the worker claims with
+// SKIP LOCKED and exits when there is nothing to claim.
+async function hasDuePendingJobs(supabase, nowIso) {
+  const { data, error } = await supabase
+    .from('collection_jobs')
+    .select('id')
+    .eq('status', 'pending')
+    .lte('scheduled_for', nowIso)
+    .limit(1)
+  if (error) throw new Error(error.message)
+  return Array.isArray(data) && data.length > 0
+}
+
+async function kickWorkerIfNeeded(supabase, { totalJobs, invId, trigger = triggerWorker, now = () => new Date() }) {
+  let duePending = null
+  try {
+    duePending = await hasDuePendingJobs(supabase, now().toISOString())
+  } catch (err) {
+    console.error(`[Scheduler/${invId}] due pending jobs read failed:`, err && err.message)
+  }
+
+  const reason = totalJobs > 0 ? 'enqueued' : (duePending ? 'due_pending' : null)
+  if (!reason) return { triggered: false, reason: null, duePending }
+
+  try {
+    await trigger()
+    console.log(`[Scheduler/${invId}] worker triggered (${reason})`)
+    return { triggered: true, reason, duePending }
+  } catch (err) {
+    console.error(`[Scheduler/${invId}] worker trigger failed (${reason}):`, err && err.message)
+    return { triggered: false, reason, duePending, error: (err && err.message) || String(err) }
+  }
+}
+
 exports.handler = async (event) => {
   const gate = requireCronAuth(event)
   if (gate) return gate.response
@@ -157,9 +207,16 @@ exports.handler = async (event) => {
     }
   }
 
-  if (totalJobs > 0) await triggerWorker()
+  // After the cadence work, once per run: new work OR any due pending job
+  // starts the worker (see kickWorkerIfNeeded above). Never throws.
+  const kick = await kickWorkerIfNeeded(supabase, { totalJobs, invId })
+  const worker = { triggered: kick.triggered, reason: kick.reason, duePending: kick.duePending }
+  if (kick.error) worker.error = kick.error
 
-  console.log(`[Scheduler/${invId}] done | enqueued:${enqueued} jobs:${totalJobs} skippedBudget:${skippedBudget} skippedNoWork:${skippedNoWork}`)
-  await recordJobRun(supabase, true, { invId, enqueued, totalJobs, skippedBudget, skippedNoWork })
-  return { statusCode: 200, body: JSON.stringify({ enqueued, totalJobs, skippedBudget, skippedNoWork }) }
+  console.log(`[Scheduler/${invId}] done | enqueued:${enqueued} jobs:${totalJobs} skippedBudget:${skippedBudget} skippedNoWork:${skippedNoWork} worker:${kick.triggered ? kick.reason : 'no'}`)
+  await recordJobRun(supabase, true, { invId, enqueued, totalJobs, skippedBudget, skippedNoWork, worker })
+  return { statusCode: 200, body: JSON.stringify({ enqueued, totalJobs, skippedBudget, skippedNoWork, workerTriggered: kick.triggered }) }
 }
+
+exports.kickWorkerIfNeeded = kickWorkerIfNeeded
+exports.hasDuePendingJobs = hasDuePendingJobs
