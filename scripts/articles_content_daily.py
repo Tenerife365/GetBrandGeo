@@ -1185,3 +1185,123 @@ ARTICLES_DAILY.append(dict(
     <p>Then make the current facts easy to find: the edition year of each award on your site, a dated "last updated" line on your service and pricing pages, and current figures in your business profiles. This study cannot say that dated pages change which year an engine picks. It shows how often the year is there, and how much it varies.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-116", bid="BG-116", date="2026-11-09", date_label="November 9, 2026", read=6,
+    tags=["Original Research", "London and Dublin", "Cross-Engine Consensus"],
+    title="London and Dublin, Same Questions: Which Names AI Engines Carry Across the Border",
+    h1="London and Dublin, Same Questions: Which Names AI Engines <em>Carry Across</em> the Border",
+    h1_plain="London and Dublin, Same Questions: Which Names AI Engines Carry Across the Border",
+    subtitle="We asked four AI engines the same eight business questions in London and Dublin. Software names travelled: 14 of 17 showed up in both cities. Law firms and advisors did not: 4 shared names across five questions.",
+    meta_desc="Four AI engines answered the same eight business questions for London and Dublin in July 2026. 14 of 17 software names appeared in both cities. Banking split along the border, with Revolut the only name in all 8 answers. Law and advice questions shared 4 firms in total.",
+    og_desc="Same questions, London and Dublin, four AI engines. 14 of 17 software names appeared in both cities. Law and advice shared 4 firms across five questions. Revolut was the only bank in all 8 answers.",
+    ld_desc="Original BrandGEO research comparing what Claude, Gemini, Meta AI and Perplexity named when asked the same eight business questions for London and Dublin on July 10, 2026: which software, banking, law and wealth management names appear in both cities' answers and which stay on one side.",
+    keywords="ai recommendations london dublin, chatgpt uk vs ireland, ai visibility across countries, do ai engines recommend the same brands in different cities, international ai visibility, perplexity gemini claude london dublin",
+    about=["AI Visibility Research", "Cross-Engine Consensus", "International Markets", "Professional Services"],
+    findings=[("14 of 17", "software names named twice in one city also appeared in the other city's answers"),
+              ("8 of 8", "business banking answers in both cities that named Revolut, the only bank in all of them"),
+              ("4", "firms named in both cities across five law and advice questions"),
+              ("0", "of those 4 firms named by more than one engine in either city")],
+    faq=[("Do AI engines recommend the same brands in London and Dublin?",
+          "For software, mostly yes. When four engines were asked about CRM and project management tools for each city, 14 of the 17 names that came up at least twice appeared in both cities' answers. For law firms, financial advisors and property solicitors, almost never: across five questions only 4 firms appeared on both sides, each in one answer per city."),
+         ("Which business banking apps did AI engines name for the UK and Ireland?",
+          "Revolut appeared in all 4 answers for each country. Monzo and Starling appeared in all 4 UK answers and none of the Irish ones. AIB and N26 appeared in 3 Irish answers and no UK answer. Tide and Wise appeared on both sides."),
+         ("If my firm is visible in AI answers in one country, will it show up in another?",
+          "This study suggests it depends on what you sell. Software and app brands crossed from one city to the other. Professional firms almost never did, even when the question was worded the same. Check each market on its own."),
+         ("How many answers is this based on?",
+          "64 answers: 8 questions, 2 cities, 4 engines (Claude, Gemini, Meta AI and Perplexity), collected on July 10, 2026. That is a small sample, so we report counts, not percentages, and we do not claim why an engine named a firm.")],
+    related=[("/bg-016.html", "BG-016", "Cross-Engine Consensus: When AI Engines Agree, and When They Don't",
+              "Agreement between engines inside one city, from the same July collection."),
+             ("/ai-visibility-for-london.html", "London", "AI Visibility in London",
+              "The London answers, question by question."),
+             ("/ai-visibility-for-dublin.html", "Dublin", "AI Visibility in Dublin",
+              "The Dublin answers, question by question.")],
+    cta_h="See which names AI engines give in your own market",
+    cta_p="Run the free audit on your own domain and read what each engine says about your market today. No signup and no card.",
+    og=dict(
+        fname="og-bg-116.png",
+        kicker="BG-116 · Original Research",
+        lines=[[("London and Dublin,", "w")], [("Same Questions", "g")]],
+        sub=["64 answers, July 2026,",
+             "4 engines, 8 questions."],
+        stats=[("14 of 17", "software names in both cities", "CRM and project tools"),
+               ("8 of 8", "banking answers named Revolut", "4 London, 4 Dublin"),
+               ("4", "firms shared in law and advice", "across 5 questions"),
+               ("0", "of them named twice in a city", "1 answer per side each"),],
+        footer="London and Dublin in AI Answers",
+    ),
+    body="""  <p>A company that sells in both the UK and Ireland usually asks one question about AI search: if the engines recommend us in London, do they recommend us in Dublin too? We had the data to check. On July 10, 2026 we asked four AI engines the same eight business questions for London and for Dublin, and compared the names in the two sets of answers.</p>
+
+  <p><strong>The answer splits by what you sell.</strong> Software names crossed the border: 14 of the 17 CRM and project management tools named at least twice in one city also appeared in the other. Business banking split along the border, with Revolut the only name in all 8 answers. Law firms, financial advisors and property solicitors almost never crossed: across five questions, 4 firms appeared in both cities, and each of them in only one answer per city.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>Claude, Gemini, Meta AI and Perplexity each answered eight questions for London and the same eight for Dublin, 64 answers in all. Three questions were worded the same apart from the city (commercial contract disputes, wealth management for expats, property purchase solicitors), one apart from the country (business banking apps), and four were close but not identical: the London CRM question asked for UK-based software, the Dublin one for tools used by startups. ChatGPT answered in London but returned errors in Dublin that day, so it is left out of both sides. Meta AI has since been retired from our collection; its July answers stay in.</p>
+    <p>For software and banking we searched the answer text for a list of brand names, with word boundaries, and read every hit in context. For the five law and advice questions we listed every firm named, by hand, and searched for each one in the other city's answers. With 4 answers per city per question, we report counts, not percentages. We count what the engines wrote. We cannot say why an engine named a firm, and we do not name law or wealth firms here, since most carry their founders' surnames.</p>
+  </div>
+
+  <h2>Software: the same names on both sides</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Names in 2 or more answers in a city</th><th>Also in the other city</th><th>Named in both, answers out of 4 (London, Dublin)</th></tr></thead>
+    <tbody>
+      <tr><td>CRM software</td><td>7</td><td>6</td><td>Zoho 3 and 3, HubSpot 2 and 4, Pipedrive 2 and 4, Freshsales 2 and 2, Salesforce 1 and 4, monday.com 1 and 2</td></tr>
+      <tr><td>Project management</td><td>10</td><td>8</td><td>Asana 4 and 3, ClickUp 4 and 3, Trello 4 and 3, monday.com 3 and 4, Jira 3 and 3, Basecamp 3 and 3, Notion 3 and 1, Wrike 2 and 1</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The three names that stayed on one side are telling. Capsule appeared in all 4 London CRM answers and no Dublin one, and the London question asked for UK-based software; two of the answers described Capsule as British or London-based. Linear appeared in 2 London project management answers and Smartsheet in 2 Dublin ones. Everything else that came up more than once came up in both cities.</p>
+
+  <h2>Banking: split along the border, with one exception</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Name</th><th>UK answers (of 4)</th><th>Ireland answers (of 4)</th></tr></thead>
+    <tbody>
+      <tr><td>Revolut</td><td>4</td><td>4</td></tr>
+      <tr><td>Monzo</td><td>4</td><td>0</td></tr>
+      <tr><td>Starling</td><td>4</td><td>0</td></tr>
+      <tr><td>Tide</td><td>3</td><td>1</td></tr>
+      <tr><td>Wise</td><td>2</td><td>3</td></tr>
+      <tr><td>AIB</td><td>0</td><td>3</td></tr>
+      <tr><td>N26</td><td>0</td><td>3</td></tr>
+      <tr><td>Bank of Ireland</td><td>0</td><td>2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The question was the same apart from the country. UK answers named UK challenger banks, and Irish answers named Irish banks and N26. Of the 8 names that came up at least twice, 3 appeared in both countries, and only Revolut was in every answer on both sides. Banking is a regulated product sold country by country, and the answers follow that line.</p>
+
+  <h2>Law and advice: almost no overlap</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Firms named in both cities</th><th>Answers naming them (London, Dublin)</th></tr></thead>
+    <tbody>
+      <tr><td>Employment law</td><td>1</td><td>1 and 1</td></tr>
+      <tr><td>Commercial contract dispute</td><td>0</td><td>none</td></tr>
+      <tr><td>Financial advisors</td><td>0</td><td>none</td></tr>
+      <tr><td>Wealth management for expats</td><td>3</td><td>1 and 1 each</td></tr>
+      <tr><td>Property purchase solicitors</td><td>0</td><td>none</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The commercial dispute question was worded the same for both cities, and the four engines agreed strongly inside each city: one London firm was in all 4 London answers, and five Dublin firms were in all 4 Dublin answers. Not one name crossed. The property question, also worded the same, gave two separate lists with nothing in common.</p>
+
+  <p>The four shared names have something in common. The one employment firm is a large UK firm, and the Dublin answer named its Dublin office. The three wealth managers are UK firms, and each Dublin answer introduced them through an Irish office or presence. None was named by a second engine in either city. So the overlap that exists sits with firms that have a presence in both countries, and even there it is one engine on each side.</p>
+
+  <p>Two answers named no firm of their own. Gemini, asked about London contract disputes, said it could not recommend a firm, then named four as examples of what a legal directory ranks. Perplexity, asked about London financial advisors, pointed to two adviser directories and a regulator's search tool instead of any firm.</p>
+
+  <h2>What this means for a business in two countries</h2>
+
+  <p>For a software or app company, the result is encouraging: if the engines name you in one of these cities, they probably name you in the other, because the answer is about the product, not the place. For a bank, the country decides the list. For a law firm or an advisor, visibility in one city carried almost nothing into the other in this sample, even for firms with offices in both.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>If you sell a product across borders, check one market first and spot check the second; the names in these answers mostly travelled. If you sell a service, or anything regulated, treat each country as its own audit. Ask each engine the question a buyer in that city would type, and note whether your local office is named under its local name.</p>
+    <p>If you have an office in a second country, give it its own page, its own business profile and its own local facts, so an engine answering a Dublin question has a Dublin page to read. This study cannot show that doing so changes what an engine names. It shows how little crossed the border on its own.</p>
+  </div>""",
+))

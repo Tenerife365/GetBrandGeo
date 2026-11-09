@@ -12,3 +12,4 @@ One line per published article, newest last.
 - 2026-11-06 BG-113 https://getbrandgeo.com/bg-113.html How Often AI Engines Put a National Brand Next to Local Property Managers
 - 2026-11-07 BG-114 https://getbrandgeo.com/bg-114.html Which National Brokerage Names AI Engines Put Beside Real Estate Agents
 - 2026-11-08 BG-115 https://getbrandgeo.com/bg-115.html Which Year AI Engines Say Their Local Recommendations Are For
+- 2026-11-09 BG-116 https://getbrandgeo.com/bg-116.html London and Dublin, Same Questions: Which Names AI Engines Carry Across the Border

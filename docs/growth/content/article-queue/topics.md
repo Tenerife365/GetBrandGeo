@@ -16,7 +16,8 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
    city study or another dated row off its date. A row marked `not after YYYY-MM-DD` that
    is still unpublished after that date is set to `held <date>: past its not-after date`
    and reported, not published.
-   Cadence ruled by Constantin on 2026-11-06: at most 2 city studies (keys `city-*`) per
+   Cadence ruled by Constantin on 2026-11-06: at most 2 city studies (keys `city-*`, and
+   since 2026-11-08 also `draft-city-*`, a city study written ahead as a draft) per
    week, Monday to Sunday, alternating with other kinds of article (trending topics,
    comparisons, research team suggestions). Never publish a third city study in the same
    week, and never a city study on the day after another one, even when its `from` date
@@ -133,18 +134,18 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 13 | dates | published bg-115 2026-11-08 | How often answers mention a year or "as of", a sign of how current they claim to be |
 | 14 | answer-length | dropped 2026-11-06: stored text is capped (chatgpt and google_ai at 10,000 characters, google_ai median 9,821; claude at about 3,800), so length measures the cap, not the answer; the list-length side needed topic 2, also dropped | Answer length by engine, and whether longer answers name more firms |
 | 15 | bilingual-followup | held 2026-11-06: ruling owed by Constantin. 31 of 63 English questions were answered in the local language, which touches how BG-027 to BG-034 read; see the brief | A bilingual angle not covered by BG-027 to BG-034; read those first, drop if covered |
-| 16 | london-vs-dublin | ready (pre-checked 2026-11-06, banking and software measured, law and advice still to read by hand) | London and Dublin were asked the same 8 questions: where the engines named the same companies and where they did not |
-| 17 | immigration-languages | ready (pre-checked 2026-11-06) | How often immigration answers say which languages a firm works in, by engine |
+| 16 | london-vs-dublin | published bg-116 2026-11-09 | London and Dublin were asked the same 8 questions: where the engines named the same companies and where they did not |
+| 17 | draft-immigration-languages | ready from 2026-11-21 (draft, rule 5; written 2026-11-08, hand read: 42 of 97 firm-level) | How often immigration answers say which languages a firm works in, by engine |
 | 18 | aila | ready (pre-checked 2026-11-06) | How often immigration answers name AILA, and whether as a credential or as a place to check a lawyer |
 | 19 | free-consultation | dropped 2026-11-06: BG-110 already reports it (63 answers mention a free consultation); personal injury alone gives 61 of 98, no new angle | How often answers say the first consultation is free |
 | 20 | disclaimers | dropped 2026-11-06: 1 answer of 591 carries a "not legal advice" style disclaimer, nothing to report | How often answers carry a legal or financial disclaimer |
 | 21 | notario-warnings | dropped 2026-11-06: 9 of 98 immigration answers warn about notarios or scams, too few to split by engine | How often immigration answers warn about notario fraud |
 | 22 | closing-offers | dropped 2026-11-06: 116 answers end with an offer to help further, but perplexity alone is 70 and gemini and google_ai are 0, the ends of capped answers are cut, and the perplexity side overlaps BG-107 | How often answers end by offering more help |
 | 23 | legal-aid | dropped 2026-11-06: 22 immigration answers name legal aid or nonprofit options, partly reported in BG-109, too thin alone | How often immigration answers point to free or low cost legal help |
-| 24 | city-austin | ready from 2026-11-12 (pre-checked 2026-11-06, third basis) | What ChatGPT, Claude and Gemini recommend in Austin, and which firms all three agree on |
-| 25 | city-portland | ready from 2026-11-14 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Portland, Oregon, and where they agree |
-| 26 | city-lasvegas | ready from 2026-11-17 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Las Vegas, and where they agree |
-| 27 | city-orlando | ready from 2026-11-20 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Orlando, and where they agree |
+| 24 | draft-city-austin | ready from 2026-11-12 (draft, rule 5; city study, written 2026-11-08) | What ChatGPT, Claude and Gemini recommend in Austin, and which firms all three agree on |
+| 25 | draft-city-portland | ready from 2026-11-14 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Portland, Oregon, and where they agree |
+| 26 | draft-city-lasvegas | ready from 2026-11-17 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Las Vegas, and where they agree |
+| 27 | draft-city-orlando | ready from 2026-11-20 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Orlando, and where they agree |
 | 28 | city-nashville | ready from 2026-11-24 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Nashville, and where they agree |
 | 29 | city-sacramento | ready from 2026-11-27 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Sacramento, and where they agree |
 | 30 | city-later | held 2026-11-06 for December: Indianapolis, Columbus, Jacksonville, San Jose (fewest firms named by all three engines: 1, 1, 1 and 2), at the same cadence | City studies after November |
@@ -324,6 +325,11 @@ and 4; Xero shows up in London CRM answers (3 and 0). Banking is the clearest sp
 same question gets UK challenger banks in London and Irish banks in Dublin, with Revolut
 the only name in both everywhere. Still owed: the law and advice questions read by hand.
 Small n (4 engines), so report counts, never percentages. Rests on `response_text` only.
+Published 2026-11-09 as BG-116. Correction from the hand read: Xero appears in London CRM
+and banking answers only as an accounting tool the product connects to, so it is not
+counted as a CRM name. Law and advice, read by hand: 4 firms in both cities across the
+five questions, each named by one engine per city. Record:
+`data/bg-116-london-vs-dublin-2026-11-09.md`.
 
 ### 17 immigration-languages
 Immigration rows only (rn = 4), clients 28 to 47, from `response_text`. Pattern for a
@@ -402,6 +408,11 @@ engines, and across the ten cities the 28 firms named by all three are mostly pr
 home builders, breweries and lobbying firms (22), not law firms (6). Say what
 a business in that city should do. Drop a city if the hand read leaves fewer than 2
 firms named by all three. Never compare a city's numbers with a July city as a trend.
+Since 2026-11-08 (hub ruling) these are written ahead as drafts in `drafts/` and published
+by rule 5. The hand read changes the counts a lot: exact bold strings miss shortened names,
+grouped bold lines and firms named in running text. Austin moved from 6 to 16 firms named by
+all three, Portland from 5 to 14, Las Vegas from 3 to 12, Orlando from 3 to 6; each draft
+carries its own queries and hand-read table.
 
 ### 33 to 45 drafts (non-city days, 13 to 30 November)
 Written 2026-11-06 in a separate session from `research-suggestions-2026-11-06.md`. Each
