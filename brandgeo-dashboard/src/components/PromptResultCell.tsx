@@ -15,7 +15,7 @@
  * Spec: docs/design/ai-visibility-prompt-focus-spec-2026-10-28.md, section
  * "PromptResultCell". Text comes from src/lib/aiVisibilityCopy.ts.
  */
-import { AlertTriangle, Check, Clock, Lock, Minus, X } from 'lucide-react'
+import { TriangleAlert, Check, Clock, Lock, Minus, X } from 'lucide-react'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import { formatDate } from '../lib/format'
 import {
@@ -44,23 +44,23 @@ interface Props {
 }
 
 const STATE_CLASS: Record<CellState, string> = {
-  mentioned: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30',
-  absent: 'bg-red-500/10 text-red-400 ring-1 ring-red-500/25',
-  no_answer: 'bg-dark-700/20 text-slate-500 border border-dashed border-dark-600',
-  error: 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30',
-  pending: 'bg-dark-700/40 text-slate-500 ring-1 ring-dark-600/60',
-  locked: 'bg-dark-700/20',
+  mentioned: 'bg-pos-tint text-pos-ink',
+  absent: 'bg-surface-2 text-neg',
+  no_answer: 'bg-surface-2 text-ink-3',
+  error: 'bg-surface-2 text-warn',
+  pending: 'bg-surface-2 text-ink-3',
+  locked: 'bg-transparent text-ink-3',
 }
 
 function Glyph({ state, size }: { state: CellState; size: number }) {
   const common = { size, 'aria-hidden': true as const }
   switch (state) {
-    case 'mentioned': return <Check {...common} />
-    case 'absent': return <X {...common} />
+    case 'mentioned': return <Check {...common} className="text-pos-ink" />
+    case 'absent': return <X {...common} className="text-neg" />
     case 'no_answer': return <Minus {...common} />
-    case 'error': return <AlertTriangle {...common} />
+    case 'error': return <TriangleAlert {...common} className="text-warn" />
     case 'pending': return <Clock {...common} />
-    default: return <Lock {...common} className="text-slate-500" />
+    default: return <Lock {...common} className="text-ink-3" />
   }
 }
 
@@ -74,7 +74,7 @@ export default function PromptResultCell({
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex h-5 w-5 items-center justify-center rounded ${STATE_CLASS[state]}`}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-badge ${STATE_CLASS[state]}`}
       >
         <Glyph state={state} size={12} />
       </span>
@@ -85,9 +85,9 @@ export default function PromptResultCell({
     return (
       <span
         aria-hidden="true"
-        className={`flex w-full min-h-[44px] items-center justify-center rounded-md py-1.5 ${STATE_CLASS.locked}`}
+        className={`flex w-full min-h-[40px] items-center justify-center rounded-badge py-1.5 ${STATE_CLASS.locked}`}
       >
-        <Lock size={12} aria-hidden="true" className="text-slate-500" />
+        <Lock size={12} aria-hidden="true" className="text-ink-3" />
       </span>
     )
   }
@@ -120,8 +120,8 @@ export default function PromptResultCell({
   }
 
   const box = variant === 'tile'
-    ? 'flex flex-col items-center justify-center gap-0.5 rounded-md w-full min-h-[56px] py-1.5'
-    : 'flex flex-col items-center justify-center gap-0.5 rounded-md w-full min-h-[44px] py-1.5'
+    ? 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[56px] py-1.5'
+    : 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[40px] py-1.5'
 
   return (
     <span className={`${box} ${STATE_CLASS[state]}`} title={spoken}>
@@ -129,9 +129,9 @@ export default function PromptResultCell({
         <img src={meta?.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
       )}
       <Glyph state={state} size={14} />
-      <span aria-hidden="true" className="text-[10px] leading-none font-medium">{word}</span>
+      <span aria-hidden="true" className="text-meta leading-none font-semibold">{word}</span>
       {state === 'error' && since && (
-        <span aria-hidden="true" className="text-[10px] leading-none text-amber-400/80">{cellSinceLine(since)}</span>
+        <span aria-hidden="true" className="text-meta leading-none text-warn">{cellSinceLine(since)}</span>
       )}
       <span className="sr-only">{spoken}</span>
     </span>

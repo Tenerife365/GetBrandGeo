@@ -31,20 +31,20 @@ export function AllowanceMeter({
   const state = pct >= 100 ? 'full' : pct >= 85 ? 'warn' : 'ok'
   // Status tokens (dashboard-visual-system.md §8.5), not a hand-picked
   // rose/amber pair — "full" is the unfavourable pole, "ok" is neutral.
-  const barColor = state === 'full' ? 'bg-sentiment-negative' : state === 'warn' ? 'bg-amber-400' : 'bg-brand-500'
-  const textColor = state === 'full' ? 'text-sentiment-negative' : state === 'warn' ? 'text-amber-400' : 'text-slate-400'
+  const barColor = state === 'full' ? 'bg-neg' : state === 'warn' ? 'bg-warn' : 'bg-accent'
+  const textColor = state === 'full' ? 'text-neg' : state === 'warn' ? 'text-warn' : 'text-ink-2'
 
   return (
     <div className="min-w-[140px]">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] text-slate-500 uppercase tracking-wide font-medium">{label}</span>
+        <span className="text-meta text-ink-3">{label}</span>
         {/* "n of m", never a bare fraction (§12.1). */}
-        <span className={`text-[11px] tabular-nums font-medium ${textColor}`}>
+        <span className={`text-meta tabular-nums ${textColor}`}>
           {format(used)} of {format(cap)}
         </span>
       </div>
-      <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      <div className="h-1 rounded-sm bg-surface-3 overflow-hidden">
+        <div className={`h-full rounded-sm transition-all duration-[260ms] ease-out motion-reduce:transition-none ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )

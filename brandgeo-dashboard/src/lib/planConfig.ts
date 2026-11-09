@@ -275,15 +275,16 @@ export const ENGINE_META: Record<EngineId, {
   claude:     { label: 'Claude',         logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://claude.ai',              chartColor: '#ea580c' },
   perplexity: { label: 'Perplexity',     logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://perplexity.ai',          chartColor: '#0891b2' },
   google_ai:  { label: 'Google AI Mode', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',            chartColor: '#db2777' },
-  // Teal-700. Validated against the other nine with CIEDE2000 before being
-  // chosen, not picked by eye: worst normal-vision separation is 19.2 (vs
-  // perplexity #0891b2), above the 15 floor and comfortably better than the
-  // closest EXISTING pair in this table (gemini/deepseek at 6.9). Clears 3:1 on
-  // all three real surfaces (3.49 on #0a0f1e, 3.26 on #0f172a, 5.47 on white).
-  // Teal was the widest genuinely free slot: red is reserved for the sentiment
-  // negative pole, lime is the sentiment positive pole, and violet is the brand
-  // accent. If this order or set changes, re-run the validator (spec §17 V1/V2).
-  ai_overview: { label: 'Google AI Overviews', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',     chartColor: '#0f766e' },
+  // Green-teal #1c7b5a. Re-derived 2026-11 with the dataviz validator against the
+  // seven LIVE engines in their adjacent (legend) order: worst adjacent normal
+  // vision separation 17.1, worst colour-vision-deficiency separation 7.7
+  // (protanopia), chroma 0.101, all passing the floors for adjacent-order layouts.
+  // The all-pairs check FAILS, so engine colours are only used where marks are
+  // adjacent in the fixed engine order (legend, rank bars), never as an
+  // unordered categorical scale. Teal stays the widest free hue slot: red is the
+  // sentiment negative pole, lime the positive pole, violet the brand accent.
+  // If this order or set changes, re-run the validator (spec 17 V1/V2).
+  ai_overview: { label: 'Google AI Overviews', logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://google.com',     chartColor: '#1c7b5a' },
   meta:       { label: 'Meta AI',        logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://meta.ai',               chartColor: '#c026d3' },
   deepseek:   { label: 'DeepSeek',       logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://deepseek.com',          chartColor: '#6366f1' },
   grok:       { label: 'Grok',           logoUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=https://x.ai',                  chartColor: '#a16207' },

@@ -98,7 +98,7 @@ export default function AuditRequest() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg text-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
             {loading ? 'Auditing your visibility…' : 'Run my free audit'}

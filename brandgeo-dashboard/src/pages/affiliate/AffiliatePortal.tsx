@@ -53,7 +53,7 @@ import { SAMPLE_ME, SAMPLE_RATES } from './affiliateSample'
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
 const btn = 'inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-control text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
-const btnPrimary = `${btn} bg-brand-500 hover:bg-brand-400 text-white`
+const btnPrimary = `${btn} bg-accent-strong hover:bg-accent-strong-hover text-on-accent`
 const btnGhost = `${btn} bg-dark-700 hover:bg-dark-600 text-slate-200 border border-dark-600`
 
 const DEFAULT_FIELDS: PayoutDetailFields = {

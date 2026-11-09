@@ -1,9 +1,11 @@
-import { AlertTriangle } from 'lucide-react'
+import Card from './ui/Card'
+import StatusGlyph from './ui/StatusGlyph'
+import { buttonClasses } from './ui/Button'
 
 /**
- * Retry banner for a failed data load. Same look as the banner on the AI
- * Visibility prompt area. Use it where the empty state would otherwise say
- * "no data yet", so a failed read never reads as an empty account.
+ * Retry banner for a failed data load. Use it where the empty state would
+ * otherwise say "no data yet", so a failed read never reads as an empty
+ * account. Card standard, neg glyph, Retry as a secondary button.
  */
 interface LoadErrorCardProps {
   message?: string
@@ -19,19 +21,12 @@ export default function LoadErrorCard({
   className = '',
 }: LoadErrorCardProps) {
   return (
-    <div
-      role="alert"
-      className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dark-700 bg-dark-800 p-3 ${className}`.trim()}
-    >
-      <AlertTriangle size={16} aria-hidden="true" className="shrink-0 text-amber-400" />
-      <span className="text-sm text-slate-200">{message}</span>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="ml-auto min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
-      >
+    <Card role="alert" className={`mb-4 flex flex-wrap items-center gap-3 border-line ${className}`.trim()}>
+      <StatusGlyph kind="neg" size={16} className="shrink-0 text-neg" />
+      <span className="text-body text-ink">{message}</span>
+      <button type="button" onClick={onRetry} className={`ml-auto ${buttonClasses('secondary', 'md')}`}>
         {retryLabel}
       </button>
-    </div>
+    </Card>
   )
 }

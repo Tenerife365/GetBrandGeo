@@ -39,11 +39,11 @@ export default function ChartTooltip({ active, label, payload, formatValue, form
         border: `1px solid ${chart.tooltipBorder}`,
         borderRadius: 8, // --control-radius
         padding: '8px 10px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        boxShadow: 'var(--shadow-raised)',
       }}
     >
       {title && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: chart.axisInk, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: chart.axisInk, marginBottom: 4 }}>{title}</div>
       )}
       {payload.map((item, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>

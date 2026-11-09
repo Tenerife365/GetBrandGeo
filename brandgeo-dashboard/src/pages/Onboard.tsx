@@ -440,7 +440,7 @@ export default function Onboard() {
             <div className="flex gap-2">
               <button onClick={() => setStep(4)} disabled={creating} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors disabled:opacity-40">Back</button>
               <button onClick={handleCreate} disabled={creating || !email}
-                className="flex-1 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="flex-1 py-2 rounded-lg bg-accent-strong text-on-accent text-sm font-semibold hover:bg-accent-strong-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {creating ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : 'Create Client & Send Invite'}
               </button>
             </div>

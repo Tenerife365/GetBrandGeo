@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, TrendingUp, Award, ChevronDown } from 'lucide-react'
+import { Bot, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
@@ -13,21 +13,17 @@ import RouteSkeleton from '../components/RouteSkeleton'
 import Skeleton from '../components/Skeleton'
 import { ownRows, nextSeq, isStale } from '../lib/resultsGuards'
 import LoadErrorCard from '../components/LoadErrorCard'
-import { SentimentDot } from '../components/ScoreBadge'
-import { PageTitle, SectionHeading } from '../components/Typography'
 import EngineChip from '../components/EngineChip'
-import SharedEmptyState from '../components/EmptyState'
+import {
+  Page, PageHeader, HeroAnswer, Badge, Chip, ChipGroup, Select, DataList, StatusGlyph,
+} from '../components/ui'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
 import { formatDate } from '../lib/format'
 import type { LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { promptCategoryLabel } from '../lib/promptCategories'
 
-// Engine identity is now ENGINE_META + EngineChip (dashboard-visual-system.md
-// §8.4) — this file used to carry its OWN independent copy of engine label +
-// colour (a fourth such copy in the app, alongside Competitors.tsx and
-// AIVisibility.tsx), hand-picked separately from the chart palette and cited
-// by the audit (F-14/F-15) as one of the two places Claude/Meta AI collide.
+// Engine identity is ENGINE_META + EngineChip / Chip swatch (one source, one hex).
 
 const CATEGORY_LABEL: Record<string, string> = {
   mid:            'Mid (100-200)',
@@ -40,19 +36,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   direct_brand:   'Direct Brand',
 }
 
-const CATEGORY_COLOR: Record<string, string> = {
-  mid:            'bg-blue-500/20 text-blue-300',
-  large:          'bg-purple-500/20 text-purple-300',
-  very_large:     'bg-amber-500/20 text-amber-300',
-  general:        'bg-slate-500/20 text-slate-300',
-  tool_discovery: 'bg-emerald-500/20 text-emerald-300',
-  geo_category:   'bg-blue-500/20 text-blue-300',
-  problem_based:  'bg-amber-500/20 text-amber-300',
-  direct_brand:   'bg-violet-500/20 text-violet-300',
-}
-
 const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(cat)
-const getCatColor = (cat: string) => CATEGORY_COLOR[cat] ?? 'bg-slate-500/20 text-slate-300'
 
 type FilterLLM = LLMName | 'all'
 type FilterCat = PromptCategory | 'all'
@@ -118,10 +102,10 @@ export default function Mentions() {
   if (!snapshot || !view) {
     if (status === 'error') {
       return (
-        <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
-          <PageTitle>{t.men_title}</PageTitle>
-          <div className="mt-4"><LoadErrorCard onRetry={() => reload()} /></div>
-        </div>
+        <Page>
+          <PageHeader title={t.men_title} />
+          <LoadErrorCard onRetry={() => reload()} />
+        </Page>
       )
     }
     return <RouteSkeleton />
@@ -142,16 +126,42 @@ export default function Mentions() {
   const noMentions = totalMentions === 0 && mentions.length === 0
   const avgPositionLabel = formatAvgPosition(view.summary.avgPosition)
   const positiveSentiment = view.summary.positive
-  const engineCounts = view.engineCounts
+  const engineCounts = view.engineCounts.filter(e => e.count > 0)
+
+  const sentimentKind = (s: string) => (s === 'positive' ? 'pos' : s === 'negative' ? 'neg' : 'neu') as 'pos' | 'neg' | 'neu'
+
+  const engineChips = (
+    <ChipGroup label="Engine">
+      <Chip selected={filterLLM === 'all'} onClick={() => setFilterLLM('all')}>
+        {historyLoading ? allEnginesLabel : fmt(t.men_allEngines, { n: mentions.length })}
+      </Chip>
+      {engineCounts.map(({ llm, count }) => (
+        <Chip
+          key={llm}
+          selected={filterLLM === llm}
+          count={count}
+          swatch={ENGINE_META[llm as EngineId]?.chartColor}
+          onClick={() => setFilterLLM(llm === filterLLM ? 'all' : (llm as LLMName))}
+        >
+          {ENGINE_META[llm as EngineId]?.label ?? llm}
+        </Chip>
+      ))}
+    </ChipGroup>
+  )
+  const catKeys = ['all', ...Object.keys(CATEGORY_LABEL)] as FilterCat[]
+  const catChips = (
+    <ChipGroup label="Category">
+      {catKeys.map(cat => (
+        <Chip key={cat} selected={filterCat === cat} onClick={() => setFilterCat(cat)}>
+          {cat === 'all' ? t.men_allCategories : getCatLabel(cat)}
+        </Chip>
+      ))}
+    </ChipGroup>
+  )
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-6">
-        <PageTitle>{t.men_title}</PageTitle>
-        <p className="text-sm text-slate-400 mt-0.5">
-          {fmt(t.men_subtitle, { brandName })}
-        </p>
-      </div>
+    <Page>
+      <PageHeader title={t.men_title} />
 
       {loadError && (
         <LoadErrorCard
@@ -160,160 +170,127 @@ export default function Mentions() {
         />
       )}
 
-      <SectionHeading className="sr-only">Mention summary</SectionHeading>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <TrendingUp size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-emerald-400 shrink-0'} />
-          <div>
-            <div className={`text-2xl tabular-nums ${noMentions ? 'font-medium text-slate-500' : 'font-bold text-white'}`}>{totalMentions}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{t.men_totalMentions}</div>
-          </div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <Award size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-amber-400 shrink-0'} />
-          <div>
-            {avgPositionLabel !== null ? (
-              <div className="text-2xl font-bold text-white tabular-nums">{avgPositionLabel}</div>
-            ) : (
-              <div className="text-sm font-medium text-slate-500 mt-1.5">Not ranked yet</div>
-            )}
-            <div className="text-xs text-slate-500 mt-0.5">{t.men_avgPosition}</div>
-          </div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4 flex items-center gap-4">
-          <Bot size={20} className={noMentions ? 'text-slate-600 shrink-0' : 'text-blue-400 shrink-0'} />
-          <div>
-            <div className={`text-2xl tabular-nums ${noMentions ? 'font-medium text-slate-500' : 'font-bold text-sentiment-positive'}`}>{positiveSentiment}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{t.men_positiveSentiment}</div>
-          </div>
-        </div>
-      </div>
-
-      <p className="text-xs text-slate-500 -mt-3 mb-6">
-        Latest answer per prompt and engine. The list below is every mention on record.
-      </p>
-
-      <SectionHeading className="sr-only">Filter mentions</SectionHeading>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={() => setFilterLLM('all')}
-          aria-pressed={filterLLM === 'all'}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-            filterLLM === 'all'
-              ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
-              : 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600'
-          }`}>
-          {historyLoading ? allEnginesLabel : fmt(t.men_allEngines, { n: mentions.length })}
-        </button>
-        {engineCounts.map(({ llm, count }) => {
-          if (count === 0) return null
-          return (
-            <EngineChip
-              key={llm}
-              id={llm as EngineId}
-              selected={filterLLM === llm}
-              onClick={() => setFilterLLM(llm === filterLLM ? 'all' : (llm as LLMName))}
-            >
-              {' '}({count})
-            </EngineChip>
-          )
-        })}
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        {(['all', ...Object.keys(CATEGORY_LABEL)] as FilterCat[]).map(cat => (
-          <button key={cat} onClick={() => setFilterCat(cat)}
-            aria-pressed={filterCat === cat}
-            className={`px-3 py-1 rounded-lg text-xs transition-colors border ${
-              filterCat === cat
-                ? 'bg-brand-500/30 text-brand-300 border-brand-500/40'
-                : 'bg-dark-800 text-slate-500 border-dark-700 hover:border-dark-600'
-            }`}>
-            {cat === 'all' ? t.men_allCategories : getCatLabel(cat)}
-          </button>
-        ))}
-      </div>
-
-      {historyFailed && (
-        <LoadErrorCard
-          message="Couldn't load the list of mentions."
-          onRetry={() => { void loadHistory(false) }}
-        />
-      )}
-
-      {historyLoading && <Skeleton className="h-[220px] w-full rounded-lg" />}
-      <div className="space-y-2">
-        {filtered.map(m => {
-          const engineId = (ENGINE_META[m.llm as EngineId] ? m.llm : 'chatgpt') as EngineId
-          const isOpen = expanded === m.id
-          return (
-            <div key={m.id} className="bg-dark-800 rounded-xl overflow-hidden">
-              <button className="w-full text-left px-5 py-4 hover:bg-dark-700/30 transition-colors"
-                onClick={() => setExpanded(isOpen ? null : m.id)}
-                aria-expanded={isOpen}>
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 w-10 text-center mt-0.5">
-                    {m.brand_position ? (
-                      <>
-                        <div className="text-lg font-bold text-sentiment-positive tabular-nums">#{m.brand_position}</div>
-                        <div className="text-[10px] text-slate-600">pos</div>
-                      </>
-                    ) : (
-                      <div className="text-sm text-slate-600 mt-1">-</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <EngineChip id={engineId} interactive={false} />
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCatColor(m.category)}`}>
-                        {getCatLabel(m.category)}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <SentimentDot value={m.sentiment} />{m.sentiment}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-200 truncate">{m.promptText}</p>
-                  </div>
-                  <ChevronDown size={15}
-                    className={`shrink-0 text-slate-600 transition-transform mt-1 ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-              {isOpen && m.response_snippet && (
-                <div className="border-t border-dark-700 px-5 py-4 bg-dark-700/20">
-                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">{t.men_responseSnippet}</div>
-                  <blockquote className={`text-sm text-slate-300 italic leading-relaxed border-l-2 pl-3 ${
-                    m.sentiment === 'positive' ? 'border-sentiment-positive' : m.sentiment === 'negative' ? 'border-sentiment-negative' : 'border-sentiment-neutral'
-                  }`}>
-                    "{m.response_snippet}"
-                  </blockquote>
-                  <div className="mt-3 text-xs text-slate-600">
-                    {t.men_checked} {formatDate(m.checked_at)}
-                  </div>
-                </div>
-              )}
-              {isOpen && !m.response_snippet && (
-                <div className="border-t border-dark-700 px-5 py-3 bg-dark-700/20 text-xs text-slate-600 italic">
-                  {t.men_noSnippet}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {filtered.length === 0 && !historyFailed && history !== null && (
-        noMentions ? (
-          <SharedEmptyState
-            icon={Bot}
-            title="Not measured yet"
-            body={t.men_noMentions}
-            actionLabel="Run a collection"
-            actionTo="/ai-visibility"
-            minHeight={220}
+      <div className="space-y-4 md:space-y-6">
+        {noMentions ? (
+          <HeroAnswer
+            loading={historyLoading}
+            empty={{
+              icon: Bot,
+              // copy: pending bg-copy
+              title: 'No AI answer has named your brand yet.',
+              body: t.men_noMentions,
+              actionLabel: 'See the prompts',
+              actionTo: '/ai-visibility',
+            }}
+            answer=""
           />
         ) : (
-          <div className="text-center py-16 text-slate-500">{t.men_noFilter}</div>
-        )
-      )}
-    </div>
+          <HeroAnswer
+            value={totalMentions}
+            unit={totalMentions === 1 ? 'mention' : 'mentions'}
+            // copy: pending bg-copy
+            answer={`AI engines named ${brandName} ${totalMentions} ${totalMentions === 1 ? 'time' : 'times'}${avgPositionLabel !== null ? `, at an average position of ${avgPositionLabel}` : ''}.`}
+            // copy: pending bg-copy
+            context={`${positiveSentiment} of them positive. Latest answer per prompt and engine.`}
+          />
+        )}
+
+        {!noMentions && (
+          <>
+            <div className="hidden md:flex flex-col gap-3">
+              {engineChips}
+              {catChips}
+            </div>
+            <div className="md:hidden grid grid-cols-1 gap-3">
+              <Select aria-label="Engine" value={filterLLM} onChange={e => setFilterLLM(e.target.value as FilterLLM)}>
+                <option value="all">{historyLoading ? allEnginesLabel : fmt(t.men_allEngines, { n: mentions.length })}</option>
+                {engineCounts.map(({ llm, count }) => (
+                  <option key={llm} value={llm}>{ENGINE_META[llm as EngineId]?.label ?? llm} ({count})</option>
+                ))}
+              </Select>
+              <Select aria-label="Category" value={filterCat} onChange={e => setFilterCat(e.target.value as FilterCat)}>
+                {catKeys.map(cat => (
+                  <option key={cat} value={cat}>{cat === 'all' ? t.men_allCategories : getCatLabel(cat)}</option>
+                ))}
+              </Select>
+            </div>
+          </>
+        )}
+
+        {historyFailed && (
+          <LoadErrorCard
+            message="Couldn't load the list of mentions."
+            onRetry={() => { void loadHistory(false) }}
+          />
+        )}
+
+        {historyLoading && <Skeleton className="h-[220px] w-full rounded-lg" />}
+
+        {filtered.length > 0 && (
+          <DataList
+            ariaLabel="Mentions"
+            rows={filtered}
+            getKey={m => m.id}
+            renderRow={m => {
+              const engineId = (ENGINE_META[m.llm as EngineId] ? m.llm : 'chatgpt') as EngineId
+              const isOpen = expanded === m.id
+              return (
+                <div className="w-full min-w-0">
+                  <button
+                    type="button"
+                    className="w-full text-left flex items-start gap-4 min-h-[44px]"
+                    onClick={() => setExpanded(isOpen ? null : m.id)}
+                    aria-expanded={isOpen}
+                  >
+                    <span className="shrink-0 w-10 text-center">
+                      {m.brand_position ? (
+                        <>
+                          <span className="block text-value text-ink tabular-nums">#{m.brand_position}</span>
+                          <span className="block text-meta text-ink-3">pos</span>
+                        </>
+                      ) : (
+                        <span className="block text-body text-ink-3 mt-1">n/a</span>
+                      )}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-body text-ink line-clamp-2 md:line-clamp-1 break-words">{m.promptText}</span>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <EngineChip id={engineId} interactive={false} />
+                        <Badge tone="neutral">{getCatLabel(m.category)}</Badge>
+                        <span className="inline-flex items-center gap-1 text-meta text-ink-2">
+                          <StatusGlyph kind={sentimentKind(m.sentiment)} size={12} />{m.sentiment}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronDown size={16} aria-hidden="true"
+                      className={`shrink-0 text-ink-3 transition-transform motion-reduce:transition-none mt-1 ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isOpen && m.response_snippet && (
+                    <div className="mt-3 rounded-control bg-surface-2 p-4">
+                      <div className="text-meta text-ink-3 mb-2">{t.men_responseSnippet}</div>
+                      <blockquote className="m-0 text-body text-ink-2 leading-relaxed">
+                        &quot;{m.response_snippet}&quot;
+                      </blockquote>
+                      <div className="mt-3 text-meta text-ink-3">
+                        {t.men_checked} {formatDate(m.checked_at)}
+                      </div>
+                    </div>
+                  )}
+                  {isOpen && !m.response_snippet && (
+                    <div className="mt-3 rounded-control bg-surface-2 p-4 text-meta text-ink-3">
+                      {t.men_noSnippet}
+                    </div>
+                  )}
+                </div>
+              )
+            }}
+          />
+        )}
+
+        {filtered.length === 0 && !historyFailed && history !== null && !noMentions && (
+          <p className="m-0 py-12 text-center text-body text-ink-3">{t.men_noFilter}</p>
+        )}
+      </div>
+    </Page>
   )
 }

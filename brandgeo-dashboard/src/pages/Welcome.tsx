@@ -202,7 +202,7 @@ export default function Welcome() {
             <button
               onClick={submit}
               disabled={loading}
-              className="w-full mt-5 bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-5 bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <>Continue <ArrowRight size={16} /></>}
             </button>

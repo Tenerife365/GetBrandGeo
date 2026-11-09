@@ -51,7 +51,7 @@ export default function ResetPassword() {
               <CheckCircle className="mx-auto mb-3 text-emerald-400" size={36} />
               <h1 className="text-lg font-semibold text-white mb-2">Password saved</h1>
               <p className="text-sm text-slate-400 mb-6">Next, tell us what to track.</p>
-              <button onClick={() => navigate('/', { replace: true })} className="w-full bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Continue</button>
+              <button onClick={() => navigate('/', { replace: true })} className="w-full bg-accent-strong hover:bg-accent-strong-hover text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors">Continue</button>
             </div>
           ) : (
             <div>
@@ -67,7 +67,7 @@ export default function ResetPassword() {
                   <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat password" disabled={!sessionReady} className={ic} />
                 </div>
                 {error && <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"><AlertCircle size={14} /> {error}</div>}
-                <button type="submit" disabled={loading || !sessionReady} className="w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                <button type="submit" disabled={loading || !sessionReady} className="w-full bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
                   {loading && <Loader2 size={16} className="animate-spin" />}
                   {loading ? 'Updating...' : 'Update password'}
                 </button>

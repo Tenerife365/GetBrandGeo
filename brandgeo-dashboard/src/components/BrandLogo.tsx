@@ -53,9 +53,9 @@ export default function BrandLogo({
   }
 
   return (
-    <span className={`${sizeClass} ${roundedClass} bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 flex items-center justify-center ${textClass} font-bold shrink-0 overflow-hidden`}>
+    <span className={`${sizeClass} ${roundedClass} bg-accent-tint text-accent-ink ring-1 ring-accent-ink/25 flex items-center justify-center ${textClass} font-bold shrink-0 overflow-hidden`}>
       {src
-        ? <img src={src} alt={name} onError={onError} className="w-full h-full object-contain bg-white" />
+        ? <img src={src} alt={name} onError={onError} className="w-full h-full object-contain bg-on-accent" />
         : initials(name)}
     </span>
   )

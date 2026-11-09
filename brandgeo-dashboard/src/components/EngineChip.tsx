@@ -18,7 +18,6 @@
  */
 import type { ButtonHTMLAttributes } from 'react'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
-import { hexToRgba } from '../lib/color'
 
 interface EngineChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'id' | 'children'> {
   id: EngineId
@@ -32,12 +31,6 @@ interface EngineChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 export default function EngineChip({ id, selected = false, interactive = true, className = '', onClick, children, ...rest }: EngineChipProps) {
   const meta = ENGINE_META[id]
   const asButton = interactive
-  const sharedStyle = selected
-    ? {
-        backgroundColor: hexToRgba(meta.chartColor, 0.14),
-        borderColor: hexToRgba(meta.chartColor, 0.45),
-      }
-    : undefined
 
   const inner = (
     <>
@@ -47,10 +40,10 @@ export default function EngineChip({ id, selected = false, interactive = true, c
           width: 8,
           height: 8,
           backgroundColor: meta.chartColor,
-          boxShadow: selected ? '0 0 0 2px rgb(var(--dark-800))' : undefined,
+          boxShadow: selected ? '0 0 0 2px rgb(var(--surface))' : undefined,
         }}
       />
-      <span className={selected ? 'font-semibold' : 'font-medium'} style={{ color: selected ? 'rgb(var(--text-base))' : 'rgb(var(--text-secondary))' }}>
+      <span className={selected ? 'font-semibold text-accent-ink' : 'text-ink-2'}>
         {meta.label}{children}
       </span>
     </>
@@ -60,11 +53,15 @@ export default function EngineChip({ id, selected = false, interactive = true, c
   // pseudo-element live in the `.engine-chip` class (index.css) — a plain
   // inline style can't express the breakpoint, and the §13.4 44px tap target
   // has to be a real hit area, not just a bigger visible chip.
-  const sharedClass = `engine-chip inline-flex items-center gap-1.5 rounded-full border text-xs transition-colors ${className}`
+  // Selected follows the Chip contract (accent-tint, accent-ink border); the
+  // swatch keeps the engine identity colour in both states.
+  const sharedClass = `engine-chip inline-flex items-center gap-1.5 rounded-badge border text-meta transition-colors duration-[180ms] ease-out ${
+    selected ? 'bg-accent-tint border-accent-ink' : 'bg-surface border-edge hover:bg-surface-2'
+  } ${className}`
 
   if (!asButton) {
     return (
-      <span className={sharedClass} style={{ borderColor: selected ? undefined : 'rgb(var(--dark-600))', ...sharedStyle }}>
+      <span className={sharedClass}>
         {inner}
       </span>
     )
@@ -76,7 +73,6 @@ export default function EngineChip({ id, selected = false, interactive = true, c
       onClick={onClick}
       aria-pressed={selected}
       className={sharedClass}
-      style={{ borderColor: selected ? undefined : 'rgb(var(--dark-600))', ...sharedStyle }}
       {...rest}
     >
       {inner}

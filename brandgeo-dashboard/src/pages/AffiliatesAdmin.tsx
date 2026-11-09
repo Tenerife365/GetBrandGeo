@@ -31,7 +31,7 @@ const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-
 // Same look, intrinsic width: for the filter bars, where w-full in `ic` would win over a trailing w-auto.
 const icAuto = ic.replace('w-full', 'w-auto')
 const btn = 'inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-control text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
-const btnPrimary = `${btn} bg-brand-500 hover:bg-brand-400 text-white`
+const btnPrimary = `${btn} bg-accent-strong hover:bg-accent-strong-hover text-on-accent`
 const btnGhost = `${btn} bg-dark-700 hover:bg-dark-600 text-slate-200 border border-dark-600`
 const btnDanger = `${btn} bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30`
 const btnSmall = 'inline-flex items-center gap-1 min-h-[28px] px-2 rounded text-xs font-medium transition-colors disabled:opacity-60'

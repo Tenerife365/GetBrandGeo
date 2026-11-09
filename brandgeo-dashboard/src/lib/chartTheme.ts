@@ -13,9 +13,10 @@
  * light mode rendered a near-black tooltip on a white page because nothing
  * could theme it.
  *
- * Every value below is exactly the §3 (A9) and §8.5 token value for the
- * corresponding theme — this module re-expresses those tokens in a form
- * Recharts can consume, it does not invent or duplicate a colour.
+ * Every value below is exactly the index.css token value for the
+ * corresponding theme (phase3-visual-spec.md section 9.1) - this module
+ * re-expresses those tokens in a form Recharts can consume, it does not invent
+ * a colour. tests/tokens_sync.test.js fails if a hex here drifts from index.css.
  *
  * Engine colours are NOT here. They live in ENGINE_META (planConfig.ts) and do
  * not fork by theme (§8.2, judgement call J1) — every chart keys its engine
@@ -24,68 +25,110 @@
 import { useTheme } from './themeContext'
 
 export interface ChartTheme {
-  /** CartesianGrid stroke — §3 A9 --grid-line. Decorative, deliberately below 3:1 (gridlines are exempt from WCAG 1.4.11). */
+  /** CartesianGrid stroke, --line. Decorative, deliberately below 3:1 (gridlines are exempt from WCAG 1.4.11). */
   gridLine: string
-  /** XAxis/YAxis tick fill — §3 A9 --axis-ink. This is text, so it clears 4.5:1 in both themes. */
+  /** XAxis/YAxis tick fill, --ink-3. This is text, so it clears 4.5:1 in both themes. */
   axisInk: string
   tooltipSurface: string
   tooltipBorder: string
   tooltipInk: string
-  /** The card surface a chart sits on — the stroke gap between stacked bar segments (§9.5) and the activeDot border use this. */
+  /** The card surface a chart sits on: the stroke gap between stacked bar segments and the activeDot border use this. */
   cardSurface: string
-  /** §8.5 sentiment ramp, resolved to hex for the current theme. */
+  /** Sentiment ramp, resolved to hex for the current theme. */
   sentimentPositive: string
   sentimentNeutral: string
   sentimentNegative: string
-  /** §9.5 — the tenant's own brand series in a competitor chart. Same value as --rail-active. */
+  /** The tenant's own series in a competitor chart, --accent. */
+  you: string
+  /** Every other brand in a competitor chart, --neu. Told apart by dash pattern, not hue (fieldDash). */
+  field: string
+  /** Empty remainder of a meter or bar, --surface-3. */
+  track: string
+  /** Same value as --accent-ink. */
   railActive: string
 }
 
 const DARK: ChartTheme = {
-  gridLine: '#243044',
-  axisInk: '#94a3b8',
-  tooltipSurface: '#1e293b',
-  tooltipBorder: '#334155',
-  tooltipInk: '#e2e8f0',
-  cardSurface: '#0f172a',
+  gridLine: '#23242b',
+  axisInk: '#878d99',
+  tooltipSurface: '#16171e',
+  tooltipBorder: '#32333c',
+  tooltipInk: '#e8e9ed',
+  cardSurface: '#101116',
   sentimentPositive: '#84cc16',
-  sentimentNeutral: '#94a3b8',
+  sentimentNeutral: '#666a75',
   sentimentNegative: '#fb7185',
+  you: '#8b5cf6',
+  field: '#666a75',
+  track: '#1d1e27',
   railActive: '#a78bfa',
 }
 
-// SYNCED 2026-07-30 with the light-mode contrast fixes in index.css. Two values
-// here had gone stale the moment those tokens moved, which is the failure mode
-// this module's own docstring cannot prevent: --axis-ink and --grid-line are
-// defined in index.css and referenced by NOTHING, so the CSS side is dead
-// documentation and this file is the only thing that paints. Nothing errors
-// when they diverge.
-//   axisInk          #64748b -> #556479. The comment on the interface says this
-//                    "clears 4.5:1 in both themes"; at #64748b it measured 4.76
-//                    and only because every chart happens to sit on a white
-//                    card. On the page it was 4.45 and on --dark-700 3.95, so
-//                    the claim held by placement, not by the value. Now 6.03 on
-//                    the card, 5.00 on the darkest light surface.
-//   sentimentPositive #4d7c0f -> #3f6212, matching --sentiment-positive, which
-//                    moved because .text-sentiment-positive is real text
-//                    (TrendDelta.tsx:37) and measured 4.09 on its own lime tint.
-//                    As a chart fill either value clears the 3:1 non-text floor,
-//                    so this change is for token truth, not for the chart.
-// sentimentNeutral stays #64748b deliberately: --sentiment-neutral was left
-// alone because it only fills a 2x2 dot. See the note beside it in index.css.
 const LIGHT: ChartTheme = {
-  gridLine: '#eaeaf2',
-  axisInk: '#556479',
+  gridLine: '#e2e2ea',
+  axisInk: '#62626c',
   tooltipSurface: '#ffffff',
-  tooltipBorder: '#d8d6e6',
-  tooltipInk: '#0f172a',
+  tooltipBorder: '#cfcfda',
+  tooltipInk: '#09090f',
   cardSurface: '#ffffff',
-  sentimentPositive: '#3f6212',
-  sentimentNeutral: '#64748b',
+  sentimentPositive: '#58870f',
+  sentimentNeutral: '#71717a',
   sentimentNegative: '#9f1239',
-  railActive: '#7c3aed',
+  you: '#7c3aed',
+  field: '#71717a',
+  track: '#ececf4',
+  railActive: '#6d28d9',
 }
 
 export function useChartTheme(): ChartTheme {
   return useTheme().theme === 'light' ? LIGHT : DARK
 }
+
+// -- Shared Recharts props (spec 9.1) ----------------------------------------
+// Spread these instead of restating them per chart, so every chart carries the
+// same grid, axis, bar and line treatment.
+
+/** Horizontal gridlines only, 1px. */
+export function gridProps(t: ChartTheme) {
+  return { vertical: false, stroke: t.gridLine, strokeWidth: 1 } as const
+}
+
+/** No axis line, no tick line, 12px ink-3 labels. */
+export function axisProps(t: ChartTheme) {
+  return {
+    axisLine: false,
+    tickLine: false,
+    tick: { fontSize: 12, fill: t.axisInk },
+  } as const
+}
+
+/** Percent Y axis: 0, 50, 100. */
+export function yPercentAxis(t: ChartTheme) {
+  return {
+    ...axisProps(t),
+    width: 48,
+    domain: [0, 100] as [number, number],
+    ticks: [0, 50, 100],
+    tickFormatter: (v: number) => v + '%',
+  }
+}
+
+export function barProps(t: ChartTheme) {
+  return {
+    radius: [4, 4, 0, 0] as [number, number, number, number],
+    maxBarSize: 24,
+    stroke: t.cardSurface,
+    strokeWidth: 2,
+  }
+}
+
+export function lineProps(t: ChartTheme) {
+  return {
+    strokeWidth: 2,
+    dot: false as const,
+    activeDot: { r: 5, strokeWidth: 2, stroke: t.cardSurface },
+  }
+}
+
+/** Dash patterns for the field series in a competitor chart (solid, dashed, dotted). */
+export const fieldDash = ['0', '6 3', '2 3']

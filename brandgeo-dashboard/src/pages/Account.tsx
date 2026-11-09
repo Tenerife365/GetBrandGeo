@@ -13,6 +13,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS, PLAN_ORDER, featureUnlockPlan, type Plan } from '../lib/planConfig'
 import { PageTitle } from '../components/Typography'
+import { buttonClasses } from '../components/ui'
 import BrandLogo from '../components/BrandLogo'
 import PromotionsPanel from '../components/PromotionsPanel'
 import McpAccessSection from '../components/McpAccessSection'
@@ -400,7 +401,7 @@ export default function Account() {
   }
 
   const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-3xl mx-auto">
@@ -763,7 +764,7 @@ export default function Account() {
             <button
               onClick={deleteAccount}
               disabled={deleting || !activeClient?.slug || delConfirm.trim() !== activeClient.slug}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-500/90 text-white hover:bg-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              className={`${buttonClasses('danger')} shrink-0`}
             >
               {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Delete
             </button>

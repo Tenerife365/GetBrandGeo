@@ -18,7 +18,7 @@ export default function ChartLegend({ payload }: ChartLegendProps) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingBottom: 4 }}>
       {payload.map((entry, i) => (
-        <span key={i} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+        <span key={i} className="inline-flex items-center gap-1.5 text-meta text-ink-2">
           <span
             className="inline-block rounded-full flex-shrink-0"
             style={{ width: 8, height: 8, backgroundColor: entry.color }}

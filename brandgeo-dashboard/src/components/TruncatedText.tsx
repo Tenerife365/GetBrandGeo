@@ -87,7 +87,7 @@ export default function TruncatedText({ text, className }: TruncatedTextProps) {
       {pos && createPortal(
         <div
           role="tooltip"
-          className="fixed z-50 pointer-events-none bg-dark-800 border border-dark-600 rounded-lg shadow-2xl px-3 py-2 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap break-words"
+          className="fixed z-50 pointer-events-none bg-dark-800 border border-dark-600 rounded-lg shadow-2xl px-3 py-2 text-sm text-ink leading-relaxed whitespace-pre-wrap break-words"
           style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }}
         >
           {text}

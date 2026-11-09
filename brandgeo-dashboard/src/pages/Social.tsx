@@ -94,7 +94,7 @@ interface PublishTargetResult {
 // ── Shared styles (DESIGN-SYSTEM.md tokens) ──────────────────────────────────
 const card = 'bg-dark-800 border border-dark-700 rounded-xl'
 const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 const secondaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-dark-700 text-slate-200 border border-dark-600 hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
 function StatusBadge({ status }: { status: string }) {

@@ -136,12 +136,12 @@ export default function AdminBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => { setOpen(o => !o); if (!open) load() }}
-        className="relative p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 transition-colors"
+        className="relative p-1.5 rounded-lg text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
       >
         <Bell size={18} />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-brand-500 text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent-strong text-on-accent text-meta font-bold flex items-center justify-center">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -152,24 +152,24 @@ export default function AdminBell() {
         // never clips against the sidebar's overflow.
         <div className="fixed left-4 top-16 w-[22rem] max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-hidden bg-dark-800 border border-dark-700 rounded-xl shadow-2xl z-50 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-dark-700 shrink-0">
-            <span className="text-sm font-semibold text-white">Notifications</span>
+            <span className="text-sm font-semibold text-ink">Notifications</span>
             <div className="flex items-center gap-2">
-              <button onClick={load} className="p-1 text-slate-500 hover:text-slate-200" aria-label="Refresh">
+              <button onClick={load} className="p-1 text-ink-3 hover:text-ink" aria-label="Refresh">
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               </button>
               {unread > 0 && (
-                <button onClick={markAllRead} className="text-xs text-brand-300 hover:underline inline-flex items-center gap-1">
+                <button onClick={markAllRead} className="text-xs text-accent-ink hover:underline inline-flex items-center gap-1">
                   <Check size={12} /> Mark all read
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="p-1 text-slate-500 hover:text-slate-200" aria-label="Close">
+              <button onClick={() => setOpen(false)} className="p-1 text-ink-3 hover:text-ink" aria-label="Close">
                 <X size={14} />
               </button>
             </div>
           </div>
           <div className="overflow-y-auto">
             {items.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">
+              <p className="px-4 py-8 text-center text-sm text-ink-3">
                 {loading ? 'Loading…' : 'No notifications yet.'}
               </p>
             )}
@@ -187,29 +187,29 @@ export default function AdminBell() {
                     canOpen ? 'hover:bg-dark-700/50 cursor-pointer' : 'cursor-default'
                   } ${n.read_at ? 'opacity-60' : ''}`}
                 >
-                  <Icon size={16} className={`shrink-0 mt-0.5 ${n.read_at ? 'text-slate-500' : 'text-brand-300'}`} />
+                  <Icon size={16} className={`shrink-0 mt-0.5 ${n.read_at ? 'text-ink-3' : 'text-accent-ink'}`} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white truncate">{n.title}</span>
-                      {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />}
+                      <span className="text-sm font-medium text-ink truncate">{n.title}</span>
+                      {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
                     </span>
-                    {n.body && <span className="block text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</span>}
+                    {n.body && <span className="block text-xs text-ink-2 mt-0.5 line-clamp-2">{n.body}</span>}
                     {/* Which client, always, resolved from client_id rather than
                         from the body text. This is the line that makes a row
                         actionable, so it sits above the timestamp and is not
                         dimmed to slate-600 the way the timestamp is. */}
                     {who && (
-                      <span className="flex items-center gap-1.5 mt-1.5 text-[11px] min-w-0">
-                        <Building2 size={11} className="shrink-0 text-slate-500" />
-                        <span className={`truncate font-medium ${who.gone ? 'text-slate-500 italic' : 'text-brand-300'}`}>
+                      <span className="flex items-center gap-1.5 mt-1.5 text-meta min-w-0">
+                        <Building2 size={11} className="shrink-0 text-ink-3" />
+                        <span className={`truncate font-medium ${who.gone ? 'text-ink-3 italic' : 'text-accent-ink'}`}>
                           {who.name}
                         </span>
                         {who.gone
-                          ? <span className="text-slate-500 shrink-0">(deleted)</span>
-                          : <ArrowRight size={11} className="shrink-0 text-slate-500" />}
+                          ? <span className="text-ink-3 shrink-0">(deleted)</span>
+                          : <ArrowRight size={11} className="shrink-0 text-ink-3" />}
                       </span>
                     )}
-                    <span className="block text-[10px] text-slate-600 mt-1">{timeAgo(n.created_at)}</span>
+                    <span className="block text-meta text-ink-3 mt-1">{timeAgo(n.created_at)}</span>
                   </span>
                 </button>
               )

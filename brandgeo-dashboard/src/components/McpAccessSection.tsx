@@ -154,9 +154,9 @@ function fmtDT(iso: string | null): string {
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-const ghostBtn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 hover:bg-dark-600 text-slate-200 border border-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const inputCls = 'w-full bg-dark-700 border border-edge rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-3 focus:border-accent-ink'
+const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const ghostBtn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 hover:bg-dark-600 text-ink border border-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
 function CopyBtn({ text }: { text: string }) {
   const [ok, setOk] = useState(false)
@@ -263,7 +263,7 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
   const nameOf = (g: GrantRow) => g.client_name || APPS.nameFallback
   const hostCell = (g: GrantRow) => isLoopbackHost(g.redirect_host)
     ? APPS.redirectLoopback
-    : <span className="font-mono text-[11px] break-all">{g.redirect_host || ''}</span>
+    : <span className="font-mono text-meta break-all">{g.redirect_host || ''}</span>
   const accessText = (g: GrantRow) => g.access === 'read_write' ? APPS.accessWrite : APPS.accessRead
   const lastUsed = (g: GrantRow) => g.last_used_at ? fmtDT(g.last_used_at) : APPS.neverUsed
 
@@ -282,7 +282,7 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
       aria-label={APPS.disconnectAria(nameOf(g))}
       onClick={() => setConfirmId(g.id)}
       disabled={disconnectingId !== null}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 hover:bg-dark-600 text-red-400 border border-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed max-md:min-h-[44px] ${phone ? 'w-full justify-center mt-3' : ''}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 hover:bg-dark-600 text-neg border border-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed max-md:min-h-[44px] ${phone ? 'w-full justify-center mt-3' : ''}`}
     >
       <Trash2 size={12} /> {APPS.disconnect}
     </button>
@@ -291,15 +291,15 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
   const confirmBlock = (g: GrantRow, phone: boolean) => (
     <div
       onKeyDown={e => onConfirmKey(e, g.id)}
-      className={`bg-red-500/10 border border-red-500/20 rounded-lg p-3 ${phone ? 'mt-3' : ''}`}
+      className={`bg-neg-tint border border-neg/20 rounded-lg p-3 ${phone ? 'mt-3' : ''}`}
     >
-      <p className="text-xs text-slate-300 break-words">{APPS.confirm(nameOf(g))}</p>
+      <p className="text-xs text-ink-2 break-words">{APPS.confirm(nameOf(g))}</p>
       <div className={`mt-2 flex gap-2 ${phone ? 'flex-col' : ''}`}>
         <button
           type="button"
           onClick={() => disconnect(g)}
           disabled={disconnectingId !== null}
-          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed max-md:min-h-[44px]"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neg-tint border border-neg/30 text-neg hover:opacity-80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed max-md:min-h-[44px]"
         >
           {disconnectingId === g.id && <Loader2 size={12} className="animate-spin motion-reduce:animate-none" />} {APPS.confirmYes}
         </button>
@@ -317,7 +317,7 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
   )
 
   const failureLine = (g: GrantRow) => failure && failure.id === g.id
-    ? <p className="text-xs text-red-400 mt-1 break-words">{failure.text}</p>
+    ? <p className="text-xs text-neg mt-1 break-words">{failure.text}</p>
     : null
 
   let body: React.ReactNode = null
@@ -331,25 +331,25 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
   } else if (state === 'error') {
     body = (
       <div className="flex items-center gap-3 mt-3 flex-wrap">
-        <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {APPS.loadError}</span>
+        <span className="text-xs text-neg flex items-center gap-1.5"><AlertTriangle size={13} /> {APPS.loadError}</span>
         <button type="button" onClick={load} className={ghostBtn}>{APPS.retry}</button>
       </div>
     )
   } else if (grants.length === 0) {
     body = (
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span>{APPS.emptyBefore}<span className="font-mono text-slate-300 break-all">{MCP_ENDPOINT}</span>{APPS.emptyAfter}</span>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+        <span>{APPS.emptyBefore}<span className="font-mono text-ink-2 break-all">{MCP_ENDPOINT}</span>{APPS.emptyAfter}</span>
         <CopyBtn text={MCP_ENDPOINT} />
       </div>
     )
   } else {
     body = (
       <>
-        {!gated && <p className="text-[11px] text-slate-600 mt-4">{APPS.partialNote}</p>}
+        {!gated && <p className="text-meta text-ink-3 mt-4">{APPS.partialNote}</p>}
         <div className="hidden md:block mt-4 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-slate-500 uppercase tracking-wide text-[10px]">
+              <tr className="text-left text-ink-3 uppercase tracking-wide text-meta">
                 <th className="pb-2 pr-4 font-medium">{APPS.colApp}</th>
                 <th className="pb-2 pr-4 font-medium">{APPS.colRedirect}</th>
                 <th className="pb-2 pr-4 font-medium">{APPS.colAccess}</th>
@@ -362,11 +362,11 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
               {grants.map(g => (
                 <Fragment key={g.id}>
                   <tr className="border-t border-dark-700">
-                    <td className="py-2 pr-4 text-slate-200 break-words">{nameOf(g)}</td>
-                    <td className="py-2 pr-4 text-slate-400">{hostCell(g)}</td>
-                    <td className="py-2 pr-4 text-slate-300">{accessText(g)}</td>
-                    <td className="py-2 pr-4 text-slate-400">{fmtDT(g.created_at)}</td>
-                    <td className="py-2 pr-4 text-slate-400">{lastUsed(g)}</td>
+                    <td className="py-2 pr-4 text-ink break-words">{nameOf(g)}</td>
+                    <td className="py-2 pr-4 text-ink-2">{hostCell(g)}</td>
+                    <td className="py-2 pr-4 text-ink-2">{accessText(g)}</td>
+                    <td className="py-2 pr-4 text-ink-2">{fmtDT(g.created_at)}</td>
+                    <td className="py-2 pr-4 text-ink-2">{lastUsed(g)}</td>
                     <td className="py-2">{confirmId === g.id ? null : disconnectBtn(g, false)}</td>
                   </tr>
                   {confirmId === g.id && (
@@ -383,12 +383,12 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
         <ul className="md:hidden mt-4 space-y-3">
           {grants.map(g => (
             <li key={g.id} className="rounded-lg border border-dark-700 bg-dark-700/30 p-3">
-              <p className="text-sm font-medium text-slate-200 break-words">{nameOf(g)}</p>
+              <p className="text-sm font-medium text-ink break-words">{nameOf(g)}</p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs mt-2">
-                <dt className="text-slate-500">{APPS.colRedirect}</dt><dd className="text-slate-400">{hostCell(g)}</dd>
-                <dt className="text-slate-500">{APPS.colAccess}</dt><dd className="text-slate-300">{accessText(g)}</dd>
-                <dt className="text-slate-500">{APPS.colConnected}</dt><dd className="text-slate-400">{fmtDT(g.created_at)}</dd>
-                <dt className="text-slate-500">{APPS.colLastUsed}</dt><dd className="text-slate-400">{lastUsed(g)}</dd>
+                <dt className="text-ink-3">{APPS.colRedirect}</dt><dd className="text-ink-2">{hostCell(g)}</dd>
+                <dt className="text-ink-3">{APPS.colAccess}</dt><dd className="text-ink-2">{accessText(g)}</dd>
+                <dt className="text-ink-3">{APPS.colConnected}</dt><dd className="text-ink-2">{fmtDT(g.created_at)}</dd>
+                <dt className="text-ink-3">{APPS.colLastUsed}</dt><dd className="text-ink-2">{lastUsed(g)}</dd>
               </dl>
               {confirmId === g.id ? confirmBlock(g, true) : disconnectBtn(g, true)}
               {failureLine(g)}
@@ -402,8 +402,8 @@ function ConnectedAppsBlock({ apps, gated }: { apps: ReturnType<typeof useConnec
   return (
     <div className="mt-6 pt-6 border-t border-dark-700">
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
-      <h3 ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-slate-300 mb-1 outline-none">{APPS.heading}</h3>
-      <p className="text-xs text-slate-500 mb-3">{APPS.helper}</p>
+      <h3 ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-ink-2 mb-1 outline-none">{APPS.heading}</h3>
+      <p className="text-xs text-ink-3 mb-3">{APPS.helper}</p>
       {body}
     </div>
   )
@@ -578,8 +578,8 @@ export default function McpAccessSection({
     // tab stop) so the reveal dialog can return focus here when the Issue
     // key button is absent or disabled. outline-none is safe since focus
     // only ever lands here via script, never by keyboard navigation.
-    <h2 ref={headerRef} tabIndex={-1} className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2 outline-none">
-      <KeyRound size={15} className="text-slate-500" /> MCP access
+    <h2 ref={headerRef} tabIndex={-1} className="text-sm font-semibold text-ink-2 mb-1 flex items-center gap-2 outline-none">
+      <KeyRound size={15} className="text-ink-3" /> MCP access
     </h2>
   )
 
@@ -597,11 +597,11 @@ export default function McpAccessSection({
         className="w-full max-w-xl bg-dark-800 border border-dark-700 rounded-xl p-6 my-6 max-h-[85vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 id="mcp-reveal-title" className="text-base font-semibold text-white flex items-center gap-2"><Lock size={15} className="text-brand-300" /> Your new MCP key</h3>
-          <button onClick={closeReveal} className="text-slate-400 hover:text-white text-sm" aria-label="Done, I have copied the key">Done</button>
+          <h3 id="mcp-reveal-title" className="text-base font-semibold text-ink flex items-center gap-2"><Lock size={15} className="text-accent-ink" /> Your new MCP key</h3>
+          <button onClick={closeReveal} className="text-ink-2 hover:text-ink text-sm" aria-label="Done, I have copied the key">Done</button>
         </div>
 
-        <p className="text-xs text-amber-300 flex items-start gap-1.5 mb-3">
+        <p className="text-xs text-warn flex items-start gap-1.5 mb-3">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           This key is shown once. Copy it now. BrandGEO cannot show it again.
         </p>
@@ -611,18 +611,18 @@ export default function McpAccessSection({
           <CopyBtn text={reveal.secret} />
         </div>
 
-        <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <h4 className="text-xs font-semibold text-ink-2 uppercase tracking-wide mb-2 flex items-center gap-1.5">
           <Terminal size={13} /> Setup
         </h4>
         <div className="space-y-3">
           {setupSnippets(reveal.secret).map(s => (
             <div key={s.client}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-slate-300">{s.client}</span>
+                <span className="text-xs font-medium text-ink-2">{s.client}</span>
                 <CopyBtn text={s.code} />
               </div>
-              {s.note && <p className="text-[10px] text-slate-600 mb-1">{s.note}</p>}
-              <pre className="bg-dark-900 border border-dark-700 rounded-lg p-3 text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap break-all">{s.code}</pre>
+              {s.note && <p className="text-meta text-ink-3 mb-1">{s.note}</p>}
+              <pre className="bg-dark-900 border border-dark-700 rounded-lg p-3 text-meta text-ink-2 overflow-x-auto whitespace-pre-wrap break-all">{s.code}</pre>
             </div>
           ))}
         </div>
@@ -636,7 +636,7 @@ export default function McpAccessSection({
       <>
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
-          <div className="flex items-center gap-2 text-sm text-slate-500 mt-4">
+          <div className="flex items-center gap-2 text-sm text-ink-3 mt-4">
             <Loader2 size={15} className="animate-spin" /> Loading your MCP keys…
           </div>
         </div>
@@ -651,7 +651,7 @@ export default function McpAccessSection({
       <>
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
-          <p className="text-xs text-slate-500 mt-3">MCP access isn't set up on our side yet. Check back soon, or contact support@getbrandgeo.com if this doesn't clear up.</p>
+          <p className="text-xs text-ink-3 mt-3">MCP access isn't set up on our side yet. Check back soon, or contact support@getbrandgeo.com if this doesn't clear up.</p>
         </div>
         {revealDialog}
       </>
@@ -665,7 +665,7 @@ export default function McpAccessSection({
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
           <div className="flex items-center gap-3 mt-3 flex-wrap">
-            <span className="text-xs text-red-400 flex items-center gap-1.5"><AlertTriangle size={13} /> {loadError || 'Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.'}</span>
+            <span className="text-xs text-neg flex items-center gap-1.5"><AlertTriangle size={13} /> {loadError || 'Could not load MCP keys. Try again, and if it keeps happening, contact support@getbrandgeo.com.'}</span>
             <button onClick={load} className={ghostBtn}>Retry</button>
           </div>
           <ConnectedAppsBlock apps={apps} gated={gated} />
@@ -685,7 +685,7 @@ export default function McpAccessSection({
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-left text-slate-500 uppercase tracking-wide text-[10px]">
+          <tr className="text-left text-ink-3 uppercase tracking-wide text-meta">
             <th className="pb-2 pr-4 font-medium">Label</th>
             <th className="pb-2 pr-4 font-medium">Key</th>
             <th className="pb-2 pr-4 font-medium">Access</th>
@@ -697,16 +697,16 @@ export default function McpAccessSection({
         <tbody>
           {keys.map(k => (
             <tr key={k.id} className="border-t border-dark-700">
-              <td className="py-2 pr-4 text-slate-200">{k.label || <span className="italic text-slate-500">Untitled</span>}</td>
-              <td className="py-2 pr-4"><code className="text-brand-300 font-mono">{k.key_prefix}…</code></td>
-              <td className="py-2 pr-4 text-slate-300">{scopeLabel(k.scope)}</td>
-              <td className="py-2 pr-4 text-slate-400">{fmtDT(k.created_at)}</td>
-              <td className="py-2 pr-4 text-slate-400">{k.last_used_at ? fmtDT(k.last_used_at) : 'never'}</td>
+              <td className="py-2 pr-4 text-ink">{k.label || <span className="italic text-ink-3">Untitled</span>}</td>
+              <td className="py-2 pr-4"><code className="text-accent-ink font-mono">{k.key_prefix}…</code></td>
+              <td className="py-2 pr-4 text-ink-2">{scopeLabel(k.scope)}</td>
+              <td className="py-2 pr-4 text-ink-2">{fmtDT(k.created_at)}</td>
+              <td className="py-2 pr-4 text-ink-2">{k.last_used_at ? fmtDT(k.last_used_at) : 'never'}</td>
               <td className="py-2">
                 <button
                   onClick={() => revokeKey(k)}
                   disabled={revokingId === k.id}
-                  className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 text-neg hover:text-neg disabled:opacity-50"
                 >
                   {revokingId === k.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Revoke
                 </button>
@@ -715,7 +715,7 @@ export default function McpAccessSection({
           ))}
         </tbody>
       </table>
-      {actionError && <p className="text-xs text-red-400 mt-2">{actionError}</p>}
+      {actionError && <p className="text-xs text-neg mt-2">{actionError}</p>}
     </div>
   )
 
@@ -725,7 +725,7 @@ export default function McpAccessSection({
       <>
         <div className="bg-dark-800 rounded-xl p-6 mb-6">
           {Header}
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="text-xs text-ink-2 mt-2">
             MCP access is included from the {PLAN_LABELS[unlockPlan ?? 'radar']} plan.
           </p>
           <button onClick={onUpgrade} className={`${primaryBtn} mt-3`}>
@@ -733,7 +733,7 @@ export default function McpAccessSection({
           </button>
           {keys.length > 0 && (
             <>
-              <p className="text-[11px] text-slate-600 mt-4">
+              <p className="text-meta text-ink-3 mt-4">
                 Keys issued before your plan changed are listed below. They will work again after upgrading.
               </p>
               {KeysTable}
@@ -751,7 +751,7 @@ export default function McpAccessSection({
     <>
       <div className="bg-dark-800 rounded-xl p-6 mb-6">
         {Header}
-        <p className="text-xs text-slate-500 mt-1 mb-4">
+        <p className="text-xs text-ink-3 mt-1 mb-4">
           {explanationLine}
         </p>
         {/* F1 (docs/qa/mcp-access-stage1-review-2026-09-22.md): the "Learn
@@ -762,7 +762,7 @@ export default function McpAccessSection({
 
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
-            <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Label (optional)</span>
+            <span className="block text-meta uppercase tracking-wide text-ink-3 mb-1">Label (optional)</span>
             <input
               value={label}
               onChange={e => setLabel(e.target.value.slice(0, 60))}
@@ -772,20 +772,20 @@ export default function McpAccessSection({
             />
           </label>
           <fieldset className="block">
-            <legend className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Access</legend>
+            <legend className="block text-meta uppercase tracking-wide text-ink-3 mb-1">Access</legend>
             <div role="radiogroup" aria-label="Access" className="flex flex-col gap-1.5">
               {([
                 ['read', 'Read only'],
                 ['read_write', 'Read and write (lets an AI agent mark Fix This items done)'],
               ] as [KeyScope, string][]).map(([v, text]) => (
-                <label key={v} className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+                <label key={v} className="flex items-start gap-2 text-xs text-ink-2 cursor-pointer">
                   <input
                     type="radio"
                     name="mcp-key-scope"
                     value={v}
                     checked={scope === v}
                     onChange={() => setScope(v)}
-                    className="mt-0.5 accent-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                    className="mt-0.5 accent-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink"
                   />
                   <span>{text}</span>
                 </label>
@@ -795,12 +795,12 @@ export default function McpAccessSection({
           <button ref={issueBtnRef} onClick={issueKey} disabled={issuing || atCap} className={primaryBtn}>
             {issuing ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Issue key
           </button>
-          {atCap && <span className="text-xs text-slate-500">Revoke a key to issue a new one.</span>}
+          {atCap && <span className="text-xs text-ink-3">Revoke a key to issue a new one.</span>}
         </div>
-        {issueError && <p className="text-xs text-red-400 mt-2">{issueError}</p>}
+        {issueError && <p className="text-xs text-neg mt-2">{issueError}</p>}
 
         {keys.length === 0 ? (
-          <p className="text-xs text-slate-500 mt-4">No keys yet. Issue one to connect your first AI tool.</p>
+          <p className="text-xs text-ink-3 mt-4">No keys yet. Issue one to connect your first AI tool.</p>
         ) : KeysTable}
         <ConnectedAppsBlock apps={apps} gated={gated} />
       </div>

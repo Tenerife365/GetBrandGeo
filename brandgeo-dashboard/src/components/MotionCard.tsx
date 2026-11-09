@@ -38,7 +38,7 @@ import { MOTION_FAST, EASE_OUT, staggerItem } from '../lib/motion'
 interface MotionCardProps extends Omit<HTMLMotionProps<'div'>, 'variants' | 'whileHover'> {
   /** Set when this card is a direct child of a staggerContainer grid (see doc above). */
   stagger?: boolean
-  /** Disable the hover-lift (e.g. a card that isn't interactive/clickable). Default true. */
+  /** Phase 3: hover lift is off unless the card is interactive. Default false. */
   hoverLift?: boolean
 }
 
@@ -46,7 +46,7 @@ const hoverTarget = { y: -2, transition: { duration: MOTION_FAST, ease: EASE_OUT
 
 export default function MotionCard({
   stagger = false,
-  hoverLift = true,
+  hoverLift = false,
   className,
   children,
   ...rest

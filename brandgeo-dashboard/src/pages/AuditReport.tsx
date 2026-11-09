@@ -289,7 +289,7 @@ export default function AuditReport() {
             <p className="text-sm text-slate-400 mb-5">{fatalError.body}</p>
             <a
               href="https://getbrandgeo.com/#free-audit"
-              className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+              className="inline-block bg-accent-strong hover:bg-accent-strong-hover text-on-accent font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
             >
               Run a new audit
             </a>
@@ -331,7 +331,7 @@ export default function AuditReport() {
             </p>
             <a
               href="https://getbrandgeo.com/#free-audit"
-              className="inline-block bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+              className="inline-block bg-accent-strong hover:bg-accent-strong-hover text-on-accent font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
             >
               Run a new audit
             </a>
@@ -409,7 +409,7 @@ export default function AuditReport() {
               <button
                 type="submit"
                 disabled={unlocking}
-                className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg text-sm transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors"
               >
                 {unlocking ? <Loader2 size={16} className="animate-spin" /> : null}
                 See my full breakdown
@@ -583,7 +583,7 @@ function FullReportView({ report }: { report: FullReport }) {
         <p className="text-sm text-slate-300 mb-3">Want to keep track of this, and work through each gap?</p>
         <Link
           to={`/signup?domain=${encodeURIComponent(report.domain)}`}
-          className="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-400 text-white font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
+          className="inline-flex items-center gap-1.5 bg-accent-strong hover:bg-accent-strong-hover text-on-accent font-medium py-2.5 px-5 rounded-lg text-sm transition-colors"
         >
           Start tracking {report.domain} <ArrowRight size={16} />
         </Link>

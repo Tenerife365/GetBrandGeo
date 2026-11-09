@@ -53,15 +53,15 @@ export default function ClientBanner() {
           <div
             key={n.id}
             className={`relative rounded-xl border p-4 pr-10 flex items-start gap-3 ${
-              warn ? 'bg-amber-500/10 border-amber-500/30' : 'bg-brand-500/10 border-brand-500/30'
+              warn ? 'bg-warn-tint border-warn/30' : 'bg-accent-tint border-accent-ink/40'
             }`}
           >
-            <Icon size={18} className={`${warn ? 'text-amber-400' : 'text-brand-300'} shrink-0 mt-0.5`} />
+            <Icon size={18} className={`${warn ? 'text-warn' : 'text-accent-ink'} shrink-0 mt-0.5`} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">{n.title}</p>
-              <p className="text-sm text-slate-300 mt-0.5">{n.body}</p>
+              <p className="text-sm font-semibold text-ink">{n.title}</p>
+              <p className="text-sm text-ink-2 mt-0.5">{n.body}</p>
               {n.cta_url && (
-                <a href={n.cta_url} className="inline-block mt-2 text-sm font-medium text-brand-300 hover:underline">
+                <a href={n.cta_url} className="inline-block mt-2 text-sm font-medium text-accent-ink hover:underline">
                   {n.cta_label ?? 'Open'} →
                 </a>
               )}
@@ -69,7 +69,7 @@ export default function ClientBanner() {
             <button
               onClick={() => dismiss(n.id)}
               aria-label="Dismiss notification"
-              className="absolute top-3 right-3 p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              className="absolute top-3 right-3 p-1 rounded-md text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
             >
               <X size={16} />
             </button>

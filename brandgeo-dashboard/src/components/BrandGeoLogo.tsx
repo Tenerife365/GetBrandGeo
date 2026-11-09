@@ -94,7 +94,7 @@ const SIZES: Record<BrandGeoLogoSize, { tile: number; gap: number; font: number 
  * symmetrise the two themes.
  *
  * "Brand" uses the dashboard's own ink (#0F172A, the value html.light maps
- * .text-white to) rather than the site's --t #09090F, so it sits identical to
+ * the white text utility to) rather than the site's --t #09090F, so it sits identical to
  * every heading beside it. The two differ by under 2 points of contrast.
  */
 const INK = {
@@ -207,7 +207,7 @@ export default function BrandGeoLogo({
   )
 
   const layout = `inline-flex items-center ${className}`.trim()
-  const focus = 'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500'
+  const focus = 'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink'
 
   if (to) {
     return (

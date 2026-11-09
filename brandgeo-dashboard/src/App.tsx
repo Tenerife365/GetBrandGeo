@@ -139,7 +139,7 @@ class ChunkErrorBoundary extends Component<BoundaryProps, { error: unknown | nul
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium"
+            className="px-4 py-2 rounded-lg bg-accent-strong hover:bg-accent-strong-hover text-on-accent text-sm font-medium"
           >
             Reload
           </button>

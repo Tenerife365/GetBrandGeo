@@ -2,15 +2,18 @@
  * Competitors.tsx
  * Driven entirely from ai_results.competitors_mentioned -- no legacy page_analysis.
  * Shows top 5 competitors by AI mention frequency vs the client brand.
- * Radar chart: 5 axes = 5 AI engines, showing visibility profile per entity.
+ *
+ * Phase 3 visual (spec 11.5): six blocks, PageHeader, HeroAnswer, Share of mentions,
+ * Competitor table, Disclosure "By engine and over time", Your tracked competitors.
+ * Presentation only; no query, metric, sequence guard or sort changed.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
-import { Plus, Trash2, Check, X, Globe, Tag, TrendingDown, Download } from 'lucide-react'
+import { Plus, Trash2, X, Globe, Tag, TrendingDown, Download } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { mockCompetitors, mockAIResults } from '../lib/mockData'
 import { useClient } from '../lib/clientContext'
@@ -24,150 +27,26 @@ import { readResultHistory } from '../lib/historyRead'
 import { downloadCsv, csvFilename } from '../lib/csv'
 import {
   buildCompetitorsView, buildEngineGroupData, samplePromptFor, computeTrend, trendEligibleRows, buildCompetitorsCsv,
+  engineLabel,
   type TrendPeriod, type TrendRow,
 } from '../lib/views/competitorsView'
-import { ENGINE_META } from '../lib/planConfig'
 import type { CompetitorAggregate } from '../lib/competitorFilter'
-import { useChartTheme } from '../lib/chartTheme'
+import { useChartTheme, gridProps, axisProps, yPercentAxis, barProps, lineProps, fieldDash } from '../lib/chartTheme'
 import ChartTooltip from '../components/ChartTooltip'
 import ChartLegend from '../components/ChartLegend'
-import { PageTitle } from '../components/Typography'
-import SharedEmptyState from '../components/EmptyState'
+import EmptyState from '../components/EmptyState'
 import LoadErrorCard from '../components/LoadErrorCard'
 import RouteSkeleton from '../components/RouteSkeleton'
-import Skeleton from '../components/Skeleton'
-import type { LLMName } from '../types'
+import { SkeletonChart } from '../components/ui/skeletons'
+import {
+  Page, PageHeader, SectionHeader, HeroAnswer, Card, Badge, Button, IconButton, Notice,
+  SegmentedControl, BarList, DataList, Disclosure, tableClasses,
+} from '../components/ui'
 
 // --- Types -------------------------------------------------------------------
 
-// Engine label/color sourced from ENGINE_META (planConfig.ts), not hardcoded here — this
-// file used to re-declare its own hex values and had drifted (Claude was '#8b5cf6' here vs
-// ENGINE_META's '#a855f7') per DESIGN-SYSTEM.md §1/§5's flagged duplication risk.
-const ENGINE_LABEL: Record<string, string> = Object.fromEntries(
-  Object.entries(ENGINE_META).map(([id, meta]) => [id, meta.label])
-)
-const ENGINE_COLOR: Record<string, string> = Object.fromEntries(
-  Object.entries(ENGINE_META).map(([id, meta]) => [id, meta.chartColor])
-)
-
-/**
- * The noise filter (GENERIC_TOKENS / isLikelyCompanyName / toDisplayName) and the
- * competitor aggregation loop that used to live in this file both moved to
- * lib/competitorFilter.ts (2026-07-13, CLAUDE.md §14.2) — it was the last front-end
- * copy of a filter triplicated across this file, Recommendations.tsx, and the
- * authoritative write-time filter in netlify/functions/_analysis.js. See that
- * module's header for the full history and why two copies (not one) is the
- * deliberate floor.
- *
- * `CompetitorAggregate` already carries every field this page used
- * (name/totalMentions/rankedMentions/byEngine/avgPos), plus `positions` and
- * `promptIds` — added to the shared type specifically so this page didn't need a
- * second, parallel loop to rebuild them.
- */
-type CompetitorStat = CompetitorAggregate
-
-// --- Charts ------------------------------------------------------------------
-
-const short = (s: string, n = 10) => s.length > n ? s.slice(0, n - 1) + '…' : s
-
-/**
- * Empty-cell placeholder. Replaces the bare em dash this page used to render in
- * `text-slate-700`, which measured 1.72:1 on --dark-800 and was the last
- * dark-mode contrast failure anywhere in the app (audit 2026-07-30, F5).
- *
- * Two faults were wearing one glyph. It was unreadable, and a lone dash does not
- * say WHAT is missing on a product whose whole claim is honest measurement, so
- * every call site below now passes the specific reason the cell is empty
- * ("Not ranked", "No sample prompt") rather than a punctuation mark.
- *
- * `text-slate-500` is the palette's existing muted step and is the only muted
- * value that is remapped in BOTH themes: index.css:143 lifts it to
- * rgb(148 163 184) in dark and index.css:170 drops it to rgb(85 100 121) in
- * light, precisely so it stays muted without going invisible. No new token is
- * needed and index.css is not touched.
- */
-function NoData({ children }: { children: ReactNode }) {
-  return <span className="text-slate-500 font-normal">{children}</span>
-}
-
-/**
- * Segmented trend control. The hit area, not the label, is what was undersized:
- * these measured 29x24 in the first audit and 32x33 once the earlier pass landed
- * a 32px floor. 32x33 passes WCAG 2.2 SC 2.5.8 (24x24 minimum) but sits under the
- * 44x44 best practice, which the owner has decided to meet at every width, not
- * only under a coarse pointer. The previous coarse-pointer clause is therefore
- * gone: it delivered 44x44 only on touch hardware, and a desktop browser at
- * 375px wide still reports `pointer: fine`, so the narrow case measured 32x33.
- *
- * The visual stays 32x32. The target is expanded by a transparent `::after` at a
- * negative inset, the pattern index.css already ships for `.time-pill` and
- * `.engine-chip`. -inset-1.5 is -6px on all four sides, so 32 + 6 + 6 = 44 in
- * both axes. Expressed as a utility here rather than a rule because index.css is
- * owned by the coordinator and off limits to this change.
- *
- * The gap-3 in TREND_GROUP is load-bearing and must not be reduced. Three 44px
- * targets whose visuals are 32px wide need their centres at least 44px apart, so
- * the gap floor is 44 - 32 = 12px exactly. This was verified on the running app
- * rather than argued: with the ::after in place but the gap forced back to 4px,
- * the three chips hit-test at 37x45, 36x45 and 44x45, because a later sibling's
- * pseudo-element paints over an earlier one and the first two chips lose 8px of
- * their own hit area to their right-hand neighbour. Raising the target without
- * raising the gap would have made mis-taps worse, not better. At gap-3 all three
- * measure 44 to 45 in both axes with zero overlap.
- */
-const TREND_CHIP_TARGET =
-  "relative inline-flex items-center justify-center min-w-[32px] min-h-[32px] " +
-  "after:content-[''] after:absolute after:-inset-1.5"
-const TREND_GROUP = 'flex gap-3 bg-dark-700 rounded-lg p-1'
-
-/**
- * Categorical palette for the competitor lines in the trend chart. No existing
- * token set fits: ENGINE_META colours mean engines, and chartTheme carries only
- * the brand, sentiment and chrome colours. Eight hues, none of them the brand
- * violet, each with relative luminance between about 0.14 and 0.30 so the line
- * holds at least 3:1 (WCAG 1.4.11) on BOTH the dark card (#1e293b, #0f172a) and
- * the white light card. Measured: lowest on white 3.00 (orange), lowest on dark
- * 3.34 to 3.55 (blue, magenta). Cycled past eight.
- */
-const COMPETITOR_SERIES_COLORS = [
-  '#e07b00', // orange
-  '#2f86d6', // blue
-  '#d6409f', // magenta
-  '#1f9e89', // teal
-  '#9a7d0a', // gold
-  '#d9534f', // coral
-  '#4f9d2d', // green
-  '#7c8fd9', // periwinkle
-]
-
-/** Stable colour per competitor: index in the alphabetical name order, so a rank change never recolours a line. */
-function buildCompetitorColors(names: string[]): Record<string, string> {
-  const sorted = [...names].sort((a, b) => a.localeCompare(b))
-  const out: Record<string, string> = {}
-  sorted.forEach((n, i) => { out[n] = COMPETITOR_SERIES_COLORS[i % COMPETITOR_SERIES_COLORS.length] })
-  return out
-}
-
-/**
- * Competitor rows are not engines (dashboard-visual-system.md §9.5). Colour is
- * resolved at RENDER time from the current chart theme, not baked in here:
- * the tenant's own brand renders in --rail-active and every competitor
- * renders in one flat --sentiment-neutral — identity here is "you vs. the
- * field", not nine distinguishable hues. Rank is already carried by bar
- * length and sort order, which is the whole reason the old index-keyed
- * per-position colour arrays existed here and drifted (F-22).
- */
-function buildBarData(brandName: string, brandMentions: number, topCompetitors: CompetitorStat[]) {
-  return [
-    { name: short(brandName), fullName: brandName, mentions: brandMentions, isYou: true },
-    ...topCompetitors.map(c => ({
-      name: short(c.name),
-      fullName: c.name,
-      mentions: c.totalMentions,
-      isYou: false,
-    })),
-  ]
-}
+/** "#2.9": position to one decimal, trailing zero dropped. */
+const fmtPos = (p: number) => `#${(Math.round(p * 10) / 10).toString()}`
 
 // --- Main component ----------------------------------------------------------
 
@@ -182,7 +61,7 @@ export default function Competitors() {
   const { lastCompletedAt } = useCollection()
   const { getStartDate, timeRange } = useTimeFilter()
   const chart = useChartTheme()
-  const brandName = activeClient?.name ?? 'Your brand'
+  const brandName = activeClient?.name ?? 'your brand'
   const { snapshot, status, loadError, reload } = useResults()
 
   const [showAdd, setShowAdd] = useState(false)
@@ -333,13 +212,16 @@ export default function Competitors() {
     setCompetitorError(null)
   }
 
+
+  const [openRow, setOpenRow] = useState<string | null>(null)
+
   if (snapshot === null || snap === null) {
     if (status === 'error') {
       return (
-        <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
-          <div className="mb-6"><PageTitle>Competitors</PageTitle></div>
+        <Page>
+          <PageHeader title="Competitors" />
           <LoadErrorCard onRetry={() => reload()} />
-        </div>
+        </Page>
       )
     }
     return <RouteSkeleton />
@@ -361,9 +243,6 @@ export default function Competitors() {
     }
   }
   const { topCompetitors, brandMentions, brandAvgPos, totalResponses, promptText } = cv
-  const brandEngineIds = view.population.engineIds.filter(e =>
-    view.population.cells.some(c => c.llm === e && c.brand_mentioned))
-  const barData         = buildBarData(brandName, brandMentions, topCompetitors)
   const engineGroupData = buildEngineGroupData(brandName, cv.engineShare)
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
   const trendRows       = trendEligibleRows(trendRowsRaw, activeEngines)
@@ -377,401 +256,332 @@ export default function Competitors() {
       buildCompetitorsCsv(view, brandName, snapshot.activePrompts),
     )
   }
-  // "You vs. the field" (§9.5) — resolved from the live chart theme, never a
-  // hand-picked hex, and never an array index (that's what F-22 was).
-  const colorForKey = (key: string) => key === brandName ? chart.railActive : chart.sentimentNeutral
-  // Trend lines only: one distinct colour per competitor (the legend reads the same stroke).
-  const competitorColors = buildCompetitorColors(topCompetitors.map(c => c.name))
+  const engineWord = `${activeEngines.length} engine${activeEngines.length === 1 ? '' : 's'}`
+  const enginesLabel = (c: CompetitorAggregate) =>
+    view.population.engineIds.filter(e => (c.byEngine[e] ?? 0) > 0).map(engineLabel).join(', ')
+  const brandEnginesLabel = view.population.engineIds
+    .filter(e => view.population.cells.some(c => c.llm === e && c.brand_mentioned))
+    .map(engineLabel).join(', ')
+  const noCompetitors = topCompetitors.length === 0
+  const top = topCompetitors[0]
+  const tiedAtTop = top ? topCompetitors.filter(c => c.totalMentions === top.totalMentions).length : 0
+  const mentionWord = (n: number) => `${n} mention${n === 1 ? '' : 's'}`
+  const timesWord = (n: number) => `${n} time${n === 1 ? '' : 's'}`
+  const responseWord = (n: number) => `${n} AI response${n === 1 ? '' : 's'}`
+
+  // Share of mentions: you first in accent, then the field in neutral.
+  const shareRows = [
+    { label: brandName, value: brandMentions, isYou: true },
+    ...topCompetitors.map(c => ({ label: c.name, value: c.totalMentions })),
+  ]
+
+  // Visibility by engine: one engine with data reads as a bar list, two or more as grouped bars.
+  const singleEngineRow = engineGroupData.length === 1 ? engineGroupData[0] : null
+
+  const addForm = showAdd && (
+    <Card className="mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label htmlFor="competitor-name-input" className="text-meta text-ink-2 mb-1 block">Competitor name</label>
+          <input id="competitor-name-input" autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. Premier Catering"
+            className="w-full h-9 bg-surface-2 border border-edge rounded-control px-3 text-body text-ink placeholder:text-ink-3 focus:border-accent" />
+        </div>
+        <div className="flex-1">
+          <label htmlFor="competitor-website-input" className="text-meta text-ink-2 mb-1 block">Website (optional)</label>
+          <input id="competitor-website-input" value={newWebsite} onChange={e => setNewWebsite(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="https://example.com"
+            className="w-full h-9 bg-surface-2 border border-edge rounded-control px-3 text-body text-ink placeholder:text-ink-3 focus:border-accent" />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="primary" onClick={addCompetitor} disabled={saving || !newName.trim()} loading={saving} aria-label="Add competitor">
+            Add
+          </Button>
+          <Button variant="secondary" onClick={() => setShowAdd(false)} aria-label="Cancel adding competitor">
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </Card>
+  )
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
+    <Page>
+      <PageHeader
+        title="Competitors"
+        subtitle={totalResponses === 0
+          ? 'No responses measured yet.' // copy: pending bg-copy
+          : `Top competitors mentioned across ${responseWord(totalResponses)} for ${brandName}`} // copy: pending bg-copy
+        actions={
+          <Button variant="secondary" icon={Plus} onClick={() => setShowAdd(v => !v)} aria-expanded={showAdd}>
+            Add manually
+          </Button>
+        }
+      />
 
-      {/* Header. flex-wrap + min-w-0 are load-bearing at 320: without them the
-          title column cannot shrink below its content and the Add manually
-          button cannot drop to a second line, so <main> overflowed (338 against
-          a 320 clientWidth). Pre-existing, found 2026-07-30 when 320 was first
-          tested. The document itself never overflowed, so only a checker reading
-          <main> could see it. */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3 mb-0.5">
-            <PageTitle>Competitors</PageTitle>
-          </div>
-          <p className="text-sm text-slate-400 mt-0.5">
-            {totalResponses === 0
-              ? 'No responses measured yet.'
-              : `Top competitors mentioned across ${totalResponses} AI responses for ${brandName}`}
-          </p>
-        </div>
-        <button onClick={() => setShowAdd(v => !v)}
-          aria-expanded={showAdd}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 transition-colors">
-          <Plus size={14} />
-          Add manually
-        </button>
-      </div>
+      {loadError && <div className="mb-6"><LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} /></div>}
 
-      {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
-
-      {manualFailed && <LoadErrorCard message="Couldn't load your manually tracked competitors." onRetry={() => { void loadManual() }} />}
+      {manualFailed && <div className="mb-6"><LoadErrorCard message="Couldn't load your manually tracked competitors." onRetry={() => { void loadManual() }} /></div>}
 
       {competitorError && (
-        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
-          <span>{competitorError}</span>
-          <button onClick={() => setCompetitorError(null)} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
-            <X size={14} />
-          </button>
+        <div className="mb-6">
+          <Notice tone="neg" title={competitorError} action={<Button variant="ghost" size="sm" icon={X} onClick={() => setCompetitorError(null)} aria-label="Dismiss">Dismiss</Button>} />
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">AI mentions of {brandName}</div>
-          <div className={`text-2xl font-bold tabular-nums ${totalResponses === 0 ? 'text-slate-500' : 'text-brand-300'}`}>{brandMentions}</div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            {brandAvgPos ? `Avg position #${brandAvgPos}` : 'No position data'}
-          </div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Top competitor</div>
-          <div className="text-sm font-bold text-red-300 leading-tight mt-1">
-            {topCompetitors[0]?.name ?? <NoData>None yet</NoData>}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            {topCompetitors[0]
-              ? `${topCompetitors[0].totalMentions} AI mentions`
-              : 'No competitor named in AI responses'}
-          </div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">Competitors tracked</div>
-          <div className="text-2xl font-bold text-white tabular-nums">{topCompetitors.length}</div>
-          <div className="text-xs text-slate-500 mt-0.5">from AI responses</div>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">AI responses analysed</div>
-          <div className="text-2xl font-bold text-slate-300 tabular-nums">{totalResponses}</div>
-          <div className="text-xs text-slate-500 mt-0.5">across {activeEngines.length} engine{activeEngines.length === 1 ? '' : 's'}</div>
-        </div>
-      </div>
+      {addForm}
 
-      {/* Add manually */}
-      {showAdd && (
-        <div className="mb-5 bg-dark-800 rounded-xl p-4 flex gap-3 items-end">
-          <div className="flex-1 space-y-2">
-            <div>
-              <label htmlFor="competitor-name-input" className="text-xs text-slate-500 mb-1 block">Competitor name</label>
-              <input id="competitor-name-input" autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="e.g. Premier Catering"
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
-            </div>
-            <div>
-              <label htmlFor="competitor-website-input" className="text-xs text-slate-500 mb-1 block">Website (optional)</label>
-              <input id="competitor-website-input" value={newWebsite} onChange={e => setNewWebsite(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCompetitor()} placeholder="https://example.com"
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
-            </div>
-          </div>
-          <div className="flex gap-2 pb-0.5">
-            <button onClick={addCompetitor} disabled={saving || !newName.trim()}
-              aria-label="Add competitor"
-              className="p-2.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors">
-              <Check size={16} />
-            </button>
-            <button onClick={() => setShowAdd(false)}
-              aria-label="Cancel adding competitor"
-              className="p-2.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Charts */}
-      {topCompetitors.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-
-          {/* Bar chart — AI mention counts */}
-          <div className="bg-dark-800 rounded-xl p-6">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">
-              AI Mention Count
-            </h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={barData} margin={{ left: -20, bottom: 10, right: 8 }}>
-                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false}
-                  interval={0} />
-                <YAxis tick={{ fill: chart.axisInk, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} width={40} tickCount={4} />
-                <Tooltip
-                  content={<ChartTooltip
-                    formatValue={item => `${item.value} AI mentions`}
-                    formatLabel={(_l, payload) => String(payload?.[0]?.payload?.fullName ?? '')}
-                  />}
-                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
-                />
-                <Bar dataKey="mentions" name="AI mentions" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                  {barData.map(entry => <Cell key={entry.fullName} fill={entry.isYou ? chart.railActive : chart.sentimentNeutral} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Grouped bar chart — visibility % per AI engine per brand */}
-          <div className="bg-dark-800 rounded-xl p-6">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
-              Visibility by Engine
-            </h2>
-            <p className="text-[11px] text-slate-600 mb-3">% of prompts where each brand appears, per AI engine</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={engineGroupData} margin={{ left: -20, right: 8, bottom: 4 }} barCategoryGap="25%">
-                <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
-                <XAxis dataKey="engine" tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: chart.axisInk, fontSize: 10 }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} width={40} tickCount={4} />
-                <Tooltip
-                  content={<ChartTooltip formatValue={item => `${item.value}%`} />}
-                  cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }}
-                />
-                <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
-                {groupKeys.map(key => (
-                  <Bar key={key} dataKey={key} fill={colorForKey(key)} radius={[3, 3, 0, 0]} maxBarSize={28} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      <div className="flex justify-end mb-2">
-        <button type="button" onClick={onExport} disabled={exportDisabled}
-          aria-label="Export competitors as CSV"
-          title={exportDisabled ? 'Nothing to export yet' : undefined}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-700 text-slate-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          <Download className="w-3.5 h-3.5" aria-hidden="true" />
-          Export CSV
-        </button>
-      </div>
-
-      {/* Competitors table. A real table so screen readers get row and column
-          context; the wrapper scrolls sideways on a phone instead of the page. */}
-      <div className="bg-dark-800 rounded-xl overflow-x-auto mb-4">
-        <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
-          <caption className="sr-only">Competitors named in AI responses, with mention counts, average position, engines and a sample prompt</caption>
-          <colgroup>
-            <col />
-            <col style={{ width: '7rem' }} />
-            <col style={{ width: '7rem' }} />
-            <col style={{ width: '7rem' }} />
-            <col />
-          </colgroup>
-          <thead>
-            <tr className="border-b border-dark-700 bg-dark-700/40">
-              <th scope="col" className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Competitor</th>
-              <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">AI Mentions</th>
-              <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">Avg Position</th>
-              <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide text-center">Engines</th>
-              <th scope="col" className="px-3 py-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Sample prompts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Brand row */}
-            <tr className="border-b border-dark-700/50 bg-brand-500/5">
-              <th scope="row" className="px-4 py-3 text-left font-normal">
-                <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-brand-300">{brandName}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-400">you</span>
-                </span>
-              </th>
-              <td className={`px-3 py-3 text-center font-bold tabular-nums ${totalResponses === 0 ? 'text-slate-500' : 'text-emerald-400'}`}>{brandMentions}</td>
-              <td className={`px-3 py-3 text-center tabular-nums font-semibold ${totalResponses === 0 ? 'text-slate-500' : 'text-emerald-400'}`}>
-                {brandAvgPos ? `#${brandAvgPos}` : <NoData>Not ranked</NoData>}
-              </td>
-              <td className="px-3 py-3">
-                <div className="flex items-center justify-center gap-1 flex-wrap">
-                  {brandEngineIds.map(e => (
-                    <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={ENGINE_LABEL[e]} />
-                  ))}
-                </div>
-              </td>
-              <td className="px-3 py-3 text-xs"><NoData>No sample prompt</NoData></td>
-            </tr>
-
-            {topCompetitors.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-0">
-                  <SharedEmptyState
-                    icon={Tag}
-                    title="Not measured yet"
-                    body="Competitors mentioned by AI appear here automatically once a collection runs. You can also add one manually below."
-                    actionLabel="Run a collection"
-                    actionTo="/ai-visibility"
-                  />
-                </td>
-              </tr>
-            ) : (
-              topCompetitors.map((c, idx) => {
-                const engineDots = view.population.engineIds.filter(e => (c.byEngine[e] ?? 0) > 0)
-                const samplePrompt = samplePromptFor(c, promptText) || null
-                const sampleText = samplePrompt
-                  ? (samplePrompt.length > 60 ? samplePrompt.slice(0, 58) + '…' : samplePrompt)
-                  : null
-
-                return (
-                  <tr key={c.name} className="border-b border-dark-700/50 last:border-0 hover:bg-dark-700/20 transition-colors">
-                    <th scope="row" className="px-4 py-3 text-left font-normal">
-                      <span className="flex items-center gap-2">
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-dark-700 text-slate-400">
-                          {idx + 1}
-                        </span>
-                        <span className="text-sm text-slate-200 font-medium">{c.name}</span>
-                        <TrendingDown size={12} className="text-red-500/60 flex-shrink-0" aria-hidden="true" />
-                      </span>
-                    </th>
-                    <td className="px-3 py-3 text-center tabular-nums">
-                      <span className="text-red-400 font-semibold">{c.totalMentions}</span>
-                      {/* Never ranked by any engine, only spotted in prose (pos:99).
-                          Without this the number reads as if they beat you in a list. */}
-                      {c.rankedMentions === 0 && (
-                        <span className="block text-[10px] text-slate-500 leading-tight" title="Named in prose, but never ranked in a list by any engine">
-                          prose only
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-center tabular-nums text-slate-300">
-                      {c.avgPos ? `#${c.avgPos}` : <NoData>Not ranked</NoData>}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center justify-center gap-1 flex-wrap">
-                        {engineDots.map(e => (
-                          <span key={e} className="w-2 h-2 rounded-full" style={{ background: ENGINE_COLOR[e] }} title={`${ENGINE_LABEL[e]}: ${c.byEngine[e]}×`} />
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-xs text-slate-500 truncate" title={samplePrompt ?? ''}>
-                      {sampleText ?? <NoData>No sample prompt</NoData>}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Manually tracked (secondary) */}
-      {manualComps.length > 0 && (
-        <div className="bg-dark-800 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-dark-700 text-xs font-medium text-slate-400 uppercase tracking-wide">
-            Manually tracked
-          </div>
-          {manualComps.map(c => (
-            <div key={c.id} className="flex items-center justify-between px-4 py-3 border-b border-dark-700/50 last:border-0 hover:bg-dark-700/20 group transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-300">{c.name}</span>
-                {c.website && (
-                  <a href={c.website} target="_blank" rel="noopener noreferrer"
-                    aria-label={`Visit ${c.name} website`}
-                    className="text-slate-600 hover:text-brand-400 transition-colors" onClick={e => e.stopPropagation()}>
-                    <Globe size={13} />
-                  </a>
-                )}
-              </div>
-              <button onClick={() => deleteManual(c.id)}
-                aria-label={`Remove ${c.name}`}
-                className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-70 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Performance Over Time */}
-      <div className="bg-dark-800 rounded-xl p-6 mt-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-300">Performance Over Time</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              AI mention trends for {brandName} vs top competitors
-            </p>
-          </div>
-          <div className={TREND_GROUP}>
-            {(['weekly', 'monthly', 'quarterly'] as const).map(p => (
-              <button key={p} onClick={() => setTrendPeriod(p)}
-                aria-pressed={trendPeriod === p}
-                aria-label={`View ${p} trend`}
-                className={`${TREND_CHIP_TARGET} px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  trendPeriod === p ? 'bg-brand-500/20 text-brand-300' : 'text-slate-500 hover:text-slate-300'
-                }`}>
-                {p === 'weekly' ? 'W' : p === 'monthly' ? 'M' : 'Q'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {trendLoading ? (
-          <Skeleton className="h-[220px] w-full rounded-lg" />
-        ) : trendFailed && trendRows.length === 0 ? (
-          <LoadErrorCard message="Couldn't load the trend." onRetry={() => { void loadTrend(false) }} />
-        ) : trendData.length < 2 ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-slate-500">Not enough data yet</p>
-            <p className="text-xs text-slate-600 mt-1">
-              Trend chart fills in as monthly collections accumulate
-            </p>
-          </div>
+      <div className="space-y-8">
+        {/* 1. Hero. The shared card keeps a 280 floor; this answer is short, so
+            on a phone the floor is lifted here to remove the empty bottom space. */}
+        {noCompetitors ? (
+          <HeroAnswer
+            answer=""
+            empty={{
+              icon: Tag,
+              title: 'Not measured yet',
+              body: 'Competitors appear when AI answers name other companies for your prompts.', // copy: pending bg-copy
+              actionLabel: 'Add a competitor',
+              onAction: () => setShowAdd(true),
+              variant: 'inline',
+            }}
+          />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={trendData} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid stroke={chart.gridLine} strokeWidth={1} vertical={false} />
-              <XAxis
-                dataKey="period"
-                tick={{ fill: chart.axisInk, fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                minTickGap={24}
+          <div className="max-md:[&>*]:min-h-0">
+            <HeroAnswer
+              value={brandMentions}
+              unit={brandMentions === 1 ? 'mention' : 'mentions'}
+              answer={top
+                ? (tiedAtTop > 1
+                  ? `AI engines named ${brandName} ${timesWord(brandMentions)}; ${tiedAtTop} competitors were each named ${timesWord(top.totalMentions)}.`
+                  : `AI engines named ${brandName} ${timesWord(brandMentions)}; the most named competitor, ${top.name}, ${timesWord(top.totalMentions)}.`) // copy: pending bg-copy
+                : `AI engines named ${brandName} ${timesWord(brandMentions)}.`} // copy: pending bg-copy
+              context={`across ${engineWord}`} // copy: pending bg-copy
+            />
+          </div>
+        )}
+
+        {!noCompetitors && (
+          <>
+            {/* 2. Share of mentions */}
+            <section aria-labelledby="share-heading">
+              <SectionHeader title={<span id="share-heading">Share of mentions</span>} description="How often AI engines named each company." />
+              <Card>
+                <BarList rows={shareRows} format={v => String(Math.round(v))} />
+              </Card>
+            </section>
+
+            {/* 3. Competitor table */}
+            <section>
+              <SectionHeader
+                title="Competitors"
+                count={topCompetitors.length}
+                actions={
+                  <Button variant="secondary" size="sm" icon={Download} onClick={onExport} disabled={exportDisabled}
+                    aria-label="Export competitors as CSV" title={exportDisabled ? 'Nothing to export yet' : undefined}>
+                    Export CSV
+                  </Button>
+                }
               />
-              <YAxis
-                tick={{ fill: chart.axisInk, fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-                width={40}
-                tickCount={4}
-              />
-              <Tooltip
-                content={<ChartTooltip />}
-                cursor={{ stroke: chart.gridLine, strokeWidth: 1 }}
-              />
-              <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
-              {/* The brand keeps the same colour as in the grouped bar chart above
-                  (colorForKey). Competitors get distinct hues here because a line
-                  chart with four identical grey lines cannot be read. */}
-              {/* Competitors first, brand last: later series paint on top, and the
-                  brand line is thicker, so it stays the primary read. */}
-              {topCompetitors.slice(0, 4).map(c => (
-                <Line
-                  key={c.name}
-                  type="monotone"
-                  dataKey={c.name}
-                  stroke={competitorColors[c.name]}
-                  strokeWidth={1.75}
-                  dot={false}
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: chart.cardSurface }}
+
+              {/* >= 768: table */}
+              <div className={`${tableClasses.wrap} hidden md:block`}>
+                <table className={`${tableClasses.table} table-fixed min-w-[720px]`}>
+                  <caption className="sr-only">Competitors named in AI responses, with mention counts, average position, engines and a sample prompt</caption>
+                  <colgroup>
+                    <col style={{ minWidth: '140px' }} />
+                    <col style={{ width: '7rem' }} />
+                    <col style={{ width: '7rem' }} />
+                    <col style={{ width: '10rem' }} />
+                    <col />
+                  </colgroup>
+                  <thead className={tableClasses.thead}>
+                    <tr>
+                      <th scope="col" className={tableClasses.th}>Competitor</th>
+                      <th scope="col" className={tableClasses.thRight}>AI mentions</th>
+                      <th scope="col" className={tableClasses.thRight}>Avg position</th>
+                      <th scope="col" className={tableClasses.th}>Engines</th>
+                      <th scope="col" className={tableClasses.th}>Sample prompt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className={`${tableClasses.tr} bg-accent-tint`}>
+                      <th scope="row" className={`${tableClasses.td} text-left font-semibold`}>
+                        <span className="flex items-center gap-2 flex-wrap">
+                          <span className="break-words">{brandName}</span>
+                          <Badge tone="accent">you</Badge>
+                        </span>
+                      </th>
+                      <td className={tableClasses.tdRight}>{brandMentions}</td>
+                      <td className={tableClasses.tdRight}>{brandAvgPos ? fmtPos(brandAvgPos) : <span className="text-ink-3">Not ranked</span>}</td>
+                      <td className={tableClasses.tdMuted}>{brandEnginesLabel || <span className="text-ink-3">n/a</span>}</td>
+                      <td className={tableClasses.tdMuted}><span className="text-ink-3">No sample prompt</span></td>
+                    </tr>
+                    {topCompetitors.map(c => {
+                      const samplePrompt = samplePromptFor(c, promptText) || null
+                      return (
+                        <tr key={c.name} className={tableClasses.tr}>
+                          <th scope="row" className={`${tableClasses.td} text-left font-normal`}>
+                            <span className="flex items-center gap-2">
+                              <span className="break-words">{c.name}</span>
+                              <TrendingDown size={12} className="text-neg shrink-0" role="img" aria-label="Named instead of you" />
+                            </span>
+                          </th>
+                          <td className={tableClasses.tdRight}>
+                            {c.totalMentions}
+                            {c.rankedMentions === 0 && (
+                              <span className="block text-meta text-ink-3" title="Named in prose, but never ranked in a list by any engine">prose only</span>
+                            )}
+                          </td>
+                          <td className={tableClasses.tdRight}>{c.avgPos ? fmtPos(c.avgPos) : <span className="text-ink-3">Not ranked</span>}</td>
+                          <td className={tableClasses.tdMuted}>{enginesLabel(c) || <span className="text-ink-3">n/a</span>}</td>
+                          <td className={`${tableClasses.tdMuted} truncate`} title={samplePrompt ?? ''}>
+                            {samplePrompt ?? <span className="text-ink-3">No sample prompt</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* < 768: list */}
+              <div className="md:hidden">
+                <DataList
+                  ariaLabel="Competitors named in AI responses"
+                  rows={[{ you: true as const, c: null as CompetitorAggregate | null }, ...topCompetitors.map(c => ({ you: false as const, c }))]}
+                  getKey={r => r.c?.name ?? '__you'}
+                  renderRow={r => {
+                    const key = r.c?.name ?? '__you'
+                    const pos = r.you ? brandAvgPos : r.c?.avgPos ?? null
+                    const n = r.you ? brandMentions : r.c?.totalMentions ?? 0
+                    const sp = r.c ? (samplePromptFor(r.c, promptText) || null) : null
+                    const open = openRow === key
+                    return (
+                      <div className={r.you ? 'w-[calc(100%+2rem)] min-w-0 shrink-0 bg-accent-tint -mx-4 px-4 -my-3 py-3' : 'w-full min-w-0'}>
+                        <button type="button" aria-expanded={open} onClick={() => setOpenRow(open ? null : key)} className="w-full text-left min-h-[44px]">
+                          <span className="flex items-center gap-2 flex-wrap text-body text-ink font-medium">
+                            <span className="break-words min-w-0">{r.you ? brandName : r.c?.name}</span>
+                            {r.you && <Badge tone="accent">you</Badge>}
+                          </span>
+                          <span className="block text-meta text-ink-2 tabular-nums">
+                            {mentionWord(n)}{pos ? `, avg ${fmtPos(pos)}` : ', not ranked'}
+                          </span>
+                        </button>
+                        {open && (
+                          <p className="mt-1 mb-0 text-meta text-ink-2 break-words">
+                            {sp ?? 'No sample prompt'}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  }}
                 />
-              ))}
-              <Line
-                type="monotone"
-                dataKey={brandName}
-                stroke={colorForKey(brandName)}
-                strokeWidth={3}
-                dot={false}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: chart.cardSurface }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+              </div>
+            </section>
+
+            {/* 4. By engine and over time */}
+            <Disclosure title="By engine and over time">
+              <div className="space-y-8 pt-3">
+                <div>
+                  <SectionHeader level={3} title="Visibility by engine" description="% of prompts where each brand appears, per AI engine" />
+                  {engineGroupData.length === 0 ? (
+                    <EmptyState variant="inline" icon={Tag} title="Not enough data yet" body="Engine results appear after a collection runs." minHeight={200} /> // copy: pending bg-copy
+                  ) : singleEngineRow ? (
+                    <BarList
+                      rows={groupKeys.map((k, i) => ({ label: k, value: Number(singleEngineRow[k] ?? 0), isYou: i === 0 }))}
+                      format={v => `${Math.round(v)}%`}
+                    />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={engineGroupData} margin={{ left: 0, right: 8, bottom: 4 }} barCategoryGap="25%">
+                        <CartesianGrid {...gridProps(chart)} />
+                        <XAxis dataKey="engine" {...axisProps(chart)} />
+                        <YAxis {...yPercentAxis(chart)} />
+                        <Tooltip content={<ChartTooltip formatValue={item => `${item.value}%`} />} cursor={{ fill: chart.gridLine, fillOpacity: 0.35 }} />
+                        <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                        {groupKeys.map((key, i) => (
+                          <Bar key={key} dataKey={key} fill={i === 0 ? chart.you : chart.field} fillOpacity={i === 0 ? 1 : [0.85, 0.6, 0.4][i - 1] ?? 0.4} {...barProps(chart)} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                <div>
+                  <SectionHeader
+                    level={3}
+                    title="Performance over time"
+                    description={`AI mention trends for ${brandName} vs top competitors`}
+                    actions={
+                      <SegmentedControl<TrendPeriod>
+                        ariaLabel="Trend period"
+                        value={trendPeriod}
+                        onChange={setTrendPeriod}
+                        options={[
+                          { value: 'weekly', label: 'W' },
+                          { value: 'monthly', label: 'M' },
+                          { value: 'quarterly', label: 'Q' },
+                        ]}
+                      />
+                    }
+                  />
+                  {trendLoading ? (
+                    <SkeletonChart h={240} />
+                  ) : trendFailed && trendRows.length === 0 ? (
+                    <LoadErrorCard message="Couldn't load the trend." onRetry={() => { void loadTrend(false) }} />
+                  ) : trendData.length < 2 ? (
+                    <EmptyState variant="inline" minHeight={240} title="Not enough data yet" body="Trend fills in as collections accumulate" /> // copy: pending bg-copy
+                  ) : (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <LineChart data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+                        <CartesianGrid {...gridProps(chart)} />
+                        <XAxis dataKey="period" {...axisProps(chart)} minTickGap={24} />
+                        <YAxis {...axisProps(chart)} allowDecimals={false} width={40} tickCount={4} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ stroke: chart.gridLine, strokeWidth: 1 }} />
+                        <Legend content={<ChartLegend />} verticalAlign="top" align="left" height={28} />
+                        {/* The field first, you last: later series paint on top. */}
+                        {topCompetitors.slice(0, 3).map((c, i) => (
+                          <Line key={c.name} type="monotone" dataKey={c.name} stroke={chart.field}
+                            strokeDasharray={fieldDash[i % fieldDash.length]} {...lineProps(chart)} />
+                        ))}
+                        <Line type="monotone" dataKey={brandName} stroke={chart.you} {...lineProps(chart)} strokeWidth={3} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </Disclosure>
+          </>
+        )}
+
+        {/* 5. Your tracked competitors */}
+        {manualComps.length > 0 && (
+          <section>
+            <SectionHeader title="Your tracked competitors" count={manualComps.length} />
+            <DataList
+              ariaLabel="Your tracked competitors"
+              rows={manualComps}
+              getKey={c => c.id}
+              renderRow={c => (
+                <>
+                  <span className="flex-1 min-w-0 flex items-center gap-2">
+                    <span className="text-body text-ink break-words">{c.name}</span>
+                    {c.website && (
+                      <a href={c.website} target="_blank" rel="noopener noreferrer"
+                        aria-label={`Visit ${c.name} website`}
+                        className="row-actions inline-flex" onClick={e => e.stopPropagation()}>
+                        <Globe size={14} aria-hidden="true" />
+                      </a>
+                    )}
+                  </span>
+                  <IconButton label={`Remove ${c.name}`} icon={Trash2} className="row-actions" onClick={() => deleteManual(c.id)} />
+                </>
+              )}
+            />
+          </section>
         )}
       </div>
-    </div>
+    </Page>
   )
 }

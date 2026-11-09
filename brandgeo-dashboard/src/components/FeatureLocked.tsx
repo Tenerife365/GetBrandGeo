@@ -24,6 +24,9 @@
 import { Lock, Sparkles, ArrowRight, Check, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { FEATURE_META, featureUnlockPlan, PLAN_LABELS, type FeatureId } from '../lib/planConfig'
+import Card from './ui/Card'
+import Page from './ui/Page'
+import { buttonClasses } from './ui/Button'
 
 export default function FeatureLocked({ feature }: { feature: FeatureId }) {
   const navigate = useNavigate()
@@ -34,54 +37,55 @@ export default function FeatureLocked({ feature }: { feature: FeatureId }) {
   // purchase path is offered.
   if (plan === null) {
     return (
-      <div className="p-4 sm:p-6 md:p-10 max-w-2xl mx-auto">
-        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8 sm:p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center mx-auto mb-5">
-            <Clock size={22} className="text-brand-300" />
+      <Page>
+        <Card pad="feature" className="max-w-2xl mx-auto text-center">
+          <div className="w-10 h-10 rounded-control bg-surface-3 flex items-center justify-center mx-auto mb-4">
+            <Clock size={20} aria-hidden="true" className="text-ink-3" />
           </div>
-          <h1 className="text-xl font-semibold text-white">
+          <h1 className="text-title-sm text-ink">
             {meta.label} is coming soon
           </h1>
-          <p className="text-sm text-slate-400 mt-3 max-w-md mx-auto leading-relaxed">{meta.blurb}</p>
+          <p className="text-body text-ink-2 mt-3 max-w-[48ch] mx-auto">{meta.blurb}</p>
 
-          <div className="mt-6 inline-flex items-center gap-2 text-sm text-slate-300 bg-dark-700/50 border border-dark-600 rounded-lg px-4 py-2">
-            <Sparkles size={15} className="text-brand-300" />
+          <div className="mt-6 inline-flex items-center gap-2 text-body text-ink-2 bg-surface-2 border border-line rounded-control px-4 py-2">
+            <Sparkles size={15} aria-hidden="true" className="text-ink-3" />
             In development. Not part of any plan yet.
           </div>
 
-          <p className="text-xs text-slate-400 mt-6 max-w-md mx-auto leading-relaxed">
+          <p className="text-meta text-ink-3 mt-6 max-w-[48ch] mx-auto">
             Nothing to buy today. We will tell you here as soon as it is ready.
           </p>
-        </div>
-      </div>
+        </Card>
+      </Page>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-10 max-w-2xl mx-auto">
-      <div className="bg-dark-800 border border-dark-700 rounded-2xl p-8 sm:p-10 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center mx-auto mb-5">
-          <Lock size={22} className="text-brand-300" />
+    <Page>
+      <Card pad="feature" className="max-w-2xl mx-auto text-center">
+        <div className="w-10 h-10 rounded-control bg-surface-3 flex items-center justify-center mx-auto mb-4">
+          <Lock size={20} aria-hidden="true" className="text-ink-3" />
         </div>
-        <h1 className="text-xl font-semibold text-white">
+        <h1 className="text-title-sm text-ink">
           {meta.label} is included on the {PLAN_LABELS[plan]} plan
         </h1>
-        <p className="text-sm text-slate-400 mt-3 max-w-md mx-auto leading-relaxed">{meta.blurb}</p>
+        <p className="text-body text-ink-2 mt-3 max-w-[48ch] mx-auto">{meta.blurb}</p>
 
-        <div className="mt-6 inline-flex items-center gap-2 text-sm text-slate-300 bg-dark-700/50 border border-dark-600 rounded-lg px-4 py-2">
-          <Check size={15} className="text-brand-300" />
-          Available on the <span className="text-brand-300 font-medium">{PLAN_LABELS[plan]}</span> plan and above
+        <div className="mt-6 inline-flex items-center gap-2 text-body text-ink-2 bg-surface-2 border border-line rounded-control px-4 py-2">
+          <Check size={15} aria-hidden="true" className="text-pos-ink" />
+          Available on the <span className="text-ink font-semibold">{PLAN_LABELS[plan]}</span> plan and above
         </div>
 
         <div className="mt-7">
           <button
+            type="button"
             onClick={() => navigate('/account')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors"
+            className={buttonClasses('primary', 'md')}
           >
-            <Sparkles size={15} /> See plans <ArrowRight size={15} />
+            <Sparkles size={15} aria-hidden="true" /> See plans <ArrowRight size={15} aria-hidden="true" />
           </button>
         </div>
-      </div>
-    </div>
+      </Card>
+    </Page>
   )
 }

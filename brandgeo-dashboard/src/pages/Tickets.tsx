@@ -127,7 +127,7 @@ const PRIORITY_BADGE: Record<TicketPriority, string | null> = {
 
 const card = 'bg-dark-800 rounded-xl p-6 mb-6'
 const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 const smallSelect = 'bg-dark-700 border border-dark-600 rounded-md px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-brand-500 disabled:opacity-50'
 
 function when(iso: string) {

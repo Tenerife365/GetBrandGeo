@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Archive, Check, X, Bot, Send, PlusCircle, Lock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Archive, Check, X, Bot, Send, PlusCircle, Lock, MessageSquare } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { mockPrompts } from '../lib/mockData'
 import type { Prompt } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
-import { PageTitle, SectionHeading } from '../components/Typography'
+import RouteSkeleton from '../components/RouteSkeleton'
+import AllowanceMeter from '../components/AllowanceMeter'
+import EmptyState from '../components/EmptyState'
+import { Page, PageHeader, Button, IconButton, Badge, Chip, ChipGroup, Notice, Card, DataList } from '../components/ui'
 import { removalMode, removalVerb, removalConfirm, removalFailure, removalWrite } from '../lib/promptRemoval'
 import { PLAN_PROMPTS, PLAN_LABELS, type Plan } from '../lib/planConfig'
 
-// Category is a grouping, not an alert — one quiet neutral chip everywhere, and
+// Category is a grouping, not an alert: one quiet neutral Badge everywhere, and
 // the label comes from the shared general taxonomy (lib/promptCategories.ts).
-const CAT_BADGE = 'bg-dark-700 text-slate-400'
 
 function buildSystemPrompt(name?: string, website?: string) {
   const brandLine = name    ? `Business: ${name}`       : ''
@@ -173,7 +175,8 @@ export default function Prompts() {
   // missing table — it just stops showing a cap.
   useEffect(() => {
     const plan = (activeClient?.plan ?? 'free') as Plan
-    if (isDemoMode) { setCap(PLAN_PROMPTS[plan] ?? null); return }
+    // Demo mode has no plan, so there is no cap to show (never "N of 5 on Free").
+    if (isDemoMode) { setCap(null); return }
     supabase
       .from('plan_prompt_caps')
       .select('prompt_cap')
@@ -392,325 +395,260 @@ export default function Prompts() {
     return acc
   }, {} as Record<string, number>)
 
-  if (loading) return <div className="p-8 text-slate-500 text-sm animate-pulse">{t.pr_loading}</div>
+  if (loading) return <RouteSkeleton />
+
+  const planLabel = PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]
+  const showMeter = cap !== null && cap < 100000
+  const inputClass = 'w-full h-10 bg-surface-2 border border-edge rounded-control px-3 text-body text-ink placeholder:text-ink-3 focus:border-accent-ink disabled:opacity-60'
+  const shortText = (text: string) => (text.length > 40 ? text.slice(0, 40) + '…' : text)
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
-      {/* flex-wrap + min-w-0 are load-bearing at 320: without them the title
-          column cannot shrink below its content and the button group cannot drop
-          to a second line, so <main> overflowed (358 against a 320 clientWidth).
-          Pre-existing, found 2026-07-30 when 320 was first tested, and unchanged
-          by the touch-target work: forcing the old gaps back still measured 358.
-          The document itself never overflowed, so only a checker reading <main>
-          could see it. */}
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <PageTitle>{t.pr_title}</PageTitle>
-          <p className="text-sm text-slate-400 mt-0.5">
-            {cap === null || cap >= 100000
-              ? fmt(t.pr_titleCount, { n: used })
-              : <>
-                  <span className={atCap ? 'text-amber-300 font-medium' : ''}>{used} of {cap}</span>
-                  <span> prompts used on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}</span>
-                </>}
-          </p>
-        </div>
-        {/* Prompt management is available to any signed-in user for THEIR OWN
-            client — not admin-only. This used to be gated behind `isAdmin`,
-            which meant every self-serve account (free signup AND paying
-            Essentials/Growth, both provisioned as `viewer`) landed on a
-            dashboard they could not fill. Cross-tenant safety is enforced in
-            the DB, not here: the prompts RLS policies pin writes to
-            `is_admin() OR client_id = get_my_client_id()`.
-            See SECURITY-AUDIT.md §0.5. */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
-            aria-expanded={showDiscover}
-            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors ${
-              showDiscover
-                ? 'bg-brand-500/30 text-brand-200 border border-brand-500/50'
-                : 'bg-brand-500/15 text-brand-300 hover:bg-brand-500/25 border border-brand-500/20'
-            }`}
-          >
-            <Bot size={14} />
-            {t.pr_aiDiscover}
-          </button>
-          <button
-            onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`) : setShowAdd(true))}
-            aria-disabled={capBlocks}
-            title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
-            className={`flex items-center gap-2 px-4 py-2 max-md:min-h-[44px] rounded-lg text-sm transition-colors border ${
-              capBlocks
-                ? 'bg-dark-800 text-slate-500 border-dark-700 cursor-not-allowed'
-                : 'bg-dark-700 text-slate-300 hover:bg-dark-600 border-dark-600'
-            }`}
-          >
-            {capBlocks ? <Lock size={14} /> : <Plus size={14} />}
-            {t.pr_addPrompt}
-          </button>
-        </div>
-      </div>
-
-      {/* Plan cap notice. Two distinct states: a customer who is blocked and
-          needs to know the way out (delete one), and an admin who is over a
-          customer's cap on purpose and needs to know they are. */}
-      {atCap && (
-        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
-          capBlocks
-            ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
-            : 'border-brand-500/30 bg-brand-500/10 text-brand-200'
-        }`}>
-          {capBlocks ? (
-            <>
-              <strong>You have used all {cap} prompts on {PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan]}.</strong>{' '}
-              {verb} a prompt you no longer track to add a new one, or upgrade for more.
-            </>
-          ) : (
-            <>
-              <strong>This client is at its plan limit ({used} of {cap}).</strong>{' '}
-              You can add beyond it as an admin. The customer cannot.
-            </>
-          )}
-        </div>
-      )}
-
-      {capError && (
-        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex items-start justify-between gap-3">
-          <span>{capError}</span>
-          {/* 14x14 glyph, 44x44 target. Extends over the message text beside it,
-              which is not interactive, and 3px past the banner padding. */}
-          <button onClick={clearNotice} aria-label="Dismiss" className="relative flex-shrink-0 text-red-300/70 hover:text-red-200 after:absolute after:content-[''] after:[inset:-15px]">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Dynamic category filter — shows only categories that exist in this client's prompts */}
-      {usedCategories.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setFilterCat('all')}
-            aria-pressed={filterCat === 'all'}
-            className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
-              filterCat === 'all'
-                ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
-                : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
-            }`}
-          >
-            All · {prompts.length}
-          </button>
-          {usedCategories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}
-              aria-pressed={filterCat === cat}
-              className={`inline-flex items-center px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs font-medium border transition-all ${
-                filterCat === cat
-                  ? 'border-brand-500/50 bg-brand-500/15 text-brand-300'
-                  : 'border-dark-700 bg-dark-800 text-slate-400 hover:border-dark-600 hover:text-slate-300'
-              }`}
-            >
-              {promptCategoryLabel(cat)} · {catCounts[cat]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {showDiscover && (
-        <div className="mb-6 bg-dark-800 border border-brand-500/25 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-dark-700/60 flex items-center gap-2">
-            <Bot size={15} className="text-brand-400" />
-            <span className="text-sm font-semibold text-brand-300">{t.pr_aiDiscoveryTitle}</span>
-            <span className="text-xs text-slate-500 ml-auto">{t.pr_poweredBy}</span>
-          </div>
-
-          <div className="px-4 py-4 space-y-3 max-h-64 overflow-y-auto">
-            {chatMessages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${
-                  m.role === 'user'
-                    ? 'bg-brand-500/20 text-brand-100'
-                    : 'bg-dark-700 text-slate-300'
-                }`}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-            {aiLoading && (
-              <div className="flex justify-start">
-                <div className="bg-dark-700 text-slate-400 px-3 py-2 rounded-xl text-sm animate-pulse">
-                  {t.pr_generatingPrompts}
-                </div>
-              </div>
+    <Page>
+      <PageHeader
+        title={t.pr_title}
+        subtitle={showMeter ? undefined : fmt(t.pr_titleCount, { n: used })}
+        actions={
+          <>
+            {showMeter && cap !== null && (
+              <AllowanceMeter label={`Prompts on ${planLabel}`} used={used} cap={cap} />
             )}
-            <div ref={chatEndRef} />
-          </div>
+            <Button
+              variant="secondary"
+              icon={Bot}
+              aria-expanded={showDiscover}
+              onClick={() => { setShowDiscover(v => !v); setSuggestions([]); if (showDiscover) { setClientConfig(null); setChatMessages([{ role: 'assistant', content: "Hi! Describe your business and I will generate the best AI monitoring prompts for you." }]) } }}
+            >
+              {t.pr_aiDiscover}
+            </Button>
+            {/* Prompt management is available to any signed-in user for THEIR OWN
+                client, not admin-only. Cross-tenant safety is enforced in the DB:
+                the prompts RLS policies pin writes to
+                `is_admin() OR client_id = get_my_client_id()`.
+                See SECURITY-AUDIT.md section 0.5. */}
+            <Button
+              variant="primary"
+              icon={capBlocks ? Lock : Plus}
+              aria-disabled={capBlocks}
+              title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
+              onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`) : setShowAdd(true))}
+            >
+              {t.pr_addPrompt}
+            </Button>
+          </>
+        }
+      />
 
-          {suggestions.length > 0 && (
-            <div className="border-t border-dark-700/60 px-4 py-3 space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  {fmt(t.pr_suggestions, { n: suggestions.length })}
-                </span>
-                <button
-                  onClick={addAllSuggestions}
-                  className="flex items-center gap-1.5 text-xs font-medium text-brand-300 hover:text-brand-200 transition-colors"
-                >
-                  <PlusCircle size={12} />
-                  {t.pr_addAll}
-                </button>
-              </div>
-              {suggestions.map((s, i) => (
-                <div key={i} className={`flex items-start gap-2 p-2 rounded-lg border transition-colors ${
-                  s.added ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-dark-700/50 border-dark-600/50 hover:border-dark-500'
-                }`}>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${CAT_BADGE}`}>
-                    {promptCategoryLabel(categorizePrompt(s.text, brandName))}
-                  </span>
-                  <span className="text-xs text-slate-300 flex-1">{s.text}</span>
-                  <button
-                    onClick={() => addSuggestion(s, i)}
-                    disabled={s.added}
-                    aria-label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
-                    className={`relative shrink-0 p-1 rounded-lg transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-12px] ${
-                      s.added
-                        ? 'text-emerald-500 cursor-default'
-                        : 'text-slate-500 hover:text-brand-300 hover:bg-brand-500/10'
-                    }`}
-                  >
-                    {s.added ? <Check size={13} /> : <Plus size={13} />}
-                  </button>
+      <div className="space-y-4 md:space-y-6">
+        {/* One alarm per route: a save or add failure outranks the plan-limit
+            notice. The limit notice has two states, a customer who is blocked and
+            needs the way out, and an admin who is over a cap on purpose. */}
+        {capError ? (
+          <Notice
+            tone="neg"
+            // copy: pending bg-copy
+            title={capError}
+            action={<Button variant="tertiary" onClick={clearNotice}>Dismiss</Button>}
+          />
+        ) : atCap && (
+          <Notice
+            tone={capBlocks ? 'warn' : 'accent'}
+            // copy: pending bg-copy
+            title={capBlocks ? `You have used all ${cap} prompts on ${planLabel}.` : `This client is at its plan limit (${used} of ${cap}).`}
+            action={capBlocks ? <Button variant="tertiary" onClick={() => { window.location.assign('/account') }}>Upgrade</Button> : undefined}
+          >
+            {capBlocks
+              ? `${verb} a prompt you no longer track to add a new one, or upgrade for more.`
+              : 'You can add beyond it as an admin. The customer cannot.'}
+          </Notice>
+        )}
+
+        {usedCategories.length > 0 && (
+          <ChipGroup label="Category">
+            <Chip selected={filterCat === 'all'} count={prompts.length} onClick={() => setFilterCat('all')}>All</Chip>
+            {usedCategories.map(cat => (
+              <Chip key={cat} selected={filterCat === cat} count={catCounts[cat]} onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}>
+                {promptCategoryLabel(cat)}
+              </Chip>
+            ))}
+          </ChipGroup>
+        )}
+
+        {showDiscover && (
+          <Card pad="none" className="overflow-hidden">
+            <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+              <Bot size={16} aria-hidden="true" className="text-accent-ink" />
+              <span className="text-heading text-ink">{t.pr_aiDiscoveryTitle}</span>
+              <span className="text-meta text-ink-3 ml-auto">{t.pr_poweredBy}</span>
+            </div>
+
+            <div className="px-4 py-4 space-y-3 max-h-64 overflow-y-auto">
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] px-3 py-2 rounded-control text-body text-ink ${
+                    m.role === 'user' ? 'bg-accent-tint' : 'bg-surface-2'
+                  }`}>
+                    {m.content}
+                  </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          <div className="border-t border-dark-700/60 px-4 py-3 flex gap-2">
-            <input
-              value={userInput}
-              onChange={e => setUserInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder={t.pr_placeholder}
-              aria-label="Message to AI Discover"
-              className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
-              disabled={aiLoading}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!userInput.trim() || aiLoading}
-              aria-label="Send message"
-              className="inline-flex items-center justify-center px-3 py-2 max-md:min-w-[44px] max-md:min-h-[44px] rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors"
-            >
-              <Send size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showAdd && (
-        <div className="mb-4 bg-dark-800 border border-brand-500/30 rounded-xl p-4 flex gap-3 items-start">
-          <div className="flex-1 space-y-2">
-            <input
-              autoFocus
-              value={newText}
-              onChange={e => setNewText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addPrompt()}
-              placeholder={t.pr_searchPlaceholder}
-              aria-label="New prompt text"
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500"
-            />
-            <p className="text-[11px] text-slate-600">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
-          </div>
-          {/* 32x32 visible, 44x44 target below md, and the gap goes to 16px there
-              so the two targets do not overlap (32 + 12 = 44, centres 48 apart). */}
-          <div className="flex gap-2 max-md:gap-4 pt-0.5">
-            <button onClick={() => addPrompt()} disabled={saving || !newText.trim()} aria-label="Add prompt" className="relative p-2 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><Check size={16} /></button>
-            <button onClick={() => setShowAdd(false)} aria-label="Cancel adding prompt" className="relative p-2 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 transition-colors max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-6px]"><X size={16} /></button>
-          </div>
-        </div>
-      )}
-
-      <SectionHeading className="sr-only">Prompts</SectionHeading>
-      <div className="space-y-1.5">
-        {filtered.map((p, i) => {
-          const isEditing = editId === p.id
-          // gap-2 below sm: three of this row's four children are flex-shrink-0
-          // (index, category badge, actions), so at 320 the three 16px gaps were
-          // 48px of fixed cost the row could not give back, and it overflowed
-          // <main>. The text span also needs min-w-0 below, or `flex-1` still
-          // cannot shrink past its longest word.
-          return (
-            <div key={p.id} className="bg-dark-800 border border-dark-700 rounded-xl px-4 py-3 flex items-center gap-2 sm:gap-4 group hover:border-dark-600 transition-colors">
-              <span className="text-xs text-slate-600 tabular-nums w-5 text-right flex-shrink-0">{i + 1}</span>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${CAT_BADGE}`}>{promptCategoryLabel(p.category)}</span>
-              {isEditing ? (
-                <div className="flex-1 flex gap-3 items-center">
-                  <input
-                    autoFocus
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                    aria-label="Edit prompt text"
-                    className="flex-1 bg-dark-700 border border-brand-500/50 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none"
-                  />
-                  {/* Same 44x44 target and 20px separation as the resting row
-                      above. Cancel throws away what was just typed, so it gets
-                      the same treatment Delete does. The outer gap is 12px, not
-                      8px, so Save's hit box does not reach back over the input
-                      it sits beside (9px of extension, 12px of gap, 3px clear). */}
-                  <div className="flex gap-5 flex-shrink-0">
-                    <button onClick={saveEdit} disabled={saving} aria-label="Save prompt" className="relative p-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 disabled:opacity-40 after:absolute after:content-[''] after:[inset:-9px]"><Check size={14} /></button>
-                    <button onClick={() => setEditId(null)} aria-label="Cancel editing prompt" className="relative p-1.5 rounded-lg bg-dark-700 text-slate-400 hover:bg-dark-600 after:absolute after:content-[''] after:[inset:-9px]"><X size={14} /></button>
+              {aiLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-surface-2 text-ink-2 px-3 py-2 rounded-control text-body motion-safe:animate-pulse">
+                    {t.pr_generatingPrompts}
                   </div>
                 </div>
-              ) : (
-                <>
-                  <span className="flex-1 min-w-0 text-sm text-slate-300">{p.text}</span>
-                  {/* Row actions. Three separate things are going on here, all of
-                      them the same defect measured from different angles
-                      (dashboard-uiux-audit-2026-07-30.md F3):
-
-                      1. TAP AREA. The icons stay 26x26 — that is the size the row
-                         density wants, and growing them would push the row from
-                         52px to ~70px and change how many prompts fit on a
-                         screen. The TARGET grows instead, via a transparent
-                         ::after inset -9px, giving 44x44. Same technique the
-                         shipped .time-pill / .engine-chip rules in index.css
-                         already use. 44 on desktop as well as mobile, not just
-                         mobile: Delete is destructive and a mouse can miss too.
-                      2. SEPARATION. 44px targets 4px apart overlap by 14px, so
-                         the fix above would have made mis-tapping WORSE. gap-5
-                         (20px) puts the centres 46px apart, so the two hit boxes
-                         clear each other by 2px and a thumb cannot take Delete
-                         when it meant Edit.
-                      3. REACHABILITY. opacity-0 + group-hover has no meaning on a
-                         touch device, which has no hover: these were invisible on
-                         a phone, which is a worse problem than being small. They
-                         are always visible below md now, and unchanged above it.
-                         md:focus-within keeps them visible for keyboard users on
-                         desktop, where they were previously focusable at opacity
-                         0 (the responsive variant has to be doubled up because
-                         Tailwind emits media queries after pseudo-class variants,
-                         so a bare focus-within: would lose to md:opacity-0). */}
-                  <div className="flex gap-5 flex-shrink-0 transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
-                    <button onClick={() => startEdit(p)} aria-label={`Edit prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors after:absolute after:content-[''] after:[inset:-9px]"><Pencil size={14} /></button>
-                    <button onClick={() => deletePrompt(p.id)} aria-label={`${verb} prompt: ${p.text.length > 40 ? p.text.slice(0, 40) + '…' : p.text}`} className="relative p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors after:absolute after:content-[''] after:[inset:-9px]">{isAdmin ? <Trash2 size={14} /> : <Archive size={14} />}</button>
-                  </div>
-                </>
               )}
+              <div ref={chatEndRef} />
             </div>
-          )
-        })}
-      </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-slate-500">
-          {prompts.length === 0
-            ? t.pr_noPrompts
-            : t.pr_noFilter}
-        </div>
-      )}
-    </div>
+            {suggestions.length > 0 && (
+              <div className="border-t border-line px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-meta text-ink-3">
+                    {fmt(t.pr_suggestions, { n: suggestions.length })}
+                  </span>
+                  <Button variant="tertiary" size="sm" icon={PlusCircle} onClick={addAllSuggestions}>
+                    {t.pr_addAll}
+                  </Button>
+                </div>
+                {suggestions.map((s, i) => (
+                  <div key={i} className={`flex items-start gap-2 p-2 rounded-control border ${
+                    s.added ? 'bg-surface-2 border-line' : 'bg-surface border-line hover:bg-surface-2'
+                  }`}>
+                    <Badge tone="neutral">{promptCategoryLabel(categorizePrompt(s.text, brandName))}</Badge>
+                    <span className="text-body text-ink flex-1">{s.text}</span>
+                    <IconButton
+                      label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
+                      icon={s.added ? Check : Plus}
+                      disabled={s.added}
+                      onClick={() => addSuggestion(s, i)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="border-t border-line px-4 py-3 flex gap-2">
+              <input
+                value={userInput}
+                onChange={e => setUserInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                placeholder={t.pr_placeholder}
+                aria-label="Message to AI Discover"
+                className={`flex-1 ${inputClass}`}
+                disabled={aiLoading}
+              />
+              <IconButton
+                label="Send message"
+                icon={Send}
+                variant="secondary"
+                onClick={sendMessage}
+                disabled={!userInput.trim() || aiLoading}
+              />
+            </div>
+          </Card>
+        )}
+
+        {showAdd && (
+          <Card className="flex gap-3 items-start">
+            <div className="flex-1 space-y-2 min-w-0">
+              <input
+                autoFocus
+                value={newText}
+                onChange={e => setNewText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addPrompt()}
+                placeholder={t.pr_searchPlaceholder}
+                aria-label="New prompt text"
+                className={inputClass}
+              />
+              <p className="m-0 text-meta text-ink-3">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
+            </div>
+            <div className="flex gap-2">
+              <IconButton label="Add prompt" icon={Check} variant="secondary" onClick={() => addPrompt()} disabled={saving || !newText.trim()} />
+              <IconButton label="Cancel adding prompt" icon={X} onClick={() => setShowAdd(false)} />
+            </div>
+          </Card>
+        )}
+
+        {prompts.length === 0 && !showAdd && !showDiscover ? (
+          <Card pad="feature" className="flex flex-col items-center gap-4 text-center">
+            <EmptyState
+              icon={MessageSquare}
+              // copy: pending bg-copy
+              title="No prompts yet"
+              body={t.pr_noPrompts}
+              minHeight={0}
+            />
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" icon={Plus} onClick={() => setShowAdd(true)}>{t.pr_addPrompt}</Button>
+              <Button variant="secondary" icon={Bot} onClick={() => setShowDiscover(true)}>{t.pr_aiDiscover}</Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            {filtered.length > 0 && (
+              <DataList
+                ariaLabel="Prompts"
+                rows={filtered}
+                getKey={p => p.id}
+                renderRow={(p, i) => {
+                  const isEditing = editId === p.id
+                  return (
+                    <>
+                      <span className="text-meta text-ink-3 tabular-nums w-5 text-right shrink-0">{i + 1}</span>
+                      <span className="hidden sm:flex w-28 shrink-0"><Badge tone="neutral">{promptCategoryLabel(p.category)}</Badge></span>
+                      {isEditing ? (
+                        <div className="flex-1 min-w-0 flex gap-3 items-center">
+                          <input
+                            autoFocus
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                            aria-label="Edit prompt text"
+                            className={`flex-1 min-w-0 ${inputClass}`}
+                          />
+                          <div className="flex gap-2 shrink-0">
+                            <IconButton label="Save prompt" icon={Check} variant="secondary" onClick={saveEdit} disabled={saving} />
+                            <IconButton label="Cancel editing prompt" icon={X} onClick={() => setEditId(null)} />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-body text-ink">{p.text}</span>
+                            <span className="sm:hidden mt-1 block"><Badge tone="neutral">{promptCategoryLabel(p.category)}</Badge></span>
+                          </span>
+                          {/* Row actions are always visible (no hover reveal), so a touch
+                              device can reach them. The 44px hit area on a phone comes
+                              from the primitive's own padding. */}
+                          <div className="row-actions flex gap-2 shrink-0">
+                            <IconButton label={`Edit prompt: ${shortText(p.text)}`} icon={Pencil} onClick={() => startEdit(p)} />
+                            <button
+                              type="button"
+                              onClick={() => deletePrompt(p.id)}
+                              aria-label={`${verb} prompt: ${shortText(p.text)}`}
+                              title={`${verb} prompt`}
+                              className="relative inline-flex items-center justify-center w-8 h-8 rounded-control text-ink-2 hover:bg-surface-2 hover:text-neg transition-colors duration-[180ms] after:absolute after:-inset-1.5 after:content-[''] md:after:hidden"
+                            >
+                              {isAdmin ? <Trash2 size={14} /> : <Archive size={14} />}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )
+                }}
+              />
+            )}
+
+            {filtered.length === 0 && (
+              <p className="m-0 py-12 text-center text-body text-ink-3">
+                {prompts.length === 0 ? t.pr_noPrompts : t.pr_noFilter}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </Page>
   )
 }

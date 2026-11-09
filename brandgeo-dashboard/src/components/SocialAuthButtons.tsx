@@ -34,7 +34,7 @@ function GoogleIcon() {
 
 const btn =
   'w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg text-sm font-medium ' +
-  'bg-dark-700 border border-dark-600 text-slate-200 hover:bg-dark-600 hover:border-dark-500 ' +
+  'bg-dark-700 border border-dark-600 text-ink hover:bg-dark-600 hover:border-dark-500 ' +
   'transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
 
 export default function SocialAuthButtons({ onError, next }: { onError?: (msg: string) => void; next?: string | null }) {

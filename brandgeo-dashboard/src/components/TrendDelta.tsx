@@ -29,26 +29,30 @@ interface TrendDeltaProps {
 
 export default function TrendDelta({ delta, period, unit = 'pts', higherIsBetter = true, className = '' }: TrendDeltaProps) {
   if (delta === null || delta === undefined) {
-    return <span className={`text-xs text-slate-500 ${className}`}>First measurement</span>
+    // copy: pending bg-copy
+    return <span className={`text-meta text-ink-3 ${className}`}>First measurement</span>
   }
 
   const direction: 'up' | 'down' | 'flat' = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
   const favourable = direction === 'flat' ? null : (direction === 'up') === higherIsBetter
-  const colorClass = favourable === null ? 'text-slate-400' : favourable ? 'text-sentiment-positive' : 'text-sentiment-negative'
+  // The number is never coloured (spec 7.3); only the glyph carries tone.
+  const glyphClass = favourable === null ? 'text-neu' : favourable ? 'text-pos-ink' : 'text-neg'
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium tabular-nums ${colorClass} ${className}`}>
+    <span className={`inline-flex items-center gap-1 text-meta text-ink-2 tabular-nums ${className}`}>
       {direction === 'flat' ? (
-        <Minus size={10} />
+        <Minus size={10} aria-hidden="true" className={glyphClass} />
       ) : (
         <Triangle
           size={9}
           fill="currentColor"
           stroke="none"
+          aria-hidden="true"
+          className={glyphClass}
           style={{ transform: direction === 'down' ? 'rotate(180deg)' : undefined }}
         />
       )}
-      {delta > 0 ? '+' : ''}{delta}{unit} <span className="text-slate-500 font-normal">vs {period}</span>
+      {delta > 0 ? '+' : ''}{delta}{unit} <span className="text-ink-3">vs {period}</span>
     </span>
   )
 }

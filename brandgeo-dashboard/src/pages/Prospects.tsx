@@ -525,13 +525,13 @@ function TouchQuickLog({
             <div className="inline-flex rounded-lg border border-dark-600 p-0.5 bg-dark-700 w-full">
               <button
                 onClick={() => setDirection('out')}
-                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'out' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'out' ? 'bg-accent-strong text-on-accent' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 <ArrowUpRight size={11} /> Sent
               </button>
               <button
                 onClick={() => setDirection('in')}
-                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'in' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${direction === 'in' ? 'bg-accent-strong text-on-accent' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 <ArrowDownLeft size={11} /> Received
               </button>
@@ -560,7 +560,7 @@ function TouchQuickLog({
           <div className="sm:col-span-2">
             <button
               onClick={submitDetailed}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors"
             >
               Log touch
             </button>
@@ -847,7 +847,7 @@ function ProspectRow({
         {next && (
           <button
             onClick={() => changeStage(next.to)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors"
           >
             <CheckCircle2 size={13} /> {next.label}
           </button>
@@ -1252,13 +1252,13 @@ export default function Prospects() {
         <div className="inline-flex rounded-lg border border-dark-600 p-0.5 bg-dark-800">
           <button
             onClick={() => setView('queue')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'queue' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'queue' ? 'bg-accent-strong text-on-accent' : 'text-slate-400 hover:text-slate-200'}`}
           >
             Next up{prospects.length > 0 ? ` (${actionableCount})` : ''}
           </button>
           <button
             onClick={() => setView('all')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'all' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === 'all' ? 'bg-accent-strong text-on-accent' : 'text-slate-400 hover:text-slate-200'}`}
           >
             All ({prospects.length})
           </button>

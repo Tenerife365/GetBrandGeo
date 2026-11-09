@@ -15,10 +15,7 @@ import type { ReactNode } from 'react'
 
 export function PageTitle({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <h1
-      className={`text-2xl font-bold tracking-tight text-white ${className}`}
-      style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}
-    >
+    <h1 className={`text-title-sm md:text-title text-ink ${className}`}>
       {children}
     </h1>
   )
@@ -26,21 +23,18 @@ export function PageTitle({ children, className = '' }: { children: ReactNode; c
 
 export function SectionHeading({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <h2 className={`text-sm font-semibold text-slate-200 mb-3 ${className}`} style={{ lineHeight: 1.3 }}>
+    <h2 className={`text-heading text-ink mb-3 ${className}`}>
       {children}
     </h2>
   )
 }
 
 /**
- * Uppercase KPI caption. NOT a heading — always a <span>, never h2/h3 (§6.3).
+ * KPI caption (sentence case, meta role). NOT a heading: always a <span>, never h2/h3 (§6.3).
  */
 export function StatLabel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <span
-      className={`block text-[11px] font-semibold uppercase text-slate-400 ${className}`}
-      style={{ letterSpacing: '0.06em' }}
-    >
+    <span className={`block text-meta text-ink-2 ${className}`}>
       {children}
     </span>
   )
@@ -49,7 +43,7 @@ export function StatLabel({ children, className = '' }: { children: ReactNode; c
 /** Paired value for StatLabel — 28px/700 on a hero, 22px/700 on a tile. */
 export function StatValue({ children, size = 'tile', className = '' }: { children: ReactNode; size?: 'hero' | 'tile'; className?: string }) {
   return (
-    <span className={`block font-bold tabular-nums text-white ${size === 'hero' ? 'text-[28px]' : 'text-[22px]'} ${className}`}>
+    <span className={`block tabular-nums text-ink ${size === 'hero' ? 'text-display-sm' : 'text-value'} ${className}`}>
       {children}
     </span>
   )

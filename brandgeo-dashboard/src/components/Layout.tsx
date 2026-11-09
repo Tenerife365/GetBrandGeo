@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick,
+  Eye, EyeOff, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -15,6 +15,8 @@ import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
 import BrandGeoMark from './BrandGeoLogo'
 import ClientBanner from './ClientBanner'
+import Badge from './ui/Badge'
+import SegmentedControl from './ui/SegmentedControl'
 import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
@@ -268,6 +270,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/recommendations', icon: Lightbulb,       label: t.nav_recommendations },
     { to: '/prompts',         icon: BookText,        label: t.nav_prompts         },
   ]
+  // Phase 3 shell (spec 8): the phone bar shows five slots, the last of which is
+  // "More" and opens the same drawer. The three pages that no longer have a slot
+  // make More read as active.
+  // Short labels (spec 8, CP4): the first word of "AI Visibility" and "Brand
+  // Sentiment" read "AI" and "Brand", so English gets explicit one-word labels.
+  // Other languages keep their own first word; sidebar labels and i18n keys are
+  // untouched.
+  // copy: pending bg-copy
+  const MOBILE_SHORT: Record<string, string> = lang === 'en'
+    ? { '/ai-visibility': 'Visibility', '/sentiment': 'Sentiment', '/mentions': 'Mentions' }
+    : {}
+  const MOBILE_SLOTS = nav.slice(0, 4)
+  const MORE_PATHS = ['/competitors', '/recommendations', '/prompts']
 
   // Bucket clients once for both the customer switcher and the separate Internal control.
   const groupedClients: Record<ClientGroupKey, typeof clients> = { active: [], free: [], test: [], research: [], archived: [] }
@@ -335,7 +350,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   ]
 
   // Active nav state (dashboard-visual-system.md §4.2, replacing the old
-  // bg-brand-500/15 + before:bg-brand-400 rail-only treatment measured at
+  // bg-accent-tint + before:bg-accent rail-only treatment measured at
   // 1.17:1 background / 1.24:1 text — both effectively invisible with the
   // rail hidden). `.nav-item`/`.is-active` (index.css) carry the whole state:
   // a solid raised fill (--surface-nav-active), white/ink semibold text
@@ -480,7 +495,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Skip-to-content link (WCAG 2.4.1) — visually hidden until keyboard-focused.
           sr-only/focus:not-sr-only are Tailwind built-ins; .skip-link (index.css) handles
           the fixed positioning once it's focused. */}
-      <a href="#main-content" className="skip-link sr-only focus:not-sr-only bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
+      <a href="#main-content" className="skip-link sr-only focus:not-sr-only bg-accent-strong text-on-accent px-4 py-2 rounded-control text-sm font-medium">
         Skip to main content
       </a>
 
@@ -505,9 +520,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // At 768 and up this is undefined: the sidebar is the real shell there.
         inert={isMobile && !sidebarOpen ? '' : undefined}
         className={[
-        'fixed inset-y-0 left-0 z-50 w-64 bg-surface-nav border-r border-nav flex flex-col',
+        'fixed inset-y-0 left-0 z-50 w-60 bg-canvas border-r border-edge flex flex-col',
         'transition-transform duration-200 ease-in-out',
-        'md:relative md:w-64 md:flex-shrink-0',
+        'md:relative md:w-60 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ].join(' ')}>
 
@@ -524,20 +539,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setViewingAsUser(true)}
                 title="View this client as one of its users"
                 aria-label="View as user"
-                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="text-ink-2 hover:text-ink transition-colors p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink"
               >
                 <Eye size={16} />
               </button>
             )}
             <AdminBell />
             {isDemoMode && (
-              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">Demo</span>
+              <Badge tone="neutral">Demo</Badge>
             )}
             {/* md:hidden, so this only ever exists on a touch-sized viewport:
                 44x44 unconditionally rather than behind a query. The 18px glyph
                 is unchanged; only the box around it grew, and the header is
                 72px tall so nothing moves. */}
-            <button onClick={closeSidebarAndRestore} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-slate-400 hover:text-white transition-colors" aria-label="Close menu">
+            <button onClick={closeSidebarAndRestore} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-ink-2 hover:text-ink transition-colors" aria-label="Close menu">
               <X size={18} />
             </button>
           </div>
@@ -545,17 +560,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Collection progress: visible from any tab except the affiliate admin */}
         {!affiliateMode && collecting && progress && (
-          <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0">
+          <div className="px-3 py-2.5 bg-accent-tint border-b border-accent-ink/40 flex-shrink-0">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
-                <Loader2 size={11} className="animate-spin text-brand-400" />
-                <span className="text-xs text-brand-300 font-medium truncate max-w-[120px]">
+                <Loader2 size={11} className="animate-spin text-accent-ink" />
+                <span className="text-xs text-accent-ink font-medium truncate max-w-[120px]">
                   {progress.clientName}
                 </span>
               </div>
               <button
                 onClick={stopCollection}
-                className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                className="flex items-center gap-1 text-meta text-ink-3 hover:text-neg transition-colors"
                 title="Stop collection"
               >
                 <StopCircle size={11} />
@@ -564,13 +579,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="h-1 bg-dark-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-brand-400 rounded-full transition-all duration-300"
+                className="h-full bg-accent rounded-full transition-all duration-300"
                 style={{ width: `${collectPct}%` }}
               />
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-slate-600">{progress.done}/{progress.total} prompts</span>
-              <span className="text-[10px] text-slate-600">{collectPct}%</span>
+              <span className="text-meta text-ink-3">{progress.done}/{progress.total} prompts</span>
+              <span className="text-meta text-ink-3">{collectPct}%</span>
             </div>
           </div>
         )}
@@ -581,18 +596,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             A stopped run says stopped, with what was actually checked.
             Dismissible, and cleared the moment another run starts. */}
         {!affiliateMode && !collecting && runNotice && (
-          <div className="px-3 py-2.5 bg-brand-500/8 border-b border-brand-500/20 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-3 py-2.5 bg-accent-tint border-b border-accent-ink/40 flex-shrink-0 flex items-center justify-between gap-2">
             <NavLink
               to="/ai-visibility"
               onClick={() => { dismissRunNotice(); closeSidebar() }}
-              className="text-xs text-brand-300 font-medium hover:underline"
+              className="text-xs text-accent-ink font-medium hover:underline"
             >
               {describeRun(runNotice)}
             </NavLink>
             <button
               onClick={dismissRunNotice}
               aria-label="Dismiss"
-              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-slate-500 hover:text-brand-300 transition-colors"
+              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-ink-3 hover:text-accent-ink transition-colors"
             >
               <X size={12} />
             </button>
@@ -602,12 +617,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Inline notice, replacing alert() for billing-portal and
             client-group-update failures (dismissible, does not block the app). */}
         {sidebarNotice && (
-          <div className="px-3 py-2.5 bg-red-500/8 border-b border-red-500/20 flex-shrink-0 flex items-start justify-between gap-2">
-            <p className="text-xs text-red-300 leading-relaxed">{sidebarNotice}</p>
+          <div className="px-3 py-2.5 bg-neg-tint border-b border-neg/20 flex-shrink-0 flex items-start justify-between gap-2">
+            <p className="text-xs text-neg leading-relaxed">{sidebarNotice}</p>
             <button
               onClick={() => setSidebarNotice(null)}
               aria-label="Dismiss"
-              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-red-300/70 hover:text-red-200 transition-colors"
+              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-neg/70 hover:text-neg transition-colors"
             >
               <X size={12} />
             </button>
@@ -618,7 +633,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {affiliateMode && (
           <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Affiliate program">
             <div>
-              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Affiliate program</div>
+              <div className="text-meta font-semibold text-ink-3 px-3 mb-2">Affiliate program</div>
               <div className="space-y-1">
                 {AFFILIATE_TABS.map(({ id, label }) => {
                   const Icon = AFFILIATE_TAB_META[id].icon
@@ -636,18 +651,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             {affiliateOverview && (
               <div>
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">At a glance</div>
+                <div className="text-meta font-semibold text-ink-3 px-3 mb-2">At a glance</div>
                 <dl className="px-3 space-y-2 text-sm">
-                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Owed to partners</dt><dd className="text-slate-100 font-medium text-right">{owedLabel(affiliateOverview)}</dd></div>
-                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Active partners</dt><dd className="text-slate-100 font-medium">{affiliateOverview.counts.affiliates_active}<span className="text-slate-500 font-normal"> / {affiliateOverview.counts.affiliates_total}</span></dd></div>
-                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Applications waiting</dt><dd className={affiliateOverview.counts.applications_pending ? 'text-amber-300 font-medium' : 'text-slate-100 font-medium'}>{affiliateOverview.counts.applications_pending}</dd></div>
-                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Needs reconciliation</dt><dd className={affiliateOverview.counts.reconciliation_flags ? 'text-amber-300 font-medium' : 'text-slate-100 font-medium'}>{affiliateOverview.counts.reconciliation_flags}</dd></div>
-                  <div className="flex items-baseline justify-between gap-2"><dt className="text-slate-400">Referral clicks</dt><dd className="text-slate-100 font-medium">{affiliateOverview.counts.clicks_total}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Owed to partners</dt><dd className="text-ink font-medium text-right">{owedLabel(affiliateOverview)}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Active partners</dt><dd className="text-ink font-medium">{affiliateOverview.counts.affiliates_active}<span className="text-ink-3 font-normal"> / {affiliateOverview.counts.affiliates_total}</span></dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Applications waiting</dt><dd className={affiliateOverview.counts.applications_pending ? 'text-warn font-medium' : 'text-ink font-medium'}>{affiliateOverview.counts.applications_pending}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Needs reconciliation</dt><dd className={affiliateOverview.counts.reconciliation_flags ? 'text-warn font-medium' : 'text-ink font-medium'}>{affiliateOverview.counts.reconciliation_flags}</dd></div>
+                  <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Referral clicks</dt><dd className="text-ink font-medium">{affiliateOverview.counts.clicks_total}</dd></div>
                 </dl>
               </div>
             )}
             <div>
-              <Link to="/" onClick={closeSidebar} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+              <Link to="/" onClick={closeSidebar} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors">
                 <ArrowLeft size={16} /> Back to BrandGEO
               </Link>
             </div>
@@ -659,7 +674,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
-              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
+              <div className="text-meta font-semibold text-ink-3 px-3 mb-2">
                 {group.label}
               </div>
               <div className="space-y-1">
@@ -670,8 +685,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Icon size={16} />
                     {label}
-                    {to === '/social' && socialLocked && <Lock size={12} className="ml-auto text-slate-500" />}
-                    {to === '/seo' && seoLocked && <Lock size={12} className="ml-auto text-slate-500" />}
+                    {to === '/social' && socialLocked && <Lock size={12} className="ml-auto text-ink-3" />}
+                    {to === '/seo' && seoLocked && <Lock size={12} className="ml-auto text-ink-3" />}
                   </NavLink>
                 ))}
               </div>
@@ -683,7 +698,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Client switcher: admin only, not in affiliate mode */}
         {!affiliateMode && isAdmin && clients.length > 0 && (
           <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
-            <div className="text-xs text-slate-600 uppercase tracking-wider px-1 mb-1.5">{t.sidebar_client}</div>
+            <div className="text-meta text-ink-3 px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
                 ref={clientBtnRef}
@@ -697,15 +712,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   })
                   setShowAddMarket(false); setShowLangs(false)
                 }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-slate-300 bg-brand-500/10 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-ink-2 bg-surface-2 border border-edge hover:bg-surface-3 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showClients}
               >
-                <BrandLogo name={activeClient?.name ?? '?'} website={activeClient?.brand_website} sizeClass="w-5 h-5" roundedClass="rounded-md" textClass="text-[9px]" />
+                <BrandLogo name={activeClient?.name ?? '?'} website={activeClient?.brand_website} sizeClass="w-5 h-5" roundedClass="rounded-md" textClass="text-meta" />
                 <span className="flex-1 text-left truncate font-medium">
                   {clients.find(c => c.id === activeClientId)?.name ?? t.sidebar_selectClient}
                 </span>
-                <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+                <ChevronDown size={13} className="text-ink-3 flex-shrink-0" />
               </button>
               {showClients && (() => {
                 // Customer switcher shows ONLY subscriber buckets (active/free/test).
@@ -720,7 +735,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           role="tab"
                           aria-selected={current === g.key}
                           onClick={() => setClientGroup(g.key)}
-                          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${current === g.key ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-dark-600 border border-transparent'}`}
+                          className={`px-2 py-1 rounded text-meta font-medium transition-colors ${current === g.key ? 'bg-accent-tint text-accent-ink border border-accent-ink/40' : 'text-ink-2 hover:text-ink hover:bg-dark-600 border border-transparent'}`}
                         >
                           {g.label} <span className="opacity-60">{groupedClients[g.key].length}</span>
                         </button>
@@ -730,7 +745,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       {groupedClients[current].map(c => (
                         <button key={c.id}
                           onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
-                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
                         >
                           <Building2 size={12} className="flex-shrink-0" />
                           <span className="truncate">{c.name}</span>
@@ -745,7 +760,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Reclassify the current client's group (admin) */}
             {activeClient && (
               <div className="flex items-center gap-2 mt-2 px-1">
-                <span className="text-[11px] text-slate-500 flex-shrink-0">Group</span>
+                <span className="text-meta text-ink-3 flex-shrink-0">Group</span>
                 <select
                   value={activeClient.category ?? 'active'}
                   disabled={catSaving}
@@ -761,7 +776,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     }
                     finally { setCatSaving(false) }
                   }}
-                  className="flex-1 bg-dark-700 border border-dark-600 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-brand-500/50 disabled:opacity-50"
+                  className="flex-1 bg-dark-700 border border-edge rounded px-2 py-1 text-meta text-ink-2 focus:border-accent-ink disabled:opacity-50"
                   aria-label="Client group category"
                 >
                   <option value="active">Active</option>
@@ -781,7 +796,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <button
                   ref={internalBtnRef}
                   onClick={() => { setShowInternal(v => !v); setShowClients(false) }}
-                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[11px] text-slate-400 bg-dark-700/40 border border-dark-600/60 hover:text-slate-200 hover:border-dark-500 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-meta text-ink-2 bg-dark-700/40 border border-dark-600/60 hover:text-ink hover:border-dark-500 transition-colors"
                   aria-haspopup="listbox"
                   aria-expanded={showInternal}
                   title="Internal research workspaces for content and other uses, not customer accounts"
@@ -789,19 +804,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <FlaskConical size={12} className="flex-shrink-0" />
                   <span className="flex-1 text-left">Internal / Research</span>
                   <span className="opacity-60">{internalCount}</span>
-                  <ChevronDown size={12} className="text-slate-500 flex-shrink-0" />
+                  <ChevronDown size={12} className="text-ink-3 flex-shrink-0" />
                 </button>
                 {showInternal && (
                   <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50 max-h-72 overflow-y-auto">
                     {INTERNAL_GROUP_KEYS.map(key => groupedClients[key].length > 0 && (
                       <div key={key}>
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 px-3 pt-2 pb-1 bg-dark-800/40">
+                        <div className="text-meta uppercase tracking-wider text-ink-3 px-3 pt-2 pb-1 bg-dark-800/40">
                           {CLIENT_GROUPS.find(g => g.key === key)?.label}
                         </div>
                         {groupedClients[key].map(c => (
                           <button key={c.id}
                             onClick={() => { setActiveClientId(c.id); setShowInternal(false) }}
-                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
                           >
                             <Building2 size={12} className="flex-shrink-0" />
                             <span className="truncate">{c.name}</span>
@@ -826,8 +841,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2.5 px-1 py-1">
               <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
               <span className="min-w-0 text-left">
-                <span className="block text-sm font-medium text-slate-200 truncate">{activeClient.name}</span>
-                <span className="block text-[11px] text-slate-500">Your dashboard</span>
+                <span className="block text-sm font-medium text-ink truncate">{activeClient.name}</span>
+                <span className="block text-meta text-ink-3">Your dashboard</span>
               </span>
             </div>
           </div>
@@ -838,7 +853,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
             {/* Literal string, not t.sidebar_market: that key reads "MARKET" and i18nContext.tsx is outside this change's scope. Same classes as the neighbouring labels, so CSS uppercases it. */}
-            <span className="text-xs text-slate-600 uppercase tracking-wider">Collection market</span>
+            <span className="text-meta text-ink-3">Collection market</span>
             {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
                 text button so there is no padding to grow without moving the
                 MARKET header row it shares (this row is deliberately compact,
@@ -847,7 +862,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 50.6 x 44.5 while the label stays exactly where it was. */}
             <button
               onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
-              className="relative flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
+              className="relative flex items-center gap-1 text-meta text-ink-3 hover:text-ink-2 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
               aria-expanded={showMarketEditor}
               aria-label={showMarketEditor ? 'Done editing collection market' : 'Edit collection market. Used for collections you start from this browser; scheduled refreshes use the account default.'}
             >
@@ -862,14 +877,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {!showMarketEditor && (
             <div className="space-y-0.5">
               {selections.map(sel => (
-                <div key={sel.market.id} className="flex items-center gap-2 px-1 py-1 text-sm text-slate-300">
+                <div key={sel.market.id} className="flex items-center gap-2 px-1 py-1 text-sm text-ink-2">
                   {sel.market.flagCode === 'un'
-                    ? <Globe2 size={14} className="text-slate-400 flex-shrink-0" />
+                    ? <Globe2 size={14} className="text-ink-2 flex-shrink-0" />
                     : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
                   }
                   <span className="truncate">
                     {sel.market.label}
-                    {sel.region.id !== 'ALL' && <span className="text-slate-500"> · {sel.region.label}</span>}
+                    {sel.region.id !== 'ALL' && <span className="text-ink-3"> · {sel.region.label}</span>}
                   </span>
                 </div>
               ))}
@@ -885,14 +900,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {/* Market header row */}
                 <div className="flex items-center gap-2 px-3 py-2">
                   {sel.market.flagCode === 'un'
-                    ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                    ? <Globe2 size={15} className="text-ink-2 flex-shrink-0" />
                     : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
                   }
-                  <span className="flex-1 text-sm text-slate-300 truncate">{sel.market.label}</span>
+                  <span className="flex-1 text-sm text-ink-2 truncate">{sel.market.label}</span>
                   {selections.length > 1 && (
                     <button
                       onClick={() => removeSelection(sel.market.id)}
-                      className="relative p-1.5 text-slate-600 hover:text-slate-400 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px]"
+                      className="relative p-1.5 text-ink-3 hover:text-ink-2 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px]"
                       title={`Remove ${sel.market.label}`}
                       aria-label={`Remove ${sel.market.label} from selected markets`}
                     >
@@ -909,7 +924,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         const r = sel.market.regions.find(r => r.id === e.target.value)
                         if (r) updateRegion(sel.market.id, r)
                       }}
-                      className="w-full text-xs bg-dark-600 border border-dark-500 rounded px-2 py-1 max-md:min-h-[44px] text-slate-400 focus:outline-none focus:border-brand-500/50 cursor-pointer"
+                      className="w-full text-xs bg-dark-600 border border-edge rounded px-2 py-1 max-md:min-h-[44px] text-ink-2 focus:border-accent-ink cursor-pointer"
                       aria-label={`Region for ${sel.market.label}`}
                     >
                       {sel.market.regions.map(r => (
@@ -928,7 +943,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 ref={marketBtnRef}
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-ink-3 hover:text-ink-2 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
                 aria-haspopup="listbox"
                 aria-expanded={showAddMarket}
               >
@@ -940,10 +955,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {availableMarkets.map(m => (
                     <button key={m.id}
                       onClick={() => { addSelection(m); setShowAddMarket(false) }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300 hover:bg-dark-600 transition-colors"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-ink-2 hover:bg-dark-600 transition-colors"
                     >
                       {m.flagCode === 'un'
-                        ? <Globe2 size={15} className="text-slate-400 flex-shrink-0" />
+                        ? <Globe2 size={15} className="text-ink-2 flex-shrink-0" />
                         : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
                       }
                       <span>{m.label}</span>
@@ -961,7 +976,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Bottom actions */}
         <div className="p-4 border-t border-dark-700/60 space-y-1 flex-shrink-0">
           <NavLink to="/account" onClick={closeSidebar}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors">
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors">
             <User size={16} />
             My Profile
           </NavLink>
@@ -970,7 +985,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={openBilling}
               disabled={billingLoading}
-              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors disabled:opacity-60"
             >
               {billingLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
               {t.sidebar_billing}
@@ -987,21 +1002,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 ref={langBtnRef}
                 onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-                className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}
                 title="Language"
               >
                 <img src={`https://flagcdn.com/w20/${currentLang.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
                 <span className="flex-1 text-left truncate">{currentLang.label}</span>
-                <ChevronDown size={13} className="text-slate-500 flex-shrink-0" />
+                <ChevronDown size={13} className="text-ink-3 flex-shrink-0" />
               </button>
               {showLangs && (
                 <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
                   {LANGUAGES.map(l => (
                     <button key={l.id}
                       onClick={() => { setLang(l.id); setShowLangs(false) }}
-                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-brand-300 bg-brand-500/10' : 'text-slate-300 hover:bg-dark-600'}`}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
                     >
                       <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
                       <span>{l.label}</span>
@@ -1020,7 +1035,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               aria-checked={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={t.sidebar_darkMode}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
             >
               {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -1029,7 +1044,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               aria-label={t.sidebar_signOut}
               title={t.sidebar_signOut}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-slate-400 hover:text-red-400 hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-ink-2 hover:text-neg hover:bg-dark-700 transition-colors"
             >
               <LogOut size={16} />
             </button>
@@ -1037,11 +1052,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main. canvas-bleed (index.css) is the depth cue from §4.1: a 24px
-          gradient painted on the CANVAS side of the divider, decaying to
-          nothing, so the canvas reads as sitting behind the rail rather than
-          beside it. It contributes nothing to any measured ratio — the
-          border-nav divider on <aside> alone carries the 3:1. */}
+      {/* Main. The canvas-bleed gradient is retired (Phase 3 spec 8): the
+          sidebar and canvas share one surface and the --edge divider on <aside>
+          carries the separation. */}
       <div
         // The open mobile drawer was not modal: all of <main>'s controls behind
         // it stayed focusable. Making the background inert while the drawer is
@@ -1049,7 +1062,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // exact mirror of the aside's own inert above, driven by the same
         // boolean. Above 768 this is always undefined.
         inert={isMobile && sidebarOpen ? '' : undefined}
-        className="flex-1 flex flex-col min-w-0 overflow-hidden canvas-bleed"
+        className="flex-1 flex flex-col min-w-0 overflow-hidden bg-canvas"
       >
 
         {/* View-as-user banner. Sits outside the scroll container on purpose, so
@@ -1057,15 +1070,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             impersonated view for the real product. Amber, not brand violet,
             because it is a state warning and not a feature. */}
         {viewingAsUser && (
-          <div className="flex-shrink-0 bg-amber-500/15 border-b border-amber-500/40 px-4 sm:px-6 py-2 flex items-center gap-3">
-            <Eye size={14} className="text-amber-400 flex-shrink-0" />
-            <p className="text-xs text-amber-200 min-w-0">
+          <div className="flex-shrink-0 bg-warn-tint border-b border-warn/40 px-4 sm:px-6 py-2 flex items-center gap-3">
+            <Eye size={14} className="text-warn flex-shrink-0" />
+            <p className="text-xs text-ink min-w-0">
               Viewing as a user of <strong className="font-semibold">{activeClient?.name ?? 'this client'}</strong>.
-              <span className="hidden sm:inline text-amber-200/70"> Admin controls are hidden. Your own permissions are unchanged.</span>
+              <span className="hidden sm:inline text-ink/70"> Admin controls are hidden. Your own permissions are unchanged.</span>
             </p>
             <button
               onClick={() => setViewingAsUser(false)}
-              className="ml-auto flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-amber-100 bg-amber-500/25 hover:bg-amber-500/40 border border-amber-500/40 rounded-md px-2.5 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="ml-auto flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-ink bg-warn-tint hover:opacity-80 border border-warn/40 rounded-md px-2.5 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-warn"
             >
               <EyeOff size={13} /> Exit
             </button>
@@ -1073,15 +1086,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Mobile header */}
-        <header className="md:hidden flex-shrink-0 h-14 bg-dark-800 border-b border-dark-700/60 flex items-center px-4 gap-3">
+        <header className="md:hidden flex-shrink-0 h-14 bg-canvas border-b border-line flex items-center px-4 gap-3">
           {/* Mobile-only header, so 44x44 unconditionally. h-14 (56px) has room. */}
-          <button ref={hamburgerRef} onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 text-slate-400 hover:text-white transition-colors" aria-label="Open menu">
+          <button ref={hamburgerRef} onClick={() => setSidebarOpen(true)} className="flex items-center justify-center w-11 h-11 -ml-2 rounded-control text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors" aria-label="Open menu">
             <Menu size={20} />
           </button>
           <BrandGeoLogo />
-          {affiliateMode && <span className="text-xs font-medium text-slate-400">Affiliates</span>}
+          {affiliateMode && <span className="text-meta font-medium text-ink-3">Affiliates</span>}
+          {isDemoMode && <Badge tone="neutral">Demo</Badge>}
           {!affiliateMode && collecting && progress && (
-            <div className="ml-auto flex items-center gap-1.5 text-xs text-brand-400">
+            <div className="ml-auto flex items-center gap-1.5 text-meta text-accent-ink">
               <Loader2 size={12} className="animate-spin" />
               <span>{progress.done}/{progress.total}</span>
             </div>
@@ -1097,24 +1111,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             decorative here (40% alpha is fine): the 3:1 divider requirement is
             the sidebar's, not this strip's (§4.4). */}
         {!hideTimeFilter && (
-        <div className="flex-shrink-0 border-b border-nav-40 bg-surface-bar backdrop-blur-sm px-4 sm:px-6 py-2 flex items-center gap-1">
-          <span id="time-filter-label" className="text-xs text-slate-400 mr-2">{TIME_FILTER_LABEL[pathname]}</span>
-          <div role="group" aria-labelledby="time-filter-label" className="flex items-center gap-1">
-          {((['7d', '30d', '90d', 'all'] as const)).map(r => (
-            <button
-              key={r}
-              onClick={() => setTimeRange(r)}
-              aria-pressed={timeRange === r}
-              className={`time-pill${timeRange === r ? ' is-pressed' : ''}`}
-            >
-              {TIME_LABELS[r]}
-            </button>
-          ))}
-          </div>
+        <div className="flex-shrink-0 h-12 border-b border-line bg-canvas px-4 sm:px-6 flex items-center gap-3">
+          {/* copy: pending bg-copy. The caption is visible from 768 up; below that it
+              is kept as the control's accessible name only. */}
+          <span className="hidden md:inline text-meta text-ink-3">{TIME_FILTER_LABEL[pathname]}</span>
+          <SegmentedControl
+            className="max-md:w-full max-md:[&>button]:flex-1"
+            ariaLabel={TIME_FILTER_LABEL[pathname] ?? 'Time range'}
+            value={timeRange}
+            onChange={(r: TimeRange) => setTimeRange(r)}
+            options={(['7d', '30d', '90d', 'all'] as const).map(r => ({ value: r, label: TIME_LABELS[r] }))}
+          />
         </div>
         )}
 
-        <main ref={mainRef} id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-16 md:pb-0 focus:outline-none">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="flex-1 overflow-auto scrollbar-thin pb-20 md:pb-0 focus:outline-none">
           {!affiliateMode && <ClientBanner />}
           {children}
         </main>
@@ -1129,7 +1140,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // Sibling of the main column, so it needs the drawer's inert flag too or
         // the "trap" would have a seven-link hole in it.
         inert={isMobile && sidebarOpen ? '' : undefined}
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-nav-95 backdrop-blur-md border-t border-nav flex items-stretch justify-around safe-area-pb"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-line flex items-stretch justify-around safe-area-pb"
       >
         {affiliateMode && AFFILIATE_TABS.map(({ id }) => {
           const { icon: Icon, short } = AFFILIATE_TAB_META[id]
@@ -1143,7 +1154,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           )
         })}
-        {!affiliateMode && nav.map(({ to, icon: Icon, label }) => (
+        {!affiliateMode && MOBILE_SLOTS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -1153,10 +1164,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Icon size={19} />
             <span className="mobile-nav-label">
-              {label.split(' ')[0]}
+              {MOBILE_SHORT[to] ?? label.split(' ')[0]}
             </span>
           </NavLink>
         ))}
+        {!affiliateMode && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="More pages"
+            aria-current={MORE_PATHS.some(pth => pathname.startsWith(pth)) ? 'page' : undefined}
+            className={`mobile-nav-item${MORE_PATHS.some(pth => pathname.startsWith(pth)) ? ' is-active' : ''}`}
+          >
+            <Ellipsis size={19} />
+            {/* copy: pending bg-copy */}
+            <span className="mobile-nav-label">More</span>
+          </button>
+        )}
       </nav>
 
       {/* Our own support widget is RETIRED from the UI as of 2026-07-29, in

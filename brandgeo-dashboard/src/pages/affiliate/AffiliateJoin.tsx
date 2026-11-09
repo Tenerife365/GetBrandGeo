@@ -13,7 +13,7 @@ import { PAYOUT_METHODS, PAYOUT_METHOD_LABELS, type JoinPreview, type PayoutMeth
 import { isDemoMode } from '../../lib/supabase'
 
 const ic = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition'
-const bc = 'w-full bg-brand-500 hover:bg-brand-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
+const bc = 'w-full bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-medium py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
 
 const DETAIL_FIELDS: Record<PayoutMethod, { key: string; label: string }[]> = {
   wise: [{ key: 'account_holder', label: 'Account holder' }, { key: 'email', label: 'Wise email' }, { key: 'iban', label: 'IBAN (optional)' }, { key: 'country', label: 'Country' }],

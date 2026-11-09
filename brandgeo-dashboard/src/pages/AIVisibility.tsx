@@ -15,14 +15,13 @@ import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { useCollection, type CollectionBlockReason } from '../lib/collectionContext'
-import { useTheme } from '../lib/themeContext'
 import {
   ENGINE_META, ALL_ENGINES, COMING_SOON_ENGINES, RETIRED_ENGINES, ENGINE_UNLOCK_PLAN, PLAN_LABELS,
   getPlanLimits, QUEUE_ONLY_ENGINES,
   type EngineId, type EngineState,
 } from '../lib/planConfig'
 import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
-import { MOTION_BASE, MOTION_FAST, EASE_OUT, heroReveal, useCountUp } from '../lib/motion'
+import { MOTION_BASE, MOTION_FAST, EASE_OUT } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
 import CooldownCountdown from '../components/CooldownCountdown'
@@ -35,10 +34,14 @@ import type { EngineBand } from '../lib/metrics'
 import { buildAiVisibilityData, buildAiVisibilityCsvRows, AI_VISIBILITY_CSV_HEADER } from '../lib/views/aiVisibilityView'
 import { toCsv, csvFilename, downloadCsv } from '../lib/csv'
 import { promptCategoryLabel } from '../lib/promptCategories'
-import { useChartTheme } from '../lib/chartTheme'
 import SharedEmptyState from '../components/EmptyState'
 import { formatDate, formatRelativeOrDate, formatRatio } from '../lib/format'
 import PromptResultCell from '../components/PromptResultCell'
+import {
+  Card, ScoreDial, Meter, Badge, StatusGlyph, Page, PageHeader, HeroAnswer, SectionHeader,
+  Button, Chip, ChipGroup, SegmentedControl, Disclosure,
+  SkeletonBlock, SkeletonHero, SkeletonDial, SkeletonTable,
+} from '../components/ui'
 import {
   buildCellViews, summarisePrompt, sortPrompts, promptCompetitors, buildHeadline,
   lockedCandidates, pickLockedColumns, parseRankedCompetitors,
@@ -97,7 +100,7 @@ const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(
 // A category is a grouping, not an alert — so its badge stays neutral (Gestalt
 // Focal-Point Law: color is reserved for meaning, not decoration). One quiet
 // chip for every category; the label text still identifies which one it is.
-const getCatColor = (_cat: string) => 'bg-dark-700 text-slate-400'
+const getCatColor = (_cat: string) => 'bg-surface-2 text-ink-2'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -218,26 +221,26 @@ function EngineToggleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-dark-800 border border-dark-600 rounded-xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-surface border border-line rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-dark-700">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-line">
           {/* min-w-0 so a long client name truncates instead of widening the
               modal past its max-w-md (same min-width:auto flex trap). */}
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white">Engine Configuration</h2>
-            <p className="text-xs text-slate-500 mt-0.5 truncate" title={clientName}>{clientName}</p>
+            <h2 className="text-body font-semibold text-ink">Engine Configuration</h2>
+            <p className="text-meta text-ink-3 mt-0.5 truncate" title={clientName}>{clientName}</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close engine configuration"
-            className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-dark-700 transition-colors"
+            className="shrink-0 p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Engine list */}
-        <div className="divide-y divide-dark-700/50 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-line max-h-96 overflow-y-auto">
           {planEngines.map(engine => {
             const meta  = ENGINE_META[engine]
             const state = engineStates[engine]
@@ -250,15 +253,15 @@ function EngineToggleModal({
               <div key={engine} className="flex items-center gap-3 px-5 py-3.5">
                 <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 rounded-lg object-contain shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-white">
+                  <div className="flex items-center gap-1.5 text-body font-medium text-ink">
                     <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: meta.chartColor }} />
                     {meta.label}
                   </div>
                   {!isBuilt && (
-                    <div className="text-[10px] text-slate-600 mt-0.5">Coming Soon, not yet collecting data</div>
+                    <div className="text-meta text-ink-3 mt-0.5">Coming Soon, not yet collecting data</div>
                   )}
                   {isBuilt && !isEnabled && (
-                    <div className="text-[10px] text-amber-600 mt-0.5">Disabled, shown as Coming Soon to client</div>
+                    <div className="text-meta text-warn mt-0.5">Disabled, shown as Coming Soon to client</div>
                   )}
                 </div>
 
@@ -267,26 +270,26 @@ function EngineToggleModal({
                   <button
                     onClick={() => handleToggle(engine, isEnabled)}
                     disabled={isSaving}
-                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors duration-200 disabled:opacity-50 ${
                       isEnabled
-                        ? 'bg-brand-500 border-brand-500'
-                        : 'bg-dark-600 border-dark-500'
+                        ? 'bg-accent border-accent-ink'
+                        : 'bg-surface-3 border-line-2'
                     }`}
                   >
                     {isSaving
-                      ? <Loader2 size={10} className="animate-spin absolute inset-0 m-auto text-white" />
-                      : <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 mt-[1px] ${isEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      ? <Loader2 size={10} className="animate-spin absolute inset-0 m-auto text-on-accent motion-reduce:animate-none" />
+                      : <span className={`inline-block h-3.5 w-3.5 rounded-full shadow transition-transform duration-200 mt-[1px] ${isEnabled ? 'bg-on-accent translate-x-4' : 'bg-ink-3 translate-x-0.5'}`} />
                     }
                   </button>
                 ) : (
-                  <span className="text-[10px] text-slate-600 shrink-0 bg-dark-700 px-2 py-1 rounded">🔜 Soon</span>
+                  <span className="text-meta text-ink-3 shrink-0 bg-surface-2 px-2 py-1 rounded">🔜 Soon</span>
                 )}
               </div>
             )
           })}
         </div>
 
-        <div className="px-5 py-3 bg-dark-700/30 text-xs text-slate-600">
+        <div className="px-5 py-3 bg-surface-2 text-meta text-ink-3">
           Disabled engines show as "Coming Soon" to clients. Locked engines require a plan upgrade.
         </div>
       </div>
@@ -310,8 +313,6 @@ export default function AIVisibility() {
   const { activeClientId, activeClient, isAdmin, activeEngines, engineStates, setClientEngineOverride } = useClient()
   const brandName = activeClient?.name ?? 'your brand'
   const { t } = useI18n()
-  const { theme } = useTheme()
-  const chart = useChartTheme()
 
   // Customer-facing allowance, derived from the plan rather than from spend.
   // Both come from getPlanLimits so this page cannot drift from what the
@@ -687,11 +688,6 @@ export default function AIVisibility() {
   const { dimensions, aiScore } = data?.score ?? ZERO_SCORE
   const overallPct = dimensions.recognition
 
-  // Score count-up (0 → aiScore) once data has loaded — matches the Overview hero's
-  // flow (useCountUp + ring sweep, DASHBOARD-UX-2026.md §6 Phase B). Called here,
-  // unconditionally, so it stays before the `if (loading) return` early-return below
-  // (Rules of Hooks).
-  const displayedScore = useCountUp(aiScore, !loading)
 
   // Competitors, the absent count and the check total all read the same
   // population (active prompts, active engines, newest usable answer per cell).
@@ -814,8 +810,8 @@ export default function AIVisibility() {
   const sectionIsOpen = (key: SectionKey): boolean => {
     const stored = sectionOpen[key]
     if (stored !== undefined) return stored
-    if (key !== 'unchecked') return true
-    return !renderPlan.some(s => s.key !== 'unchecked')
+    if (key === 'notYet' || key === 'unchecked') return !renderPlan.some(s => s.key !== 'notYet' && s.key !== 'unchecked')
+    return true
   }
 
   // ── Fix This hub ──────────────────────────────────────────────────────────
@@ -1061,91 +1057,21 @@ export default function AIVisibility() {
   // on a true first mount or a client switch (see the `silent` load() param
   // above), never during an in-progress or completed collection run.
   if (!snapshot && status === 'error') return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <PageTitle>{t.aiv_title}</PageTitle>
-      </div>
+    <Page>
+      <PageHeader title={t.aiv_title} />
       <LoadErrorCard onRetry={() => reload()} />
-    </div>
+    </Page>
   )
 
   if (loading) return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-4 w-56" />
-        </div>
-        <Skeleton className="h-9 w-32 rounded-lg" />
-      </div>
-
-      <div className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center">
-        <div className="flex flex-col items-center gap-3">
-          <Skeleton className="w-40 h-40 rounded-full" />
-          <Skeleton className="h-4 w-28" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="space-y-1.5">
-              <Skeleton className="h-3 w-32" />
-              <Skeleton className="h-2 w-full rounded-full" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-card-compact flex items-center gap-3">
-            <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-3.5 w-20" />
-              <Skeleton className="h-4 w-16" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Prompt block skeleton. Two shapes, because the real block is a table
-          from 640px up and a stack of cards below it. */}
-      <div className="hidden sm:block">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-5 w-2/3 mt-3" />
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-20" />)}
-          <Skeleton className="h-10 w-80" />
-        </div>
-        <Skeleton className="h-5 w-48 mt-6" />
-        <div className="mt-2 flex flex-col gap-2">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
-        </div>
-      </div>
-      <div className="sm:hidden">
-        <Skeleton className="h-5 w-full" />
-        <Skeleton className="h-5 w-1/2 mt-2" />
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-20" />)}
-        </div>
-        <Skeleton className="h-11 w-full mt-2" />
-        <div className="mt-4 flex flex-col gap-2">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full rounded-lg" />)}
-        </div>
-      </div>
-    </div>
+    <Page>
+      <PageHeader title={t.aiv_title} subtitle={t.aiv_subtitle} />
+      <div className="mb-4"><SkeletonHero /></div>
+      <div className="mb-4"><SkeletonBlock className="h-40 w-full" /></div>
+      <SkeletonBlock className="h-5 w-24 mb-3" />
+      <SkeletonTable rows={5} cols={4} />
+    </Page>
   )
-
-  const circumference   = 2 * Math.PI * 54
-  const dashOffset      = circumference - (aiScore / 100) * circumference
-  const ringTextFill    = theme === 'light' ? '#1e293b' : 'white'
-  // The score ring's "%" glyph. Solid hexes, not alpha, so the value can be
-  // contrast-checked at all: light was rgba(0,0,0,0.4), which composites to
-  // rgb(153,153,153) on the white card and measures 2.85:1 at 14px/500 against
-  // a 4.5 floor (discovery audit 2026-07-31, found while regression-sweeping
-  // Layout.tsx). #556479 is the same muted value --axis-ink uses, 6.03:1 on the
-  // card and 5.00:1 on the darkest light surface. Dark is unchanged in
-  // appearance: #93979f IS rgba(255,255,255,0.55) composited on --dark-800,
-  // and it already passed at 6.09:1.
-  const ringTextFillDim = theme === 'light' ? '#556479' : '#93979f'
 
   // Zero mentions across everything that was answered. Three of the six
   // dimensions (knowledge, sentiment, accuracy) are defined only when the brand
@@ -1197,8 +1123,8 @@ export default function AIVisibility() {
   // Plain functions that return JSX (no hooks), so they can read page state.
   // Spec: docs/design/ai-visibility-prompt-focus-spec-2026-10-28.md section 5.
 
-  const NEUTRAL_CHIP = 'inline-flex shrink-0 items-center rounded-full bg-dark-700 px-2 py-0.5 text-xs text-slate-200 tabular-nums'
-  const AMBER_CHIP = 'inline-flex shrink-0 items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400'
+  const NEUTRAL_CHIP = 'inline-flex shrink-0 items-center rounded-full bg-surface-2 px-2 py-0.5 text-meta text-ink tabular-nums'
+  const AMBER_CHIP = 'inline-flex shrink-0 items-center rounded-full border border-warn bg-warn-tint px-2 py-0.5 text-meta text-warn'
   const SORT_LABEL: Record<SortMode, string> = {
     best: AIV_COPY.sortBest,
     needs_work: AIV_COPY.sortNeedsWork,
@@ -1217,13 +1143,13 @@ export default function AIVisibility() {
     <ChevronDown
       size={16}
       aria-hidden="true"
-      className={`shrink-0 text-slate-400 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+      className={`shrink-0 text-ink-2 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
       style={{ transitionDuration: `${Math.round(MOTION_FAST * 1000)}ms` }}
     />
   )
 
   const categoryChip = (prompt: Prompt) => (
-    <span className={`shrink-0 text-[10px] font-medium px-1.5 leading-[15px] rounded-full ${getCatColor(prompt.category)}`}>
+    <span className={`shrink-0 text-meta font-medium px-1.5 leading-[15px] rounded-full ${getCatColor(prompt.category)}`}>
       {getCatLabel(prompt.category)}
     </span>
   )
@@ -1267,7 +1193,7 @@ export default function AIVisibility() {
             {activeLLMs.map(llm => (
               <div key={llm.id} className="px-1 py-1 flex flex-col items-center gap-1">
                 <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain" />
-                <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
+                <span className="text-meta font-semibold text-ink-2 text-center leading-tight">{llm.label}</span>
               </div>
             ))}
           </div>
@@ -1285,16 +1211,16 @@ export default function AIVisibility() {
     const answered = summaries.get(prompt.id)?.answered ?? 0
     return (
       <div className="mb-3">
-        <h4 className="text-xs font-semibold text-slate-200 mb-2">{AIV_COPY.competitorHeading}</h4>
+        <h4 className="text-meta font-semibold text-ink mb-2">{AIV_COPY.competitorHeading}</h4>
         {list.length === 0 ? (
-          <p className="text-sm text-slate-400">{AIV_COPY.competitorEmpty}</p>
+          <p className="text-body text-ink-2">{AIV_COPY.competitorEmpty}</p>
         ) : (
           <ol className="space-y-1.5">
             {list.map(c => (
               <li key={c.name} className="flex items-baseline gap-2">
-                <span className="text-sm text-slate-200">{c.name}</span>
-                <span className="text-xs text-slate-400">{namedByEngines(c.k, answered)}</span>
-                {c.bestRank != null && <span className="text-xs text-slate-400 tabular-nums">#{c.bestRank}</span>}
+                <span className="text-body text-ink">{c.name}</span>
+                <span className="text-meta text-ink-2">{namedByEngines(c.k, answered)}</span>
+                {c.bestRank != null && <span className="text-meta text-ink-2 tabular-nums">#{c.bestRank}</span>}
               </li>
             ))}
           </ol>
@@ -1315,11 +1241,11 @@ export default function AIVisibility() {
     if (rankedList.length === 0) return null
     return (
       <div className="mb-2">
-        <div className="text-[9px] text-slate-600 uppercase tracking-wide font-semibold mb-1">AI Top Results</div>
+        <div className="text-meta text-ink-3 uppercase tracking-wide font-semibold mb-1">AI Top Results</div>
         {rankedList.map(entry => (
           <div key={`${entry.pos}-${entry.name}`}
-            className={`text-[10px] flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-emerald-400/90 font-medium' : 'text-slate-400/80'}`}>
-            <span className="font-mono text-slate-600 shrink-0 w-5">#{entry.pos}</span>
+            className={`text-meta flex items-start gap-1 mb-0.5 ${entry.isBrand ? 'text-pos-ink font-medium' : 'text-ink-2'}`}>
+            <span className="font-mono text-ink-3 shrink-0 w-5">#{entry.pos}</span>
             <span className="leading-tight">{entry.name}{entry.isBrand ? ' ✓' : ''}</span>
           </div>
         ))}
@@ -1346,13 +1272,13 @@ export default function AIVisibility() {
             const cv = cellViews.get(prompt.id)?.get(llm.id)
             const isErrorCell = cv?.state === 'error'
             const tone = isErrorCell
-              ? 'bg-dark-800 border-dark-700'
-              : r?.brand_mentioned ? 'bg-sentiment-positive-15 border-sentiment-positive-20'
-              : r ? 'bg-sentiment-negative-15 border-sentiment-negative-20'
-              : 'bg-dark-800 border-dark-700'
+              ? 'bg-surface border-line'
+              : r?.brand_mentioned ? 'bg-pos-tint border-pos'
+              : r ? 'bg-neg-tint border-neg'
+              : 'bg-surface border-line'
             return (
               <div key={llm.id} className={`rounded-lg p-3 border ${tone}`}>
-                <div className="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                <div className="text-meta font-semibold text-ink-2 mb-2 flex items-center gap-1.5">
                   <img src={llm.logoUrl} alt={llm.label} className="w-3.5 h-3.5 rounded object-contain" />
                   {llm.label}
                   {/* QUEUE_ONLY_ENGINES cannot finish inside the 26s Netlify wall
@@ -1363,7 +1289,7 @@ export default function AIVisibility() {
                     <button
                       onClick={(ev) => { ev.stopPropagation(); handleRefreshEngine(llm.id) }}
                       disabled={collecting || refreshingEngine !== null}
-                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                      className="ml-auto p-1 rounded hover:bg-surface-3 text-ink-3 hover:text-ink-2 transition-colors disabled:opacity-30"
                       title={`${llm.label} is too slow for an instant re-run, so this starts it in the background across all prompts. It keeps running if you leave the page.`}
                       aria-label={`Re-run ${llm.label} in the background`}
                     >
@@ -1373,7 +1299,7 @@ export default function AIVisibility() {
                     <button
                       onClick={(ev) => { ev.stopPropagation(); handleRefreshCell(prompt, llm.id) }}
                       disabled={refreshingCell !== null || collecting}
-                      className="ml-auto p-1 rounded hover:bg-dark-600 text-slate-600 hover:text-slate-300 transition-colors disabled:opacity-30"
+                      className="ml-auto p-1 rounded hover:bg-surface-3 text-ink-3 hover:text-ink-2 transition-colors disabled:opacity-30"
                       title={`Re-run this prompt on ${llm.label} only. Charges for one engine call.`}
                       aria-label={`Re-run this prompt on ${llm.label} only`}
                     >
@@ -1382,21 +1308,21 @@ export default function AIVisibility() {
                   ))}
                 </div>
                 {cellRefreshFailed === `${prompt.id}:${llm.id}` && (
-                  <div className="flex items-center gap-1 text-[10px] text-red-400 mb-1.5">
+                  <div className="flex items-center gap-1 text-meta text-neg mb-1.5">
                     <AlertTriangle size={9} /> Refresh failed, try again
                   </div>
                 )}
                 {isErrorCell && cv ? (
                   <>
-                    <div className="text-xs text-amber-400 mb-1">
+                    <div className="text-meta text-warn mb-1">
                       {panelNotAnswering(formatDate(cv.errorSince ?? cv.current?.checked_at ?? ''))}
                     </div>
                     {cv.previousOk && (
                       <>
-                        <div className="text-xs text-slate-400 mb-2">{panelLastResult(formatDate(cv.previousOk.checked_at))}</div>
+                        <div className="text-meta text-ink-2 mb-2">{panelLastResult(formatDate(cv.previousOk.checked_at))}</div>
                         {topResultsOf(cv.previousOk)}
                         {cv.previousOk.response_snippet && (
-                          <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
+                          <p className="text-meta text-ink-3 mt-1 line-clamp-3 italic leading-relaxed">
                             {cv.previousOk.response_snippet}
                           </p>
                         )}
@@ -1405,30 +1331,30 @@ export default function AIVisibility() {
                   </>
                 ) : r ? (
                   <>
-                    <div className={`text-xs font-bold mb-2 ${r.brand_mentioned ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <div className={`text-meta font-semibold mb-2 ${r.brand_mentioned ? 'text-pos-ink' : 'text-neg'}`}>
                       {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
                     </div>
                     {topResultsOf(r)}
                     {r.sentiment && r.brand_mentioned && (
-                      <div className={`text-[10px] font-medium mb-1 ${r.sentiment === 'positive' ? 'text-emerald-500' : r.sentiment === 'negative' ? 'text-red-500' : 'text-slate-500'}`}>
+                      <div className={`text-meta font-medium mb-1 ${r.sentiment === 'positive' ? 'text-pos-ink' : r.sentiment === 'negative' ? 'text-neg' : 'text-ink-3'}`}>
                         {r.sentiment}
                       </div>
                     )}
                     {r.checked_at && (
-                      <div className="text-[10px] text-slate-600 font-mono">
+                      <div className="text-meta text-ink-3 font-mono">
                         {formatDate(r.checked_at)}
                       </div>
                     )}
                     {r.response_snippet && (
-                      <p className="text-[10px] text-slate-500 mt-1 line-clamp-3 italic leading-relaxed">
+                      <p className="text-meta text-ink-3 mt-1 line-clamp-3 italic leading-relaxed">
                         {r.response_snippet}
                       </p>
                     )}
                   </>
                 ) : cv?.state === 'no_answer' ? (
-                  <div className="text-xs text-slate-400">{AIV_COPY.legendNoAnswer}</div>
+                  <div className="text-meta text-ink-2">{AIV_COPY.legendNoAnswer}</div>
                 ) : (
-                  <div className="text-xs text-slate-600">{t.aiv_notChecked}</div>
+                  <div className="text-meta text-ink-3">{t.aiv_notChecked}</div>
                 )}
               </div>
             )
@@ -1436,13 +1362,13 @@ export default function AIVisibility() {
         </div>
 
         {missing.length > 0 && (
-          <div className="mt-3 px-3 py-2.5 bg-dark-700/40 border border-dark-600 rounded-lg flex items-start gap-2">
-            <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-slate-400" />
+          <div className="mt-3 px-3 py-2.5 bg-surface-2 border border-line rounded-lg flex items-start gap-2">
+            <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-ink-2" />
             <div>
-              <div className="text-xs text-slate-200 font-medium mb-0.5">
+              <div className="text-meta text-ink font-medium mb-0.5">
                 {fmt(t.aiv_opportunity, { brand: brandName, llms: missing.map(l => l.label).join(', ') })}
               </div>
-              <div className="text-[11px] text-slate-400">{t.aiv_opportunityTip}</div>
+              <div className="text-meta text-ink-2">{t.aiv_opportunityTip}</div>
             </div>
           </div>
         )}
@@ -1453,7 +1379,7 @@ export default function AIVisibility() {
   // Expanded body wrapper. `kind` decides what sits above the existing panel.
   const expandedBody = (prompt: Prompt, kind: SectionKey) => (
     <Collapse open={expandedRow === prompt.id}>
-      <div id={`aiv-row-${prompt.id}`} className="border-t border-dark-700/50 bg-dark-700/20 px-4 py-4">
+      <div id={`aiv-row-${prompt.id}`} className="border-t border-line bg-surface-2 px-4 py-4">
         {kind !== 'appear' && cellStrip(prompt.id)}
         {kind === 'notYet' && competitorBlock(prompt)}
         {enginePanel(prompt)}
@@ -1479,7 +1405,7 @@ export default function AIVisibility() {
         : <span className={NEUTRAL_CHIP}>{onlyPending ? AIV_COPY.chipPending : AIV_COPY.chipNoAnswer}</span>
       : null
     const ratioChip = kind === 'appear'
-      ? <span className={NEUTRAL_CHIP}>{formatRatio(mentions, answered, 'engines')}</span>
+      ? <span className={NEUTRAL_CHIP}>{formatRatio(mentions, answered, answered === 1 ? 'engine' : 'engines')}</span>
       : kind === 'notYet'
         ? <span className={NEUTRAL_CHIP}>{ratioNoneChip(answered)}</span>
         : null
@@ -1492,11 +1418,11 @@ export default function AIVisibility() {
             aria-expanded={isExpanded}
             aria-controls={`aiv-row-${prompt.id}`}
             onClick={() => toggleRow(prompt.id)}
-            className="block w-full text-left rounded-lg border border-dark-700 bg-dark-800 p-3 min-h-[44px]"
+            className="block w-full text-left rounded-lg border border-line bg-surface p-3 min-h-[44px]"
           >
             <span className="flex items-start gap-2">
-              <span className="text-xs text-slate-400 tabular-nums shrink-0 pt-0.5">{num}</span>
-              <span className="block min-w-0 flex-1 text-sm text-slate-200 line-clamp-2">{prompt.text}</span>
+              <span className="text-meta text-ink-2 tabular-nums shrink-0 pt-0.5">{num}</span>
+              <span className="block min-w-0 flex-1 text-body text-ink line-clamp-2">{prompt.text}</span>
               {chevron(isExpanded)}
             </span>
             <span className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -1510,7 +1436,7 @@ export default function AIVisibility() {
               </span>
             )}
             {kind === 'notYet' && topComp && (
-              <span className="block text-xs text-slate-400 mt-1.5">{enginesNamed(topComp)}</span>
+              <span className="block text-meta text-ink-2 mt-1.5">{enginesNamed(topComp)}</span>
             )}
           </button>
           {expandedBody(prompt, kind)}
@@ -1520,17 +1446,17 @@ export default function AIVisibility() {
 
     if (kind === 'appear') {
       return (
-        <div className={`border-b border-dark-700 last:border-0 ${num % 2 === 0 ? 'bg-dark-700/15' : ''}`}>
+        <div className={`border-b border-line last:border-0 ${num % 2 === 0 ? 'bg-surface-2' : ''}`}>
           <button
             type="button"
             aria-expanded={isExpanded}
             aria-controls={`aiv-row-${prompt.id}`}
             onClick={() => toggleRow(prompt.id)}
-            className="grid w-full text-left transition-colors hover:bg-dark-700/30"
+            className="grid w-full text-left transition-colors hover:bg-surface-2"
             style={{ gridTemplateColumns: tableColsTemplate }}
           >
             <span className="block px-2 py-2.5 self-center">
-              <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-dark-700 text-[10px] font-semibold text-slate-400 tabular-nums">
+              <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-surface-2 text-meta font-semibold text-ink-2 tabular-nums">
                 {/* Sequential across the rendered sections, never the stored
                     `position` (a sort key with gaps and duplicates). */}
                 {num}
@@ -1538,14 +1464,14 @@ export default function AIVisibility() {
             </span>
             <span className="block px-3 py-2.5 self-center min-w-0">
               <span className="flex items-center gap-2 min-w-0">
-                <span className="block truncate flex-1 min-w-0 text-sm text-slate-200" title={prompt.text}>{prompt.text}</span>
+                <span className="block truncate flex-1 min-w-0 text-body text-ink" title={prompt.text}>{prompt.text}</span>
                 {chevron(isExpanded)}
               </span>
               <span className="flex items-center gap-1.5 mt-1 min-w-0 whitespace-nowrap">
                 {categoryChip(prompt)}
                 {ratioChip}
                 {isAdmin && (
-                  <span className="min-w-0 truncate text-[9px] text-slate-600 hidden lg:inline" title="Expand this row to re-run a single engine">
+                  <span className="min-w-0 truncate text-meta text-ink-3 hidden lg:inline" title="Expand this row to re-run a single engine">
                     expand to refresh per engine
                   </span>
                 )}
@@ -1573,18 +1499,18 @@ export default function AIVisibility() {
           aria-expanded={isExpanded}
           aria-controls={`aiv-row-${prompt.id}`}
           onClick={() => toggleRow(prompt.id)}
-          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-dark-700/40 rounded-lg"
+          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-surface-2 rounded-lg"
         >
-          <span className="text-xs text-slate-400 tabular-nums">{num}</span>
+          <span className="text-meta text-ink-2 tabular-nums">{num}</span>
           <span className="flex items-center gap-2 min-w-0">
-            <span className="block truncate min-w-0 text-sm text-slate-200" title={prompt.text}>{prompt.text}</span>
+            <span className="block truncate min-w-0 text-body text-ink" title={prompt.text}>{prompt.text}</span>
             {categoryChip(prompt)}
           </span>
           <span className="flex items-center gap-2 min-w-0">
             {ratioChip}
             {reasonChip}
             {kind === 'notYet' && topComp && (
-              <span className="hidden md:block text-xs text-slate-400 truncate max-w-[14rem]">{enginesNamed(topComp)}</span>
+              <span className="hidden md:block text-meta text-ink-2 truncate max-w-[14rem]">{enginesNamed(topComp)}</span>
             )}
           </span>
           {chevron(isExpanded)}
@@ -1598,8 +1524,60 @@ export default function AIVisibility() {
   const headlineEngineLabel = headline.engine ? ENGINE_META[headline.engine].label : null
   const uncheckedEngineList = joinEngineLabels(headline.errorEngines.map(e => ENGINE_META[e].label))
 
+  // Spec 11.2 block entrance: the first four blocks fade and slide in on a
+  // short stagger (260ms ease-out). MotionConfig reducedMotion="user" at the
+  // app root drops the slide for users who ask. No count-up on the dial.
+  const reveal = (i: number) => ({
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: MOTION_BASE, ease: EASE_OUT, delay: i * 0.06 },
+  })
+
+  const firstRun = prompts.length > 0 && totalChecked === 0 && headline.variant === 'unchecked' && headline.errorEngines.length === 0
+  const heroBadge: { label: string; tone: 'neutral' | 'pos' | 'warn' | 'neg' } =
+    totalChecked === 0 ? { label: 'Not measured yet', tone: 'neutral' } // copy: pending bg-copy
+    : zeroMention ? { label: AIV_COPY.bandNotRecommended, tone: 'neutral' }
+    : aiScore >= 60 ? { label: 'Strong', tone: 'pos' }
+    : aiScore >= 35 ? { label: 'Developing', tone: 'warn' }
+    : { label: 'Needs work', tone: 'neg' }
+  const heroGlyph = heroBadge.tone === 'pos' || heroBadge.tone === 'warn' || heroBadge.tone === 'neg'
+    ? <StatusGlyph kind={heroBadge.tone} size={12} />
+    : undefined
+
+  const heroAnswer =
+    headline.variant === 'recommended' ? headlineRecommended(headline.a, headline.n, headlineEngineLabel, headline.pos)
+    : headline.variant === 'notYet' ? headlineNotYet(headline.n, headline.k)
+    : collecting ? AIV_COPY.headlineChecking
+    : firstRun ? AIV_COPY.headlineFirstCheckPending
+    : AIV_COPY.headlineUncheckedTitle
+  const heroContext =
+    headline.variant === 'unchecked' && !collecting && !firstRun
+      ? headlineUncheckedReason(
+          headline.errorEngines.length > 0 ? uncheckedEngineList : null,
+          headline.since ? formatDate(headline.since) : null,
+          headline.errorEngines.length,
+        )
+      : lastChecked ? fmt(t.aiv_lastChecked, { date: formatDate(lastChecked) }) : undefined
+  const heroAction = headline.variant === 'unchecked' && !collecting ? (
+    <>
+      <Button
+        variant="primary"
+        icon={isAdmin ? RotateCcw : Play}
+        onClick={runHeadlineAction}
+        disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
+        aria-label={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
+        title={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
+      >
+        {isAdmin ? AIV_COPY.actionForceRefresh : AIV_COPY.actionRunCollection}
+      </Button>
+      {!isAdmin && collectionAllowance.nextAvailableAt && (
+        <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
+      )}
+    </>
+  ) : undefined
+
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+    <Page>
 
       {/* Engine toggle modal */}
       {showEngineModal && activeClient && (
@@ -1612,96 +1590,82 @@ export default function AIVisibility() {
         />
       )}
 
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <PageTitle>{t.aiv_title}</PageTitle>
+      {/* ── Block 1: page header ────────────────────────────────────────────── */}
+      <PageHeader
+        title={t.aiv_title}
+        badge={selections.length > 0 ? (
+          <span className="inline-flex flex-wrap items-center gap-2">
             {selections.map(sel => (
-              <span
-                key={sel.market.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-300 border border-slate-600/50"
-              >
+              <Badge key={sel.market.id} tone="neutral">
                 {sel.market.flagCode === 'un'
-                  ? <Globe2 size={11} className="text-slate-400" />
+                  ? <Globe2 size={11} aria-hidden="true" />
                   : <img src={`https://flagcdn.com/w16/${sel.market.flagCode}.png`} alt="" className="w-3.5 h-auto rounded-sm" />
                 }
                 {sel.market.id}
-                {sel.region.id !== 'ALL' && <span className="text-slate-500">· {sel.region.label}</span>}
-              </span>
+                {sel.region.id !== 'ALL' && <span className="text-ink-3">· {sel.region.label}</span>}
+              </Badge>
             ))}
-          </div>
-          <p className="text-sm text-slate-400 mt-0.5">
-            {t.aiv_subtitle}
-            {lastChecked && (
-              <span className="ml-2 text-slate-600">
-                - {fmt(t.aiv_lastChecked, { date: formatDate(lastChecked) })}
-              </span>
+          </span>
+        ) : undefined}
+        subtitle={t.aiv_subtitle}
+        actions={
+          <>
+            {/* Engine configuration is an admin-only concern (sets what every client
+                on a plan collects). Kept admin-gated. */}
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                icon={Settings}
+                onClick={() => setShowEngineModal(true)}
+                title="Configure engines for this client"
+                aria-label="Configure engines for this client"
+              >
+                Engines
+              </Button>
             )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Engine configuration is an admin-only concern (sets what every client
-              on a plan collects). Kept admin-gated. */}
-          {isAdmin && (
-            <button
-              onClick={() => setShowEngineModal(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500"
-              title="Configure engines for this client"
-              aria-label="Configure engines for this client"
+            {/* Force Refresh WIPES all existing results before re-running, so it is
+                admin-only and keeps its own label so it still reads as the
+                destructive one. */}
+            {isAdmin && (
+              <Button
+                variant="danger"
+                icon={RotateCcw}
+                onClick={forceCollection}
+                disabled={collecting || loading}
+                title="Force Refresh: wipes existing results and re-runs all engines"
+                aria-label="Force refresh: wipes existing results and re-runs all engines"
+              >
+                Force Refresh
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              icon={RefreshCw}
+              onClick={onReloadClick}
+              disabled={loading || reloading}
             >
-              <Settings size={14} />
-              <span className="hidden sm:inline" aria-hidden="true">Engines</span>
-            </button>
-          )}
-          {/* PRIMARY action — the only solid-violet button in the header, so the
-              eye lands on it (Nielsen audit: "reserve solid purple for the primary CTA").
-              Visible to VIEWERS too, not just admins: a self-serve client MUST be able
-              to trigger their own collection — the backend already authorises a viewer
-              to run collection for their own client (_auth.js step 5) and budget-caps it
-              (checkCollectionLimits). Without this, a free signup can add prompts but
-              never see a single result — the product is inert for them. */}
-          <button
-            onClick={runCollection}
-            disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {collecting
-              ? <><Loader2 size={14} className="animate-spin" /> {collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…'}</>
-              : <><Play size={14} /> Run Collection</>
-            }
-          </button>
-          {/* Force Refresh WIPES all existing results before re-running — destructive.
-              Kept admin-only so a client can't accidentally delete their own history. */}
-          {isAdmin && (
-            <button
-              onClick={forceCollection}
-              disabled={collecting || loading}
-              title="Force Refresh: wipes existing results and re-runs all engines"
-              aria-label="Force refresh: wipes existing results and re-runs all engines"
-              /* Grouped with the other secondary actions (same outlined base), but keeps a
-                 muted orange label/border so it still reads as the destructive one — Error
-                 Prevention cue preserved, per the Nielsen audit's own praise for it. */
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              {refreshed ? <span className="text-pos-ink">{t.aiv_refreshed}</span> : t.aiv_reload}
+            </Button>
+            {/* The page's only primary. Visible to viewers too: the backend already
+                authorises a viewer to run collection for their own client (_auth.js
+                step 5) and budget-caps it, and without it a free signup could add
+                prompts but never see a single result. */}
+            <Button
+              variant="primary"
+              icon={collecting ? Loader2 : Play}
+              onClick={runCollection}
+              disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
             >
-              <RotateCcw size={14} />
-              <span className="hidden sm:inline" aria-hidden="true">Force Refresh</span>
-            </button>
-          )}
-          {/* Secondary/neutral outlined — same base as Engines + Force Refresh. */}
-          <button
-            onClick={onReloadClick}
-            disabled={loading || reloading}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-slate-400 hover:text-slate-200 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={14} className={loading || reloading ? 'animate-spin' : ''} />
-            {refreshed ? <span className="text-emerald-400">{t.aiv_refreshed}</span> : t.aiv_reload}
-          </button>
-        </div>
-      </div>
+              {collecting
+                ? (collectProgress ? `${collectProgress.done}/${collectProgress.total}` : 'Starting…')
+                : 'Run Collection'}
+            </Button>
+          </>
+        }
+      />
       {reloadFailed && (
-        <div role="status" className="mb-4 flex items-center gap-2 text-xs text-amber-300">
-          <AlertTriangle size={14} aria-hidden="true" className="shrink-0 text-amber-400" />
+        <div role="status" className="mb-4 flex items-center gap-2 text-meta text-warn">
+          <AlertTriangle size={14} aria-hidden="true" className="shrink-0 text-warn" />
           {AIV_COPY.promptsLoadError}
         </div>
       )}
@@ -1718,29 +1682,29 @@ export default function AIVisibility() {
         // for an admin; every other action kind is safe for any viewer.
         const showAction = !!action && (action.kind !== 'open-engine-modal' || isAdmin)
         return (
-          <div className="mb-4 flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg text-xs bg-amber-500/10 border border-amber-500/20">
+          <div className="mb-4 flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg text-meta bg-warn-tint border border-warn">
             <div className="flex items-start gap-2 min-w-0">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" />
+              <AlertTriangle size={14} className="shrink-0 mt-0.5 text-warn" />
               <div className="min-w-0">
-                <span className="font-semibold text-amber-300">{title}.</span>{' '}
-                <span className="text-amber-300/80">{body}</span>
+                <span className="font-semibold text-warn">{title}.</span>{' '}
+                <span className="text-warn">{body}</span>
                 {showAction && (
                   <div className="mt-1.5">
                     {action!.kind === 'link' && (
-                      <Link to={action!.to} className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2">
+                      <Link to={action!.to} className="font-medium text-warn hover:text-warn underline underline-offset-2">
                         {action!.label}
                       </Link>
                     )}
                     {action!.kind === 'open-engine-modal' && (
                       <button
                         onClick={() => setShowEngineModal(true)}
-                        className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2"
+                        className="font-medium text-warn hover:text-warn underline underline-offset-2"
                       >
                         {action!.label}
                       </button>
                     )}
                     {action!.kind === 'mailto' && (
-                      <a href={action!.href} className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2">
+                      <a href={action!.href} className="font-medium text-warn hover:text-warn underline underline-offset-2">
                         {action!.label}
                       </a>
                     )}
@@ -1751,7 +1715,7 @@ export default function AIVisibility() {
             <button
               onClick={clearBlockReason}
               aria-label="Dismiss"
-              className="relative flex-shrink-0 text-amber-300/70 hover:text-amber-200 after:absolute after:content-[''] after:[inset:-15px]"
+              className="relative flex-shrink-0 text-warn hover:text-warn after:absolute after:content-[''] after:[inset:-15px]"
             >
               <X size={14} />
             </button>
@@ -1760,30 +1724,22 @@ export default function AIVisibility() {
       })()}
 
       {/* Collection allowance row.
-          SPLIT BY AUDIENCE 2026-07-29, owner's call. It used to show every user
-          a "Monthly API budget" meter in euros. That is OUR cost of goods, not
-          the customer's allowance: it answers "how much does BrandGEO spend on
-          you" when the customer is asking "how much can I still use". Worse, it
-          moves for reasons the customer cannot see or control, because a euro
-          of ChatGPT buys a different amount of work than a euro of SerpApi.
-
-          Customers now see what they bought: how often collection runs, and how
-          many of their prompts are in use. Admins keep the euro meter, because
-          for them it IS the operative number, and it is the one that actually
-          blocks a run in _auth.js. */}
+          SPLIT BY AUDIENCE 2026-07-29, owner's call. Customers see what they
+          bought (how often collection runs, how many prompts are in use);
+          admins keep the euro meter, because for them it IS the operative
+          number, and it is the one that actually blocks a run in _auth.js. */}
       {!isDemoMode && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {!isAdmin && collectionAllowance.nextAvailableAt && (
             <div className="flex items-center gap-2">
               <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
               {/* Only true for a plan whose cadence is slower than weekly (today,
-                  only free at 720h) -- every paid plan is already weekly
-                  (PLAN_COLLECTION_COOLDOWN_HOURS in planConfig.ts), so this link
-                  never promises an upgrade that would not actually change anything. */}
+                  only free at 720h) -- every paid plan is already weekly, so this
+                  link never promises an upgrade that would not change anything. */}
               {planLimits.collectionCooldownH > 168 && (
                 <Link
                   to="/account"
-                  className="text-[11px] font-medium text-brand-400 hover:text-brand-300 underline underline-offset-2"
+                  className="text-meta font-medium text-accent-ink hover:text-accent-ink underline underline-offset-2"
                 >
                   Upgrade for weekly runs
                 </Link>
@@ -1794,16 +1750,13 @@ export default function AIVisibility() {
           {!isAdmin && (
             <>
               <div className="min-w-[140px]">
-                <div className="text-[11px] text-slate-500 uppercase tracking-wide font-medium mb-1">
+                <div className="text-meta text-ink-3 uppercase tracking-wide font-medium mb-1">
                   Included runs
                 </div>
-                <div className="text-[11px] tabular-nums font-medium text-slate-400">
+                <div className="text-meta tabular-nums font-medium text-ink-2">
                   {planCadence.label}
                 </div>
               </div>
-              {/* Prompts is the allowance a customer can actually act on: it is
-                  the number they see on the pricing page, the number Prompts.tsx
-                  meters, and the number the DB trigger enforces. */}
               <AllowanceMeter
                 label="Prompts in use"
                 used={prompts.length}
@@ -1824,76 +1777,37 @@ export default function AIVisibility() {
         </div>
       )}
 
-      {/* ── AI Visibility Score card ─────────────────────────────────────────── */}
+      {/* ── Block 2: hero answer (the "recommended in N of M" sentence lives here) ── */}
       <SectionHeading className="sr-only">AI Visibility Score</SectionHeading>
-      <motion.div
-        className="mb-4 bg-dark-800 rounded-xl p-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6 items-center"
-        variants={heroReveal} initial="hidden" animate="show"
-      >
-        <div className="flex flex-col items-center gap-3">
-          {/* Empty state (§11): ring at --grid-line, centre reads "Not measured
-              yet", no percentage, no band label — never a 0% ring, which reads
-              as a verdict rather than an absence of measurement (F-03). */}
-          <svg viewBox="0 0 120 120" className="w-40 h-40" style={{ overflow: 'visible' }}>
-            <defs>
-              <linearGradient id="scoreRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#c4b5fd" />
-                <stop offset="100%" stopColor="#6d28d9" />
-              </linearGradient>
-              <filter id="scoreGlow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            </defs>
-            <circle cx="60" cy="60" r="54" fill="none" stroke={theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="6" />
-            {totalChecked === 0 ? (
-              <circle cx="60" cy="60" r="54" fill="none" stroke={chart.gridLine} strokeWidth="6" />
-            ) : (
-              <>
-                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="10" strokeLinecap="round"
-                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-                  filter="url(#scoreGlow)" opacity="0.3"
-                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-                  transition={{ duration: 1.4, ease: EASE_OUT }} />
-                <motion.circle cx="60" cy="60" r="54" fill="none" stroke="url(#scoreRingGrad)" strokeWidth="5.5" strokeLinecap="round"
-                  strokeDasharray={`${circumference}`} transform="rotate(-90 60 60)"
-                  initial={{ strokeDashoffset: circumference }} animate={{ strokeDashoffset: dashOffset }}
-                  transition={{ duration: 1.4, ease: EASE_OUT }} />
-              </>
+      <motion.div className="mb-4" {...reveal(0)}>
+        {prompts.length === 0 ? (
+          <HeroAnswer
+            answer=""
+            empty={{
+              icon: Target,
+              title: 'No prompts yet', // copy: pending bg-copy
+              body: t.aiv_noPrompts,
+              actionLabel: 'Add prompts', // copy: pending bg-copy
+              actionTo: '/prompts',
+            }}
+          />
+        ) : (
+          <HeroAnswer
+            badge={{ label: heroBadge.label, tone: heroBadge.tone, glyph: heroGlyph }}
+            answer={heroAnswer}
+            context={heroContext}
+            action={heroAction}
+            visual={<ScoreDial score={totalChecked === 0 ? null : aiScore} size="lg" />}
+          >
+            {/* Empty state (§11): a null score draws the dial empty and its centre
+                reads "Not measured yet", never a 0% ring (F-03). */}
+            {headline.variant === 'notYet' && headline.chips.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {headline.chips.map(name => <Badge key={name} tone="neutral">{name}</Badge>)}
+              </div>
             )}
-            <text x="60" y="60" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, -apple-system, sans-serif">
-              {totalChecked === 0 ? (
-                <tspan fontSize="15" fontWeight="600" fill={chart.axisInk} textAnchor="middle">
-                  <tspan x="60" dy="-6">Not</tspan>
-                  <tspan x="60" dy="18">measured</tspan>
-                </tspan>
-              ) : (
-                <>
-                  <tspan fontSize="38" fontWeight="800" fill={ringTextFill} letterSpacing="-1.5">{displayedScore}</tspan>
-                  <tspan fontSize="14" fontWeight="500" fill={ringTextFillDim} dy="-14">%</tspan>
-                </>
-              )}
-            </text>
-          </svg>
-          <div className="text-center -mt-1">
-            {/* Score-weighting transparency (Nielsen audit): an info affordance explaining
-                how the headline number derives from the 6 sub-dimensions. Weights mirror
-                aiVisibilityScore.ts exactly.
-
-                2026-07-30 a11y pass. It used to be a bare `<span tabIndex={0}>` with an
-                aria-label and no role, so AT announced a label attached to nothing, and
-                it carried `cursor: auto`, so a mouse user got no signal at all. It is a
-                real <button> now, which supplies the role, the keyboard activation and
-                the global :focus-visible ring for free.
-                It is also a DISCLOSURE, not a pure tooltip: hover-only reveal is
-                unreachable on touch, where there is no hover state to enter, so click
-                toggles it open as well and aria-expanded reports which it is.
-                The `after:-inset-[7px]` grows an 11px control to a 25px hit target
-                without moving a pixel of the visible layout. Same transparent-::after
-                trick already shipped for .time-pill and .engine-chip in index.css;
-                written inline here because index.css is off limits this pass. */}
-            <div className="flex items-center justify-center gap-1 mb-2">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.15em]">AI Visibility Score</span>
+            <div className="mb-3 flex items-center gap-1">
+              <span className="text-meta text-ink-3">AI Visibility Score</span>
               <span className="relative group inline-flex">
                 <button
                   type="button"
@@ -1903,496 +1817,380 @@ export default function AIVisibility() {
                   aria-expanded={scoreInfoOpen}
                   aria-controls="score-weighting-help"
                   aria-label="How the AI Visibility Score is calculated"
-                  className="relative inline-flex items-center justify-center rounded text-slate-500 hover:text-slate-300 cursor-help after:content-[''] after:absolute after:-inset-[7px]"
+                  className="relative inline-flex items-center justify-center rounded text-ink-3 hover:text-ink cursor-help after:content-[''] after:absolute after:-inset-[7px]"
                 >
-                  <Info size={11} aria-hidden="true" />
+                  <Info size={12} aria-hidden="true" />
                 </button>
                 <span
                   id="score-weighting-help"
-                  /* The width cap is not decorative, and the constant is not arbitrary.
-                     This popup is centred on the TRIGGER, and the trigger sits at the
-                     right-hand end of a row that is itself centred in the viewport, so
-                     its centre is offset from the viewport centre by half the row width
-                     minus half the icon: measured at 66.34px. A centred box therefore
-                     clips once its width passes `100vw - 132.68px`. At 320 the fixed
-                     240px w-60 overran the right edge by 26.34px and pushed <main>
-                     (the real scroll container, overflow-x:auto) to scrollWidth 346.
-                     11rem = 176px leaves 43.32px of headroom over the geometric
-                     requirement, i.e. 21.66px of clearance each side, which also
-                     absorbs a classic 15px scrollbar gutter on platforms where 100vw
-                     exceeds clientWidth. It is inert at >=~1440 (cap 1264px vs 240px),
-                     so wide layouts are byte-identical.
-                     If the "AI Visibility Score" label above ever gets longer, the
-                     66.34px offset grows and this constant must grow with it. */
-                  className={`pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${scoreInfoOpen ? 'block' : 'hidden group-hover:block group-focus-within:block'} w-60 max-w-[calc(100vw-11rem)] z-20 rounded-lg bg-dark-700 border border-dark-600 p-3 text-left shadow-xl normal-case tracking-normal`}
+                  /* The width cap is load-bearing: it keeps the popup inside the
+                     viewport at 320. */
+                  className={`pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ${scoreInfoOpen ? 'block' : 'hidden group-hover:block group-focus-within:block'} w-60 max-w-[calc(100vw-11rem)] z-20 rounded-card bg-surface border border-line p-3 text-left shadow-card normal-case tracking-normal`}
                 >
-                  <span className="block text-[11px] font-semibold text-slate-200 mb-1.5">How this score is calculated</span>
-                  <span className="block text-[10px] text-slate-400 leading-relaxed">
+                  <span className="block text-meta text-ink mb-1.5">How this score is calculated</span>
+                  <span className="block text-meta text-ink-2 leading-relaxed">
                     A weighted average of six signals: Recognition 25%, Knowledge 20%, Sentiment 15%, Accuracy 15%, Reach 15%, Consistency 10%.
                   </span>
                 </span>
               </span>
             </div>
-            {/* Never issue a verdict before there is data (§11 rule 1 / F-03): a
-                brand with zero checks previously read "Needs Work" — a judgement,
-                not an absence of measurement. */}
-            {totalChecked === 0 ? (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border bg-dark-700/60 text-slate-400 border-dark-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                Not measured yet
-              </div>
-            ) : zeroMention ? (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border bg-dark-700/60 text-slate-400 border-dark-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                {AIV_COPY.bandNotRecommended}
-              </div>
-            ) : (
-              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
-                aiScore >= 60 ? 'bg-sentiment-positive-15 text-sentiment-positive border-sentiment-positive-30'
-                : aiScore >= 35 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                : 'bg-sentiment-negative-15 text-sentiment-negative border-sentiment-negative-30'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${aiScore >= 60 ? 'bg-sentiment-positive' : aiScore >= 35 ? 'bg-amber-400' : 'bg-sentiment-negative'}`} />
-                {aiScore >= 60 ? 'Strong' : aiScore >= 35 ? 'Developing' : 'Needs Work'}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-          {dimConfig.map(d => {
-            const notApplicable = zeroMention && NEEDS_MENTION_DIMS.includes(d.key)
-            return (
-            <div key={d.key}>
-              {/* min-w-0 on the label block and shrink-0 on the value is load-bearing,
-                  not tidying. A flex item defaults to `min-width: auto`, so the label
-                  block refuses to shrink below its own content, and the % value gets
-                  pushed past the right edge of <main>. Between 768 and ~810px the
-                  sidebar has appeared (md:) while this grid is already 2-up (sm:), so
-                  main is only ~502px wide and the row overflowed it by 19px. */}
-              <div className="flex justify-between items-center gap-2 mb-1">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-slate-300">{d.label}</span>
-                  {notApplicable
-                    ? <span className="ml-2 text-xs text-slate-400">{AIV_COPY.dimNeedsMention}</span>
-                    : <span className="ml-2 text-xs text-slate-600">{d.desc}</span>}
-                </div>
-                {/* No 0% here when nothing has been checked yet. A zero
-                    dimension score would read as a measured failing grade,
-                    not as "we have not looked" (§11 rule 1). */}
-                {totalChecked === 0 ? (
-                  <span className="shrink-0 text-xs italic text-slate-300">Not measured yet</span>
-                ) : notApplicable ? (
-                  <span className="shrink-0 text-sm font-medium text-slate-400">{AIV_COPY.dimNotApplicable}</span>
-                ) : (
-                  <span className={`shrink-0 text-sm font-bold tabular-nums ${d.value >= 80 ? 'text-emerald-400' : 'text-slate-300'}`}>
-                    {d.value}%
-                  </span>
-                )}
-              </div>
-              <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-                {/* No fill at all when unmeasured, not a fill stuck at 0.
-                    An empty track reads as "nothing recorded"; a 0-width
-                    animated bar still implies a bar chart with a real zero. */}
-                {totalChecked > 0 && !notApplicable && (
-                  <motion.div
-                    className="h-full rounded-full bg-brand-500"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${d.value}%` }}
-                    transition={{ duration: 1, ease: EASE_OUT, delay: 0.15 }}
-                  />
-                )}
-              </div>
-            </div>
-            )
-          })}
-        </div>
-      </motion.div>
-
-      {/* ── Engine status grid ───────────────────────────────────────────────── */}
-      {/* Compact horizontal cards: logo tile on the left, condensed details on the
-          right (name + status pill, then %/stats). Fewer, wider columns than the old
-          5-up so each card can lay out horizontally. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
-
-        {/* Active engine cards */}
-        {engineStatusCards.map(e => {
-          const statusStyles = {
-            KNOW:         { badge: 'bg-brand-500/15 text-brand-300 border border-brand-500/30', dot: 'bg-brand-400',   card: 'border-brand-500/20 hover:border-brand-500/40' },
-            PARTIAL:      { badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' },
-            MISSING:      { badge: 'bg-red-500/15 text-red-300 border border-red-500/30',       dot: 'bg-red-400',     card: 'border-red-500/20 hover:border-red-500/40'   },
-            UNAVAILABLE:  { badge: 'bg-slate-700/60 text-slate-400 border border-slate-600/40', dot: 'bg-slate-500',   card: 'border-slate-700/60' },
-            // Neutral, not a verdict: zero checks with no error is an absence
-            // of data, not a failure, so it gets the same quiet slate the
-            // rest of the app uses for "nothing measured yet" rather than
-            // MISSING's red.
-            NOT_MEASURED: { badge: 'bg-dark-700/60 text-slate-400 border border-dark-600',      dot: 'bg-slate-500',   card: 'border-dark-700 hover:border-dark-600'        },
-          }[e.status]
-          const statusLabel = e.status === 'NOT_MEASURED' ? 'NOT MEASURED' : e.status
-          return (
-            <div key={e.id} className={`group relative bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${statusStyles.card}`}>
-              {/* Top-right cluster: when this engine last returned data, and the
-                  control to re-run it. Previously the button was opacity-0 until
-                  hover, so on a trackpad or touch screen it was effectively
-                  undiscoverable, and there was no freshness signal anywhere on
-                  the card. The timestamp is always visible and quiet; the button
-                  sits at 60% and comes up on hover or keyboard focus, so it
-                  reads as available without competing with the score. */}
-              <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
-                {e.lastOkAt && !e.isUnavailable && (
-                  <span
-                    className="text-[9px] leading-none text-slate-500 tabular-nums"
-                    title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
-                  >
-                    {formatRelativeOrDate(e.lastOkAt)}
-                  </span>
-                )}
-                {isAdmin && (
-                  <button
-                    onClick={() => handleRefreshEngine(e.id)}
-                    disabled={collecting || refreshingEngine !== null}
-                    className="p-1 rounded-md opacity-60 hover:opacity-100 focus-visible:opacity-100 hover:bg-dark-600 text-slate-400 hover:text-slate-100 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-                    title={`Re-run every prompt on ${e.label} only. Charges for this engine alone.`}
-                    aria-label={`Re-run all prompts on ${e.label}`}
-                  >
-                    <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
-                  </button>
-                )}
-              </div>
-
-              {/* Logo tile — left */}
-              <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60 ${e.isUnavailable ? 'opacity-40' : ''}`}>
-                <img src={e.logoUrl} alt={e.label} className={`w-7 h-7 object-contain ${e.isUnavailable ? 'grayscale' : ''}`} />
-              </div>
-
-              {/* Details — right */}
-              <div className="min-w-0 flex-1">
-                {/* pr-16 clears the absolutely-positioned timestamp + refresh
-                    cluster above. pr-4 only cleared the icon and the label now
-                    runs under the timestamp. */}
-                <div className="flex items-center gap-1.5 pr-16">
-                  <span className={`text-sm font-semibold truncate ${e.isUnavailable ? 'text-slate-500' : 'text-white'}`}>{e.label}</span>
-                  <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${statusStyles.badge}`}>
-                    {e.isUnavailable
-                      ? <><AlertTriangle size={8} className="mr-0.5" />{AIV_COPY.engineNotAnswering}</>
-                      : <><span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusStyles.dot}`} />{statusLabel}</>
-                    }
-                  </span>
-                </div>
-
-                {e.isUnavailable ? (
-                  <>
-                    <div
-                      className="flex items-center gap-1.5 text-xs text-amber-400 mt-1"
-                      title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
-                    >
-                      <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
-                      {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
-                    </div>
-                    <div className="text-[10px] text-amber-400/80 mt-1">
-                      {isAdmin
-                        ? 'Force Refresh to retry'
-                        : collectionAllowance.nextAvailableAt
-                          // A non-admin in cooldown can't press Run Collection to
-                          // retry -- the button is disabled until this date, so
-                          // saying "to retry" next to a disabled control would be
-                          // telling them to do something they cannot do.
-                          ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
-                          : 'Run Collection to retry'}
-                    </div>
-                  </>
-                ) : e.status === 'NOT_MEASURED' ? (
-                  <div className="text-[10px] italic text-slate-300 mt-1">Not measured yet · run a collection to check this engine</div>
-                ) : (
-                  <>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className={`text-lg font-bold tabular-nums leading-none ${e.pct >= 80 ? 'text-emerald-400' : 'text-slate-200'}`}>{e.pct}%</span>
-                      <span className="text-[11px] text-slate-500">{e.mentioned}/{e.checked} prompts</span>
-                      {e.bestPos !== null && (
-                        <span className="text-[11px] text-slate-600">· best #{e.bestPos}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+              {dimConfig.map(d => {
+                const notApplicable = zeroMention && NEEDS_MENTION_DIMS.includes(d.key)
+                return (
+                  <div key={d.key}>
+                    <div className="flex justify-between items-center gap-2 mb-1">
+                      <div className="min-w-0">
+                        <span className="text-body font-medium text-ink">{d.label}</span>
+                        {notApplicable
+                          ? <span className="ml-2 text-meta text-ink-2">{AIV_COPY.dimNeedsMention}</span>
+                          : <span className="ml-2 text-meta text-ink-3">{d.desc}</span>}
+                      </div>
+                      {/* No 0% when nothing has been checked: a zero would read as a
+                          measured failing grade, not "we have not looked" (§11 rule 1). */}
+                      {totalChecked === 0 ? (
+                        <span className="shrink-0 text-meta text-ink-2">Not measured yet</span>
+                      ) : notApplicable ? (
+                        <span className="shrink-0 text-body text-ink-2">{AIV_COPY.dimNotApplicable}</span>
+                      ) : (
+                        <span className="shrink-0 text-body font-semibold text-ink tabular-nums">{d.value}%</span>
                       )}
                     </div>
-                    {/* Mixed-case fetch failure (Nielsen audit): some checks errored while others
-                        succeeded, so the % above is partial. Admins retry via the refresh icon (hover). */}
-                    {/* The MOST RECENT attempt failed, even though older rows
-                        succeeded and the % above is real. This is the state that
-                        used to be completely silent: you press refresh, the
-                        spinner stops, the card is unchanged, and nothing tells
-                        you the run failed. It outranks the partial notice below
-                        because it describes what just happened, not the history. */}
-                    {e.lastAttemptFailed && (
-                      <div
-                        className="flex items-center gap-1.5 text-xs text-amber-400 mt-0.5"
-                        title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
-                      >
-                        <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
-                        {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
-                      </div>
-                    )}
-                    {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
-                      <div
-                        className="flex items-center gap-1 text-[10px] text-amber-400/80 mt-0.5"
-                        title={isAdmin
-                          ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
-                          : 'Some checks failed to sync, so this percentage is partial.'}
-                      >
-                        <AlertTriangle size={9} /> {enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))}
-                      </div>
-                    )}
-                  </>
-                )}
-                {/* This specific "re-run this engine" click was rejected
-                    (cooldown, budget, or a request failure) rather than
-                    actually starting, same lastAttemptFailed presentation
-                    as above, so a manual retry that goes nowhere is never
-                    silent on the card whose button was pressed. Colour
-                    follows the same rule as the top-of-page notice: a
-                    cooldown or a budget ceiling is amber (warn/blocked),
-                    never red, red is reserved for a genuine request failure. */}
-                {engineRefreshFailed === e.id && (() => {
-                  const isRealFailure = lastBlockReason?.reason === 'request_failed'
+                    <Meter thick ariaLabel={d.label} value={totalChecked === 0 || notApplicable ? null : d.value} />
+                  </div>
+                )
+              })}
+            </div>
+          </HeroAnswer>
+        )}
+      </motion.div>
+
+      {/* ── Block 3: engines (status cards, coming soon and locked in one card) ── */}
+      {(engineStatusCards.length > 0 || comingSoonEngines.length > 0 || lockedChipEngines.length > 0) && (
+        <motion.div className="mb-4" {...reveal(1)}>
+          <Card pad="standard">
+            <SectionHeader title="Engines" />{/* copy: pending bg-copy */}
+            {engineStatusCards.length > 0 && (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+                {engineStatusCards.map(e => {
+                  const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
+                    ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
+                    : e.status === 'KNOW' ? { label: 'Known', tone: 'pos' } // copy: pending bg-copy
+                    : e.status === 'PARTIAL' ? { label: 'Partial', tone: 'warn' } // copy: pending bg-copy
+                    : e.status === 'MISSING' ? { label: 'Missing', tone: 'neg' } // copy: pending bg-copy
+                    : { label: 'Not checked yet', tone: 'neutral' } // copy: pending bg-copy
+                  const statusKind = statusBadge.tone === 'neutral' ? null : statusBadge.tone
                   return (
-                    <div className={`flex items-center gap-1 text-[10px] mt-0.5 ${isRealFailure ? 'text-red-400' : 'text-amber-400'}`}>
-                      <AlertTriangle size={9} /> Refresh did not run{lastBlockReason ? ` · ${describeCollectionBlock(lastBlockReason).title.toLowerCase()}` : ''}
+                    <div key={e.id} className="relative rounded-control bg-surface-2 p-3 flex flex-col gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-6 h-6 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        <span className="text-heading text-ink truncate">{e.label}</span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleRefreshEngine(e.id)}
+                            disabled={collecting || refreshingEngine !== null}
+                            className="ml-auto relative p-1 rounded-md text-ink-2 hover:text-ink hover:bg-surface-3 transition-colors disabled:opacity-25 disabled:cursor-not-allowed after:content-[''] after:absolute after:-inset-[8px]"
+                            title={`Re-run every prompt on ${e.label} only. Charges for this engine alone.`}
+                            aria-label={`Re-run all prompts on ${e.label}`}
+                          >
+                            <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
+                          </button>
+                        )}
+                      </div>
+
+                      {e.isUnavailable ? (
+                        <>
+                          <div
+                            className="flex items-start gap-1.5 text-meta text-warn"
+                            title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
+                          >
+                            <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
+                            {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
+                          </div>
+                          <div className="text-meta text-ink-2">
+                            {isAdmin
+                              ? 'Force Refresh to retry'
+                              : collectionAllowance.nextAvailableAt
+                                // A non-admin in cooldown can't press Run Collection to
+                                // retry, so do not tell them to.
+                                ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
+                                : 'Run Collection to retry'}
+                          </div>
+                        </>
+                      ) : e.status === 'NOT_MEASURED' ? (
+                        <div className="text-meta text-ink-2">Not measured yet · run a collection to check this engine</div>
+                      ) : (
+                        <>
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
+                            <span className="text-meta text-ink-2">
+                              {e.mentioned} of {e.checked} prompts{e.bestPos !== null ? `, best #${e.bestPos}` : ''}
+                            </span>
+                          </div>
+                          {/* The MOST RECENT attempt failed even though older rows
+                              succeeded and the % above is real. It outranks the
+                              partial notice because it describes what just happened. */}
+                          {e.lastAttemptFailed && (
+                            <div
+                              className="flex items-start gap-1.5 text-meta text-warn"
+                              title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
+                            >
+                              <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
+                              {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
+                            </div>
+                          )}
+                          {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
+                            <div
+                              className="flex items-start gap-1.5 text-meta text-warn"
+                              title={isAdmin
+                                ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
+                                : 'Some checks failed to sync, so this percentage is partial.'}
+                            >
+                              <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" /> {enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* This specific "re-run this engine" click was rejected
+                          (cooldown, budget, or a request failure) rather than
+                          starting, so a manual retry that goes nowhere is never
+                          silent on the card whose button was pressed. A cooldown
+                          or a budget ceiling is amber, red is reserved for a
+                          genuine request failure. */}
+                      {engineRefreshFailed === e.id && (() => {
+                        const isRealFailure = lastBlockReason?.reason === 'request_failed'
+                        return (
+                          <div className={`flex items-center gap-1 text-meta ${isRealFailure ? 'text-neg' : 'text-warn'}`}>
+                            <AlertTriangle size={12} aria-hidden="true" /> Refresh did not run{lastBlockReason ? ` · ${describeCollectionBlock(lastBlockReason).title.toLowerCase()}` : ''}
+                          </div>
+                        )
+                      })()}
+
+                      <div className="mt-auto flex flex-wrap items-center gap-2">
+                        <Badge tone={statusBadge.tone} glyph={statusKind ? <StatusGlyph kind={statusKind} size={12} /> : undefined}>
+                          {statusBadge.label}
+                        </Badge>
+                        {e.lastOkAt && !e.isUnavailable && (
+                          <span
+                            className="text-meta text-ink-3 tabular-nums"
+                            title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
+                          >
+                            {formatRelativeOrDate(e.lastOkAt)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )
-                })()}
+                })}
               </div>
-            </div>
-          )
-        })}
+            )}
 
-        {/* Coming Soon engine cards */}
-        {comingSoonEngines.map(id => {
-          const meta = ENGINE_META[id]
-          return (
-            <div key={id} className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-card-compact flex items-center gap-3 opacity-70">
-              <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/40">
-                <img src={meta.logoUrl} alt={meta.label} className="w-7 h-7 object-contain grayscale" />
+            {/* Coming soon collapses to one quiet line. */}
+            {comingSoonEngines.length > 0 && (
+              <p className="mt-3 mb-0 text-meta text-ink-3">
+                <Clock size={11} aria-hidden="true" className="inline mr-1 -mt-0.5" />
+                {`Coming soon: ${joinEngineLabels(comingSoonEngines.map(id => ENGINE_META[id].label))}`}{/* copy: pending bg-copy */}
+              </p>
+            )}
+
+            {/* Locked engines stay as chips under one label. */}
+            {lockedChipEngines.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-meta font-medium text-ink-3 flex items-center gap-1">
+                  <Lock size={11} aria-hidden="true" /> Locked on your plan{/* copy: pending bg-copy */}
+                </span>
+                {lockedChipEngines.map(id => {
+                  const meta      = ENGINE_META[id]
+                  const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
+                  return (
+                    <Link
+                      key={id}
+                      to="/account"
+                      aria-label={`${meta.label}: unlock on ${planLabel}`}
+                      title={`${meta.label} is available on the ${planLabel} plan and above`}
+                      className="flex items-center gap-1.5 min-h-[32px] pl-1.5 pr-2 py-1 rounded-badge bg-surface border border-edge hover:bg-surface-2 transition-colors"
+                    >
+                      <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain grayscale opacity-70" />
+                      <span className="text-meta font-medium text-ink-2">{meta.label}</span>
+                      <span className="text-meta text-ink-3">Unlock on {planLabel}</span>
+                    </Link>
+                  )
+                })}
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-slate-500 truncate">{meta.label}</span>
-                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full text-[9px] font-bold px-1.5 py-0.5 bg-slate-700/50 text-slate-500 border border-slate-600/30">
-                    <Clock size={9} /> Soon
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-600 mt-1">
-                  {COMING_SOON_ENGINES.has(id) ? 'Not yet built' : 'Paused by admin'}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-
-      </div>
-
-      {/* Locked engines — compact chip strip (least important; keeps the active +
-          coming-soon grid to a clean 4-up, and reads as a subtle upgrade prompt). */}
-      {lockedChipEngines.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-[10px] font-medium text-slate-600 uppercase tracking-wider mr-0.5 flex items-center gap-1">
-            <Lock size={10} /> Locked
-          </span>
-          {lockedChipEngines.map(id => {
-            const meta      = ENGINE_META[id]
-            const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
-            return (
-              <Link
-                key={id}
-                to="/account"
-                aria-label={`${meta.label}: unlock on ${planLabel}`}
-                title={`${meta.label} is available on the ${planLabel} plan and above`}
-                className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg bg-dark-800/40 border border-dark-700/40 hover:border-dark-600 hover:bg-dark-800/60 transition-colors"
-              >
-                <img src={meta.logoUrl} alt="" className="w-4 h-4 object-contain grayscale opacity-70" />
-                <span className="text-xs font-medium text-slate-500">{meta.label}</span>
-                <span className="text-[10px] text-slate-600">Unlock on {planLabel}</span>
-              </Link>
-            )
-          })}
-        </div>
+            )}
+          </Card>
+        </motion.div>
       )}
 
-      {/* ── Fix This hub ─────────────────────────────────────────────────────── */}
+      {/* ── Block 4: fix this ───────────────────────────────────────────────── */}
       {/* Always mounted, so the announcement survives the hub re-rendering. */}
       <div className="sr-only" role="status" aria-live="polite">{fixAnnounce}</div>
       {(openFixItems.length > 0 || doneFixRows.length > 0) && (
-        <div className="mb-4 bg-dark-800 rounded-xl overflow-hidden">
-          <button
-            ref={fixHubToggleRef}
-            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-dark-700/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
-            onClick={() => setShowFixHub(v => !v)}
-            aria-expanded={showFixHub}
-          >
-            {/* min-w-0 + flex-wrap: this row carries four pieces of content and
-                sits at ~460px of usable width in the 768-810px band. */}
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <Zap size={15} className="text-brand-400" />
-              <span className="text-sm font-semibold text-white">Fix This</span>
-              {/* The separator here used to be a leading em dash. The parent row is
-                  already `flex items-center gap-2`, so the 8px gap does the separating
-                  and the dash was carrying no information the layout did not. */}
-              <span className="text-xs text-slate-500">{openFixItems.length} action{openFixItems.length !== 1 ? 's' : ''} to improve your score</span>
-              <div className="flex items-center gap-1 ml-1">
-                {(['P0','P1','P2'] as const).map(p => {
-                  const count = openFixItems.filter(i => i.priority === p).length
-                  if (!count) return null
-                  const cls = p === 'P0' ? 'bg-red-500/20 text-red-300' : p === 'P1' ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'
-                  return <span key={p} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{count} {p}</span>
-                })}
-              </div>
-            </div>
-            {showFixHub ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
-          </button>
-
+        <motion.section className="mb-6" aria-label="Fix this" {...reveal(2)}>
+          <SectionHeader
+            title="Fix this"/* copy: pending bg-copy */
+            count={openFixItems.length}
+            description={`${openFixItems.length} action${openFixItems.length !== 1 ? 's' : ''} to improve your score`}
+            actions={
+              <Button
+                ref={fixHubToggleRef}
+                variant="ghost"
+                size="sm"
+                icon={showFixHub ? ChevronUp : ChevronDown}
+                onClick={() => setShowFixHub(v => !v)}
+                aria-expanded={showFixHub}
+              >
+                {showFixHub ? 'Hide' : 'Show'}{/* copy: pending bg-copy */}
+              </Button>
+            }
+          />
           <Collapse open={showFixHub}>
-            <div className="border-t border-dark-700/50">
-              {/* Workflow explainer: the Nielsen audit flagged that the intended
-                  action was ambiguous. The fix itself is a content action outside
+            <Card pad="none" className="overflow-hidden">
+              {/* Workflow explainer: the fix itself is a content action outside
                   the app; marking it done is what the app tracks and re-checks
                   (docs/arch/fix-states.md). */}
-              <div className="px-5 py-2.5 text-[11px] text-slate-500 bg-dark-700/20 border-b border-dark-700/50">
+              <p className="m-0 px-4 py-2.5 text-meta text-ink-2 bg-surface-2 border-b border-line">
                 {FIX_COPY.explainer}
-              </div>
+              </p>
               {openFixItems.length === 0 && (
-                <div className="px-5 py-4 text-xs text-slate-400 flex items-center gap-2">
-                  <CircleCheck size={14} className="text-emerald-400 shrink-0" aria-hidden="true" />
+                <div className="px-4 py-4 text-meta text-ink-2 flex items-center gap-2">
+                  <CircleCheck size={14} className="text-pos-ink shrink-0" aria-hidden="true" />
                   {FIX_COPY.allDone}
                 </div>
               )}
-              <div className="divide-y divide-dark-700/50">
-              {(showAllFixes ? openFixItems : openFixItems.slice(0, 3)).map(item => {
-                const row = fixRows.get(item.id)
-                const reopenedLine = reopenedFixLine(row)
-                const busy = fixBusy === item.id
-                const pStyles = {
-                  P0: { border: 'border-l-4 border-l-red-500',    badge: 'bg-red-500/20 text-red-300',       title: 'text-red-300'   },
-                  P1: { border: 'border-l-4 border-l-amber-500',  badge: 'bg-amber-500/20 text-amber-300',   title: 'text-amber-300' },
-                  P2: { border: 'border-l-4 border-l-purple-500', badge: 'bg-purple-500/20 text-purple-300', title: 'text-slate-200' },
-                }[item.priority]
-                return (
-                  <div key={item.id} className={`px-5 py-4 ${pStyles.border}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <ul className="m-0 p-0 list-none divide-y divide-line">
+                {(showAllFixes ? openFixItems : openFixItems.slice(0, 3)).map(item => {
+                  const row = fixRows.get(item.id)
+                  const reopenedLine = reopenedFixLine(row)
+                  const busy = fixBusy === item.id
+                  const prioTone = item.priority === 'P0' ? 'neg' : item.priority === 'P1' ? 'accent' : 'neutral'
+                  return (
+                    <li key={item.id} className="px-4 py-4">
                       <div className="flex items-start gap-3 min-w-0">
-                        <span className={`mt-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${pStyles.badge}`}>
-                          {item.priority}
-                        </span>
-                        <div className="min-w-0">
-                          <div className={`text-sm font-semibold ${pStyles.title} mb-0.5 break-words`}>{item.title}</div>
-                          <div className="text-xs text-slate-500 mb-2">{item.description}</div>
+                        <Badge tone={prioTone}>{item.priority}</Badge>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-heading text-ink break-words">{item.title}</div>
+                          <div className="text-body text-ink-2 mt-0.5">{item.description}</div>
                           {reopenedLine && (
-                            <div className="mb-2 flex items-start gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                            <div className="mt-2 flex items-start gap-1.5 text-meta text-warn bg-warn-tint border border-warn rounded-control px-3 py-2">
                               <RotateCcw size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
                               <span>{reopenedLine}</span>
                             </div>
                           )}
-                          <div className="text-xs text-slate-400 leading-relaxed bg-dark-700/40 rounded-lg px-3 py-2">
-                            <span className="text-slate-600 font-medium uppercase tracking-wide text-[9px] block mb-1">Recommended fix</span>
+                          <div className="mt-3 rounded-control bg-surface-2 p-3 text-body text-ink-2">
+                            <span className="text-meta font-medium text-ink-3 block mb-1">Recommended fix</span>
                             {item.fix}
                           </div>
                           {fixNotice?.id === item.id && (
-                            <div role="status" className="mt-2 text-xs text-amber-300">{fixNotice.text}</div>
+                            <div role="status" className="mt-2 text-meta text-warn">{fixNotice.text}</div>
                           )}
+                          <div className="mt-3 flex flex-row flex-wrap items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => copyFix(item.id, fixPromptFor(item))}
+                              aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
+                            >
+                              {copiedFix === item.id
+                                ? <><CheckCheck size={14} aria-hidden="true" className="text-pos-ink" /> Copied</>
+                                : <><Copy size={14} aria-hidden="true" /> {FIX_COPY.copyPrompt}</>
+                              }
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={CircleCheck}
+                              loading={busy}
+                              onClick={() => markFix(item, 'done')}
+                              aria-label={`${FIX_COPY.markDone}: ${item.title}`}
+                            >
+                              {FIX_COPY.markDone}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={EyeOff}
+                              disabled={busy}
+                              onClick={() => markFix(item, 'dismissed')}
+                              aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
+                            >
+                              {FIX_COPY.dismiss}
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-row flex-wrap sm:flex-col sm:flex-nowrap gap-2 shrink-0 pl-9 sm:pl-0">
-                        <button
-                          onClick={() => copyFix(item.id, fixPromptFor(item))}
-                          aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
-                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs border border-dark-600 text-slate-400 hover:text-slate-200 hover:border-dark-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-                        >
-                          {copiedFix === item.id
-                            ? <><CheckCheck size={12} className="text-emerald-400" /> Copied</>
-                            : <><Copy size={12} /> {FIX_COPY.copyPrompt}</>
-                          }
-                        </button>
-                        <button
-                          onClick={() => markFix(item, 'done')}
-                          disabled={busy}
-                          aria-label={`${FIX_COPY.markDone}: ${item.title}`}
-                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-                        >
-                          {busy ? <Loader2 size={12} className="animate-spin" /> : <CircleCheck size={12} />} {FIX_COPY.markDone}
-                        </button>
-                        <button
-                          onClick={() => markFix(item, 'dismissed')}
-                          disabled={busy}
-                          aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
-                          className="flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-dark-700/50 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-                        >
-                          <EyeOff size={12} /> {FIX_COPY.dismiss}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              </div>
-              {/* Pagination (Nielsen audit edge case): only top 3 shown by default.
-                  Done and set-aside fixes leave this list, so the next ones move up. */}
+                    </li>
+                  )
+                })}
+              </ul>
+              {/* Only the top 3 are shown by default. Done and set-aside fixes
+                  leave this list, so the next ones move up. */}
               {openFixItems.length > 3 && (
-                <button
-                  onClick={() => setShowAllFixes(v => !v)}
-                  className="w-full px-5 py-2.5 text-xs font-medium text-brand-400 hover:text-brand-300 hover:bg-dark-700/30 border-t border-dark-700/50 transition-colors"
-                >
-                  {showAllFixes ? 'Show fewer' : `Show all ${openFixItems.length} actions`}
-                </button>
+                <div className="border-t border-line px-4 py-2">
+                  <Button variant="tertiary" size="sm" onClick={() => setShowAllFixes(v => !v)}>
+                    {showAllFixes ? 'Show fewer' : `Show all ${openFixItems.length} actions`}
+                  </Button>
+                </div>
               )}
               {doneFixRows.length > 0 && (
-                <div className="border-t border-dark-700/50">
+                <div className="border-t border-line">
                   <button
                     onClick={() => setShowDoneFixes(v => !v)}
                     aria-expanded={showDoneFixes}
-                    className="w-full flex items-center justify-between px-5 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-dark-700/30 transition-colors"
+                    className="w-full min-h-[44px] flex items-center justify-between px-4 py-2.5 text-meta font-medium text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
                   >
                     <span className="flex items-center gap-1.5">
-                      <CircleCheck size={13} className="text-emerald-400" aria-hidden="true" />
+                      <CircleCheck size={13} className="text-pos-ink" aria-hidden="true" />
                       {FIX_COPY.doneHeading} ({doneFixRows.length})
                     </span>
-                    {showDoneFixes ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    {showDoneFixes ? <ChevronUp size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
                   </button>
                   <Collapse open={showDoneFixes}>
-                    <ul className="divide-y divide-dark-700/40 bg-dark-700/10">
+                    <ul className="m-0 p-0 list-none divide-y divide-line bg-surface-2">
                       {doneFixRows.map(row => {
                         const busy = fixBusy === row.fix_id
                         const tone = row.status === 'verified'
-                          ? 'text-emerald-300'
-                          : row.status === 'dismissed' ? 'text-slate-500' : 'text-slate-300'
+                          ? 'text-pos-ink'
+                          : row.status === 'dismissed' ? 'text-ink-3' : 'text-ink-2'
                         const measurable = row.status === 'done' && parseMetricKey(row.metric_key) !== null && row.baseline_value !== null
                           && evaluateFix(row, results, fixPromptIds, fixEngineIds).state !== 'untracked'
                         return (
-                          <li key={row.fix_id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <li key={row.fix_id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                             <div className="min-w-0">
-                              <div className={`text-xs font-semibold ${tone} break-words`}>
+                              <div className={`text-meta font-semibold ${tone} break-words`}>
                                 {row.status === 'verified' && <CheckCheck size={12} className="inline mr-1 -mt-0.5" aria-hidden="true" />}
                                 {row.title ?? row.fix_id}
                               </div>
-                              <div className="text-xs text-slate-500 mt-0.5">{doneFixLine(row)}</div>
+                              <div className="text-meta text-ink-3 mt-0.5">{doneFixLine(row)}</div>
                               {fixNotice?.id === row.fix_id && (
-                                <div role="status" className="mt-1 text-xs text-amber-300">{fixNotice.text}</div>
+                                <div role="status" className="mt-1 text-meta text-warn">{fixNotice.text}</div>
                               )}
                             </div>
                             <div className="flex gap-2 shrink-0">
                               {measurable && (
-                                <button
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={RefreshCw}
+                                  loading={checkRequested === row.fix_id}
+                                  disabled={busy}
                                   onClick={() => checkFixNow(row.fix_id)}
-                                  disabled={busy || checkRequested === row.fix_id}
                                   aria-label={`${FIX_COPY.checkNow}: ${row.title ?? row.fix_id}`}
-                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border border-dark-600 text-slate-300 hover:text-white hover:border-dark-500 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                                 >
-                                  {checkRequested === row.fix_id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} {FIX_COPY.checkNow}
-                                </button>
+                                  {FIX_COPY.checkNow}
+                                </Button>
                               )}
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={Undo2}
+                                loading={busy}
                                 onClick={() => reopenFix(row.fix_id)}
-                                disabled={busy}
                                 aria-label={`${row.status === 'dismissed' ? FIX_COPY.restore : FIX_COPY.reopen}: ${row.title ?? row.fix_id}`}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-dark-700/50 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                               >
-                                {busy ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
                                 {row.status === 'dismissed' ? FIX_COPY.restore : FIX_COPY.reopen}
-                              </button>
+                              </Button>
                             </div>
                           </li>
                         )
@@ -2401,111 +2199,38 @@ export default function AIVisibility() {
                   </Collapse>
                 </div>
               )}
-            </div>
+            </Card>
           </Collapse>
-        </div>
+        </motion.section>
       )}
 
-      {/* ── Prompt area: headline, toolbar, sections, legend ───────────────── */}
-      <h2 className="text-lg font-semibold text-white mb-3">{AIV_COPY.promptsHeading}</h2>
+      {/* ── Your prompts (block 5) ──────────────────────────────────────────── */}
+      <section aria-label={AIV_COPY.promptsHeading} className="mb-6">
+        <SectionHeader title={AIV_COPY.promptsHeading} count={prompts.length > 0 ? prompts.length : undefined} />
 
-      {loadError && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dark-700 bg-dark-800 p-3">
-          <AlertTriangle size={16} aria-hidden="true" className="shrink-0 text-amber-400" />
-          <span className="text-sm text-slate-200">{AIV_COPY.promptsLoadError}</span>
-          <button
-            type="button"
-            onClick={() => reload({ quiet: true })}
-            className="ml-auto min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
-          >
-            {AIV_COPY.promptsLoadRetry}
-          </button>
-        </div>
-      )}
+        {loadError && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface p-3">
+            <AlertTriangle size={16} aria-hidden="true" className="shrink-0 text-warn" />
+            <span className="text-body text-ink">{AIV_COPY.promptsLoadError}</span>
+            <Button variant="secondary" size="sm" className="ml-auto" onClick={() => reload({ quiet: true })}>
+              {AIV_COPY.promptsLoadRetry}
+            </Button>
+          </div>
+        )}
 
-      {prompts.length > 0 && (
-        <div className="mb-4">
-          {headline.variant === 'recommended' && (
-            <p className="text-base font-semibold text-white leading-snug">
-              {headlineRecommended(headline.a, headline.n, headlineEngineLabel, headline.pos)}
-            </p>
-          )}
-          {headline.variant === 'notYet' && (
-            <>
-              <p className="text-base font-semibold text-white leading-snug">{headlineNotYet(headline.n, headline.k)}</p>
-              {headline.chips.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {headline.chips.map(name => (
-                    <span key={name} className="inline-flex items-center rounded-full border border-dark-600 bg-dark-700 px-2.5 py-1 text-xs font-medium text-slate-200">
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          {headline.variant === 'unchecked' && (collecting ? (
-            <p className="flex items-center gap-2 text-base font-semibold text-white leading-snug">
-              <Loader2 size={14} aria-hidden="true" className="animate-spin motion-reduce:animate-none shrink-0" />
-              {AIV_COPY.headlineChecking}
-            </p>
-          ) : (
-            <>
-              <p className="text-base font-semibold text-white leading-snug">{AIV_COPY.headlineUncheckedTitle}</p>
-              <p className="text-sm text-slate-400 mt-1">
-                {headlineUncheckedReason(
-                  headline.errorEngines.length > 0 ? uncheckedEngineList : null,
-                  headline.since ? formatDate(headline.since) : null,
-                  headline.errorEngines.length,
-                )}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={runHeadlineAction}
-                  disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
-                  aria-label={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
-                  title={isAdmin ? AIV_COPY.actionForceRefreshAria : undefined}
-                  className={isAdmin
-                    ? 'flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm transition-colors border border-dark-600 bg-dark-700/50 text-orange-300/90 hover:text-orange-200 hover:border-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed'
-                    : 'flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-colors border border-brand-500 bg-brand-500 text-white hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed'}
-                >
-                  {isAdmin
-                    ? <><RotateCcw size={14} aria-hidden="true" /> {AIV_COPY.actionForceRefresh}</>
-                    : <><Play size={14} aria-hidden="true" /> {AIV_COPY.actionRunCollection}</>}
-                </button>
-                {!isAdmin && collectionAllowance.nextAvailableAt && (
-                  <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
-                )}
-              </div>
-            </>
-          ))}
-        </div>
-      )}
-
-      {prompts.length > 0 && (() => {
-        const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
-        const chipBase = 'px-3 py-1.5 min-h-[44px] sm:min-h-0 rounded-lg text-xs font-medium transition-colors border'
-        const chipOn = 'bg-brand-500 text-white border-brand-600'
-        const chipOff = 'bg-dark-800 text-slate-400 border-dark-700 hover:border-dark-600 hover:text-slate-300'
-        return (
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            {activeCats.length > 0 ? (
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setFilterCats(new Set())}
-                  aria-pressed={filterCats.size === 0}
-                  className={`${chipBase} ${filterCats.size === 0 ? chipOn : chipOff}`}
-                >
-                  {t.aiv_allCategories}
-                </button>
-                {activeCats.map(cat => {
-                  const active = filterCats.has(cat)
-                  return (
-                    <button
-                      type="button"
+        {prompts.length > 0 && (() => {
+          const activeCats = [...new Set(prompts.map(p => p.category).filter(Boolean))]
+          return (
+            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              {activeCats.length > 0 ? (
+                <ChipGroup label="Category">{/* copy: pending bg-copy */}
+                  <Chip selected={filterCats.size === 0} onClick={() => setFilterCats(new Set())}>
+                    {t.aiv_allCategories}
+                  </Chip>
+                  {activeCats.map(cat => (
+                    <Chip
                       key={cat}
+                      selected={filterCats.has(cat)}
                       onClick={() => {
                         setFilterCats(prev => {
                           const next = new Set(prev)
@@ -2514,246 +2239,204 @@ export default function AIVisibility() {
                           return next
                         })
                       }}
-                      aria-pressed={active}
-                      className={`${chipBase} ${active ? chipOn : chipOff}`}
                     >
                       {getCatLabel(cat)}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : <span />}
-
-            {prompts.length >= 2 && (
-              <>
-                <div
-                  role="group"
-                  aria-label={AIV_COPY.sortGroupLabel}
-                  className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-dark-700 bg-dark-800 p-1"
-                >
-                  <span className="px-2 text-xs text-slate-400">{AIV_COPY.sortLabel}</span>
-                  {SORT_MODES.map(mode => (
-                    <button
-                      type="button"
-                      key={mode}
-                      aria-pressed={sortMode === mode}
-                      onClick={() => changeSort(mode)}
-                      className={`time-pill ${sortMode === mode ? 'is-pressed' : ''}`}
-                    >
-                      {SORT_LABEL[mode]}
-                    </button>
+                    </Chip>
                   ))}
-                </div>
-                <div className="sm:hidden w-full">
-                  <label htmlFor="aiv-sort" className="text-xs text-slate-400 block mb-1">{AIV_COPY.sortLabel}</label>
-                  <select
-                    id="aiv-sort"
-                    value={sortMode}
-                    onChange={e => changeSort(parseSortMode(e.target.value))}
-                    className="w-full min-h-[44px] rounded-lg border border-dark-700 bg-dark-800 px-3 text-sm text-slate-200"
-                  >
-                    {SORT_MODES.map(mode => <option key={mode} value={mode}>{SORT_LABEL[mode]}</option>)}
-                  </select>
-                </div>
-              </>
-            )}
+                </ChipGroup>
+              ) : <span />}
 
-            <button
-              type="button"
-              onClick={exportCsv}
-              disabled={visibleCount === 0}
-              title={visibleCount === 0 ? 'Nothing to export yet' : undefined}
-              aria-label="Export AI Visibility results as CSV"
-              className="ml-auto inline-flex items-center gap-2 min-h-[44px] sm:min-h-0 px-3 py-1.5 rounded-lg text-xs font-medium border border-dark-600 bg-dark-700/50 text-slate-300 hover:text-slate-100 hover:border-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download size={14} aria-hidden="true" />
-              Export CSV
-            </button>
-          </div>
-        )
-      })()}
-
-      {orderFrozen && prompts.length >= 2 && (
-        <p className="text-xs text-slate-400 mb-3">{AIV_COPY.orderFrozenNote}</p>
-      )}
-
-      {prompts.length === 0 && !loadError && (
-        <div className="bg-dark-800 rounded-xl overflow-hidden">
-          <SharedEmptyState
-            icon={Target}
-            title="No prompts yet"
-            body={t.aiv_noPrompts}
-            actionLabel="Add prompts"
-            actionTo="/prompts"
-          />
-        </div>
-      )}
-
-      {prompts.length > 0 && visibleCount === 0 && (
-        <div className="rounded-lg border border-dashed border-dark-600 p-6 text-center">
-          <p className="text-sm text-slate-300">{AIV_COPY.categoryEmpty}</p>
-          <button
-            type="button"
-            onClick={() => setFilterCats(new Set())}
-            className="mt-3 min-h-[44px] px-3 rounded-lg text-sm font-medium border border-dark-600 bg-dark-700 text-slate-200 hover:border-dark-500"
-          >
-            {AIV_COPY.categoryEmptyAction}
-          </button>
-        </div>
-      )}
-
-      {renderPlan.map((sec, secIdx) => {
-        const open = sectionIsOpen(sec.key)
-        const failureDates = sec.key === 'unchecked'
-          ? sec.rows.map(r => summaries.get(r.prompt.id)?.oldestErrorSince).filter((d): d is string => !!d).sort()
-          : []
-        return (
-          <section key={sec.key} className={secIdx === 0 ? '' : 'mt-6'}>
-            <h3 className="m-0">
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={`aiv-section-${sec.key}`}
-                onClick={() => setSectionOpen(prev => ({ ...prev, [sec.key]: !open }))}
-                className="flex w-full items-center gap-2 min-h-[44px] py-2 text-left"
-              >
-                <span className="text-sm font-semibold text-slate-200">{SECTION_TITLE[sec.key]}</span>
-                <span className="text-xs text-slate-400 tabular-nums">{promptCount(sec.rows.length)}</span>
-                {failureDates.length > 0 && (
-                  <span className="text-xs text-slate-400">{sectionUncheckedExtra(formatDate(failureDates[0]))}</span>
-                )}
-                <ChevronDown
-                  size={16}
-                  aria-hidden="true"
-                  className={`ml-auto shrink-0 text-slate-400 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
-                  style={{ transitionDuration: `${Math.round(MOTION_FAST * 1000)}ms` }}
-                />
-              </button>
-            </h3>
-            <div id={`aiv-section-${sec.key}`}>
-              <Collapse open={open}>
-                <div className={`mt-2 ${isWide ? 'bg-dark-800 rounded-xl overflow-hidden' : 'space-y-2'}`}>
-                  <div className={isWide && sec.key === 'appear' ? 'overflow-x-auto' : ''}>
-                    <div style={isWide && sec.key === 'appear' ? { minWidth: tableMinWidth } : undefined}>
-                      {isWide && sec.key === 'appear' && (
-                        <div
-                          className="grid border-b border-dark-700 bg-dark-700/50"
-                          style={{ gridTemplateColumns: tableColsTemplate }}
-                        >
-                          <div className="px-2 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">#</div>
-                          <div className="px-3 py-2.5 text-[11px] font-medium text-slate-400 uppercase tracking-wide self-center">{t.aiv_prompt}</div>
-                          {activeLLMs.map(llm => (
-                            <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
-                              <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-                              <span className="text-[10px] font-semibold text-slate-300 text-center leading-tight">{llm.label}</span>
-                            </div>
-                          ))}
-                          {lockedColumns.map(id => (
-                            <Link
-                              key={id}
-                              to="/account"
-                              aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
-                              title={ENGINE_META[id].label}
-                              className="flex flex-col items-center justify-center gap-0.5 min-h-[44px] rounded-md hover:bg-dark-700/40"
-                            >
-                              <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain grayscale" />
-                              <span className="text-[10px] leading-none text-slate-400">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                      <AnimatePresence initial={false}>
-                        {sec.rows.map(({ prompt, num }) => (
-                          <motion.div
-                            key={prompt.id}
-                            layout="position"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
-                          >
-                            {renderRow(sec.key, prompt, num)}
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                {prompts.length >= 2 && (
+                  <>
+                    <div className="hidden sm:block">
+                      <SegmentedControl
+                        ariaLabel={AIV_COPY.sortGroupLabel}
+                        value={sortMode}
+                        onChange={(m: SortMode) => changeSort(m)}
+                        options={SORT_MODES.map(mode => ({ value: mode, label: SORT_LABEL[mode] }))}
+                      />
                     </div>
-                  </div>
-                </div>
-              </Collapse>
+                    <div className="sm:hidden w-full">
+                      <label htmlFor="aiv-sort" className="text-meta text-ink-2 block mb-1">{AIV_COPY.sortLabel}</label>
+                      <select
+                        id="aiv-sort"
+                        value={sortMode}
+                        onChange={e => changeSort(parseSortMode(e.target.value))}
+                        className="w-full min-h-[44px] rounded-control border border-line bg-surface px-3 text-body text-ink"
+                      >
+                        {SORT_MODES.map(mode => <option key={mode} value={mode}>{SORT_LABEL[mode]}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Download}
+                  onClick={exportCsv}
+                  disabled={visibleCount === 0}
+                  title={visibleCount === 0 ? 'Nothing to export yet' : undefined}
+                  aria-label="Export AI Visibility results as CSV"
+                >
+                  Export CSV
+                </Button>
+              </div>
             </div>
-          </section>
-        )
-      })}
+          )
+        })()}
 
-      {prompts.length > 0 && (
-        <>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-            {([
-              ['mentioned', AIV_COPY.legendMentioned],
-              ['absent', AIV_COPY.legendAbsent],
-              ['no_answer', AIV_COPY.legendNoAnswer],
-              ['error', AIV_COPY.legendError],
-              ['pending', AIV_COPY.legendPending],
-            ] as [CellState, string][]).map(([state, label]) => (
-              <span key={state} className="inline-flex items-center gap-1.5">
-                <PromptResultCell state={state} engineId={activeLLMs[0]?.id ?? 'chatgpt'} variant="legend" />
-                {label}
-              </span>
-            ))}
-            {lockedColumns.length > 0 && isWide && (
-              <span className="inline-flex items-center gap-1.5">
-                <PromptResultCell state="locked" engineId={lockedColumns[0]} variant="legend" />
-                {AIV_COPY.legendLocked}
-              </span>
-            )}
+        {orderFrozen && prompts.length >= 2 && (
+          <p className="text-meta text-ink-2 mb-3">{AIV_COPY.orderFrozenNote}</p>
+        )}
+
+        {prompts.length === 0 && !loadError && (
+          <Card pad="none" className="overflow-hidden">
+            <SharedEmptyState
+              icon={Target}
+              title="No prompts yet"
+              body={t.aiv_noPrompts}
+              actionLabel="Add prompts"
+              actionTo="/prompts"
+            />
+          </Card>
+        )}
+
+        {prompts.length > 0 && visibleCount === 0 && (
+          <div className="rounded-card border border-dashed border-line p-6 text-center">
+            <p className="text-body text-ink-2">{AIV_COPY.categoryEmpty}</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={() => setFilterCats(new Set())}>
+              {AIV_COPY.categoryEmptyAction}
+            </Button>
           </div>
-          {!isAdmin && <p className="mt-2 text-xs text-slate-400">{AIV_COPY.viewerHint}</p>}
-        </>
-      )}
+        )}
 
-      {/* ── Competitor insights (supplementary — sits below the prompt table) ──── */}
-      {competitorFreq.length > 0 && (
-        <div className="mt-6 mb-4 bg-dark-800 rounded-xl overflow-hidden">
-          <button
-            className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
-            onClick={() => setShowInsights(v => !v)}
-            aria-expanded={showInsights}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle size={15} className="text-amber-400" />
-              <span className="text-sm font-semibold text-amber-300">
-                Top competitors in AI recommendations
-                {gapCount > 0 && (
-                  <span className="ml-2 font-normal text-amber-500/70 text-xs">
-                    ({brandName} absent {gapCount} of {totalChecked} checks)
+        {(() => {
+          const appearSec = renderPlan.find(s => s.key === 'appear')
+          const notYetSec = renderPlan.find(s => s.key === 'notYet')
+          const uncheckedSec = renderPlan.find(s => s.key === 'unchecked')
+          const rowsOf = (sec: (typeof renderPlan)[number]) => (
+            <AnimatePresence initial={false}>
+              {sec.rows.map(({ prompt, num }) => (
+                <motion.div
+                  key={prompt.id}
+                  layout="position"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
+                >
+                  {renderRow(sec.key, prompt, num)}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )
+          const failureDates = uncheckedSec
+            ? uncheckedSec.rows.map(r => summaries.get(r.prompt.id)?.oldestErrorSince).filter((d): d is string => !!d).sort()
+            : []
+          const legend = prompts.length > 0 ? (
+            <Disclosure key={`legend-${activeClientId ?? ''}`} title="What the symbols mean">{/* copy: pending bg-copy */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-meta text-ink-2">
+                {([
+                  ['mentioned', AIV_COPY.legendMentioned],
+                  ['absent', AIV_COPY.legendAbsent],
+                  ['no_answer', AIV_COPY.legendNoAnswer],
+                  ['error', AIV_COPY.legendError],
+                  ['pending', AIV_COPY.legendPending],
+                ] as [CellState, string][]).map(([state, label]) => (
+                  <span key={state} className="inline-flex items-center gap-1.5">
+                    <PromptResultCell state={state} engineId={activeLLMs[0]?.id ?? 'chatgpt'} variant="legend" />
+                    {label}
+                  </span>
+                ))}
+                {lockedColumns.length > 0 && isWide && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <PromptResultCell state="locked" engineId={lockedColumns[0]} variant="legend" />
+                    {AIV_COPY.legendLocked}
                   </span>
                 )}
-              </span>
-            </div>
-            {showInsights ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
-          </button>
-
-          <Collapse open={showInsights}>
-            <div className="px-5 pb-4 border-t border-dark-700/50">
-              <p className="text-xs text-slate-500 mt-3 mb-3">
-                Companies that appear most often in AI top-5 rankings across all prompts. Real response data only.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {competitorFreq.map(({ name, count, avgPos }) => (
-                  <div key={name} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <Target size={11} className="text-red-400" />
-                    <span className="text-sm font-medium text-red-300">{name}</span>
-                    <span className="text-xs text-red-500/70">{count}x</span>
-                    {avgPos !== null && <span className="text-xs text-slate-600">avg #{avgPos}</span>}
-                  </div>
-                ))}
               </div>
-            </div>
-          </Collapse>
-        </div>
-      )}
+            </Disclosure>
+          ) : null
+          const showCard = !!appearSec
+          return (
+            <>
+              {showCard && appearSec && (
+                <Card pad="none" className="overflow-hidden">
+                  <div id="aiv-section-appear">
+                    <div className={isWide ? 'overflow-x-auto' : 'p-3 space-y-2'}>
+                      <div style={isWide ? { minWidth: tableMinWidth } : undefined}>
+                        {isWide && (
+                          <div
+                            className="grid border-b border-line bg-surface-2"
+                            style={{ gridTemplateColumns: tableColsTemplate }}
+                          >
+                            <div className="px-2 py-2.5 text-meta font-semibold text-ink-2 self-center">#</div>
+                            <div className="px-3 py-2.5 text-meta font-semibold text-ink-2 self-center">{t.aiv_prompt}</div>
+                            {activeLLMs.map(llm => (
+                              <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
+                                <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
+                                <span className="text-meta font-semibold text-ink-2 text-center leading-tight">{llm.label}</span>
+                              </div>
+                            ))}
+                            {lockedColumns.map(id => (
+                              <Link
+                                key={id}
+                                to="/account"
+                                aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
+                                title={ENGINE_META[id].label}
+                                className="flex flex-col items-center justify-center gap-0.5 min-h-[44px] rounded-md hover:bg-surface-3"
+                              >
+                                <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain grayscale" />
+                                <span className="text-meta leading-none text-ink-2">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                        {rowsOf(appearSec)}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
-      {/* ── Category breakdown (supplementary — sits below the prompt table) ───── */}
+              {notYetSec && (
+                <div id="aiv-section-notYet" className="mt-4">
+                  <Disclosure
+                    title={SECTION_TITLE.notYet}
+                    count={notYetSec.rows.length}
+                    summary={`${promptCount(notYetSec.rows.length)}, no engine named your brand`}/* copy: pending bg-copy */
+                    defaultOpen={sectionIsOpen('notYet')}
+                    key={`notYet-${activeClientId ?? ''}`}
+                  >
+                    <div className={isWide ? 'pt-2' : 'pt-2 space-y-2'}>{rowsOf(notYetSec)}</div>
+                  </Disclosure>
+                </div>
+              )}
+
+              {uncheckedSec && (
+                <div id="aiv-section-unchecked" className="mt-4">
+                  <Disclosure
+                    title={SECTION_TITLE.unchecked}
+                    count={uncheckedSec.rows.length}
+                    summary={failureDates.length > 0 ? sectionUncheckedExtra(formatDate(failureDates[0])) : promptCount(uncheckedSec.rows.length)}
+                    defaultOpen={sectionIsOpen('unchecked')}
+                    key={`unchecked-${activeClientId ?? ''}`}
+                  >
+                    <div className={isWide ? 'pt-2' : 'pt-2 space-y-2'}>{rowsOf(uncheckedSec)}</div>
+                  </Disclosure>
+                </div>
+              )}
+
+              {legend && <div className="mt-4">{legend}</div>}
+            </>
+          )
+        })()}
+
+        {prompts.length > 0 && !isAdmin && <p className="mt-3 text-meta text-ink-2">{AIV_COPY.viewerHint}</p>}
+      </section>
+
+      {/* ── Competitors and categories (block 7) ────────────────────────────── */}
       {(() => {
         const catStats = (data?.categoryStats ?? []).map(c => ({
           cat: c.category,
@@ -2765,36 +2448,57 @@ export default function AIVisibility() {
 
         // Nothing measured yet means every category would show 0%, which is
         // not a comparison, it is a placeholder pretending to be data (§11
-        // rule 1). Suppress the whole card rather than render nine zeroes.
-        if (totalChecked > 0 && catStats.length > 0) return (
-          <div className="mb-4 bg-dark-800 rounded-xl p-6">
-            {/* Same min-width:auto shape as the score breakdown above: neither flex
-                item could shrink, so the long right-hand caption pushed past the card.
-                min-w-0 lets the caption wrap instead. */}
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="shrink-0 text-xs font-semibold text-slate-400 uppercase tracking-wider">Category Breakdown</h3>
-              <span className="min-w-0 text-xs text-slate-600 text-right">{totalChecked} total checks across {prompts.length} prompts × {activeLLMs.length} engines</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {catStats.map(({ cat, label, pct, checked, mentioned }) => (
-                <div key={cat} className="flex flex-col gap-1">
-                  {/* Same shape again, and this grid is 2-up from the smallest
-                      viewport, so each cell is the narrowest box on the page. */}
-                  <div className="flex justify-between items-center gap-1.5">
-                    <span className={`min-w-0 truncate text-xs px-1.5 py-0.5 rounded-full ${getCatColor(cat)}`} title={label}>{label}</span>
-                    <span className={`shrink-0 text-xs font-bold tabular-nums ${pct >= 50 ? 'text-emerald-400' : pct >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{pct}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-dark-700 overflow-hidden">
-                    <div className={`h-full rounded-full ${pct >= 50 ? 'bg-emerald-400' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-[10px] text-slate-600">{mentioned}/{checked} checks</span>
+        // rule 1). Suppress the category list rather than render nine zeroes.
+        const showCats = totalChecked > 0 && catStats.length > 0
+        if (competitorFreq.length === 0 && !showCats) return null
+        const weakest = showCats ? catStats[catStats.length - 1] : null
+        const summaryParts = [
+          competitorFreq.length > 0 ? `${competitorFreq.length} competitors named` : null,
+          weakest ? `weakest category ${weakest.label} at ${weakest.pct}%` : null,
+        ].filter((s): s is string => !!s)
+        return (
+          <Disclosure
+            key={`cats-${activeClientId ?? ''}`}
+            title="Competitors and categories"/* copy: pending bg-copy */
+            summary={summaryParts.join(', ')}/* copy: pending bg-copy */
+          >
+            {competitorFreq.length > 0 && (
+              <div className="pt-3">
+                <h3 className="text-heading text-ink">Top competitors in AI recommendations</h3>
+                <p className="text-meta text-ink-3 mt-1 mb-3">
+                  Companies that appear most often in AI top-5 rankings across all prompts. Real response data only.
+                  {gapCount > 0 && ` ${brandName} absent ${gapCount} of ${totalChecked} checks.`}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {competitorFreq.map(({ name, count, avgPos }) => (
+                    <span key={name} className="inline-flex items-center gap-2">
+                      <Badge tone="neutral">{name} {count}x</Badge>
+                      {avgPos !== null && <span className="text-meta text-ink-3">avg #{avgPos}</span>}
+                    </span>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
+            {showCats && (
+              <div className="pt-4">
+                <h3 className="text-heading text-ink">Category breakdown</h3>
+                <p className="text-meta text-ink-3 mt-1 mb-3">{totalChecked} total checks across {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} × {activeLLMs.length} engine{activeLLMs.length !== 1 ? 's' : ''}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                  {catStats.map(({ cat, label, pct, checked, mentioned }) => (
+                    <Meter
+                      key={cat}
+                      value={pct}
+                      tone={pct >= 50 ? 'pos' : pct >= 25 ? 'warn' : 'neg'}
+                      label={label}
+                      valueLabel={`${pct}% · ${mentioned}/${checked} checks`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </Disclosure>
         )
-        return null
       })()}
-    </div>
+    </Page>
   )
 }

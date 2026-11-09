@@ -54,7 +54,7 @@ type Phase = 'loading' | 'ready' | 'deciding' | 'done' | 'error'
 interface ErrState { key: ErrorKey; from: 'check' | 'decide'; planName: string }
 
 const primaryBtn =
-  'w-full min-h-[44px] bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
+  'w-full min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover disabled:opacity-60 disabled:cursor-not-allowed text-on-accent font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2'
 const ghostBtn =
   'w-full min-h-[44px] rounded-lg text-sm font-medium bg-dark-700 hover:bg-dark-600 text-slate-200 border border-dark-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2'
 

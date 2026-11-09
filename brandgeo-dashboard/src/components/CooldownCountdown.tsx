@@ -43,7 +43,7 @@ export function CooldownCountdown({
   if (remainingMs <= 0) return null
 
   return (
-    <div className="inline-flex items-center gap-1.5 text-xs text-amber-400/90 bg-amber-400/10 border border-amber-400/20 rounded-lg px-2.5 py-1">
+    <div className="inline-flex items-center gap-1.5 text-xs text-warn/90 bg-warn-tint border border-warn/20 rounded-lg px-2.5 py-1">
       <Clock size={12} />
       <span>{label} <span className="font-medium tabular-nums">{formatRemaining(remainingMs)}</span></span>
     </div>

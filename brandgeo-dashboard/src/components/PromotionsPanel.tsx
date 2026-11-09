@@ -37,8 +37,8 @@ interface Promotion {
 }
 
 const card = 'bg-dark-800 rounded-xl p-6 mb-6'
-const inputCls = 'w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500'
-const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const inputCls = 'w-full bg-dark-700 border border-edge rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-3 focus:border-accent-ink'
+const primaryBtn = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
 async function authedPost<T>(fn: string, body: unknown): Promise<{ status: number; data: T | null }> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -130,36 +130,36 @@ export default function PromotionsPanel() {
 
   return (
     <div className={card}>
-      <h2 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2">
-        <Gift size={15} className="text-brand-400" /> Promotions
-        <span className="text-[10px] font-normal uppercase tracking-wide text-slate-500 border border-dark-600 rounded px-1.5 py-0.5">Admin</span>
+      <h2 className="text-sm font-semibold text-ink-2 mb-1 flex items-center gap-2">
+        <Gift size={15} className="text-accent-ink" /> Promotions
+        <span className="text-meta font-normal uppercase tracking-wide text-ink-3 border border-dark-600 rounded px-1.5 py-0.5">Admin</span>
       </h2>
-      <p className="text-xs text-slate-500 mb-4">
+      <p className="text-xs text-ink-3 mb-4">
         Platform-wide discount codes. They apply to signups and renewals for the plans you pick, and propagate to the
         marketing site's pricing page automatically (PRICING-STRATEGY-2026-07.md §8).
       </p>
 
       {unavailable ? (
-        <p className="text-xs text-amber-400/90 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
-          Promotions backend isn't deployed yet (T3: the <code className="text-amber-300">promotions</code> table +
+        <p className="text-xs text-warn/90 bg-warn-tint border border-warn/20 rounded-lg px-3 py-2">
+          Promotions backend isn't deployed yet (T3: the <code className="text-warn">promotions</code> table +
           Stripe coupon wiring). This panel is ready; it'll start working the moment that ships.
         </p>
       ) : loading ? (
-        <p className="text-xs text-slate-500">Loading promotions…</p>
+        <p className="text-xs text-ink-3">Loading promotions…</p>
       ) : (
         <>
           {promotions.length === 0 ? (
-            <p className="text-xs text-slate-500 mb-4">No promotions yet.</p>
+            <p className="text-xs text-ink-3 mb-4">No promotions yet.</p>
           ) : (
             <div className="space-y-2 mb-4">
               {promotions.map(p => (
                 <div key={p.id} className="flex items-center justify-between gap-3 bg-dark-700/40 border border-dark-700 rounded-lg px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-200 font-medium truncate">{p.label}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">{p.code}</span>
+                      <span className="text-sm text-ink font-medium truncate">{p.label}</span>
+                      <span className="text-meta text-ink-3 font-mono">{p.code}</span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs text-ink-3 mt-0.5">
                       {formatValue(p)} · {p.plans.map(pl => PLAN_LABELS[pl]).join(', ')}
                       {p.ends_at ? ` · ends ${new Date(p.ends_at).toLocaleDateString()}` : ''}
                     </div>
@@ -168,8 +168,8 @@ export default function PromotionsPanel() {
                     onClick={() => toggleActive(p)}
                     className={`shrink-0 inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors ${
                       p.active
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                        : 'bg-dark-700 text-slate-500 border-dark-600 hover:text-slate-300'
+                        ? 'bg-pos-tint text-pos-ink border-pos/30 hover:opacity-80'
+                        : 'bg-dark-700 text-ink-3 border-dark-600 hover:text-ink-2'
                     }`}
                   >
                     {p.active ? <><Check size={12} /> Active</> : <><Ban size={12} /> Inactive</>}
@@ -178,7 +178,7 @@ export default function PromotionsPanel() {
               ))}
             </div>
           )}
-          {msg && <p className={`text-xs mb-3 ${msg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{msg.text}</p>}
+          {msg && <p className={`text-xs mb-3 ${msg.ok ? 'text-pos-ink' : 'text-neg'}`}>{msg.text}</p>}
 
           {!showForm ? (
             <button onClick={() => setShowForm(true)} className={primaryBtn}>
@@ -188,33 +188,33 @@ export default function PromotionsPanel() {
             <div className="border border-dark-700 rounded-lg p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Label</label>
+                  <label className="text-meta uppercase tracking-wide text-ink-3 mb-1 block">Label</label>
                   <input className={inputCls} value={label} onChange={e => setLabel(e.target.value)} placeholder="Launch week 20% off" />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Code</label>
+                  <label className="text-meta uppercase tracking-wide text-ink-3 mb-1 block">Code</label>
                   <input className={inputCls} value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="LAUNCH20" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Type</label>
+                  <label className="text-meta uppercase tracking-wide text-ink-3 mb-1 block">Type</label>
                   <select className={inputCls} value={discountType} onChange={e => setDiscountType(e.target.value as 'percent' | 'fixed')}>
                     <option value="percent">Percent off</option>
                     <option value="fixed">Fixed € off</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Value</label>
+                  <label className="text-meta uppercase tracking-wide text-ink-3 mb-1 block">Value</label>
                   <input type="number" className={inputCls} value={value} onChange={e => setValue(Number(e.target.value))} min={0} />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1 block">Ends</label>
+                  <label className="text-meta uppercase tracking-wide text-ink-3 mb-1 block">Ends</label>
                   <input type="date" className={inputCls} value={endsAt} onChange={e => setEndsAt(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5 block">Applies to</label>
+                <label className="text-meta uppercase tracking-wide text-ink-3 mb-1.5 block">Applies to</label>
                 <div className="flex flex-wrap gap-1.5">
                   {PLAN_ORDER.filter(p => p !== 'pro').map(p => (
                     <button
@@ -222,8 +222,8 @@ export default function PromotionsPanel() {
                       onClick={() => togglePlan(p)}
                       className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
                         plans.has(p)
-                          ? 'bg-brand-500/15 text-brand-300 border-brand-500/40'
-                          : 'bg-dark-700 text-slate-400 border-dark-600 hover:text-slate-200'
+                          ? 'bg-accent-tint text-accent-ink border-accent-ink/40'
+                          : 'bg-dark-700 text-ink-2 border-dark-600 hover:text-ink'
                       }`}
                     >
                       {PLAN_LABELS[p]}
@@ -235,7 +235,7 @@ export default function PromotionsPanel() {
                 <button onClick={create} disabled={saving} className={primaryBtn}>
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Create
                 </button>
-                <button onClick={resetForm} className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+                <button onClick={resetForm} className="text-xs text-ink-3 hover:text-ink-2">Cancel</button>
               </div>
             </div>
           )}

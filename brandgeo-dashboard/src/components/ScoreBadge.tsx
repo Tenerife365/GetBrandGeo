@@ -1,49 +1,35 @@
 import type { Classification } from '../types'
+import Badge, { type BadgeTone } from './ui/Badge'
+import ScoreDial from './ui/ScoreDial'
 
-const CONFIG: Record<Classification, { label: string; color: string }> = {
-  strategic:              { label: 'Strategic',       color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  high_value:             { label: 'High Value',      color: 'bg-brand-500/20 text-brand-400 border-brand-500/30' },
-  medium_value:           { label: 'Medium Value',    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  low_value:              { label: 'Low Value',       color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
-  competitor_opportunity: { label: 'Competitor Opp.', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+const CONFIG: Record<Classification, { label: string; tone: BadgeTone }> = {
+  strategic:              { label: 'Strategic',       tone: 'pos' },
+  high_value:             { label: 'High Value',      tone: 'accent' },
+  medium_value:           { label: 'Medium Value',    tone: 'neutral' },
+  low_value:              { label: 'Low Value',       tone: 'neutral' },
+  competitor_opportunity: { label: 'Competitor Opp.', tone: 'warn' },
 }
 
 export function ClassificationBadge({ value }: { value: Classification }) {
-  const { label, color } = CONFIG[value] ?? CONFIG.low_value
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${color}`}>
-      {label}
-    </span>
-  )
+  const { label, tone } = CONFIG[value] ?? CONFIG.low_value
+  return <Badge tone={tone}>{label}</Badge>
 }
 
-// Sentiment tokens (dashboard-visual-system.md §8.5), not emerald/slate/red —
-// those hues double as engine identity (ChatGPT/Grok-adjacent slate/negative
-// red-family), which is exactly the "one hue, three meanings" collision the
-// audit's F-14 named. Disjoint hue families now: lime / neutral-slate / rose.
+// Sentiment fills are the pos / neu / neg tokens. The dot is paired with a word
+// wherever it is read, never colour alone.
 export function SentimentDot({ value }: { value: string }) {
   const colors: Record<string, string> = {
-    positive: 'bg-sentiment-positive',
-    neutral:  'bg-sentiment-neutral',
-    negative: 'bg-sentiment-negative',
-    none:     'bg-dark-600',
+    positive: 'bg-pos',
+    neutral:  'bg-neu',
+    negative: 'bg-neg',
+    none:     'bg-surface-3',
   }
   return (
-    <span className={`inline-block w-2 h-2 rounded-full ${colors[value] ?? 'bg-sentiment-neutral'}`} />
+    <span aria-hidden="true" className={`inline-block w-2 h-2 rounded-full ${colors[value] ?? 'bg-neu'}`} />
   )
 }
 
+/** Kept for existing imports: the one score dial (spec 7.3), medium size. */
 export function GeoScoreRing({ score }: { score: number }) {
-  const color =
-    score >= 76 ? 'text-emerald-400' :
-    score >= 51 ? 'text-brand-400' :
-    score >= 21 ? 'text-blue-400' :
-    'text-slate-500'
-
-  return (
-    <div className={`text-2xl font-bold tabular-nums ${color}`}>
-      {score}
-      <span className="text-sm text-slate-500 font-normal">/100</span>
-    </div>
-  )
+  return <ScoreDial score={score} size="md" />
 }

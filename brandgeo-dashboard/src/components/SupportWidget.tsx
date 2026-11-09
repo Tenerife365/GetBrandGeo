@@ -70,57 +70,57 @@ export default function SupportWidget() {
       <button
         onClick={() => { setOpen(v => !v); if (state === 'sent') setState('idle') }}
         aria-label={open ? 'Close support' : 'Get help'}
-        className="fixed z-50 bottom-20 right-4 md:bottom-6 md:right-6 w-12 h-12 rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/25 flex items-center justify-center hover:bg-brand-400 transition-colors"
+        className="fixed z-50 bottom-20 right-4 md:bottom-6 md:right-6 w-12 h-12 rounded-full bg-accent-strong text-on-accent shadow-raised flex items-center justify-center hover:bg-accent-strong-hover transition-colors"
       >
         {open ? <X size={20} /> : <MessageCircle size={20} />}
       </button>
 
       {open && (
         <div className="fixed z-50 bottom-36 right-4 md:bottom-24 md:right-6 w-[calc(100vw-2rem)] max-w-sm bg-dark-800 rounded-2xl shadow-2xl border border-dark-700 overflow-hidden">
-          <div className="px-5 py-4 border-b border-dark-700/60 bg-brand-500/5">
-            <div className="text-sm font-semibold text-white">Need a hand?</div>
-            <div className="text-xs text-slate-400 mt-0.5">Ask about a feature, report a problem, or make a request, and we&apos;ll reply to your email.</div>
+          <div className="px-5 py-4 border-b border-dark-700/60 bg-accent-tint">
+            <div className="text-sm font-semibold text-ink">Need a hand?</div>
+            <div className="text-xs text-ink-2 mt-0.5">Ask about a feature, report a problem, or make a request, and we&apos;ll reply to your email.</div>
           </div>
 
           {state === 'sent' ? (
             <div className="px-5 py-8 text-center">
-              <div className="w-11 h-11 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto mb-3"><Check size={20} /></div>
-              <div className="text-sm font-medium text-slate-200 mb-1">
+              <div className="w-11 h-11 rounded-full bg-pos-tint text-pos-ink flex items-center justify-center mx-auto mb-3"><Check size={20} /></div>
+              <div className="text-sm font-medium text-ink mb-1">
                 {ticketId !== null ? `Request #${ticketId} raised` : 'Message sent'}
               </div>
-              <p className="text-xs text-slate-500">Thanks, we&apos;ll get back to you at {email || 'your email'}.</p>
+              <p className="text-xs text-ink-3">Thanks, we&apos;ll get back to you at {email || 'your email'}.</p>
               {ticketId !== null && (
                 <Link
                   to="/tickets"
                   onClick={() => setOpen(false)}
-                  className="mt-3 inline-block text-xs text-brand-400 hover:text-brand-300 font-medium"
+                  className="mt-3 inline-block text-xs text-accent-ink hover:text-accent-ink font-medium"
                 >
                   Track it in Support
                 </Link>
               )}
               <div>
-                <button onClick={() => { setState('idle'); setTicketId(null) }} className="mt-4 text-xs text-brand-400 hover:text-brand-300 font-medium">Send another</button>
+                <button onClick={() => { setState('idle'); setTicketId(null) }} className="mt-4 text-xs text-accent-ink hover:text-accent-ink font-medium">Send another</button>
               </div>
             </div>
           ) : (
             <div className="px-5 py-4 space-y-3">
               <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject (optional)"
                 aria-label="Subject"
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500" />
+                className="w-full bg-dark-700 border border-edge rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-3 focus:border-accent-ink" />
               <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
                 placeholder="How can we help?"
                 aria-label="Message"
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500 resize-none" />
+                className="w-full bg-dark-700 border border-edge rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-3 focus:border-accent-ink resize-none" />
               {state === 'error' && (
-                <p className="text-xs text-red-400">
+                <p className="text-xs text-neg">
                   Could not send right now.{' '}
-                  <a href={mailtoFallback} className="underline hover:text-red-300">Email us directly</a>.
+                  <a href={mailtoFallback} className="underline hover:text-neg">Email us directly</a>.
                 </p>
               )}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-slate-600 truncate">To support@getbrandgeo.com</span>
+                <span className="text-meta text-ink-3 truncate">To support@getbrandgeo.com</span>
                 <button onClick={send} disabled={!message.trim() || state === 'sending'}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-400 transition-colors disabled:opacity-50 shrink-0">
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-accent-strong text-on-accent hover:bg-accent-strong-hover transition-colors disabled:opacity-50 shrink-0">
                   {state === 'sending' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   Send
                 </button>

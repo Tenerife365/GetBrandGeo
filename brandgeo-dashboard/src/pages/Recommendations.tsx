@@ -19,10 +19,9 @@
  *    what a client was told, and when, and from what evidence, survives the page reload.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Zap, Target,
-  TrendingUp, RefreshCw, Sparkles, Lightbulb, History, Check, X, CircleSlash,
+  Clock, ChevronDown, ChevronUp, Zap, Target, RefreshCw, Sparkles, History, Check, X, CircleSlash,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -32,12 +31,15 @@ import { buildSnapshotView } from '../lib/metrics'
 import {
   buildRecommendationsStats, buildEngineErrors, buildAiSnippets, type RecommendationsStats,
 } from '../lib/views/recommendationsView'
-import { ENGINE_META, LIVE_ENGINES, type EngineId } from '../lib/planConfig'
-import { useChartTheme } from '../lib/chartTheme'
-import { PageTitle, SectionHeading } from '../components/Typography'
+import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import EngineChip from '../components/EngineChip'
 import SharedEmptyState from '../components/EmptyState'
-import Skeleton from '../components/Skeleton'
 import LoadErrorCard from '../components/LoadErrorCard'
+import { SkeletonList } from '../components/ui/skeletons'
+import {
+  Page, PageHeader, SectionHeader, HeroAnswer, Card, Badge, Button, Notice, Disclosure, StatusGlyph,
+  type BadgeTone,
+} from '../components/ui'
 import type { LLMName } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -98,20 +100,14 @@ const LLM_LABEL: Record<string, string> = Object.fromEntries(
   Object.entries(ENGINE_META).map(([id, m]) => [id, m.label])
 )
 
-// LLM_COLOR (a fifth independent hand-picked engine-colour map, on top of the
-// four the audit already named) is DELETED — dashboard-visual-system.md §8.4:
+// LLM_COLOR (a fifth independent hand-picked engine-colour map) is DELETED:
 // one source (ENGINE_META[id].chartColor), never a second hand-picked map.
-// EngineTag below is the same swatch-plus-text-token treatment as EngineChip,
-// sized for this dense inline list instead of a filter row.
+// EngineTag is the read-only EngineChip (swatch plus ink label). An id with no
+// ENGINE_META entry (a retired engine in an old stored row) falls back to a
+// neutral Badge so a missing key never crashes the page.
 function EngineTag({ id, fallbackLabel }: { id: string; fallbackLabel: string }) {
-  const meta = ENGINE_META[id as EngineId]
-  const chart = useChartTheme()
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-medium bg-dark-700 text-slate-300">
-      <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta?.chartColor ?? chart.sentimentNeutral }} />
-      {meta?.label ?? fallbackLabel}
-    </span>
-  )
+  if (!ENGINE_META[id as EngineId]) return <Badge tone="neutral">{fallbackLabel}</Badge>
+  return <EngineChip id={id as EngineId} interactive={false} />
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -212,17 +208,18 @@ const LLM_QUICK_WINS: Record<string, string[]> = {
   ],
 }
 
-const IMPACT_STYLE = {
-  critical: { badge: 'bg-red-500/15 text-red-400 border border-red-500/20',       icon: <AlertTriangle size={13} />, label: 'Critical'      },
-  high:     { badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', icon: <Zap size={13} />,           label: 'High Impact'  },
-  medium:   { badge: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',    icon: <TrendingUp size={13} />,    label: 'Medium Impact' },
+// Impact is a neutral Badge with a bolt glyph (spec 11.6); the word carries the severity.
+const IMPACT_LABEL: Record<'critical' | 'high' | 'medium', string> = {
+  critical: 'Critical',
+  high:     'High impact',
+  medium:   'Medium impact',
 }
 
-const STATUS_STYLE: Record<RecStatus, { badge: string; label: string }> = {
-  new:          { badge: 'bg-slate-500/15 text-slate-400 border border-slate-500/20',    label: 'New'          },
-  acknowledged: { badge: 'bg-sky-500/15 text-sky-400 border border-sky-500/20',          label: 'Acknowledged' },
-  actioned:     { badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', label: 'Actioned'  },
-  dismissed:    { badge: 'bg-slate-600/20 text-slate-500 border border-slate-600/30',    label: 'Dismissed'    },
+const STATUS_STYLE: Record<RecStatus, { tone: BadgeTone; label: string }> = {
+  new:          { tone: 'neutral', label: 'New'          },
+  acknowledged: { tone: 'accent',  label: 'Acknowledged' },
+  actioned:     { tone: 'pos',     label: 'Actioned'     },
+  dismissed:    { tone: 'neutral', label: 'Dismissed'    },
 }
 
 const fmtDate = (iso: string) =>
@@ -371,48 +368,48 @@ function generateRecs(data: RecommendationsStats): Rec[] {
 
 function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
-  const imp = IMPACT_STYLE[rec.impact]
+  const panelId = useId()
+  const effortLabel = rec.effort === 'low' ? 'Quick win' : rec.effort === 'medium' ? 'Medium effort' : 'High effort'
 
   return (
-    <div className="bg-dark-800 rounded-xl overflow-hidden">
+    <Card pad="none">
       <button
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
-        className="w-full flex items-start gap-4 p-5 text-left hover:bg-dark-700/40 transition-colors"
+        aria-controls={panelId}
+        className="w-full flex items-start gap-4 p-4 md:p-5 text-left rounded-card hover:bg-surface-2 transition-colors"
       >
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
-              {imp.icon}{imp.label}
-            </span>
-            <span className={`text-xs ${rec.effort === 'low' ? 'text-emerald-400' : rec.effort === 'medium' ? 'text-amber-400' : 'text-slate-400'}`}>
-              <Clock size={11} className="inline mr-0.5" />
-              {rec.effort === 'low' ? 'Quick win' : rec.effort === 'medium' ? 'Medium effort' : 'High effort'} · {rec.timeEst}
+            <Badge tone="neutral" glyph={<Zap size={12} aria-hidden="true" />}>{IMPACT_LABEL[rec.impact]}</Badge>
+            <span className="inline-flex items-center gap-1 text-meta text-ink-3">
+              <Clock size={12} aria-hidden="true" />
+              {effortLabel} · {rec.timeEst}
             </span>
           </div>
-          <div className="font-semibold text-slate-100 text-sm leading-snug">{rec.title}</div>
+          <div className="text-body font-semibold text-ink leading-snug">{rec.title}</div>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {rec.fixes.map(f => (
               <EngineTag key={f} id={f} fallbackLabel={LLM_LABEL[f] ?? f} />
             ))}
           </div>
         </div>
-        <div className="flex-shrink-0 mt-1 text-slate-500">
+        <div className="flex-shrink-0 mt-1 text-ink-3" aria-hidden="true">
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
 
       {open && (
-        <div className="px-5 pb-5 border-t border-dark-700/60">
-          <div className="mt-4 mb-4 p-3.5 bg-dark-700/50 rounded-lg border border-dark-600/40">
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Why this matters</div>
-            <p className="text-sm text-slate-300 leading-relaxed">{rec.why}</p>
+        <div id={panelId} className="px-4 md:px-5 pb-5 border-t border-line">
+          <div className="mt-4 mb-4 p-3.5 bg-surface-2 rounded-control">
+            <div className="text-meta text-ink-3 mb-1">Why this matters</div>
+            <p className="text-body text-ink-2 leading-relaxed">{rec.why}</p>
           </div>
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Action steps</div>
+          <div className="text-meta text-ink-3 mb-2">Action steps</div>
           <ol className="space-y-2">
             {rec.how.map((step, i) => (
-              <li key={i} className="flex gap-3 text-sm text-slate-300 leading-relaxed">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-bold mt-0.5">
+              <li key={i} className="flex gap-3 text-body text-ink-2 leading-relaxed">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-surface-3 text-ink flex items-center justify-center text-meta font-semibold mt-0.5">
                   {i + 1}
                 </span>
                 {step}
@@ -421,7 +418,7 @@ function RecCard({ rec, defaultOpen = false }: { rec: Rec; defaultOpen?: boolean
           </ol>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -434,129 +431,94 @@ function StoredRecCard({
   canEdit: boolean
   onStatus: (id: number, status: RecStatus) => void
 }) {
-  const imp = IMPACT_STYLE[rec.priority]
   const st  = STATUS_STYLE[rec.status]
   const dim = rec.status === 'dismissed'
 
   return (
-    <div className={`bg-dark-800 border border-violet-500/15 rounded-xl p-5 ${dim ? 'opacity-55' : ''}`}>
+    <Card className={dim ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${imp.badge}`}>
-          {imp.label}
-        </span>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.badge}`}>
-          {st.label}
-        </span>
-        <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
-          <Lightbulb size={9} className="inline mr-0.5" />AI insight
-        </span>
+        <Badge tone="neutral" glyph={<Zap size={12} aria-hidden="true" />}>{IMPACT_LABEL[rec.priority]}</Badge>
+        <Badge tone={st.tone}>{st.label}</Badge>
         {(rec.engines ?? []).map(e => (
           <EngineTag key={e} id={e} fallbackLabel={LLM_LABEL[e] ?? e} />
         ))}
       </div>
 
-      <div className="font-semibold text-slate-100 text-sm mb-3">{rec.title}</div>
+      <div className="text-body font-semibold text-ink mb-3">{rec.title}</div>
 
       {rec.insight && (
-        <div className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/40 mb-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">What the data shows</div>
-          <p className="text-sm text-slate-300 leading-relaxed">{rec.insight}</p>
+        <div className="p-3 bg-surface-2 rounded-control mb-3">
+          <div className="text-meta text-ink-3 mb-1">What the data shows</div>
+          <p className="text-body text-ink-2 leading-relaxed">{rec.insight}</p>
         </div>
       )}
 
       {rec.action && (
         <>
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Action</div>
-          <p className="text-sm text-slate-300 leading-relaxed">{rec.action}</p>
+          <div className="text-meta text-ink-3 mb-1">Action</div>
+          <p className="text-body text-ink-2 leading-relaxed">{rec.action}</p>
         </>
       )}
 
       {rec.actioned_at && (
-        <div className="mt-3 text-xs text-emerald-400/80">
-          <Check size={11} className="inline mr-1" />
+        <div className="mt-3 inline-flex items-center gap-1 text-meta text-ink-2">
+          <Check size={12} aria-hidden="true" />
           Marked actioned {fmtDate(rec.actioned_at)}
         </div>
       )}
 
       {canEdit && (
-        <div className="mt-4 pt-3 border-t border-dark-700/60 flex flex-wrap gap-2">
-          <button
+        <div className="mt-4 pt-3 border-t border-line flex flex-wrap gap-2">
+          <Button
+            variant="secondary" size="sm" icon={Check}
             onClick={() => onStatus(rec.id, 'actioned')}
             disabled={rec.status === 'actioned'}
             aria-label={`Mark actioned: ${rec.title}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors disabled:opacity-40"
           >
-            <Check size={12} /> Actioned
-          </button>
-          <button
+            Actioned
+          </Button>
+          <Button
+            variant="secondary" size="sm" icon={CircleSlash}
             onClick={() => onStatus(rec.id, 'acknowledged')}
             disabled={rec.status === 'acknowledged'}
             aria-label={`Mark acknowledged: ${rec.title}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-500/15 text-sky-300 border border-sky-500/20 hover:bg-sky-500/25 transition-colors disabled:opacity-40"
           >
-            <CircleSlash size={12} /> Acknowledged
-          </button>
-          <button
+            Acknowledged
+          </Button>
+          <Button
+            variant="ghost" size="sm" icon={X}
             onClick={() => onStatus(rec.id, 'dismissed')}
             disabled={rec.status === 'dismissed'}
             aria-label={`Dismiss: ${rec.title}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-dark-600 text-slate-400 hover:text-slate-200 hover:bg-dark-700 transition-colors disabled:opacity-40"
           >
-            <X size={12} /> Dismiss
-          </button>
+            Dismiss
+          </Button>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 
 /**
- * Content-shaped loading state for the body of this page, replacing the bare
- * "Loading recommendations…" string the 2026-07-30 UI/UX audit measured (F8):
- * plain text, no structure, and ZERO interactive elements in <main> for the whole
- * wait. The page header is deliberately NOT part of this component: it renders
- * unchanged during the fetch, so the Refresh control stays reachable and the
- * header's box never moves when data lands.
- *
- * Shape mirrors the resolved page's first two regions: the per-engine card grid
- * (logo tile, name line, percentage line) and the first content card below it.
- *
- * Reduced motion: <Skeleton> uses Tailwind's `animate-pulse`, which is NOT
- * governed by App.tsx's <MotionConfig reducedMotion="user"> (that only covers
- * Motion's own animate/variants). index.css already freezes `.animate-pulse` to
- * a static 0.6 opacity under `prefers-reduced-motion: reduce`; the explicit
- * `motion-reduce:animate-none` here is a second, local guard so this state does
- * not silently start pulsing if that global rule is ever refactored away.
+ * Content-shaped loading state for the body of this page (2026-07-30 audit F8).
+ * The page header renders unchanged during the fetch so the Refresh control
+ * stays reachable and the header box never moves when data lands. The hero is
+ * the shared HeroAnswer skeleton; the list below mirrors the first action card.
  */
 function RecommendationsSkeleton() {
-  const still = 'motion-reduce:animate-none'
   return (
     <div role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">Loading recommendations</span>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6" aria-hidden="true">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-dark-800 border border-dark-700 rounded-xl p-card-compact flex items-center gap-3">
-            <Skeleton className={`shrink-0 w-12 h-12 rounded-xl ${still}`} />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className={`h-4 w-24 ${still}`} />
-              <Skeleton className={`h-5 w-16 ${still}`} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-dark-800 rounded-xl p-5 space-y-3" aria-hidden="true">
-        <Skeleton className={`h-4 w-40 ${still}`} />
-        <Skeleton className={`h-3 w-full ${still}`} />
-        <Skeleton className={`h-3 w-5/6 ${still}`} />
-        <Skeleton className={`h-16 w-full rounded-lg ${still}`} />
+      <div aria-hidden="true" className="space-y-6">
+        <HeroAnswer loading answer="" />
+        <SkeletonList rows={2} />
       </div>
     </div>
   )
 }
+
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -730,252 +692,179 @@ export default function Recommendations() {
   }
 
 
-  const overallPct  = stats ? Math.round(stats.overallRate * 100) : 0
   const gapLLMCount = stats?.llmStats.filter(s => s.rate < 0.5).length ?? 0
   const visibleRuns = showAllRuns ? runs : runs.slice(0, 1)
   const latestRunId = runs[0]?.id ?? null
+  const firstRun = !loading && !(loadError && !stats) && (stats?.totalChecks ?? 0) === 0
+  const showBody = !loading && !(loadError && !stats)
+
+  // Hero engine status (spec 11.6): one badge, warn when anything needs attention.
+  const heroBadge: { label: string; tone: BadgeTone } | undefined = !stats ? undefined
+    : engineErrors.length > 0
+      ? { label: `${engineErrors.length} engine${engineErrors.length !== 1 ? 's' : ''} unavailable`, tone: 'warn' } // copy: pending bg-copy
+      : gapLLMCount > 0
+        ? { label: `${gapLLMCount} engine${gapLLMCount !== 1 ? 's' : ''} below 50%`, tone: 'warn' } // copy: pending bg-copy
+        : { label: 'All engines above 50%', tone: 'pos' } // copy: pending bg-copy
+
+  const generateButton = (
+    <Button
+      variant="primary"
+      icon={Sparkles}
+      onClick={generateAiInsights}
+      loading={aiLoading}
+      disabled={!hasResults}
+      aria-label="Generate AI insights"
+    >
+      {aiLoading ? 'Analysing…' : runs.length > 0 ? 'Generate new analysis' : 'Generate insights'}
+    </Button>
+  )
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
-      {/* Header. Rendered identically while loading: the title, the count chip slot
-          and the Refresh control do not depend on the fetch, so keeping them mounted
-          means the header's box is byte-identical before and after data lands and
-          nothing above the fold moves. Only the subtitle, which states a COUNT we do
-          not have yet, is swapped for a skeleton. Rendering "0 successful AI checks"
-          mid-fetch would be a measurement the page has not made. */}
-      <div className="mb-6 flex items-start justify-between">
-        {/* min-w-0 is load-bearing, not tidying. A flex item defaults to
-            `min-width: auto`, so this column refuses to shrink below its own
-            content and the skeleton's `max-w-full` then resolves against an
-            already-overwide parent. Without it, /recommendations overflowed
-            <main> at 375 (scrollWidth 531 vs clientWidth 375) for the whole
-            loading state: the 416px skeleton plus the 99px Refresh button.
-            The document itself did NOT overflow, which is why a checker reading
-            documentElement instead of <main> could never see it. */}
-        <div className="min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <PageTitle>Recommendations</PageTitle>
-            {!loading && recs.length > 0 && (
-              <span className="text-xs bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-medium">
-                {recs.length} action{recs.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          {loading ? (
-            <Skeleton className="h-5 w-[26rem] max-w-full motion-reduce:animate-none" />
-          ) : loadError && !stats ? null : (stats?.totalChecks ?? 0) === 0 ? (
-            <p className="text-sm text-slate-400">No responses measured yet.</p>
-          ) : (
-            <p className="text-sm text-slate-400">
-              Generated from {stats?.totalChecks ?? 0} successful AI checks. API failures are excluded.
-            </p>
-          )}
-        </div>
-        {/* aria-disabled, not disabled: a `disabled` button is removed from the tab
-            order, which is how this page came to have ZERO focusable controls in
-            <main> for the whole 8-second wait (audit F8). The click is guarded
-            instead, so the control stays reachable and announced.
-            No opacity dimming either. The old `disabled:opacity-50` measured the
-            label at 2.70:1 on --dark-900, and dimming the one focusable thing on
-            screen below legibility undoes the reason for keeping it focusable. The
-            busy state is carried by aria-disabled and the spinning icon. */}
-        <button
-          onClick={() => { if (!loading) retryAll() }}
-          aria-disabled={loading}
-          aria-label="Refresh recommendations"
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-dark-700 text-slate-400 transition-colors ${loading ? 'cursor-default' : 'hover:text-slate-200 hover:bg-dark-700'}`}
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
-      </div>
+    <Page>
+      {/* Header. Rendered identically while loading: the title, the count badge slot
+          and the Refresh control do not depend on the fetch, so the header's box is
+          the same before and after data lands. aria-disabled, not disabled: a
+          `disabled` button leaves the tab order, which is how this page once had
+          ZERO focusable controls in <main> for the whole wait (audit F8). The
+          click is guarded instead. */}
+      <PageHeader
+        title="Recommendations"
+        badge={!loading && recs.length > 0 && !(showBody && stats && hasResults)
+          ? <Badge tone="neutral">{recs.length} action{recs.length !== 1 ? 's' : ''}</Badge>
+          : undefined}
+        actions={
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            onClick={() => { if (!loading) retryAll() }}
+            aria-disabled={loading}
+            aria-label="Refresh recommendations"
+          >
+            Refresh
+          </Button>
+        }
+      />
 
       {loading && <RecommendationsSkeleton />}
 
-      {/* API-failure notice. This is OUR outage, not the brand's invisibility. */}
-      {!loading && engineErrors.length > 0 && (
-        <div className="mb-6 p-4 bg-amber-500/8 border border-amber-500/20 rounded-xl flex gap-3">
-          <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <div className="text-sm font-semibold text-amber-300 mb-0.5">
-              No usable data from {engineErrors.map(e => LLM_LABEL[e.engine] ?? e.engine).join(', ')}
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed prompt checks),
-              so they are excluded from every score and from the AI analysis below. This is a collection
-              failure, not a visibility failure. It does not mean these engines ignore your brand.
-            </p>
-          </div>
-        </div>
-      )}
+      <div className="space-y-6">
+        {/* API-failure notice. This is OUR outage, not the brand's invisibility.
+            The route's one Notice (C7). */}
+        {!loading && engineErrors.length > 0 && (
+          <Notice tone="warn" title={`No usable data from ${engineErrors.map(e => LLM_LABEL[e.engine] ?? e.engine).join(', ')}`}>
+            {/* copy: pending bg-copy */}
+            These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed prompt checks),
+            so they are excluded from every score and from the AI analysis below. This is a collection
+            failure, not a visibility failure. It does not mean these engines ignore your brand.
+          </Notice>
+        )}
 
-      {!loading && loadError && (
-        <LoadErrorCard
-          message={stats ? "Couldn't refresh these results. What you see may be out of date." : undefined}
-          onRetry={retryAll}
-        />
-      )}
+        {!loading && loadError && (
+          <LoadErrorCard
+            message={stats ? "Couldn't refresh these results. What you see may be out of date." : undefined}
+            onRetry={retryAll}
+          />
+        )}
 
-      {loading ? null : loadError && !stats ? null : (stats?.totalChecks ?? 0) === 0 ? (
-        <SharedEmptyState
-          icon={Target}
-          title="Not measured yet"
-          body="Recommendations are generated from AI check results. Run a collection to get your first set."
-          actionLabel="Run a collection"
-          actionTo="/ai-visibility"
-          minHeight={220}
-        />
-      ) : (
-        <>
-          {/* Per-engine visibility — horizontal engine cards matching the AI
-              Visibility page (logo tile left, name + status pill, % + avg position
-              right, subtle status-coloured border). */}
-          {stats && (
-            <>
-            <SectionHeading className="sr-only">Visibility by engine</SectionHeading>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        {/* Hero */}
+        {firstRun && (
+          <HeroAnswer
+            answer=""
+            empty={{
+              icon: Target,
+              title: 'Not measured yet',
+              body: 'Actions are generated after your first collection.', // copy: pending bg-copy
+              actionLabel: 'Run first collection',
+              actionTo: '/ai-visibility',
+              minHeight: 220,
+            }}
+          />
+        )}
+
+        {showBody && stats && hasResults && (
+          <HeroAnswer
+            value={recs.length}
+            unit="actions"
+            badge={heroBadge}
+            answer={recs.length > 0 ? `Start with: ${recs[0].title.replace(/[.!?]+$/, '')}.` : 'No priority actions right now.'} // copy: pending bg-copy
+            context={`Generated from ${stats.totalChecks} successful AI checks`} // copy: pending bg-copy
+          >
+            <h2 className="sr-only">Visibility by engine</h2>
+            <ul className="m-0 list-none p-0">
               {stats.llmStats.map(s => {
-                const meta = ENGINE_META[s.llm as EngineId]
-                const pct  = Math.round(s.rate * 100)
-                // Strong/Partial/Low is a status verdict, not an engine identity — the
-                // sentiment tokens (dashboard-visual-system.md §8.5) carry the two
-                // unambiguous ends so this never re-collides with an engine hue; amber
-                // stays for the middle tier (no token defines a fourth status colour).
-                const tone = s.rate >= 0.85
-                  ? { label: 'Strong',  badge: 'bg-sentiment-positive-15 text-sentiment-positive border border-sentiment-positive-30', dot: 'bg-sentiment-positive', card: 'border-sentiment-positive-20 hover:border-sentiment-positive-40' }
-                  : s.rate >= 0.5
-                  ? { label: 'Partial', badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',       dot: 'bg-amber-400',   card: 'border-amber-500/20 hover:border-amber-500/40' }
-                  : { label: 'Low',     badge: 'bg-sentiment-negative-15 text-sentiment-negative border border-sentiment-negative-30',   dot: 'bg-sentiment-negative', card: 'border-sentiment-negative-20 hover:border-sentiment-negative-40' }
+                const pct = Math.round(s.rate * 100)
+                const tier: { label: string; tone: BadgeTone; kind: 'pos' | 'warn' | 'neg' } =
+                  s.rate >= 0.85 ? { label: 'Strong',  tone: 'pos',  kind: 'pos' }
+                  : s.rate >= 0.5 ? { label: 'Partial', tone: 'warn', kind: 'warn' }
+                  : { label: 'Low', tone: 'neg', kind: 'neg' }
                 return (
-                  <div key={s.llm} className={`bg-dark-800 border rounded-xl p-card-compact flex items-center gap-3 transition-colors ${tone.card}`}>
-                    <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-dark-700/60">
-                      <img src={meta?.logoUrl} alt={meta?.label ?? LLM_LABEL[s.llm]} className="w-7 h-7 object-contain" />
+                  <li key={s.llm} className="flex items-center justify-between gap-3 py-2 border-t border-line first:border-t-0">
+                    <EngineTag id={s.llm} fallbackLabel={LLM_LABEL[s.llm] ?? s.llm} />
+                    <div className="flex items-center gap-3">
+                      <span className="text-body font-semibold text-ink tabular-nums">{pct}%</span>
+                      {s.avgPos !== null && <span className="text-meta text-ink-3">avg #{s.avgPos}</span>}
+                      <Badge tone={tier.tone} glyph={<StatusGlyph kind={tier.kind} size={12} />}>{tier.label}</Badge>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 pr-1">
-                        <span className="text-sm font-semibold text-white truncate">{meta?.label ?? LLM_LABEL[s.llm]}</span>
-                        <span className={`shrink-0 inline-flex items-center rounded-full text-[9px] font-bold px-1.5 py-0.5 ${tone.badge}`}>
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${tone.dot}`} />{tone.label}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className={`text-lg font-bold tabular-nums leading-none ${s.rate >= 0.85 ? 'text-sentiment-positive' : 'text-slate-200'}`}>{pct}%</span>
-                        {s.avgPos !== null && <span className="text-[11px] text-slate-500">avg #{s.avgPos}</span>}
-                      </div>
-                    </div>
-                  </div>
+                  </li>
                 )
               })}
-            </div>
-            </>
-          )}
+            </ul>
+          </HeroAnswer>
+        )}
 
-          {/* Competitor context */}
-          {stats && stats.competitors.length > 0 && (
-            <div className="mb-6 p-4 bg-dark-800 rounded-xl">
-              <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Competitors in AI responses</div>
-              <div className="flex flex-wrap gap-2">
-                {stats.competitors.map(c => (
-                  <div
-                    key={c.name}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
-                      c.proseOnly
-                        ? 'bg-dark-700/40 border-dark-600/50'
-                        : 'bg-red-500/10 border-red-500/20'
-                    }`}
-                    title={c.proseOnly
-                      ? 'Named in prose, but never ranked in a list by any engine, usually because they are on your own competitor seed list'
-                      : `Ranked ${c.rankedMentions}× by AI engines`}
-                  >
-                    <Target size={10} className={c.proseOnly ? 'text-slate-500 shrink-0' : 'text-red-400 shrink-0'} />
-                    <span className={`text-xs font-medium ${c.proseOnly ? 'text-slate-400' : 'text-red-300'}`}>{c.name}</span>
-                    {c.proseOnly
-                      ? <span className="text-[10px] text-slate-500">prose only</span>
-                      : <span className="text-[10px] text-red-500/60">ranked {c.rankedMentions}×</span>}
-                    {c.avgPos && <span className="text-[10px] text-slate-600">avg #{c.avgPos}</span>}
-                  </div>
+        {/* Priority actions */}
+        {showBody && hasResults && (
+          <section>
+            <SectionHeader title="Priority actions" />
+            {recs.length === 0 ? (
+              <Card>
+                <SharedEmptyState
+                  variant="inline"
+                  icon={Target}
+                  body="No priority actions right now. Keep running monthly collections to track trends." // copy: pending bg-copy
+                />
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {recs.map((rec, i) => (
+                  <RecCard key={rec.id} rec={rec} defaultOpen={i === 0} />
                 ))}
               </div>
-              {stats.competitors.some(c => c.proseOnly) && (
-                <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                  "Prose only" names were never ranked by any engine. They appear because they are on your
-                  own competitor list and an engine happened to mention them. They are not counted as losses.
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </section>
+        )}
 
-          {/* Status banner */}
-          {gapLLMCount === 0 && overallPct >= 85 ? (
-            <div className="mb-6 p-4 bg-emerald-500/8 border border-emerald-500/20 rounded-xl flex gap-3">
-              <CheckCircle size={18} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-sm font-semibold text-emerald-300 mb-0.5">Strong AI visibility</div>
-                <p className="text-xs text-slate-400">All engines are above threshold. Focus on improving your average position and expanding to new prompt categories.</p>
-              </div>
-            </div>
-          ) : gapLLMCount > 0 ? (
-            <div className="mb-6 p-4 bg-red-500/8 border border-red-500/20 rounded-xl flex gap-3">
-              <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-sm font-semibold text-red-300 mb-0.5">
-                  {gapLLMCount} engine{gapLLMCount !== 1 ? 's' : ''} below 50%. Address these first.
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Overall visibility: {overallPct}%. The recommendations below are ordered by impact, so fix critical gaps first.
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── AI analysis + advice history ────────────────────────────────── */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles size={15} className="text-violet-400" />
-                <span className="text-sm font-semibold text-slate-200">AI Analysis</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                  Claude
-                </span>
-                {runs.length > 0 && (
-                  <span className="text-xs text-slate-500">
-                    · last generated {fmtDate(runs[0].generated_at)}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={generateAiInsights}
-                disabled={aiLoading || !hasResults}
-                aria-label="Generate AI insights"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 border border-violet-500/20 transition-colors disabled:opacity-50"
-              >
-                <Sparkles size={12} className={aiLoading ? 'animate-spin' : ''} />
-                {aiLoading ? 'Analysing…' : runs.length > 0 ? 'Generate new analysis' : 'Generate insights'}
-              </button>
-            </div>
+        {/* AI analysis + advice history */}
+        {showBody && (
+          <section>
+            <SectionHeader
+              title="AI analysis"
+              description={runs.length > 0 ? `Last generated ${fmtDate(runs[0].generated_at)}` : undefined}
+              actions={
+                <>
+                  <Badge tone="neutral">Claude</Badge>
+                  {generateButton}
+                </>
+              }
+            />
 
             {aiLoading && (
-              <div role="status" className="bg-dark-800 border border-violet-500/20 rounded-xl p-5 space-y-3">
-                <p className="text-sm text-slate-400">Claude is reading your actual AI responses and competitor data…</p>
-                <Skeleton className="h-3 w-full motion-reduce:animate-none" />
-                <Skeleton className="h-3 w-5/6 motion-reduce:animate-none" />
-              </div>
+              <Card role="status" className="space-y-3">
+                <p className="text-body text-ink-2">Claude is reading your actual AI responses and competitor data…</p>
+                <SkeletonList rows={2} />
+              </Card>
             )}
 
             {aiError && !aiLoading && (
-              <div className="bg-dark-800 border border-red-500/20 rounded-xl p-4 mb-3 flex items-start justify-between gap-3">
-                <p className="text-xs text-red-400">{aiError}</p>
-                <button
-                  onClick={generateAiInsights}
-                  disabled={!hasResults}
-                  className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-40"
-                >
-                  <RefreshCw size={11} /> Retry
-                </button>
+              <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-card border border-line border-l-[3px] border-l-neg bg-surface p-4">
+                <p className="text-body text-ink-2">{aiError}</p>
+                <Button variant="secondary" size="sm" icon={RefreshCw} onClick={generateAiInsights} disabled={!hasResults}>
+                  Retry
+                </Button>
               </div>
             )}
 
-            {/* Unsaved fallback — only when persistence failed. */}
+            {/* Unsaved fallback, only when persistence failed. */}
             {unsavedRecs.length > 0 && !aiLoading && (
               <div className="space-y-3 mb-3">
                 {unsavedRecs.map((rec, i) => (
@@ -995,11 +884,13 @@ export default function Recommendations() {
             )}
 
             {!aiLoading && runs.length === 0 && unsavedRecs.length === 0 && !aiError && (
-              <div className="bg-dark-800 border border-dark-700 border-dashed rounded-xl p-5 text-center text-sm text-slate-600">
-                Click "Generate insights". Claude reads your actual response snippets and ranked competitors
-                and produces specific, evidence-based advice. Every run is saved, so you keep a record of what
-                was advised and when.
-              </div>
+              <Card>
+                <SharedEmptyState
+                  variant="inline"
+                  icon={Sparkles}
+                  body={'Click "Generate insights". Claude reads your actual response snippets and ranked competitors and produces specific, evidence-based advice. Every run is saved, so you keep a record of what was advised and when.'} // copy: pending bg-copy
+                />
+              </Card>
             )}
 
             {/* Persisted history */}
@@ -1010,12 +901,12 @@ export default function Recommendations() {
               const isLatest = run.id === latestRunId
               return (
                 <div key={run.id} className="mb-5">
-                  <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
-                    <History size={12} />
+                  <div className="flex items-center gap-2 mb-2 text-meta text-ink-3">
+                    <History size={12} aria-hidden="true" />
                     <span>
                       {isLatest ? 'Latest analysis' : 'Earlier analysis'} · {fmtDate(run.generated_at)} · {run.model}
                     </span>
-                    <span className="text-slate-600">
+                    <span>
                       · {items.filter(i => i.status === 'actioned').length}/{items.length} actioned
                     </span>
                   </div>
@@ -1034,38 +925,50 @@ export default function Recommendations() {
             })}
 
             {runs.length > 1 && !aiLoading && (
-              <button
+              <Button
+                variant="ghost"
+                icon={showAllRuns ? ChevronUp : ChevronDown}
                 onClick={() => setShowAllRuns(v => !v)}
                 aria-expanded={showAllRuns}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 border border-dark-700 border-dashed hover:bg-dark-800 transition-colors"
+                className="w-full"
               >
                 {showAllRuns
-                  ? <><ChevronUp size={13} /> Hide earlier analyses</>
-                  : <><ChevronDown size={13} /> Show {runs.length - 1} earlier analys{runs.length - 1 === 1 ? 'is' : 'es'}</>}
-              </button>
+                  ? 'Hide earlier analyses'
+                  : `Show ${runs.length - 1} earlier analys${runs.length - 1 === 1 ? 'is' : 'es'}`}
+              </Button>
             )}
-          </div>
+          </section>
+        )}
 
-          {/* Rule-based recs */}
-          <div className="flex items-center gap-2 mb-3">
-            <Target size={14} className="text-slate-500" />
-            <span className="text-sm font-semibold text-slate-400">Priority actions</span>
-          </div>
-
-          {recs.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-sm">
-              <CheckCircle size={32} className="mx-auto mb-3 opacity-30" />
-              No priority actions right now. Keep running monthly collections to track trends.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recs.map((rec, i) => (
-                <RecCard key={rec.id} rec={rec} defaultOpen={i === 0} />
+        {/* Who AI names instead */}
+        {showBody && stats && stats.competitors.length > 0 && (
+          <Disclosure title="Who AI names instead" count={stats.competitors.length}>
+            <div className="flex flex-wrap gap-2">
+              {stats.competitors.map(c => (
+                <span
+                  key={c.name}
+                  title={c.proseOnly
+                    ? 'Named in prose, but never ranked in a list by any engine, usually because they are on your own competitor seed list'
+                    : `Ranked ${c.rankedMentions}× by AI engines`}
+                >
+                  <Badge tone="neutral">
+                    {c.name}
+                    {c.proseOnly ? ' · prose only' : ` · ranked ${c.rankedMentions}×`}
+                    {c.avgPos ? ` · avg #${c.avgPos}` : ''}
+                  </Badge>
+                </span>
               ))}
             </div>
-          )}
-        </>
-      )}
-    </div>
+            {stats.competitors.some(c => c.proseOnly) && (
+              <p className="text-meta text-ink-3 mt-3 leading-relaxed">
+                {/* copy: pending bg-copy */}
+                "Prose only" names were never ranked by any engine. They appear because they are on your
+                own competitor list and an engine happened to mention them. They are not counted as losses.
+              </p>
+            )}
+          </Disclosure>
+        )}
+      </div>
+    </Page>
   )
 }
