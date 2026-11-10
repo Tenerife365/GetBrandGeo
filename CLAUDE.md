@@ -22,6 +22,92 @@
 
 ## CURRENT STATE (newest entry 2026-11-10)
 
+### 2026-11-10 (second): Phase 4 reviewed after the fact, fix round and density pass LIVE (638c8de)
+
+**Constantin's words, in order: "Yes, review it", "Yes, start fixes", then
+mid-round a second ask: the Overview tile graphics "don't fit very well",
+the engines on AI Visibility "should be on the same line, as columns", Fix
+this "should not be auto opened", and when opened it should show "P0 first
+column, P1 second column, P2 third column" with a next control, because "I
+have a lot of interest to see also the prompts quicker".** The aim of the
+density pass is that last sentence: the prompts are reached sooner. Keep it
+in mind before adding anything above "Your prompts" on AI Visibility.
+
+**Three commits, two pushes, one Netlify build.** `d2fefcf` (docs only,
+pushed 07:59:03Z):
+`docs/qa/phase4-polish-review-2026-11-10.md`, the independent `bg-verify`
+review of Phase 4 (`6a47971`), PASS WITH FINDINGS. `4f73fff`: 10 dashboard
+files plus `docs/design/phase3-visual/phase4-fix-rulings-2026-11-10.md` and
+`docs/design/phase3-visual/phase5-density-spec-2026-11-10.md`. `638c8de`:
+`docs/qa/phase4-fix-rereview-2026-11-10.md` (PASS WITH FINDINGS, 18 of 18
+criteria) and `docs/qa/phase5-density-review-2026-11-10.md` (PASS WITH
+FINDINGS, 12 of 12 criteria). The last two were pushed together at
+09:35:10Z with `BATCH_PUSH=1` on his "Commit and push".
+
+**What changed, visuals only, no props interface touched.** Fix round, per
+section 7 of the Phase 4 review (D1 to D5, L2, L6, I9, I12): locked engine
+header cells in the prompt matrix no longer overlap or spill, `Notice` keeps
+its own rule colours on hover, sidebar label inset, `Monogram`, table class
+and tone fixes. Density pass: the Engines section of `AIVisibility.tsx` is
+one `Card` holding one row of columns (active engines wide, locked engines
+as compact links to `/account`, coming soon engines as one meta line) that
+scrolls inside its own card on a phone; Fix this starts closed
+(`showFixHub` false) with a count summary and a Show control; opened, it
+shows P0, P1 and P2 as three columns with one fix each and a Next control
+per priority (`fixCursor`); the Overview tile sparkline in `Stat.tsx` is a
+64 by 24 inline line beside the value and the tile is 120 px tall at 1440,
+was 140. Files: `Layout.tsx`, `ui/{Card,Monogram,Notice,ReadoutRow,Stat}.tsx`,
+`ui/tableClasses.ts`, `pages/{AIVisibility,Competitors,Recommendations}.tsx`.
+
+**Measured in demo mode from the orchestrator seat, headless Chrome.**
+"Your prompts" on AI Visibility starts at 682 px at 1440 wide (1,581
+before) and at 1,158 px at 390 wide (2,859 before). With Fix this open it
+starts at 1,129 px and 2,229 px. No horizontal page scroll at 390, 1024,
+1280 or 1440. The demo client is the only shape that was rendered: 12 open
+fixes (2 P1, 10 P2, no P0).
+
+**Amendment worth knowing.** The density review listed four LOW
+accessibility findings (L1 to L4) and the re-review one comment finding
+(F3). A separate `bg-app` builder closed all five afterwards
+(`aria-live` on the "N of M" counter, `role="region"` on the fix text box,
+the engine meta line wraps on a phone, `aria-expanded` plus a label on the
+toggle, the `Card.tsx` comment). They were re-checked from the orchestrator
+seat, not by a second `bg-verify` run, and the density review carries an
+amendment saying so.
+
+**Before the commit:** `tsc` exit 0, 50 of 50 node test files pass, build
+exit 0, local entry chunk 569.49 kB as printed by Vite, added lines free
+of dashes with a positive control, staged files scanned for secrets,
+addresses and names. **LIVE, read from outside at 09:36Z:** `health`
+answers `commit` 638c8de, `built_at` 09:35:25Z, supabase ok, jobs ok,
+watchdog ok; the live entry is `index-ClLAmEdI.js`, the stylesheet
+`index-CJmV3IIv.css`, and the lazy chunk `AIVisibility-PhQ1Hqp7.js` carries
+"Show fixes", "Hide fixes" and "Recommended fix"; `enqueue-collection` and
+`collect-prompt` answer 401 unauthenticated. `dashboard-ci` run 42791948283
+on `638c8de` is `success`, and so is 42779119836 on `d2fefcf`.
+
+**Not checked by anyone.** A client with seven active engines was never
+rendered with the new Engines row. Live screen reader output and Firefox
+text zoom are untested. No reviewer ran a browser, `tsc`, the tests or a
+build, so every pixel figure above is the orchestrator's alone. Nobody has
+looked at the live dashboard signed in with a real account since the push.
+The screenshots are in `docs/design/phase3-visual/after-p5/`, untracked on
+purpose like the earlier screenshot folders.
+
+**Open, none blocking.** F1: the underline at `Layout.tsx:617`
+(`decoration-line-2`) measures 1.57:1 dark and 1.45:1 light, a `bg-design`
+call. F2: `Monogram` gives three letters for a name with a sharp s. F4:
+unreachable tone branches near `Recommendations.tsx:443`. `.spark-fade` is
+now unused. Spec Q1: the direction of the Avg position sparkline is
+unruled. `bg-copy`: every string marked `copy: pending bg-copy` ("Fix
+this", "Show" and "Hide", "N of M", "Next P1 fix"), the admin title that
+still says "refresh icon on this card", and a visible verb on the locked
+engine columns. Still unruled from the first Phase 4 review: accept or
+revert of I5, I6, I7, I8, I10, I11 and the LOW items L1, L3, L4, L7, L8,
+L9, L10, L11. On a 390 px phone the score hero is about 679 px tall, now
+the largest block above the prompts; observed, not asked for, not changed.
+Everything under "Open, none blocking" in the entry below still stands.
+
 ### 2026-11-10: dashboard optimisation Phases 1 to 4 LIVE (6a47971), five migrations applied, reaper cron 11 read back
 
 **Scope, in Constantin's words: "focus pe dashboard si atat, conform
@@ -134,7 +220,9 @@ the live bundle is `index-BFuTClnQ.js` and the live stylesheet
 `index-Du1glrI0.css` carries the new classes; `enqueue-collection` and
 `collect-prompt` answer 401 unauthenticated.
 
-**Not reviewed, not checked.** No independent `bg-verify` run exists for
+**Not reviewed, not checked. STALE on the review: `bg-verify` reviewed
+Phase 4 after the fact the same day, see the entry above.** At the time of
+this entry no independent `bg-verify` run existed for
 Phase 4; it shipped on Constantin's go with the orchestrator seat's own
 checks and demo-mode screenshots (dark and light, 1440 and 390 wide). Nobody
 has looked at the live dashboard signed in with a real account since the
