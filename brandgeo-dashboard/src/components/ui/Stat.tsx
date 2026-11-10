@@ -17,7 +17,7 @@ export interface StatProps {
   tone?: 'neutral' | 'warn' | 'alert'
   /** A TrendDelta, or any node. */
   delta?: ReactNode
-  /** Sparkline series, drawn full-bleed along the bottom edge of the cell. */
+  /** Sparkline series, drawn as a small fixed-size line at the right of the value. */
   spark?: number[]
   pending?: boolean
   /** Shown in place of the value when there is nothing to show. */
@@ -25,22 +25,31 @@ export interface StatProps {
 }
 
 function Spark({ points }: { points: number[] }) {
-  if (points.length < 2) return null
+  if (points.length < 3) return null
+  const W = 64
+  const H = 24
+  const P = 3
+  const n = points.length
   const min = Math.min(...points)
   const max = Math.max(...points)
-  const span = max - min || 1
-  const xy = points.map((p, i) => [(i / (points.length - 1)) * 100, 30 - ((p - min) / span) * 24] as const)
+  const xy = points.map((p, i) => {
+    const x = P + (i * (W - 2 * P)) / (n - 1)
+    const y = max === min ? H / 2 : P + (1 - (p - min) / (max - min)) * (H - 2 * P)
+    return [x.toFixed(2), y.toFixed(2)] as const
+  })
   const line = 'M' + xy.map(([x, y]) => `${x},${y}`).join(' L')
-  const area = `${line} L100,32 L0,32 Z`
+  const [lastX, lastY] = xy[xy.length - 1]
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 100 32"
-      preserveAspectRatio="none"
-      className="spark-fade pointer-events-none absolute inset-x-0 bottom-0 h-8 w-full"
+      focusable="false"
+      width={64}
+      height={24}
+      viewBox="0 0 64 24"
+      className="pointer-events-none shrink-0 self-center ml-auto hidden sm:block lg:hidden xl:block"
     >
-      <path d={area} fill="rgb(var(--ink-3) / 0.14)" />
-      <path d={line} fill="none" stroke="rgb(var(--ink-3))" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+      <path d={line} fill="none" stroke="rgb(var(--ink-3))" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastX} cy={lastY} r={2} fill="rgb(var(--ink-2))" />
     </svg>
   )
 }
@@ -65,10 +74,10 @@ export default function Stat({ label, icon: Icon, value, unit, sub, tone = 'neut
             {tone === 'alert' && <StatusGlyph kind="neg" size={12} className="self-center ml-1" />}
           </span>
         )}
+        {!empty && spark && <Spark points={spark} />}
       </div>
       {!empty && delta && <div className="mt-1.5">{delta}</div>}
       {sub && <div className="mt-1 text-meta text-ink-3">{sub}</div>}
-      {!empty && spark && <Spark points={spark} />}
     </div>
   )
 }

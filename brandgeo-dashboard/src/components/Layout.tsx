@@ -550,8 +550,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
             {/* md:hidden, so this only ever exists on a touch-sized viewport:
                 44x44 unconditionally rather than behind a query. The 18px glyph
-                is unchanged; only the box around it grew, and the header is
-                72px tall so nothing moves. */}
+                is unchanged; only the box around it grew, and the logo row is
+                h-12 (48px) so nothing moves. */}
             <button onClick={closeSidebarAndRestore} className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-ink-2 hover:text-ink transition-colors" aria-label="Close menu">
               <X size={18} />
             </button>
@@ -614,7 +614,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink
               to="/ai-visibility"
               onClick={() => { dismissRunNotice(); closeSidebar() }}
-              className="block mt-1 text-meta text-ink-2 hover:text-ink"
+              className="block mt-1 text-meta text-ink-2 underline decoration-line-2 underline-offset-2 hover:text-ink hover:decoration-ink-3"
             >
               {describeRun(runNotice)}
             </NavLink>
@@ -693,8 +693,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Icon size={16} />
                     {label}
-                    {to === '/social' && socialLocked && <Lock size={12} className="ml-auto text-ink-3" />}
-                    {to === '/seo' && seoLocked && <Lock size={12} className="ml-auto text-ink-3" />}
+                    {to === '/social' && socialLocked && <Lock size={12} className="ml-auto !text-ink-3" />}
+                    {to === '/seo' && seoLocked && <Lock size={12} className="ml-auto !text-ink-3" />}
                   </NavLink>
                 ))}
               </div>
@@ -706,7 +706,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Client switcher: admin only, not in affiliate mode */}
         {!affiliateMode && isAdmin && clients.length > 0 && (
           <div className="px-3 py-3 border-t border-line flex-shrink-0">
-            <div className="text-meta text-ink-3 px-1 mb-1.5">{t.sidebar_client}</div>
+            <div className="label-caps px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
                 ref={clientBtnRef}

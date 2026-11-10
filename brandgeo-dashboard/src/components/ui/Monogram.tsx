@@ -9,12 +9,13 @@ export interface MonogramProps {
 }
 
 function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return '?'
-  const first = Array.from(words[0])[0] ?? ''
-  const second = words.length >= 2 ? (Array.from(words[1])[0] ?? '') : ''
-  const out = (first + second).toUpperCase()
-  return out || '?'
+  const letters: string[] = []
+  for (const word of name.trim().split(/\s+/)) {
+    const ch = Array.from(word).find(c => /\p{L}|\p{N}/u.test(c))
+    if (ch) letters.push(ch)
+    if (letters.length === 2) break
+  }
+  return letters.join('').toUpperCase() || '?'
 }
 
 export default function Monogram({ name, size = 24, you = false }: MonogramProps) {

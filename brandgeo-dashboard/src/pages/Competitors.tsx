@@ -55,7 +55,7 @@ function ShareLabel({ name, you = false }: { name: string; you?: boolean }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Monogram name={name} size={20} you={you} />
-      <span className="min-w-0 break-words sm:truncate">{name}</span>
+      <span className="min-w-0 break-words sm:truncate" title={name}>{name}</span>
     </span>
   )
 }

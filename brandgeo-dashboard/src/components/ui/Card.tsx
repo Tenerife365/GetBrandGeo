@@ -1,7 +1,8 @@
 /**
  * Card: the one surface. Spec 7 / 4.7. Dark carries depth by surface step (no
- * shadow), light by --shadow-card. `interactive` adds a hover surface step and
- * is the only variant that may react to the pointer.
+ * shadow), light by --shadow-card. Every Card steps its border on hover
+ * (Notice holds its own rule colours on hover); `interactive` adds the hover
+ * surface step.
  */
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cx } from './cx'

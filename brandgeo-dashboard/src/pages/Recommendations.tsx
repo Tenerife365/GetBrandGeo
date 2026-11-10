@@ -440,7 +440,7 @@ function StoredRecCard({
     <Card className={dim ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <Badge tone="neutral" glyph={<Zap size={12} aria-hidden="true" />}>{IMPACT_LABEL[rec.priority]}</Badge>
-        <Badge tone={st.tone}>{st.label}</Badge>
+        <Badge tone={st.tone} glyph={st.tone === 'pos' || st.tone === 'warn' || st.tone === 'neg' ? <StatusGlyph kind={st.tone} size={12} /> : undefined}>{st.label}</Badge>
         {(rec.engines ?? []).map(e => (
           <EngineTag key={e} id={e} fallbackLabel={LLM_LABEL[e] ?? e} />
         ))}

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
-  CircleCheck, Undo2, EyeOff, Download,
+  CircleCheck, Undo2, EyeOff, Download, ChevronRight,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
@@ -361,9 +361,8 @@ export default function AIVisibility() {
   // The snapshot could not be loaded (or a refresh failed). Existing data stays on screen.
   const loadError = status === 'error' || staleError
   const [reloading, setReloading] = useState(false)
-  // Fix This hub: show top 3 by default, reveal the rest on demand (Nielsen audit
-  // edge case: "add a Show all when there are more than 3 items").
-  const [showAllFixes, setShowAllFixes] = useState(false)
+  // Fix This hub columns: which item each priority column is showing (clamped at render).
+  const [fixCursor, setFixCursor] = useState<{ P0: number; P1: number; P2: number }>({ P0: 0, P1: 0, P2: 0 })
   const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
   const [showInsights, setShowInsights] = useState(true)
@@ -371,7 +370,8 @@ export default function AIVisibility() {
   // still reveal it via the CSS `group` pattern; this exists so touch users, who
   // have no hover state, can reach the same content.
   const [scoreInfoOpen, setScoreInfoOpen] = useState(false)
-  const [showFixHub, setShowFixHub]     = useState(true)
+  // The Fix This hub starts closed; the header shows a short summary and opens on click.
+  const [showFixHub, setShowFixHub]     = useState(false)
   const [copiedFix, setCopiedFix]       = useState<string | null>(null)
   // Stored fix states (public.fix_states), keyed by fix_id. No row = open.
   const [fixRows, setFixRows]           = useState<Map<string, FixStateRow>>(new Map())
@@ -772,9 +772,9 @@ export default function AIVisibility() {
   const newestErrorAtByEngine = data?.newestErrorAtByEngine ?? EMPTY_BY_ENGINE
 
   const lockedColumns = pickLockedColumns(engineStates)
-  const lockedChipEngines = (isWide
-    ? lockedCandidates(engineStates).filter(e => !lockedColumns.includes(e))
-    : lockedCandidates(engineStates))
+  // Every locked engine gets a compact column in the Engines strip, on every
+  // viewport, so the strip is the whole roster on one row.
+  const lockedStripEngines = lockedCandidates(engineStates)
 
   // Rendered plan: sections in order, filtered by category, with one continuous
   // 1..N numbering across everything visible (collapsed sections still count).
@@ -844,6 +844,12 @@ export default function AIVisibility() {
   ) ?? item.fix
   const promptTextOf = (id: number) => prompts.find(p => p.id === id)?.text
   const openFixItems = fixItems.filter(i => isOpenState(fixRows.get(i.id)?.status))
+  // Closed-hub summary, for example "2 P0, 5 P1, 5 P2". Computed at render.
+  const fixSummary = (['P0', 'P1', 'P2'] as const)
+    .map(p => ({ p, n: openFixItems.filter(i => i.priority === p).length }))
+    .filter(x => x.n > 0)
+    .map(x => `${x.n} ${x.p}`)
+    .join(', ') // copy: pending bg-copy
   const doneFixRows = Array.from(fixRows.values())
     .filter(r => r.status === 'done' || r.status === 'verified' || r.status === 'dismissed')
     .sort((a, b) => (b.checked_at ?? b.marked_at ?? '').localeCompare(a.checked_at ?? a.marked_at ?? ''))
@@ -1114,8 +1120,8 @@ export default function AIVisibility() {
   // the prompt to three letters while seven 8rem engine columns stay rigid.
   const PROMPT_COL_MIN_REM = 13
   const ENGINE_COL_MIN_REM = 3.5
-  const LOCKED_COL_MIN_REM = 2.75
-  const lockedTemplate = lockedColumns.length > 0 ? ` repeat(${lockedColumns.length}, minmax(${LOCKED_COL_MIN_REM}rem, 4.5rem))` : ''
+  const LOCKED_COL_MIN_REM = 5.25
+  const lockedTemplate = lockedColumns.length > 0 ? ` repeat(${lockedColumns.length}, minmax(${LOCKED_COL_MIN_REM}rem, 5.5rem))` : ''
   const tableColsTemplate = `2.5rem minmax(${PROMPT_COL_MIN_REM}rem, 1fr) repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))${lockedTemplate}`
   const tableMinWidth = `${2.5 + PROMPT_COL_MIN_REM + activeLLMs.length * ENGINE_COL_MIN_REM + lockedColumns.length * LOCKED_COL_MIN_REM}rem`
 
@@ -1870,12 +1876,20 @@ export default function AIVisibility() {
       </motion.div>
 
       {/* ── Block 3: engines (status cards, coming soon and locked in one card) ── */}
-      {(engineStatusCards.length > 0 || comingSoonEngines.length > 0 || lockedChipEngines.length > 0) && (
+      {(engineStatusCards.length > 0 || comingSoonEngines.length > 0 || lockedStripEngines.length > 0) && (
         <motion.div className="mb-4" {...reveal(1)}>
-          <Card pad="standard">
-            <SectionHeader title="Engines" />{/* copy: pending bg-copy */}
-            {engineStatusCards.length > 0 && (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
+            <h2 className="label-caps">Engines</h2>{/* copy: pending bg-copy */}
+            {comingSoonEngines.length > 0 && (
+              <span className="inline-flex items-center gap-1 text-meta text-ink-3">
+                <Clock size={11} aria-hidden="true" />
+                {`Coming soon: ${joinEngineLabels(comingSoonEngines.map(id => ENGINE_META[id].label))}`}{/* copy: pending bg-copy */}
+              </span>
+            )}
+          </div>
+          {(engineStatusCards.length > 0 || lockedStripEngines.length > 0) && (
+            <Card pad="none" className="overflow-hidden">
+              <div className="flex divide-x divide-line overflow-x-auto snap-x snap-mandatory lg:snap-none">
                 {engineStatusCards.map(e => {
                   const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
                     ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
@@ -1884,11 +1898,36 @@ export default function AIVisibility() {
                     : e.status === 'MISSING' ? { label: 'Missing', tone: 'neg' } // copy: pending bg-copy
                     : { label: 'Not checked yet', tone: 'neutral' } // copy: pending bg-copy
                   const statusKind = statusBadge.tone === 'neutral' ? null : statusBadge.tone
+                  const isMeasured = !e.isUnavailable && e.status !== 'NOT_MEASURED'
+                  const sinceText = formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? '')
+                  const isPartialWarn = isMeasured && !e.lastAttemptFailed && partialErrorEngines.has(e.id)
+                  // One warn line at most: unavailable, then last attempt failed, then partial.
+                  const warnSentence = e.isUnavailable || (isMeasured && e.lastAttemptFailed)
+                    ? engineNotAnsweringLine(e.lastErrorCode, sinceText)
+                    : isPartialWarn
+                      ? enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))
+                      : null
+                  const warnTitle = isPartialWarn
+                    ? (isAdmin
+                        ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
+                        : 'Some checks failed to sync, so this percentage is partial.')
+                    : (warnSentence !== null && isAdmin && e.lastErrorCode ? `${warnSentence} (${e.lastErrorCode})` : warnSentence ?? undefined)
+                  const metaText = e.isUnavailable
+                    ? (isAdmin
+                        ? 'Force Refresh to retry'
+                        : collectionAllowance.nextAvailableAt
+                          // A non-admin in cooldown can't press Run Collection to
+                          // retry, so do not tell them to.
+                          ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
+                          : 'Run Collection to retry')
+                    : e.status === 'NOT_MEASURED'
+                      ? 'Not measured yet · run a collection to check this engine'
+                      : `${e.mentioned} of ${e.checked} prompts${e.bestPos !== null ? `, best #${e.bestPos}` : ''}`
                   return (
-                    <div key={e.id} className="relative rounded-control bg-surface-2 p-3 flex flex-col gap-2 min-w-0">
+                    <div key={e.id} className="relative flex flex-col gap-1 min-w-[46%] sm:min-w-[164px] lg:min-w-[132px] lg:max-w-[280px] flex-[2_1_0%] p-3 snap-start">
                       <div className="flex items-center gap-2 min-w-0">
-                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-6 h-6 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
-                        <span className="text-heading text-ink truncate">{e.label}</span>
+                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-5 h-5 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        <span className="text-body font-semibold text-ink truncate" title={e.label}>{e.label}</span>
                         {isAdmin && (
                           <button
                             onClick={() => handleRefreshEngine(e.id)}
@@ -1902,58 +1941,26 @@ export default function AIVisibility() {
                         )}
                       </div>
 
-                      {e.isUnavailable ? (
-                        <>
-                          <div
-                            className="flex items-start gap-1.5 text-meta text-warn"
-                            title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
-                          >
-                            <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
-                            {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
-                          </div>
-                          <div className="text-meta text-ink-2">
-                            {isAdmin
-                              ? 'Force Refresh to retry'
-                              : collectionAllowance.nextAvailableAt
-                                // A non-admin in cooldown can't press Run Collection to
-                                // retry, so do not tell them to.
-                                ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
-                                : 'Run Collection to retry'}
-                          </div>
-                        </>
-                      ) : e.status === 'NOT_MEASURED' ? (
-                        <div className="text-meta text-ink-2">Not measured yet · run a collection to check this engine</div>
-                      ) : (
-                        <>
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
-                            <span className="text-meta text-ink-2">
-                              {e.mentioned} of {e.checked} prompts{e.bestPos !== null ? `, best #${e.bestPos}` : ''}
-                            </span>
-                          </div>
-                          {/* The MOST RECENT attempt failed even though older rows
-                              succeeded and the % above is real. It outranks the
-                              partial notice because it describes what just happened. */}
-                          {e.lastAttemptFailed && (
-                            <div
-                              className="flex items-start gap-1.5 text-meta text-warn"
-                              title={isAdmin ? (e.lastErrorCode ?? undefined) : undefined}
-                            >
-                              <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
-                              {engineNotAnsweringLine(e.lastErrorCode, formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? ''))}
-                            </div>
-                          )}
-                          {partialErrorEngines.has(e.id) && !e.lastAttemptFailed && (
-                            <div
-                              className="flex items-start gap-1.5 text-meta text-warn"
-                              title={isAdmin
-                                ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
-                                : 'Some checks failed to sync, so this percentage is partial.'}
-                            >
-                              <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" /> {enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))}
-                            </div>
-                          )}
-                        </>
+                      <div className="flex items-center gap-2 min-h-[28px]">
+                        {isMeasured && (
+                          <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
+                        )}
+                        <Badge
+                          tone={statusBadge.tone}
+                          glyph={statusKind ? <StatusGlyph kind={statusKind} size={12} /> : undefined}
+                          className="ml-auto shrink-0"
+                        >
+                          {statusBadge.label}
+                        </Badge>
+                      </div>
+
+                      <div className="text-meta text-ink-2 line-clamp-2 sm:line-clamp-none sm:truncate" title={metaText}>{metaText}</div>
+
+                      {warnSentence !== null && (
+                        <div className="flex items-start gap-1 text-meta text-warn" title={warnTitle}>
+                          <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
+                          <span className="line-clamp-2 min-w-0">{warnSentence}</span>
+                        </div>
                       )}
 
                       {/* This specific "re-run this engine" click was rejected
@@ -1964,47 +1971,28 @@ export default function AIVisibility() {
                           genuine request failure. */}
                       {engineRefreshFailed === e.id && (() => {
                         const isRealFailure = lastBlockReason?.reason === 'request_failed'
+                        const refreshFailedText = `Refresh did not run${lastBlockReason ? ` · ${describeCollectionBlock(lastBlockReason).title.toLowerCase()}` : ''}`
                         return (
-                          <div className={`flex items-center gap-1 text-meta ${isRealFailure ? 'text-neg' : 'text-warn'}`}>
-                            <AlertTriangle size={12} aria-hidden="true" /> Refresh did not run{lastBlockReason ? ` · ${describeCollectionBlock(lastBlockReason).title.toLowerCase()}` : ''}
+                          <div className={isRealFailure ? 'flex items-center gap-1 text-meta text-neg truncate' : 'flex items-center gap-1 text-meta text-warn truncate'} title={refreshFailedText}>
+                            <AlertTriangle size={12} aria-hidden="true" className="shrink-0" /> {refreshFailedText}
                           </div>
                         )
                       })()}
 
-                      <div className="mt-auto flex flex-wrap items-center gap-2">
-                        <Badge tone={statusBadge.tone} glyph={statusKind ? <StatusGlyph kind={statusKind} size={12} /> : undefined}>
-                          {statusBadge.label}
-                        </Badge>
-                        {e.lastOkAt && !e.isUnavailable && (
-                          <span
-                            className="text-meta text-ink-3 tabular-nums"
-                            title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
-                          >
-                            {formatRelativeOrDate(e.lastOkAt)}
-                          </span>
-                        )}
-                      </div>
+                      {e.lastOkAt && !e.isUnavailable && (
+                        <div
+                          className="mt-auto text-meta text-ink-3 tabular-nums truncate"
+                          title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
+                        >
+                          {formatRelativeOrDate(e.lastOkAt)}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
-              </div>
-            )}
-
-            {/* Coming soon collapses to one quiet line. */}
-            {comingSoonEngines.length > 0 && (
-              <p className="mt-3 mb-0 text-meta text-ink-3">
-                <Clock size={11} aria-hidden="true" className="inline mr-1 -mt-0.5" />
-                {`Coming soon: ${joinEngineLabels(comingSoonEngines.map(id => ENGINE_META[id].label))}`}{/* copy: pending bg-copy */}
-              </p>
-            )}
-
-            {/* Locked engines stay as chips under one label. */}
-            {lockedChipEngines.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-meta font-medium text-ink-3 flex items-center gap-1">
-                  <Lock size={11} aria-hidden="true" /> Locked on your plan{/* copy: pending bg-copy */}
-                </span>
-                {lockedChipEngines.map(id => {
+                {/* Locked engines: compact columns on the same row, each one a
+                    link to the plan page. */}
+                {lockedStripEngines.map(id => {
                   const meta      = ENGINE_META[id]
                   const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
                   return (
@@ -2013,17 +2001,22 @@ export default function AIVisibility() {
                       to="/account"
                       aria-label={`${meta.label}: unlock on ${planLabel}`}
                       title={`${meta.label} is available on the ${planLabel} plan and above`}
-                      className="flex items-center gap-1.5 min-h-[32px] pl-1.5 pr-2 py-1 rounded-badge bg-surface border border-edge hover:bg-surface-2 transition-colors"
+                      className="group flex flex-col gap-1 min-w-[124px] lg:min-w-[96px] lg:max-w-[168px] flex-1 basis-0 p-3 lg:px-2 xl:px-3 snap-start hover:bg-surface-2 transition-colors focus-visible:-outline-offset-2"
                     >
-                      <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain grayscale opacity-70" />
-                      <span className="text-meta font-medium text-ink-2">{meta.label}</span>
-                      <span className="text-meta text-ink-3">Unlock on {planLabel}</span>
+                      <span className="flex items-center gap-2 min-w-0 lg:flex-col lg:items-start lg:gap-1 xl:flex-row xl:items-center xl:gap-2">
+                        <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 shrink-0 object-contain grayscale opacity-70" />
+                        <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
+                      </span>
+                      <span className="flex items-center gap-1 min-w-0 text-meta text-ink-3">
+                        <Lock size={11} aria-hidden="true" className="shrink-0" />
+                        <span className="truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{planLabel}</span>
+                      </span>
                     </Link>
                   )
                 })}
               </div>
-            )}
-          </Card>
+            </Card>
+          )}
         </motion.div>
       )}
 
@@ -2035,15 +2028,18 @@ export default function AIVisibility() {
           <SectionHeader
             title="Fix this"/* copy: pending bg-copy */
             count={openFixItems.length}
-            description={`${openFixItems.length} action${openFixItems.length !== 1 ? 's' : ''} to improve your score`}
+            description={showFixHub
+              ? `${openFixItems.length} action${openFixItems.length !== 1 ? 's' : ''} to improve your score`
+              : (openFixItems.length === 0 ? FIX_COPY.allDone : fixSummary)}
             actions={
               <Button
                 ref={fixHubToggleRef}
-                variant="ghost"
+                variant={showFixHub ? 'ghost' : 'secondary'}
                 size="sm"
                 icon={showFixHub ? ChevronUp : ChevronDown}
                 onClick={() => setShowFixHub(v => !v)}
                 aria-expanded={showFixHub}
+                aria-label={showFixHub ? 'Hide fixes' : 'Show fixes'}/* copy: pending bg-copy */
               >
                 {showFixHub ? 'Hide' : 'Show'}{/* copy: pending bg-copy */}
               </Button>
@@ -2051,92 +2047,114 @@ export default function AIVisibility() {
           />
           <Collapse open={showFixHub}>
             <Card pad="none" className="overflow-hidden">
-              {/* Workflow explainer: the fix itself is a content action outside
-                  the app; marking it done is what the app tracks and re-checks
-                  (docs/arch/fix-states.md). */}
-              <p className="m-0 px-4 py-2.5 text-meta text-ink-2 bg-surface-2 border-b border-line">
-                {FIX_COPY.explainer}
-              </p>
               {openFixItems.length === 0 && (
                 <div className="px-4 py-4 text-meta text-ink-2 flex items-center gap-2">
                   <CircleCheck size={14} className="text-pos-ink shrink-0" aria-hidden="true" />
                   {FIX_COPY.allDone}
                 </div>
               )}
-              <ul className="m-0 p-0 list-none divide-y divide-line">
-                {(showAllFixes ? openFixItems : openFixItems.slice(0, 3)).map(item => {
-                  const row = fixRows.get(item.id)
-                  const reopenedLine = reopenedFixLine(row)
-                  const busy = fixBusy === item.id
-                  const prioTone = item.priority === 'P0' ? 'neg' : item.priority === 'P1' ? 'accent' : 'neutral'
-                  return (
-                    <li key={item.id} className="px-4 py-4">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <Badge tone={prioTone}>{item.priority}</Badge>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-heading text-ink break-words">{item.title}</div>
-                          <div className="text-body text-ink-2 mt-0.5">{item.description}</div>
-                          {reopenedLine && (
-                            <div className="mt-2 flex items-start gap-1.5 text-meta text-warn bg-warn-tint border border-warn rounded-control px-3 py-2">
-                              <RotateCcw size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-                              <span>{reopenedLine}</span>
-                            </div>
+              {openFixItems.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-line">
+                  {(['P0', 'P1', 'P2'] as const).map(p => {
+                    const list = openFixItems.filter(i => i.priority === p)
+                    // Clamp at render: a fix that leaves the list lets the next one take its place.
+                    const idx = list.length === 0 ? 0 : Math.min(fixCursor[p], list.length - 1)
+                    const item = list[idx]
+                    const prioTone = p === 'P0' ? 'neg' : p === 'P1' ? 'accent' : 'neutral'
+                    const row = item ? fixRows.get(item.id) : undefined
+                    const reopenedLine = reopenedFixLine(row)
+                    const busy = item ? fixBusy === item.id : false
+                    return (
+                      <section key={p} aria-label={`${p} fixes`/* copy: pending bg-copy */} className="flex flex-col min-w-0 p-4">
+                        <div className="flex items-center gap-2 mb-3 min-h-[28px]">
+                          <Badge tone={prioTone}>{p}</Badge>
+                          {list.length > 0 && (
+                            <span className="text-meta text-ink-3 tabular-nums" aria-live="polite" aria-atomic="true">{`${idx + 1} of ${list.length}`/* copy: pending bg-copy */}</span>
                           )}
-                          <div className="mt-3 rounded-control bg-surface-2 p-3 text-body text-ink-2">
-                            <span className="text-meta font-medium text-ink-3 block mb-1">Recommended fix</span>
-                            {item.fix}
-                          </div>
-                          {fixNotice?.id === item.id && (
-                            <div role="status" className="mt-2 text-meta text-warn">{fixNotice.text}</div>
-                          )}
-                          <div className="mt-3 flex flex-row flex-wrap items-center gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => copyFix(item.id, fixPromptFor(item))}
-                              aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
-                            >
-                              {copiedFix === item.id
-                                ? <><CheckCheck size={14} aria-hidden="true" className="text-pos-ink" /> Copied</>
-                                : <><Copy size={14} aria-hidden="true" /> {FIX_COPY.copyPrompt}</>
-                              }
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon={CircleCheck}
-                              loading={busy}
-                              onClick={() => markFix(item, 'done')}
-                              aria-label={`${FIX_COPY.markDone}: ${item.title}`}
-                            >
-                              {FIX_COPY.markDone}
-                            </Button>
+                          {list.length > 1 && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              icon={EyeOff}
-                              disabled={busy}
-                              onClick={() => markFix(item, 'dismissed')}
-                              aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
+                              icon={ChevronRight}
+                              className="ml-auto"
+                              aria-label={`Next ${p} fix`/* copy: pending bg-copy */}
+                              onClick={() => setFixCursor(c => ({ ...c, [p]: (idx + 1) % list.length }))}
                             >
-                              {FIX_COPY.dismiss}
+                              Next{/* copy: pending bg-copy */}
                             </Button>
-                          </div>
+                          )}
                         </div>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-              {/* Only the top 3 are shown by default. Done and set-aside fixes
-                  leave this list, so the next ones move up. */}
-              {openFixItems.length > 3 && (
-                <div className="border-t border-line px-4 py-2">
-                  <Button variant="tertiary" size="sm" onClick={() => setShowAllFixes(v => !v)}>
-                    {showAllFixes ? 'Show fewer' : `Show all ${openFixItems.length} actions`}
-                  </Button>
+                        {!item && (
+                          <p className="m-0 text-meta text-ink-3">Nothing open at this priority{/* copy: pending bg-copy */}</p>
+                        )}
+                        {item && (
+                          <div key={item.id} className="flex flex-col flex-1 min-w-0">
+                            <div className="text-heading text-ink line-clamp-2 break-words" title={item.title}>{item.title}</div>
+                            <div className="text-body text-ink-2 mt-1 line-clamp-4" title={item.description}>{item.description}</div>
+                            {reopenedLine && (
+                              <div className="mt-2 flex items-start gap-1.5 text-meta text-warn bg-warn-tint border border-warn rounded-control px-3 py-2">
+                                <RotateCcw size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
+                                <span>{reopenedLine}</span>
+                              </div>
+                            )}
+                            <div
+                              className="mt-3 rounded-control bg-surface-2 p-3 text-body text-ink-2 max-h-[176px] overflow-y-auto"
+                              tabIndex={0}
+                              role="region"
+                              aria-label="Recommended fix"
+                            >
+                              <span className="text-meta font-medium text-ink-3 block mb-1">Recommended fix</span>
+                              {item.fix}
+                            </div>
+                            {fixNotice?.id === item.id && (
+                              <div role="status" className="mt-2 text-meta text-warn">{fixNotice.text}</div>
+                            )}
+                            <div className="mt-auto pt-3 flex flex-row flex-wrap items-center gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => copyFix(item.id, fixPromptFor(item))}
+                                aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
+                              >
+                                {copiedFix === item.id
+                                  ? <><CheckCheck size={14} aria-hidden="true" className="text-pos-ink" /> Copied</>
+                                  : <><Copy size={14} aria-hidden="true" /> {FIX_COPY.copyPrompt}</>
+                                }
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={CircleCheck}
+                                loading={busy}
+                                onClick={() => markFix(item, 'done')}
+                                aria-label={`${FIX_COPY.markDone}: ${item.title}`}
+                              >
+                                {FIX_COPY.markDone}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={EyeOff}
+                                disabled={busy}
+                                onClick={() => markFix(item, 'dismissed')}
+                                aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
+                              >
+                                {FIX_COPY.dismiss}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    )
+                  })}
                 </div>
               )}
+              {/* Workflow explainer: the fix itself is a content action outside
+                  the app; marking it done is what the app tracks and re-checks
+                  (docs/arch/fix-states.md). */}
+              <p className="m-0 px-4 py-2.5 text-meta text-ink-2 bg-surface-2 border-t border-line">
+                {FIX_COPY.explainer}
+              </p>
               {doneFixRows.length > 0 && (
                 <div className="border-t border-line">
                   <button
@@ -2391,12 +2409,16 @@ export default function AIVisibility() {
                                 to="/account"
                                 aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
                                 title={ENGINE_META[id].label}
-                                className="flex flex-col items-center justify-center gap-1 min-h-[44px] py-1 rounded-md hover:bg-surface-3 min-w-0"
+                                className="flex flex-col items-center justify-center gap-1 min-h-[44px] px-1 py-1.5 rounded-md hover:bg-surface-3 min-w-0"
                               >
                                 <span className="w-6 h-6 rounded-badge bg-surface ring-1 ring-inset ring-line flex items-center justify-center">
                                   <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain grayscale opacity-70" />
                                 </span>
-                                <span className="text-meta leading-none text-ink-2 whitespace-nowrap">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                                <span className="max-w-full text-meta leading-tight text-ink-2 text-center break-words line-clamp-2">{ENGINE_META[id].label}</span>
+                                <span className="inline-flex max-w-full items-center justify-center gap-1 text-meta leading-tight text-ink-3">
+                                  <Lock size={10} aria-hidden="true" className="shrink-0" />
+                                  <span className="min-w-0 text-center">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                                </span>
                               </Link>
                             ))}
                           </div>

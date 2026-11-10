@@ -8,7 +8,7 @@ export default function ReadoutRow({ children }: { children: ReactNode }) {
     <Card pad="none">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line rounded-card overflow-hidden">
         {cells.map((cell, i) => (
-          <div key={i} className="relative overflow-hidden bg-surface p-5 pb-10 min-h-[136px] min-w-0">
+          <div key={i} className="relative overflow-hidden bg-surface p-5 min-h-[120px] min-w-0">
             {cell}
           </div>
         ))}

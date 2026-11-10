@@ -12,9 +12,9 @@ export interface NoticeProps {
 }
 
 const RULE: Record<NoticeProps['tone'], string> = {
-  warn: 'border-l-warn',
-  neg: 'border-l-neg',
-  accent: 'border-l-accent-ink',
+  warn: 'border-l-warn hover:border-l-warn hover:border-t-line hover:border-r-line hover:border-b-line',
+  neg: 'border-l-neg hover:border-l-neg hover:border-t-line hover:border-r-line hover:border-b-line',
+  accent: 'border-l-accent-ink hover:border-l-accent-ink hover:border-t-line hover:border-r-line hover:border-b-line',
 }
 const GLYPH: Record<NoticeProps['tone'], StatusKind> = { warn: 'warn', neg: 'warn', accent: 'info' }
 

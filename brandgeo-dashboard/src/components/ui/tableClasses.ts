@@ -4,7 +4,7 @@
  * Use `th scope="col"`.
  */
 export const tableClasses = {
-  wrap: 'overflow-x-auto lg:overflow-x-clip lg:overflow-y-visible rounded-card border border-line bg-surface shadow-card',
+  wrap: 'overflow-x-auto lg:overflow-clip rounded-card border border-line bg-surface shadow-card',
   table: 'w-full border-collapse text-body text-ink',
   thead: '',
   th: 'table-head-sticky h-9 px-4 text-left label-caps whitespace-nowrap',
