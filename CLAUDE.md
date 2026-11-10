@@ -20,7 +20,144 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-02)
+## CURRENT STATE (newest entry 2026-11-10)
+
+### 2026-11-10: dashboard optimisation Phases 1 to 4 LIVE (6a47971), five migrations applied, reaper cron 11 read back
+
+**Scope, in Constantin's words: "focus pe dashboard si atat, conform
+instructionilor de optimizare".** Four commits in three days, each pushed on
+his go with `BATCH_PUSH=1`, one Netlify build each. Source blueprint:
+`docs/audit/system-uiux-blueprint-2026-11-08.md` (still untracked).
+`origin/main` is `6a47971`.
+
+**Phase 1, `9560027` (2026-11-08 20:43Z), server spend gates and frontend
+quick wins, 19 files.** 15 confirmed findings fixed. `get-subscription` IDOR
+closed (the `client_id` is parsed first, then `requireAuth(event, {
+clientId })`). `collect-prompt` takes its engines from the plan of the
+client, server side; `force` is admin only and a viewer sending it is
+answered with `force_ignored`. `collection-worker-background`,
+`run-full-audit-background` and `seo-crawl-background` gate on
+`X-Internal-Key` and fail closed (503 when the variable is unset, 401 when
+wrong, `timingSafeEqual`), which closes the R1 fail-open recorded on
+2026-07-28. `_auth.js` `checkCollectionLimits` reads spend through the
+`sum_cost_eur` RPC and a read error blocks with `budget_unverifiable`.
+Frontend: route-level code splitting with a chunk-error boundary, mid-run
+reloads throttled to one per 25 s, `LoadErrorCard` with Retry, mobile nav
+order, the "Collection market" label.
+`tests/phase1_server_hardening.test.js`, 65 checks.
+
+**Phase 2, `4aa7193` (2026-11-09 07:15Z), shared results layer and collector
+billing gates, 55 files.** Overview, AI Visibility, Mentions, Brand
+Sentiment, Competitors and Recommendations read ONE results layer fed by the
+`client_results_latest` RPC, and `src/lib/metrics.ts` holds the one set of
+metric definitions. History reads are paged, so the 1,000 row truncation is
+gone on those six pages. CSV export on AI Visibility and Competitors. Client
+switch guards. The three collectors verify that the prompt exists and
+belongs to the client (404 or 403), use the stored prompt text for a viewer,
+parse ids as positive int4, refuse a non-object body, and keep the admin
+only force and the plan engine gate. `schedule-collections` starts the
+worker when pending jobs are due. Spec
+`docs/arch/phase2-results-layer-spec.md`, plan
+`docs/arch/phase2-dashboard-plan-2026-11-08.md`. Reviews, all in `docs/qa/`:
+the server chain (`phase2-server-review`, `rereview`, `final`, `final2`,
+`n7-closure`) opened FAIL and closed PASS WITH FINDINGS; the frontend chain
+(`phase2-frontend-review`, `rereview`, `final`, `final2`) returned FAIL
+twice and closed PASS WITH FINDINGS at `final2`.
+
+**Rulings taken in this work, do not re-argue.** Prompts are ARCHIVED, never
+deleted, by a customer ("Archive, not delete"): the Prompts page sets
+`is_active = false` for a viewer and the database now refuses a DELETE from
+a viewer. The hourly scheduler starts the worker ("Hourly scheduler starts
+it"). All three 2026-11-09 migrations were applied on "Yes, apply all
+three".
+
+**Five migrations applied to production and read back from
+`supabase_migrations.schema_migrations`:** `sum_cost_eur_rpc_2026_11_08`,
+`client_results_latest_rpc_2026_11_08`,
+`prompts_delete_admin_only_and_column_grants_2026_11_09`,
+`prompt_cap_bypass_fix_2026_11_09`, `reap_stuck_collection_jobs_2026_11_08`.
+Files in `db/`: `supabase-sum-cost-eur-rpc-2026-11-08.sql`,
+`supabase-client-results-latest-rpc-2026-11-08.sql`,
+`supabase-prompts-delete-admin-only-2026-11-09.sql`,
+`supabase-prompt-cap-bypass-fix-2026-11-09.sql`,
+`supabase-collection-jobs-reaper-2026-11-08.sql`. The cap fix answers P1 of
+`docs/qa/phase2-server-n7-closure-2026-11-09.md`: the prompt cap trigger was
+a no-op for viewers. Live `prompts` policies: `prompts_delete` is
+`is_admin()` only; `prompts_update` and `prompts_client_read` are
+`is_admin() OR has_client_access(client_id)`.
+
+**`cron.job` 11 `reap-stuck-collection-jobs`, `25 * * * *`, active, read
+back 2026-11-10.** 23 runs `succeeded` from 2026-11-09 08:25Z to 2026-11-10
+06:25Z, 23 `job_runs` rows all `ok = true`, and every `detail` reads zero
+requeued, zero failed, zero runs touched (`stale_after` `00:30:00`,
+`max_attempts` 3). So the job runs and has not yet had anything to reap; its
+requeue path is unexercised in production. The same read showed
+`obs-watchdog` 48, `schedule-collections` 48, `expire-plan-grants` 2 and
+`ping-sitemap` 2 runs in two days, all `ok = true`.
+
+**Phase 3, `733b6f7` (2026-11-09 09:44Z), the visual upgrade, 88 files.**
+The brief set three guardrails that still bind any visual work on the
+dashboard: visuals only (no query, data fetching, effect, results context or
+billing change), no change to the props interface of an existing shared
+component, and theme safety through the CSS variables. Colour now comes from
+semantic tokens in `src/index.css` mapped in `tailwind.config.js`
+(`bg-surface`, `bg-surface-2`, `text-ink`, `text-ink-2`, `border-line`,
+`border-edge`, `shadow-raised`, `rounded-control`, `rounded-badge`), guarded
+by `tests/tokens_sync.test.js`. Light mode holds by construction: the 92
+`!important` remaps are gone and one rule is left. Surfaces are near
+neutral; violet is kept for the primary action, selection and the series of
+the client itself. Six type sizes, weight cap 600. Neutral sidebar with an
+active rail, the time filter as a segmented control, a 5-slot phone bar
+(Overview, Visibility, Sentiment, Mentions, More), new primitives in
+`src/components/ui/`. Spec
+`docs/design/phase3-visual/phase3-visual-spec.md`; review
+`docs/qa/phase3-visual-review-2026-11-09.md` FAIL on seven criteria, then
+`docs/qa/phase3-visual-rereview-2026-11-09.md` PASS WITH FINDINGS.
+**Sections 4.2 and 4.3 below are STALE on this:** "dark mode only" and the
+slate class list no longer describe the dashboard. Use the tokens.
+
+**Phase 4, `6a47971` (pushed 2026-11-10 06:59:32Z), polish of the shell,
+surfaces and tables, 25 files.** Spec
+`docs/design/phase3-visual/phase4-polish-spec.md` (P4-1 to P4-30). New: font
+size `kpi` (32 px on 36 px, 600), the classes `.label-caps`,
+`.card-accent-top`, `.spark-fade`, `.table-head-sticky`, `.reveal`,
+`.reveal-row`, `.status-dot`, `.side-row` and `.scrim`, and
+`src/components/ui/Monogram.tsx`. Two layout regressions were caught in
+screenshots and fixed before the commit: a clipped locked-engine header in
+the AI Visibility matrix and names overlapping bars in the phone "Share of
+mentions" chart. Before the commit: `tsc` exit 0, 50 of 50 node test files
+pass, build exit 0, entry chunk 569,509 bytes against 569,286 before (223
+bytes more), stylesheet 70,147 bytes, dash scan on added lines clean with a
+positive control. **LIVE, read from outside at 07:00:27Z:** `health` answers
+`commit` 6a47971, `built_at` 06:59:46Z, supabase ok, jobs ok, watchdog ok;
+the live bundle is `index-BFuTClnQ.js` and the live stylesheet
+`index-Du1glrI0.css` carries the new classes; `enqueue-collection` and
+`collect-prompt` answer 401 unauthenticated.
+
+**Not reviewed, not checked.** No independent `bg-verify` run exists for
+Phase 4; it shipped on Constantin's go with the orchestrator seat's own
+checks and demo-mode screenshots (dark and light, 1440 and 390 wide). Nobody
+has looked at the live dashboard signed in with a real account since the
+push. After a dashboard deploy, hard reload (Ctrl+Shift+R) before judging
+it.
+
+**Worth knowing before touching the shell.** `SegmentedControl` renders on
+every route through `Layout`, so it imports nothing from `motion`: a sliding
+`layoutId` indicator pulled about 128 kB into the entry chunk on 2026-11-09
+and was replaced by a CSS transition. Keep motion out of anything `Layout`
+imports, and judge it by the entry chunk size.
+
+**Open, none blocking.** L16: the W, M and Q segments on Brand Sentiment and
+Competitors expose single letters as accessible names; the fix needs an
+optional per-option label on `SegmentedOption`, a props change, so it was
+left out under the guardrail and needs a ruling. `bg-copy`: the three
+placeholder sentences for Collecting, Done and Stopped. `bg-architect`: M11,
+AI Visibility shows two denominators one card apart (prompts in the hero,
+answered rows in the engine tile). The admin Revenue page still reads
+through the 1,000 row limit. The worker does not re-check the client budget
+per job (the second layer named in the n7 closure). The `ai_results` RLS
+initPlan rewrite is unwritten (`docs/arch/ai-results-rls-initplan.md` does
+not exist). `.scrim` may want a token of its own.
 
 ### 2026-11-02 (second): retro review findings all CLOSED, pushed as 49c69b9 (one Netlify build), M3 ruled as filtered totals
 
