@@ -10,7 +10,7 @@
  * Over time, Recent signals. Presentation only; no query, metric or sort changed.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
@@ -116,6 +116,9 @@ function useSentimentHistory(
 }
 
 
+// Staggered reveal index (CSS keyframe in index.css, no motion import).
+const rv = (i: number) => ({ '--i': i } as CSSProperties)
+
 const SENTIMENT_KIND: Record<string, StatusKind> = { positive: 'pos', neutral: 'neu', negative: 'neg' }
 const kindOf = (s: string): StatusKind => SENTIMENT_KIND[s] ?? 'neu'
 
@@ -207,6 +210,7 @@ export default function BrandSentiment() {
 
       <div className="space-y-6">
         {total === 0 ? (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             empty={{
               icon: Meh,
@@ -219,12 +223,23 @@ export default function BrandSentiment() {
             }}
             answer=""
           />
+          </div>
         ) : (
           <>
+            <div className="reveal" style={rv(0)}>
             <HeroAnswer
               value={score}
               unit="/100"
-              badge={{ label: scoreLabel, tone: scoreTone(score) }}
+              badge={{
+                label: scoreLabel,
+                tone: scoreTone(score),
+                glyph: (() => {
+                  const tone = scoreTone(score)
+                  return tone === 'pos' || tone === 'warn' || tone === 'neg'
+                    ? <StatusGlyph kind={tone} size={12} />
+                    : undefined
+                })(),
+              }}
               // copy: pending bg-copy
               answer={`${pct.positive}% of the ${total} AI answer${total !== 1 ? 's' : ''} that mention${total !== 1 ? '' : 's'} your brand ${total !== 1 ? 'are' : 'is'} positive.`}
               // copy: pending bg-copy
@@ -238,10 +253,11 @@ export default function BrandSentiment() {
                 ]}
               />
             </HeroAnswer>
+            </div>
 
             {/* By engine: one row per engine with data, a 100% stacked bar. Polarity by
                 fixed order, and the n is printed, so one engine reads as one row. */}
-            <section aria-labelledby="sent-by-engine">
+            <section aria-labelledby="sent-by-engine" className="reveal" style={rv(1)}>
               <SectionHeader
                 title={<span id="sent-by-engine">By engine</span>}
                 description="Share of positive, neutral and negative mentions per engine."
@@ -251,7 +267,7 @@ export default function BrandSentiment() {
                   <EmptyState variant="inline" minHeight={120} body="No per-engine data yet." />
                 ) : (
                   <ul className="space-y-3">
-                    {engineRows.map(id => {
+                    {engineRows.map((id, idx) => {
                       const s = byEngine[id]
                       const segs = [
                         { key: 'pos', n: s.positive, p: s.pct.positive, cls: 'bg-pos', word: 'Positive' },
@@ -259,7 +275,7 @@ export default function BrandSentiment() {
                         { key: 'neg', n: s.negative, p: s.pct.negative, cls: 'bg-neg', word: 'Negative' },
                       ].filter(x => x.p > 0)
                       return (
-                        <li key={id} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                        <li key={id} className={`flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3${idx < 10 ? ' reveal-row' : ''}`} style={idx < 10 ? rv(idx) : undefined}>
                           <span className="sm:w-[200px] shrink-0">
                             <EngineChip id={id as EngineId} interactive={false} />
                           </span>
@@ -282,7 +298,7 @@ export default function BrandSentiment() {
             </section>
 
             {/* Over time */}
-            <section aria-labelledby="sent-over-time">
+            <section aria-labelledby="sent-over-time" className="reveal" style={rv(2)}>
               <SectionHeader
                 title={<span id="sent-over-time">Over time</span>}
                 actions={
@@ -328,7 +344,7 @@ export default function BrandSentiment() {
             </section>
 
             {/* Recent signals */}
-            <section aria-labelledby="sent-recent">
+            <section aria-labelledby="sent-recent" className="reveal" style={rv(3)}>
               <SectionHeader
                 title={<span id="sent-recent">Recent signals</span>}
                 // copy: pending bg-copy

@@ -6,7 +6,7 @@
  * Extra optional prop beyond the frozen contract: `getKey` for a stable React
  * key. Without it the index is used.
  */
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 export interface DataListProps<T> {
   rows: T[]
@@ -22,7 +22,8 @@ export default function DataList<T>({ rows, renderRow, getKey, ariaLabel }: Data
       {rows.map((row, i) => (
         <li
           key={getKey ? getKey(row, i) : i}
-          className="group min-h-[56px] px-4 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors duration-[180ms] ease-out [&_.row-actions]:text-ink-3 [&_.row-actions]:transition-colors hover:[&_.row-actions]:text-ink focus-within:[&_.row-actions]:text-ink"
+          className={`group min-h-[56px] px-4 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors duration-[180ms] ease-out motion-reduce:transition-none${i < 10 ? ' reveal-row' : ''} [&_.row-actions]:text-ink-3 [&_.row-actions]:transition-colors hover:[&_.row-actions]:text-ink focus-within:[&_.row-actions]:text-ink`}
+          style={i < 10 ? ({ '--i': i } as CSSProperties) : undefined}
         >
           {renderRow(row, i)}
         </li>

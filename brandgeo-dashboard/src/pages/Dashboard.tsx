@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { RefreshCw, TrendingUp, Target, Hash, Eye, Radar } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -22,7 +22,7 @@ import LoadErrorCard from '../components/LoadErrorCard'
 import EngineChip from '../components/EngineChip'
 import {
   Page, PageHeader, HeroAnswer, ScoreDial, Card, ReadoutRow, Stat, Meter, BarList, DataList,
-  Button, Badge, Disclosure, SkeletonHero, SkeletonStat, SkeletonBlock, buttonClasses,
+  Button, Badge, Disclosure, SkeletonHero, SkeletonReadout, SkeletonBlock, StatusGlyph, buttonClasses,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
 
@@ -47,6 +47,9 @@ function scoreBand(score: number): { label: string; tone: 'pos' | 'warn' | 'neg'
   if (score >= 35) return { label: 'Developing', tone: 'warn' }
   return { label: 'Needs work', tone: 'neg' }
 }
+
+// Staggered reveal index for the first four top-level blocks (CSS keyframe, no motion import).
+const rv = (i: number) => ({ '--i': i } as CSSProperties)
 
 const sparkNumbers = (pts: SparkPoint[] | undefined): number[] | undefined =>
   pts ? pts.map(p => p.v).filter((v): v is number => v != null) : undefined
@@ -194,13 +197,7 @@ export default function Dashboard() {
         <div className="space-y-4 md:space-y-6">
           <SkeletonHero />
           <Card pad="standard"><SkeletonBlock className="h-16 w-full" /></Card>
-          <Card pad="none">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line rounded-card overflow-hidden">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="bg-surface p-5"><SkeletonStat /></div>
-              ))}
-            </div>
-          </Card>
+          <SkeletonReadout />
           <SkeletonBlock className="h-12 w-full" />
         </div>
       </Page>
@@ -221,6 +218,7 @@ export default function Dashboard() {
             measurement. No score, no label, no 0%. Routes to /prompts when
             there are no prompts yet, otherwise to /ai-visibility. */}
         {!view.hasAnyMeasurement && (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             empty={{
               icon: Radar,
@@ -234,12 +232,14 @@ export default function Dashboard() {
             }}
             answer=""
           />
+          </div>
         )}
 
         {view.hasAnyMeasurement && scoreData && band && (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             visual={<ScoreDial score={scoreData.aiScore} size="lg" />}
-            badge={{ label: band.label, tone: band.tone }}
+            badge={{ label: band.label, tone: band.tone, glyph: <StatusGlyph kind={band.tone} size={12} /> }}
             // copy: pending bg-copy
             answer={view.mention.pct === null
               ? 'Your brand has not been checked yet.'
@@ -261,12 +261,13 @@ export default function Dashboard() {
               })}
             </ul>
           </HeroAnswer>
+          </div>
         )}
 
         {/* "What to do next": the SAME persisted advice /recommendations shows,
             not a duplicate generator. Only renders once there is something to say. */}
         {recsLoaded && topRec && (
-          <Card interactive pad="standard">
+          <Card interactive pad="standard" className="reveal" style={rv(1)}>
             <h2 className="m-0 text-heading text-ink">What to do next</h2>
             <div className="mt-2 flex items-start gap-3">
               <Badge tone="neutral">{topRec.priority}</Badge>
@@ -279,7 +280,7 @@ export default function Dashboard() {
         )}
 
         {view.hasAnyMeasurement && (
-          <section aria-labelledby="key-metrics-h">
+          <section aria-labelledby="key-metrics-h" className="reveal" style={rv(2)}>
             <h2 id="key-metrics-h" className="sr-only">Key metrics</h2>
             {/* The score hero is gated on all-time data, so it keeps a real score
                 even when the SELECTED window has no rows. This line explains the
@@ -332,6 +333,7 @@ export default function Dashboard() {
         )}
 
         {view.hasAnyMeasurement && (
+          <div className="reveal" style={rv(3)}>
           <Disclosure title="Show engine breakdown and recent activity">
             <div className="space-y-6 pt-3">
               <div>
@@ -377,6 +379,7 @@ export default function Dashboard() {
               </div>
             </div>
           </Disclosure>
+          </div>
         )}
       </div>
     </Page>
@@ -398,7 +401,7 @@ function ResultRow({ row, mentioned }: { row: RecentEntry; mentioned: boolean })
           {mentioned && row.brand_position != null && ` · #${row.brand_position}`}
         </p>
       </div>
-      <Badge tone={mentioned ? 'pos' : 'neutral'}>{mentioned ? t.aiv_yes : t.aiv_no}</Badge>
+      <Badge tone={mentioned ? 'pos' : 'neutral'} glyph={mentioned ? <StatusGlyph kind="pos" size={12} /> : undefined}>{mentioned ? t.aiv_yes : t.aiv_no}</Badge>
     </>
   )
 }

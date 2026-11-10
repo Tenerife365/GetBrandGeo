@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Bot, ChevronDown } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
@@ -37,6 +37,9 @@ const CATEGORY_LABEL: Record<string, string> = {
 }
 
 const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(cat)
+
+// Staggered reveal index (CSS keyframe in index.css, no motion import).
+const rv = (i: number) => ({ '--i': i } as CSSProperties)
 
 type FilterLLM = LLMName | 'all'
 type FilterCat = PromptCategory | 'all'
@@ -172,6 +175,7 @@ export default function Mentions() {
 
       <div className="space-y-4 md:space-y-6">
         {noMentions ? (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             loading={historyLoading}
             empty={{
@@ -184,7 +188,9 @@ export default function Mentions() {
             }}
             answer=""
           />
+          </div>
         ) : (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             value={totalMentions}
             unit={totalMentions === 1 ? 'mention' : 'mentions'}
@@ -193,15 +199,16 @@ export default function Mentions() {
             // copy: pending bg-copy
             context={`${positiveSentiment} of them positive. Latest answer per prompt and engine.`}
           />
+          </div>
         )}
 
         {!noMentions && (
           <>
-            <div className="hidden md:flex flex-col gap-3">
+            <div className="reveal hidden md:flex flex-col gap-3" style={rv(1)}>
               {engineChips}
               {catChips}
             </div>
-            <div className="md:hidden grid grid-cols-1 gap-3">
+            <div className="reveal md:hidden grid grid-cols-1 gap-3" style={rv(2)}>
               <Select aria-label="Engine" value={filterLLM} onChange={e => setFilterLLM(e.target.value as FilterLLM)}>
                 <option value="all">{historyLoading ? allEnginesLabel : fmt(t.men_allEngines, { n: mentions.length })}</option>
                 {engineCounts.map(({ llm, count }) => (
@@ -227,6 +234,7 @@ export default function Mentions() {
         {historyLoading && <Skeleton className="h-[220px] w-full rounded-lg" />}
 
         {filtered.length > 0 && (
+          <div className="reveal" style={rv(3)}>
           <DataList
             ariaLabel="Mentions"
             rows={filtered}
@@ -285,6 +293,7 @@ export default function Mentions() {
               )
             }}
           />
+          </div>
         )}
 
         {filtered.length === 0 && !historyFailed && history !== null && !noMentions && (

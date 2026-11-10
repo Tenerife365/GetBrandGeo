@@ -42,11 +42,26 @@ import {
   Page, PageHeader, SectionHeader, HeroAnswer, Card, Badge, Button, IconButton, Notice,
   SegmentedControl, BarList, DataList, Disclosure, tableClasses,
 } from '../components/ui'
+import Monogram from '../components/ui/Monogram'
+import type { CSSProperties } from 'react'
 
 // --- Types -------------------------------------------------------------------
 
 /** "#2.9": position to one decimal, trailing zero dropped. */
 const fmtPos = (p: number) => `#${(Math.round(p * 10) / 10).toString()}`
+
+/** Presentational label for the share BarList: monogram anchor plus the name. */
+function ShareLabel({ name, you = false }: { name: string; you?: boolean }) {
+  return (
+    <span className="flex items-center gap-2 min-w-0 max-w-full">
+      <Monogram name={name} size={20} you={you} />
+      <span className="min-w-0 break-words sm:truncate">{name}</span>
+    </span>
+  )
+}
+
+/** Stagger index for the `.reveal` / `.reveal-row` classes. */
+const revealStyle = (i: number) => ({ '--i': i } as CSSProperties)
 
 // --- Main component ----------------------------------------------------------
 
@@ -271,8 +286,8 @@ export default function Competitors() {
 
   // Share of mentions: you first in accent, then the field in neutral.
   const shareRows = [
-    { label: brandName, value: brandMentions, isYou: true },
-    ...topCompetitors.map(c => ({ label: c.name, value: c.totalMentions })),
+    { label: <ShareLabel name={brandName} you />, value: brandMentions, isYou: true },
+    ...topCompetitors.map(c => ({ label: <ShareLabel name={c.name} />, value: c.totalMentions })),
   ]
 
   // Visibility by engine: one engine with data reads as a bar list, two or more as grouped bars.
@@ -335,6 +350,7 @@ export default function Competitors() {
         {/* 1. Hero. The shared card keeps a 280 floor; this answer is short, so
             on a phone the floor is lifted here to remove the empty bottom space. */}
         {noCompetitors ? (
+          <div className="reveal" style={revealStyle(0)}>
           <HeroAnswer
             answer=""
             empty={{
@@ -346,8 +362,9 @@ export default function Competitors() {
               variant: 'inline',
             }}
           />
+          </div>
         ) : (
-          <div className="max-md:[&>*]:min-h-0">
+          <div className="max-md:[&>*]:min-h-0 reveal" style={revealStyle(0)}>
             <HeroAnswer
               value={brandMentions}
               unit={brandMentions === 1 ? 'mention' : 'mentions'}
@@ -364,15 +381,15 @@ export default function Competitors() {
         {!noCompetitors && (
           <>
             {/* 2. Share of mentions */}
-            <section aria-labelledby="share-heading">
+            <section aria-labelledby="share-heading" className="reveal" style={revealStyle(1)}>
               <SectionHeader title={<span id="share-heading">Share of mentions</span>} description="How often AI engines named each company." />
-              <Card>
+              <Card pad="standard">
                 <BarList rows={shareRows} format={v => String(Math.round(v))} />
               </Card>
             </section>
 
             {/* 3. Competitor table */}
-            <section>
+            <section className="reveal" style={revealStyle(2)}>
               <SectionHeader
                 title="Competitors"
                 count={topCompetitors.length}
@@ -405,9 +422,10 @@ export default function Competitors() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className={`${tableClasses.tr} bg-accent-tint`}>
-                      <th scope="row" className={`${tableClasses.td} text-left font-semibold`}>
-                        <span className="flex items-center gap-2 flex-wrap">
+                    <tr className={`${tableClasses.tr} bg-accent-tint reveal-row`} style={revealStyle(0)}>
+                      <th scope="row" className={`${tableClasses.td} text-left font-semibold shadow-[inset_2px_0_0_rgb(var(--accent-ink))]`}>
+                        <span className="flex items-center gap-2.5 flex-wrap">
+                          <Monogram name={brandName} you />
                           <span className="break-words">{brandName}</span>
                           <Badge tone="accent">you</Badge>
                         </span>
@@ -417,14 +435,15 @@ export default function Competitors() {
                       <td className={tableClasses.tdMuted}>{brandEnginesLabel || <span className="text-ink-3">n/a</span>}</td>
                       <td className={tableClasses.tdMuted}><span className="text-ink-3">No sample prompt</span></td>
                     </tr>
-                    {topCompetitors.map(c => {
+                    {topCompetitors.map((c, ci) => {
                       const samplePrompt = samplePromptFor(c, promptText) || null
                       return (
-                        <tr key={c.name} className={tableClasses.tr}>
+                        <tr key={c.name} className={`${tableClasses.tr}${ci < 9 ? ' reveal-row' : ''}`} style={ci < 9 ? revealStyle(ci + 1) : undefined}>
                           <th scope="row" className={`${tableClasses.td} text-left font-normal`}>
-                            <span className="flex items-center gap-2">
+                            <span className="flex items-center gap-2.5">
+                              <Monogram name={c.name} />
                               <span className="break-words">{c.name}</span>
-                              <TrendingDown size={12} className="text-neg shrink-0" role="img" aria-label="Named instead of you" />
+                              <TrendingDown size={12} className="text-ink-3 shrink-0" role="img" aria-label="Named instead of you" />
                             </span>
                           </th>
                           <td className={tableClasses.tdRight}>
@@ -460,7 +479,8 @@ export default function Competitors() {
                     return (
                       <div className={r.you ? 'w-[calc(100%+2rem)] min-w-0 shrink-0 bg-accent-tint -mx-4 px-4 -my-3 py-3' : 'w-full min-w-0'}>
                         <button type="button" aria-expanded={open} onClick={() => setOpenRow(open ? null : key)} className="w-full text-left min-h-[44px]">
-                          <span className="flex items-center gap-2 flex-wrap text-body text-ink font-medium">
+                          <span className="flex items-center gap-2.5 flex-wrap text-body text-ink font-medium">
+                            <Monogram name={r.you ? brandName : r.c?.name ?? ''} you={r.you} />
                             <span className="break-words min-w-0">{r.you ? brandName : r.c?.name}</span>
                             {r.you && <Badge tone="accent">you</Badge>}
                           </span>
@@ -481,6 +501,7 @@ export default function Competitors() {
             </section>
 
             {/* 4. By engine and over time */}
+            <div className="reveal" style={revealStyle(3)}>
             <Disclosure title="By engine and over time">
               <div className="space-y-8 pt-3">
                 <div>
@@ -552,6 +573,7 @@ export default function Competitors() {
                 </div>
               </div>
             </Disclosure>
+            </div>
           </>
         )}
 

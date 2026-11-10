@@ -23,9 +23,9 @@ export function SkeletonText({ lines = 3, className }: { lines?: number; classNa
 export function SkeletonStat({ className }: { className?: string }) {
   return (
     <div aria-hidden="true" className={cx('space-y-2', className)}>
-      <div className="skeleton h-4 w-24" />
-      <div className="skeleton h-7 w-20" />
-      <div className="skeleton h-4 w-32" />
+      <div className="skeleton h-3 w-24" />
+      <div className="skeleton h-9 w-20" />
+      <div className="skeleton h-3 w-32" />
     </div>
   )
 }
@@ -35,7 +35,7 @@ export function SkeletonReadout({ n = 4 }: { n?: number }) {
     <Card pad="none" aria-hidden="true">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-line rounded-card overflow-hidden">
         {Array.from({ length: n }, (_, i) => (
-          <div key={i} className="bg-surface p-5">
+          <div key={i} className="relative overflow-hidden bg-surface p-5 pb-10 min-h-[136px] min-w-0">
             <SkeletonStat />
           </div>
         ))}

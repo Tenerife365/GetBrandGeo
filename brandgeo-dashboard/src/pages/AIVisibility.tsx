@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
@@ -1115,7 +1115,7 @@ export default function AIVisibility() {
   const PROMPT_COL_MIN_REM = 13
   const ENGINE_COL_MIN_REM = 3.5
   const LOCKED_COL_MIN_REM = 2.75
-  const lockedTemplate = lockedColumns.length > 0 ? ` repeat(${lockedColumns.length}, minmax(${LOCKED_COL_MIN_REM}rem, 3.5rem))` : ''
+  const lockedTemplate = lockedColumns.length > 0 ? ` repeat(${lockedColumns.length}, minmax(${LOCKED_COL_MIN_REM}rem, 4.5rem))` : ''
   const tableColsTemplate = `2.5rem minmax(${PROMPT_COL_MIN_REM}rem, 1fr) repeat(${activeLLMs.length}, minmax(${ENGINE_COL_MIN_REM}rem, 5.5rem))${lockedTemplate}`
   const tableMinWidth = `${2.5 + PROMPT_COL_MIN_REM + activeLLMs.length * ENGINE_COL_MIN_REM + lockedColumns.length * LOCKED_COL_MIN_REM}rem`
 
@@ -1392,6 +1392,10 @@ export default function AIVisibility() {
     const isExpanded = expandedRow === prompt.id
     const sum = summaries.get(prompt.id)
     const answered = sum?.answered ?? 0
+    // Staggered fade for the first 10 visible rows only (presentational).
+    const revealCls = num <= 10 ? ' reveal-row' : ''
+    const revealSty = num <= 10 ? ({ '--i': num - 1 } as CSSProperties) : undefined
+    const stickyBg = num % 2 === 0 ? 'bg-surface-2' : 'bg-surface group-hover:bg-surface-2'
     const mentions = sum?.mentions ?? 0
     const topComp = kind === 'notYet' ? topCompetitorOf(prompt.id) : null
     const cv = cellViews.get(prompt.id)
@@ -1412,7 +1416,7 @@ export default function AIVisibility() {
 
     if (!isWide) {
       return (
-        <div>
+        <div className={revealCls.trim() || undefined} style={revealSty}>
           <button
             type="button"
             aria-expanded={isExpanded}
@@ -1446,23 +1450,23 @@ export default function AIVisibility() {
 
     if (kind === 'appear') {
       return (
-        <div className={`border-b border-line last:border-0 ${num % 2 === 0 ? 'bg-surface-2' : ''}`}>
+        <div className={`border-b border-line last:border-0 ${num % 2 === 0 ? 'bg-surface-2' : ''}${revealCls}`} style={revealSty}>
           <button
             type="button"
             aria-expanded={isExpanded}
             aria-controls={`aiv-row-${prompt.id}`}
             onClick={() => toggleRow(prompt.id)}
-            className="grid w-full text-left transition-colors hover:bg-surface-2"
+            className="group grid w-full text-left transition-colors motion-reduce:transition-none hover:bg-surface-2"
             style={{ gridTemplateColumns: tableColsTemplate }}
           >
-            <span className="block px-2 py-2.5 self-center">
+            <span className={`block px-2 py-2.5 self-center sticky left-0 z-[1] ${stickyBg}`}>
               <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded-md bg-surface-2 text-meta font-semibold text-ink-2 tabular-nums">
                 {/* Sequential across the rendered sections, never the stored
                     `position` (a sort key with gaps and duplicates). */}
                 {num}
               </span>
             </span>
-            <span className="block px-3 py-2.5 self-center min-w-0">
+            <span className={`block px-3 py-2.5 self-center min-w-0 sticky left-10 z-[1] ${stickyBg} shadow-[1px_0_0_rgb(var(--line))]`}>
               <span className="flex items-center gap-2 min-w-0">
                 <span className="block truncate flex-1 min-w-0 text-body text-ink" title={prompt.text}>{prompt.text}</span>
                 {chevron(isExpanded)}
@@ -1493,13 +1497,13 @@ export default function AIVisibility() {
 
     // CalmRow (notYet) and UncheckedRow (unchecked): same four-column grid.
     return (
-      <div>
+      <div className={revealCls.trim() || undefined} style={revealSty}>
         <button
           type="button"
           aria-expanded={isExpanded}
           aria-controls={`aiv-row-${prompt.id}`}
           onClick={() => toggleRow(prompt.id)}
-          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-surface-2 rounded-lg"
+          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-surface-2 transition-colors motion-reduce:transition-none rounded-lg"
         >
           <span className="text-meta text-ink-2 tabular-nums">{num}</span>
           <span className="flex items-center gap-2 min-w-0">
@@ -1817,7 +1821,7 @@ export default function AIVisibility() {
                   aria-expanded={scoreInfoOpen}
                   aria-controls="score-weighting-help"
                   aria-label="How the AI Visibility Score is calculated"
-                  className="relative inline-flex items-center justify-center rounded text-ink-3 hover:text-ink cursor-help after:content-[''] after:absolute after:-inset-[7px]"
+                  className="relative inline-flex items-center justify-center rounded text-ink-3 hover:text-ink cursor-help after:content-[''] after:absolute after:-inset-[10px] max-md:after:-inset-4"
                 >
                   <Info size={12} aria-hidden="true" />
                 </button>
@@ -2371,12 +2375,14 @@ export default function AIVisibility() {
                             className="grid border-b border-line bg-surface-2"
                             style={{ gridTemplateColumns: tableColsTemplate }}
                           >
-                            <div className="px-2 py-2.5 text-meta font-semibold text-ink-2 self-center">#</div>
-                            <div className="px-3 py-2.5 text-meta font-semibold text-ink-2 self-center">{t.aiv_prompt}</div>
+                            <div className="px-2 py-2.5 label-caps self-center sticky left-0 z-[1] bg-surface-2">#</div>
+                            <div className="px-3 py-2.5 label-caps self-center sticky left-10 z-[1] bg-surface-2 shadow-[1px_0_0_rgb(var(--line))]">{t.aiv_prompt}</div>
                             {activeLLMs.map(llm => (
-                              <div key={llm.id} className="px-1 py-2.5 flex flex-col items-center justify-center gap-1">
-                                <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-5 h-5 rounded object-contain" />
-                                <span className="text-meta font-semibold text-ink-2 text-center leading-tight">{llm.label}</span>
+                              <div key={llm.id} className="px-1 py-2 flex flex-col items-center justify-center gap-1">
+                                <span className="w-6 h-6 rounded-badge bg-surface ring-1 ring-inset ring-line flex items-center justify-center">
+                                  <img src={llm.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
+                                </span>
+                                <span className="text-meta font-medium text-ink-2 text-center leading-tight">{llm.label}</span>
                               </div>
                             ))}
                             {lockedColumns.map(id => (
@@ -2385,10 +2391,12 @@ export default function AIVisibility() {
                                 to="/account"
                                 aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
                                 title={ENGINE_META[id].label}
-                                className="flex flex-col items-center justify-center gap-0.5 min-h-[44px] rounded-md hover:bg-surface-3"
+                                className="flex flex-col items-center justify-center gap-1 min-h-[44px] py-1 rounded-md hover:bg-surface-3 min-w-0"
                               >
-                                <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 rounded object-contain grayscale" />
-                                <span className="text-meta leading-none text-ink-2">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                                <span className="w-6 h-6 rounded-badge bg-surface ring-1 ring-inset ring-line flex items-center justify-center">
+                                  <img src={ENGINE_META[id].logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain grayscale opacity-70" />
+                                </span>
+                                <span className="text-meta leading-none text-ink-2 whitespace-nowrap">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
                               </Link>
                             ))}
                           </div>

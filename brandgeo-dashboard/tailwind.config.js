@@ -96,6 +96,7 @@ export default {
         'display-sm': ['40px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '600' }],
         title: ['24px', { lineHeight: '32px', letterSpacing: '-0.01em', fontWeight: '600' }],
         'title-sm': ['22px', { lineHeight: '30px', letterSpacing: '-0.01em', fontWeight: '600' }],
+        kpi: ['32px', { lineHeight: '36px', letterSpacing: '-0.02em', fontWeight: '600' }],
         value: ['20px', { lineHeight: '28px', fontWeight: '600' }],
         answer: ['20px', { lineHeight: '28px', fontWeight: '500' }],
         'answer-sm': ['18px', { lineHeight: '26px', fontWeight: '500' }],

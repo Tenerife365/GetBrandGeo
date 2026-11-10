@@ -25,9 +25,9 @@ export default function Card({ pad = 'standard', interactive = false, className,
   return (
     <div
       className={cx(
-        'bg-surface border border-line rounded-card shadow-card',
+        'bg-surface border border-line rounded-card shadow-card transition-colors duration-[180ms] ease-out hover:border-line-2 motion-reduce:transition-none',
         PAD[pad],
-        interactive && 'transition-colors duration-[180ms] hover:bg-surface-2 hover:border-line-2',
+        interactive && 'hover:bg-surface-2',
         className,
       )}
       {...rest}

@@ -1,17 +1,18 @@
 /**
- * tableClasses (spec 7.3): class strings for a real <table>. Head row 36 high
- * on surface-2, body rows min 48 with a line rule. Use `th scope="col"`.
+ * tableClasses (spec 7.3, Phase 4 C1): class strings for a real <table>. Head
+ * cells 36 high and sticky (blurred surface-2), body rows 44 with a line rule.
+ * Use `th scope="col"`.
  */
 export const tableClasses = {
-  wrap: 'overflow-x-auto rounded-card border border-line bg-surface shadow-card',
+  wrap: 'overflow-x-auto lg:overflow-x-clip lg:overflow-y-visible rounded-card border border-line bg-surface shadow-card',
   table: 'w-full border-collapse text-body text-ink',
-  thead: 'bg-surface-2',
-  th: 'h-9 px-4 text-left text-meta font-semibold text-ink-2 whitespace-nowrap border-b border-line',
-  thRight: 'h-9 px-4 text-right text-meta font-semibold text-ink-2 whitespace-nowrap border-b border-line',
-  tr: 'border-b border-line last:border-b-0 hover:bg-surface-2 transition-colors duration-[180ms] ease-out',
-  td: 'min-h-[48px] h-12 px-4 align-middle text-body text-ink',
-  tdRight: 'min-h-[48px] h-12 px-4 align-middle text-body text-ink text-right tabular-nums',
-  tdMuted: 'min-h-[48px] h-12 px-4 align-middle text-body text-ink-2',
+  thead: '',
+  th: 'table-head-sticky h-9 px-4 text-left label-caps whitespace-nowrap',
+  thRight: 'table-head-sticky h-9 px-4 text-right label-caps whitespace-nowrap',
+  tr: 'border-b border-line last:border-b-0 hover:bg-surface-2 transition-colors duration-[180ms] ease-out motion-reduce:transition-none',
+  td: 'h-11 px-4 align-middle text-body text-ink',
+  tdRight: 'h-11 px-4 align-middle text-body text-ink text-right tabular-nums',
+  tdMuted: 'h-11 px-4 align-middle text-body text-ink-2',
 } as const
 
 export default tableClasses

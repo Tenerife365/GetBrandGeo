@@ -129,7 +129,7 @@ export default function PromptResultCell({
         <img src={meta?.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
       )}
       <Glyph state={state} size={14} />
-      <span aria-hidden="true" className="text-meta leading-none font-semibold">{word}</span>
+      <span aria-hidden="true" className={`text-meta leading-none font-semibold${state === 'mentioned' ? ' text-ink' : ''}`}>{word}</span>
       {state === 'error' && since && (
         <span aria-hidden="true" className="text-meta leading-none text-warn">{cellSinceLine(since)}</span>
       )}

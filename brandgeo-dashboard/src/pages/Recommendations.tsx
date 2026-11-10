@@ -19,7 +19,7 @@
  *    what a client was told, and when, and from what evidence, survives the page reload.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   Clock, ChevronDown, ChevronUp, Zap, Target, RefreshCw, Sparkles, History, Check, X, CircleSlash,
 } from 'lucide-react'
@@ -221,6 +221,8 @@ const STATUS_STYLE: Record<RecStatus, { tone: BadgeTone; label: string }> = {
   actioned:     { tone: 'pos',     label: 'Actioned'     },
   dismissed:    { tone: 'neutral', label: 'Dismissed'    },
 }
+
+const rv = (i: number) => ({ '--i': i } as CSSProperties)
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
@@ -768,6 +770,7 @@ export default function Recommendations() {
 
         {/* Hero */}
         {firstRun && (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             answer=""
             empty={{
@@ -779,26 +782,28 @@ export default function Recommendations() {
               minHeight: 220,
             }}
           />
+          </div>
         )}
 
         {showBody && stats && hasResults && (
+          <div className="reveal" style={rv(0)}>
           <HeroAnswer
             value={recs.length}
             unit="actions"
-            badge={heroBadge}
+            badge={heroBadge ? { ...heroBadge, glyph: heroBadge.tone === 'pos' || heroBadge.tone === 'warn' ? <StatusGlyph kind={heroBadge.tone} size={12} /> : undefined } : undefined}
             answer={recs.length > 0 ? `Start with: ${recs[0].title.replace(/[.!?]+$/, '')}.` : 'No priority actions right now.'} // copy: pending bg-copy
             context={`Generated from ${stats.totalChecks} successful AI checks`} // copy: pending bg-copy
           >
             <h2 className="sr-only">Visibility by engine</h2>
             <ul className="m-0 list-none p-0">
-              {stats.llmStats.map(s => {
+              {stats.llmStats.map((s, idx) => {
                 const pct = Math.round(s.rate * 100)
                 const tier: { label: string; tone: BadgeTone; kind: 'pos' | 'warn' | 'neg' } =
                   s.rate >= 0.85 ? { label: 'Strong',  tone: 'pos',  kind: 'pos' }
                   : s.rate >= 0.5 ? { label: 'Partial', tone: 'warn', kind: 'warn' }
                   : { label: 'Low', tone: 'neg', kind: 'neg' }
                 return (
-                  <li key={s.llm} className="flex items-center justify-between gap-3 py-2 border-t border-line first:border-t-0">
+                  <li key={s.llm} className={`${idx < 10 ? 'reveal-row ' : ''}flex items-center justify-between gap-3 py-2 border-t border-line first:border-t-0`} style={idx < 10 ? rv(idx) : undefined}>
                     <EngineTag id={s.llm} fallbackLabel={LLM_LABEL[s.llm] ?? s.llm} />
                     <div className="flex items-center gap-3">
                       <span className="text-body font-semibold text-ink tabular-nums">{pct}%</span>
@@ -810,11 +815,12 @@ export default function Recommendations() {
               })}
             </ul>
           </HeroAnswer>
+          </div>
         )}
 
         {/* Priority actions */}
         {showBody && hasResults && (
-          <section>
+          <section className="reveal" style={rv(1)}>
             <SectionHeader title="Priority actions" />
             {recs.length === 0 ? (
               <Card>
@@ -836,7 +842,7 @@ export default function Recommendations() {
 
         {/* AI analysis + advice history */}
         {showBody && (
-          <section>
+          <section className="reveal" style={rv(2)}>
             <SectionHeader
               title="AI analysis"
               description={runs.length > 0 ? `Last generated ${fmtDate(runs[0].generated_at)}` : undefined}
@@ -942,6 +948,7 @@ export default function Recommendations() {
 
         {/* Who AI names instead */}
         {showBody && stats && stats.competitors.length > 0 && (
+          <div className="reveal" style={rv(3)}>
           <Disclosure title="Who AI names instead" count={stats.competitors.length}>
             <div className="flex flex-wrap gap-2">
               {stats.competitors.map(c => (
@@ -967,6 +974,7 @@ export default function Recommendations() {
               </p>
             )}
           </Disclosure>
+          </div>
         )}
       </div>
     </Page>

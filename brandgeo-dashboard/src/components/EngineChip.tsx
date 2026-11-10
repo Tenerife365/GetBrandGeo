@@ -61,7 +61,7 @@ export default function EngineChip({ id, selected = false, interactive = true, c
 
   if (!asButton) {
     return (
-      <span className={sharedClass}>
+      <span className={`inline-flex items-center gap-1.5 text-meta text-ink-2 ${className}`}>
         {inner}
       </span>
     )

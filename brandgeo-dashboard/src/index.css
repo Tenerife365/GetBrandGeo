@@ -621,57 +621,19 @@ select:focus-visible:focus-visible {
 .nav-item.is-active {
   background-color: rgb(var(--surface-3));
   color: rgb(var(--ink));
-  font-weight: 600;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px rgb(var(--line-2));
 }
 .nav-item.is-active::before {
   height: 20px;
   background-color: rgb(var(--accent-ink));
+  box-shadow: 0 0 8px 0 rgb(var(--accent-ink) / 0.45);
 }
-.nav-item svg { color: inherit; }
+.nav-item svg { color: rgb(var(--ink-3)); transition: color var(--motion-fast) var(--ease-out); }
+.nav-item:hover svg { color: rgb(var(--ink-2)); }
 .nav-item.is-active svg { color: rgb(var(--accent-ink)); }
 @media (max-width: 767px) {
   .nav-item { min-height: 44px; }
-}
-
-/* Time-filter bar, pressed pill (§4.4). The criterion is that the pressed
-   pill is at least as strong as the nav's active item — measured stronger on
-   both cues, both themes (see §4.4's table). The pill carries a border the
-   nav item does not need, because the nav item has the rail and the pill has
-   nowhere to put one. */
-.time-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 4px 12px;
-  border-radius: var(--control-radius);
-  border: 1px solid transparent;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: rgb(var(--ink-2));
-  background-color: transparent;
-  transition: background-color var(--motion-fast) var(--ease-out),
-              color var(--motion-fast) var(--ease-out),
-              border-color var(--motion-fast) var(--ease-out);
-}
-.time-pill:hover {
-  color: rgb(var(--ink));
-  background-color: rgb(var(--surface-2));
-}
-.time-pill.is-pressed {
-  background-color: rgb(var(--surface-3));
-  color: rgb(var(--ink));
-  font-weight: 600;
-  border-color: rgb(var(--accent-ink));
-}
-@media (max-width: 767px) {
-  .time-pill { min-height: 36px; }
-  /* 44px tap area (WCAG 2.5.8) below 768px without growing the visible pill. */
-  .time-pill::after {
-    content: '';
-    position: absolute;
-    inset: -6px;
-  }
 }
 
 /* Engine identity chip (§8.4, §13.4). 28px tall at 1280 (the floor is 24px,
@@ -727,6 +689,7 @@ select:focus-visible:focus-visible {
 .mobile-nav-item.is-active::before {
   height: 2px;
   background-color: rgb(var(--accent-ink));
+  box-shadow: 0 0 8px 0 rgb(var(--accent-ink) / 0.45);
 }
 .mobile-nav-label {
   font-size: 12px;
@@ -737,4 +700,41 @@ select:focus-visible:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Phase 4 polish shared classes (phase4-polish-spec.md A6). Consumed by the
+   shell, the surfaces and the tables. */
+@layer components {
+  .label-caps { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--ink-3)); }
+  .card-accent-top { position: relative; }
+  .card-accent-top::before { content: ''; position: absolute; top: -1px; left: 16px; right: 16px; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, rgb(var(--accent-ink) / 0) 0%, rgb(var(--accent-ink) / 0.9) 50%, rgb(var(--accent-ink) / 0) 100%); }
+  .spark-fade { -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%); mask-image: linear-gradient(to bottom, black 0%, transparent 100%); }
+  .table-head-sticky { position: sticky; top: 0; z-index: 2; background-color: rgb(var(--surface-2) / 0.85);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); box-shadow: inset 0 -1px 0 rgb(var(--line)); }
+  .status-dot { position: relative; display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: currentColor; flex-shrink: 0; }
+  .status-dot.is-live::after { content: ''; position: absolute; inset: -3px; border-radius: 9999px; border: 1px solid currentColor; opacity: 0;
+    animation: status-ping 1600ms var(--ease-out) infinite; }
+  .reveal { animation: reveal-up var(--motion-base) var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+  .reveal-row { animation: reveal-fade var(--motion-fast) var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 24ms); }
+  .side-row { display: flex; align-items: center; gap: 12px; width: 100%; height: 36px; padding: 0 12px; border-radius: var(--radius-control);
+    font-size: 14px; line-height: 20px; color: rgb(var(--ink-2));
+    transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
+  .side-row:hover { background-color: rgb(var(--surface-2)); color: rgb(var(--ink)); }
+  .side-row svg { color: rgb(var(--ink-3)); }
+  .side-row:hover svg { color: rgb(var(--ink-2)); }
+}
+@keyframes status-ping { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes reveal-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes reveal-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 767px) { .side-row { height: 44px; } }
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.is-live::after { animation: none; opacity: 0; }
+  .reveal, .reveal-row { animation: none; }
+}
+
+/* Mobile drawer backdrop. A dimming scrim is neither surface nor ink, so it has
+   no semantic token; kept here so no component carries a raw colour. */
+@layer components {
+  .scrim { background-color: rgb(0 0 0 / 0.6); }
 }

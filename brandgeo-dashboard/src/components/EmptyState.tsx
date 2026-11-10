@@ -49,7 +49,9 @@ export default function EmptyState({
     )
   ) : null
 
-  const base = variant === 'page' ? 'min-h-[320px] py-16' : 'min-h-[160px] py-8'
+  const base = variant === 'page'
+    ? 'min-h-[320px] py-16 border border-dashed border-line-2 rounded-card'
+    : 'min-h-[160px] py-8'
 
   return (
     <div
@@ -57,7 +59,7 @@ export default function EmptyState({
       style={minHeight ? { minHeight } : undefined}
     >
       {Icon && (
-        <div className="w-10 h-10 rounded-control flex items-center justify-center mb-3 bg-surface-3">
+        <div className="w-10 h-10 rounded-control flex items-center justify-center mb-3 bg-surface-2 ring-1 ring-inset ring-line">
           <Icon size={20} aria-hidden="true" className={tone === 'error' ? 'text-neg' : 'text-ink-3'} />
         </div>
       )}

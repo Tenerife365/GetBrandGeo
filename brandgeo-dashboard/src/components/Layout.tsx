@@ -353,13 +353,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // bg-accent-tint + before:bg-accent rail-only treatment measured at
   // 1.17:1 background / 1.24:1 text — both effectively invisible with the
   // rail hidden). `.nav-item`/`.is-active` (index.css) carry the whole state:
-  // a solid raised fill (--surface-nav-active), white/ink semibold text
+  // a solid raised fill (--surface-nav-active), ink text
   // (--text-nav-active), and the rail (--rail-active) — three cues, of which
   // two clear the 1.5:1 rail-hidden floor independently (§4.2's table; dark
   // clears it on background, light on text — that split is forced, see §4.2).
   //
   // Inactive items are NOT dimmed. They stay at --text-nav-idle, unchanged in
-  // value from the slate-300 this app already used — the comment this
+  // value from the secondary ink this app already used; the comment this
   // replaces recorded that they were deliberately brightened to stay distinct
   // from the group headers, and this spec doesn't reopen that; the active
   // state moved instead (judgement call J6).
@@ -490,7 +490,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const availableMarkets = MARKETS.filter(m => !selections.some(s => s.market.id === m.id))
 
   return (
-    <div className="flex h-screen bg-dark-900 overflow-hidden">
+    <div className="flex h-screen bg-canvas overflow-hidden">
 
       {/* Skip-to-content link (WCAG 2.4.1) — visually hidden until keyboard-focused.
           sr-only/focus:not-sr-only are Tailwind built-ins; .skip-link (index.css) handles
@@ -501,11 +501,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile backdrop */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={closeSidebar} />
+        <div className="fixed inset-0 z-40 scrim md:hidden" onClick={closeSidebar} />
       )}
 
       {/* Sidebar — its own named surface (--surface-nav), not the card surface
-          (--dark-800). border-nav is a SOLID token (dashboard-visual-system.md
+          (--surface). border-nav is a SOLID token (dashboard-visual-system.md
           A1/A2): it must clear 3:1 against both the canvas and this surface, and
           an alpha border cannot be measured without knowing what's behind it —
           that's exactly how the previous 1.31:1/1.07:1 readings went unnoticed. */}
@@ -527,7 +527,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ].join(' ')}>
 
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-dark-700/60 flex items-center justify-between flex-shrink-0">
+        <div className="h-12 px-4 border-b border-line flex items-center justify-between flex-shrink-0">
           <BrandGeoLogo onNavigate={closeSidebar} />
           <div className="flex items-center gap-2">
             {/* Enter view-as-user. Exiting is deliberately NOT here — this
@@ -558,71 +558,79 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Collection progress: visible from any tab except the affiliate admin */}
+        {/* System status line (phase4 spec A4): a dot, one word and a mono counter,
+            not an alert box. Running shows a 2px progress hairline on the bottom
+            edge; the ended states show what the run did. Same data and handlers
+            as before. Visible from any tab except the affiliate admin. */}
         {!affiliateMode && collecting && progress && (
-          <div className="px-3 py-2.5 bg-accent-tint border-b border-accent-ink/40 flex-shrink-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <Loader2 size={11} className="animate-spin text-accent-ink" />
-                <span className="text-xs text-accent-ink font-medium truncate max-w-[120px]">
-                  {progress.clientName}
-                </span>
-              </div>
+          <div className="relative px-4 py-2.5 border-b border-line bg-canvas flex-shrink-0" role="status" aria-live="polite">
+            <div className="flex items-center gap-2">
+              <span className="status-dot text-accent is-live" aria-hidden="true" />
+              {/* copy: pending bg-copy */}
+              <span className="label-caps text-ink-2">Collecting</span>
+              <span className="text-meta text-ink-2 truncate min-w-0">{progress.clientName}</span>
               <button
                 onClick={stopCollection}
-                className="flex items-center gap-1 text-meta text-ink-3 hover:text-neg transition-colors"
+                className="ml-auto inline-flex items-center gap-1 h-6 max-md:h-11 px-2 rounded-badge text-meta text-ink-3 hover:text-neg hover:bg-surface-2 transition-colors"
                 title="Stop collection"
               >
-                <StopCircle size={11} />
+                <StopCircle size={12} />
                 Stop
               </button>
             </div>
-            <div className="h-1 bg-dark-700 rounded-full overflow-hidden">
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="font-mono tabular-nums text-meta text-ink">{progress.done}/{progress.total}</span>
+              <span className="font-mono tabular-nums text-meta text-ink-3">{collectPct}%</span>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 h-[2px] bg-line" aria-hidden="true">
               <div
-                className="h-full bg-accent rounded-full transition-all duration-300"
+                className="h-full bg-accent transition-[width] duration-300 ease-out motion-reduce:transition-none"
                 style={{ width: `${collectPct}%` }}
               />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-meta text-ink-3">{progress.done}/{progress.total} prompts</span>
-              <span className="text-meta text-ink-3">{collectPct}%</span>
             </div>
           </div>
         )}
 
-        {/* End-of-run notice -- same progress slot, shown once the run above
-            ends. Brand chrome like the in-progress banner (the sentiment tokens
-            are reserved for sentiment data, dashboard-visual-system.md 8.6).
-            A stopped run says stopped, with what was actually checked.
+        {/* End-of-run status -- same slot, shown once the run above ends. A
+            stopped run says stopped, with what was actually checked.
             Dismissible, and cleared the moment another run starts. */}
         {!affiliateMode && !collecting && runNotice && (
-          <div className="px-3 py-2.5 bg-accent-tint border-b border-accent-ink/40 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="relative px-4 py-2.5 border-b border-line bg-canvas flex-shrink-0" role="status" aria-live="polite">
+            <div className="flex items-center gap-2">
+              <span
+                className={`status-dot ${runNotice.kind === 'stopped' ? 'text-ink-3' : runNotice.failed > 0 ? 'text-warn' : 'text-pos'}`}
+                aria-hidden="true"
+              />
+              {/* copy: pending bg-copy */}
+              <span className="label-caps text-ink-2">{runNotice.kind === 'stopped' ? 'Stopped' : 'Done'}</span>
+              <button
+                onClick={dismissRunNotice}
+                aria-label="Dismiss"
+                className="ml-auto w-6 h-6 max-md:w-11 max-md:h-11 -mr-1 flex items-center justify-center rounded-badge text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            </div>
             <NavLink
               to="/ai-visibility"
               onClick={() => { dismissRunNotice(); closeSidebar() }}
-              className="text-xs text-accent-ink font-medium hover:underline"
+              className="block mt-1 text-meta text-ink-2 hover:text-ink"
             >
               {describeRun(runNotice)}
             </NavLink>
-            <button
-              onClick={dismissRunNotice}
-              aria-label="Dismiss"
-              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-ink-3 hover:text-accent-ink transition-colors"
-            >
-              <X size={12} />
-            </button>
           </div>
         )}
 
         {/* Inline notice, replacing alert() for billing-portal and
             client-group-update failures (dismissible, does not block the app). */}
         {sidebarNotice && (
-          <div className="px-3 py-2.5 bg-neg-tint border-b border-neg/20 flex-shrink-0 flex items-start justify-between gap-2">
-            <p className="text-xs text-neg leading-relaxed">{sidebarNotice}</p>
+          <div className="px-4 py-2.5 border-b border-line flex-shrink-0 flex items-start gap-2">
+            <span className="status-dot text-neg mt-1.5" aria-hidden="true" />
+            <p className="flex-1 min-w-0 text-meta text-neg">{sidebarNotice}</p>
             <button
               onClick={() => setSidebarNotice(null)}
               aria-label="Dismiss"
-              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-neg/70 hover:text-neg transition-colors"
+              className="shrink-0 -m-1 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center text-neg hover:text-ink transition-colors"
             >
               <X size={12} />
             </button>
@@ -631,10 +639,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Affiliate mode: the program's sections and its headline numbers */}
         {affiliateMode && (
-          <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Affiliate program">
+          <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto" aria-label="Affiliate program">
             <div>
-              <div className="text-meta font-semibold text-ink-3 px-3 mb-2">Affiliate program</div>
-              <div className="space-y-1">
+              <div className="label-caps px-3 mb-1.5">Affiliate program</div>
+              <div className="space-y-0.5">
                 {AFFILIATE_TABS.map(({ id, label }) => {
                   const Icon = AFFILIATE_TAB_META[id].icon
                   const active = pathname === '/affiliates' && affiliateTab === id
@@ -651,7 +659,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             {affiliateOverview && (
               <div>
-                <div className="text-meta font-semibold text-ink-3 px-3 mb-2">At a glance</div>
+                <div className="label-caps px-3 mb-1.5">At a glance</div>
                 <dl className="px-3 space-y-2 text-sm">
                   <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Owed to partners</dt><dd className="text-ink font-medium text-right">{owedLabel(affiliateOverview)}</dd></div>
                   <div className="flex items-baseline justify-between gap-2"><dt className="text-ink-2">Active partners</dt><dd className="text-ink font-medium">{affiliateOverview.counts.affiliates_active}<span className="text-ink-3 font-normal"> / {affiliateOverview.counts.affiliates_total}</span></dd></div>
@@ -662,7 +670,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <div>
-              <Link to="/" onClick={closeSidebar} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors">
+              <Link to="/" onClick={closeSidebar} className="side-row">
                 <ArrowLeft size={16} /> Back to BrandGEO
               </Link>
             </div>
@@ -671,13 +679,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
         {!affiliateMode && (
-        <nav className="flex-1 p-4 space-y-6 overflow-y-auto" aria-label="Primary">
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
-              <div className="text-meta font-semibold text-ink-3 px-3 mb-2">
+              <div className="label-caps px-3 mb-1.5">
                 {group.label}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {group.items.map(({ to, icon: Icon, label }) => (
                   <NavLink key={to} to={to} end={to === '/'}
                     onClick={closeSidebar}
@@ -697,7 +705,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Client switcher: admin only, not in affiliate mode */}
         {!affiliateMode && isAdmin && clients.length > 0 && (
-          <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
+          <div className="px-3 py-3 border-t border-line flex-shrink-0">
             <div className="text-meta text-ink-3 px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
@@ -712,12 +720,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   })
                   setShowAddMarket(false); setShowLangs(false)
                 }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-ink-2 bg-surface-2 border border-edge hover:bg-surface-3 transition-colors"
+                className="side-row font-medium text-ink aria-expanded:bg-surface-3"
                 aria-haspopup="listbox"
                 aria-expanded={showClients}
               >
                 <BrandLogo name={activeClient?.name ?? '?'} website={activeClient?.brand_website} sizeClass="w-5 h-5" roundedClass="rounded-md" textClass="text-meta" />
-                <span className="flex-1 text-left truncate font-medium">
+                <span className="flex-1 text-left truncate">
                   {clients.find(c => c.id === activeClientId)?.name ?? t.sidebar_selectClient}
                 </span>
                 <ChevronDown size={13} className="text-ink-3 flex-shrink-0" />
@@ -728,14 +736,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const tabs = CLIENT_GROUPS.filter(g => CUSTOMER_GROUP_KEYS.includes(g.key) && groupedClients[g.key].length > 0)
                 const current: ClientGroupKey = tabs.find(tb => tb.key === clientGroup)?.key ?? (tabs[0]?.key ?? 'active')
                 return (
-                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
-                    <div className="flex flex-wrap gap-1 p-2 border-b border-dark-600 bg-dark-800/40" role="tablist">
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-line-2 rounded-control shadow-raised overflow-hidden z-50">
+                    <div className="flex flex-wrap gap-1 p-2 border-b border-line bg-surface-2" role="tablist">
                       {tabs.map(g => (
                         <button key={g.key}
                           role="tab"
                           aria-selected={current === g.key}
                           onClick={() => setClientGroup(g.key)}
-                          className={`px-2 py-1 rounded text-meta font-medium transition-colors ${current === g.key ? 'bg-accent-tint text-accent-ink border border-accent-ink/40' : 'text-ink-2 hover:text-ink hover:bg-dark-600 border border-transparent'}`}
+                          className={`px-2 py-1 rounded text-meta font-medium transition-colors ${current === g.key ? 'bg-accent-tint text-accent-ink border border-accent-ink/40' : 'text-ink-2 hover:text-ink hover:bg-surface-3 border border-transparent'}`}
                         >
                           {g.label} <span className="opacity-60">{groupedClients[g.key].length}</span>
                         </button>
@@ -745,7 +753,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       {groupedClients[current].map(c => (
                         <button key={c.id}
                           onClick={() => { setActiveClientId(c.id); setShowClients(false) }}
-                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
+                          className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'}`}
                         >
                           <Building2 size={12} className="flex-shrink-0" />
                           <span className="truncate">{c.name}</span>
@@ -776,7 +784,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     }
                     finally { setCatSaving(false) }
                   }}
-                  className="flex-1 bg-dark-700 border border-edge rounded px-2 py-1 text-meta text-ink-2 focus:border-accent-ink disabled:opacity-50"
+                  className="flex-1 h-8 bg-surface-2 border border-edge rounded-control px-2 text-meta text-ink-2 focus:border-accent-ink disabled:opacity-50"
                   aria-label="Client group category"
                 >
                   <option value="active">Active</option>
@@ -796,7 +804,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <button
                   ref={internalBtnRef}
                   onClick={() => { setShowInternal(v => !v); setShowClients(false) }}
-                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-meta text-ink-2 bg-dark-700/40 border border-dark-600/60 hover:text-ink hover:border-dark-500 transition-colors"
+                  className="side-row text-meta"
                   aria-haspopup="listbox"
                   aria-expanded={showInternal}
                   title="Internal research workspaces for content and other uses, not customer accounts"
@@ -807,16 +815,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <ChevronDown size={12} className="text-ink-3 flex-shrink-0" />
                 </button>
                 {showInternal && (
-                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50 max-h-72 overflow-y-auto">
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-line-2 rounded-control shadow-raised z-50 max-h-72 overflow-y-auto">
                     {INTERNAL_GROUP_KEYS.map(key => groupedClients[key].length > 0 && (
                       <div key={key}>
-                        <div className="text-meta uppercase tracking-wider text-ink-3 px-3 pt-2 pb-1 bg-dark-800/40">
+                        <div className="label-caps px-3 pt-2 pb-1">
                           {CLIENT_GROUPS.find(g => g.key === key)?.label}
                         </div>
                         {groupedClients[key].map(c => (
                           <button key={c.id}
                             onClick={() => { setActiveClientId(c.id); setShowInternal(false) }}
-                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
+                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${c.id === activeClientId ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'}`}
                           >
                             <Building2 size={12} className="flex-shrink-0" />
                             <span className="truncate">{c.name}</span>
@@ -837,7 +845,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             is the single "My Profile" entry in the bottom actions, so this no
             longer duplicates it. (Ownership; de-duped 2026-07-19) */}
         {!affiliateMode && !isAdmin && activeClient && (
-          <div className="p-4 border-t border-dark-700/60 flex-shrink-0">
+          <div className="px-3 py-3 border-t border-line flex-shrink-0">
             <div className="flex items-center gap-2.5 px-1 py-1">
               <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
               <span className="min-w-0 text-left">
@@ -850,10 +858,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Market selector: multi-select with per-market region pickers; client data, so not in affiliate mode */}
         {!affiliateMode && (
-        <div className="p-4 border-t border-dark-700/60 space-y-2 flex-shrink-0">
+        <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
           <div className="flex items-center justify-between px-1">
             {/* Literal string, not t.sidebar_market: that key reads "MARKET" and i18nContext.tsx is outside this change's scope. Same classes as the neighbouring labels, so CSS uppercases it. */}
-            <span className="text-meta text-ink-3">Collection market</span>
+            <span className="label-caps">Collection market</span>
             {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
                 text button so there is no padding to grow without moving the
                 MARKET header row it shares (this row is deliberately compact,
@@ -896,7 +904,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Selected market chips */}
           <div className="space-y-1">
             {selections.map(sel => (
-              <div key={sel.market.id} className="bg-dark-700 rounded-lg overflow-hidden">
+              <div key={sel.market.id} className="bg-surface-2 rounded-control overflow-hidden">
                 {/* Market header row */}
                 <div className="flex items-center gap-2 px-3 py-2">
                   {sel.market.flagCode === 'un'
@@ -924,7 +932,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         const r = sel.market.regions.find(r => r.id === e.target.value)
                         if (r) updateRegion(sel.market.id, r)
                       }}
-                      className="w-full text-xs bg-dark-600 border border-edge rounded px-2 py-1 max-md:min-h-[44px] text-ink-2 focus:border-accent-ink cursor-pointer"
+                      className="w-full text-xs bg-surface border border-edge rounded-control px-2 py-1 max-md:min-h-[44px] text-ink-2 focus:border-accent-ink cursor-pointer"
                       aria-label={`Region for ${sel.market.label}`}
                     >
                       {sel.market.regions.map(r => (
@@ -943,7 +951,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 ref={marketBtnRef}
                 onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-lg text-xs text-ink-3 hover:text-ink-2 hover:bg-dark-700 transition-colors border border-dashed border-dark-600 hover:border-dark-500"
+                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-control text-xs text-ink-3 hover:text-ink-2 hover:bg-surface-2 transition-colors border border-dashed border-line-2 hover:border-edge"
                 aria-haspopup="listbox"
                 aria-expanded={showAddMarket}
               >
@@ -951,11 +959,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 Add market
               </button>
               {showAddMarket && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-y-auto max-h-56 shadow-xl z-50">
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-line-2 rounded-control shadow-raised overflow-y-auto max-h-56 z-50">
                   {availableMarkets.map(m => (
                     <button key={m.id}
                       onClick={() => { addSelection(m); setShowAddMarket(false) }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-ink-2 hover:bg-dark-600 transition-colors"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
                     >
                       {m.flagCode === 'un'
                         ? <Globe2 size={15} className="text-ink-2 flex-shrink-0" />
@@ -974,9 +982,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Bottom actions */}
-        <div className="p-4 border-t border-dark-700/60 space-y-1 flex-shrink-0">
+        <div className="px-3 py-3 border-t border-line space-y-0.5 flex-shrink-0">
           <NavLink to="/account" onClick={closeSidebar}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors">
+            className="side-row">
             <User size={16} />
             My Profile
           </NavLink>
@@ -985,9 +993,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={openBilling}
               disabled={billingLoading}
-              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors disabled:opacity-60"
+              className="side-row disabled:opacity-60"
             >
-              {billingLoading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+              {billingLoading ? <Loader2 size={16} className="animate-spin motion-reduce:animate-none" /> : <CreditCard size={16} />}
               {t.sidebar_billing}
             </button>
           )}
@@ -1002,7 +1010,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 ref={langBtnRef}
                 onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
-                className="flex items-center gap-2 w-full px-3 py-2 max-md:min-h-[44px] rounded-lg text-sm text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
+                className="side-row"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}
                 title="Language"
@@ -1012,11 +1020,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <ChevronDown size={13} className="text-ink-3 flex-shrink-0" />
               </button>
               {showLangs && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-dark-700 border border-dark-600 rounded-lg overflow-hidden shadow-xl z-50">
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-line-2 rounded-control shadow-raised overflow-hidden z-50">
                   {LANGUAGES.map(l => (
                     <button key={l.id}
                       onClick={() => { setLang(l.id); setShowLangs(false) }}
-                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-dark-600'}`}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${l.id === lang ? 'text-accent-ink bg-accent-tint' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'}`}
                     >
                       <img src={`https://flagcdn.com/w20/${l.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
                       <span>{l.label}</span>
@@ -1035,7 +1043,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               aria-checked={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={t.sidebar_darkMode}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-ink-2 hover:text-ink hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors duration-[180ms]"
             >
               {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -1044,7 +1052,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               aria-label={t.sidebar_signOut}
               title={t.sidebar_signOut}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg text-ink-2 hover:text-neg hover:bg-dark-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-neg hover:bg-surface-2 transition-colors duration-[180ms]"
             >
               <LogOut size={16} />
             </button>
@@ -1095,26 +1103,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {affiliateMode && <span className="text-meta font-medium text-ink-3">Affiliates</span>}
           {isDemoMode && <Badge tone="neutral">Demo</Badge>}
           {!affiliateMode && collecting && progress && (
-            <div className="ml-auto flex items-center gap-1.5 text-meta text-accent-ink">
-              <Loader2 size={12} className="animate-spin" />
+            <div className="ml-auto inline-flex items-center gap-2 h-7 px-2 rounded-badge border border-line bg-surface font-mono tabular-nums text-meta text-ink-2" role="status">
+              <span className="status-dot text-accent is-live" aria-hidden="true" />
               <span>{progress.done}/{progress.total}</span>
             </div>
           )}
         </header>
 
-        {/* Global time filter bar — hidden on the profile page (no historical data
-            there). Solid --surface-bar (A7), not a translucent bg-dark-800/60 —
-            a translucent chrome surface can't be verified against 3:1 without
-            knowing what's scrolling under it. #0d1425 is the exact value the old
-            60% composite already produced over the dark canvas, so dark mode
-            doesn't change visually, it only becomes measurable. The border is
-            decorative here (40% alpha is fine): the 3:1 divider requirement is
-            the sidebar's, not this strip's (§4.4). */}
+        {/* Global time filter bar: hidden on routes with no time-windowed data.
+            Solid bg-canvas (Phase 3 spec 8), so the strip can be contrast-checked
+            without knowing what scrolls under it. The border is decorative; the
+            3:1 divider requirement belongs to the sidebar. */}
         {!hideTimeFilter && (
         <div className="flex-shrink-0 h-12 border-b border-line bg-canvas px-4 sm:px-6 flex items-center gap-3">
           {/* copy: pending bg-copy. The caption is visible from 768 up; below that it
               is kept as the control's accessible name only. */}
-          <span className="hidden md:inline text-meta text-ink-3">{TIME_FILTER_LABEL[pathname]}</span>
+          <span className="hidden md:inline label-caps">{TIME_FILTER_LABEL[pathname]}</span>
           <SegmentedControl
             className="max-md:w-full max-md:[&>button]:flex-1"
             ariaLabel={TIME_FILTER_LABEL[pathname] ?? 'Time range'}
