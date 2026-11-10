@@ -136,7 +136,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 15 | bilingual-followup | held 2026-11-06: ruling owed by Constantin. 31 of 63 English questions were answered in the local language, which touches how BG-027 to BG-034 read; see the brief | A bilingual angle not covered by BG-027 to BG-034; read those first, drop if covered |
 | 16 | london-vs-dublin | published bg-116 2026-11-09 | London and Dublin were asked the same 8 questions: where the engines named the same companies and where they did not |
 | 17 | draft-immigration-languages | ready from 2026-11-21 (draft, rule 5; written 2026-11-08, hand read: 42 of 97 firm-level) | How often immigration answers say which languages a firm works in, by engine |
-| 18 | aila | ready (pre-checked 2026-11-06) | How often immigration answers name AILA, and whether as a credential or as a place to check a lawyer |
+| 18 | aila | published bg-117 2026-11-10 | How often immigration answers name AILA, and whether as a credential or as a place to check a lawyer |
 | 19 | free-consultation | dropped 2026-11-06: BG-110 already reports it (63 answers mention a free consultation); personal injury alone gives 61 of 98, no new angle | How often answers say the first consultation is free |
 | 20 | disclaimers | dropped 2026-11-06: 1 answer of 591 carries a "not legal advice" style disclaimer, nothing to report | How often answers carry a legal or financial disclaimer |
 | 21 | notario-warnings | dropped 2026-11-06: 9 of 98 immigration answers warn about notarios or scams, too few to split by engine | How often immigration answers warn about notario fraud |

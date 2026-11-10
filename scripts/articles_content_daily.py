@@ -1305,3 +1305,117 @@ ARTICLES_DAILY.append(dict(
     <p>If you have an office in a second country, give it its own page, its own business profile and its own local facts, so an engine answering a Dublin question has a Dublin page to read. This study cannot show that doing so changes what an engine names. It shows how little crossed the border on its own.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-117", bid="BG-117", date="2026-11-10", date_label="November 10, 2026", read=6,
+    tags=["Original Research", "US Cities", "Immigration Law"],
+    title="How AI Engines Use AILA When They Recommend Immigration Lawyers",
+    h1="How AI Engines Use <em>AILA</em> When They Recommend Immigration Lawyers",
+    h1_plain="How AI Engines Use AILA When They Recommend Immigration Lawyers",
+    subtitle="We read 97 AI answers about immigration lawyers in 20 US cities. ChatGPT named the American Immigration Lawyers Association in all 19 of its answers, mostly as a way to check a lawyer. Perplexity named it in none of 20.",
+    meta_desc="In 97 AI answers about immigration lawyers across 20 US cities, collected in July 2026, 43 named AILA. ChatGPT did in 19 of 19 and told buyers to check or ask about membership in all 19. Claude used it as a lawyer's credential in 13 of 20. Perplexity never named it.",
+    og_desc="43 of 97 AI answers about immigration lawyers named AILA. ChatGPT: 19 of 19, as a way to check a lawyer. Claude: 13 of 20, as a credential. Perplexity: 0 of 20.",
+    ld_desc="Original BrandGEO research counting how often ChatGPT, Claude, Gemini, Perplexity and Google AI Mode name the American Immigration Lawyers Association (AILA) in 97 answers about immigration lawyers across 20 US cities, collected on July 24 and 25, 2026, and whether they use it as a firm's credential or as a way for the buyer to check a lawyer.",
+    keywords="aila ai answers, immigration lawyer ai visibility, chatgpt immigration lawyer recommendation, aila membership credential, ai search immigration attorney, does chatgpt check aila",
+    about=["AI Visibility Research", "Local Search", "Immigration Law", "Credentials"],
+    findings=[("43 of 97", "immigration lawyer answers named AILA; 0 of 488 answers to the other questions did"),
+              ("19 of 19", "ChatGPT answers named AILA, and all 19 told the buyer to use it to check or find a lawyer"),
+              ("13 of 20", "Claude answers named AILA, every time as a membership attached to a named lawyer or firm"),
+              ("0 of 20", "Perplexity answers named AILA")],
+    faq=[("Do AI engines mention AILA when recommending immigration lawyers?",
+          "Often, but it depends on the engine. In 97 answers about immigration lawyers across 20 US cities, collected in July 2026, 43 named the American Immigration Lawyers Association. ChatGPT named it in 19 of 19 answers, Claude in 13 of 20, Gemini in 8 of 20, Google AI Mode in 3 of 18 and Perplexity in none of 20."),
+         ("How do AI engines use AILA membership?",
+          "Two ways. 33 answers attached AILA to a named lawyer or firm as a credential: a membership, a chapter role, a conference. 22 answers told the buyer to use AILA to check or find a lawyer, through its lawyer search, a local chapter, or by asking the lawyer whether they are a member. ChatGPT did the second in all 19 of its answers; the other engines did it once each."),
+         ("Should an immigration lawyer mention AILA membership on their website?",
+          "This study cannot say that it changes which lawyers an engine names. It shows that when Claude, Gemini and Google AI Mode named AILA, they almost always attached it to a specific lawyer, and ChatGPT told buyers in 11 of 19 answers to ask a lawyer directly whether they are a member."),
+         ("Did the engines check whether the lawyers really are AILA members?",
+          "We did not check, and the answers do not say they did. Some ChatGPT answers cited the firm's own site or a directory for the claim. We count what the engines wrote.")],
+    related=[("/bg-112.html", "BG-112", "The Facts AI Engines Attach to the Local Firms They Recommend",
+              "Years in business, board certification and awards, counted across all trades."),
+             ("/bg-111.html", "BG-111", "How Often AI Engines Tell Buyers to Check a Firm Before Hiring It",
+              "The other checks engines tell buyers to make, and which engine makes them."),
+             ("/bg-109.html", "BG-109", "How Often AI Engines Give a Street Address or Phone Number for the Firms They Name",
+              "Which contact details come with the firms engines name.")],
+    cta_h="See what AI engines say about your firm's credentials",
+    cta_p="Run the free audit on your own domain and read what each engine says about your firm and your market today. No signup and no card.",
+    og=dict(
+        fname="og-bg-117.png",
+        kicker="BG-117 · Original Research",
+        lines=[[("AILA in AI", "w")], [("Lawyer Answers", "g")]],
+        sub=["97 immigration answers,",
+             "July 2026, 20 US cities."],
+        stats=[("43 of 97", "answers named AILA", "BrandGEO, July 2026"),
+               ("19 of 19", "ChatGPT answers named it", "all as a way to check"),
+               ("13 of 20", "Claude answers named it", "all as a credential"),
+               ("0 of 20", "Perplexity answers named it", "immigration question"),],
+        footer="AILA in AI Answers",
+    ),
+    body="""  <p>Ask an AI engine for the best immigration lawyer in your city and one name comes up that is not a law firm: the American Immigration Lawyers Association, AILA, the national association of immigration attorneys. We counted how often each engine names it and, reading every answer by hand, what it uses the name for.</p>
+
+  <p><strong>43 of 97 immigration answers named AILA.</strong> None of the 488 answers to our other questions did, so this is a signal specific to the trade. The engines split into two habits. ChatGPT named AILA in all 19 of its answers and, in every one, told the buyer to use it to check or find a lawyer. Claude named it in 13 of 20, and every time as a membership attached to a lawyer it was recommending. Perplexity never named it.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked the same immigration lawyer question in each of 20 US cities. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered on July 24 and 25, 2026, and 97 usable answers came back (ChatGPT 19, after one city's July rows were removed in a later refresh). We searched the answer text for "AILA" as a whole word and for the full name, then read all 43 matching answers and sorted each mention into one of two uses: a credential attached to a named lawyer or firm, or advice to the buyer to use AILA to check or find a lawyer. An answer can do both.</p>
+    <p>Stored Claude answers are cut at about 3,800 characters and ChatGPT and Google AI Mode answers at 10,000, so the counts are lower bounds for those engines. We count what the engines wrote. We did not check whether the lawyers named are AILA members, and we cannot say why an engine named the association or whether doing so affects which lawyers it picks.</p>
+  </div>
+
+  <h2>Who names AILA</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Answers</th><th>Named AILA</th><th>As a lawyer's credential</th><th>As a way to check or find a lawyer</th></tr></thead>
+    <tbody>
+      <tr><td>ChatGPT</td><td>19</td><td>19</td><td>11</td><td>19</td></tr>
+      <tr><td>Claude</td><td>20</td><td>13</td><td>13</td><td>1</td></tr>
+      <tr><td>Gemini</td><td>20</td><td>8</td><td>7</td><td>1</td></tr>
+      <tr><td>Google AI Mode</td><td>18</td><td>3</td><td>2</td><td>1</td></tr>
+      <tr><td>Perplexity</td><td>20</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><td>All five</td><td>97</td><td>43</td><td>33</td><td>22</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>12 answers used AILA both ways, 11 of them from ChatGPT. So 21 answers used it only as a credential and 10 only as a check.</p>
+
+  <h2>AILA as a credential</h2>
+
+  <p>In 33 answers the association appears inside a lawyer's or firm's description: a member, a past chapter chair, a speaker at its conferences, a firm whose attorneys all belong. This is the use Claude, Gemini and Google AI Mode share. Claude did it in all 13 of its AILA answers, often several times in one answer, one line per recommended lawyer, next to bar admissions and languages spoken. Gemini did it in 7 of its 8. Google AI Mode did it twice, once under a heading it labelled "Credentials".</p>
+
+  <p>AILA is one of several credentials in these answers. Board certification or a certified specialist title, which BG-112 counted across trades, appeared in 29 of the 97 immigration answers: Claude 9, ChatGPT 7, Google AI Mode 7, Gemini 6, Perplexity 0. ChatGPT often put the two side by side, telling buyers to prefer a lawyer who is an AILA member or board certified in immigration law.</p>
+
+  <h2>AILA as a way to check a lawyer</h2>
+
+  <p>In 22 answers AILA was addressed to the buyer, not attached to a firm. Here ChatGPT is almost alone: 19 of the 22. Its advice took three forms, often more than one per answer:</p>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>What ChatGPT told the buyer</th><th>ChatGPT answers (of 19)</th></tr></thead>
+    <tbody>
+      <tr><td>Ask the lawyer: "Are you an AILA member?"</td><td>11</td></tr>
+      <tr><td>Use AILA's lawyer search, directory or a local chapter</td><td>9</td></tr>
+      <tr><td>Said membership is a useful filter but not a guarantee</td><td>3</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The other engines did this once each. One Gemini answer called the AILA lawyer finder the most important resource and suggested finding smaller firms through it. One Claude answer, after its list, told the buyer to look for AILA members. One Google AI Mode answer carried it in its source list, through a university page that sends students to the association's site.</p>
+
+  <p>This sits next to what BG-111 found across all trades: ChatGPT is the engine most likely to tell a buyer to verify a firm before hiring it. In immigration answers, AILA is the specific check it names.</p>
+
+  <h2>Why Perplexity's zero needs context</h2>
+
+  <p>Perplexity's 20 immigration answers averaged about 1,100 characters, against 3,000 to 3,900 for ChatGPT, Claude and Gemini. Two of them said Perplexity had no search results to work from. None mentioned board certification either, and one mentioned a bar association. Perplexity's short answers carried almost no credentials of any kind, so its zero for AILA is part of that pattern, not a sign it treats the association differently from other credentials.</p>
+
+  <p>For context, the government bodies also came up: USCIS, the federal agency that decides most applications, in 22 answers (ChatGPT 12, Google AI Mode 5, Claude 3, Gemini 1, Perplexity 1), and EOIR, which runs the immigration courts, in 3, all from ChatGPT. The professional association was named about twice as often as the agency.</p>
+
+  <h2>What this means for an immigration firm</h2>
+
+  <p>Two different buyers see two different things. A buyer who asks Claude, Gemini or Google AI Mode sees AILA as a line in some lawyers' descriptions and not in others. A buyer who asks ChatGPT is told, in most answers, to ask every lawyer about AILA membership or to look them up through the association. Either way, membership is the one credential in this trade that four of the five engines brought up unprompted.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Ask the five engines who the best immigration lawyers in your city are, and note whether your membership, chapter role or board certification appears next to your name, and next to your competitors'. If ChatGPT tells a buyer to check AILA, make sure your listing there is current and matches your website.</p>
+    <p>On your own site, state each attorney's AILA membership and any chapter role in plain text on their profile page, with the year, alongside bar admissions and certifications. This study cannot show that doing so changes which lawyers an engine names. It shows how often the engines bring the association up, and how differently they use it.</p>
+  </div>""",
+))
