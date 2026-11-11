@@ -14,3 +14,4 @@ One line per published article, newest last.
 - 2026-11-08 BG-115 https://getbrandgeo.com/bg-115.html Which Year AI Engines Say Their Local Recommendations Are For
 - 2026-11-09 BG-116 https://getbrandgeo.com/bg-116.html London and Dublin, Same Questions: Which Names AI Engines Carry Across the Border
 - 2026-11-10 BG-117 https://getbrandgeo.com/bg-117.html How AI Engines Use AILA When They Recommend Immigration Lawyers
+- 2026-11-11 BG-118 https://getbrandgeo.com/bg-118.html Which Case Types AI Engines Attach to Personal Injury Firms

@@ -1419,3 +1419,120 @@ ARTICLES_DAILY.append(dict(
     <p>On your own site, state each attorney's AILA membership and any chapter role in plain text on their profile page, with the year, alongside bar admissions and certifications. This study cannot show that doing so changes which lawyers an engine names. It shows how often the engines bring the association up, and how differently they use it.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-118", bid="BG-118", date="2026-11-11", date_label="November 11, 2026", read=6,
+    tags=["Original Research", "US Cities", "Personal Injury"],
+    title="Which Case Types AI Engines Attach to Personal Injury Firms",
+    h1="Which Case Types AI Engines Attach to <em>Personal Injury</em> Firms",
+    h1_plain="Which Case Types AI Engines Attach to Personal Injury Firms",
+    subtitle="We read 97 AI answers about personal injury lawyers in 20 US cities. Four engines tied case types like wrongful death and truck crashes to the firms they named. Perplexity listed the same case types, but as a filter for the buyer, almost never next to a firm.",
+    meta_desc="In 97 AI answers about personal injury lawyers across 20 US cities, collected in July 2026, 81 mentioned wrongful death. ChatGPT, Claude, Gemini and Google AI Mode attached it to a named firm in 59 of 62 such answers. Perplexity mentioned it in 19 of 20 and attached it to a firm once.",
+    og_desc="81 of 97 AI answers about personal injury lawyers mentioned wrongful death. Four engines tied it to a named firm in 59 of 62. Perplexity: 19 mentions, 1 tied to a firm.",
+    ld_desc="Original BrandGEO research counting which personal injury case types (car, truck, wrongful death, medical malpractice and nine others) ChatGPT, Claude, Gemini, Perplexity and Google AI Mode mention in 97 answers about personal injury lawyers across 20 US cities, collected on July 24 and 25, 2026, and, read by hand, whether each mention is attached to a named firm or offered to the buyer as a filter.",
+    keywords="personal injury lawyer ai visibility, chatgpt personal injury lawyer recommendation, ai search wrongful death lawyer, perplexity law firm recommendations, truck accident lawyer ai answers, practice areas ai engines",
+    about=["AI Visibility Research", "Local Search", "Personal Injury Law", "Practice Areas"],
+    findings=[("6.2", "case types named per personal injury answer on average, from 4.0 (Perplexity) to 8.3 (ChatGPT)"),
+              ("59 of 62", "wrongful death mentions by ChatGPT, Claude, Gemini and Google AI Mode attached to a named firm"),
+              ("1 of 19", "Perplexity answers mentioning wrongful death that attached it to a firm"),
+              ("0 of 20", "Perplexity answers naming motorcycle, dog bite, pedestrian, nursing home or rideshare cases")],
+    faq=[("Do AI engines say which cases a personal injury firm handles?",
+          "Most do. In 97 answers about personal injury lawyers across 20 US cities, collected in July 2026, the engines named 6.2 case types per answer on average. When ChatGPT, Claude, Gemini and Google AI Mode mentioned a case type, they mostly attached it to a named firm: in 59 of 62 answers for wrongful death, 49 of 55 for medical malpractice and 45 of 50 for truck crashes. Perplexity did so in 1 of 19, 2 of 9 and 2 of 10."),
+         ("Which personal injury case types do AI engines mention most?",
+          "Car accidents (86 of 97 answers), wrongful death (81), premises liability or slip and fall (69), medical malpractice (64) and truck crashes (60). Rideshare (10), nursing home (14) and dog bite (18) came last."),
+         ("Why does Perplexity rarely attach case types to firms?",
+          "We cannot say why. We can say what it wrote: its personal injury answers were short (median about 1,450 characters, against 3,000 to 4,300 for ChatGPT, Claude and Gemini) and used case types as a list for the buyer to compare firms on or to narrow a later search, not as a description of a firm."),
+         ("Should a personal injury firm list its case types on its website?",
+          "This study cannot show that doing so changes which firms an engine names. It shows that four of the five engines described the firms they named by case type, so a buyer reading those answers sees a firm's case types next to its name.")],
+    related=[("/bg-112.html", "BG-112", "The Facts AI Engines Attach to the Local Firms They Recommend",
+              "Years in business, board certification and awards, counted across all trades."),
+             ("/bg-110.html", "BG-110", "What Fees AI Engines Quote When They Recommend Lawyers, Agents and Property Managers",
+              "Contingency percentages and other fees, counted on the same answers."),
+             ("/bg-107.html", "BG-107", "When an AI Engine Names No One: 15 Answers With No Firm in Them",
+              "The answers that named no firm at all, by engine.")],
+    cta_h="See which case types AI engines attach to your firm",
+    cta_p="Run the free audit on your own domain and read what each engine says about your firm and your market today. No signup and no card.",
+    og=dict(
+        fname="og-bg-118.png",
+        kicker="BG-118 · Original Research",
+        lines=[[("Case Types in", "w")], [("Injury Answers", "g")]],
+        sub=["97 personal injury answers,",
+             "July 2026, 20 US cities."],
+        stats=[("6.2", "case types per answer", "BrandGEO, July 2026"),
+               ("59 of 62", "wrongful death mentions", "tied to a firm, 4 engines"),
+               ("1 of 19", "Perplexity mentions", "tied to a firm"),
+               ("81 of 97", "answers named", "wrongful death"),],
+        footer="Case Types in AI Answers",
+    ),
+    body="""  <p>Ask an AI engine for the best personal injury lawyer in your city and most answers do more than list names. They say what each firm handles: car crashes, truck wrecks, wrongful death, medical malpractice. We counted which case types each engine names, and, reading the answers by hand, whether a case type was attached to a firm or offered to the buyer as a way to choose.</p>
+
+  <p><strong>The engines named 6.2 case types per answer on average, and 93 of 97 answers named at least three.</strong> The split is in how they used them. ChatGPT, Claude, Gemini and Google AI Mode described the firms they named by case type. Perplexity named nearly as many case types in its lists, but as filters for the buyer: compare firms by case type, or ask it to narrow the list to car accidents or wrongful death.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>We asked the same personal injury lawyer question in each of 20 US cities. ChatGPT, Claude, Gemini, Perplexity and Google AI Mode answered on July 24 and 25, 2026, and 97 usable answers came back (ChatGPT 19, after one city's July rows were removed in a later refresh; Google AI Mode 18). We searched the answer text for 13 case types, each with a word pattern, and counted the answers that named each one. For wrongful death, medical malpractice and truck crashes we then read every matching passage and sorted each answer: a case type attached to a named firm or lawyer, or only a general mention addressed to the buyer.</p>
+    <p>Stored Claude answers are cut at about 3,800 characters and ChatGPT and Google AI Mode answers at 10,000, so the counts are lower bounds for those engines. We count what the engines wrote. We did not check whether the firms really handle the cases attached to them, and we cannot say why an engine described a firm the way it did.</p>
+  </div>
+
+  <h2>Which case types come up</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Case type</th><th>ChatGPT (19)</th><th>Claude (20)</th><th>Gemini (20)</th><th>Google AI Mode (18)</th><th>Perplexity (20)</th><th>All (97)</th></tr></thead>
+    <tbody>
+      <tr><td>Car accident</td><td>17</td><td>18</td><td>14</td><td>18</td><td>19</td><td>86</td></tr>
+      <tr><td>Wrongful death</td><td>19</td><td>15</td><td>12</td><td>16</td><td>19</td><td>81</td></tr>
+      <tr><td>Premises liability, slip and fall</td><td>18</td><td>13</td><td>9</td><td>16</td><td>13</td><td>69</td></tr>
+      <tr><td>Medical malpractice</td><td>15</td><td>16</td><td>10</td><td>14</td><td>9</td><td>64</td></tr>
+      <tr><td>Truck crash</td><td>17</td><td>13</td><td>7</td><td>13</td><td>10</td><td>60</td></tr>
+      <tr><td>Brain, spinal or catastrophic injury</td><td>17</td><td>7</td><td>10</td><td>15</td><td>8</td><td>57</td></tr>
+      <tr><td>Workplace or construction injury</td><td>10</td><td>12</td><td>8</td><td>12</td><td>1</td><td>43</td></tr>
+      <tr><td>Product liability</td><td>10</td><td>10</td><td>8</td><td>11</td><td>1</td><td>40</td></tr>
+      <tr><td>Motorcycle</td><td>10</td><td>6</td><td>9</td><td>9</td><td>0</td><td>34</td></tr>
+      <tr><td>Pedestrian or bicycle</td><td>11</td><td>4</td><td>3</td><td>10</td><td>0</td><td>28</td></tr>
+      <tr><td>Dog bite</td><td>6</td><td>5</td><td>3</td><td>4</td><td>0</td><td>18</td></tr>
+      <tr><td>Nursing home</td><td>5</td><td>3</td><td>1</td><td>5</td><td>0</td><td>14</td></tr>
+      <tr><td>Rideshare (Uber, Lyft)</td><td>3</td><td>2</td><td>0</td><td>5</td><td>0</td><td>10</td></tr>
+      <tr><td>Average types per answer</td><td>8.3</td><td>6.2</td><td>4.7</td><td>8.2</td><td>4.0</td><td>6.2</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Car accidents and wrongful death were near universal. Below the top five the engines part. ChatGPT and Google AI Mode reached deep into the list: pedestrian and bicycle cases in 11 of 19 and 10 of 18 answers. Perplexity named none of motorcycle, pedestrian, dog bite, nursing home or rideshare cases in 20 answers, and workplace and product cases once each. One Gemini answer and one Perplexity answer named no case type at all.</p>
+
+  <h2>Attached to a firm, or handed to the buyer</h2>
+
+  <p>A case type in an answer can do two jobs. It can describe a firm ("handles car accidents, truck wrecks and wrongful death"), or it can be advice to the buyer ("the best choice depends on whether your case is a car crash or medical malpractice"). We read every passage for three case types and counted the answers where at least one mention was attached to a named firm or lawyer.</p>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Engine</th><th>Wrongful death</th><th>Medical malpractice</th><th>Truck crash</th></tr></thead>
+    <tbody>
+      <tr><td>ChatGPT</td><td>16 of 19</td><td>11 of 15</td><td>14 of 17</td></tr>
+      <tr><td>Claude</td><td>15 of 15</td><td>15 of 16</td><td>12 of 13</td></tr>
+      <tr><td>Gemini</td><td>12 of 12</td><td>10 of 10</td><td>6 of 7</td></tr>
+      <tr><td>Google AI Mode</td><td>16 of 16</td><td>13 of 14</td><td>13 of 13</td></tr>
+      <tr><td>Perplexity</td><td>1 of 19</td><td>2 of 9</td><td>2 of 10</td></tr>
+      <tr><td>All five</td><td>60 of 81</td><td>51 of 64</td><td>47 of 60</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Read the table by row. Claude, Gemini and Google AI Mode almost never mentioned these case types except to describe a firm. ChatGPT did both: it described each firm by its best fit, and many of its answers also opened by telling the buyer that the right firm depends on the case type. Perplexity is the other way round. Of its 19 answers that mentioned wrongful death, 18 did so only in a list for the buyer, typically "compare firms on case type: car accident, truck crash, wrongful death" or an offer to narrow the list to the best firms for one of them. Across the three case types, 4 of its 20 answers tied any of them to a firm, each time in a single short line.</p>
+
+  <h2>Why Perplexity's lists look different</h2>
+
+  <p>Perplexity's personal injury answers were short: a median of about 1,450 characters, against 3,000 to 4,300 for Claude, Gemini and ChatGPT, and close to the 10,000 character cap for Google AI Mode. A short answer has room for a few firm names and little description of each. Its case types sat in the closing advice instead. That fits what BG-112 found across all trades: Perplexity attached almost no facts of any kind, years in business, certifications or awards, to the firms it named.</p>
+
+  <p>So the same question gets two kinds of answer. On four engines a buyer with a truck crash can see, next to a firm's name, that it handles truck crashes. On Perplexity the buyer is told that case type matters and is left to find out which firm handles what.</p>
+
+  <h2>What this means for a personal injury firm</h2>
+
+  <p>When an engine described a firm, it described it in the language of case types, and it used the same handful most of the time: car accidents, wrongful death, premises liability, medical malpractice, truck crashes. The narrower types, dog bites, nursing home neglect, rideshare crashes, appeared in a minority of answers. A firm that focuses on one of those cannot assume an engine will mention it.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What to do with this</div>
+    <p>Ask the five engines who the best personal injury lawyers in your city are, and write down the case types each one attaches to your firm and to the firms named next to you. If an engine lists your firm with case types you do not handle, or leaves out the one you are known for, that is the gap to look at.</p>
+    <p>On your own site, give each case type you take its own page in plain words, with the results you can state publicly, and use the same names buyers use: truck accident, wrongful death, medical malpractice. This study cannot show that doing so changes which firms an engine names or what it says about them. It shows that four of five engines describe firms by case type, and which case types they reach for.</p>
+  </div>""",
+))

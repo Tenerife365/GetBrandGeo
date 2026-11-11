@@ -21,12 +21,22 @@ day from data BrandGEO has already collected. Ruled by Constantin on 2026-10-28
    week, Monday to Sunday, alternating with other kinds of article (trending topics,
    comparisons, research team suggestions). Never publish a third city study in the same
    week, and never a city study on the day after another one, even when its `from` date
-   has passed. If no other topic is eligible, publish nothing that day.
+   has passed.
    His words: "I want to do 2 cities maximum per week, and then we alternate with
-   something else." So the queue is no longer filled only with articles generated from
-   platform data: do not add platform-data topics under STEP 2b of the routine while
-   this paragraph stands; report the empty day instead. The days without a city study
-   wait for topics from the research team.
+   something else."
+   **Ruling, Constantin, 2026-11-10: every site marked for articles publishes every
+   day, 7 days out of 7** ("regula este ca toate conturile marcate cu articole,
+   posteaza zilnic, 7/7"). An empty day is no longer acceptable. This replaces the
+   2026-11-06 lines that said "if no other topic is eligible, publish nothing" and
+   "do not add platform-data topics under STEP 2b". The 2 city studies a week limit
+   stands. On a day with no dated row, take the first undated `ready` topic in table
+   order (rule 1 as above); undated platform-data topics are the buffer for exactly
+   those days.
+   STEP 2b of the routine applies again, read this way: count only the `ready` rows
+   with no `from` date (the buffer), not the drafts dated ahead. If fewer than 3 are
+   in the buffer, add new platform-data topics the same run (they publish from the
+   next day on). If a day still ends with nothing eligible, report it as a breach of
+   the 7/7 rule under "Necesită acțiunea ta", never as a normal empty day.
 2. Run its SQL, read-only, against `duiyifepitvugyulobqm`. Never collect, never call an engine.
 3. If the numbers do not carry a clear finding, set the topic to `dropped` with one line
    saying why, and stop for the day. A dull day is better than a padded article.
@@ -164,6 +174,10 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 43 | draft-tool-ownership | ready from 2026-11-28 (draft, rule 5) | Who owns the main AI visibility tools after the past year's deals |
 | 44 | draft-roundup-oct-nov | ready from 2026-11-29 (draft, rule 5) | What changed in AI search from 1 October to 6 November 2026 |
 | 45 | draft-year-end-checks | ready from 2026-11-30 (draft, rule 5) | Five things a local firm should check in AI answers before the new year |
+| 46 | pi-case-types | published bg-118 2026-11-11 | Which case types AI engines attach to personal injury firms, and which engine names the fewest |
+| 47 | pm-services | ready (pre-checked 2026-11-10, buffer) | Which services AI engines say local property managers offer: screening, rent, maintenance, evictions |
+| 48 | immigration-case-types | ready (pre-checked 2026-11-11, buffer) | Which kinds of immigration case AI engines say a lawyer handles: family, work visas, asylum, removal, citizenship |
+| 49 | agent-specialties | ready (pre-checked 2026-11-11, buffer) | What AI engines say local real estate agents specialize in: luxury, first-time buyers, relocation, investors, condos |
 
 ## Briefs
 
@@ -425,3 +439,80 @@ article says so); 41 passed on both originals; 42 passed with Google's two pages
 disagreeing on access, which the article reports; 43 passed on Sitecore's, HubSpot's and
 Profound's own pages; 38 failed and is dropped. 44 covers 1 October to 6 November only;
 a session, not the routine, refreshes it if the rest of November is wanted.
+
+### 46 pi-case-types
+Personal injury rows only (rn = 1), clients 28 to 47, July basis (`checked_at <
+'2026-11-01'`, 97 answers: chatgpt 19, claude 20, gemini 20, google_ai 18, perplexity
+20), from `response_text` with backslashes stripped. One pattern per case type, word
+start boundary: car or auto or vehicle accident/crash/collision; truck, trucking,
+18-wheeler; motorcycle; medical malpractice or negligence; wrongful death; premises
+liability or slip and fall; dog bite; pedestrian or bicycle accident; brain injury, TBI,
+spinal cord, catastrophic injury; workers comp, workplace injury, construction accident;
+product liability or defective product; nursing home; rideshare, Uber, Lyft.
+Pre-check 2026-11-10 (answers naming the type, of 97): car 82, wrongful death 81,
+premises 67, medical malpractice 64, truck 60, catastrophic 57, product 40, workplace
+39, motorcycle 34, dog bite 18, pedestrian 18, nursing home 14, rideshare 10. 92 of 97
+name 3 or more types, 2 name none. The engine spread is the finding: Perplexity names
+motorcycle, dog bite, pedestrian, nursing home and rideshare 0 times and workplace and
+product once each, while ChatGPT and Google AI Mode name most types in most answers
+(google_ai workplace 12 of 18, perplexity 1 of 20).
+Read by hand 2026-11-10, 20 rows (ids 2569 to 2688): no false match, but two uses
+exist. Most mentions attach a type to a named firm ("handles car accidents, truck
+wrecks, medical malpractice"); some are generic advice ("best depends on whether your
+case is a car crash, medical malpractice ...", Perplexity's "Case type: car accident,
+truck crash, wrongful death"). The article must count the firm-attached use separately,
+read by hand, at least for wrongful death, medical malpractice and truck. "car/truck
+crashes" misses the car pattern; widen it before the final count. Not covered by BG-112
+(credentials) or BG-110 (fees). Drop if the firm-attached count removes the engine
+spread. Name no firm: most PI firms carry a person's name.
+
+### 47 pm-services
+Property management rows only (rn = 3), July basis (98 answers: chatgpt 19, claude 20,
+gemini 20, google_ai 19, perplexity 20). Services: tenant screening; rent collection;
+maintenance or repairs; eviction; HOA or community association; owner or tenant portal
+or app; financial reporting or owner statements; 24/7 or emergency maintenance; leasing
+or marketing the rental; short-term or vacation rental.
+Pre-check 2026-11-10 (of 98): maintenance 80, leasing 69, screening 57, eviction 54,
+reporting 49, rent collection 45, emergency 39, HOA 37, portal 20, short-term 17.
+Perplexity names almost none (screening 2, maintenance 2, rent 0, portal 0) against
+Gemini screening 19 of 20 and rent 16 of 20. Patterns are loose and NOT yet read by
+hand: `maintenance|repairs` and `reporting` and `commercial` catch prose about the
+buyer, not the firm. Read 20 rows by hand and tighten before writing; count the
+firm-attached use separately as in 46. BG-113 counted national brands and BG-110 fees
+on the same rows; do not repeat either. Drop if tightening removes the spread.
+
+### 48 immigration-case-types
+Added 2026-11-11 by the routine (STEP 2b: the undated buffer had 1 row after BG-118).
+Immigration rows only (rn = 4), clients 28 to 47, July basis (`checked_at <
+'2026-11-01'`, 97 answers: chatgpt 19, claude 20, gemini 20, google_ai 18, perplexity
+20), `response_text` with backslashes stripped. Patterns, word start: family-based,
+family immigration, marriage-based, spousal, green card; H-1B, employment-based,
+business immigration, work visa, EB-n, PERM (whole word); asylum; deportation, removal
+defense, removal proceedings, immigration court; citizenship, naturalization; DACA,
+U visa, VAWA, T visa.
+Pre-check 2026-11-11 (answers naming the type, of 97): removal 94, family 93,
+citizenship 85, asylum 83, employment 68, humanitarian 36. The spread is employment and
+humanitarian: Perplexity names employment cases in 4 of 20 and humanitarian in 1,
+against ChatGPT 18 of 19 and 14 of 19. 10 rows read by hand (ids 2387 to 2478): no
+false match, and the same two uses as BG-118 (attached to a firm, "Good fit for:
+business immigration"; or advice, "a focus on the type of case you have: family-based,
+employment-based"). Read 20 more by hand and count the firm-attached use separately for
+employment and asylum, as BG-118 did. "green card" may be generic process text; check
+it. Not covered by BG-117 (AILA) or row 17 (languages, draft for 2026-11-21). Drop if
+the firm-attached count removes the spread. Name no firm.
+
+### 49 agent-specialties
+Added 2026-11-11 by the routine (STEP 2b). Real estate agent rows only (rn = 2), July
+basis (97 answers: chatgpt 19, claude 20, gemini 20, google_ai 18, perplexity 20).
+Patterns, word start: luxury; first-time buyer or first time home buyer; relocat;
+investor or investment property; condo, condominium; new construction, new build.
+Pre-check 2026-11-11 (of 97): luxury 63, first-time buyers 58, condo 42, investors 34,
+relocation 30, new construction 18. The engines lean different ways: Claude names
+luxury in 17 of 20 and first-time buyers in 7; ChatGPT first-time buyers in 18 of 19
+and luxury in 11; Perplexity investors in 1 of 20. 10 luxury rows read by hand (ids
+2399 to 2460): no false match, but uses differ: luxury as an agent's specialty, as a
+brokerage description, and as a budget filter for the buyer ("starter home vs.
+luxury"). Read 20 more by hand, count the agent-attached use separately, and keep
+brokerage descriptions apart from agents (BG-114 counted brokerages; do not repeat it).
+Agents are people: report counts only, name no agent and no team named after a person.
+Drop if the agent-attached count removes the spread.
