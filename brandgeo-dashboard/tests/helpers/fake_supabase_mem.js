@@ -45,6 +45,14 @@ const UNIQUE = {
   oauth_grants: [{ cols: ['user_id', 'oauth_client_id', 'client_id'], where: (r) => r.revoked_at === null || r.revoked_at === undefined }],
   oauth_codes: [['code_hash'], ['request_id_hash']],
   oauth_tokens: [['token_hash']],
+  // Explee lead import (db/supabase-explee-lead-import-2026-11-11.sql): the pk
+  // and the two partial identity indexes on creating/created rows. A table no
+  // other suite uses, so existing tests are unaffected.
+  explee_leads: [
+    ['person_id'],
+    { cols: ['email_sha256'], where: (r) => r.decision === 'creating' || r.decision === 'created' },
+    { cols: ['brand_domain'], where: (r) => r.decision === 'creating' || r.decision === 'created' },
+  ],
 }
 
 const HAS_UPDATED_AT = new Set(['affiliate_programs', 'affiliates', 'affiliate_memberships', 'affiliate_attributions', 'affiliate_conversions', 'affiliate_commissions', 'affiliate_payout_batches'])
@@ -141,7 +149,8 @@ class Query {
     return rows.map((r) => { const o = {}; for (const n of names) o[n] = clone(r[n]); return o })
   }
   _checkUnique(row, exclude) {
-    for (const spec of UNIQUE[this.table] || []) {
+    const extra = (this.db.extraUnique && this.db.extraUnique[this.table]) || []
+    for (const spec of (UNIQUE[this.table] || []).concat(extra)) {
       const key = Array.isArray(spec) ? spec : spec.cols
       const where = Array.isArray(spec) ? null : spec.where
       if (where && !where(row)) continue
@@ -181,6 +190,7 @@ class Query {
     const now = db.now().toISOString()
     if (this.op === 'select') return this._finish(this._match(rows))
     if (this.op === 'insert') {
+      if (db.failInsert && db.failInsert.has(this.table)) return { data: null, error: { message: `${this.table} insert refused` } }
       const inserted = []
       for (const input of this.payload) {
         const row = Object.assign({}, (DEFAULTS[this.table] || (() => ({})))(), clone(input))
@@ -236,12 +246,51 @@ class Query {
   then(res, rej) { return this._run().then(res, rej) }
 }
 
-function createFakeSupabase({ now = () => new Date(), users = [] } = {}) {
+// Opt-in extensions (Explee lead import, docs/arch/explee-lead-import.md 5.6).
+// Every one is off unless the caller passes it, so the defaults of every
+// existing suite are unchanged:
+//   extraUnique     { table: [spec, ...] }  more UNIQUE specs, e.g. clients slug
+//   sumCostEur      true: rpc('sum_cost_eur', { p_since, p_client_id }) sums the
+//                   seeded ai_results.cost_eur for the client (all clients when
+//                   p_client_id is null) since p_since
+//   pagedListUsers  true: auth.admin.listUsers({ page, perPage }) honours paging
+//   authBehaviour   { beforeInvite?(email, options), invite?(email, options) }:
+//                   beforeInvite may await (two runs interleave there); invite
+//                   may return a full { data, error } result (an existing user,
+//                   an injected error) or undefined for the default behaviour.
+// inviteUserByEmail also records { email, redirectTo } in db.invites, and
+// deleteUser is recorded in db.deletedUsers (both additive arrays).
+// Revision 3 of the lead import adds three more, also off by default:
+//   failInsert          [table, ...]: every insert into those tables answers an
+//                       error ('<table> insert refused')
+//   listUsersPageCap    number: with pagedListUsers, serve at most this many
+//                       users a page whatever perPage asks (GoTrue capping)
+//   listUsersNextPage   true: with pagedListUsers, every answer carries
+//                       data.nextPage (the next page number, or null on the last)
+// Revision 4 (V1) adds, also off by default:
+//   stampCreatedAt        true: createUser (and so the default
+//                         inviteUserByEmail path) stamps the new user's
+//                         created_at from the injected now. Off, a new user has
+//                         no created_at (the "missing created_at" case).
+//   inviteResendsPending  true: inviteUserByEmail for an address that already
+//                         has a user returns that user when it is unconfirmed
+//                         (GoTrue's re-send) and refuses a confirmed one
+//                         (email_confirmed_at set) with "already been registered".
+//   authBehaviour.onListUsers(args)  awaited before each listUsers page is
+//                         served, so a test can add a user between two passes.
+// A user_profiles insert for an id that already has a profile answers 23505
+// through the existing UNIQUE on user_profiles.id (no option needed).
+function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = null, sumCostEur = false, pagedListUsers = false, authBehaviour = null, failInsert = null, listUsersPageCap = null, listUsersNextPage = false, stampCreatedAt = false, inviteResendsPending = false } = {}) {
   const db = {
     tables: {},
     serial: {},
     calls: [],
     triggers: {},                // table -> (op, oldRow, newRow, nowIso) => row, upsert only
+    extraUnique,
+    failInsert: Array.isArray(failInsert) && failInsert.length ? new Set(failInsert) : null,
+    authBehaviour,
+    invites: [],
+    deletedUsers: [],
     now,
     users: new Map(),            // token -> user
     usersById: new Map(),        // id -> user
@@ -283,6 +332,15 @@ function createFakeSupabase({ now = () => new Date(), users = [] } = {}) {
         }
         return { data: n, error: null }
       }
+      if (name === 'sum_cost_eur' && sumCostEur) {
+        let sum = 0
+        for (const r of db.tables.ai_results || []) {
+          if (args.p_client_id !== null && args.p_client_id !== undefined && String(r.client_id) !== String(args.p_client_id)) continue
+          if (args.p_since && r.checked_at && r.checked_at < args.p_since) continue
+          sum += Number(r.cost_eur || 0)
+        }
+        return { data: sum, error: null }
+      }
       return { data: null, error: { message: `unknown rpc ${name}` } }
     },
     auth: {
@@ -295,17 +353,48 @@ function createFakeSupabase({ now = () => new Date(), users = [] } = {}) {
           const existing = Array.from(db.usersById.values()).find((u) => u.email === email)
           if (existing) return { data: { user: null }, error: { message: 'A user with this email address has already been registered' } }
           const u = { id: uuid(), email }
+          if (stampCreatedAt) u.created_at = db.now().toISOString()
           db.usersById.set(u.id, u)
           db.createdUsers.push(u)
           return { data: { user: u }, error: null }
         },
-        async listUsers() { return { data: { users: Array.from(db.usersById.values()) }, error: null } },
+        async listUsers(args) {
+          if (db.authBehaviour && db.authBehaviour.onListUsers) await db.authBehaviour.onListUsers(args)
+          const all = Array.from(db.usersById.values())
+          if (!pagedListUsers || !args) return { data: { users: all }, error: null }
+          const asked = args.perPage || 50
+          const perPage = listUsersPageCap ? Math.min(asked, listUsersPageCap) : asked
+          const page = args.page || 1
+          const data = { users: all.slice((page - 1) * perPage, page * perPage) }
+          if (listUsersNextPage) data.nextPage = page * perPage < all.length ? page + 1 : null
+          return { data, error: null }
+        },
+        async deleteUser(id) {
+          db.deletedUsers.push(id)
+          db.usersById.delete(id)
+          return { data: null, error: null }
+        },
         async generateLink({ email, options }) {
           const link = `https://fake.supabase/auth/v1/verify?token=${crypto.randomBytes(8).toString('hex')}&type=magiclink&redirect_to=${encodeURIComponent(options.redirectTo)}`
           db.generatedLinks.push({ email, link })
           return { data: { properties: { action_link: link } }, error: null }
         },
-        async inviteUserByEmail(email) { return db.auth.admin.createUser({ email }) },
+        async inviteUserByEmail(email, options) {
+          db.invites.push({ email, redirectTo: options && options.redirectTo })
+          const b = db.authBehaviour
+          if (b && b.beforeInvite) await b.beforeInvite(email, options)
+          if (b && b.invite) {
+            const r = await b.invite(email, options)
+            if (r !== undefined) return r
+          }
+          if (inviteResendsPending) {
+            const key = String(email || '').toLowerCase()
+            const existing = Array.from(db.usersById.values()).find((u) => String(u.email || '').toLowerCase() === key)
+            if (existing && existing.email_confirmed_at) return { data: { user: null }, error: { message: 'A user with this email address has already been registered' } }
+            if (existing) return { data: { user: existing }, error: null }
+          }
+          return db.auth.admin.createUser({ email })
+        },
       },
     },
     storage: {

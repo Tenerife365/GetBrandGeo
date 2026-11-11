@@ -187,9 +187,12 @@ console.log('\n6. plan-writing paths write refresh_cadence')
   // Source-level check, deliberately. These five functions each need a live
   // Supabase service key to run, so behaviour cannot be exercised here; what CAN
   // be guaranteed is that none of them silently loses the write in a later edit.
+  // 2026-11-11: the Onboard wizard's client insert moved into
+  // _provision_client.js (shared with the Explee lead import), so that file is
+  // the one that must call refreshCadenceFor and write the column.
   for (const f of [
     'provision-account.js',
-    'onboard-client.js',
+    '_provision_client.js',
     'stripe-webhook.js',
     'set-client-plan.js',
     'expire-plan-grants.js',
@@ -218,7 +221,7 @@ console.log('\n6. plan-writing paths write refresh_cadence')
   // being bolted onto an object several lines above its own update call.
   let updatesChecked = 0
   for (const f of [
-    'provision-account.js', 'onboard-client.js', 'stripe-webhook.js',
+    'provision-account.js', 'onboard-client.js', '_provision_client.js', 'stripe-webhook.js',
     'set-client-plan.js', 'expire-plan-grants.js', 'schedule-collections.js',
   ]) {
     const src = read(`netlify/functions/${f}`)

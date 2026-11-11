@@ -56,6 +56,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const { requireAuth } = require('./_auth')
 const { PLAN_LIVE_ENGINES, refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
+const { provisionAdminWizardClient } = require('./_provision_client')
 
 // Derive the accepted ladder from _cost.js, never by hand. _cost.js is the
 // current server-side mirror of planConfig.ts and is the copy that enforces
@@ -65,7 +66,6 @@ const { PLAN_LIVE_ENGINES, refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = requir
 const VALID_PLANS = new Set(Object.keys(PLAN_LIVE_ENGINES))
 const DEFAULT_PLAN = 'essentials'
 const VALID_ROLES = ['admin', 'viewer']
-const APP_URL = 'https://app.getbrandgeo.com'
 
 exports.handler = async (event) => {
   // Auth: only admin users may create clients
@@ -125,146 +125,88 @@ exports.handler = async (event) => {
   // schedule-collections.js treats NULL as "due now", so an unstamped new client
   // is collected by the next hourly cron on top of the wizard's own initial
   // collection run. Stamping starts the cadence clock at provisioning.
+  //
+  // The write itself now lives in _provision_client.js (2026-11-11, the Explee
+  // lead import shares it); this line keeps the derivation visible here and is
+  // the fallback value of refresh_cadence in the response below.
   const refreshCadence = refreshCadenceFor(clientPlan, DEFAULT_CLIENT_CATEGORY)
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-  // 1. Create client row
-  const { data: client, error: clientErr } = await supabase
-    .from('clients')
-    .insert({
-      name, slug, brand_website, brand_aliases, known_competitors,
-      plan: clientPlan,
-      refresh_cadence: refreshCadence,
-      last_refresh_at: new Date().toISOString(),
-      default_market_id: default_market_id || null,
-      default_region_id: default_region_id || null,
-    })
-    .select()
-    .single()
-
-  if (clientErr) {
-    // Postgres unique_violation on clients.slug — translate the raw driver
-    // error into something the admin can actually act on.
-    const friendly = clientErr.code === '23505' || /slug/i.test(clientErr.message)
-      ? `A client with the slug "${slug}" already exists. Choose a different slug and try again.`
-      : `Client creation failed: ${clientErr.message}`
-    return { statusCode: 409, headers: auth.headers, body: JSON.stringify({ error: friendly }) }
-  }
-
-  // 2. Invite the client by email instead of setting a password directly —
-  // Supabase sends its "Invite user" template email (same delivery path
-  // signup-client.js already relies on for its confirmation email) with a
-  // link to /reset-password, where ResetPassword.tsx lets them set their
-  // own password. The admin never sees or has to relay a password.
-  const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
-    contact_email,
-    { redirectTo: `${APP_URL}/reset-password` },
-  )
-
-  if (authErr) {
-    // Rollback client row
-    await supabase.from('clients').delete().eq('id', client.id)
-    const friendly = /already.*regist|already.*exist/i.test(authErr.message)
-      ? `${contact_email} already has an account. Use a different email, or have them use "Forgot password" on the login screen to regain access.`
-      : `Invite email failed: ${authErr.message}`
-    return { statusCode: 409, headers: auth.headers, body: JSON.stringify({ error: friendly }) }
-  }
-
-  // 3. Create user_profiles row linking user → client with the chosen access level
-  const { error: profileErr } = await supabase
-    .from('user_profiles')
-    .insert({ id: authData.user.id, client_id: client.id, role: userRole })
-
-  if (profileErr) {
-    // Rollback both
-    await supabase.auth.admin.deleteUser(authData.user.id)
-    await supabase.from('clients').delete().eq('id', client.id)
-    return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Profile creation failed: ${profileErr.message}` }) }
-  }
-
-  // 4. Seed initial prompts, if any were provided by the wizard.
-  // A single .insert() with an array is one INSERT statement — atomic on
-  // its own even without an explicit DB transaction wrapping all 4 steps.
-  let promptsCreated = 0
-  const promptRows = Array.isArray(prompts)
-    ? prompts
-        .map(t => (typeof t === 'string' ? t : t?.text))
-        .filter(t => typeof t === 'string' && t.trim().length > 0)
-        .map((text, idx) => ({
-          client_id: client.id,
-          text: text.trim(),
-          category: 'general',
-          is_active: true,
-          position: idx + 1,
-        }))
-    : []
-
-  if (promptRows.length > 0) {
-    const { error: promptsErr } = await supabase.from('prompts').insert(promptRows)
-    if (promptsErr) {
-      // Rollback everything created so far
-      await supabase.from('user_profiles').delete().eq('id', authData.user.id)
-      await supabase.auth.admin.deleteUser(authData.user.id)
-      await supabase.from('clients').delete().eq('id', client.id)
-      return { statusCode: 500, headers: auth.headers, body: JSON.stringify({ error: `Prompt seeding failed: ${promptsErr.message}` }) }
-    }
-    promptsCreated = promptRows.length
-  }
-
-  // 5. Append-only audit row recording the plan this client was PROVISIONED
-  // with. Same row shape as set-client-plan.js:166 and expire-plan-grants.js:47
-  // (`from_plan` is null, since a brand-new client has no prior plan).
+  // Steps 1 to 5 (client row, invite to /reset-password, user_profiles row,
+  // prompts, client_events audit row last and non-fatal), with the rollback
+  // of earlier steps on a later failure, run in _provision_client.js, in the
+  // same order and with the same writes as before.
   //
-  // Deliberately LAST and deliberately non-fatal. Steps 1-4 are already
-  // committed and the client is fully usable by this point, so a failure here
-  // must not roll any of it back: an audit gap is a far smaller problem than
-  // deleting a client that was created correctly, and logging must never be the
-  // thing that breaks provisioning. It also cannot leave a half-created client,
-  // because it creates nothing the client depends on and runs after every step
-  // that can roll back. If a rollback above did fire, this line is never
-  // reached, so no orphan row is written (and client_events cascades on client
-  // delete anyway).
-  let auditLogged = false
-  try {
-    const { error: eventErr } = await supabase.from('client_events').insert({
-      client_id: client.id,
-      actor:     auth.user.id,
-      type:      'onboarded',
-      from_plan: null,
-      to_plan:   clientPlan,
-      meta: {
-        source:            'onboard-client',
-        slug:              client.slug ?? slug,
-        role:              userRole,
-        plan_provided:     planProvided,   // false = the DEFAULT_PLAN default was applied
-        prompts_created:   promptsCreated,
-        refresh_cadence:   refreshCadence,
-        default_market_id: default_market_id || null,
-      },
-    })
-    if (eventErr) {
-      console.error(`[onboard-client] audit row failed for client ${client.id}: ${eventErr.message}`)
-    } else {
-      auditLogged = true
-    }
-  } catch (e) {
-    console.error(`[onboard-client] audit row threw for client ${client.id}: ${e.message}`)
+  // One deliberate behaviour change (Rule U, docs/arch/explee-lead-import.md
+  // D8): an address that already has an auth user (confirmed, pending, or
+  // without a profile) is answered with the existing "already has an account"
+  // 409 BEFORE anything is created, instead of being re-invited, and a user
+  // that existed before this call is never bound to the new client or deleted
+  // by a rollback. Revision 4 (V1): the helper checks the logins a second
+  // time immediately before the invite (Check B), so an address that
+  // registered during this call also gets that 409, with the client row
+  // rolled back, at any stage (wizardError maps email_registered by code).
+  const result = await provisionAdminWizardClient(supabase, {
+    name, slug, brand_website, brand_aliases, known_competitors,
+    plan: clientPlan,
+    default_market_id, default_region_id,
+    contact_email,
+    prompts,
+    role: userRole,
+  }, {
+    actor: auth.user.id,
+    source: 'onboard-client',
+    meta: { plan_provided: planProvided },   // false = the DEFAULT_PLAN default was applied
+    now: () => new Date(),
+  })
+
+  if (!result.ok) {
+    const { statusCode, error } = wizardError(result, { slug, contact_email })
+    return { statusCode, headers: auth.headers, body: JSON.stringify({ error }) }
   }
 
+  const client = result.client
   return {
     statusCode: 200,
     headers: auth.headers,
     body: JSON.stringify({
       client_id:       client.id,
       client_name:     client.name,
-      user_id:         authData.user.id,
+      user_id:         result.userId,
       plan:            client.plan,
       role:            userRole,
       refresh_cadence: client.refresh_cadence ?? refreshCadence,
       engines_enabled: client.engines_enabled ?? null,
-      prompts_created: promptsCreated,
-      audit_logged:    auditLogged,
+      prompts_created: result.promptsCreated,
+      audit_logged:    result.auditLogged,
     }),
   }
 }
+
+/**
+ * Maps a failed ProvisionResult onto the status codes and texts this endpoint
+ * has always answered with. A rollback_failed result keeps the answer of the
+ * step that failed (the old code ignored rollback errors).
+ */
+function wizardError(result, { slug, contact_email }) {
+  const msg = result.message
+  if (result.code === 'email_registered') {
+    return { statusCode: 409, error: `${contact_email} already has an account. Use a different email, or have them use "Forgot password" on the login screen to regain access.` }
+  }
+  if (result.code === 'slug_taken') {
+    return { statusCode: 409, error: `A client with the slug "${slug}" already exists. Choose a different slug and try again.` }
+  }
+  if (result.code === 'auth_lookup_incomplete') {
+    return { statusCode: 500, error: 'Client creation failed: the existing logins could not be checked. Try again in a minute.' }
+  }
+  switch (result.stage) {
+    case 'client':  return { statusCode: 409, error: `Client creation failed: ${msg}` }
+    case 'invite':  return { statusCode: 409, error: `Invite email failed: ${msg}` }
+    case 'profile': return { statusCode: 500, error: `Profile creation failed: ${msg}` }
+    case 'prompts': return { statusCode: 500, error: `Prompt seeding failed: ${msg}` }
+    default:        return { statusCode: 500, error: `Client creation failed: ${msg}` }
+  }
+}
+
+exports.wizardError = wizardError
