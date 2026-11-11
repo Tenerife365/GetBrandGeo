@@ -19,6 +19,18 @@ const fs = require('fs')
 const path = require('path')
 const env = require('./helpers/affiliate_test_env')
 const { createFakeSupabase } = require('./helpers/fake_supabase_mem')
+const { installFakeClock } = require('./helpers/fake_clock')
+
+// One clock for the whole file. handleStripeEvent takes no clock: a deleted
+// subscription is stamped with `new Date()` (markSubscriptionEnded), and step 7
+// then expects the invoice paid on day 60 to fall AFTER that stamp. On the
+// system date that held only until 2026-11-11 10:00 UTC, which is day 60.
+// The file now runs on day 45: after the day 30 renewal that earns commission,
+// before the day 60 invoice that must not, the same side of every fixture date
+// as the runs that passed.
+const T0_MS = Date.parse('2026-09-12T10:00:00Z')
+const clock = new Date(T0_MS + 45 * 86400000)
+installFakeClock(() => clock)
 
 env.installAuthMock()
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://placeholder.supabase.co'
@@ -56,7 +68,7 @@ async function main() {
   ok('the hook runs inside the event idempotency lock, so a retry cannot double-record')
 
   section('affiliate Stripe handlers with the fake')
-  const db = createFakeSupabase()
+  const db = createFakeSupabase({ now: () => clock })
   const [program] = db.seed('affiliate_programs', [{ slug: 'brandgeo', name: 'BrandGEO', destination_url: 'https://getbrandgeo.com/', status: 'active', is_public: true, sale_commission_type: 'percent', sale_commission_bps: 2000, recurring_commission_bps: 2000, recurring_months: 12, attribution_days: 30, approval_days: 30 }])
   const [ana] = db.seed('affiliates', [{ email: 'ana@partner-a.example.com', full_name: 'Ana Partner', status: 'active', user_id: 'u-ana', email_hash: core.hashEmail('ana@partner-a.example.com') }])
   const [mAna] = db.seed('affiliate_memberships', [{ affiliate_id: ana.id, program_id: program.id, status: 'active' }])
@@ -66,7 +78,7 @@ async function main() {
   ])
   const convs = () => db.rows('affiliate_conversions')
   const comms = () => db.rows('affiliate_commissions')
-  const T0 = Math.floor(Date.parse('2026-09-12T10:00:00Z') / 1000)
+  const T0 = Math.floor(T0_MS / 1000)
 
   // 1. checkout with the affiliate's promotion code
   const session = { id: 'cs_1', customer: 'cus_1', customer_details: { email: 'buyer@customer-x.example.com' }, amount_total: 29900, currency: 'eur', invoice: 'in_1', subscription: 'sub_1', payment_intent: 'pi_1', created: T0, discounts: [{ promotion_code: 'promo_123' }] }

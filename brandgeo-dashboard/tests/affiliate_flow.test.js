@@ -15,6 +15,7 @@
 const assert = require('assert')
 const env = require('./helpers/affiliate_test_env')
 const { createFakeSupabase } = require('./helpers/fake_supabase_mem')
+const { installFakeClock } = require('./helpers/fake_clock')
 
 env.installAuthMock({ tokens: { 'admin-jwt': { role: 'admin', user: { id: 'admin-1', email: 'admin@example.com' } } } })
 const admin = env.fn('affiliate-admin.js')
@@ -29,7 +30,14 @@ let passed = 0
 const ok = (n) => { passed++; console.log('  ok -', n) }
 const section = (n) => console.log(`\n${n}`)
 
+// One clock for the whole file. The handlers below take no clock of their own
+// (affiliate-conversions.js calls recordConversion with `now = new Date()`), so
+// the system date used to decide whether a fixture visit had expired: the file
+// went red on 2026-11-11 10:00 UTC, the first-touch visit of section 8 plus its
+// 60 day window. installFakeClock makes `new Date()` and `Date.now()` answer
+// from `clock` everywhere, so the result no longer depends on the day it runs.
 let clock = new Date('2026-09-12T10:00:00Z')
+installFakeClock(() => clock)
 const db = createFakeSupabase({ now: () => clock })
 const call = (h, ev) => h.handle(ev, { supabase: db }).then(env.parse)
 const adminPost = (body) => call(admin, env.post(body, { token: 'admin-jwt' }))
