@@ -20,7 +20,125 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-10)
+## CURRENT STATE (newest entry 2026-11-11)
+
+### 2026-11-11: market list 26 to 61, type-to-filter market and region selector LIVE (855952c)
+
+**Constantin's words: "I need south korea, singapore, australia on the list
+and more developed countries", the list being "the dashboard where we select
+the market to search for the ai visibility", because "I have a lot of new
+leads"; and "the selector needs to have a typing case in the beginning so
+once I type the first letter it starts filtering so I can search easier when
+oboarding. Same goes for region in the country."** Australia and Singapore
+were already in the list; the native dropdown only hid them below the fold.
+South Korea was missing.
+
+**Two commits, one push, one Netlify build.** `d464b3e` (10 dashboard
+files) and `855952c` (two review reports), pushed 08:23:01Z on his "Commit
+and push" with `BATCH_PUSH=1`.
+
+**The market list, `src/lib/markets.ts`: 61 markets and 253 regions.** 35
+markets appended: KR NZ HK TW MY TH ID PH VN NO FI IS LU GR CZ HU SK SI HR
+BG EE LV LT CY MT TR IL QA KW BH OM ZA AR CL CO, each with its main cities,
+plus more cities on the thin old markets. Nine markets carry only the ALL
+region (SG HK IS LU CY MT QA KW BH), so the sidebar hides their region field
+by the existing more-than-one-region rule. `Market` gained an optional
+`aliases?: string[]`, used for search only, never shown.
+**Rules that bind any later edit of this file:** append only. Never reorder,
+rename or remove an old market or region: the ids sit in
+`clients.default_market_id`, `clients.default_region_id` and in
+localStorage, `tests/fix_items.test.js` pins `MARKETS[0]` as WW and
+`MARKETS[1]` as RO, and `marketContext.tsx` falls back to `MARKETS[1]`.
+Display order belongs to `src/lib/marketOptions.tsx` (Worldwide first, then
+A to Z), never to the array. A new market id must be the ISO 3166-1 alpha-2
+code, because it goes to OpenAI as `user_location.country` and to SerpApi as
+`gl`, and `flagCode` is the same code in lower case for flagcdn. The first
+region of a new market must be `{ id: 'ALL', label: 'All regions' }`: the
+server reads a label starting with "All " as the whole country
+(`_collect.js`). The file stays pure data with no import, because Netlify
+functions and the node tests load it.
+
+**The selector, new `src/components/ui/Combobox.tsx`** (WAI-ARIA 1.2
+combobox with a listbox), with `src/lib/comboboxFilter.ts` (pure:
+`normalizeForSearch`, `filterComboboxOptions`) and
+`src/lib/marketOptions.tsx` (`buildMarketOptions`, `buildRegionOptions`).
+It replaces the native selects for Default market and Default region in
+`Onboard.tsx`, and the Add market popup and the region select in the market
+block of `Layout.tsx`. Focus or click selects the label, so the first key
+filters. Match order: label prefix, then a word start or an alias, then a
+substring, diacritics ignored ("s" lists Saudi Arabia, Singapore, Slovakia;
+"kor" finds South Korea; "united" finds USA, UK and UAE). Leaving the field
+commits typed text only when it names exactly one option, otherwise the
+label comes back; the sidebar picker (`clearOnSelect`) never commits on
+leave. Sizes: 40 px field and 36 px rows on desktop, 28 px field in the
+sidebar, 44 px and 16 px text on a phone. **Two things to keep:** it imports
+nothing from `motion` (Layout renders it on every route), and it keeps the
+active option in view by setting `scrollTop` on the list, never with
+`scrollIntoView`, which also scrolls the overflow-hidden app shell and
+leaves the user no way back.
+
+**Server, `netlify/functions/_enqueue.js`:** `COUNTRY_NAMES` now holds 60
+full names, one per market id except WW, so a scheduled run on a new market
+gets a geo label instead of falling back to the website TLD. This also gave
+a label to BR, MX, SG, IN, JP, AE and SA, which had none. Read from
+production the same day (`clients` grouped by `default_market_id`): only DE,
+ES, FR, GB, IE, IT, RO, US, WW and one null exist, so no current scheduled
+prompt changed.
+
+**Tests, 52 files now (was 50):** `tests/markets_data.test.js` (39 checks:
+old ids, labels, flag codes and order pinned from git HEAD of 2026-11-11,
+ISO shape, ALL first, COUNTRY_NAMES coverage) and
+`tests/combobox_filter.test.js` (14 checks). A market added without a
+COUNTRY_NAMES entry fails the first one.
+
+**Reviews, both `bg-verify`, read-only, PASS WITH FINDINGS:**
+`docs/qa/market-selector-review-interaction-2026-11-11.md` (1 MAJOR, 3 LOW,
+1 INFO) and `docs/qa/market-selector-review-data-2026-11-11.md` (1 MEDIUM,
+2 LOW, 5 INFO). The orchestrator closed the MAJOR (after a mouse click the
+first key could append to "Worldwide" instead of replacing it), the MEDIUM
+(a dash check in the new test was written `/[20132014]/`, a class of digits,
+the heredoc backslash loss again), four LOW and the `scrollIntoView` defect
+it found in its own screenshot. No second `bg-verify` run was made on those
+edits; each report carries an amendment saying so.
+
+**Measured from the orchestrator seat, headless Chrome over CDP with real
+mouse and key events, demo mode: 72 of 72 assertions.** The Onboard fields
+at 1440 by 900 and 390 by 844; the real sidebar block at 1440 by 900, 1280
+by 620, 390 by 844 and 390 by 560. Lists open inside the viewport, every
+visible option is hittable, Escape closes the list and leaves the phone
+drawer open, no sideways page scroll, no overflow-hidden element left
+scrolled. **Trap worth knowing:** `Onboard.tsx` returns early unless
+`isAdmin`, and demo mode never sets it, so the wizard cannot be rendered in
+demo. The two fields were mounted outside the page from the same components
+through a temporary, never committed harness file imported in the dev
+server (`import('/src/<file>.tsx')` from the page), then deleted.
+
+**Before the commit:** `tsc` exit 0, 52 of 52 node test files, build exit 0,
+entry chunk 580.13 kB against 569.49 kB before (the longer list and the
+selector both sit in the entry, because Layout imports them), added lines
+free of dashes with a positive control, flagcdn answered 200 for all 35 new
+codes. **LIVE, read from outside at 08:24:05Z:** `health` answers `commit`
+855952c, `built_at` 08:23:20Z, supabase ok, jobs ok, watchdog ok; the live
+entry `index-CPeKmG7Z.js` carries "South Korea", "New Zealand", "Busan",
+"Add a market" and "No match"; the lazy chunk `Onboard-Cdc95TZR.js` carries
+"Type to search markets" and "Type to search regions"; `enqueue-collection`,
+`collect-prompt` and `onboard-client` answer 401 unauthenticated;
+`dashboard-ci` run 42986592823 on `855952c` is `success`.
+
+**Not checked by anyone.** The real Onboard page signed in as an admin. A
+real iPhone or Android device (the clicks were mouse events, touch was not
+emulated). A screen reader, Firefox. Light mode contrast by measurement.
+SerpApi acceptance of `gl` for each new country, and of the new city names
+as `location`.
+
+**Open, none blocking.** Adding the 61st market in the sidebar unmounts the
+focused field and drops keyboard focus. Regions are a fixed list: a city
+that is not listed cannot be typed in (offered to Constantin, not asked
+for). Older, not touched: the UK goes to SerpApi as `gl=gb` where Google
+may expect `uk`, unverified; Singapore's single region label is "Singapore",
+so the server reads it as a city ("Singapore, Singapore"), harmless.
+`normalizeForSearch` does not fold letters without a decomposition (the
+Polish L with stroke, the Danish O with stroke); no current label has one.
 
 ### 2026-11-10 (second): Phase 4 reviewed after the fact, fix round and density pass LIVE (638c8de)
 
