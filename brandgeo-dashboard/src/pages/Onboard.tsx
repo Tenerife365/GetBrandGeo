@@ -7,6 +7,10 @@ import { MARKETS } from '../lib/marketContext'
 import { supabase } from '../lib/supabase'
 import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus } from 'lucide-react'
 import { PageTitle } from '../components/Typography'
+import { Combobox } from '../components/ui'
+import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
+
+const MARKET_OPTIONS = buildMarketOptions(MARKETS)
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
 
@@ -264,19 +268,15 @@ export default function Onboard() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Default market</label>
-                <select value={marketId} onChange={e => handleMarketChange(e.target.value)}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
-                  {MARKETS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
+                <label htmlFor="onboard-market" className="block text-xs text-slate-400 mb-1">Default market</label>
+                <Combobox id="onboard-market" options={MARKET_OPTIONS} value={marketId} onChange={handleMarketChange}
+                  ariaLabel="Default market" placeholder="Type to search markets" />
               </div>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Default region</label>
-              <select value={regionId} onChange={e => setRegionId(e.target.value)}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
-                {selectedMarket.regions.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
+              <label htmlFor="onboard-region" className="block text-xs text-slate-400 mb-1">Default region</label>
+              <Combobox id="onboard-region" options={buildRegionOptions(selectedMarket)} value={regionId} onChange={setRegionId}
+                ariaLabel="Default region" placeholder="Type to search regions" />
             </div>
             <p className="text-xs text-slate-500 -mt-2">
               Plan controls which AI engines collect for this client. Market and region set what

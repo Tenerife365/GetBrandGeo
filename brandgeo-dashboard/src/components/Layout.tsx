@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
-  StopCircle, Plus, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
+  StopCircle, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
   Eye, EyeOff, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
@@ -17,6 +17,8 @@ import BrandGeoMark from './BrandGeoLogo'
 import ClientBanner from './ClientBanner'
 import Badge from './ui/Badge'
 import SegmentedControl from './ui/SegmentedControl'
+import Combobox from './ui/Combobox'
+import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
 import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
 import { useI18n, LANGUAGES } from '../lib/i18nContext'
@@ -124,7 +126,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { collecting, progress, stopCollection, lastRunOutcome } = useCollection()
   const { timeRange, setTimeRange } = useTimeFilter()
   const [sidebarOpen, setSidebarOpen]   = useState(false)
-  const [showAddMarket, setShowAddMarket] = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
   const [showMarketEditor, setShowMarketEditor] = useState(false)  // market area collapses to a summary by default (set-once, rarely changes)
@@ -144,7 +145,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // (Master-Dashboard-Polish Phase 5, keyboard/focus pass). None of these change the
   // existing toggle-on-click behavior, they just add the missing keyboard/click-away paths.
   const clientMenuRef = useRef<HTMLDivElement>(null)
-  const marketMenuRef = useRef<HTMLDivElement>(null)
   const langMenuRef   = useRef<HTMLDivElement>(null)
   const internalMenuRef = useRef<HTMLDivElement>(null)
 
@@ -154,7 +154,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // which is then at left: -57, off-screen inside the closed drawer. Both are
   // the same missing step: return focus to whatever opened the thing.
   const clientBtnRef   = useRef<HTMLButtonElement>(null)
-  const marketBtnRef   = useRef<HTMLButtonElement>(null)
   const langBtnRef     = useRef<HTMLButtonElement>(null)
   const internalBtnRef = useRef<HTMLButtonElement>(null)
   const hamburgerRef   = useRef<HTMLButtonElement>(null)
@@ -211,7 +210,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     function handlePointerDown(e: MouseEvent) {
       const target = e.target as Node
       if (showClients && clientMenuRef.current && !clientMenuRef.current.contains(target)) setShowClients(false)
-      if (showAddMarket && marketMenuRef.current && !marketMenuRef.current.contains(target)) setShowAddMarket(false)
       if (showLangs && langMenuRef.current && !langMenuRef.current.contains(target)) setShowLangs(false)
       if (showInternal && internalMenuRef.current && !internalMenuRef.current.contains(target)) setShowInternal(false)
     }
@@ -222,7 +220,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
       if (showClients)   { setShowClients(false);   focusAfterCommit(clientBtnRef.current);   return }
-      if (showAddMarket) { setShowAddMarket(false); focusAfterCommit(marketBtnRef.current);   return }
       if (showLangs)     { setShowLangs(false);     focusAfterCommit(langBtnRef.current);     return }
       if (showInternal)  { setShowInternal(false);  focusAfterCommit(internalBtnRef.current); return }
       if (sidebarOpen)   { setSidebarOpen(false);   focusAfterCommit(hamburgerRef.current);   return }
@@ -233,7 +230,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showClients, showAddMarket, showLangs, showInternal, sidebarOpen])
+  }, [showClients, showLangs, showInternal, sidebarOpen])
 
   // End-of-run notice. collectionContext writes lastRunOutcome exactly once
   // per run, in its finally block, from the poll's own final count. That is
@@ -718,7 +715,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     if (opening && activeClient) setClientGroup(clientBucket(activeClient))
                     return opening
                   })
-                  setShowAddMarket(false); setShowLangs(false)
+                  setShowLangs(false)
                 }}
                 className="side-row font-medium text-ink aria-expanded:bg-surface-3"
                 aria-haspopup="listbox"
@@ -869,7 +866,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 grows instead: inset -14px vertical, -8px horizontal, giving
                 50.6 x 44.5 while the label stays exactly where it was. */}
             <button
-              onClick={() => { setShowMarketEditor(v => !v); setShowAddMarket(false) }}
+              onClick={() => { setShowMarketEditor(v => !v) }}
               className="relative flex items-center gap-1 text-meta text-ink-3 hover:text-ink-2 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
               aria-expanded={showMarketEditor}
               aria-label={showMarketEditor ? 'Done editing collection market' : 'Edit collection market. Used for collections you start from this browser; scheduled refreshes use the account default.'}
@@ -904,7 +901,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Selected market chips */}
           <div className="space-y-1">
             {selections.map(sel => (
-              <div key={sel.market.id} className="bg-surface-2 rounded-control overflow-hidden">
+              <div key={sel.market.id} className="bg-surface-2 rounded-control">
                 {/* Market header row */}
                 <div className="flex items-center gap-2 px-3 py-2">
                   {sel.market.flagCode === 'un'
@@ -926,19 +923,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {/* Inline region selector — only shown when market has sub-regions */}
                 {sel.market.regions.length > 1 && (
                   <div className="px-2 pb-2">
-                    <select
+                    <Combobox
+                      size="sm"
+                      placement="top"
+                      options={buildRegionOptions(sel.market)}
                       value={sel.region.id}
-                      onChange={e => {
-                        const r = sel.market.regions.find(r => r.id === e.target.value)
+                      onChange={rid => {
+                        const r = sel.market.regions.find(x => x.id === rid)
                         if (r) updateRegion(sel.market.id, r)
                       }}
-                      className="w-full text-xs bg-surface border border-edge rounded-control px-2 py-1 max-md:min-h-[44px] text-ink-2 focus:border-accent-ink cursor-pointer"
-                      aria-label={`Region for ${sel.market.label}`}
-                    >
-                      {sel.market.regions.map(r => (
-                        <option key={r.id} value={r.id}>{r.label}</option>
-                      ))}
-                    </select>
+                      ariaLabel={`Region for ${sel.market.label}`}
+                    />
                   </div>
                 )}
               </div>
@@ -947,34 +942,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Add market picker */}
           {availableMarkets.length > 0 && (
-            <div className="relative" ref={marketMenuRef}>
-              <button
-                ref={marketBtnRef}
-                onClick={() => { setShowAddMarket(v => !v); setShowClients(false); setShowLangs(false) }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 max-md:min-h-[44px] rounded-control text-xs text-ink-3 hover:text-ink-2 hover:bg-surface-2 transition-colors border border-dashed border-line-2 hover:border-edge"
-                aria-haspopup="listbox"
-                aria-expanded={showAddMarket}
-              >
-                <Plus size={11} />
-                Add market
-              </button>
-              {showAddMarket && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-line-2 rounded-control shadow-raised overflow-y-auto max-h-56 z-50">
-                  {availableMarkets.map(m => (
-                    <button key={m.id}
-                      onClick={() => { addSelection(m); setShowAddMarket(false) }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
-                    >
-                      {m.flagCode === 'un'
-                        ? <Globe2 size={15} className="text-ink-2 flex-shrink-0" />
-                        : <img src={`https://flagcdn.com/w20/${m.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
-                      }
-                      <span>{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Combobox
+              size="sm"
+              placement="top"
+              clearOnSelect
+              options={buildMarketOptions(availableMarkets)}
+              value={null}
+              onChange={id => { const m = availableMarkets.find(x => x.id === id); if (m) addSelection(m) }}
+              placeholder="Add market"
+              ariaLabel="Add a market"
+            />
           )}
           </div>
           )}
@@ -1009,7 +986,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative flex-1 min-w-0" ref={langMenuRef}>
               <button
                 ref={langBtnRef}
-                onClick={() => { setShowLangs(v => !v); setShowAddMarket(false); setShowClients(false) }}
+                onClick={() => { setShowLangs(v => !v); setShowClients(false) }}
                 className="side-row"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}

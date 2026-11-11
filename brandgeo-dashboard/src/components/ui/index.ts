@@ -40,6 +40,8 @@ export { default as SegmentedControl } from './SegmentedControl'
 export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl'
 export { default as Select } from './Select'
 export type { SelectProps } from './Select'
+export { default as Combobox } from './Combobox'
+export type { ComboboxProps, ComboboxOption } from './Combobox'
 export { default as Disclosure } from './Disclosure'
 export type { DisclosureProps } from './Disclosure'
 export {
