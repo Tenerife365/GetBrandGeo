@@ -161,3 +161,33 @@ row present and disabled; `authenticated` has no insert, update, delete or
 truncate on either table; `anon` cannot select either table; 0 cron jobs
 named for the import.
 
+## 8. First dry pull did nothing: bundler setting missing, 2026-11-11
+
+After the deploy of `61581b0` the first dry pull was triggered by hand at
+15:31:52 UTC (`net.http_post` with the cron secret, body `{"mode":"dry_run"}`).
+Netlify logged the invocation and answered 202, as it does for every
+background function. No `job_runs` row appeared. The database request log
+shows no request to `explee_leads`, `explee_import_settings` or `job_runs`
+in the following minutes, so the function stopped before its first step.
+Nothing was created, sent or changed.
+
+The same file completes the same path under plain node with stubbed
+services, and as an esbuild bundle for node 22 with no syntax warning.
+`explee-import-background.js` requires `src/lib/markets.ts`. The only other
+function that requires a `.ts` file, `mcp-server`, carries
+`node_bundler = "esbuild"` in `netlify.toml`; the new function did not. The
+function's own error log could not be read from this seat, so the cause is
+inferred from those facts, not read from an error line.
+
+How it was missed: the build and review agents were told not to edit
+`netlify.toml` (another session has an open edit in it), the spec said no
+entry was needed for a background function, and every test loads the file
+through `tests/helpers/ts_require.js`, which hides the difference. No
+reviewer could run the Netlify bundler.
+
+Fix: a `[functions."explee-import-background"]` entry with
+`node_bundler = "esbuild"`, and `tests/ts_require_bundler.test.js`, which
+fails for any function that reaches a `.ts` file without that setting (5
+checks; it fails against the config deployed at `61581b0`). Both written
+from this seat; no `bg-verify` run was made on them.
+

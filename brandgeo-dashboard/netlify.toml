@@ -270,6 +270,15 @@
 # filename suffix gives it up to 15 minutes automatically) — like
 # run-full-audit-background, it does NOT take a `timeout` setting.
 
+# explee-import-background (docs/arch/explee-lead-import.md) is a Background
+# Function too, so no `timeout`. It requires src/lib/markets.ts, and a function
+# that requires a .ts file must be bundled by esbuild, as mcp-server is. Under
+# the default bundler its first invocation (2026-11-11 15:31 UTC) made no
+# database call and wrote no job_runs row. tests/ts_require_bundler.test.js
+# pins this for every function.
+[functions."explee-import-background"]
+  node_bundler = "esbuild"
+
 # ── Manual "notify Google now" trigger (CLAUDE.md — Google Indexing API) ─────
 # One outbound call to Google; gated by FORCE_INDEX_KEY (see the file's own
 # header comment for the real limits of what this API actually guarantees).
