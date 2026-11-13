@@ -161,7 +161,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 30 | city-later | held 2026-11-06 for December: Indianapolis, Columbus, Jacksonville, San Jose (fewest firms named by all three engines: 1, 1, 1 and 2), at the same cadence | City studies after November |
 | 31 | agreement-by-trade | dropped 2026-11-06: on the November basis the 28 firms named by all three engines are 9 property managers, 6 home builders, 4 breweries and 3 lobbying firms against 6 law firms, but BG-016 already reports when engines agree and when they do not | Which kinds of business all three engines agree on |
 | 32 | la-four-months | dropped 2026-11-06: same 6 Los Angeles questions in July and November, but bold markup differs between months (Gemini bolds no names on 2 July prompts and 2 November ones) and Claude's answers changed character, so a churn count would measure the instrument; ChatGPT's July rows were deleted | How much an engine's recommendations change in four months |
-| 33 | draft-chatgpt-search-share | ready from 2026-11-13 (draft, rule 5) | What OpenAI's "a fifth of Google" claim does and does not tell a local business |
+| 33 | draft-chatgpt-search-share | published bg-120 2026-11-13 | What OpenAI's "a fifth of Google" claim does and does not tell a local business |
 | 34 | draft-search-console-ai | ready from 2026-11-15, not after 2026-12-02 (draft, rule 5) | What Search Console's AI report shows today, before the UK deadline of 3 December |
 | 35 | draft-engine-scorecard | ready from 2026-11-16 (draft, rule 5) | What each engine tells a buyer about a local firm, from BG-106 to BG-113 |
 | 36 | draft-safegeo | ready from 2026-11-18 (draft, rule 5) | What the SafeGEO paper at EMNLP 2026 measured about gaming AI recommendations |
