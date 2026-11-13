@@ -53,11 +53,18 @@ const UNIQUE = {
     { cols: ['email_sha256'], where: (r) => r.decision === 'creating' || r.decision === 'created' },
     { cols: ['brand_domain'], where: (r) => r.decision === 'creating' || r.decision === 'created' },
   ],
+  // 7 day invite links (db/supabase-client-invite-links-2026-11-13.sql): the
+  // unique token_hash and client_invite_links_one_active, at most one row per
+  // user that is neither revoked nor accepted. A table no other suite uses.
+  client_invite_links: [
+    ['token_hash'],
+    { cols: ['user_id'], where: (r) => (r.revoked_at === null || r.revoked_at === undefined) && (r.accepted_at === null || r.accepted_at === undefined) },
+  ],
 }
 
 const HAS_UPDATED_AT = new Set(['affiliate_programs', 'affiliates', 'affiliate_memberships', 'affiliate_attributions', 'affiliate_conversions', 'affiliate_commissions', 'affiliate_payout_batches'])
 
-const SERIAL = new Set(['affiliate_applications', 'affiliate_visits', 'affiliate_resources', 'affiliate_audit_log', 'affiliate_rate_limits', 'terms_acceptances', 'clients', 'client_events', 'fix_states'])
+const SERIAL = new Set(['affiliate_applications', 'affiliate_visits', 'affiliate_resources', 'affiliate_audit_log', 'affiliate_rate_limits', 'terms_acceptances', 'clients', 'client_events', 'fix_states', 'client_invite_links'])
 
 const DEFAULTS = {
   affiliate_programs: () => ({ status: 'draft', is_public: true, currency: 'EUR', lead_commission_cents: 0, sale_commission_type: 'percent', sale_commission_cents: 0, sale_commission_bps: 0, recurring_commission_bps: 0, recurring_months: null, attribution_days: 30, attribution_mode: 'last_touch', approval_days: 30, min_payout_cents: 5000, payout_schedule: 'Monthly, within 15 days after month end', tagline: null, description: null, logo_url: null, brand_color: null, terms_md: null, terms_url: null, terms_version: null, api_key_hash: null, api_key_prefix: null, api_key_created_at: null, archived_at: null }),
@@ -85,6 +92,14 @@ const DEFAULTS = {
   oauth_grants: () => ({ client_name: '', redirect_host: '', scope: 'mcp:read', last_used_at: null, revoked_at: null, expires_at: null }),
   oauth_codes: () => ({ code_hash: null, request_id_hash: null, scope_requested: null, scope_granted: null, resource: null, state: null, used_at: null, grant_id: null }),
   oauth_tokens: () => ({ scope: 'mcp:read', used_at: null, revoked_at: null, rotated_from: null }),
+  client_invite_links: () => ({ created_by: null, revoked_at: null, revoked_reason: null, accepted_at: null, last_redeemed_at: null, redeem_count: 0 }),
+}
+
+// Error a missing table answers through PostgREST: 42P01 is Postgres's own
+// "relation does not exist", PGRST205 is PostgREST's schema cache miss.
+function missingTableError(table, code) {
+  if (code === 'PGRST205') return { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` }
+  return { code: code || '42P01', message: `relation "public.${table}" does not exist` }
 }
 
 function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)) }
@@ -260,6 +275,17 @@ class Query {
   async _run() {
     const db = this.db
     db.calls.push({ table: this.table, op: this.op })
+    if (db.missingTables && Object.prototype.hasOwnProperty.call(db.missingTables, this.table)) {
+      return { data: null, error: missingTableError(this.table, db.missingTables[this.table]) }
+    }
+    for (const f of db.faults) {
+      if (f.table !== this.table || (f.op && f.op !== this.op)) continue
+      if (f.times !== undefined && f.times <= 0) continue
+      if (f.times !== undefined) f.times -= 1
+      if (f.before) await f.before(db, this)
+      if (f.error) return { data: null, error: clone(f.error) }
+      break
+    }
     const rows = this._rows()
     const now = db.now().toISOString()
     if (this.op === 'select') return this._finish(this._match(rows))
@@ -364,8 +390,47 @@ class Query {
 //                     set_primary_client_location). Every rpc call is also
 //                     recorded with its arguments in db.rpcArgs. No lock, no
 //                     transaction: control flow only, as everything here.
-function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = null, sumCostEur = false, pagedListUsers = false, authBehaviour = null, failInsert = null, listUsersPageCap = null, listUsersNextPage = false, stampCreatedAt = false, inviteResendsPending = false, clientLocations = false } = {}) {
+// 7 day invite links (docs/arch/invite-link-7-days.md section 10) add, all
+// off or inert by default so every existing suite is unchanged:
+//   missingTables   { table: '42P01' | 'PGRST205' } (or an array of table
+//                   names, meaning 42P01): every query on that table answers
+//                   the missing-table error. Also settable later on
+//                   db.missingTables, e.g. db.missingTables = { client_invite_links: 'PGRST205' }.
+//   db.faults       an array, empty by default, a test pushes entries
+//                   { table, op?, times?, before?(db, query), error? }. A
+//                   query takes the FIRST entry that matches it (op omitted
+//                   matches every op) and still has times left: it awaits
+//                   before (a concurrent write, say), then answers error when
+//                   given, else runs normally. times counts down per use;
+//                   omitted means every time.
+//   rpcFaults       { rpcName: { message, code? } } (also db.rpcFaults later):
+//                   that rpc answers { data: null, error }.
+//   auth.admin.getUserById(id): the user (a shallow copy) or a 404
+//                   { status: 404, code: 'user_not_found' } error.
+//   auth.admin.generateLink({ type: 'invite', email, options? }): runs the
+//                   same authBehaviour.beforeInvite and authBehaviour.invite
+//                   hooks as inviteUserByEmail, honours stampCreatedAt (through
+//                   createUser), treats an existing UNCONFIRMED user exactly as
+//                   inviteUserByEmail does under the same inviteResendsPending
+//                   flag, refuses a CONFIRMED user (email_confirmed_at set) with
+//                   { status: 422, code: 'email_exists' }, writes a new
+//                   confirmation_token on the user and stamps invited_at at every
+//                   success, records { type, email, redirectTo, userId,
+//                   properties } in db.generatedLinks, and answers
+//                   { user, properties: { hashed_token (56 hex),
+//                   verification_type: 'invite', action_link, email_otp } }.
+//                   An invite hook may return its own { data, error }; a
+//                   success without data.properties gets the default ones.
+//                   db.generateLinkOverride, when set, is awaited instead of
+//                   all of that for type 'invite' (after the record is pushed).
+//                   Other types keep the earlier answer ({ action_link } only,
+//                   recorded as { email, link }), which the affiliate tests use.
+function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = null, sumCostEur = false, pagedListUsers = false, authBehaviour = null, failInsert = null, listUsersPageCap = null, listUsersNextPage = false, stampCreatedAt = false, inviteResendsPending = false, clientLocations = false, missingTables = null, rpcFaults = null } = {}) {
   const db = {
+    missingTables: Array.isArray(missingTables) ? Object.fromEntries(missingTables.map((t) => [t, '42P01'])) : missingTables,
+    faults: [],
+    rpcFaults,
+    generateLinkOverride: null,
     tables: {},
     serial: {},
     calls: [],
@@ -385,6 +450,7 @@ function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = 
     from(table) { return new Query(db, table) },
     async rpc(name, args = {}) {
       db.calls.push({ rpc: name })
+      if (db.rpcFaults && db.rpcFaults[name]) return { data: null, error: clone(db.rpcFaults[name]) }
       const nowD = db.now()
       if (name === 'affiliate_record_visit') {
         const visits = db.tables.affiliate_visits || (db.tables.affiliate_visits = [])
@@ -463,10 +529,57 @@ function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = 
           db.usersById.delete(id)
           return { data: null, error: null }
         },
-        async generateLink({ email, options }) {
-          const link = `https://fake.supabase/auth/v1/verify?token=${crypto.randomBytes(8).toString('hex')}&type=magiclink&redirect_to=${encodeURIComponent(options.redirectTo)}`
-          db.generatedLinks.push({ email, link })
-          return { data: { properties: { action_link: link } }, error: null }
+        async getUserById(id) {
+          const u = db.usersById.get(id)
+          if (!u) return { data: { user: null }, error: { status: 404, code: 'user_not_found', message: 'User not found' } }
+          return { data: { user: Object.assign({}, u) }, error: null }
+        },
+        async generateLink({ type, email, options } = {}) {
+          if (type !== 'invite') {
+            const redirectTo = options && options.redirectTo
+            const link = `https://fake.supabase/auth/v1/verify?token=${crypto.randomBytes(8).toString('hex')}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`
+            db.generatedLinks.push({ email, link })
+            return { data: { properties: { action_link: link } }, error: null }
+          }
+          const rec = { type: 'invite', email, redirectTo: (options && options.redirectTo) || null, userId: null, properties: null }
+          db.generatedLinks.push(rec)
+          if (db.generateLinkOverride) return db.generateLinkOverride({ type, email, options })
+          const finish = (result) => {
+            const user = result && result.data && result.data.user
+            if (!result || result.error || !user) return result
+            const stored = db.usersById.get(user.id)
+            const tokenValue = crypto.randomBytes(16).toString('hex')
+            const stamp = db.now().toISOString()
+            if (stored) { stored.confirmation_token = tokenValue; stored.invited_at = stamp }
+            user.confirmation_token = tokenValue
+            user.invited_at = stamp
+            let properties = result.data.properties
+            if (!properties) {
+              const hashed = crypto.randomBytes(28).toString('hex')
+              properties = {
+                hashed_token: hashed,
+                verification_type: 'invite',
+                action_link: `https://fake.supabase/auth/v1/verify?token=${hashed}&type=invite&redirect_to=${encodeURIComponent(rec.redirectTo || '')}`,
+                email_otp: String(crypto.randomInt(100000, 1000000)),
+              }
+            }
+            rec.userId = user.id
+            rec.properties = clone(properties)
+            return { data: Object.assign({}, result.data, { user, properties }), error: null }
+          }
+          const b = db.authBehaviour
+          if (b && b.beforeInvite) await b.beforeInvite(email, options)
+          if (b && b.invite) {
+            const r = await b.invite(email, options)
+            if (r !== undefined) return finish(r)
+          }
+          const key = String(email || '').toLowerCase()
+          const existing = Array.from(db.usersById.values()).find((u) => String(u.email || '').toLowerCase() === key)
+          if (existing && existing.email_confirmed_at) {
+            return { data: { user: null, properties: null }, error: { status: 422, code: 'email_exists', message: 'A user with this email address has already been registered' } }
+          }
+          if (existing && inviteResendsPending) return finish({ data: { user: existing }, error: null })
+          return finish(await db.auth.admin.createUser({ email }))
         },
         async inviteUserByEmail(email, options) {
           db.invites.push({ email, redirectTo: options && options.redirectTo })

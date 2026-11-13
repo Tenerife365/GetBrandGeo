@@ -63,6 +63,51 @@ installModule(path.join(FN, '_auth.js'), {
 const P = require('../netlify/functions/_provision_client')
 const newWizard = require('../netlify/functions/onboard-client')
 
+// ── 7 day invite link (docs/arch/invite-link-7-days.md section 10) ────────
+// Every provisioning case runs TWICE: mode 'supabase' sets the kill switch
+// INVITE_LINK_CHANNEL=supabase (today's path), mode 'link' turns the channel
+// on with a dummy Resend key and the Resend sender stubbed on the cached
+// _email.js module (which _invite_link.js reads at call time). No fixture flag
+// differs between the two runs of one case.
+let MODE = 'supabase'
+let emailDb = null
+let emailImpl = async () => ({ ok: true, id: 'em_test' })
+const emailMod = require(path.join(FN, '_email.js'))
+emailMod.sendBrandedEmail = async (msg) => {
+  const r = await emailImpl(msg)
+  if (emailDb) {
+    emailDb.resendCalls.push({ to: msg && msg.to, ok: !!(r && r.ok) })
+    if (r && r.ok) emailDb.emailLog.push({ to: msg && msg.to, via: 'resend' })
+  }
+  return r
+}
+function setMode(mode) {
+  MODE = mode
+  emailImpl = async () => ({ ok: true, id: 'em_test' })
+  if (mode === 'supabase') { process.env.INVITE_LINK_CHANNEL = 'supabase'; delete process.env.RESEND_API_KEY }
+  else { delete process.env.INVITE_LINK_CHANNEL; process.env.RESEND_API_KEY = 'test-resend-key' }
+}
+/** Records every email that went out on this db (the newest db made). */
+function track(db) {
+  emailDb = db
+  db.emailLog = []
+  db.resendCalls = []
+  const inv = db.auth.admin.inviteUserByEmail
+  db.auth.admin.inviteUserByEmail = async (email, options) => {
+    const r = await inv(email, options)
+    if (!(r && r.error)) db.emailLog.push({ to: email, via: 'supabase' })
+    return r
+  }
+  return db
+}
+// The two helpers of section 10, plus the address list behind them.
+/** Emails that went out: Resend answers ok plus inviteUserByEmail calls without an error. generateLink sends nothing. */
+const emailsSent = (db) => db.emailLog.length
+const emailAddresses = (db) => db.emailLog.map((x) => x.to)
+/** Users the fake auth created (generateLink or inviteUserByEmail on an unknown address). */
+const usersCreatedByAuth = (db) => db.createdUsers.length
+const inviteLinks = (db) => db.generatedLinks.filter((g) => g.type === 'invite')
+
 let oldWizard = null
 try {
   const src = execFileSync('git', ['show', 'feed1d5:brandgeo-dashboard/netlify/functions/onboard-client.js'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
@@ -109,7 +154,7 @@ function makeDb({ failInsert = [], invite = null, users = [], stampCreatedAt = t
     if (fails.has(t)) q.insert = () => errQuery(`${t} insert refused`)
     return q
   }
-  return db
+  return track(db)
 }
 
 function wizardBody(over = {}) {
@@ -163,7 +208,7 @@ async function runScenario(handler, body, opts) {
   return { r, db }
 }
 
-async function main() {
+async function suite() {
   console.log('\n1. wizard before (feed1d5) and after, identical fakes')
   console.log('   rev 3, A1: brand_aliases is the ONE intended difference in the client row (the account name first)')
   if (!oldWizard) {
@@ -181,7 +226,11 @@ async function main() {
         // string-only scenarios in section 2 and compared without it here.
         const norm = (x) => { const o = Object.assign({}, x); if (o.client_id !== undefined) o.client_id = 'ID'; if (o.user_id !== undefined) o.user_id = 'UID'; delete o.locations_created; return o }
         assert.deepStrictEqual(typeof b.r.body === 'object' ? norm(b.r.body) : b.r.body, typeof a.r.body === 'object' ? norm(a.r.body) : a.r.body, 'response body')
-        assert.deepStrictEqual(sideEffects(b.db), sideEffects(a.db), 'side-effect order')
+        // Link run: the new wizard also writes its own client_invite_links
+        // rows (supersede, insert), which feed1d5 never had; every other side
+        // effect keeps its order.
+        const ownLinkWrites = (list) => (MODE === 'link' ? list.filter((x) => !x.startsWith('client_invite_links:')) : list)
+        assert.deepStrictEqual(ownLinkWrites(sideEffects(b.db)), sideEffects(a.db), 'side-effect order')
         // Every column identical except brand_aliases ...
         assert.deepStrictEqual(strip(b.db.rows('clients'), ['id', 'created_at', 'last_refresh_at', 'brand_aliases']), strip(a.db.rows('clients'), ['id', 'created_at', 'last_refresh_at', 'brand_aliases']), 'clients rows except brand_aliases')
         // ... and brand_aliases differs ONLY by the aliases rule of 5.4.
@@ -194,8 +243,12 @@ async function main() {
         }
         assert.deepStrictEqual(strip(b.db.rows('prompts'), ['id', 'created_at', 'client_id']), strip(a.db.rows('prompts'), ['id', 'created_at', 'client_id']), 'prompts rows')
         assert.deepStrictEqual(strip(b.db.rows('user_profiles'), ['id', 'created_at', 'client_id']), strip(a.db.rows('user_profiles'), ['id', 'created_at', 'client_id']), 'profile rows')
-        assert.deepStrictEqual(strip(b.db.rows('client_events'), ['id', 'created_at', 'client_id']), strip(a.db.rows('client_events'), ['id', 'created_at', 'client_id']), 'audit rows')
-        assert.deepStrictEqual(b.db.invites, a.db.invites, 'invites and redirect')
+        // CHANGED ON PURPOSE (spec 6.4): the onboarded meta gains
+        // invite_channel, which feed1d5 never wrote; compared without it.
+        const noChannel = (rows) => rows.map((ev) => { const m = Object.assign({}, ev.meta); delete m.invite_channel; return Object.assign({}, ev, { meta: m }) })
+        assert.deepStrictEqual(noChannel(strip(b.db.rows('client_events'), ['id', 'created_at', 'client_id'])), strip(a.db.rows('client_events'), ['id', 'created_at', 'client_id']), 'audit rows')
+        if (MODE === 'supabase') assert.deepStrictEqual(b.db.invites, a.db.invites, 'invites and redirect')
+        else assert.deepStrictEqual(emailAddresses(b.db), emailAddresses(a.db), 'emails that went out, to the same addresses')
       })
     }
     await check('the A1 difference really shows: the success scenario stores the name first', async () => {
@@ -214,15 +267,26 @@ async function main() {
     assert.strictEqual(r.body.locations_created, 0, 'no extra location: 0, and no add_client_locations call')
     assert.ok(!db.calls.some((c) => c.rpc), 'no rpc at all without extra locations (S1)')
     assert.ok(db.rows('prompts').every((p) => !('location_id' in p)), 'primary rows carry no location_id key')
-    assert.deepStrictEqual(sideEffects(db), ['clients:insert', 'auth:invite', 'user_profiles:insert', 'prompts:insert', 'client_events:insert'])
-    assert.deepStrictEqual(db.invites, [{ email: 'owner@acme.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }])
+    if (MODE === 'supabase') {
+      assert.deepStrictEqual(sideEffects(db), ['clients:insert', 'auth:invite', 'user_profiles:insert', 'prompts:insert', 'client_events:insert'])
+      assert.deepStrictEqual(db.invites, [{ email: 'owner@acme.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }])
+    } else {
+      // The user is created by generateLink (its hooks fire there), then our
+      // link row is issued and the Resend email goes out, all before the profile.
+      assert.deepStrictEqual(sideEffects(db), ['clients:insert', 'auth:invite', 'client_invite_links:update', 'client_invite_links:insert', 'user_profiles:insert', 'prompts:insert', 'client_events:insert'])
+      assert.deepStrictEqual(inviteLinks(db).map((g) => [g.email, g.redirectTo]), [['owner@acme.example', 'https://app.getbrandgeo.com/reset-password']])
+      assert.deepStrictEqual(db.emailLog, [{ to: 'owner@acme.example', via: 'resend' }])
+      assert.strictEqual(db.invites.length, 0, 'no Supabase invite email')
+    }
     const c = db.rows('clients')[0]
     assert.deepStrictEqual(Object.keys(strip([c])[0]).filter((k) => !['stripe_customer_id', 'stripe_subscription_id'].includes(k)).sort(),
       ['brand_aliases', 'brand_website', 'default_market_id', 'default_region_id', 'known_competitors', 'name', 'plan', 'refresh_cadence', 'slug'].sort())
     assert.strictEqual(c.last_refresh_at.length, 24)
     assert.strictEqual(db.rows('user_profiles')[0].role, 'viewer')
     const ev = db.rows('client_events')[0]
-    assert.deepStrictEqual(Object.keys(ev.meta).sort(), ['default_market_id', 'plan_provided', 'prompts_created', 'refresh_cadence', 'role', 'slug', 'source'])
+    // CHANGED ON PURPOSE (spec 6.4): the meta gains invite_channel.
+    assert.deepStrictEqual(Object.keys(ev.meta).sort(), ['default_market_id', 'invite_channel', 'plan_provided', 'prompts_created', 'refresh_cadence', 'role', 'slug', 'source'])
+    assert.strictEqual(ev.meta.invite_channel, MODE === 'link' ? 'brandgeo' : 'supabase')
     assert.strictEqual(ev.meta.source, 'onboard-client'); assert.strictEqual(ev.actor, ADMIN_ID); assert.strictEqual(ev.type, 'onboarded')
   })
   await check('409 texts: slug taken, invite failed, already registered', async () => {
@@ -250,7 +314,7 @@ async function main() {
     const db = makeDb({ users: [{ id: 'u-existing', email: 'Owner@Acme.example', invited_at: '2026-11-01T00:00:00Z' }] })
     const r = await runWizard(newWizard.handler, db, wizardBody())
     assert.strictEqual(r.status, 409); assert.ok(r.body.error.startsWith('owner@acme.example already has an account.'))
-    assert.strictEqual(db.rows('clients').length, 0); assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.deletedUsers.length, 0)
+    assert.strictEqual(db.rows('clients').length, 0); assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.deletedUsers.length, 0)
     assert.ok(db.usersById.has('u-existing'))
   })
 
@@ -270,7 +334,7 @@ async function main() {
       const before = JSON.stringify(db.usersById.get(user.id))
       const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
       assert.strictEqual(r.ok, false); assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.stage, 'precheck')
-      assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.deletedUsers.length, 0)
+      assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.deletedUsers.length, 0)
       assert.strictEqual(JSON.stringify(db.usersById.get(user.id)), before)
       assert.strictEqual(db.rows('clients').length, 0)
     })
@@ -296,7 +360,7 @@ async function main() {
   await check('an incomplete auth listing creates nothing', async () => {
     const db = makeDb()
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ authEmails: { set: new Set(), ids: new Set(), complete: false } }))
-    assert.strictEqual(r.code, 'auth_lookup_incomplete'); assert.strictEqual(db.calls.length, 0); assert.strictEqual(db.invites.length, 0)
+    assert.strictEqual(r.code, 'auth_lookup_incomplete'); assert.strictEqual(db.calls.length, 0); assert.strictEqual(emailsSent(db), 0)
   })
   await check('listUsers paging: a user on page 2 is still found', async () => {
     const db = makeDb()
@@ -379,7 +443,7 @@ async function main() {
     const db = makeDb()
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ onBeforeClient: async () => { throw new Error('write failed') } }))
     assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'client'); assert.strictEqual(r.code, 'db_error')
-    assert.strictEqual(db.rows('clients').length, 0); assert.strictEqual(db.invites.length, 0)
+    assert.strictEqual(db.rows('clients').length, 0); assert.strictEqual(emailsSent(db), 0)
   })
   await check('a failure after the invite carries the userId (C2, C3); one before it does not', async () => {
     const after = await P.provisionViewerClient(makeDb({ failInsert: ['user_profiles'] }), viewerInput(), ctxFor())
@@ -394,14 +458,14 @@ async function main() {
     for (let i = 0; i < 2100; i++) db.usersById.set(`u${i}`, { id: `u${i}`, email: `user${i}@many.example` })
     // the 1,460th user sits on page 30 when 50 are served a page
     db.usersById.set('u1459', { id: 'u1459', email: 'ana@blue-river.example' })
-    return db
+    return track(db)
   }
   await check('pages capped at 50 with nextPage: a user on page 30 is found and the pre-check says email_registered', async () => {
     const db = manyUsers({ listUsersPageCap: 50, listUsersNextPage: true })
     const auth = await P.loadAuthEmails(db, { perPage: 1000, maxPages: 60 })
     assert.strictEqual(auth.complete, true); assert.ok(auth.set.has('ana@blue-river.example')); assert.strictEqual(auth.set.size, 2100)
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ authEmails: auth }))
-    assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(db.invites.length, 0)
+    assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(emailsSent(db), 0)
   })
   await check('pages capped at 50 WITHOUT nextPage: the pass ends only at the first empty page and still finds it', async () => {
     const db = manyUsers({ listUsersPageCap: 50 })
@@ -417,7 +481,7 @@ async function main() {
     const auth = await P.loadAuthEmails(db)
     assert.strictEqual(auth.complete, false); assert.strictEqual(auth.error, 'page_cap')
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
-    assert.strictEqual(r.code, 'auth_lookup_incomplete'); assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+    assert.strictEqual(r.code, 'auth_lookup_incomplete'); assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.rows('clients').length, 0)
   })
   await check('a short first page (GoTrue capping) never ends the pass by itself', async () => {
     const db = manyUsers({ listUsersPageCap: 50 })
@@ -437,9 +501,12 @@ async function main() {
   console.log('\n6. revision 4: V1, Check B before the invite and the "created by this call" rule (criterion 50, helper and wizard)')
   const T_INV = FIXED.getTime()
   const iso = (msOff) => new Date(T_INV + msOff).toISOString()
+  // Idempotent: on the link run a hook can fire twice (generateLink, then a
+  // restore or fallback inviteUserByEmail); the other call made the user and
+  // its profile once, so a second firing adds nothing.
   const addUser = (db, u, withProfile) => {
     db.usersById.set(u.id, u)
-    if (withProfile) db.seed('user_profiles', [{ id: u.id, client_id: 999, role: 'viewer' }])
+    if (withProfile && !db.rows('user_profiles').some((p) => p.id === u.id)) db.seed('user_profiles', [{ id: u.id, client_id: 999, role: 'viewer' }])
   }
   await check('(c) a user made after Check B, returned by the invite (re-send), created 6 s before T_inv: not ours, 0 binds, 0 deletes, inviteSent', async () => {
     const u = { id: 'u-late', email: 'ana@blue-river.example', created_at: iso(-6000) }
@@ -447,7 +514,7 @@ async function main() {
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
     assert.strictEqual(r.ok, false); assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.inviteSent, true)
     assert.strictEqual(r.userId, undefined, 'a not-ours user is never reported as ours')
-    assert.strictEqual(db.invites.length, 1); assert.strictEqual(db.deletedUsers.length, 0)
+    assert.strictEqual(emailsSent(db), 1); assert.strictEqual(db.deletedUsers.length, 0)
     assert.strictEqual(db.rows('user_profiles').length, 0, 'not bound (was bound)'); assert.strictEqual(db.rows('clients').length, 0)
     assert.ok(db.usersById.has('u-late'))
   })
@@ -475,14 +542,14 @@ async function main() {
     const db = makeDb({ onListUsers: async (a) => { if (a && a.page === 1 && ++passes1 === 2) addUser(db, { id: 'u-mid', email: 'ana@blue-river.example', invited_at: iso(0) }, false) } })
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
     assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'precheck'); assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.inviteSent, undefined)
-    assert.strictEqual(db.invites.length, 0, 'no invite (was 1)'); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+    assert.strictEqual(emailsSent(db), 0, 'no invite (was 1)'); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
   })
   await check('Check B ignores ctx.authEmails: an importer snapshot without the user still stops before the invite', async () => {
     const db = makeDb()
     addUser(db, { id: 'u-snap', email: 'ana@blue-river.example', invited_at: iso(0) }, true)
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ authEmails: { set: new Set(), ids: new Set(), complete: true } }))
     assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.stage, 'precheck')
-    assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+    assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
     assert.strictEqual(db.rows('user_profiles').length, 1)
   })
   await check('Check B incomplete: client rolled back, auth_lookup_incomplete, 0 invites', async () => {
@@ -490,7 +557,7 @@ async function main() {
     const db = makeDb({ onListUsers: async (a) => { if (a && a.page === 1 && ++passes1 === 2) throw new Error('listing down') } })
     const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
     assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'precheck'); assert.strictEqual(r.code, 'auth_lookup_incomplete')
-    assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+    assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.rows('clients').length, 0)
   })
   await check('(f) the wizard for a new address: exactly 2 listUsers passes (Check A and Check B), the same 200 answer', async () => {
     let passCount = 0
@@ -498,14 +565,14 @@ async function main() {
     const r = await runWizard(newWizard.handler, db, wizardBody())
     assert.strictEqual(r.status, 200); assert.strictEqual(r.body.prompts_created, 2)
     assert.strictEqual(passCount, 2)
-    assert.strictEqual(db.invites.length, 1); assert.strictEqual(db.rows('user_profiles').length, 1)
+    assert.strictEqual(emailsSent(db), 1); assert.strictEqual(db.rows('user_profiles').length, 1)
   })
   await check('(g) the wizard, a login made between Check A and Check B: the existing 409 email text, 0 invites, 0 deletes', async () => {
     let passes1 = 0
     const db = makeDb({ onListUsers: async (a) => { if (a && a.page === 1 && ++passes1 === 2) addUser(db, { id: 'u-w', email: 'owner@acme.example', invited_at: iso(0) }, true) } })
     const r = await runWizard(newWizard.handler, db, wizardBody())
     assert.strictEqual(r.status, 409); assert.ok(r.body.error.startsWith('owner@acme.example already has an account.'))
-    assert.strictEqual(db.invites.length, 0); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+    assert.strictEqual(emailsSent(db), 0); assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
   })
   await check('the wizard maps a not-ours invite (inviteSent) to the same 409 email text', async () => {
     const db = makeDb({ stampCreatedAt: false })
@@ -513,16 +580,206 @@ async function main() {
     assert.strictEqual(r.status, 409); assert.ok(r.body.error.startsWith('owner@acme.example already has an account.'))
     assert.strictEqual(db.deletedUsers.length, 0)
   })
-  await check('source text: no FRESH_WINDOW_MS, and loadAuthEmails is called between onStep(\'client\') and inviteUserByEmail', async () => {
+  await check('source text: no FRESH_WINDOW_MS; onStep(\'client\'), channelReady, Check B, the invite call, the "ours" test, deliverInvite, onStep(\'invite\') in that order', async () => {
     const src = fs.readFileSync(path.join(FN, '_provision_client.js'), 'utf8')
     assert.ok(!/FRESH_WINDOW_MS/.test(src), 'FRESH_WINDOW_MS is gone')
     assert.ok(/OURS_SKEW_MS\s*=\s*5000/.test(src), 'OURS_SKEW_MS = 5000')
+    // CHANGED ON PURPOSE (spec section 10): the first call after Check B may be
+    // generateLink( or inviteUserByEmail(; channelReady sits before Check B
+    // and deliverInvite between the "ours" test and onStep('invite').
     const a = src.indexOf("onStep('client'")
+    const r = src.indexOf('channelReady(supabase', a)
     const b = src.indexOf('loadAuthEmails(supabase', a)
-    const c = src.indexOf('inviteUserByEmail(', a)
-    assert.ok(a > 0 && b > a && c > b, `onStep('client') ${a}, Check B ${b}, invite ${c}`)
+    const firstAfter = (needles, from) => Math.min(...needles.map((n) => src.indexOf(n, from)).filter((i) => i >= 0))
+    const c = firstAfter(['generateLink(', 'inviteUserByEmail('], b)
+    const o = src.indexOf('const ours =', c)
+    const d = src.indexOf('deliverInvite(', o)
+    const s = src.indexOf("onStep('invite'", o)
+    assert.ok(a > 0 && r > a && b > r && c > b, `onStep('client') ${a}, channelReady ${r}, Check B ${b}, invite ${c}`)
+    assert.ok(o > c && d > o && s > d, `ours ${o}, deliverInvite ${d}, onStep('invite') ${s}`)
   })
 
+  await linkCases(viewerInput, ctxFor, iso, addUser)
+}
+
+// ── 7. the 7 day invite link in provisioning (spec 6.4 and section 10) ─────
+async function linkCases(viewerInput, ctxFor, iso, addUser) {
+  console.log(`\n7. 7 day invite link, ${MODE} run`)
+  if (MODE === 'supabase') {
+    await check('kill switch: a viewer gets today\'s inviteUserByEmail, no link row, no readiness read, no generateLink, invite_channel supabase', async () => {
+      const db = makeDb()
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+      assert.strictEqual(r.ok, true, r.message); assert.strictEqual(r.inviteChannel, 'supabase')
+      assert.strictEqual(db.invites.length, 1); assert.strictEqual(inviteLinks(db).length, 0); assert.strictEqual(db.resendCalls.length, 0)
+      assert.strictEqual(db.calls.filter((c) => c.table === 'client_invite_links').length, 0)
+      assert.strictEqual(db.rows('client_events')[0].meta.invite_channel, 'supabase')
+    })
+    return
+  }
+  await check('viewer, channel on: generateLink creates the user, one Resend email, zero inviteUserByEmail, one active 7 day row', async () => {
+    const db = makeDb()
+    const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+    assert.strictEqual(r.ok, true, r.message); assert.strictEqual(r.inviteChannel, 'brandgeo')
+    assert.deepStrictEqual(inviteLinks(db).map((g) => [g.email, g.redirectTo]), [['ana@blue-river.example', 'https://app.getbrandgeo.com/reset-password']])
+    assert.deepStrictEqual(db.resendCalls, [{ to: 'ana@blue-river.example', ok: true }])
+    assert.strictEqual(db.invites.length, 0)
+    assert.strictEqual(usersCreatedByAuth(db), 1); assert.strictEqual(emailsSent(db), 1)
+    const rows = db.rows('client_invite_links')
+    assert.strictEqual(rows.length, 1)
+    assert.deepStrictEqual([rows[0].user_id, rows[0].client_id, rows[0].source, rows[0].created_by, rows[0].revoked_at, rows[0].accepted_at], [r.userId, r.client.id, 'explee-import', null, null, null])
+    assert.strictEqual(Date.parse(rows[0].expires_at) - Date.parse(rows[0].created_at), 7 * 24 * 3600 * 1000)
+    assert.strictEqual(db.rows('client_events')[0].meta.invite_channel, 'brandgeo')
+  })
+  await check('the wizard passes its source and actor into the row', async () => {
+    const db = makeDb({ now: WIZARD_CLOCK })
+    const r = await runWizard(newWizard.handler, db, wizardBody())
+    assert.strictEqual(r.status, 200)
+    const row = db.rows('client_invite_links')[0]
+    assert.strictEqual(row.source, 'onboard-client'); assert.strictEqual(row.created_by, ADMIN_ID)
+  })
+  await check('admin role, channel on: inviteUserByEmail only, no link row, no Resend', async () => {
+    const db = makeDb()
+    const r = await P.provisionAdminWizardClient(db, viewerInput({ role: 'admin' }), ctxFor())
+    assert.strictEqual(r.ok, true, r.message); assert.strictEqual(r.role, 'admin'); assert.strictEqual(r.inviteChannel, 'supabase')
+    assert.strictEqual(db.invites.length, 1); assert.strictEqual(inviteLinks(db).length, 0); assert.strictEqual(db.resendCalls.length, 0)
+    assert.strictEqual(db.rows('client_invite_links').length, 0)
+  })
+  for (const code of ['42P01', 'PGRST205']) {
+    await check(`table missing (${code}), channel on: today's inviteUserByEmail only, no generateLink, no Resend (M3)`, async () => {
+      const db = makeDb()
+      db.missingTables = { client_invite_links: code }
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+      assert.strictEqual(r.ok, true, r.message); assert.strictEqual(r.inviteChannel, 'supabase')
+      assert.strictEqual(db.invites.length, 1); assert.strictEqual(inviteLinks(db).length, 0); assert.strictEqual(db.resendCalls.length, 0)
+    })
+  }
+  await check('Resend refuses, the Supabase fallback answers: created, invite_channel supabase, 1 generateLink, 1 Resend refusal, 1 inviteUserByEmail', async () => {
+    emailImpl = async () => ({ ok: false, error: 'Resend HTTP 422' })
+    try {
+      const db = makeDb({ inviteResendsPending: true })
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+      assert.strictEqual(r.ok, true, r.message); assert.strictEqual(r.inviteChannel, 'supabase')
+      assert.strictEqual(inviteLinks(db).length, 1); assert.deepStrictEqual(db.resendCalls.map((x) => x.ok), [false]); assert.strictEqual(db.invites.length, 1)
+      assert.strictEqual(usersCreatedByAuth(db), 1); assert.strictEqual(emailsSent(db), 1)
+      assert.strictEqual(db.rows('client_invite_links')[0].revoked_reason, 'send_failed')
+      assert.strictEqual(db.rows('client_events')[0].meta.invite_channel, 'supabase')
+    } finally { emailImpl = async () => ({ ok: true, id: 'em_test' }) }
+  })
+  await check('delivery failure (Resend refuses, the fallback errors): stage invite, invite_error, no userId, no inviteSent, user and client deleted', async () => {
+    emailImpl = async () => ({ ok: false, error: 'Resend HTTP 500' })
+    try {
+      const db = makeDb()
+      const steps = []
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ onStep: async (s) => { steps.push(s) } }))
+      assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'invite'); assert.strictEqual(r.code, 'invite_error')
+      assert.strictEqual(r.userId, undefined); assert.strictEqual(r.inviteSent, undefined)
+      assert.strictEqual(db.deletedUsers.length, 1); assert.strictEqual(db.rows('clients').length, 0)
+      assert.strictEqual(db.rows('user_profiles').length, 0); assert.strictEqual(emailsSent(db), 0)
+      assert.deepStrictEqual(steps, ['client'], 'onStep(invite) never runs when no email went out')
+    } finally { emailImpl = async () => ({ ok: true, id: 'em_test' }) }
+  })
+  await check('delivery failure with a rate-limited fallback: email_rate_limited, no userId, user and client deleted', async () => {
+    emailImpl = async () => ({ ok: false, error: 'Resend HTTP 500' })
+    try {
+      let n = 0
+      const db = makeDb({ invite: async () => (++n === 2 ? { data: { user: null }, error: { status: 429, message: 'email rate limit exceeded' } } : undefined) })
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+      assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'invite'); assert.strictEqual(r.code, 'email_rate_limited')
+      assert.strictEqual(r.userId, undefined); assert.strictEqual(db.deletedUsers.length, 1); assert.strictEqual(db.rows('clients').length, 0)
+    } finally { emailImpl = async () => ({ ok: true, id: 'em_test' }) }
+  })
+  await check('"not ours" on the generateLink branch: exactly one inviteUserByEmail (the restore), zero Resend, inviteSent true', async () => {
+    const u = { id: 'u-late2', email: 'ana@blue-river.example', created_at: iso(-6000) }
+    const db = makeDb({ inviteResendsPending: true, beforeInvite: async () => addUser(db, u, false) })
+    const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+    assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.inviteSent, true); assert.strictEqual(r.userId, undefined)
+    assert.strictEqual(inviteLinks(db).length, 1); assert.strictEqual(db.invites.length, 1); assert.strictEqual(db.resendCalls.length, 0)
+    assert.strictEqual(db.rows('client_invite_links').length, 0); assert.strictEqual(db.deletedUsers.length, 0)
+  })
+  await check('"not ours" on the generateLink branch with a failed restore: still email_registered with inviteSent true', async () => {
+    const db = makeDb({ stampCreatedAt: false })
+    const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+    assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.inviteSent, true)
+    assert.strictEqual(inviteLinks(db).length, 1); assert.strictEqual(db.invites.length, 1, 'the restore was tried once'); assert.strictEqual(emailsSent(db), 0, 'and it failed')
+    assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+  })
+
+  // Server review LOW-1 (docs/qa/invite-link-7-days-server-review-2026-11-13.md).
+  // Two calls for one address inside the 5 s "ours" window: the hook stands for
+  // the OTHER call, which made the user (created 1 s before T_inv, so this call
+  // judges it ours) and its profile.
+  const REGISTERED = 'an auth user already exists for this address'
+  await check('LOW-1 (a) delivery failure (Resend refuses, fallback 429) for a user that already has a profile: the user is kept, only the client is deleted, email_registered with inviteSent', async () => {
+    emailImpl = async () => ({ ok: false, error: 'Resend HTTP 500' })
+    try {
+      const u = { id: 'u-other-call', email: 'ana@blue-river.example', created_at: iso(-1000) }
+      let n = 0
+      const db = makeDb({
+        inviteResendsPending: true,
+        beforeInvite: async () => addUser(db, u, true),
+        invite: async () => (++n === 2 ? { data: { user: null }, error: { status: 429, message: 'email rate limit exceeded' } } : undefined),
+      })
+      const steps = []
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor({ onStep: async (s) => { steps.push(s) } }))
+      assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'invite'); assert.strictEqual(r.code, 'email_registered')
+      assert.strictEqual(r.message, REGISTERED); assert.strictEqual(r.inviteSent, true); assert.strictEqual(r.userId, undefined)
+      assert.strictEqual(n, 2, 'sanity: generateLink, then the fallback inviteUserByEmail')
+      assert.strictEqual(inviteLinks(db).length, 1); assert.deepStrictEqual(db.resendCalls.map((x) => x.ok), [false]); assert.strictEqual(db.invites.length, 1)
+      assert.strictEqual(db.deletedUsers.length, 0, 'the other call\'s user is never deleted (was deleted)')
+      assert.ok(db.usersById.has('u-other-call'))
+      assert.strictEqual(db.rows('user_profiles').length, 1); assert.strictEqual(db.rows('user_profiles')[0].client_id, 999)
+      assert.strictEqual(db.rows('clients').length, 0)
+      assert.deepStrictEqual(steps, ['client'])
+    } finally { emailImpl = async () => ({ ok: true, id: 'em_test' }) }
+  })
+  await check('LOW-1 (a) delivery failure when the profile read errors: the user is kept, only the client is deleted, email_registered with inviteSent', async () => {
+    emailImpl = async () => ({ ok: false, error: 'Resend HTTP 500' })
+    try {
+      const db = makeDb()
+      db.faults.push({ table: 'user_profiles', op: 'select', error: { message: 'profile read refused' } })
+      const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+      assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'invite'); assert.strictEqual(r.code, 'email_registered')
+      assert.strictEqual(r.message, REGISTERED); assert.strictEqual(r.inviteSent, true); assert.strictEqual(r.userId, undefined)
+      assert.strictEqual(db.deletedUsers.length, 0, 'an unreadable profile never licenses a delete')
+      assert.strictEqual(usersCreatedByAuth(db), 1); assert.strictEqual(db.rows('clients').length, 0)
+      assert.ok(db.calls.some((c) => c.table === 'user_profiles' && c.op === 'select'), 'sanity: the profile read ran')
+    } finally { emailImpl = async () => ({ ok: true, id: 'em_test' }) }
+  })
+  await check('LOW-1 (b) profile unique violation on the link run: one Resend email, then exactly one restore inviteUserByEmail; user and profile untouched; the same answer', async () => {
+    const u = { id: 'u-own-profile2', email: 'ana@blue-river.example', created_at: iso(-1000) }
+    const db = makeDb({ inviteResendsPending: true, beforeInvite: async () => addUser(db, u, true) })
+    const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+    assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'profile'); assert.strictEqual(r.code, 'email_registered')
+    assert.strictEqual(r.message, REGISTERED); assert.strictEqual(r.inviteSent, true); assert.strictEqual(r.userId, undefined)
+    assert.strictEqual(inviteLinks(db).length, 1); assert.deepStrictEqual(db.resendCalls, [{ to: 'ana@blue-river.example', ok: true }])
+    assert.deepStrictEqual(db.invites, [{ email: 'ana@blue-river.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }], 'exactly one restore')
+    assert.strictEqual(emailsSent(db), 2); assert.deepStrictEqual(emailAddresses(db), ['ana@blue-river.example', 'ana@blue-river.example'])
+    assert.strictEqual(db.deletedUsers.length, 0); assert.ok(db.usersById.has('u-own-profile2'))
+    assert.strictEqual(db.rows('user_profiles').length, 1); assert.strictEqual(db.rows('user_profiles')[0].client_id, 999)
+    assert.strictEqual(db.rows('clients').length, 0)
+  })
+  await check('LOW-1 (b) the same with a failed restore (429): the answer is unchanged, the restore was tried once', async () => {
+    const u = { id: 'u-own-profile3', email: 'ana@blue-river.example', created_at: iso(-1000) }
+    let n = 0
+    const db = makeDb({
+      inviteResendsPending: true,
+      beforeInvite: async () => addUser(db, u, true),
+      invite: async () => (++n === 2 ? { data: { user: null }, error: { status: 429, message: 'email rate limit exceeded' } } : undefined),
+    })
+    const r = await P.provisionViewerClient(db, viewerInput(), ctxFor())
+    assert.strictEqual(r.ok, false); assert.strictEqual(r.stage, 'profile'); assert.strictEqual(r.code, 'email_registered'); assert.strictEqual(r.inviteSent, true)
+    assert.strictEqual(n, 2); assert.strictEqual(db.invites.length, 1); assert.strictEqual(emailsSent(db), 1, 'only the Resend email went out')
+    assert.strictEqual(db.deletedUsers.length, 0); assert.strictEqual(db.rows('clients').length, 0)
+  })
+}
+
+async function main() {
+  for (const mode of ['supabase', 'link']) {
+    setMode(mode)
+    console.log(`\n==== run: ${mode === 'supabase' ? 'INVITE_LINK_CHANNEL=supabase (today\'s path)' : 'channel on, dummy Resend key, Resend stubbed'} ====`)
+    await suite()
+  }
+  setMode('supabase')
   console.log(`\n${passes} passed, ${failures} failed`)
   if (failures) process.exit(1)
 }

@@ -726,9 +726,10 @@ export default function Onboard() {
               </section>
             )}
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Mail size={18} className="text-brand-400" /> Client Invite</h2>
+            {/* copy: pending bg-copy. C-O1: a viewer gets the 7 day BrandGEO link, an
+                admin login stays on the Supabase invite (24 hours). */}
             <p className="text-xs text-slate-500">
-              We'll email this address an invite link to set their own password and log in
-              at the access level chosen below. No password to relay by hand.
+              {`We will email this address an invite link, valid for ${role === 'viewer' ? '7 days' : '24 hours'}, to set their own password and log in.`}
             </p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Email *</label>
@@ -819,7 +820,8 @@ export default function Onboard() {
                   <div>Client ID: <span className="text-slate-300">#{newClientId}</span></div>
                 </div>
 
-                {/* Resend invite: invite links expire after about an hour; covers a missed
+                {/* Resend invite: an invite link lasts 24 hours on the Supabase channel (admin
+                    logins) and 7 days on the BrandGEO channel (viewer logins); covers a missed
                     or spam-filtered first email without needing the Supabase
                     Dashboard (task, 2026-07-09). */}
                 <div className="flex items-center justify-between gap-3 text-xs">

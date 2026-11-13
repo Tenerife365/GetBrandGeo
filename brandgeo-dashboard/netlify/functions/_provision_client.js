@@ -6,7 +6,8 @@
  * Steps, in the order onboard-client.js has always run them:
  *   1. clients insert (refresh_cadence through refreshCadenceFor, last_refresh_at
  *      stamped at creation)
- *   2. inviteUserByEmail to /reset-password
+ *   2. inviteUserByEmail to /reset-password (BrandGEO channel: generateLink,
+ *      then 2b, our 7 day invite email; see below)
  *   3. user_profiles insert
  *   3b. (2026-11-13) add_client_locations, only when the request names extra
  *      locations (docs/arch/multi-location-collection.md 5.4); location
@@ -42,10 +43,20 @@
  * Two exports, so the role is never a field the importer can pass:
  * provisionViewerClient always writes 'viewer'; provisionAdminWizardClient is
  * for the admin-gated wizard only.
+ *
+ * 7 day invite link (2026-11-13, docs/arch/invite-link-7-days.md 6.4): for a
+ * viewer login, when channelReady says the BrandGEO channel can run, step 2
+ * creates the user with generateLink (which sends nothing) and step 2b emails
+ * our own 7 day link through deliverInvite, before onStep('invite'), so every
+ * later step keeps its meaning ("an email went out"). The channel is chosen
+ * before Check B and before the user exists; when it cannot run (admin role,
+ * kill switch, no Resend key, table missing) step 2 is today's exact
+ * inviteUserByEmail line.
  */
 const { refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 const { slugify } = require('./_explee_rules')
 const { validatePair, locationKey } = require('./_locations')
+const { channelReady, deliverInvite } = require('./_invite_link')
 
 // Multi-location onboarding (docs/arch/multi-location-collection.md 5.4).
 // Matches the prompt cap trigger's last fallback (supabase-prompt-cap-bypass-fix-2026-11-09.sql:92-94).
@@ -340,10 +351,17 @@ async function provision(supabase, input, ctx, role) {
     }
   }
 
+  // ── 7 day invite link: the channel, chosen BEFORE Check B ────────────────
+  // (docs/arch/invite-link-7-days.md 6.4) so the rule below still holds: no
+  // awaited call sits between Check B and the call that creates the user.
+  // Never throws; false runs today's exact invite line.
+  const useLink = await channelReady(supabase, role)
+
   // ── Rule U step 1, Check B (rev 4, V1, both paths) ───────────────────────
   // A fresh, complete paged pass immediately before the invite (never
   // ctx.authEmails, never a cached set). No other awaited call sits between
-  // the end of this pass and inviteUserByEmail.
+  // the end of this pass and inviteUserByEmail (or, on the BrandGEO channel,
+  // generateLink).
   const authB = await loadAuthEmails(supabase)
   if (!authB || !authB.complete) {
     if (!(await deleteClient())) return fail('precheck', 'rollback_failed', 'auth user listing incomplete', { clientId: client.id })
@@ -355,8 +373,13 @@ async function provision(supabase, input, ctx, role) {
   }
 
   // ── 2. invite ────────────────────────────────────────────────────────────
+  // BrandGEO channel: generateLink creates the user and sends NOTHING; the
+  // email goes in step 2b. Its answer carries token material (properties),
+  // which is never logged and never read here: only data.user is used.
   const tInv = now().getTime()
-  const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(contact, { redirectTo: REDIRECT_TO })
+  const { data: authData, error: authErr } = useLink
+    ? await supabase.auth.admin.generateLink({ type: 'invite', email: contact, options: { redirectTo: REDIRECT_TO } })
+    : await supabase.auth.admin.inviteUserByEmail(contact, { redirectTo: REDIRECT_TO })
   if (authErr) {
     const rolled = await deleteClient()
     if (!rolled) return fail('invite', 'rollback_failed', authErr.message, { clientId: client.id })
@@ -379,6 +402,19 @@ async function provision(supabase, input, ctx, role) {
   const ours = !authB.ids.has(user.id) && Number.isFinite(createdMs) && createdMs >= tInv - OURS_SKEW_MS
   if (!ours) {
     console.error(`[provision] invite for client ${client.id} returned a user this call did not create; not bound, not deleted`)
+    if (useLink) {
+      // generateLink just rotated that person's invite token, killing the
+      // link they hold, so send today's invite once, exactly as the Supabase
+      // channel would have. A failure is logged by status only and changes
+      // nothing below: inviteSent still means this call touched the
+      // address's auth state, which the lead import's stamp and stop rule need.
+      try {
+        const res = await supabase.auth.admin.inviteUserByEmail(contact, { redirectTo: REDIRECT_TO })
+        if (res && res.error) console.error(`[provision] restoring the invite for client ${client.id} failed (status ${res.error.status || 'n/a'})`)
+      } catch (e) {
+        console.error(`[provision] restoring the invite for client ${client.id} threw`)
+      }
+    }
     const rolled = await deleteClient()
     if (!rolled) return fail('invite', 'rollback_failed', 'pre-existing user returned', { clientId: client.id, inviteSent: true })
     return fail('invite', 'email_registered', 'an auth user already exists for this address', { inviteSent: true })
@@ -397,6 +433,56 @@ async function provision(supabase, input, ctx, role) {
     return fail(stage, 'db_error', message, { userId: user.id, inviteSent: true })
   }
 
+  // ── 2b. the BrandGEO invite email (7 day link), before the invite step ───
+  // Only on the generateLink branch. deliverInvite issues our token, emails
+  // it through Resend, and falls back to today's Supabase invite when Resend
+  // refuses or times out. rotate false: generateLink above just created the
+  // user, so there is no earlier link to kill. On a failure nothing went out:
+  // the user and the client are removed and the result carries no userId and
+  // no inviteSent, exactly like today's invite-error results.
+  let inviteChannel = 'supabase'
+  if (useLink) {
+    const delivered = await deliverInvite(supabase, {
+      user: { id: user.id, email: typeof user.email === 'string' && user.email ? user.email : contact },
+      clientId: client.id,
+      clientName: client.name ?? input.name ?? null,
+      role,
+      source: ctx.source,
+      actor: ctx.actor || null,
+      delivery: 'email',
+      rotate: false,
+    })
+    if (!delivered.ok) {
+      console.error(`[provision] invite delivery for client ${client.id} failed (${delivered.code}); rolling back`)
+      // Profile proof BEFORE any user delete (server review LOW-1): a second
+      // call for the same address inside the 5 s "ours" window can misjudge a
+      // user another call just created. When that user already has a profile,
+      // or the read cannot tell, the user is not ours: it is never deleted and
+      // only the client this call inserted is removed, as at the profile step.
+      let profileSeen = false
+      try {
+        const { data: prof, error: profReadErr } = await supabase
+          .from('user_profiles').select('id').eq('id', user.id).maybeSingle()
+        profileSeen = !!profReadErr || !!prof
+        if (profReadErr) console.error(`[provision] profile read for client ${client.id} failed; the user is kept`)
+      } catch {
+        profileSeen = true
+        console.error(`[provision] profile read for client ${client.id} threw; the user is kept`)
+      }
+      if (profileSeen) {
+        console.error(`[provision] invite delivery for client ${client.id}: the user has a profile or it could not be read; not ours, not deleted`)
+        if (!(await deleteClient())) return fail('invite', 'rollback_failed', delivered.message, { clientId: client.id, inviteSent: true })
+        return fail('invite', 'email_registered', 'an auth user already exists for this address', { inviteSent: true })
+      }
+      let okAll = true
+      try { const res = await supabase.auth.admin.deleteUser(user.id); if (res && res.error) okAll = false } catch { okAll = false }
+      if (!(await deleteClient())) okAll = false
+      if (!okAll) return fail('invite', 'rollback_failed', delivered.message, { clientId: client.id, userId: user.id })
+      return fail('invite', delivered.code === 'email_rate_limited' ? 'email_rate_limited' : 'invite_error', delivered.message)
+    }
+    inviteChannel = delivered.channel
+  }
+
   if (ctx.onStep) {
     try { await ctx.onStep('invite', { userId: user.id }) } catch (e) {
       return rollbackUserAndClient('invite', 'progress write failed', false)
@@ -412,6 +498,19 @@ async function provision(supabase, input, ctx, role) {
     // the user is not ours. Neither the user nor that profile is touched;
     // only the client this call inserted is deleted.
     console.error(`[provision] profile for client ${client.id} already existed; the user is not ours, not deleted`)
+    if (useLink) {
+      // Server review LOW-1: the 7 day row step 2b issued is bound to the
+      // client deleted below (and cascades with it), and generateLink rotated
+      // the person's token, so send today's invite once, exactly as the "not
+      // ours" restore above does. A failure is logged by status only and
+      // changes nothing in the answer.
+      try {
+        const res = await supabase.auth.admin.inviteUserByEmail(contact, { redirectTo: REDIRECT_TO })
+        if (res && res.error) console.error(`[provision] restoring the invite for client ${client.id} failed (status ${res.error.status || 'n/a'})`)
+      } catch (e) {
+        console.error(`[provision] restoring the invite for client ${client.id} threw`)
+      }
+    }
     if (!(await deleteClient())) return fail('profile', 'rollback_failed', profileErr.message, { clientId: client.id, inviteSent: true })
     return fail('profile', 'email_registered', 'an auth user already exists for this address', { inviteSent: true })
   }
@@ -470,6 +569,8 @@ async function provision(supabase, input, ctx, role) {
         prompts_created:   promptsCreated,
         refresh_cadence:   refreshCadence,
         default_market_id: input.default_market_id || null,
+        // 2026-11-13 (docs/arch/invite-link-7-days.md 6.4): which email went out.
+        invite_channel:    inviteChannel,
       },
       // Added 2026-11-13, only when they apply, so a call with no extra
       // location and no cap override writes the same meta as before.
@@ -491,6 +592,7 @@ async function provision(supabase, input, ctx, role) {
     locationsCreated: locPlan.extras.length,
     auditLogged,
     refreshCadence,
+    inviteChannel,
   }
 }
 

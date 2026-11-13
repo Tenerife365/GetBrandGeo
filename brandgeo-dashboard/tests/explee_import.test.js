@@ -29,6 +29,48 @@ delete process.env.SENTRY_DSN
 delete process.env.EXPLEE_API_KEY
 
 const FN = path.join(__dirname, '..', 'netlify', 'functions')
+
+// ── 7 day invite link (docs/arch/invite-link-7-days.md section 10) ────────
+// Every case runs TWICE: mode 'supabase' sets INVITE_LINK_CHANNEL=supabase
+// (today's path), mode 'link' turns the channel on with a dummy Resend key
+// and the Resend sender stubbed. The stub replaces _email.js in require.cache
+// BEFORE the importer loads, so nothing in this file can reach Resend.
+let MODE = 'supabase'
+let emailDb = null
+{
+  const emailPath = require.resolve(path.join(FN, '_email.js'))
+  const realEmail = require(emailPath)
+  require.cache[emailPath].exports = Object.assign({}, realEmail, {
+    async sendBrandedEmail(msg) {
+      if (emailDb) emailDb.emailLog.push({ to: msg && msg.to, via: 'resend' })
+      return { ok: true, id: 'em_test' }
+    },
+  })
+}
+function setMode(mode) {
+  MODE = mode
+  if (mode === 'supabase') { process.env.INVITE_LINK_CHANNEL = 'supabase'; delete process.env.RESEND_API_KEY }
+  else { delete process.env.INVITE_LINK_CHANNEL; process.env.RESEND_API_KEY = 'test-resend-key' }
+}
+/** Records every email that goes out on this db (the newest env made). */
+function track(db) {
+  emailDb = db
+  db.emailLog = []
+  const inv = db.auth.admin.inviteUserByEmail
+  db.auth.admin.inviteUserByEmail = async (email, options) => {
+    const r = await inv(email, options)
+    if (!(r && r.error)) db.emailLog.push({ to: email, via: 'supabase' })
+    return r
+  }
+  return db
+}
+/** Emails that went out: Resend answers ok plus inviteUserByEmail calls without an error. generateLink sends nothing. */
+const emailsSent = (db) => db.emailLog.length
+const emailAddresses = (db) => db.emailLog.map((x) => x.to)
+/** Users the fake auth created (generateLink or inviteUserByEmail on an unknown address). */
+const usersCreatedByAuth = (db) => db.createdUsers.length
+const inviteLinks = (db) => db.generatedLinks.filter((g) => g.type === 'invite')
+
 const importer = require(path.join(FN, 'explee-import-background.js'))
 const { createExpleeClient, ExpleeError, ALLOWED_CALLS } = require(path.join(FN, '_explee_client.js'))
 const auth = require(path.join(FN, '_auth.js'))
@@ -85,7 +127,7 @@ function env({ mode = 'dry_run', settings = {}, clockIso = '2026-11-11T05:00:00Z
   // rev 4, V1: stampCreatedAt on by default (a user the invite creates carries
   // created_at from the injected clock, as GoTrue would); a case that needs
   // it off passes sbOpts: { stampCreatedAt: false }.
-  const db = createFakeSupabase(Object.assign({ now: clock.now, sumCostEur: true, pagedListUsers: true, extraUnique: { clients: [['slug']] }, authBehaviour, stampCreatedAt: true }, sbOpts))
+  const db = track(createFakeSupabase(Object.assign({ now: clock.now, sumCostEur: true, pagedListUsers: true, extraUnique: { clients: [['slug']] }, authBehaviour, stampCreatedAt: true }, sbOpts)))
   if (!noSettings) db.seed('explee_import_settings', [settingsRow(Object.assign({ mode }, settings))])
   // rev 3, M3: every Explee call may "take" e.delayMs on the injected clock;
   // e.callStarts records the elapsed time at which each call started.
@@ -150,7 +192,7 @@ function addLead(e, i, { intent = 'hot_lead', email, from, company, body = REPLY
 const writtenTables = (db) => new Set(db.calls.filter((c) => c.table && c.op !== 'select').map((c) => c.table))
 const lastRun = (e) => e.jobRuns()[e.jobRuns().length - 1]
 
-async function main() {
+async function suite() {
   console.log('\n1. gate, modes, settings (criterion 17)')
   await check('a refused gate writes no job_runs row and builds no deps', async () => {
     const e = env()
@@ -270,7 +312,7 @@ async function main() {
       assert.ok(!/Person \d/.test(call.body), 'no person name')
       assert.ok(!call.body.includes('600 12'), 'no phone')
     }
-    assert.strictEqual(e.db.rows('clients').length, 0); assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(e.db.rows('clients').length, 0); assert.strictEqual(emailsSent(e.db), 0)
     assert.strictEqual(lastRun(e).detail.dryPayloads, 5)
   })
   await check('a second dry run payloads the next 5 and leaves current payloads alone', async () => {
@@ -377,11 +419,22 @@ async function main() {
     assert.strictEqual(c.plan, 'free'); assert.strictEqual(c.refresh_cadence, 'monthly'); assert.strictEqual(c.last_refresh_at, '2026-11-11T05:00:00.000Z')
     assert.strictEqual(c.onboarding_complete, true); assert.strictEqual(c.default_market_id, 'ES'); assert.strictEqual(c.default_region_id, 'ALL')
     assert.strictEqual(c.brand_website, 'co1.example'); assert.strictEqual(c.name, 'Company 1'); assert.deepStrictEqual(c.known_competitors, [])
-    assert.deepStrictEqual(e.db.invites, [{ email: 'lead1@co1.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }])
+    if (MODE === 'supabase') assert.deepStrictEqual(e.db.invites, [{ email: 'lead1@co1.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }])
+    else {
+      // Link run: generateLink creates the user (sends nothing, same redirect),
+      // then one Resend email; no Supabase invite email.
+      assert.deepStrictEqual(inviteLinks(e.db).map((g) => [g.email, g.redirectTo]), [['lead1@co1.example', 'https://app.getbrandgeo.com/reset-password']])
+      assert.deepStrictEqual(e.db.emailLog, [{ to: 'lead1@co1.example', via: 'resend' }])
+      assert.strictEqual(e.db.invites.length, 0)
+      const link = e.db.rows('client_invite_links')
+      assert.strictEqual(link.length, 1); assert.strictEqual(link[0].source, 'explee-import'); assert.strictEqual(link[0].created_by, null)
+    }
+    assert.strictEqual(emailsSent(e.db), 1); assert.strictEqual(usersCreatedByAuth(e.db), 1)
     assert.strictEqual(e.db.rows('user_profiles').length, 1); assert.strictEqual(e.db.rows('user_profiles')[0].role, 'viewer')
     assert.strictEqual(e.db.rows('prompts').length, 5)
     const ev = e.db.rows('client_events')
     assert.strictEqual(ev.length, 1); assert.strictEqual(ev[0].meta.source, 'explee-import'); assert.strictEqual(ev[0].meta.explee_person_id, 'p1')
+    assert.strictEqual(ev[0].meta.invite_channel, MODE === 'link' ? 'brandgeo' : 'supabase')
     const runs = e.db.rows('collection_runs')
     assert.strictEqual(runs.length, 1); assert.strictEqual(runs[0].trigger, 'scheduled')
     assert.strictEqual(e.worker.n, 1)
@@ -410,7 +463,7 @@ async function main() {
     addLead(e, 1); addLead(e, 2)
     await e.run()
     assert.strictEqual(e.lead('p1').reason, 'already_customer'); assert.strictEqual(e.lead('p2').reason, 'already_customer')
-    assert.strictEqual(e.db.invites.length, 0); assert.strictEqual(e.db.deletedUsers.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0); assert.strictEqual(e.db.deletedUsers.length, 0)
     assert.deepStrictEqual(e.db.usersById.get('u1'), { id: 'u1', email: 'lead1@co1.example', invited_at: '2026-11-11T04:00:00Z' })
   })
   await check('a client already on the domain (or a subdomain) is already_customer; the dry run sees it too', async () => {
@@ -442,7 +495,7 @@ async function main() {
     assert.deepStrictEqual(pair1, ['created:', 'skipped:already_customer'], pair1.join(' '))
     assert.deepStrictEqual(pair2, ['created:', 'skipped:company_has_account'], pair2.join(' '))
     assert.strictEqual(e.db.rows('clients').length, 2)
-    assert.strictEqual(e.db.invites.length, 2)
+    assert.strictEqual(emailsSent(e.db), 2)
   })
   await check('the daily cap counts creating rows', async () => {
     const e = env({ mode: 'live', settings: { max_creates_per_day: 1 } })
@@ -469,7 +522,7 @@ async function main() {
     addLead(e, 2, { intent: 'email_changed', body: 'New address: cy@co2.example' })
     await e.run()
     assert.strictEqual(e.db.rows('clients').length, 1); assert.strictEqual(lastRun(e).detail.referralsThisRun, 1)
-    assert.strictEqual(e.db.invites[0].email, 'bo@co1.example')
+    assert.strictEqual(emailAddresses(e.db)[0], 'bo@co1.example')
     await e.run()
     assert.strictEqual(e.db.rows('clients').length, 2)
     assert.strictEqual(e.lead('p2').invitee_source, 'referral')
@@ -536,7 +589,7 @@ async function main() {
     e.db.seed('explee_leads', [{ person_id: 'p1', project_id: 11, campaign_id: 21, state: 'processing', decision: 'creating', email: 'lead1@co1.example', email_sha256: 'a'.repeat(64), brand_domain: 'co1.example', reserved_at: '2026-11-11T04:00:00Z', claimed_at: '2026-11-11T04:00:00Z', client_id: 77, user_id: null, attempts: 0, final: false, first_seen_at: '2026-11-11T04:00:00Z', updated_at: '2026-11-11T04:00:00Z' }])
     await e.run()
     assert.strictEqual(e.lead('p1').reason, 'half_made'); assert.strictEqual(e.lead('p1').final, true)
-    assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0)
     assert.strictEqual(e.events.filter((x) => x.type === 'explee_orphan').length, 1)
   })
   await check('a stale processing row with no ids is decided again', async () => {
@@ -738,7 +791,15 @@ async function main() {
     delete process.env.EXPLEE_API_KEY
     await assert.rejects(c.listProjects(), (er) => er.code === 'missing_key')
   })
+}
 
+async function main() {
+  for (const mode of ['supabase', 'link']) {
+    setMode(mode)
+    console.log(`\n==== run: ${mode === 'supabase' ? 'INVITE_LINK_CHANNEL=supabase (today\'s path)' : 'channel on, dummy Resend key, Resend stubbed'} ====`)
+    await suite()
+  }
+  setMode('supabase')
   console.log(`\n${passes} passed, ${failures} failed`)
   if (failures) process.exit(1)
 }
@@ -779,7 +840,7 @@ async function revision3() {
     const e = env({ mode: 'live', sbOpts: { failInsert: ['user_profiles'] } })
     for (let i = 1; i <= 6; i++) addLead(e, i)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 1, 'one invite in run 1 (was 6)')
+    assert.strictEqual(emailsSent(e.db), 1, 'one invite in run 1 (was 6)')
     const failed = e.db.rows('explee_leads').filter((r) => r.decision === 'failed' && r.reason === 'provision_error')
     assert.strictEqual(failed.length, 1); assert.strictEqual(failed[0].final, true); assert.ok(failed[0].reserved_at, 'reserved_at kept')
     assert.ok(failed[0].email_sha256, 'the address stays suppressed')
@@ -788,12 +849,12 @@ async function revision3() {
     for (const r of others) assert.ok(r.reserved_at === null || r.reserved_at === undefined, `${r.person_id} reserved_at`)
     assert.strictEqual(e.db.rows('clients').length, 0)
     assert.strictEqual(lastRun(e).detail.createsAttempted, 1); assert.strictEqual(lastRun(e).detail.stopCreating, 'provision_error')
-    const first = e.db.invites[0].email
+    const first = emailAddresses(e.db)[0]
     e.clock.add(HOUR_MS)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 2)
-    assert.notStrictEqual(e.db.invites[1].email, first)
-    assert.strictEqual(e.db.invites.filter((x) => x.email === first).length, 1, 'never re-invited')
+    assert.strictEqual(emailsSent(e.db), 2)
+    assert.notStrictEqual(emailAddresses(e.db)[1], first)
+    assert.strictEqual(emailAddresses(e.db).filter((x) => x === first).length, 1, 'never re-invited')
     assert.strictEqual(inWindow(e), 2, 'both failed calls stay in the daily window')
     assert.strictEqual(lastRun(e).detail.createsToday, 2)
   })
@@ -801,7 +862,7 @@ async function revision3() {
     const e = env({ mode: 'live', sbOpts: { failInsert: ['clients'] } })
     for (let i = 1; i <= 3; i++) addLead(e, i)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0)
     const r = e.lead('p1')
     assert.strictEqual(r.reason, 'provision_error'); assert.strictEqual(r.final, false); assert.strictEqual(r.attempts, 1)
     assert.ok(r.reserved_at === null || r.reserved_at === undefined)
@@ -873,7 +934,7 @@ async function revision3() {
       ])
       assert.strictEqual(arrivals, 2, 'both runs passed the duplicate checks before either reserved')
       const created = e.db.rows('explee_leads').filter((r) => r.decision === 'created')
-      assert.strictEqual(created.length, 1, 'one account per company (was 2)'); assert.strictEqual(e.db.invites.length, 1)
+      assert.strictEqual(created.length, 1, 'one account per company (was 2)'); assert.strictEqual(emailsSent(e.db), 1)
       assert.strictEqual(e.db.rows('clients').length, 1)
       assert.strictEqual((ra.detail.reservationRechecks || 0) + (rb.detail.reservationRechecks || 0), 1, 'the post-reservation re-check released the second row')
       const loser = created[0].person_id === 'p1' ? 'p2' : 'p1'
@@ -895,7 +956,7 @@ async function revision3() {
       addLead(e, 1)
       const gen = e.deps().generatePrompts
       await e.run({ generatePrompts: async (d, o) => { e.setSettings(patch); return gen(d, o) } })
-      assert.strictEqual(e.db.rows('clients').length, 0, 'no account (was 1)'); assert.strictEqual(e.db.invites.length, 0)
+      assert.strictEqual(e.db.rows('clients').length, 0, 'no account (was 1)'); assert.strictEqual(emailsSent(e.db), 0)
       const r = e.lead('p1')
       assert.strictEqual(r.state, 'seen'); assert.strictEqual(r.decision ?? null, null); assert.strictEqual(r.final, false)
       assert.ok(r.reserved_at === null || r.reserved_at === undefined)
@@ -942,7 +1003,7 @@ async function revision3() {
     assert.strictEqual(r.decision, 'failed'); assert.strictEqual(r.reason, 'half_made'); assert.strictEqual(r.final, true)
     assert.strictEqual(r.client_id, orphan.id)
     assert.strictEqual(e.events.filter((x) => x.type === 'explee_orphan').length, 1); assert.strictEqual(e.events.find((x) => x.type === 'explee_orphan').email, true)
-    assert.strictEqual(e.db.invites.length, 0); assert.strictEqual(e.db.deletedUsers.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0); assert.strictEqual(e.db.deletedUsers.length, 0)
     assert.strictEqual(e.db.calls.filter((c) => c.table === 'clients' && (c.op === 'insert' || c.op === 'delete')).length, 0)
     assert.strictEqual(e.db.rows('clients').length, 1)
   })
@@ -1212,7 +1273,7 @@ async function revision3() {
     addLead(e, 1, { company: 'acme.example', email: 'ana@mail.trybrandgeo.com' })
     await e.run()
     assert.strictEqual(e.lead('p1').reason, 'own_sender_domain'); assert.strictEqual(e.lead('p1').final, false)
-    assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0)
   })
 
   console.log('\n27. revision 3: M3, a lead claimed just before 11 minutes starts no outbound call at 13 (criterion 36)')
@@ -1228,7 +1289,7 @@ async function revision3() {
       assert.strictEqual(threadGets(e, 'p1'), 1, 'the lead was claimed and read before 11 minutes')
       assert.strictEqual(homepageCalls, 0, 'no homepage read after 13 minutes (was 1)')
       assert.strictEqual(e.openai.length, 0, 'no OpenAI call after 13 minutes')
-      assert.strictEqual(e.db.rows('clients').length, 0); assert.strictEqual(e.db.invites.length, 0)
+      assert.strictEqual(e.db.rows('clients').length, 0); assert.strictEqual(emailsSent(e.db), 0)
       assert.ok(e.timing.callStarts.every((s) => s.elapsed < 13 * 60000))
       assert.ok((lastRun(e).detail.truncated || []).includes('decide'), JSON.stringify(lastRun(e).detail.truncated))
       const r = e.lead('p1')
@@ -1303,7 +1364,7 @@ async function revision4() {
           return gen(d, o)
         },
       })
-      assert.strictEqual(e.db.invites.length, 0, 'no invite (the reviewer measured 1)')
+      assert.strictEqual(emailsSent(e.db), 0, 'no invite (the reviewer measured 1)')
       assert.strictEqual(e.db.deletedUsers.length, 0, 'no delete (the reviewer measured the self-serve user deleted)')
       assert.strictEqual(profileInserts(e), 0, 'no user_profiles insert by the helper')
       assert.strictEqual(e.db.rows('clients').length, 0)
@@ -1326,7 +1387,7 @@ async function revision4() {
     })
     addLead(e, 1); addLead(e, 2)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 1); assert.strictEqual(e.db.deletedUsers.length, 0)
+    assert.strictEqual(emailsSent(e.db), 1); assert.strictEqual(e.db.deletedUsers.length, 0)
     assert.strictEqual(profileInserts(e), 0, 'not bound (was bound)')
     assert.strictEqual(e.db.rows('clients').length, 0)
     const r = e.lead('p1')
@@ -1342,7 +1403,11 @@ async function revision4() {
       mode: 'live',
       sbOpts: { inviteResendsPending: true },
       authBehaviour: {
+        // Idempotent (server review LOW-1): on the link run the profile-step
+        // restore inviteUserByEmail fires this hook a second time; the other
+        // call made the user and its profile once.
         beforeInvite: async (email) => {
+          if (e.db.usersById.has('u-close')) return
           e.db.usersById.set('u-close', { id: 'u-close', email, created_at: new Date(e.clock.t - 1000).toISOString() })
           e.db.seed('user_profiles', [{ id: 'u-close', client_id: null, role: 'viewer' }])
         },
@@ -1355,12 +1420,26 @@ async function revision4() {
     assert.strictEqual(e.db.rows('clients').length, 0)
     const r = e.lead('p1')
     assert.strictEqual(r.reason, 'already_customer'); assert.strictEqual(r.final, true); assert.ok(r.invite_sent_at)
+    // One inviteUserByEmail on both runs: on the Supabase run it is the invite
+    // itself; on the link run it is the profile-step restore (server review
+    // LOW-1 b), after generateLink and the Resend email.
+    assert.strictEqual(e.db.invites.length, 1)
+    if (MODE === 'link') assert.strictEqual(inviteLinks(e.db).length, 1)
   })
   await check('(e) the invite returns a new user with no created_at (stampCreatedAt off): not bound, not deleted, already_customer with invite_sent_at', async () => {
     const e = env({ mode: 'live', sbOpts: { stampCreatedAt: false } })
     addLead(e, 1)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 1); assert.strictEqual(profileInserts(e), 0); assert.strictEqual(e.db.deletedUsers.length, 0)
+    if (MODE === 'supabase') assert.strictEqual(emailsSent(e.db), 1)
+    else {
+      // Link run, fixture unchanged: generateLink made the user, it is "not
+      // ours", and the restore inviteUserByEmail fails (the fake refuses an
+      // existing address without inviteResendsPending), so no email went out.
+      // Raw counts per spec section 10: 1 generateLink, 1 inviteUserByEmail,
+      // zero Resend. Reported: emailsSent cannot hold 1 on this run.
+      assert.strictEqual(inviteLinks(e.db).length, 1); assert.strictEqual(e.db.invites.length, 1); assert.strictEqual(emailsSent(e.db), 0)
+    }
+    assert.strictEqual(profileInserts(e), 0); assert.strictEqual(e.db.deletedUsers.length, 0)
     assert.strictEqual(e.db.rows('clients').length, 0)
     const r = e.lead('p1')
     assert.strictEqual(r.reason, 'already_customer'); assert.ok(r.invite_sent_at)
@@ -1388,7 +1467,7 @@ async function revision4() {
       await e.run()
       assert.strictEqual(lastRun(e).detail.stopCreating, 'day_cap', `run ${run}`)
     }
-    assert.strictEqual(e.db.invites.length, 1, 'one invite in total (the reviewer measured 4)')
+    assert.strictEqual(emailsSent(e.db), 1, 'one invite in total (the reviewer measured 4)')
   })
   await check('one address under two person_ids of two companies: the first half_made after its invite, the second run healthy: 1 invite, already_customer', async () => {
     const e = env({ mode: 'live', sbOpts: { failInsert: ['user_profiles'] } })
@@ -1402,7 +1481,7 @@ async function revision4() {
     e.db.failInsert = null
     e.clock.add(HOUR_MS)
     await e.run()
-    assert.strictEqual(e.db.invites.length, 1, 'the same address is invited once (was twice)')
+    assert.strictEqual(emailsSent(e.db), 1, 'the same address is invited once (was twice)')
     assert.strictEqual(e.lead('p2').decision, 'skipped'); assert.strictEqual(e.lead('p2').reason, 'already_customer')
   })
 
@@ -1423,7 +1502,7 @@ async function revision4() {
     const r = e.lead('p1')
     assert.strictEqual(r.decision, 'skipped'); assert.strictEqual(r.reason, 'company_has_account'); assert.strictEqual(r.final, true)
     assert.strictEqual(lastRun(e).detail.reservationRechecks || 0, 0, 'no reservation was made (was 1 every run)')
-    assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0)
     const before = callsFor(e, 'p1')
     e.clock.add(HOUR_MS)
     await e.run()
@@ -1463,14 +1542,14 @@ async function revision4() {
     addLead(e, 1, { company: 'acme.example', email: 'ana@getbrandgeo.com' })
     await e.run()
     assert.strictEqual(e.lead('p1').reason, 'own_sender_domain', 'was created'); assert.strictEqual(e.lead('p1').final, false)
-    assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(emailsSent(e.db), 0)
   })
   await check('a replier at persona.example when our sent messages came from team@mail.persona.example: own_sender_domain, 0 invites', async () => {
     const e = env({ mode: 'live' })
     addLead(e, 1, { company: 'persona.example', email: 'ana@persona.example' })
     for (const m of e.fx.threadOf('p1').messages) if (m.type === 'sent') m.from_email = 'team@mail.persona.example'
     await e.run()
-    assert.strictEqual(e.lead('p1').reason, 'own_sender_domain', 'was created'); assert.strictEqual(e.db.invites.length, 0)
+    assert.strictEqual(e.lead('p1').reason, 'own_sender_domain', 'was created'); assert.strictEqual(emailsSent(e.db), 0)
   })
 
   console.log('\n35. revision 4: N1, the 13 minute guard before the homepage, each generation, provisioning and the summary (criterion 55)')
@@ -1489,7 +1568,7 @@ async function revision4() {
       generatePrompts: slowGen(e, [{ prompts: ['too short'], brandName: '' }, { prompts: GOOD_PROMPTS, brandName: '' }], counter),
     })
     assert.strictEqual(counter.n, 1, 'the second generation is not started (was 2)')
-    assert.strictEqual(e.db.invites.length, 0, 'no invite at or after 13 minutes (the reviewer measured 13.53)')
+    assert.strictEqual(emailsSent(e.db), 0, 'no invite at or after 13 minutes (the reviewer measured 13.53)')
     assert.strictEqual(e.db.rows('clients').length, 0)
     const r = e.lead('p1')
     assert.ok(!r.reserved_at); assert.strictEqual(r.final, false); assert.strictEqual(r.attempts || 0, 0); assert.strictEqual(r.attempts_total || 0, 0)
@@ -1506,7 +1585,7 @@ async function revision4() {
       generatePrompts: slowGen(e, [{ prompts: GOOD_PROMPTS, brandName: '' }], counter),
     })
     assert.strictEqual(counter.n, 1)
-    assert.strictEqual(e.db.invites.length, 0, 'no provisioning at or after 13 minutes (was 1)'); assert.strictEqual(e.db.rows('clients').length, 0)
+    assert.strictEqual(emailsSent(e.db), 0, 'no provisioning at or after 13 minutes (was 1)'); assert.strictEqual(e.db.rows('clients').length, 0)
     assert.ok(!e.lead('p1').reserved_at); assert.strictEqual(lastRun(e).detail.stopCreating, 'guard')
     assert.strictEqual(lastRun(e).detail.createsAttempted, 0)
   })
@@ -1517,7 +1596,7 @@ async function revision4() {
     let homepage = 0
     await e.run({ fetchHomepage: async () => { homepage++; e.clock.add(6000); return { signal: 'W', ogSiteName: null } } })
     assert.strictEqual(homepage, 1, 'started at 12.95, before the guard')
-    assert.strictEqual(e.db.invites.length, 0); assert.strictEqual(e.openai.length, 0, 'no generation started after 13 minutes')
+    assert.strictEqual(emailsSent(e.db), 0); assert.strictEqual(e.openai.length, 0, 'no generation started after 13 minutes')
   })
   await check('the last listing page returns at 14.0 min at 07:05 UTC: no summary, last_summary_date unchanged, deferred_guard; 08:05 sends it once', async () => {
     const e = env({ mode: 'live', clockIso: '2026-11-11T07:05:00Z', settings: { last_me_at: '2026-11-11T07:00:00Z', last_summary_date: '2026-11-10', last_reconcile_date: '2026-11-11' } })

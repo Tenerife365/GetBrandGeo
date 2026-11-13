@@ -16,6 +16,7 @@ import RouteSkeleton from './components/RouteSkeleton'
 import { peekOauthNext } from './lib/oauthNext'
 
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Invite = lazy(() => import('./pages/Invite'))
 const Signup = lazy(() => import('./pages/Signup'))
 const Welcome = lazy(() => import('./pages/Welcome'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
@@ -77,8 +78,11 @@ function clearReloadFlag() {
 
 // Vite fires this when a preload (dependency chunk or CSS) fails. Reload once;
 // if that was already tried, let the error propagate to the boundary below.
+// On /invite no reload happens: a reload would drop the token the page holds in
+// memory, so the page's own catch shows its inline retry error instead.
 if (typeof window !== 'undefined') {
   window.addEventListener('vite:preloadError', (e) => {
+    if (window.location.pathname === '/invite') return
     if (reloadOnce()) e.preventDefault()
   })
 }
@@ -277,6 +281,8 @@ export default function App() {
                   and NOT behind OnboardGate (that would loop). */}
               <Route path="/welcome" element={<PrivateRoute><Welcome /></PrivateRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              {/* Public landing page for the 7 day invite email. Makes no call on load. */}
+              <Route path="/invite" element={<Invite />} />
               {/* Public, unauthenticated — Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10) */}
               {/* MCP stage 3 consent page. Own session check (sends to
                   /login?next=...), so NOT behind PrivateRoute, OnboardGate or Layout. */}

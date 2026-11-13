@@ -46,6 +46,38 @@ installModule(path.join(FN, '_auth.js'), {
 const P = require(path.join(FN, '_provision_client'))
 const wizard = require(path.join(FN, 'onboard-client'))
 
+// ── 7 day invite link (docs/arch/invite-link-7-days.md section 10) ────────
+// Every case runs TWICE: mode 'supabase' sets INVITE_LINK_CHANNEL=supabase
+// (today's path), mode 'link' turns the channel on with a dummy Resend key
+// and the Resend sender stubbed on the cached _email.js module.
+let MODE = 'supabase'
+let emailDb = null
+const emailMod = require(path.join(FN, '_email.js'))
+emailMod.sendBrandedEmail = async (msg) => {
+  if (emailDb) emailDb.emailLog.push({ to: msg && msg.to, via: 'resend' })
+  return { ok: true, id: 'em_test' }
+}
+function setMode(mode) {
+  MODE = mode
+  if (mode === 'supabase') { process.env.INVITE_LINK_CHANNEL = 'supabase'; delete process.env.RESEND_API_KEY }
+  else { delete process.env.INVITE_LINK_CHANNEL; process.env.RESEND_API_KEY = 'test-resend-key' }
+}
+function track(db) {
+  emailDb = db
+  db.emailLog = []
+  const inv = db.auth.admin.inviteUserByEmail
+  db.auth.admin.inviteUserByEmail = async (email, options) => {
+    const r = await inv(email, options)
+    if (!(r && r.error)) db.emailLog.push({ to: email, via: 'supabase' })
+    return r
+  }
+  return db
+}
+/** Emails that went out: Resend answers ok plus inviteUserByEmail calls without an error. generateLink sends nothing. */
+const emailsSent = (db) => db.emailLog.length
+/** Users the fake auth created (generateLink or inviteUserByEmail on an unknown address). */
+const usersCreatedByAuth = (db) => db.createdUsers.length
+
 function makeDb({ caps = [{ plan: 'free', prompt_cap: 5 }, { plan: 'growth', prompt_cap: 35 }], rpcFails = false } = {}) {
   const db = createFakeSupabase({ now: () => new Date(), pagedListUsers: true, stampCreatedAt: true, clientLocations: true, extraUnique: { clients: [['slug']] } })
   if (caps) db.seed('plan_prompt_caps', caps)
@@ -53,7 +85,7 @@ function makeDb({ caps = [{ plan: 'free', prompt_cap: 5 }, { plan: 'growth', pro
     const orig = db.rpc.bind(db)
     db.rpc = async (name, args) => (name === 'add_client_locations' ? { data: null, error: { message: 'simulated rpc failure' } } : orig(name, args))
   }
-  return db
+  return track(db)
 }
 
 const input = (over = {}) => Object.assign({
@@ -66,12 +98,13 @@ const writes = (db) => db.calls.filter((c) => c.rpc || (c.op && c.op !== 'select
 const rpcNames = (db) => db.calls.filter((c) => c.rpc).map((c) => c.rpc)
 const nothingCreated = (db) => {
   assert.strictEqual(db.rows('clients').length, 0, 'no client row')
-  assert.strictEqual(db.invites.length, 0, 'no invite')
+  assert.strictEqual(emailsSent(db), 0, 'no invite')
+  assert.strictEqual(usersCreatedByAuth(db), 0, 'no user')
   assert.strictEqual(rpcNames(db).length, 0, 'no rpc')
   assert.strictEqual(db.rows('prompts').length, 0, 'no prompt')
 }
 
-async function main() {
+async function suite() {
   console.log('locations created, prompts mapped per key')
   await check('two extra markets, a multi-key prompt and a string prompt: rows, ids and order', async () => {
     const db = makeDb()
@@ -104,8 +137,13 @@ async function main() {
     const r = await P.provisionAdminWizardClient(db, input({ locations: [{ market_id: 'FR', region_ids: ['PAR'] }], prompts: [{ text: 'q', location_keys: ['FR:PAR'] }] }), ctx())
     assert.strictEqual(r.ok, true, r.message)
     const w = writes(db).filter((x) => x !== 'rpc:ensure_primary_client_location')
-    assert.deepStrictEqual(w, ['clients:insert', 'user_profiles:insert', 'rpc:add_client_locations', 'prompts:insert', 'client_events:insert'])
-    assert.strictEqual(db.invites.length, 1)
+    // Link run: our invite link row (supersede, insert) is written between
+    // the client and the profile; everything else keeps its order.
+    const linkWrites = MODE === 'link' ? ['client_invite_links:update', 'client_invite_links:insert'] : []
+    assert.deepStrictEqual(w, ['clients:insert', ...linkWrites, 'user_profiles:insert', 'rpc:add_client_locations', 'prompts:insert', 'client_events:insert'])
+    assert.strictEqual(emailsSent(db), 1)
+    assert.strictEqual(usersCreatedByAuth(db), 1)
+    assert.strictEqual(db.rows('client_events')[0].meta.invite_channel, MODE === 'link' ? 'brandgeo' : 'supabase')
     const args = db.rpcArgs.find((a) => a.name === 'add_client_locations').args
     assert.strictEqual(args.p_limit, null); assert.strictEqual(args.p_created_by, ADMIN_ID)
     assert.deepStrictEqual(args.p_pairs, [{ market_id: 'FR', region_id: 'PAR' }])
@@ -269,7 +307,15 @@ async function main() {
     const res = await wizard.handler({ httpMethod: 'POST', headers: {}, body: 'null' })
     assert.strictEqual(res.statusCode, 400)
   })
+}
 
+async function main() {
+  for (const mode of ['supabase', 'link']) {
+    setMode(mode)
+    console.log(`\n==== run: ${mode === 'supabase' ? 'INVITE_LINK_CHANNEL=supabase' : 'channel on, dummy Resend key, Resend stubbed'} ====`)
+    await suite()
+  }
+  setMode('supabase')
   console.log(`\nprovision_locations: ${passes} passed, ${failures} failed`)
   process.exit(failures ? 1 : 0)
 }
