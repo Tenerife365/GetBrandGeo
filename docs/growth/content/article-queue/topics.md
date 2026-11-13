@@ -178,6 +178,13 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 47 | pm-services | ready (pre-checked 2026-11-10, buffer) | Which services AI engines say local property managers offer: screening, rent, maintenance, evictions |
 | 48 | immigration-case-types | ready (pre-checked 2026-11-11, buffer) | Which kinds of immigration case AI engines say a lawyer handles: family, work visas, asylum, removal, citizenship |
 | 49 | agent-specialties | ready (pre-checked 2026-11-11, buffer) | What AI engines say local real estate agents specialize in: luxury, first-time buyers, relocation, investors, condos |
+| 50 | draft-yearend-review | ready from 2026-12-01 (draft, rule 5) | Five things to gather from 2026 before an AI visibility line goes into the 2027 plan |
+| 51 | draft-measure-2027 | ready from 2026-12-02 (draft, rule 5) | Which AI visibility measures are worth funding in 2027, which are context, and which to leave out of the plan |
+| 52 | draft-after-bfcm | ready from 2026-12-03 (draft, rule 5) | What AI engines say about a store's offers and policies after Black Friday and Cyber Monday, and how to test it |
+| 53 | draft-holiday-referrals | ready from 2026-12-04 (draft, rule 5) | What an AI referral line in holiday analytics can and cannot support in a year-end report |
+| 54 | draft-answers-log | ready from 2026-12-05 (draft, rule 5) | How to keep a before-and-after log of AI answers that still means something in January |
+| 55 | draft-stale-facts | ready from 2026-12-06 (draft, rule 5) | Which seasonal facts go stale in AI answers, and a five-step audit for the first week of December |
+| 56 | draft-fund-questions | ready from 2026-12-07 (draft, rule 5) | Seven questions to ask before funding AI visibility work in 2027, whether by hand, with help or with a tool |
 
 ## Briefs
 
@@ -516,3 +523,18 @@ luxury"). Read 20 more by hand, count the agent-attached use separately, and kee
 brokerage descriptions apart from agents (BG-114 counted brokerages; do not repeat it).
 Agents are people: report counts only, name no agent and no team named after a person.
 Drop if the agent-attached count removes the spread.
+
+### 50 to 56 drafts (1 to 7 December, How To planning series)
+Written 2026-11-13 by the laptop content session as lot 1 for December, second-verified the
+same day (`CST Ops\_runs\2026-11-13_lot1_verif_brandgeo.md`: all seven OK with corrections),
+then corrected and converted to the draft format on the desktop the same day. Applied: on 56
+the "free plan stays free" promise removed, Google's statement limited to Google's own
+features, the AI SaaS Radar name and its GEO Pack interest disclosed, and the free plan's own
+answers added; on 51 "common choice" softened, the score caveat tied to BG-015 and applied to
+our own score, share of voice reported as a trend (BG-084); on 52 the Black Friday and Cyber
+Monday dates sourced; on 54 the missing-referrer line tied to BG-015; on 55 the generalisation
+narrowed to BG-119; internal links added to every draft; the closing CTA varied and no longer
+promises a per-engine answer view. These are practical guides with no new data, shorter than
+the research series (about 650 to 800 words) by design. Publish by rule 5; do not rewrite.
+Overlaps noted, not blocking: 50 with 45 (draft-year-end-checks, 30 Nov), 52 with BG-081,
+56 with BG-093 and BG-094 (not reopened).
