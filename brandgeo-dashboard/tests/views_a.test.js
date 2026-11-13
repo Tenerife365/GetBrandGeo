@@ -79,12 +79,26 @@ check('csv header is exact', () => eq(A.AI_VISIBILITY_CSV_HEADER, [
   'Prompt ID', 'Prompt', 'Category', 'Engine', 'Result', 'Brand mentioned', 'Position',
   'Sentiment', 'Competitors named', 'Checked at', 'Last answer at', 'Not answering since',
 ]))
+check('csv header gains Location only for a multi-location export', () => {
+  eq(A.aiVisibilityCsvHeader(false), A.AI_VISIBILITY_CSV_HEADER)
+  eq(A.aiVisibilityCsvHeader(true), [...A.AI_VISIBILITY_CSV_HEADER, 'Location'])
+})
 const cellViews = buildCellViews(av.cellRows, engines, F.activePromptIds)
 const csvRows = A.buildAiVisibilityCsvRows({
   prompts: activePrompts, engines: engines.map(e => ({ id: e, label: e })), cellViews, results: av.results,
 })
 const csvCell = (pid, eng) => csvRows.find(r => r[0] === pid && r[3] === eng)
-const COL = { result: 4, mentioned: 5, position: 6, sentiment: 7, comps: 8, checked: 9, lastAnswer: 10, since: 11 }
+const COL = { result: 4, mentioned: 5, position: 6, sentiment: 7, comps: 8, checked: 9, lastAnswer: 10, since: 11, location: 12 }
+check('csv Location is the last column, from locationLabelOf, absent when none is given', () => {
+  eq(csvRows.every(r => r.length === COL.location), true)
+  const withLoc = A.buildAiVisibilityCsvRows({
+    prompts: activePrompts, engines: engines.map(e => ({ id: e, label: e })), cellViews, results: av.results,
+    locationLabelOf: p => 'Loc ' + p.id,
+  })
+  withLoc.forEach(r => eq(r[COL.location], 'Loc ' + r[0]))
+  withLoc.forEach(r => eq(r.length, A.aiVisibilityCsvHeader(true).length))
+  eq(withLoc.length, csvRows.length)
+})
 check('csv has one row per prompt and engine', () => eq(csvRows.length, activePrompts.length * engines.length))
 check('csv rows are as wide as the header', () => csvRows.forEach(r => eq(r.length, A.AI_VISIBILITY_CSV_HEADER.length)))
 check('csv result labels come from the fixed set', () => {
@@ -145,6 +159,24 @@ check('csv Not answering since is the error run start, error cells only', () => 
 check('csv serialises with BOM and CRLF', () => {
   const s = toCsv(A.AI_VISIBILITY_CSV_HEADER, csvRows)
   if (s.charCodeAt(0) !== 0xFEFF || !s.includes('\r\n')) throw new Error('format')
+})
+
+// ── Competitors CSV location column (F15) ───────────────────────────────────
+const CV = L('views/competitorsView.ts')
+check('competitors csv Location lists every distinct location of the competitor prompts', () => {
+  const ids = new Set(activePrompts.map(pr => pr.id))
+  const labelOf = id => (id % 2 === 0 ? 'Loc even' : 'Loc odd')
+  const csv = CV.buildCompetitorsCsv(sv, 'Brand', activePrompts, { labelOf, scopeLabel: 'All locations' })
+  const lines = csv.replace('﻿', '').split('\r\n')
+  eq(lines[0].endsWith(',Location'), true)
+  eq(lines[1].endsWith(',All locations'), true)
+  M.competitorStats(sv.population, 100).forEach((c, i) => {
+    const want = []
+    for (const id of c.promptIds) { if (!ids.has(id)) continue; const l = labelOf(id); if (!want.includes(l)) want.push(l) }
+    eq(lines[2 + i].endsWith(',' + want.join('; ')), true)
+  })
+  // Without the location argument the file keeps its 7 columns.
+  eq(CV.buildCompetitorsCsv(sv, 'Brand', activePrompts).split('\r\n')[0].split(',').length, 7)
 })
 
 // ── Mentions ────────────────────────────────────────────────────────────────

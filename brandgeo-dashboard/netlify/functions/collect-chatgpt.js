@@ -12,6 +12,10 @@
  * POST body:
  *   { prompt_id, prompt_text, client_id, client_config, force?,
  *     market_label?, region_label?, market_id? }
+ *   The three geo fields are accepted so an old tab does not 400, and IGNORED
+ *   since 2026-11-13: the prompt is asked from its own location, resolved on
+ *   the server (resolvePromptGeo below), and the row carries that stamp
+ *   (location_id, asked_market_id, asked_region_id).
  *
  * Server-side gates (Phase 2, 2026-11-08), the same rules collect-prompt.js
  * applies to the fast engines:
@@ -34,6 +38,7 @@ const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
 const { withObservability, captureException } = require('./_observability')
 const { activeEnginesFor } = require('./_cost')
+const { loadLocationRow, resolveLocation, fallbackGeo } = require('./_locations')
 
 const ENGINE = 'chatgpt'
 
@@ -74,7 +79,7 @@ function engineAllowed(plan, enginesEnabled) {
 async function loadPromptForCollect(supabase, { promptId, clientId, role, bodyText }) {
   const { data, error } = await supabase
     .from('prompts')
-    .select('id, text, client_id, is_active')
+    .select('id, text, client_id, is_active, location_id')
     .eq('id', promptId)
     .maybeSingle()
   if (error) return { status: 500, error: 'Prompt lookup failed', logMessage: error.message }
@@ -83,7 +88,26 @@ async function loadPromptForCollect(supabase, { promptId, clientId, role, bodyTe
   const ids = { promptId: data.id, clientId: data.client_id }
   const isAdmin = role === 'admin'
   if (!isAdmin && data.is_active !== true) return { skip: 'prompt_inactive', ...ids }
-  return { ok: true, text: isAdmin ? bodyText : data.text, ...ids }
+  return { ok: true, text: isAdmin ? bodyText : data.text, ...ids, locationId: data.location_id ?? null }
+}
+
+// One location per prompt (docs/arch/multi-location-collection.md 6.2,
+// 2026-11-13). The place a prompt is asked from is resolved HERE, on the
+// server, from the prompt's own location_id and the client's id; the
+// market_label, region_label and market_id of the body are ignored. A null
+// location_id, or a row that is not returned for this client, is asked at the
+// client's default country (fallbackGeo, the pre 2026-11-13 behaviour). A
+// failed read refuses BEFORE any engine call, so no money is spent on an
+// answer asked from the wrong place:
+//   ok          -> { ok: true, geo: { location_id, market_id, region_id, market_label, region_label } }
+//   read error  -> { status: 500, error: 'Location lookup failed', reason: 'location_read_failed', logMessage }
+// The identical function sits in collect-claude.js and collect-prompt.js;
+// tests/phase2_prompt_ownership.test.js asserts the three agree.
+async function resolvePromptGeo(supabase, { clientId, locationId, clientRow }) {
+  if (locationId == null) return { ok: true, geo: fallbackGeo(clientRow) }
+  const res = await loadLocationRow(supabase, clientId, locationId)
+  if (!res.ok) return { status: 500, error: 'Location lookup failed', reason: 'location_read_failed', logMessage: res.error }
+  return { ok: true, geo: res.row ? resolveLocation(res.row) : fallbackGeo(clientRow) }
 }
 
 // N1 (2026-11-09): an id from the body is accepted only as a positive safe
@@ -131,7 +155,9 @@ exports.handler = withObservability('collect-chatgpt', async (event) => {
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid body' }) }
 
-  const { prompt_id: rawPromptId, prompt_text, client_id: rawClientId, client_config, market_label, region_label, market_id } = body
+  // market_label, region_label and market_id of the body are not read: the
+  // place is resolved from the prompt's location (resolvePromptGeo above).
+  const { prompt_id: rawPromptId, prompt_text, client_id: rawClientId, client_config } = body
 
   if (!rawPromptId || !prompt_text || !rawClientId || !client_config)
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -181,7 +207,7 @@ exports.handler = withObservability('collect-chatgpt', async (event) => {
   // cheap model and still collected; it now refuses, as collect-prompt.js does.
   const { data: clientRow, error: clientErr } = await supabase
     .from('clients')
-    .select('plan, engines_enabled')
+    .select('plan, engines_enabled, default_market_id')
     .eq('id', client_id)
     .maybeSingle()
   if (clientErr) {
@@ -195,6 +221,15 @@ exports.handler = withObservability('collect-chatgpt', async (event) => {
     console.log(`[ChatGPT/${invId}] client_id:${client_id} plan:${clientRow.plan} does not include chatgpt, refused`)
     return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, prompt_id, llm: ENGINE, reason: 'no_engines_for_plan', ...forceFlag }) }
   }
+
+  // Where this prompt is asked from, resolved before the limits check and any
+  // engine call (resolvePromptGeo above).
+  const geoCheck = await resolvePromptGeo(supabase, { clientId: client_id, locationId: promptCheck.locationId, clientRow })
+  if (geoCheck.status) {
+    console.error(`[ChatGPT/${invId}] prompt_id:${prompt_id} client_id:${client_id} location ${promptCheck.locationId} lookup failed, refused before any engine call:`, geoCheck.logMessage)
+    return { statusCode: geoCheck.status, headers: auth.headers, body: JSON.stringify({ error: geoCheck.error, llm: ENGINE, reason: geoCheck.reason, ...forceFlag }) }
+  }
+  const geo = geoCheck.geo
 
   // SCALE-SPEC.md §2 — see _auth.js's checkCollectionLimits doc comment.
   const limitCheck = await checkCollectionLimits(auth.supabase, client_id)
@@ -225,7 +260,9 @@ exports.handler = withObservability('collect-chatgpt', async (event) => {
   // beside the older ones.
   const T0 = Date.now()
   const { rows } = await collectEngines([ENGINE], {
-    prompt_id, prompt_text: promptText, client_id, client_config, market_label, region_label, market_id,
+    prompt_id, prompt_text: promptText, client_id, client_config,
+    market_label: geo.market_label, region_label: geo.region_label, market_id: geo.market_id,
+    asked: { location_id: geo.location_id, market_id: geo.market_id, region_id: geo.region_id },
     plan: clientRow.plan ?? null,
   })
   const row = rows[0]
@@ -258,5 +295,6 @@ exports.handler = withObservability('collect-chatgpt', async (event) => {
 exports.effectiveForce = effectiveForce
 exports.engineAllowed = engineAllowed
 exports.loadPromptForCollect = loadPromptForCollect
+exports.resolvePromptGeo = resolvePromptGeo
 exports.parseId = parseId
 exports.ENGINE = ENGINE

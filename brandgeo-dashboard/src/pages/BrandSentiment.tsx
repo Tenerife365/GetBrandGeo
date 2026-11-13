@@ -45,15 +45,20 @@ import {
   type BadgeTone, type StatusKind,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
+import { useLocations } from '../lib/locationsContext'
+import { locationLabel, locationScopeLine } from '../lib/locations'
 
 type SentimentFilter = SentimentKey | 'all'
 type EngineFilter = string
 
-const HISTORY_COLUMNS = 'id, prompt_id, llm, sentiment, brand_position, response_snippet, checked_at'
+const HISTORY_COLUMNS = 'id, prompt_id, llm, sentiment, brand_position, response_snippet, checked_at, asked_market_id, asked_region_id'
+
+// Where the answer was asked from (null on older rows).
+type SentimentRow = SentimentHistoryRow & { asked_market_id?: string | null; asked_region_id?: string | null }
 
 interface HistoryState {
   status: 'loading' | 'ready' | 'error'
-  rows: SentimentHistoryRow[]
+  rows: SentimentRow[]
   /** The client the rows belong to; rows of another client are never shown. */
   clientId: number
 }
@@ -76,7 +81,7 @@ function useSentimentHistory(
     if (!quiet) setState(prev => ({ status: 'loading', rows: prev.clientId === clientId ? prev.rows : [], clientId }))
     if (isDemoMode) {
       const since = sinceIso ? new Date(sinceIso).getTime() : null
-      const rows: SentimentHistoryRow[] = mockAIResults
+      const rows: SentimentRow[] = mockAIResults
         .filter(r => r.brand_mentioned && (since === null || new Date(r.checked_at).getTime() >= since))
         .map(r => ({
           id: r.id,
@@ -91,7 +96,7 @@ function useSentimentHistory(
       if (!isStale(seq, mine)) setState({ status: 'ready', rows, clientId })
       return
     }
-    const res = await readResultHistory<SentimentHistoryRow>(supabase, {
+    const res = await readResultHistory<SentimentRow>(supabase, {
       clientId, sinceIso, columns: HISTORY_COLUMNS, mentionedOnly: true,
     })
     if (isStale(seq, mine)) return
@@ -110,7 +115,7 @@ function useSentimentHistory(
   const mineNow = isOwn(state, clientId)
   return {
     status: mineNow ? state.status : 'loading' as const,
-    rows: ownRows(state, clientId, [] as SentimentHistoryRow[]),
+    rows: ownRows(state, clientId, [] as SentimentRow[]),
     reload: () => { void load(false) },
   }
 }
@@ -139,6 +144,7 @@ export default function BrandSentiment() {
   const { getStartDate, timeRange, setTimeRange } = useTimeFilter()
   const chart = useChartTheme()
   const { snapshot, status, loadError, reload } = useResults()
+  const { locations, isMulti, selected } = useLocations()
 
   // timeRange is the dependency that changes the window; getStartDate reads it.
   const sinceIso = useMemo(
@@ -164,9 +170,13 @@ export default function BrandSentiment() {
     [snapshot],
   )
 
+  // The feed is client-wide history: the location filter applies by prompt id.
+  const locationPromptIds = snapshot?.locationPromptIds ?? null
   const feed = useMemo(
-    () => feedRows(history.rows).filter(r => activeEngines.includes(r.llm as EngineId)),
-    [history.rows, activeEngines],
+    () => feedRows(history.rows)
+      .filter(r => activeEngines.includes(r.llm as EngineId))
+      .filter(r => !locationPromptIds || locationPromptIds.has(r.prompt_id)),
+    [history.rows, activeEngines, locationPromptIds],
   )
   const trendData = useMemo(() => computeTrend(feed, trendPeriod), [feed, trendPeriod])
   const feedTotals = useMemo(() => feedCounts(feed), [feed])
@@ -204,7 +214,10 @@ export default function BrandSentiment() {
 
   return (
     <Page>
-      <PageHeader title="Brand Sentiment" />
+      <PageHeader
+        title="Brand Sentiment"
+        subtitle={isMulti ? locationScopeLine(locations.length, selected.size) : undefined}
+      />
 
       {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
 
@@ -433,6 +446,14 @@ export default function BrandSentiment() {
                                   </span>
                                 </span>
                                 <span className="block text-body text-ink truncate">{promptText.get(e.prompt_id) ?? ''}</span>
+                                {isMulti && (
+                                  <span className="block text-meta text-ink-3 truncate">
+                                    {/* copy: pending bg-copy */}
+                                    {(e as SentimentRow).asked_market_id
+                                      ? `Asked from ${locationLabel({ market_id: (e as SentimentRow).asked_market_id as string, region_id: (e as SentimentRow).asked_region_id ?? 'ALL' })}`
+                                      : 'Location not recorded'}
+                                  </span>
+                                )}
                               </span>
                               <ChevronDown
                                 size={15}

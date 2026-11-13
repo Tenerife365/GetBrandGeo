@@ -13,8 +13,16 @@
  *   default_region_id?: string,   // e.g. 'B' (Bucharest) — must belong to default_market_id's regions
  *   contact_email,
  *   role?: 'admin'|'viewer',      // access level for the invited user (default 'viewer')
- *   prompts?: string[]   // initial buyer-query prompts to seed for this client
+ *   prompts?: string[] | { text, location_keys?: string[] }[]
+ *                        // initial buyer-query prompts to seed for this client;
+ *                        // location_keys entries are 'primary' or 'MARKET:REGION'
+ *   locations?: { market_id, region_ids: string[] }[]   // extra locations (2026-11-13)
+ *   allow_over_cap?: boolean      // explicit admin override of the plan's prompt cap
  * }
+ * Response adds locations_created (2026-11-13). A location refusal answers
+ * 400 { error, code: 'invalid_location' }, an over-cap request 400
+ * { error, code: 'prompt_cap_exceeded' }; both happen before anything is
+ * created (docs/arch/multi-location-collection.md 5.4).
  *
  * Note (task #73 fix, 2026-07-08): this function sets an explicit `plan`
  * default on the new client (was previously omitted, falling through to an
@@ -76,10 +84,14 @@ exports.handler = async (event) => {
 
   let body
   try { body = JSON.parse(event.body) } catch { return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' } }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid body' }) }
+  }
 
   const {
     name, slug, brand_website, brand_aliases, known_competitors,
     plan, default_market_id, default_region_id, contact_email, role, prompts,
+    locations, allow_over_cap,
   } = body
 
   if (!name || !slug || !contact_email) {
@@ -153,6 +165,8 @@ exports.handler = async (event) => {
     default_market_id, default_region_id,
     contact_email,
     prompts,
+    locations,
+    allow_over_cap: allow_over_cap === true,
     role: userRole,
   }, {
     actor: auth.user.id,
@@ -162,8 +176,9 @@ exports.handler = async (event) => {
   })
 
   if (!result.ok) {
-    const { statusCode, error } = wizardError(result, { slug, contact_email })
-    return { statusCode, headers: auth.headers, body: JSON.stringify({ error }) }
+    const { statusCode, error, code } = wizardError(result, { slug, contact_email })
+    if (statusCode >= 500) console.error(`[OnboardClient] provisioning failed at ${result.stage} (${result.code}): ${result.message}`)
+    return { statusCode, headers: auth.headers, body: JSON.stringify(code ? { error, code } : { error }) }
   }
 
   const client = result.client
@@ -179,6 +194,7 @@ exports.handler = async (event) => {
       refresh_cadence: client.refresh_cadence ?? refreshCadence,
       engines_enabled: client.engines_enabled ?? null,
       prompts_created: result.promptsCreated,
+      locations_created: result.locationsCreated || 0,
       audit_logged:    result.auditLogged,
     }),
   }
@@ -200,7 +216,16 @@ function wizardError(result, { slug, contact_email }) {
   if (result.code === 'auth_lookup_incomplete') {
     return { statusCode: 500, error: 'Client creation failed: the existing logins could not be checked. Try again in a minute.' }
   }
+  // 2026-11-13, both refused before anything is created.
+  if (result.code === 'invalid_location') {
+    return { statusCode: 400, code: 'invalid_location', error: `A location is not valid: ${msg}` }
+  }
+  if (result.code === 'prompt_cap_exceeded') {
+    return { statusCode: 400, code: 'prompt_cap_exceeded', error: `Too many prompts for this plan: ${msg}. Each location of a question uses one prompt.` }
+  }
   switch (result.stage) {
+    case 'validate':  return { statusCode: 500, error: 'Client creation failed: the prompt cap could not be checked. Try again in a minute.' }
+    case 'locations': return { statusCode: 500, error: 'Location setup failed. Nothing was kept; try again.' }
     case 'client':  return { statusCode: 409, error: `Client creation failed: ${msg}` }
     case 'invite':  return { statusCode: 409, error: `Invite email failed: ${msg}` }
     case 'profile': return { statusCode: 500, error: `Profile creation failed: ${msg}` }

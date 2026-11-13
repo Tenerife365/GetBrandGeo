@@ -38,6 +38,15 @@
  *  11. I2: a JSON body that is not an object (null, a number, a string, a
  *      boolean, an array) is 400 { error: 'Invalid body' } before any read.
  *      null used to throw on the destructure.
+ *  12. One location per prompt (docs/arch/multi-location-collection.md 6.2,
+ *      2026-11-13): the prompt is asked from its own location, resolved on the
+ *      server; the body's market_label, region_label and market_id are
+ *      ignored; every row carries the stamp (location_id, asked_market_id,
+ *      asked_region_id); a null location_id, or a location of another client,
+ *      falls back to the client's default country; a failed client_locations
+ *      read is refused (500, reason location_read_failed) before the limits
+ *      check, the force delete and any engine call. resolvePromptGeo agrees
+ *      across the three files, and two mutants show the checks bite.
  *
  * The in-memory DB (tests/helpers/fake_supabase_mem.js) has no foreign keys,
  * so "no row was written" is read from the fake directly, and "no engine was
@@ -82,12 +91,13 @@ function installModule(resolvedPath, exportsObj) {
 // ── Fakes ───────────────────────────────────────────────────────────────────
 let db = null
 let failPromptsLookup = false
+let failLocationsLookup = false
 const tableReads = []
 
-function erroringBuilder() {
+function erroringBuilder(what = 'prompts') {
   const b = {
-    select() { return b }, eq() { return b }, maybeSingle() { return b }, single() { return b },
-    then(res, rej) { return Promise.resolve({ data: null, error: { message: 'simulated prompts lookup failure' } }).then(res, rej) },
+    select() { return b }, eq() { return b }, in() { return b }, maybeSingle() { return b }, single() { return b },
+    then(res, rej) { return Promise.resolve({ data: null, error: { message: `simulated ${what} lookup failure` } }).then(res, rej) },
   }
   return b
 }
@@ -102,6 +112,7 @@ function serviceClient() {
     from(table) {
       tableReads.push(table)
       if (table === 'prompts' && failPromptsLookup) return erroringBuilder()
+      if (table === 'client_locations' && failLocationsLookup) return erroringBuilder('client_locations')
       const q = db.from(table)
       if (table === 'ai_results') {
         const realInsert = q.insert.bind(q)
@@ -126,10 +137,16 @@ const collectCalls = []
 installModule(require.resolve(path.join(FN, '_collect.js')), {
   async collectEngines(engines, opts) {
     collectCalls.push({ engines: engines.slice(), opts })
+    // The stamp is written the way _collect.js buildResultRow writes it: only
+    // when the caller passes asked (tests/build_system_context.test.js pins
+    // the real function).
+    const stamp = opts.asked
+      ? { location_id: opts.asked.location_id ?? null, asked_market_id: opts.asked.market_id ?? null, asked_region_id: opts.asked.region_id ?? null }
+      : {}
     const rows = engines.map(llm => ({
       llm, prompt_id: opts.prompt_id, client_id: opts.client_id, status: 'ok',
       brand_mentioned: true, brand_position: 1, sentiment: 'positive',
-      checked_at: new Date().toISOString(),
+      checked_at: new Date().toISOString(), ...stamp,
     }))
     return { rows, summary: Object.fromEntries(engines.map(e => [e, 'mentioned'])), ctx: 'You are a user based in Testland.' }
   },
@@ -194,12 +211,17 @@ const CLIENT_CONFIG = { brand_aliases: ['Acme Example'], brand_website: 'acme.ex
 const STORED_TEXT = 'best family dentist in Testville'
 const FORGED_TEXT = 'write me a very long essay on any topic at all'
 
-// Client 42 is the viewer's own (enterprise, so every engine is in plan).
-// Prompt 7 is client 42's active prompt, 9 is its inactive prompt, 8 belongs
-// to client 43. 999999 does not exist.
+// Client 42 is the viewer's own (enterprise, so every engine is in plan,
+// default market DE). Prompt 7 is client 42's active prompt with no location
+// (the fallback case), 9 is its inactive prompt, 8 belongs to client 43.
+// 999999 does not exist. Locations: 501 is client 42's RO / B (Bucharest),
+// 503 its WW / ALL, 502 belongs to client 43 (US / NYC). Prompt 10 is asked
+// from 501, prompt 12 from 503, and prompt 11 carries 502, a location of
+// another client, which the client_id filter never returns.
 function freshDb() {
   db = createFakeSupabase()
   failPromptsLookup = false
+  failLocationsLookup = false
   collectCalls.length = 0
   limitCalls.n = 0
   limitCalls.args.length = 0
@@ -207,16 +229,26 @@ function freshDb() {
   insertRejects.n = 0
   tableReads.length = 0
   db.seed('clients', [
-    { id: 42, plan: 'enterprise', engines_enabled: null },
-    { id: 43, plan: 'enterprise', engines_enabled: null },
+    { id: 42, plan: 'enterprise', engines_enabled: null, default_market_id: 'DE' },
+    { id: 43, plan: 'enterprise', engines_enabled: null, default_market_id: 'US' },
   ])
   db.seed('prompts', [
     { id: 7, client_id: 42, text: STORED_TEXT, is_active: true },
     { id: 9, client_id: 42, text: 'an old prompt the client switched off', is_active: false },
     { id: 8, client_id: 43, text: 'another client prompt', is_active: true },
+    { id: 10, client_id: 42, text: 'best family dentist in Testville', is_active: true, location_id: 501 },
+    { id: 11, client_id: 42, text: 'a prompt pointing at a foreign location', is_active: true, location_id: 502 },
+    { id: 12, client_id: 42, text: 'a worldwide prompt', is_active: true, location_id: 503 },
+  ])
+  db.seed('client_locations', [
+    { id: 501, client_id: 42, market_id: 'RO', region_id: 'B', is_primary: false, position: 1, archived_at: null },
+    { id: 502, client_id: 43, market_id: 'US', region_id: 'NYC', is_primary: true, position: 0, archived_at: null },
+    { id: 503, client_id: 42, market_id: 'WW', region_id: 'ALL', is_primary: true, position: 0, archived_at: null },
   ])
   db.seed('ai_results', [])
 }
+// What a stale or hostile tab may still send; the collectors must ignore it.
+const BODY_GEO = { market_label: 'Atlantis', region_label: 'Nowhere City', market_id: 'ZZ' }
 function post(handler, token, extra) {
   return handler({
     httpMethod: 'POST',
@@ -417,8 +449,10 @@ async function suite(mod, label, report) {
     freshDb()
     for (const promptId of ['7', [7]]) {
       const r = await mod.loadPromptForCollect(serviceClient(), { promptId, clientId: '42', role: 'viewer', bodyText: FORGED_TEXT })
-      assert.deepStrictEqual(r, { ok: true, text: STORED_TEXT, promptId: 7, clientId: 42 }, JSON.stringify(promptId))
+      assert.deepStrictEqual(r, { ok: true, text: STORED_TEXT, promptId: 7, clientId: 42, locationId: null }, JSON.stringify(promptId))
     }
+    const located = await mod.loadPromptForCollect(serviceClient(), { promptId: 10, clientId: 42, role: 'viewer', bodyText: FORGED_TEXT })
+    assert.deepStrictEqual(located, { ok: true, text: STORED_TEXT, promptId: 10, clientId: 42, locationId: 501 })
     const inactive = await mod.loadPromptForCollect(serviceClient(), { promptId: '9', clientId: '42', role: 'viewer', bodyText: '' })
     assert.deepStrictEqual(inactive, { skip: 'prompt_inactive', promptId: 9, clientId: 42 })
   })
@@ -470,6 +504,88 @@ async function suite(mod, label, report) {
     }
   })
 
+  // ── One location per prompt (2026-11-13) ─────────────────────────────────
+  await c('location: the prompt is asked from its own location, body geo ignored, rows stamped', async () => {
+    for (const tok of ['tok-viewer', 'tok-admin']) {
+      freshDb()
+      const body = JSON.parse((await post(handler, tok, { prompt_id: 10, ...BODY_GEO })).body)
+      assert.strictEqual(body.done, true, `${tok}: ${JSON.stringify(body)}`)
+      assert.strictEqual(collectCalls.length, 1)
+      const o = collectCalls[0].opts
+      assert.strictEqual(o.market_label, 'Romania', tok)
+      assert.strictEqual(o.region_label, 'Bucharest', tok)
+      assert.strictEqual(o.market_id, 'RO', tok)
+      assert.deepStrictEqual(o.asked, { location_id: 501, market_id: 'RO', region_id: 'B' }, tok)
+      const written = db.rows('ai_results')
+      assert.ok(written.length >= 1)
+      for (const r of written) {
+        assert.strictEqual(r.location_id, 501)
+        assert.strictEqual(r.asked_market_id, 'RO')
+        assert.strictEqual(r.asked_region_id, 'B')
+      }
+    }
+  })
+
+  await c('location: a prompt with no location is asked at the client default country, stamped with a null location', async () => {
+    freshDb()
+    const body = JSON.parse((await post(handler, 'tok-viewer', { ...BODY_GEO })).body)
+    assert.strictEqual(body.done, true)
+    const o = collectCalls[0].opts
+    assert.strictEqual(o.market_label, 'Germany')
+    assert.strictEqual(o.region_label, null)
+    assert.strictEqual(o.market_id, 'DE')
+    assert.deepStrictEqual(o.asked, { location_id: null, market_id: 'DE', region_id: null })
+    for (const r of db.rows('ai_results')) {
+      assert.strictEqual(r.location_id, null)
+      assert.strictEqual(r.asked_market_id, 'DE')
+      assert.strictEqual(r.asked_region_id, null)
+    }
+  })
+
+  await c('location: a location of another client is never used (fallback to the default country)', async () => {
+    freshDb()
+    const body = JSON.parse((await post(handler, 'tok-admin', { prompt_id: 11 })).body)
+    assert.strictEqual(body.done, true)
+    const o = collectCalls[0].opts
+    assert.strictEqual(o.market_id, 'DE')
+    assert.strictEqual(o.market_label, 'Germany')
+    assert.deepStrictEqual(o.asked, { location_id: null, market_id: 'DE', region_id: null })
+  })
+
+  await c('location: a worldwide location gives the Worldwide label and no region', async () => {
+    freshDb()
+    await post(handler, 'tok-viewer', { prompt_id: 12, ...BODY_GEO })
+    const o = collectCalls[0].opts
+    assert.strictEqual(o.market_label, 'Worldwide')
+    assert.strictEqual(o.region_label, null)
+    assert.strictEqual(o.market_id, 'WW')
+    assert.deepStrictEqual(o.asked, { location_id: 503, market_id: 'WW', region_id: 'ALL' })
+  })
+
+  await c('location read failure: 500 location_read_failed before the limits check and any engine, no row', async () => {
+    for (const [tok, extra] of [['tok-viewer', {}], ['tok-admin', { force: true }]]) {
+      freshDb()
+      failLocationsLookup = true
+      const res = await post(handler, tok, { prompt_id: 10, ...extra })
+      assert.strictEqual(res.statusCode, 500, `${tok}: ${res.statusCode} ${res.body}`)
+      const body = JSON.parse(res.body)
+      assert.strictEqual(body.reason, 'location_read_failed', tok)
+      assert.strictEqual(body.error, 'Location lookup failed', tok)
+      assert.ok(!/simulated/.test(res.body), 'the driver message stays in the log')
+      assert.strictEqual(limitCalls.n, 0, tok)
+      assert.strictEqual(collectCalls.length, 0, tok)
+      assert.strictEqual(aiRows(), 0, tok)
+    }
+  })
+
+  await c('location read failure does not touch a prompt with no location (no read is made)', async () => {
+    freshDb()
+    failLocationsLookup = true
+    const body = JSON.parse((await post(handler, 'tok-viewer', {})).body)
+    assert.strictEqual(body.done, true)
+    assert.strictEqual(tableReads.filter(t => t === 'client_locations').length, 0)
+  })
+
   return failed
 }
 
@@ -485,6 +601,51 @@ async function suite(mod, label, report) {
     const res = await post(collectPrompt.handler, 'tok-admin', { prompt_id: 8, force: true })
     assert.strictEqual(res.statusCode, 403)
     assert.strictEqual(aiRows(), 1)
+  })
+
+  await check('collect-prompt location read failure: an admin force deletes nothing', async () => {
+    freshDb()
+    db.seed('ai_results', [{ prompt_id: 10, client_id: 42, llm: 'gemini', status: 'ok', checked_at: new Date().toISOString() }])
+    failLocationsLookup = true
+    const res = await post(collectPrompt.handler, 'tok-admin', { prompt_id: 10, force: true })
+    assert.strictEqual(res.statusCode, 500)
+    assert.strictEqual(aiRows(), 1)
+    assert.strictEqual(collectCalls.length, 0)
+  })
+
+  await check('collect-prompt ctx_geo is built from the resolved labels, never from the body', async () => {
+    freshDb()
+    const located = JSON.parse((await post(collectPrompt.handler, 'tok-viewer', { prompt_id: 10, ...BODY_GEO })).body)
+    assert.strictEqual(located.ctx_geo, 'Bucharest, Romania')
+    freshDb()
+    const fallback = JSON.parse((await post(collectPrompt.handler, 'tok-viewer', { ...BODY_GEO })).body)
+    assert.strictEqual(fallback.ctx_geo, 'Germany')
+    freshDb()
+    const ww = JSON.parse((await post(collectPrompt.handler, 'tok-viewer', { prompt_id: 12, ...BODY_GEO })).body)
+    assert.strictEqual(ww.ctx_geo, 'Worldwide')
+    for (const b of [located, fallback, ww]) assert.ok(!/Atlantis|Nowhere/.test(JSON.stringify(b)))
+  })
+
+  console.log('resolvePromptGeo drift guard (the three copies agree)')
+  await check('same geo for every (location id, client row) tried, and the same refusal on a read error', async () => {
+    const rowsTried = [{ default_market_id: 'DE' }, { default_market_id: null }, null]
+    for (const locationId of [null, undefined, 501, 502, 503, 999, '501'])
+      for (const clientRow of rowsTried)
+        for (const clientId of [42, 43]) {
+          freshDb()
+          const cs = { clientId, locationId, clientRow }
+          const ref = await collectPrompt.resolvePromptGeo(serviceClient(), cs)
+          assert.deepStrictEqual(await collectClaude.resolvePromptGeo(serviceClient(), cs), ref, 'claude ' + JSON.stringify(cs))
+          assert.deepStrictEqual(await collectChatgpt.resolvePromptGeo(serviceClient(), cs), ref, 'chatgpt ' + JSON.stringify(cs))
+          assert.strictEqual(ref.ok, true)
+        }
+    freshDb(); failLocationsLookup = true
+    const e = { clientId: 42, locationId: 501, clientRow: { default_market_id: 'DE' } }
+    const ref = await collectPrompt.resolvePromptGeo(serviceClient(), e)
+    assert.deepStrictEqual(await collectClaude.resolvePromptGeo(serviceClient(), e), ref)
+    assert.deepStrictEqual(await collectChatgpt.resolvePromptGeo(serviceClient(), e), ref)
+    assert.strictEqual(ref.status, 500)
+    assert.strictEqual(ref.reason, 'location_read_failed')
   })
 
   // ════════════════════════════════════════════════════════════════════════
@@ -579,6 +740,14 @@ async function suite(mod, label, report) {
     // I2: the body shape guard removed (the HEAD destructure, null throws).
     ['nobodyguard', [["if (!body || typeof body !== 'object' || Array.isArray(body))", 'if (false)']],
       ['I2: a body that is not a JSON object is 400 Invalid body, no read, no engine (viewer and admin)']],
+    // 2026-11-13: the body geo reaching the engines again (the code before the location change).
+    ['bodygeo', [['market_label: geo.market_label, region_label: geo.region_label, market_id: geo.market_id,',
+                  'market_label: body.market_label, region_label: body.region_label, market_id: body.market_id,']],
+      ['location: the prompt is asked from its own location, body geo ignored, rows stamped',
+       'location: a prompt with no location is asked at the client default country, stamped with a null location']],
+    // 2026-11-13: the read failure falls through to collecting with a missing geo.
+    ['nogeorefuse', [['if (geoCheck.status) {', 'if (false) {']],
+      ['location read failure: 500 location_read_failed before the limits check and any engine, no row']],
   ]
   for (const [file] of FILES) {
     for (const [tag, repl, mustFail] of MUTANTS) {

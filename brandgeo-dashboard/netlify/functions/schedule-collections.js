@@ -157,7 +157,7 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: error.message }
   }
 
-  let enqueued = 0, skippedBudget = 0, skippedNoWork = 0, totalJobs = 0
+  let enqueued = 0, skippedBudget = 0, skippedNoWork = 0, skippedTransient = 0, totalJobs = 0
 
   for (const client of (clients || [])) {
     if (!isDue(client.refresh_cadence, client.last_refresh_at)) continue
@@ -193,7 +193,17 @@ exports.handler = async (event) => {
       createdBy: null,
     })
 
-    // Stamp last_refresh_at for any non-budget outcome (enqueued OR nothing to do)
+    // A transient refusal (a read failed, see _enqueue.js) is treated like the
+    // budget skip: NOT stamped, so the next hourly run retries this client
+    // instead of it losing a whole cycle. L1 of
+    // docs/qa/multi-location-review-server-2026-11-13.md.
+    if (result.skipped && result.transient) {
+      skippedTransient++
+      console.warn(`[Scheduler/${invId}] client ${client.id} (${client.name}) refused for a transient reason (${result.reason}), not stamped, retried next hour`)
+      continue
+    }
+
+    // Stamp last_refresh_at for any other outcome (enqueued OR nothing to do)
     // so we don't re-check this client every hour until its cadence elapses again.
     await supabase.from('clients').update({ last_refresh_at: new Date().toISOString() }).eq('id', client.id)
 
@@ -213,9 +223,9 @@ exports.handler = async (event) => {
   const worker = { triggered: kick.triggered, reason: kick.reason, duePending: kick.duePending }
   if (kick.error) worker.error = kick.error
 
-  console.log(`[Scheduler/${invId}] done | enqueued:${enqueued} jobs:${totalJobs} skippedBudget:${skippedBudget} skippedNoWork:${skippedNoWork} worker:${kick.triggered ? kick.reason : 'no'}`)
-  await recordJobRun(supabase, true, { invId, enqueued, totalJobs, skippedBudget, skippedNoWork, worker })
-  return { statusCode: 200, body: JSON.stringify({ enqueued, totalJobs, skippedBudget, skippedNoWork, workerTriggered: kick.triggered }) }
+  console.log(`[Scheduler/${invId}] done | enqueued:${enqueued} jobs:${totalJobs} skippedBudget:${skippedBudget} skippedNoWork:${skippedNoWork} skippedTransient:${skippedTransient} worker:${kick.triggered ? kick.reason : 'no'}`)
+  await recordJobRun(supabase, true, { invId, enqueued, totalJobs, skippedBudget, skippedNoWork, skippedTransient, worker })
+  return { statusCode: 200, body: JSON.stringify({ enqueued, totalJobs, skippedBudget, skippedNoWork, skippedTransient, workerTriggered: kick.triggered }) }
 }
 
 exports.kickWorkerIfNeeded = kickWorkerIfNeeded

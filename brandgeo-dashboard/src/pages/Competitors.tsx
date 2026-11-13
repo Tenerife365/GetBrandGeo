@@ -24,6 +24,8 @@ import { useTimeFilter } from '../lib/timeFilterContext'
 import { useResults } from '../lib/resultsContext'
 import { buildSnapshotView } from '../lib/metrics'
 import { readResultHistory } from '../lib/historyRead'
+import { useLocations } from '../lib/locationsContext'
+import { locationLabel, locationScopeLine, promptLocationId } from '../lib/locations'
 import { downloadCsv, csvFilename } from '../lib/csv'
 import {
   buildCompetitorsView, buildEngineGroupData, samplePromptFor, computeTrend, trendEligibleRows, buildCompetitorsCsv,
@@ -78,6 +80,7 @@ export default function Competitors() {
   const chart = useChartTheme()
   const brandName = activeClient?.name ?? 'your brand'
   const { snapshot, status, loadError, reload } = useResults()
+  const { locations, primary, isMulti, selected } = useLocations()
 
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
@@ -260,15 +263,31 @@ export default function Competitors() {
   const { topCompetitors, brandMentions, brandAvgPos, totalResponses, promptText } = cv
   const engineGroupData = buildEngineGroupData(brandName, cv.engineShare)
   const groupKeys       = [brandName, ...topCompetitors.slice(0, 3).map(c => c.name)]
-  const trendRows       = trendEligibleRows(trendRowsRaw, activeEngines)
+  // The trend history is read client-wide, so the location filter is applied by prompt id.
+  const trendInScope    = snapshot.locationPromptIds
+    ? trendRowsRaw.filter(r => snapshot.locationPromptIds!.has(r.prompt_id))
+    : trendRowsRaw
+  const trendRows       = trendEligibleRows(trendInScope, activeEngines)
   const trendData       = computeTrend(trendRows, brandName, topCompetitors, trendPeriod)
   const trendLoading    = (trendStatus === 'loading' || trendState.clientId !== activeClientId) && trendRows.length === 0
   const trendFailed     = trendStatus === 'error'
   const exportDisabled  = view.population.cells.length === 0
+  const locationOfPrompt = (promptId: number): string => {
+    const pr = snapshot.prompts.find(x => x.id === promptId)
+    const lid = pr ? promptLocationId(pr, primary?.id ?? null) : null
+    const loc = locations.find(l => l.id === lid)
+    return loc ? locationLabel(loc) : ''
+  }
+  const scopeLabel = selected.size === 0
+    ? 'All locations' // copy: pending bg-copy
+    : locations.filter(l => selected.has(l.id)).map(locationLabel).join('; ')
   const onExport = () => {
     downloadCsv(
       csvFilename('competitors', activeClient?.slug, activeClientId, new Date()),
-      buildCompetitorsCsv(view, brandName, snapshot.activePrompts),
+      buildCompetitorsCsv(
+        view, brandName, snapshot.activePrompts,
+        isMulti ? { labelOf: locationOfPrompt, scopeLabel } : undefined,
+      ),
     )
   }
   const engineWord = `${activeEngines.length} engine${activeEngines.length === 1 ? '' : 's'}`
@@ -324,9 +343,9 @@ export default function Competitors() {
     <Page>
       <PageHeader
         title="Competitors"
-        subtitle={totalResponses === 0
+        subtitle={`${totalResponses === 0
           ? 'No responses measured yet.' // copy: pending bg-copy
-          : `Top competitors mentioned across ${responseWord(totalResponses)} for ${brandName}`} // copy: pending bg-copy
+          : `Top competitors mentioned across ${responseWord(totalResponses)} for ${brandName}.`}${isMulti ? ` ${locationScopeLine(locations.length, selected.size)}` : ''}`} // copy: pending bg-copy
         actions={
           <Button variant="secondary" icon={Plus} onClick={() => setShowAdd(v => !v)} aria-expanded={showAdd}>
             Add manually

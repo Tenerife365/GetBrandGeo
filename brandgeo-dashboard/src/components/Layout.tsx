@@ -4,12 +4,14 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis,
+  Eye, EyeOff, Layers, Star, Check, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
-import { useMarket, MARKETS } from '../lib/marketContext'
+import { MARKETS, type Market } from '../lib/marketContext'
+import { useLocations, LocationFlag, SIDEBAR_VISIBLE_LOCATIONS, LOCATION_CHIP_MAX } from '../lib/locationsContext'
+import { locationLabel, promptCountLabel } from '../lib/locations'
 import { useClient } from '../lib/clientContext'
-import { hasFeature } from '../lib/planConfig'
+import { hasFeature, PLAN_LABELS, type Plan } from '../lib/planConfig'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
@@ -18,6 +20,9 @@ import ClientBanner from './ClientBanner'
 import Badge from './ui/Badge'
 import SegmentedControl from './ui/SegmentedControl'
 import Combobox from './ui/Combobox'
+import MultiCombobox from './ui/MultiCombobox'
+import Button from './ui/Button'
+import { SkeletonBlock } from './ui/skeletons'
 import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
 import AdminBell from './AdminBell'
 import { useTheme } from '../lib/themeContext'
@@ -117,9 +122,359 @@ function describeRun(n: { kind: 'completed' | 'stopped'; done: number; total: nu
     : `Collection stopped: ${checked} of ${n.total} prompts checked${tail}`
 }
 
+// The sidebar Locations block (multi-location design section 5). One country per
+// prompt: this block lists the client's locations and FILTERS what the dashboard
+// shows. It steers nothing about collection. Copy: pending bg-copy.
+function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
+  const { activeClient, isAdmin } = useClient()
+  const {
+    locations, limit, used, isMulti, status, refresh, selected, setSelected, canEdit, add, archive,
+  } = useLocations()
+  const [editing, setEditing] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [pickMarket, setPickMarket] = useState<Market | null>(null)
+  const [pickRegions, setPickRegions] = useState<string[]>([])
+  const [adding, setAdding] = useState(false)
+  const [archivingId, setArchivingId] = useState<number | null>(null)
+  const [blockedId, setBlockedId] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [live, setLive] = useState('')
+  const addRef = useRef<HTMLDivElement>(null)
+
+  // A client switch shows Loading again and drops any half-finished edit.
+  useEffect(() => {
+    setEditing(false); setShowAll(false); setPickMarket(null); setPickRegions([])
+    setError(null); setBlockedId(null); setLive('')
+  }, [activeClient?.id])
+
+  const primaryRow = locations.find(l => l.is_primary) ?? null
+  const fallbackLabel = locationLabel({
+    market_id: activeClient?.default_market_id ?? 'WW',
+    region_id: activeClient?.default_region_id ?? 'ALL',
+  })
+  const staticLine = (marketId: string, label: string) => (
+    <div className="flex items-center gap-2 px-1 py-1 text-sm text-ink-2 min-w-0">
+      <LocationFlag marketId={marketId} />
+      <span className="truncate" title={label}>{label}</span>
+    </div>
+  )
+
+  const planLabel = PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan] ?? 'your plan'
+  const atLimit = used >= limit
+  const viewerAtLimit = atLimit && !isAdmin
+  const totalPrompts = locations.reduce((n, l) => n + l.active_prompts, 0)
+
+  const focusAdd = () => requestAnimationFrame(() => addRef.current?.querySelector('input')?.focus())
+
+  const toggleRow = (id: number) => {
+    const loc = locations.find(l => l.id === id)
+    if (selected.size === 0) { setSelected([id]); setLive(`Showing ${loc ? locationLabel(loc) : 'location'}`); return }
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelected(next)
+    if (next.size === 0) setLive('Showing all locations')
+    else if (next.size === 1) {
+      const only = locations.find(l => l.id === [...next][0])
+      setLive(`Showing ${only ? locationLabel(only) : 'location'}`)
+    } else setLive(`Showing ${next.size} locations`)
+  }
+
+  const clearFilter = () => { setSelected([]); setLive('Showing all locations') }
+
+  const doAdd = async (marketId: string, regionIds: string[]) => {
+    setAdding(true); setError(null)
+    const r = await add(marketId, regionIds)
+    setAdding(false)
+    if (r.ok) {
+      setPickMarket(null); setPickRegions([])
+      setLive(regionIds.length > 1 ? `Added ${regionIds.length} locations` : 'Added location')
+      focusAdd()
+    } else setError(r.message)
+  }
+
+  const startAdd = (marketId: string) => {
+    const market = MARKETS.find(m => m.id === marketId)
+    if (!market) return
+    setError(null)
+    if (market.regions.length <= 1) { void doAdd(market.id, ['ALL']); return }
+    const liveIds = new Set(locations.filter(l => l.market_id === market.id).map(l => l.region_id))
+    setPickMarket(market)
+    setPickRegions(liveIds.has('ALL') ? [] : ['ALL'])
+  }
+
+  const doArchive = async (id: number, label: string) => {
+    // The archive button of the next archivable row, so keyboard focus is not lost
+    // when this row disappears. With no next row, focus goes to the Add input.
+    const archivable = locations.filter(l => !l.is_primary)
+    const at = archivable.findIndex(l => l.id === id)
+    const nextId = at >= 0 ? archivable[at + 1]?.id : undefined
+    setArchivingId(id); setError(null); setBlockedId(null)
+    const r = await archive(id)
+    setArchivingId(null)
+    if (r.ok) {
+      setLive(`Archived ${label}`)
+      requestAnimationFrame(() => {
+        const next = nextId !== undefined
+          ? document.querySelector<HTMLButtonElement>(`[data-archive-id="${nextId}"]`)
+          : null
+        if (next) next.focus(); else focusAdd()
+      })
+    } else setError(r.message)
+  }
+
+  const header = (
+    <div className="flex items-center justify-between px-1">
+      <span className="label-caps">Locations</span>
+      {status === 'ready' && (
+        <button
+          onClick={() => { setEditing(v => !v); setError(null); setBlockedId(null); setPickMarket(null) }}
+          className="relative flex items-center gap-1 text-meta text-ink-3 hover:text-ink-2 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
+          aria-expanded={editing}
+          aria-label={editing ? 'Done managing locations' : 'Manage locations'}
+        >
+          {editing ? 'Done' : 'Edit'}
+          <ChevronDown size={11} className={`transition-transform ${editing ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+    </div>
+  )
+
+  const liveRegion = <span role="status" aria-live="polite" className="sr-only">{live}</span>
+  const errorSlot = error ? <p role="alert" className="px-1 text-meta text-neg">{error}</p> : null
+
+  if (status === 'loading') {
+    return (
+      <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0" aria-busy="true">
+        {header}
+        <div className="h-8 px-2 flex items-center"><SkeletonBlock className="h-3.5 w-full" /></div>
+        <div className="h-8 px-2 flex items-center"><SkeletonBlock className="h-3.5 w-2/3" /></div>
+      </div>
+    )
+  }
+
+  if (status === 'error' || locations.length === 0) {
+    return (
+      <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
+        {header}
+        {staticLine(activeClient?.default_market_id ?? 'WW', fallbackLabel)}
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-meta text-ink-3">Could not load locations.</span>
+          <button onClick={() => { void refresh() }} className="relative text-meta text-accent-ink hover:underline underline-offset-2 after:absolute after:content-[''] after:[inset:-14px_-6px] max-md:min-h-[44px]">Retry</button>
+        </div>
+      </div>
+    )
+  }
+
+  const addOptionMarkets = MARKETS.filter(m => {
+    const liveIds = new Set(locations.filter(l => l.market_id === m.id).map(l => l.region_id))
+    return !m.regions.every(r => liveIds.has(r.id))
+  })
+
+  const collapsible = locations.length > SIDEBAR_VISIBLE_LOCATIONS + 1
+  const visible = (!collapsible || showAll)
+    ? locations
+    : locations.filter((l, i) => i < SIDEBAR_VISIBLE_LOCATIONS || selected.has(l.id))
+  const hiddenCount = locations.length - visible.length
+  const rowCount = visible.length + 1
+
+  const rowBase = 'relative flex items-center gap-2 w-full min-w-0 px-2 h-8 max-md:min-h-[44px] rounded-control text-sm text-left transition-colors'
+
+  return (
+    <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
+      {header}
+      {liveRegion}
+
+      {!editing && !isMulti && primaryRow && staticLine(primaryRow.market_id, locationLabel(primaryRow))}
+
+      {!editing && isMulti && (
+        <div role="group" aria-label="Show results for" className={`space-y-0.5 ${rowCount > 8 ? 'max-h-[288px] overflow-y-auto' : ''}`}>
+          <button
+            type="button"
+            aria-pressed={selected.size === 0}
+            data-loc-filter
+            onClick={clearFilter}
+            className={`${rowBase} ${selected.size === 0 ? 'bg-accent-tint text-ink' : 'text-ink-2 hover:bg-surface-2'}`}
+          >
+            <Layers size={14} aria-hidden="true" className="flex-shrink-0" />
+            <span className="flex-1 truncate">All locations</span>
+            {selected.size === 0
+              ? <Check size={14} aria-hidden="true" className="flex-shrink-0 text-accent-ink" />
+              : <span aria-hidden="true" className="text-meta text-ink-3 flex-shrink-0">{totalPrompts}</span>}
+            <span className="sr-only">{promptCountLabel(totalPrompts)}</span>
+          </button>
+          {visible.map(l => {
+            const on = selected.has(l.id)
+            const label = locationLabel(l)
+            return (
+              <button
+                key={l.id}
+                type="button"
+                aria-pressed={on}
+                data-loc-filter
+                onClick={() => toggleRow(l.id)}
+                className={`${rowBase} ${on ? 'bg-accent-tint text-ink' : 'text-ink-2 hover:bg-surface-2'}`}
+              >
+                <LocationFlag marketId={l.market_id} />
+                <span className="flex-1 truncate" title={label}>{label}</span>
+                {l.is_primary && (
+                  <>
+                    <Star size={12} aria-hidden="true" className="flex-shrink-0 text-ink-3" />
+                    <span className="sr-only">, primary</span>
+                  </>
+                )}
+                {on
+                  ? <Check size={14} aria-hidden="true" className="flex-shrink-0 text-accent-ink" />
+                  : <span aria-hidden="true" className="text-meta text-ink-3 flex-shrink-0">{l.active_prompts}</span>}
+                <span className="sr-only">{promptCountLabel(l.active_prompts)}</span>
+              </button>
+            )
+          })}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setShowAll(v => !v)}
+              aria-expanded={showAll}
+              className="relative px-2 text-meta text-accent-ink hover:underline underline-offset-2 max-md:min-h-[44px] after:absolute after:content-[''] after:[inset:-8px_0]"
+            >
+              {showAll ? 'Show fewer' : `+ ${hiddenCount} more`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div className="space-y-2">
+          <div className={`space-y-1 ${locations.length > 5 ? 'max-h-[240px] overflow-y-auto' : ''}`}>
+            {locations.map(l => {
+              const label = locationLabel(l)
+              const busy = archivingId === l.id
+              const inUse = l.active_prompts > 0
+              return (
+                <div key={l.id} className="bg-surface-2 rounded-control">
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <LocationFlag marketId={l.market_id} />
+                    <span className="flex-1 min-w-0 text-sm text-ink-2 truncate" title={label}>{label}</span>
+                    {l.is_primary && <span className="text-meta text-ink-3 flex-shrink-0">Primary</span>}
+                    <span className="text-meta text-ink-3 flex-shrink-0">{promptCountLabel(l.active_prompts)}</span>
+                    {!l.is_primary && canEdit && (
+                      <button
+                        type="button"
+                        aria-label={`Archive ${label}`}
+                        data-archive-id={l.id}
+                        aria-disabled={inUse || busy ? true : undefined}
+                        onClick={() => {
+                          if (busy) return
+                          if (inUse) { setBlockedId(l.id); setError(null); return }
+                          void doArchive(l.id, label)
+                        }}
+                        className={`relative p-1.5 text-ink-3 hover:text-ink-2 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px] ${inUse ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        {busy ? <Loader2 size={12} aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : <X size={12} aria-hidden="true" />}
+                      </button>
+                    )}
+                  </div>
+                  {blockedId === l.id && (
+                    <p role="alert" className="px-3 pb-2 text-meta text-ink-3">
+                      Archive its {promptCountLabel(l.active_prompts)} first. A location is removed only when it is empty.{' '}
+                      <NavLink
+                        to="/prompts"
+                        onClick={() => { setSelected([l.id]); onNavigate() }}
+                        className="relative text-accent-ink hover:underline underline-offset-2 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-14px_-6px]"
+                      >Open prompts</NavLink>
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {isDemoMode ? (
+            <p className="px-1 text-meta text-ink-3">Not available in the demo</p>
+          ) : !canEdit ? (
+            <p className="px-1 text-meta text-ink-3">Ask your account admin to change locations.</p>
+          ) : (
+            <>
+              {Number.isFinite(limit) && (
+                <p className="px-1 text-meta text-ink-3">
+                  {isAdmin && atLimit
+                    ? `${used} of ${limit} on ${planLabel}. Admin can add more.`
+                    : `${used} of ${limit} locations on ${planLabel}`}
+                </p>
+              )}
+              {viewerAtLimit ? (
+                <p className="px-1 text-meta text-ink-3">
+                  Location limit reached{' '}
+                  <NavLink
+                    to="/account"
+                    onClick={onNavigate}
+                    className="relative text-accent-ink hover:underline underline-offset-2 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-14px_-6px]"
+                  >See plans</NavLink>
+                </p>
+              ) : pickMarket ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-1 text-sm text-ink-2 min-w-0">
+                    <LocationFlag marketId={pickMarket.id} />
+                    <span className="truncate">{pickMarket.label}</span>
+                  </div>
+                  <MultiCombobox
+                    size="sm"
+                    placement="top"
+                    options={buildRegionOptions(pickMarket)}
+                    values={pickRegions}
+                    onChange={setPickRegions}
+                    exclusiveValue="ALL"
+                    disabledReasons={Object.fromEntries(
+                      locations.filter(l => l.market_id === pickMarket.id).map(l => [l.region_id, 'Added']),
+                    )}
+                    maxSelected={isAdmin ? 25 : Math.max(0, Math.min(25, limit - used))}
+                    maxReason="Limit reached"
+                    maxChips={LOCATION_CHIP_MAX}
+                    ariaLabel={`Regions of ${pickMarket.label}`}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="primary" size="sm" loading={adding}
+                      disabled={pickRegions.length === 0}
+                      onClick={() => { void doAdd(pickMarket.id, pickRegions) }}
+                    >
+                      {pickRegions.length > 1 ? `Add ${pickRegions.length}` : 'Add'}
+                    </Button>
+                    <Button variant="ghost" size="sm" disabled={adding} onClick={() => { setPickMarket(null); setPickRegions([]); focusAdd() }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                addOptionMarkets.length > 0 && (
+                  <div ref={addRef} className="relative">
+                    <Combobox
+                      size="sm"
+                      placement="top"
+                      clearOnSelect
+                      options={buildMarketOptions(addOptionMarkets)}
+                      value=""
+                      onChange={startAdd}
+                      placeholder="Add location"
+                      ariaLabel="Add a location"
+                    />
+                    {adding && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-surface-2/70 rounded-control" aria-hidden="true">
+                        <Loader2 size={14} className="animate-spin motion-reduce:animate-none" />
+                      </span>
+                    )}
+                  </div>
+                )
+              )}
+            </>
+          )}
+          {errorSlot}
+        </div>
+      )}
+      {!editing && errorSlot}
+    </div>
+  )
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const { selections, addSelection, removeSelection, updateRegion } = useMarket()
   const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
@@ -128,7 +483,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [showClients, setShowClients]   = useState(false)
   const [showLangs, setShowLangs]       = useState(false)
-  const [showMarketEditor, setShowMarketEditor] = useState(false)  // market area collapses to a summary by default (set-once, rarely changes)
   const [clientGroup, setClientGroup]   = useState<ClientGroupKey>('active')
   const [catSaving, setCatSaving]       = useState(false)
   const [showInternal, setShowInternal] = useState(false)   // separate "Internal / Research" control
@@ -482,9 +836,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [pageLabel])
   const currentLang = LANGUAGES.find(l => l.id === lang) ?? LANGUAGES[0]
   const collectPct  = progress ? Math.round((progress.done / progress.total) * 100) : 0
-
-  // Markets not yet selected — available to add
-  const availableMarkets = MARKETS.filter(m => !selections.some(s => s.market.id === m.id))
 
   return (
     <div className="flex h-screen bg-canvas overflow-hidden">
@@ -853,110 +1204,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Market selector: multi-select with per-market region pickers; client data, so not in affiliate mode */}
-        {!affiliateMode && (
-        <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
-          <div className="flex items-center justify-between px-1">
-            {/* Literal string, not t.sidebar_market: that key reads "MARKET" and i18nContext.tsx is outside this change's scope. Same classes as the neighbouring labels, so CSS uppercases it. */}
-            <span className="label-caps">Collection market</span>
-            {/* 34.6 x 16.5 measured — the smallest control in the shell, and a
-                text button so there is no padding to grow without moving the
-                MARKET header row it shares (this row is deliberately compact,
-                see the "reclaims vertical space" note further down). The target
-                grows instead: inset -14px vertical, -8px horizontal, giving
-                50.6 x 44.5 while the label stays exactly where it was. */}
-            <button
-              onClick={() => { setShowMarketEditor(v => !v) }}
-              className="relative flex items-center gap-1 text-meta text-ink-3 hover:text-ink-2 transition-colors after:absolute after:content-[''] after:[inset:-14px_-8px]"
-              aria-expanded={showMarketEditor}
-              aria-label={showMarketEditor ? 'Done editing collection market' : 'Edit collection market. Used for collections you start from this browser; scheduled refreshes use the account default.'}
-            >
-              {showMarketEditor ? 'Done' : 'Edit'}
-              <ChevronDown size={11} className={`transition-transform ${showMarketEditor ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {/* Collapsed summary — one compact line per market (flag · region).
-              This area is set at onboarding and rarely changes, so it stays out
-              of the way until you tap Edit. */}
-          {!showMarketEditor && (
-            <div className="space-y-0.5">
-              {selections.map(sel => (
-                <div key={sel.market.id} className="flex items-center gap-2 px-1 py-1 text-sm text-ink-2">
-                  {sel.market.flagCode === 'un'
-                    ? <Globe2 size={14} className="text-ink-2 flex-shrink-0" />
-                    : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-4 h-auto rounded-sm flex-shrink-0" />
-                  }
-                  <span className="truncate">
-                    {sel.market.label}
-                    {sel.region.id !== 'ALL' && <span className="text-ink-3"> · {sel.region.label}</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {showMarketEditor && (
-          <div className="space-y-2">
-          {/* Selected market chips */}
-          <div className="space-y-1">
-            {selections.map(sel => (
-              <div key={sel.market.id} className="bg-surface-2 rounded-control">
-                {/* Market header row */}
-                <div className="flex items-center gap-2 px-3 py-2">
-                  {sel.market.flagCode === 'un'
-                    ? <Globe2 size={15} className="text-ink-2 flex-shrink-0" />
-                    : <img src={`https://flagcdn.com/w20/${sel.market.flagCode}.png`} alt="" className="w-5 h-auto rounded-sm flex-shrink-0" />
-                  }
-                  <span className="flex-1 text-sm text-ink-2 truncate">{sel.market.label}</span>
-                  {selections.length > 1 && (
-                    <button
-                      onClick={() => removeSelection(sel.market.id)}
-                      className="relative p-1.5 text-ink-3 hover:text-ink-2 transition-colors flex-shrink-0 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-10px]"
-                      title={`Remove ${sel.market.label}`}
-                      aria-label={`Remove ${sel.market.label} from selected markets`}
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-                {/* Inline region selector — only shown when market has sub-regions */}
-                {sel.market.regions.length > 1 && (
-                  <div className="px-2 pb-2">
-                    <Combobox
-                      size="sm"
-                      placement="top"
-                      options={buildRegionOptions(sel.market)}
-                      value={sel.region.id}
-                      onChange={rid => {
-                        const r = sel.market.regions.find(x => x.id === rid)
-                        if (r) updateRegion(sel.market.id, r)
-                      }}
-                      ariaLabel={`Region for ${sel.market.label}`}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Add market picker */}
-          {availableMarkets.length > 0 && (
-            <Combobox
-              size="sm"
-              placement="top"
-              clearOnSelect
-              options={buildMarketOptions(availableMarkets)}
-              value={null}
-              onChange={id => { const m = availableMarkets.find(x => x.id === id); if (m) addSelection(m) }}
-              placeholder="Add market"
-              ariaLabel="Add a market"
-            />
-          )}
-          </div>
-          )}
-        </div>
-        )}
+        {/* Locations: lists the client's locations and filters what the dashboard shows; client data, so not in affiliate mode */}
+        {!affiliateMode && <LocationsBlock onNavigate={closeSidebar} />}
 
         {/* Bottom actions */}
         <div className="px-3 py-3 border-t border-line space-y-0.5 flex-shrink-0">

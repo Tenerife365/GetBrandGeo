@@ -14,9 +14,10 @@
  *   { prompt_id, prompt_text, client_id, client_config, force?,
  *     market_label?, region_label?, market_id?, active_engines? }
  *
- * market_label / region_label — human-readable geo context (e.g. "Romania", "Bucharest")
- * market_id — ISO 3166-1 alpha-2 country code (unused by the 3 fast engines here,
- *   accepted for payload symmetry with the ChatGPT endpoint).
+ * market_label / region_label / market_id: accepted so an old tab does not
+ *   400, and IGNORED since 2026-11-13. The prompt is asked from its own
+ *   location, resolved on the server (resolvePromptGeo below), and every row
+ *   carries that stamp (location_id, asked_market_id, asked_region_id).
  * client_config: { brand_aliases, brand_website, known_competitors }
  * active_engines: optional NARROWING of the fast engines to run. It can only
  *   narrow: the server computes the allowed set from the client's own plan and
@@ -33,6 +34,7 @@ const { requireAuth, checkCollectionLimits } = require('./_auth')
 const { collectEngines } = require('./_collect')
 const { withObservability, captureException } = require('./_observability')
 const { MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS, activeEnginesFor } = require('./_cost')
+const { loadLocationRow, resolveLocation, fallbackGeo } = require('./_locations')
 
 // Engines this endpoint owns. Claude → collect-claude.js, ChatGPT → collect-chatgpt.js.
 // google_ai (Google AI Mode via SerpApi) is handled here too — it's a fast HTTP
@@ -92,7 +94,7 @@ function effectiveForce(role, force) {
 async function loadPromptForCollect(supabase, { promptId, clientId, role, bodyText }) {
   const { data, error } = await supabase
     .from('prompts')
-    .select('id, text, client_id, is_active')
+    .select('id, text, client_id, is_active, location_id')
     .eq('id', promptId)
     .maybeSingle()
   if (error) return { status: 500, error: 'Prompt lookup failed', logMessage: error.message }
@@ -101,7 +103,26 @@ async function loadPromptForCollect(supabase, { promptId, clientId, role, bodyTe
   const ids = { promptId: data.id, clientId: data.client_id }
   const isAdmin = role === 'admin'
   if (!isAdmin && data.is_active !== true) return { skip: 'prompt_inactive', ...ids }
-  return { ok: true, text: isAdmin ? bodyText : data.text, ...ids }
+  return { ok: true, text: isAdmin ? bodyText : data.text, ...ids, locationId: data.location_id ?? null }
+}
+
+// One location per prompt (docs/arch/multi-location-collection.md 6.2,
+// 2026-11-13). The place a prompt is asked from is resolved HERE, on the
+// server, from the prompt's own location_id and the client's id; the
+// market_label, region_label and market_id of the body are ignored. A null
+// location_id, or a row that is not returned for this client, is asked at the
+// client's default country (fallbackGeo, the pre 2026-11-13 behaviour). A
+// failed read refuses BEFORE any engine call, so no money is spent on an
+// answer asked from the wrong place:
+//   ok          -> { ok: true, geo: { location_id, market_id, region_id, market_label, region_label } }
+//   read error  -> { status: 500, error: 'Location lookup failed', reason: 'location_read_failed', logMessage }
+// The identical function sits in collect-claude.js and collect-chatgpt.js;
+// tests/phase2_prompt_ownership.test.js asserts the three agree.
+async function resolvePromptGeo(supabase, { clientId, locationId, clientRow }) {
+  if (locationId == null) return { ok: true, geo: fallbackGeo(clientRow) }
+  const res = await loadLocationRow(supabase, clientId, locationId)
+  if (!res.ok) return { status: 500, error: 'Location lookup failed', reason: 'location_read_failed', logMessage: res.error }
+  return { ok: true, geo: res.row ? resolveLocation(res.row) : fallbackGeo(clientRow) }
 }
 
 // N1 (2026-11-09): an id from the body is accepted only as a positive safe
@@ -149,7 +170,9 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid body' }) }
 
-  const { prompt_id: rawPromptId, prompt_text, client_id: rawClientId, client_config, market_label, region_label, market_id, active_engines } = body
+  // market_label, region_label and market_id of the body are not read: the
+  // place is resolved from the prompt's location (resolvePromptGeo above).
+  const { prompt_id: rawPromptId, prompt_text, client_id: rawClientId, client_config, active_engines } = body
   if (!rawPromptId || !prompt_text || !rawClientId || !client_config)
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing required fields' }) }
 
@@ -194,7 +217,7 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   // Plan and engine overrides come from the clients row, never from the body.
   const { data: clientRow, error: clientErr } = await supabase
     .from('clients')
-    .select('plan, engines_enabled')
+    .select('plan, engines_enabled, default_market_id')
     .eq('id', client_id)
     .maybeSingle()
   if (clientErr) {
@@ -209,6 +232,15 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   if (allowed.length === 0) {
     return { statusCode: 200, headers: auth.headers, body: JSON.stringify({ skipped: true, prompt_id, reason: 'no_engines_for_plan', ...forceFlag }) }
   }
+
+  // Where this prompt is asked from, resolved before the limits check, the
+  // force delete and any engine call (resolvePromptGeo above).
+  const geoCheck = await resolvePromptGeo(supabase, { clientId: client_id, locationId: promptCheck.locationId, clientRow })
+  if (geoCheck.status) {
+    console.error(`[${invId}] prompt_id:${prompt_id} client_id:${client_id} location ${promptCheck.locationId} lookup failed, refused before any engine call:`, geoCheck.logMessage)
+    return { statusCode: geoCheck.status, headers: auth.headers, body: JSON.stringify({ error: geoCheck.error, reason: geoCheck.reason, ...forceFlag }) }
+  }
+  const geo = geoCheck.geo
 
   // SCALE-SPEC.md §2 — hourly ceiling + monthly EUR budget + platform-wide
   // ceiling, scoped to the CONFIRMED target client. See _auth.js's
@@ -280,7 +312,9 @@ exports.handler = withObservability('collect-prompt', async (event) => {
   // engine — ok OR error, never silence (#109). No run_id → these manual rows
   // stay out of the queue's uq_ai_results_run_prompt_llm dedup index.
   const { rows, summary, ctx } = await collectEngines(toRun, {
-    prompt_id, prompt_text: promptText, client_id, client_config, market_label, region_label, market_id,
+    prompt_id, prompt_text: promptText, client_id, client_config,
+    market_label: geo.market_label, region_label: geo.region_label, market_id: geo.market_id,
+    asked: { location_id: geo.location_id, market_id: geo.market_id, region_id: geo.region_id },
   })
 
   console.log(`[${invId}] summary:`, Object.entries(summary).map(([e, s]) => `${e}=${s}`).join(' | '))
@@ -300,9 +334,10 @@ exports.handler = withObservability('collect-prompt', async (event) => {
     console.warn('[Insert] nothing to save')
   }
 
-  // ctx_geo: what location was actually used — helps debug collection results
-  const ctxGeo = market_label
-    ? (region_label && !region_label.startsWith('All ') ? `${region_label}, ${market_label}` : market_label)
+  // ctx_geo: what location was actually used, helps debug collection results.
+  // Built from the server-resolved labels only, never from the body (S11).
+  const ctxGeo = geo.market_label
+    ? (geo.region_label && !geo.region_label.startsWith('All ') ? `${geo.region_label}, ${geo.market_label}` : geo.market_label)
     : ctx.split('from ')[1]?.split('.')[0] ?? 'unknown'
 
   // The engines ran and were billed, but nothing was saved, so the row the
@@ -330,5 +365,6 @@ exports.handler = withObservability('collect-prompt', async (event) => {
 exports.resolveEngines = resolveEngines
 exports.effectiveForce = effectiveForce
 exports.loadPromptForCollect = loadPromptForCollect
+exports.resolvePromptGeo = resolvePromptGeo
 exports.parseId = parseId
 exports.FAST_ENGINES = FAST_ENGINES

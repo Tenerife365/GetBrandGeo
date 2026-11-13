@@ -75,6 +75,8 @@ export interface Prompt {
   is_active: boolean
   position: number
   created_at: string
+  /** The location this prompt is asked from. Null or absent reads as the primary. */
+  location_id?: number | null
 }
 
 export interface AIResult {

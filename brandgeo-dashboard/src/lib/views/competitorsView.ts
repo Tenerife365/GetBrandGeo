@@ -147,6 +147,14 @@ export function buildCompetitorsCsv(
   view: SnapshotView,
   brandName: string,
   activePrompts: ReadonlyArray<{ id: number; text: string }>,
+  /**
+   * Multi-location clients only: when given, the export gains a last "Location"
+   * column. A competitor row lists the distinct locations of the prompts it was
+   * named in, joined with "; " (not only its sample prompt's); the
+   * brand row carries `scopeLabel` (the filtered locations, or "All locations").
+   * Omitted for a one-location client, so its file is unchanged.
+   */
+  location?: { labelOf: (promptId: number) => string; scopeLabel: string },
 ): string {
   const p = view.population
   const promptText = new Map(activePrompts.map(pr => [pr.id, pr.text]))
@@ -163,8 +171,18 @@ export function buildCompetitorsCsv(
     averagePosition(mentioned),
     brandEngines,
     '',
+    ...(location ? [location.scopeLabel] : []),
   ]]
   for (const c of competitorStats(p, 100)) {
+    // Every distinct location this competitor was named in, in prompt order.
+    const locs: string[] = []
+    if (location) {
+      for (const id of c.promptIds) {
+        if (!promptText.has(id)) continue
+        const l = location.labelOf(id)
+        if (l && !locs.includes(l)) locs.push(l)
+      }
+    }
     rows.push([
       c.name,
       'no',
@@ -173,7 +191,8 @@ export function buildCompetitorsCsv(
       c.avgPos,
       p.engineIds.filter(e => (c.byEngine[e] ?? 0) > 0).map(engineLabel).join('; '),
       samplePromptFor(c, promptText),
+      ...(location ? [locs.join('; ')] : []),
     ])
   }
-  return toCsv(COMPETITORS_CSV_HEADER, rows)
+  return toCsv(location ? [...COMPETITORS_CSV_HEADER, 'Location'] : COMPETITORS_CSV_HEADER, rows)
 }

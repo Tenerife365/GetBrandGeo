@@ -47,28 +47,11 @@
  */
 
 const { activeEnginesFor, MONTHLY_CAPPED_ENGINES, MONTHLY_CAP_DAYS, PLAN_COLLECTION_COOLDOWN_HOURS } = require('./_cost')
-
-// ISO 3166-1 alpha-2 → country name, for scheduled runs that resolve geo from
-// the client's default_market_id (manual runs pass full labels from the browser).
-// MUST cover every market id in src/lib/markets.ts except 'WW' (full English
-// country names, not the short selector labels); tests/markets_data.test.js
-// enforces it. An unmapped id (and 'WW') yields no label, and
-// buildSystemContext silently falls back to the brand_website TLD.
-const COUNTRY_NAMES = {
-  RO: 'Romania', GB: 'United Kingdom', IE: 'Ireland', DE: 'Germany', FR: 'France',
-  ES: 'Spain', IT: 'Italy', US: 'United States', NL: 'Netherlands', PL: 'Poland',
-  AU: 'Australia', CA: 'Canada', PT: 'Portugal', BE: 'Belgium', CH: 'Switzerland',
-  AT: 'Austria', HU: 'Hungary', CZ: 'Czechia', SE: 'Sweden', DK: 'Denmark', FI: 'Finland',
-  BR: 'Brazil', MX: 'Mexico', SG: 'Singapore', IN: 'India', JP: 'Japan',
-  AE: 'United Arab Emirates', SA: 'Saudi Arabia',
-  KR: 'South Korea', NZ: 'New Zealand', HK: 'Hong Kong', TW: 'Taiwan', MY: 'Malaysia',
-  TH: 'Thailand', ID: 'Indonesia', PH: 'Philippines', VN: 'Vietnam',
-  NO: 'Norway', IS: 'Iceland', LU: 'Luxembourg', GR: 'Greece', SK: 'Slovakia',
-  SI: 'Slovenia', HR: 'Croatia', BG: 'Bulgaria', EE: 'Estonia', LV: 'Latvia',
-  LT: 'Lithuania', CY: 'Cyprus', MT: 'Malta', TR: 'Turkey',
-  IL: 'Israel', QA: 'Qatar', KW: 'Kuwait', BH: 'Bahrain', OM: 'Oman', ZA: 'South Africa',
-  AR: 'Argentina', CL: 'Chile', CO: 'Colombia',
-}
+// COUNTRY_NAMES moved to _country_names.js on 2026-11-13 (the require cycle
+// _locations.js would otherwise have); re-exported below so its existing
+// readers (explee-import-background.js, tests/markets_data.test.js) keep working.
+const { COUNTRY_NAMES } = require('./_country_names')
+const { geoForPrompt, loadLocationsByIds } = require('./_locations')
 
 function monthStartIso() {
   const d = new Date()
@@ -77,7 +60,11 @@ function monthStartIso() {
 }
 
 /**
- * enqueueClientCollection(supabase, opts) -> { runId, totalJobs, skipped, reason? }
+ * enqueueClientCollection(supabase, opts) -> { runId, totalJobs, skipped, reason?, transient? }
+ *
+ * transient: true is set only on a refusal caused by a failed read that says
+ * nothing about the client (today: the client_locations read). A scheduled
+ * caller retries such a refusal next hour instead of counting the cycle done.
  *
  * opts:
  *   clientId        (int, required)
@@ -87,14 +74,17 @@ function monthStartIso() {
  *                                                i.e. only a human Force Refresh is destructive.
  *   trigger         ('manual' | 'scheduled')
  *   createdBy       (uuid | null)              - auth.users.id for manual; null for cron
- *   market          ({ market_id, market_label, region_label } | null)
- *                                              - explicit geo (manual); null → resolve from client default
+ *   market          (any)                      - IGNORED since 2026-11-13. Kept in the signature
+ *                                                so an old caller does not break. Every prompt
+ *                                                is asked from its own location (prompts.location_id),
+ *                                                resolved here from ids; see step 4.
  *   activeEngines   (string[] | null)          - explicit engine set (manual); null → derive from plan
  */
 async function enqueueClientCollection(supabase, {
   clientId, force = false, trigger = 'manual', createdBy = null, market = null, activeEngines = null,
   replaceExisting = null,
 }) {
+  void market   // ignored on purpose, see the opts note above
   // Fail safe toward keeping data: anything that is not an explicit request to
   // replace, from a manual trigger, accumulates.
   const replace = replaceExisting === null
@@ -123,7 +113,7 @@ async function enqueueClientCollection(supabase, {
   // 3. Active prompts
   const { data: prompts } = await supabase
     .from('prompts')
-    .select('id, text')
+    .select('id, text, location_id')
     .eq('client_id', clientId)
     .eq('is_active', true)
     .order('position')
@@ -142,16 +132,31 @@ async function enqueueClientCollection(supabase, {
     plan:              client.plan ?? null,
   }
 
-  // 4. Geo - explicit (manual) or resolved from the client default (scheduled)
-  let market_id, market_label, region_label
-  if (market) {
-    market_id    = market.market_id ?? null
-    market_label = market.market_label ?? null
-    region_label = market.region_label ?? null
-  } else {
-    market_id    = client.default_market_id ?? null
-    market_label = market_id ? (COUNTRY_NAMES[market_id] ?? null) : null
-    region_label = null   // country-level for scheduled runs; region is a manual refinement
+  // 4. Geo, per prompt (docs/arch/multi-location-collection.md 6.1). Each
+  // prompt is asked from its own location, for manual and scheduled runs
+  // alike; the browser's market selection is not read. One read of
+  // client_locations for this client, archived rows included, and only when
+  // some prompt carries a location_id. A prompt with no location_id, or whose
+  // row is not returned, is asked as before this change: the client's default
+  // market at country level (fallbackGeo in _locations.js). Under the NOT NULL
+  // column and its FK that cannot happen in production; it keeps a fake
+  // database with no client_locations rows producing the old jobs.
+  // A failed read refuses the run before anything is deleted or written,
+  // rather than asking every prompt from the wrong place. The refusal is marked
+  // transient: a read error (timeout, pool exhaustion) says nothing about the
+  // client, so schedule-collections.js does not stamp last_refresh_at for it
+  // and the next hourly run retries, instead of the client losing a whole cycle
+  // (L1 of docs/qa/multi-location-review-server-2026-11-13.md).
+  const locationIds = prompts.map(p => p.location_id).filter(v => v != null)
+  const loc = await loadLocationsByIds(supabase, clientId, locationIds)
+  if (!loc.ok) {
+    console.error(`[Enqueue] client ${clientId}: client_locations read failed: ${loc.error}`)
+    return { runId: null, totalJobs: 0, skipped: true, reason: 'location read failed', transient: true }
+  }
+  const geoByPrompt = new Map(prompts.map(p => [p.id, geoForPrompt(p, loc.byId, client)]))
+  const unresolved = prompts.filter(p => geoByPrompt.get(p.id).location_id === null)
+  if (unresolved.length > 0) {
+    console.warn(`[Enqueue] client ${clientId}: ${unresolved.length} prompt(s) without a resolvable location, asked at the client default market (${client.default_market_id ?? 'none'}): ${unresolved.map(p => p.id).join(',')}`)
   }
 
   // 5. Decide each prompt's engine subset (force vs skip)
@@ -246,17 +251,25 @@ async function enqueueClientCollection(supabase, {
   if (runErr || !run) return { runId: null, totalJobs: 0, skipped: true, reason: `run insert failed: ${runErr?.message}` }
 
   // 7. Insert the jobs
-  const jobRows = jobPrompts.map(pid => ({
-    run_id:        run.id,
-    client_id:     clientId,
-    prompt_id:     pid,
-    prompt_text:   promptById.get(pid).text,
-    client_config: clientConfig,
-    market_id,
-    market_label,
-    region_label,
-    engines:       perPromptEngines.get(pid),
-  }))
+  // market_id, market_label, region_label are the columns the worker has always
+  // read; region_id and location_id (added 2026-11-13) carry the stamp the
+  // worker writes onto each ai_results row (packet 3).
+  const jobRows = jobPrompts.map(pid => {
+    const geo = geoByPrompt.get(pid)
+    return {
+      run_id:        run.id,
+      client_id:     clientId,
+      prompt_id:     pid,
+      prompt_text:   promptById.get(pid).text,
+      client_config: clientConfig,
+      market_id:     geo.market_id,
+      market_label:  geo.market_label,
+      region_label:  geo.region_label,
+      region_id:     geo.region_id,
+      location_id:   geo.location_id,
+      engines:       perPromptEngines.get(pid),
+    }
+  })
 
   const { error: jobsErr } = await supabase.from('collection_jobs').insert(jobRows)
   if (jobsErr) {

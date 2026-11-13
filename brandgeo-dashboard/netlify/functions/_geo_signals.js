@@ -45,6 +45,12 @@ async function gatherGeoSignals(supabase, clientId) {
   const competitors = Array.from(new Set((comps || []).map((c) => c.name).filter(Boolean)));
 
   // ── Visibility gaps: prompts checked recently where the brand rarely appears ──
+  // Locations (docs/arch/multi-location-collection.md 5.6, 2026-11-13): every
+  // prompt now belongs to one location (prompts.location_id), and every answer
+  // carries the place it was asked from. Release one deliberately POOLS all
+  // locations here: the gaps below are computed over every active prompt of
+  // the client with no location split, as they were before multi-location.
+  // A per-location gap list is a later change, not a bug in this one.
   const { data: prompts } = await supabase
     .from('prompts').select('id, text').eq('client_id', clientId).eq('is_active', true);
   const promptById = new Map((prompts || []).map((p) => [p.id, p.text]));

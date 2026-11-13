@@ -42,6 +42,8 @@ export { default as Select } from './Select'
 export type { SelectProps } from './Select'
 export { default as Combobox } from './Combobox'
 export type { ComboboxProps, ComboboxOption } from './Combobox'
+export { default as MultiCombobox } from './MultiCombobox'
+export type { MultiComboboxProps } from './MultiCombobox'
 export { default as Disclosure } from './Disclosure'
 export type { DisclosureProps } from './Disclosure'
 export {

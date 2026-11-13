@@ -176,7 +176,10 @@ async function main() {
         const a = await runScenario(oldWizard.handler, body, opts)
         const b = await runScenario(newWizard.handler, body, opts)
         assert.strictEqual(b.r.status, a.r.status, 'status code')
-        const norm = (x) => { const o = Object.assign({}, x); if (o.client_id !== undefined) o.client_id = 'ID'; if (o.user_id !== undefined) o.user_id = 'UID'; return o }
+        // locations_created (2026-11-13, multi-location 5.4) is the one key the
+        // new wizard adds to its response; it is pinned at 0 for these
+        // string-only scenarios in section 2 and compared without it here.
+        const norm = (x) => { const o = Object.assign({}, x); if (o.client_id !== undefined) o.client_id = 'ID'; if (o.user_id !== undefined) o.user_id = 'UID'; delete o.locations_created; return o }
         assert.deepStrictEqual(typeof b.r.body === 'object' ? norm(b.r.body) : b.r.body, typeof a.r.body === 'object' ? norm(a.r.body) : a.r.body, 'response body')
         assert.deepStrictEqual(sideEffects(b.db), sideEffects(a.db), 'side-effect order')
         // Every column identical except brand_aliases ...
@@ -206,8 +209,11 @@ async function main() {
   await check('success: 200, response keys, writes in order, redirect, viewer profile, 2 prompts, audit meta', async () => {
     const { r, db } = await runScenario(newWizard.handler, wizardBody(), {})
     assert.strictEqual(r.status, 200)
-    assert.deepStrictEqual(Object.keys(r.body).sort(), ['audit_logged', 'client_id', 'client_name', 'engines_enabled', 'plan', 'prompts_created', 'refresh_cadence', 'role', 'user_id'])
+    assert.deepStrictEqual(Object.keys(r.body).sort(), ['audit_logged', 'client_id', 'client_name', 'engines_enabled', 'locations_created', 'plan', 'prompts_created', 'refresh_cadence', 'role', 'user_id'])
     assert.strictEqual(r.body.plan, 'growth'); assert.strictEqual(r.body.refresh_cadence, 'weekly'); assert.strictEqual(r.body.prompts_created, 2); assert.strictEqual(r.body.audit_logged, true)
+    assert.strictEqual(r.body.locations_created, 0, 'no extra location: 0, and no add_client_locations call')
+    assert.ok(!db.calls.some((c) => c.rpc), 'no rpc at all without extra locations (S1)')
+    assert.ok(db.rows('prompts').every((p) => !('location_id' in p)), 'primary rows carry no location_id key')
     assert.deepStrictEqual(sideEffects(db), ['clients:insert', 'auth:invite', 'user_profiles:insert', 'prompts:insert', 'client_events:insert'])
     assert.deepStrictEqual(db.invites, [{ email: 'owner@acme.example', redirectTo: 'https://app.getbrandgeo.com/reset-password' }])
     const c = db.rows('clients')[0]

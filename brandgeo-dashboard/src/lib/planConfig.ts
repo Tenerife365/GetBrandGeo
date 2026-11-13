@@ -564,6 +564,20 @@ export const PLAN_PROMPTS: Record<Plan, number> = {
   managed: 200, pro: 200, enterprise: 100000,
 }
 
+/** Live locations (market and region pairs) a client may keep, per plan. Display
+ *  only: netlify/functions/_locations.js decides, and tests/locations_view.test.js
+ *  fails when the two disagree. An unknown plan gets 1, as on the server. */
+export const PLAN_LOCATION_LIMIT: Record<Plan, number> = {
+  free: 1, radar: 3, essentials: 5, growth: 5, growth_pro: 8,
+  managed: 25, pro: 25, enterprise: 100,
+}
+
+export function locationLimitFor(plan: string | null | undefined): number {
+  return typeof plan === 'string' && Object.prototype.hasOwnProperty.call(PLAN_LOCATION_LIMIT, plan)
+    ? PLAN_LOCATION_LIMIT[plan as Plan]
+    : 1
+}
+
 /** Minimum hours between manual collection runs (the Run-Collection cooldown).
  *  The button shows a live countdown until this elapses; the monthly € budget
  *  (PLAN_MONTHLY_API_BUDGET_EUR) is the separate hard cost cap. free = monthly. */

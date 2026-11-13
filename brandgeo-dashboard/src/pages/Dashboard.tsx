@@ -25,6 +25,8 @@ import {
   Button, Badge, Disclosure, SkeletonHero, SkeletonReadout, SkeletonBlock, StatusGlyph, buttonClasses,
 } from '../components/ui'
 import { formatDate } from '../lib/format'
+import { useLocations } from '../lib/locationsContext'
+import { locationScopeLine } from '../lib/locations'
 
 const DIMENSION_LABELS: [keyof AiVisibilityDimensions, string][] = [
   ['recognition', 'Recognition'], ['knowledge', 'Knowledge'], ['sentiment', 'Sentiment'],
@@ -82,6 +84,7 @@ export default function Dashboard() {
   })()
 
   const { snapshot, status, loadError, reload } = useResults()
+  const { locations, isMulti, selected } = useLocations()
   const [history, setHistory] = useState<DashboardHistoryRow[] | null>(null)
   const [historyFailed, setHistoryFailed] = useState(false)
   const [topRecs, setTopRecs]     = useState<TopRec[]>([])
@@ -121,16 +124,23 @@ export default function Dashboard() {
   // history does not, so re-read it quietly (rows stay on screen).
   useCollectionLanded(lastCompletedAt, () => { void loadHistory(true) })
 
+  // The window history is client-wide: the location filter applies by prompt id.
+  const locationPromptIds = snapshot?.locationPromptIds ?? null
+  const historyInScope = useMemo(
+    () => (history && locationPromptIds ? history.filter(r => locationPromptIds.has(r.prompt_id)) : history),
+    [history, locationPromptIds],
+  )
+
   const view = useMemo(() => snapshot
     ? buildDashboardView({
         rows: snapshot.rows,
         activePrompts: snapshot.activePrompts,
         prompts: snapshot.prompts,
         activeEngines,
-        history,
+        history: historyInScope,
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    : null, [snapshot, activeEnginesKey, history])
+    : null, [snapshot, activeEnginesKey, historyInScope])
 
   // "What to do next": reads the SAME persisted advice Recommendations.tsx
   // shows. One embedded read (the run and its recommendations together), so
@@ -209,7 +219,11 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <PageHeader title={`${greeting}, ${brandName}`} actions={refreshButton} />
+      <PageHeader
+        title={`${greeting}, ${brandName}`}
+        subtitle={isMulti ? locationScopeLine(locations.length, selected.size) : undefined}
+        actions={refreshButton}
+      />
 
       {loadError && <LoadErrorCard message="Couldn't refresh these results. What you see may be out of date." onRetry={() => reload({ quiet: true })} />}
 

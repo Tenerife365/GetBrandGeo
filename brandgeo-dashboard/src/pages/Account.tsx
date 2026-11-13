@@ -5,15 +5,23 @@
  * billing dates (started / paid-until — manual for non-Stripe Managed clients,
  * editable by admins), change-email, and a secure change-password flow.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Mail, CreditCard, KeyRound, Loader2, Check, ShieldCheck, Globe, RefreshCw, Crown, Pencil, Gift, Trash2,
+  Archive, AlertTriangle,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { PLAN_LABELS, PLAN_ORDER, featureUnlockPlan, type Plan } from '../lib/planConfig'
 import { PageTitle } from '../components/Typography'
-import { buttonClasses } from '../components/ui'
+import {
+  buttonClasses, Card, SectionHeader, Badge, Button, IconButton, Combobox, MultiCombobox, SkeletonBlock,
+} from '../components/ui'
+import { useLocations, LocationFlag } from '../lib/locationsContext'
+import { locationLabel, promptCountLabel } from '../lib/locations'
+import { MARKETS } from '../lib/markets'
+import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
 import BrandLogo from '../components/BrandLogo'
 import PromotionsPanel from '../components/PromotionsPanel'
 import McpAccessSection from '../components/McpAccessSection'
@@ -79,6 +87,278 @@ interface SubInfo {
   status?: string
   current_period_end?: number
   cancel_at_period_end?: boolean
+}
+
+/**
+ * Locations section (docs/design/multi-location-ui-2026-11-13.md section 8).
+ * Same list, add and archive as the sidebar, through useLocations only. Errors
+ * show the message the context already mapped through locationErrorMessage.
+ */
+function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin: boolean; onUpgrade?: () => void }) {
+  const { locations, limit, used, status, refresh, canEdit, add, archive, setPrimary, setSelected } = useLocations()
+  const { activeClientId, refreshClients } = useClient()
+  const [error, setError] = useState<string | null>(null)
+  const [live, setLive] = useState('')
+  const [hintId, setHintId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [pickMarket, setPickMarket] = useState<string | null>(null)
+  const [pickRegions, setPickRegions] = useState<string[]>([])
+  const rowRefs = useRef<Record<number, HTMLLIElement | null>>({})
+
+  const planLabel = PLAN_LABELS[(plan || 'free') as Plan] ?? plan
+  const finiteLimit = Number.isFinite(limit) && limit < 1000
+  const atLimit = finiteLimit && used >= limit
+  const liveKeys = new Set(locations.map(l => `${l.market_id}|${l.region_id}`))
+  const marketsLeft = MARKETS.filter(m => !m.regions.every(r => liveKeys.has(`${m.id}|${r.id}`)))
+  const pickedMarket = pickMarket ? MARKETS.find(m => m.id === pickMarket) ?? null : null
+  const slotsLeft = finiteLimit ? Math.max(0, limit - used) : 25
+  const regionMax = isAdmin ? 25 : Math.min(25, slotsLeft)
+
+  // Focus follows the inline confirm: into it on open.
+  useEffect(() => {
+    if (confirmId !== null) document.getElementById('acct-loc-confirm-btn')?.focus()
+  }, [confirmId])
+
+  const startPick = (marketId: string) => {
+    setError(null)
+    const m = MARKETS.find(x => x.id === marketId)
+    if (!m) return
+    if (m.regions.length <= 1) {
+      void (async () => {
+        setBusy(true)
+        const r = await add(m.id, ['ALL'])
+        setBusy(false)
+        if (!r.ok) setError(r.message)
+        else setLive(`${m.label} added`)   // copy: pending bg-copy
+      })()
+      return
+    }
+    setPickMarket(m.id)
+    setPickRegions(liveKeys.has(`${m.id}|ALL`) ? [] : ['ALL'])
+  }
+
+  const submitPick = async () => {
+    if (!pickedMarket || pickRegions.length === 0) return
+    setBusy(true)
+    const r = await add(pickedMarket.id, pickRegions)
+    setBusy(false)
+    if (!r.ok) { setError(r.message); return }
+    setLive(`${pickRegions.length === 1 ? '1 location' : `${pickRegions.length} locations`} added`)   // copy: pending bg-copy
+    setPickMarket(null)
+    setPickRegions([])
+  }
+
+  const doArchive = async (id: number, label: string) => {
+    // Focus goes to the next row's archive button, else the Add input, because the
+    // row that held it is about to disappear.
+    const archivable = locations.filter(l => !l.is_primary)
+    const at = archivable.findIndex(l => l.id === id)
+    const nextId = at >= 0 ? archivable[at + 1]?.id : undefined
+    setError(null)
+    setHintId(null)
+    setBusy(true)
+    const r = await archive(id)
+    setBusy(false)
+    if (!r.ok) { setError(r.message); return }
+    setLive(`${label} archived`)   // copy: pending bg-copy
+    requestAnimationFrame(() => {
+      const next = nextId !== undefined
+        ? rowRefs.current[nextId]?.querySelector<HTMLButtonElement>('button[aria-label^="Archive "]')
+        : null
+      if (next) next.focus(); else document.getElementById('acct-loc-add')?.focus()
+    })
+  }
+
+  const doMakePrimary = async (id: number, label: string) => {
+    setError(null)
+    setBusy(true)
+    const r = await setPrimary(id)
+    setBusy(false)
+    if (!r.ok) { setError(r.message); return }
+    // clients.default_market_id and default_region_id follow the primary on the server:
+    // re-read the client so the sidebar and the other pages show the new primary.
+    await refreshClients(activeClientId)
+    setConfirmId(null)
+    setLive(`${label} is now the primary location`)   // copy: pending bg-copy
+    requestAnimationFrame(() => rowRefs.current[id]?.focus())
+  }
+
+  const closeConfirm = (id: number) => {
+    setConfirmId(null)
+    requestAnimationFrame(() => document.getElementById(`acct-loc-mp-${id}`)?.focus())
+  }
+
+  return (
+    <Card pad="feature" className="mb-6">
+      <section aria-label="Locations">
+        <SectionHeader
+          title="Locations"
+          count={used}
+          description={`Where your prompts are asked from.${finiteLimit ? ` ${used} of ${limit} on ${planLabel}.` : ''}`}
+        />
+        <div className="sr-only" role="status" aria-live="polite">{live}</div>
+        {error && <p role="alert" className="m-0 mt-2 text-meta text-neg">{error}</p>}
+
+        {status === 'loading' && (
+          <ul role="list" className="mt-3 divide-y divide-line rounded-card border border-line bg-surface">
+            {[0, 1].map(i => (
+              <li key={i} className="min-h-[56px] px-4 py-3 flex items-center"><SkeletonBlock className="h-4 w-1/2" /></li>
+            ))}
+          </ul>
+        )}
+
+        {status === 'error' && (
+          <div className="mt-3 flex items-center gap-3 rounded-control border border-line p-3">
+            <AlertTriangle size={16} aria-hidden="true" className="text-warn shrink-0" />
+            <span className="text-body text-ink flex-1">Could not load locations.</span>
+            <Button variant="secondary" size="sm" onClick={() => { void refresh() }}>Retry</Button>
+          </div>
+        )}
+
+        {status === 'ready' && (
+          <>
+            <ul role="list" className="mt-3 divide-y divide-line rounded-card border border-line bg-surface">
+              {locations.map(l => {
+                const label = locationLabel(l)
+                const blocked = l.active_prompts > 0
+                return (
+                  <li
+                    key={l.id}
+                    ref={el => { rowRefs.current[l.id] = el }}
+                    tabIndex={-1}
+                    className="min-h-[56px] px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2 outline-none"
+                  >
+                    <LocationFlag marketId={l.market_id} size={16} />
+                    <span className="text-body text-ink min-w-0 truncate" title={label}>{label}</span>
+                    {l.is_primary && <Badge tone="neutral">Primary</Badge>}
+                    <span className="text-meta text-ink-2 tabular-nums">{promptCountLabel(l.active_prompts)}</span>
+                    {canEdit && !l.is_primary && (
+                      <div className="flex items-center gap-2 ml-auto">
+                        {isAdmin && (
+                          <Button
+                            id={`acct-loc-mp-${l.id}`}
+                            variant="tertiary"
+                            size="sm"
+                            aria-label={`Make ${label} the primary location`}
+                            onClick={() => { setError(null); setHintId(null); setConfirmId(l.id) }}
+                          >
+                            Make primary
+                          </Button>
+                        )}
+                        <IconButton
+                          icon={Archive}
+                          label={`Archive ${label}`}
+                          aria-disabled={blocked}
+                          disabled={busy && !blocked}
+                          onClick={() => {
+                            if (blocked) { setHintId(l.id); return }
+                            void doArchive(l.id, label)
+                          }}
+                        />
+                      </div>
+                    )}
+                    {hintId === l.id && blocked && (
+                      <p className="w-full m-0 text-meta text-ink-2">
+                        {`Archive its ${promptCountLabel(l.active_prompts)} first. A location is removed only when it is empty.`}
+                        {' '}
+                        <Link to="/prompts" onClick={() => setSelected([l.id])} className="text-accent-ink underline">Open prompts</Link>
+                      </p>
+                    )}
+                    {confirmId === l.id && (
+                      <div
+                        role="group"
+                        aria-label={`Make ${label} the primary location`}
+                        className="w-full mt-1 rounded-control bg-surface-2 border border-line p-3 space-y-2"
+                        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); closeConfirm(l.id) } }}
+                      >
+                        <p className="m-0 text-body text-ink">
+                          {`New prompts will be asked from ${label} by default. Existing prompts keep their location.`}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button id="acct-loc-confirm-btn" variant="primary" size="sm" loading={busy} onClick={() => { void doMakePrimary(l.id, label) }}>
+                            Make primary
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => closeConfirm(l.id)}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+
+            {isDemoMode && <p className="m-0 mt-3 text-meta text-ink-3">Not available in the demo</p>}
+
+            {canEdit && (
+              <div className="mt-4 space-y-2">
+                {atLimit && !isAdmin ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="m-0 text-meta text-ink-2">{`Location limit reached on ${planLabel}.`}</p>
+                    {onUpgrade && <Button variant="secondary" size="sm" onClick={onUpgrade}>Upgrade</Button>}
+                  </div>
+                ) : (
+                  <>
+                    {atLimit && isAdmin && (
+                      <p className="m-0 text-meta text-ink-2">{`${used} of ${limit} on ${planLabel}. Admin can add more.`}</p>
+                    )}
+                    {pickedMarket ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-meta text-ink-2">
+                          <LocationFlag marketId={pickedMarket.id} size={16} />
+                          <span>{pickedMarket.label}</span>
+                        </div>
+                        <MultiCombobox
+                          size="md"
+                          options={buildRegionOptions(pickedMarket)}
+                          values={pickRegions}
+                          onChange={setPickRegions}
+                          ariaLabel={`Regions in ${pickedMarket.label}`}
+                          placeholder="Pick regions"
+                          exclusiveValue="ALL"
+                          disabledReasons={Object.fromEntries(
+                            pickedMarket.regions.filter(r => liveKeys.has(`${pickedMarket.id}|${r.id}`)).map(r => [r.id, 'Added']),
+                          )}
+                          maxSelected={regionMax}
+                          maxReason="Limit reached"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            loading={busy}
+                            disabled={pickRegions.length === 0}
+                            onClick={() => { void submitPick() }}
+                          >
+                            {pickRegions.length > 1 ? `Add ${pickRegions.length}` : 'Add'}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => { setPickMarket(null); setPickRegions([]) }}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <label htmlFor="acct-loc-add" className="block text-meta text-ink-2">Add a location</label>
+                        <Combobox
+                          id="acct-loc-add"
+                          size="md"
+                          clearOnSelect
+                          options={buildMarketOptions(marketsLeft)}
+                          value={null}
+                          onChange={startPick}
+                          ariaLabel="Add a location"
+                          placeholder="Type a country"
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    </Card>
+  )
 }
 
 export default function Account() {
@@ -550,6 +830,13 @@ export default function Account() {
           </p>
         )}
       </div>
+
+      {/* Locations (docs/design/multi-location-ui-2026-11-13.md section 8). */}
+      <LocationsSection
+        plan={activeClient?.plan ?? 'free'}
+        isAdmin={isAdmin}
+        onUpgrade={currentIdx >= 0 && displayedTiers[currentIdx + 1] ? () => upgradeTo(displayedTiers[currentIdx + 1]) : undefined}
+      />
 
       {/* MCP access (docs/arch/mcp-access.md section 7.2). Placed after the plan
           blocks. Visible to an admin for any client, and to a viewer for their

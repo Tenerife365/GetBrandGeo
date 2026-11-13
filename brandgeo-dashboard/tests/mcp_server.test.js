@@ -70,13 +70,23 @@ function issueKey(clientId, { createdBy = VIEWER, revoked = false, rowClientId =
   return { secret, row }
 }
 
+// Locations (2026-11-13): prompt 1 is asked from 11 (US / NYC), prompt 2 from
+// 12 (WW / ALL), prompt 3 from 13 (US / AUS, a research region id not in
+// markets.ts), prompt 4 carries 21, a location of client 2, which the
+// client_id filter never returns, so its location reads null.
 db.seed('prompts', [
-  { id: 1, client_id: 1, text: 'best alpha tool', category: 'general', is_active: true, position: 1 },
-  { id: 2, client_id: 1, text: 'alpha vs beta', category: 'general', is_active: true, position: 2 },
-  { id: 3, client_id: 1, text: 'alpha pricing', category: 'general', is_active: true, position: 3 },
-  { id: 4, client_id: 1, text: 'retired prompt', category: 'general', is_active: false, position: 4 },
-  { id: 5, client_id: 2, text: 'bravo secret prompt', category: 'general', is_active: true, position: 1 },
-  { id: 6, client_id: 2, text: 'bravo other', category: 'general', is_active: true, position: 2 },
+  { id: 1, client_id: 1, text: 'best alpha tool', category: 'general', is_active: true, position: 1, location_id: 11 },
+  { id: 2, client_id: 1, text: 'alpha vs beta', category: 'general', is_active: true, position: 2, location_id: 12 },
+  { id: 3, client_id: 1, text: 'alpha pricing', category: 'general', is_active: true, position: 3, location_id: 13 },
+  { id: 4, client_id: 1, text: 'retired prompt', category: 'general', is_active: false, position: 4, location_id: 21 },
+  { id: 5, client_id: 2, text: 'bravo secret prompt', category: 'general', is_active: true, position: 1, location_id: 21 },
+  { id: 6, client_id: 2, text: 'bravo other', category: 'general', is_active: true, position: 2, location_id: 21 },
+])
+db.seed('client_locations', [
+  { id: 11, client_id: 1, market_id: 'US', region_id: 'NYC', is_primary: false, position: 1, archived_at: null },
+  { id: 12, client_id: 1, market_id: 'WW', region_id: 'ALL', is_primary: true, position: 0, archived_at: null },
+  { id: 13, client_id: 1, market_id: 'US', region_id: 'AUS', is_primary: false, position: 2, archived_at: null },
+  { id: 21, client_id: 2, market_id: 'DE', region_id: 'BE', is_primary: true, position: 0, archived_at: null },
 ])
 const r = (o) => Object.assign({ status: 'ok', brand_position: null, sentiment: 'neutral', response_snippet: 'answer', competitors_mentioned: '[]' }, o)
 db.seed('ai_results', [
@@ -419,6 +429,22 @@ async function main() {
   assert.notStrictEqual(pp.results[0].engine, pp2.results[0].engine)
   ok('get_prompt_results keyset cursor pages without overlap')
 
+  // One location per prompt (docs/arch/multi-location-collection.md 5.5).
+  const usLabel = require(path.join(__dirname, '..', 'src', 'lib', 'markets.ts')).MARKETS.find((m) => m.id === 'US').label
+  lp = await toolOk('list_prompts', { active_only: false }, KA.secret)
+  assert.deepStrictEqual(lp.prompts.map((p) => [p.id, p.location]), [
+    [1, { id: 11, market_id: 'US', region_id: 'NYC', label: `${usLabel} · New York` }],
+    [2, { id: 12, market_id: 'WW', region_id: 'ALL', label: 'Worldwide' }],
+    [3, { id: 13, market_id: 'US', region_id: 'AUS', label: `${usLabel} (AUS)` }],
+    [4, null],
+  ])
+  const prLoc = await toolOk('get_prompt_results', { prompt_id: 1 })
+  assert.deepStrictEqual(prLoc.prompt.location, { id: 11, market_id: 'US', region_id: 'NYC', label: `${usLabel} · New York` })
+  assert.strictEqual((await toolOk('get_prompt_results', { prompt_id: 4 })).prompt.location, null)
+  const lpB = await toolOk('list_prompts', {}, KB.secret)
+  assert.ok(lpB.prompts.every((p) => p.location && p.location.id === 21 && p.location.label === 'Germany · Berlin'), JSON.stringify(lpB.prompts))
+  ok('list_prompts and get_prompt_results carry location { id, market_id, region_id, label } per prompt; an unknown research region reads "Market (ID)"; another client\'s location id reads null; no new input')
+
   section('9. scan ceiling')
   const small = { ...HIGH, scanPage: 2, scanCeiling: 2 }
   const tr = await toolOk('get_visibility_summary', {}, KA.secret, { config: small })
@@ -668,10 +694,16 @@ async function main() {
     { id: 203, client_id: 61, text: 'affordable portrait studio', category: 'general', is_active: true, position: 3 },
     { id: 204, client_id: 61, text: 'studio rental with lighting', category: 'general', is_active: true, position: 4 },
     { id: 205, client_id: 61, text: 'wedding photo studio near me', category: 'general', is_active: true, position: 5 },
-    { id: 206, client_id: 61, text: 'headshot studio for teams', category: 'general', is_active: true, position: 6 },
+    { id: 206, client_id: 61, text: 'headshot studio for teams', category: 'general', is_active: true, position: 6, location_id: 611 },
     { id: 207, client_id: 61, text: 'retired studio question', category: 'general', is_active: false, position: 7 },
     { id: 301, client_id: 62, text: 'quill pens online', category: 'general', is_active: true, position: 1 },
     { id: 302, client_id: 62, text: 'best quill brand', category: 'general', is_active: true, position: 2 },
+  ])
+  // 2026-11-13: prompt 206 is asked from Berlin (611); the others carry no
+  // location here, so their fixes keep the client's default market (RO).
+  fdb.seed('client_locations', [
+    { id: 610, client_id: 61, market_id: 'RO', region_id: 'ALL', is_primary: true, position: 0, archived_at: null },
+    { id: 611, client_id: 61, market_id: 'DE', region_id: 'BE', is_primary: false, position: 1, archived_at: null },
   ])
   const NW = (pos) => ({ name: 'Northwind Atelier', pos })
   const HP = (pos) => ({ name: 'Harbor Pine Imaging', pos })
@@ -736,9 +768,23 @@ async function main() {
     const states = new Map(fdb.rows('fix_states').filter((x) => x.client_id === clientId).map((x) => [x.fix_id, x]))
     const items = fixItemsLib.buildFixItems({ brandName: client.name, engines, prompts, results: built.results, errorEngines: built.errorEngines, stateOf: (id) => states.get(id)?.status })
     const market = marketsLib.MARKETS.find((m) => m.id === client.default_market_id)?.label ?? null
+    // 2026-11-13: a prompt_gap fix names its prompt's location (market label,
+    // then the region label unless ALL); every other fix the default market.
+    const locLabel = (pid) => {
+      const p = fdb.rows('prompts').find((x) => x.id === pid && x.client_id === clientId)
+      const l = p && fdb.rows('client_locations').find((x) => x.id === p.location_id && x.client_id === clientId)
+      if (!l) return null
+      const mk = marketsLib.MARKETS.find((m) => m.id === l.market_id)
+      if (l.region_id === 'ALL') return mk.label
+      return `${mk.label} · ${mk.regions.find((r) => r.id === l.region_id).label}`
+    }
+    const marketFor = (item) => {
+      const m = /^prompt_gap:(\d+)$/.exec(item.id)
+      return (m && locLabel(Number(m[1]))) || market
+    }
     const promptFor = (item) => fixPromptLib.buildFixPrompt(
       { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
-      { brandName: client.name, website: client.brand_website ?? null, market, engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results: built.results },
+      { brandName: client.name, website: client.brand_website ?? null, market: marketFor(item), engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results: built.results },
     ) ?? item.fix
     const open = items.filter((i) => fixStatesLib.isOpenState(states.get(i.id)?.status))
     return { items, open, promptFor, results: built.results, promptIds: prompts.map((p) => p.id), engineIds, states }
@@ -765,6 +811,10 @@ async function main() {
     if (got.fix_id.includes(':')) assert.ok(!got.prompt.includes(got.fix_id), `the fix id ${got.fix_id} appears inside the prompt text`)
   }
   assert.ok(L.open.find((x) => x.fix_id === 'engine_missing:chatgpt').prompt.includes('Romania'), 'market label from markets.ts by default_market_id')
+  const gap206 = L.open.find((x) => x.fix_id === 'prompt_gap:206').prompt
+  assert.ok(gap206.includes('- Market: Germany · Berlin'), 'a prompt_gap fix names its prompt\'s location: ' + gap206)
+  assert.ok(!gap206.includes('- Market: Romania'), 'not the default market')
+  ok('fix prompt text: a prompt_gap fix passes its prompt\'s location label to buildFixPrompt; other fixes keep the default market')
   ok(`list_fixes: ${L.open.length} open fixes with the same ids, order, priority, title, summary, fix and byte-identical prompt text as buildFixResultMap + buildFixItems + buildFixPrompt on the same rows`)
   const reo = L.open.find((x) => x.fix_id === 'prompt_gap:206')
   assert.strictEqual(reo.status, 'reopened')

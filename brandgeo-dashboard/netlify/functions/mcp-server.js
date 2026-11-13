@@ -407,21 +407,67 @@ async function toolVisibilitySummary(ctx, args) {
   }
 }
 
+// ──ch/multi-location-collection.md 5.5, 2026-11-13) ───────
+// Each prompt belongs to one location of public.client_locations. The prompt
+// tools report it; the metric tools keep merging every location, as they
+// merge every prompt.
+
+/**
+ * The display label of a location: the market label from markets.ts, plus the
+ * region label unless the region is ALL; a region id not in markets.ts (the
+ * research workspaces) reads "Market (ID)", an unknown market the raw id. The
+ * same rule as locationLabel in src/lib/locations.ts (written in parallel by
+ * packet 4 and not required here, so this file does not depend on a module
+ * that is still being edited); never throws.
+ */
+function locationLabelOf(marketId, regionId) {
+  const m = String(marketId ?? '')
+  const rg = String(regionId ?? '')
+  const market = MARKETS.find((x) => x.id === m)
+  if (!market) return m
+  if (rg === 'ALL' || rg === '') return market.label
+  const region = market.regions.find((x) => x.id === rg)
+  if (region) return `${market.label} · ${region.label}`
+  return `${market.label} (${rg})`
+}
+
+/**
+ * One read of the client's client_locations (archived rows included: a
+ * prompt keeps the location it was created with), keyed by id. The client_id
+ * filter means another client's location is never returned.
+ */
+async function locationsOfClient(sb, clientId) {
+  const { data, error } = await sb.from('client_locations').select('id, market_id, region_id').eq('client_id', clientId)
+  if (error) throw error
+  const m = new Map()
+  for (const l of data || []) m.set(Number(l.id), l)
+  return m
+}
+
+/** { id, market_id, region_id, label } of a prompt's location, or null when it has none on this account. */
+function promptLocation(locs, locationId) {
+  if (locationId === null || locationId === undefined) return null
+  const l = locs.get(Number(locationId))
+  if (!l) return null
+  return { id: Number(l.id), market_id: l.market_id, region_id: l.region_id, label: locationLabelOf(l.market_id, l.region_id) }
+}
+
 async function toolListPrompts(ctx, args) {
   const { sb, clientId, nowIso } = ctx
   const activeOnly = boolArg(args, 'active_only', true)
   const limit = intArg(args, 'limit', { min: 1, max: 200, def: 200 })
   const cursorId = decodeCursor(args.cursor)
-  let q = sb.from('prompts').select('id, text, category, is_active, position').eq('client_id', clientId)
+  let q = sb.from('prompts').select('id, text, category, is_active, position, location_id').eq('client_id', clientId)
   if (activeOnly) q = q.eq('is_active', true)
   if (cursorId !== null) q = q.gt('id', cursorId)
   const { data, error } = await q.order('id', { ascending: true }).limit(limit + 1)
   if (error) throw error
   const page = (data || []).slice(0, limit)
+  const locs = await locationsOfClient(sb, clientId)
   return {
     client_id: clientId,
     generated_at: nowIso,
-    prompts: page.map((p) => ({ id: p.id, text: p.text, category: p.category ?? null, is_active: p.is_active !== false, position: p.position ?? null })),
+    prompts: page.map((p) => ({ id: p.id, text: p.text, category: p.category ?? null, is_active: p.is_active !== false, position: p.position ?? null, location: promptLocation(locs, p.location_id) })),
     next_cursor: (data || []).length > limit ? encodeCursor(page[page.length - 1].id) : null,
   }
 }
@@ -435,9 +481,10 @@ async function toolPromptResults(ctx, args) {
   const cursorId = decodeCursor(args.cursor)
   const win = windowFor(days, nowMs)
 
-  const p = await sb.from('prompts').select('id, text, category, is_active').eq('id', pid).eq('client_id', clientId).maybeSingle()
+  const p = await sb.from('prompts').select('id, text, category, is_active, location_id').eq('id', pid).eq('client_id', clientId).maybeSingle()
   if (p.error) throw p.error
   if (!p.data) throw new ToolInputError('No prompt with that id on this account.')
+  const locs = await locationsOfClient(sb, clientId)
 
   let q = sb.from('ai_results')
     .select('id, llm, brand_mentioned, brand_position, sentiment, response_snippet, competitors_mentioned, checked_at')
@@ -451,7 +498,7 @@ async function toolPromptResults(ctx, args) {
   return {
     client_id: clientId,
     generated_at: nowIso,
-    prompt: { id: p.data.id, text: p.data.text, category: p.data.category ?? null, is_active: p.data.is_active !== false },
+    prompt: { id: p.data.id, text: p.data.text, category: p.data.category ?? null, is_active: p.data.is_active !== false, location: promptLocation(locs, p.data.location_id) },
     window: { ...win, effective_from: win.from },
     results: page.filter((r) => eng.has(r.llm)).map((r) => ({
       engine: r.llm,
@@ -577,11 +624,11 @@ async function activePrompts(sb, cfg, clientId) {
   let last = null
   const page = Math.min(1000, cfg.promptIdCeiling)
   while (out.length < cfg.promptIdCeiling) {
-    let q = sb.from('prompts').select('id, text, position').eq('client_id', clientId).eq('is_active', true)
+    let q = sb.from('prompts').select('id, text, position, location_id').eq('client_id', clientId).eq('is_active', true)
     if (last !== null) q = q.gt('id', last)
     const { data, error } = await q.order('id', { ascending: true }).limit(page)
     if (error) throw error
-    for (const p of data || []) out.push({ id: Number(p.id), text: typeof p.text === 'string' ? p.text : '', position: Number(p.position ?? 0) })
+    for (const p of data || []) out.push({ id: Number(p.id), text: typeof p.text === 'string' ? p.text : '', position: Number(p.position ?? 0), locationId: p.location_id ?? null })
     if (!data || data.length < page) break
     last = data[data.length - 1].id
   }
@@ -630,6 +677,17 @@ async function loadFixContext(ctx, { withResults = true } = {}) {
   const brandName = client.name ?? 'your brand'
   const marketRow = MARKETS.find((m) => m.id === client.default_market_id)
   const market = marketRow ? marketRow.label : null
+  // A fix tied to one prompt (prompt_gap:<id>) names that prompt's location
+  // (docs/arch/multi-location-collection.md 5.5); every other fix keeps the
+  // client's default market, which mirrors the primary location. One read.
+  const locs = await locationsOfClient(sb, clientId)
+  const marketFor = (item) => {
+    const m = /^prompt_gap:(\d+)$/.exec(String(item.id))
+    if (!m) return market
+    const p = prompts.find((x) => x.id === Number(m[1]))
+    const loc = p ? promptLocation(locs, p.locationId) : null
+    return loc ? loc.label : market
+  }
   const promptIds = prompts.map((p) => p.id)
   const promptTextOf = (pid) => { const p = prompts.find((x) => x.id === pid); return p ? p.text : undefined }
   const items = withResults ? buildFixItems({
@@ -642,7 +700,7 @@ async function loadFixContext(ctx, { withResults = true } = {}) {
   }) : []
   const promptFor = (item) => buildFixPrompt(
     { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
-    { brandName, website: client.brand_website ?? null, market, engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results },
+    { brandName, website: client.brand_website ?? null, market: marketFor(item), engines, prompts: prompts.map((p) => ({ id: p.id, text: p.text })), results },
   ) ?? item.fix
   return { engineIds, engines, prompts, promptIds, states, results, truncated, items, promptFor, labelOf, promptTextOf }
 }
@@ -816,6 +874,8 @@ const HEAD = { client_id: T.int, generated_at: T.str }
 const ANNOTATIONS = { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 const N_OBJ = (properties) => ({ type: ['object', 'null'], properties })
+// The location a prompt is asked from; null when the prompt has none on this account.
+const LOCATION_OUT = N_OBJ({ id: T.int, market_id: T.str, region_id: T.str, label: T.str })
 
 const TOOLS = [
   {
@@ -866,7 +926,7 @@ const TOOLS = [
     },
     outputSchema: obj({
       ...HEAD,
-      prompts: arr(obj({ id: T.int, text: T.str, category: T.nStr, is_active: T.bool, position: T.nInt })),
+      prompts: arr(obj({ id: T.int, text: T.str, category: T.nStr, is_active: T.bool, position: T.nInt, location: LOCATION_OUT })),
       next_cursor: T.nStr,
     }),
     run: toolListPrompts,
@@ -888,7 +948,7 @@ const TOOLS = [
     },
     outputSchema: obj({
       ...HEAD,
-      prompt: obj({ id: T.int, text: T.str, category: T.nStr, is_active: T.bool }),
+      prompt: obj({ id: T.int, text: T.str, category: T.nStr, is_active: T.bool, location: LOCATION_OUT }),
       window: WINDOW_OUT,
       results: arr(obj({
         engine: T.str, label: T.str, checked_at: T.nStr, mentioned: T.bool, position: T.nNum,

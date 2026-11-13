@@ -9,8 +9,12 @@
  *
  * POST body:
  *   { client_id, force?, markets?, active_engines? }
- *     markets — the browser's MarketSelection[]; markets[0] is the primary geo.
- *     active_engines — the client's plan-active engine ids (browser-computed).
+ *     client_id: a positive int4.
+ *     markets: ACCEPTED AND IGNORED since 2026-11-13 (an old tab must not
+ *       400). Every prompt is asked from its own location, resolved on the
+ *       server in _enqueue.js (docs/arch/multi-location-collection.md 6.1).
+ *     active_engines: the client's plan-active engine ids (browser-computed,
+ *       re-gated against the plan in _enqueue.js).
  *
  * Returns: { run_id, total_jobs, skipped, reason? }
  */
@@ -27,6 +31,16 @@ function effectiveForceFor(role, force) {
   return role === 'admin' && force === true
 }
 
+// clients.id is int4: a positive integer (or its plain decimal string) up to
+// 2147483647, nothing else. Same rule as parseId in collect-prompt.js.
+const PG_INT_MAX = 2147483647
+function parseId(v) {
+  let n = null
+  if (typeof v === 'number') n = v
+  else if (typeof v === 'string' && /^[1-9][0-9]*$/.test(v)) n = Number(v)
+  return Number.isSafeInteger(n) && n > 0 && n <= PG_INT_MAX ? n : null
+}
+
 exports.handler = async (event) => {
   const auth = await requireAuth(event)
   if (auth.response) return auth.response
@@ -38,8 +52,18 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: auth.headers, body: 'Invalid JSON' }
   }
 
-  const { client_id, force = false, markets, active_engines } = body
-  if (!client_id) return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing client_id' }) }
+  // The body must be a JSON object; null, an array or a scalar is refused
+  // before anything is read.
+  if (!body || typeof body !== 'object' || Array.isArray(body))
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid body' }) }
+
+  // body.markets is read by nothing (see the header): geo is per prompt.
+  const { client_id: rawClientId, force = false, active_engines } = body
+  if (rawClientId === undefined || rawClientId === null || rawClientId === '')
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Missing client_id' }) }
+  const client_id = parseId(rawClientId)
+  if (client_id === null)
+    return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid client_id' }) }
 
   // Ownership — viewers may only enqueue for their own client
   if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
@@ -72,20 +96,14 @@ exports.handler = async (event) => {
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-  // Resolve primary geo from the browser's MarketSelection[].
-  const primary = Array.isArray(markets) && markets.length > 0 ? markets[0] : null
-  const market = primary ? {
-    market_id:    primary.market?.id ?? null,
-    market_label: primary.market?.label ?? null,
-    region_label: primary.region?.label ?? null,
-  } : null
-
+  // market: null. Geo is resolved per prompt from prompts.location_id inside
+  // _enqueue.js; browser labels never reach the engines.
   const result = await enqueueClientCollection(supabase, {
     clientId:      client_id,
     force:         effectiveForce,
     trigger:       'manual',
     createdBy:     auth.user.id,
-    market,
+    market:        null,
     activeEngines: Array.isArray(active_engines) && active_engines.length > 0 ? active_engines : null,
   })
 

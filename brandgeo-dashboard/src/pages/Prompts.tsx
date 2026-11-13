@@ -9,9 +9,12 @@ import { categorizePrompt, promptCategoryLabel } from '../lib/promptCategories'
 import RouteSkeleton from '../components/RouteSkeleton'
 import AllowanceMeter from '../components/AllowanceMeter'
 import EmptyState from '../components/EmptyState'
-import { Page, PageHeader, Button, IconButton, Badge, Chip, ChipGroup, Notice, Card, DataList } from '../components/ui'
+import { Page, PageHeader, Button, IconButton, Badge, Chip, ChipGroup, Notice, Card, DataList, MultiCombobox } from '../components/ui'
+import type { ComboboxOption } from '../components/ui'
 import { removalMode, removalVerb, removalConfirm, removalFailure, removalWrite } from '../lib/promptRemoval'
 import { PLAN_PROMPTS, PLAN_LABELS, type Plan } from '../lib/planConfig'
+import { useLocations, LocationFlag, LOCATION_CHIP_MAX } from '../lib/locationsContext'
+import { locationLabel, filterPromptsByLocation, promptLocationId, promptCountLabel } from '../lib/locations'
 
 // Category is a grouping, not an alert: one quiet neutral Badge everywhere, and
 // the label comes from the shared general taxonomy (lib/promptCategories.ts).
@@ -70,6 +73,13 @@ export default function Prompts() {
   const [showAdd, setShowAdd] = useState(false)
   const [newText, setNewText] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Multi-location: one country per prompt. The view filter is the global one
+  // from useLocations (no second, local filter on this page).
+  const { locations, primary, isMulti, selected, setSelected, refresh } = useLocations()
+  const [askIn, setAskIn] = useState<string[]>([])
+  const [discoverAskIn, setDiscoverAskIn] = useState<string[]>([])
+  const [announce, setAnnounce] = useState('')
 
   const [showDiscover, setShowDiscover] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -137,6 +147,7 @@ export default function Prompts() {
       const jsonMatch = content.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
+        setDiscoverAskIn(defaultAskIn())
         setSuggestions(parsed.map(p => ({
           text: p.text,
           added: prompts.some(existing => existing.text === p.text),
@@ -197,7 +208,41 @@ export default function Prompts() {
   const remaining = cap === null ? Infinity : Math.max(0, cap - used)
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages, suggestions])
 
-  const filtered = filterCat === 'all' ? prompts : prompts.filter(p => p.category === filterCat)
+  // ── Locations ───────────────────────────────────────────────────────────────
+  const primaryId = primary?.id ?? null
+  const locationById = new Map(locations.map(l => [l.id, l] as const))
+  const locationOptions: ComboboxOption[] = locations.map(l => ({
+    value: String(l.id),
+    label: locationLabel(l),
+    keywords: [l.market_id],
+    icon: <LocationFlag marketId={l.market_id} size={16} />,
+  }))
+  const liveIds = new Set(locations.map(l => String(l.id)))
+  const askInValid = askIn.filter(v => liveIds.has(v))
+  const discoverAskInValid = discoverAskIn.filter(v => liveIds.has(v))
+  const discoverNeedsLocation = isMulti && discoverAskInValid.length === 0
+  // A viewer cannot pick more locations than the plan has prompts left.
+  const limitK = !isAdmin && Number.isFinite(remaining) ? remaining : undefined
+  const defaultAskIn = (): string[] => {
+    const base = selected.size > 0
+      ? locations.filter(l => selected.has(l.id)).map(l => String(l.id))
+      : primary ? [String(primary.id)] : []
+    return limitK !== undefined ? base.slice(0, limitK) : base
+  }
+  const openAdd = () => { setAskIn(defaultAskIn()); setShowAdd(true) }
+  const toggleLocationFilter = (id: number) => {
+    if (selected.size === 0) { setSelected([id]); return }
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelected(next)
+  }
+  const countAt = (id: number) => prompts.filter(p => promptLocationId(p, primaryId) === id).length
+  const selectedLocations = locations.filter(l => selected.has(l.id))
+
+  const locFiltered = filterPromptsByLocation(prompts, selected, primaryId)
+  const catPresent = filterCat === 'all' || locFiltered.some(p => p.category === filterCat)
+  const activeCat = catPresent ? filterCat : 'all'
+  const filtered = activeCat === 'all' ? locFiltered : locFiltered.filter(p => p.category === activeCat)
 
   const startEdit = (p: Prompt) => { setEditId(p.id); setEditText(p.text) }
 
@@ -254,16 +299,24 @@ export default function Prompts() {
     }
     setPrompts(prev => prev.filter(p => p.id !== id))
     clearNotice()   // a deletion is what unblocks a capped client
+    void refresh()
   }
 
-  const addPrompt = async (text?: string): Promise<boolean> => {
+  const addPrompt = async (text?: string, locIdsArg?: number[]): Promise<boolean> => {
     const promptText = (text ?? newText).trim()
     if (!promptText) return false
+    // One country per prompt: K chosen locations make K prompts in one insert.
+    // A client with one location never sends location_id (the trigger fills the
+    // primary). A multi client always sends it, even for one chosen location,
+    // because omitting it would silently place the prompt in the primary.
+    const locIds = isMulti ? (locIdsArg ?? askInValid.map(Number)) : []
+    if (isMulti && locIds.length === 0) return false
+    const k = Math.max(1, locIds.length)
     // Client-side check is a courtesy, not the limit — the real one is the
     // enforce_prompt_cap() trigger, which is why the insert error below is
     // handled rather than assumed away.
-    if (capBlocks) {
-      showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`)
+    if (!isAdmin && cap !== null && remaining < k) {
+      showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`)   // copy: pending bg-copy
       return false
     }
     // Category is auto-assigned from the prompt text (general taxonomy), not
@@ -273,12 +326,26 @@ export default function Prompts() {
     setSaving(true)
     const position = prompts.length + 1
     if (!isDemoMode) {
+      const rows = Array.from({ length: k }, (_, i) => ({
+        text: promptText,
+        category: cat,
+        position: position + i,
+        client_id: activeClientId,
+        ...(isMulti ? { location_id: locIds[i] } : {}),
+      }))
       const { data, error } = await supabase
         .from('prompts')
-        .insert({ text: promptText, category: cat, position, client_id: activeClientId })
+        .insert(rows)
         .select()
-        .single()
       if (error) {
+        if (error.message.includes('location_archived') || error.message.includes('location_invalid')) {
+          showNotice(error.message.includes('location_archived')
+            ? 'One of those locations was archived. Pick again.'            // copy: pending bg-copy
+            : 'That location is not on this account. Pick again.')          // copy: pending bg-copy
+          void refresh()
+          setSaving(false)
+          return false
+        }
         // The trigger raises with this token when the plan cap is hit. Anything
         // else is a real failure and is shown verbatim rather than swallowed —
         // this insert used to discard its error entirely, so a rejected write
@@ -296,18 +363,21 @@ export default function Prompts() {
         setSaving(false)
         return false
       }
-      if (data) setPrompts(prev => [...prev, data])
+      if (data) setPrompts(prev => [...prev, ...(data as Prompt[])])
+      // Location prompt counts changed: re-read the list.
+      void refresh()
     } else {
       setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
     clearNotice()
+    if (k > 1) setAnnounce(`Added in ${k} locations`)   // copy: pending bg-copy
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
     return true
   }
 
   const addSuggestion = async (s: SuggestedPrompt, idx: number) => {
-    const ok = await addPrompt(s.text)
+    const ok = await addPrompt(s.text, discoverAskInValid.map(Number))
     if (ok) setSuggestions(prev => prev.map((p, i) => i === idx ? { ...p, added: true } : p))
   }
 
@@ -317,10 +387,12 @@ export default function Prompts() {
       // Take only what fits. Without this, "Add all" on a 12-prompt suggestion
       // list for a Free tenant fires 12 inserts, 7 of which the trigger rejects,
       // and the user gets seven identical error messages for one action.
-      .slice(0, isAdmin ? undefined : remaining)
+      // Each suggestion makes one prompt per chosen location, so a viewer gets
+      // floor(remaining / K) of them.
+      .slice(0, isAdmin ? undefined : Math.floor(remaining / Math.max(1, isMulti ? discoverAskInValid.length : 1)))
     const addedText = new Set<string>()
     for (const s of toAdd) {
-      if (await addPrompt(s.text)) addedText.add(s.text)
+      if (await addPrompt(s.text, discoverAskInValid.map(Number))) addedText.add(s.text)
     }
     setSuggestions(prev => prev.map(s => (addedText.has(s.text) ? { ...s, added: true } : s)))
   }
@@ -369,6 +441,7 @@ export default function Prompts() {
       const jsonMatch = content.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         const parsed: SuggestedPrompt[] = JSON.parse(jsonMatch[0])
+        setDiscoverAskIn(defaultAskIn())
         setSuggestions(parsed.map(p => ({
           text: p.text,
           added: prompts.some(existing => existing.text === p.text),
@@ -389,9 +462,9 @@ export default function Prompts() {
   }
 
   // Derive filter categories dynamically from actual prompts (works for any client)
-  const usedCategories = [...new Set(prompts.map(p => p.category))]
+  const usedCategories = [...new Set(locFiltered.map(p => p.category))]
   const catCounts = usedCategories.reduce((acc, cat) => {
-    acc[cat] = prompts.filter(p => p.category === cat).length
+    acc[cat] = locFiltered.filter(p => p.category === cat).length
     return acc
   }, {} as Record<string, number>)
 
@@ -402,11 +475,31 @@ export default function Prompts() {
   const inputClass = 'w-full h-10 bg-surface-2 border border-edge rounded-control px-3 text-body text-ink placeholder:text-ink-3 focus:border-accent-ink disabled:opacity-60'
   const shortText = (text: string) => (text.length > 40 ? text.slice(0, 40) + '…' : text)
 
+  const showLocBadge = isMulti && selected.size !== 1
+  const locationLabelOf = (p: Prompt) => {
+    const l = locationById.get(promptLocationId(p, primaryId) ?? -1)
+    return l ? locationLabel(l) : 'an archived location'   // copy: pending bg-copy
+  }
+  const locBadge = (p: Prompt, cls: string) => {
+    const l = locationById.get(promptLocationId(p, primaryId) ?? -1)
+    if (!l) return null
+    const label = locationLabel(l)
+    return (
+      <Badge tone="neutral" className={cls} glyph={<LocationFlag marketId={l.market_id} size={12} />}>
+        <span className="truncate" title={label}>{label}</span>
+      </Badge>
+    )
+  }
+  const locSubtitle = selected.size === 1
+    ? `${promptCountLabel(locFiltered.length)} in ${selectedLocations.map(locationLabel).join('')}`   // copy: pending bg-copy
+    : `${promptCountLabel(locFiltered.length)} in ${selected.size} locations`                           // copy: pending bg-copy
+
   return (
     <Page>
+      <div className="sr-only" role="status" aria-live="polite">{announce}</div>
       <PageHeader
         title={t.pr_title}
-        subtitle={showMeter ? undefined : fmt(t.pr_titleCount, { n: used })}
+        subtitle={showMeter ? undefined : (isMulti && selected.size > 0 ? locSubtitle : fmt(t.pr_titleCount, { n: used }))}
         actions={
           <>
             {showMeter && cap !== null && (
@@ -430,7 +523,7 @@ export default function Prompts() {
               icon={capBlocks ? Lock : Plus}
               aria-disabled={capBlocks}
               title={capBlocks ? `Plan limit reached (${cap} prompts)` : undefined}
-              onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`) : setShowAdd(true))}
+              onClick={() => (capBlocks ? showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`) : openAdd())}
             >
               {t.pr_addPrompt}
             </Button>
@@ -462,11 +555,32 @@ export default function Prompts() {
           </Notice>
         )}
 
+        {isMulti && (locations.length <= LOCATION_CHIP_MAX ? (
+          <ChipGroup label="Location">
+            <Chip selected={selected.size === 0} count={prompts.length} onClick={() => setSelected([])}>All</Chip>
+            {locations.map(l => (
+              <Chip key={l.id} selected={selected.has(l.id)} count={countAt(l.id)} onClick={() => toggleLocationFilter(l.id)}>
+                {locationLabel(l)}
+              </Chip>
+            ))}
+          </ChipGroup>
+        ) : (
+          <MultiCombobox
+            size="md"
+            className="w-full sm:w-80"
+            options={locationOptions}
+            values={[...selected].map(String)}
+            onChange={vals => setSelected(vals.map(Number))}
+            ariaLabel="Show prompts from"
+            placeholder="All locations"
+          />
+        ))}
+
         {usedCategories.length > 0 && (
           <ChipGroup label="Category">
-            <Chip selected={filterCat === 'all'} count={prompts.length} onClick={() => setFilterCat('all')}>All</Chip>
+            <Chip selected={activeCat === 'all'} count={locFiltered.length} onClick={() => setFilterCat('all')}>All</Chip>
             {usedCategories.map(cat => (
-              <Chip key={cat} selected={filterCat === cat} count={catCounts[cat]} onClick={() => setFilterCat(filterCat === cat ? 'all' : cat)}>
+              <Chip key={cat} selected={activeCat === cat} count={catCounts[cat]} onClick={() => setFilterCat(activeCat === cat ? 'all' : cat)}>
                 {promptCategoryLabel(cat)}
               </Chip>
             ))}
@@ -503,14 +617,34 @@ export default function Prompts() {
 
             {suggestions.length > 0 && (
               <div className="border-t border-line px-4 py-3 space-y-2">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <span className="text-meta text-ink-3">
                     {fmt(t.pr_suggestions, { n: suggestions.length })}
                   </span>
-                  <Button variant="tertiary" size="sm" icon={PlusCircle} onClick={addAllSuggestions}>
-                    {t.pr_addAll}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {isMulti && (
+                      <MultiCombobox
+                        size="sm"
+                        className="w-56"
+                        options={locationOptions}
+                        values={discoverAskInValid}
+                        onChange={setDiscoverAskIn}
+                        ariaLabel="Ask suggestions in"
+                        placeholder="Ask suggestions in"
+                        maxSelected={limitK !== undefined ? Math.max(1, limitK) : undefined}
+                        maxReason="Plan limit"
+                        invalid={discoverNeedsLocation}
+                        describedBy={discoverNeedsLocation ? 'prompts-discover-ask-empty' : undefined}
+                      />
+                    )}
+                    <Button variant="tertiary" size="sm" icon={PlusCircle} onClick={addAllSuggestions} disabled={discoverNeedsLocation}>
+                      {t.pr_addAll}
+                    </Button>
+                  </div>
                 </div>
+                {discoverNeedsLocation && (
+                  <p id="prompts-discover-ask-empty" role="alert" className="m-0 mb-2 text-meta text-neg">Pick at least one location to add these prompts</p>/* copy: pending bg-copy */
+                )}
                 {suggestions.map((s, i) => (
                   <div key={i} className={`flex items-start gap-2 p-2 rounded-control border ${
                     s.added ? 'bg-surface-2 border-line' : 'bg-surface border-line hover:bg-surface-2'
@@ -518,9 +652,9 @@ export default function Prompts() {
                     <Badge tone="neutral">{promptCategoryLabel(categorizePrompt(s.text, brandName))}</Badge>
                     <span className="text-body text-ink flex-1">{s.text}</span>
                     <IconButton
-                      label={s.added ? 'Already added' : `Add suggested prompt: ${s.text}`}
+                      label={s.added ? 'Already added' : discoverNeedsLocation ? 'Pick a location first to add this prompt' : `Add suggested prompt: ${s.text}`}
                       icon={s.added ? Check : Plus}
-                      disabled={s.added}
+                      disabled={s.added || discoverNeedsLocation}
                       onClick={() => addSuggestion(s, i)}
                     />
                   </div>
@@ -559,12 +693,46 @@ export default function Prompts() {
                 onKeyDown={e => e.key === 'Enter' && addPrompt()}
                 placeholder={t.pr_searchPlaceholder}
                 aria-label="New prompt text"
+                title="The category is auto-detected from your prompt text, so there is no need to pick one."   // copy: pending bg-copy
                 className={inputClass}
               />
-              <p className="m-0 text-meta text-ink-3">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
+              {isMulti ? (
+                <>
+                  <label htmlFor="prompts-ask-in" className="block text-meta text-ink-2">Ask in</label>{/* copy: pending bg-copy */}
+                  <MultiCombobox
+                    id="prompts-ask-in"
+                    size="md"
+                    options={locationOptions}
+                    values={askInValid}
+                    onChange={setAskIn}
+                    ariaLabel="Ask in"
+                    placeholder="Pick locations"
+                    maxSelected={limitK !== undefined ? Math.max(1, limitK) : undefined}
+                    maxReason="Plan limit"
+                    invalid={askInValid.length === 0}
+                    describedBy={askInValid.length === 0 ? 'prompts-ask-empty' : undefined}
+                  />
+                  {askInValid.length === 0 ? (
+                    <p id="prompts-ask-empty" role="alert" className="m-0 text-meta text-neg">Pick at least one location</p>
+                  ) : (
+                    <>
+                      <p className="m-0 text-meta text-ink-3">Each location makes its own copy and uses one prompt of your plan.</p>
+                      <p className={`m-0 text-meta ${(!isAdmin && askInValid.length > remaining) || (isAdmin && cap !== null && used + askInValid.length > cap) ? 'text-warn' : 'text-ink-3'}`}>
+                        {isAdmin
+                          ? (cap !== null && used + askInValid.length > cap ? 'Goes over the plan limit. Allowed for admins.' : `Uses ${promptCountLabel(askInValid.length)} of your plan.`)
+                          : Number.isFinite(remaining)
+                            ? `Uses ${askInValid.length} of ${remaining} prompts left on your plan.`
+                            : `Uses ${promptCountLabel(askInValid.length)} of your plan.`}
+                      </p>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="m-0 text-meta text-ink-3">The category is auto-detected from your prompt text, so there is no need to pick one.</p>
+              )}
             </div>
             <div className="flex gap-2">
-              <IconButton label="Add prompt" icon={Check} variant="secondary" onClick={() => addPrompt()} disabled={saving || !newText.trim()} />
+              <IconButton label="Add prompt" icon={Check} variant="secondary" onClick={() => addPrompt()} disabled={saving || !newText.trim() || (isMulti && askInValid.length === 0)} />
               <IconButton label="Cancel adding prompt" icon={X} onClick={() => setShowAdd(false)} />
             </div>
           </Card>
@@ -580,7 +748,7 @@ export default function Prompts() {
               minHeight={0}
             />
             <div className="flex flex-wrap justify-center gap-2">
-              <Button variant="primary" icon={Plus} onClick={() => setShowAdd(true)}>{t.pr_addPrompt}</Button>
+              <Button variant="primary" icon={Plus} onClick={openAdd}>{t.pr_addPrompt}</Button>
               <Button variant="secondary" icon={Bot} onClick={() => setShowDiscover(true)}>{t.pr_aiDiscover}</Button>
             </div>
           </Card>
@@ -597,26 +765,39 @@ export default function Prompts() {
                     <>
                       <span className="text-meta text-ink-3 tabular-nums w-5 text-right shrink-0">{i + 1}</span>
                       <span className="hidden sm:flex w-28 shrink-0"><Badge tone="neutral">{promptCategoryLabel(p.category)}</Badge></span>
+                      {showLocBadge && <span className="hidden md:flex w-40 shrink-0 min-w-0">{locBadge(p, 'max-w-full')}</span>}
                       {isEditing ? (
-                        <div className="flex-1 min-w-0 flex gap-3 items-center">
-                          <input
-                            autoFocus
-                            value={editText}
-                            onChange={e => setEditText(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                            aria-label="Edit prompt text"
-                            className={`flex-1 min-w-0 ${inputClass}`}
-                          />
-                          <div className="flex gap-2 shrink-0">
-                            <IconButton label="Save prompt" icon={Check} variant="secondary" onClick={saveEdit} disabled={saving} />
-                            <IconButton label="Cancel editing prompt" icon={X} onClick={() => setEditId(null)} />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex gap-3 items-center">
+                            <input
+                              autoFocus
+                              value={editText}
+                              onChange={e => setEditText(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                              aria-label="Edit prompt text"
+                              className={`flex-1 min-w-0 ${inputClass}`}
+                            />
+                            <div className="flex gap-2 shrink-0">
+                              <IconButton label="Save prompt" icon={Check} variant="secondary" onClick={saveEdit} disabled={saving} />
+                              <IconButton label="Cancel editing prompt" icon={X} onClick={() => setEditId(null)} />
+                            </div>
                           </div>
+                          {isMulti && (
+                            <p className="m-0 text-meta text-ink-3">
+                              {/* copy: pending bg-copy */}
+                              {`Asked in ${locationLabelOf(p)}. To move it, archive it and add it again.`}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <>
                           <span className="flex-1 min-w-0">
                             <span className="block text-body text-ink">{p.text}</span>
-                            <span className="sm:hidden mt-1 block"><Badge tone="neutral">{promptCategoryLabel(p.category)}</Badge></span>
+                            <span className="sm:hidden mt-1 flex flex-wrap gap-1.5">
+                              <Badge tone="neutral">{promptCategoryLabel(p.category)}</Badge>
+                              {showLocBadge && locBadge(p, 'max-w-full')}
+                            </span>
+                            {showLocBadge && <span className="hidden sm:flex md:hidden mt-1">{locBadge(p, 'max-w-full')}</span>}
                           </span>
                           {/* Row actions are always visible (no hover reveal), so a touch
                               device can reach them. The 44px hit area on a phone comes
@@ -641,7 +822,18 @@ export default function Prompts() {
               />
             )}
 
-            {filtered.length === 0 && (
+            {locFiltered.length === 0 && selected.size > 0 && prompts.length > 0 ? (
+              <Card pad="feature" className="flex flex-col items-center gap-4 text-center">
+                <EmptyState
+                  icon={MessageSquare}
+                  // copy: pending bg-copy
+                  title={`No prompts in ${selectedLocations.map(locationLabel).join(', ')} yet`}
+                  body="Add a question to see how AI answers it from this location."
+                  minHeight={0}
+                />
+                <Button variant="primary" icon={Plus} onClick={openAdd}>Add a prompt here</Button>
+              </Card>
+            ) : filtered.length === 0 && (
               <p className="m-0 py-12 text-center text-body text-ink-3">
                 {prompts.length === 0 ? t.pr_noPrompts : t.pr_noFilter}
               </p>

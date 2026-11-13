@@ -67,6 +67,9 @@ function makeDb(seed) {
   const state = {
     clients:          seed.clients || [],
     prompts:          seed.prompts || [],
+    // 2026-11-13 (multi-location): every fixture prompt carries a location_id,
+    // and _enqueue.js reads client_locations once per run to resolve it.
+    client_locations: seed.client_locations || DEFAULT_LOCATIONS,
     ai_results:       (seed.ai_results || []).map((r, i) => ({ id: i + 1, status: 'ok', ...r })),
     collection_runs:  [],
     collection_jobs:  [],
@@ -138,9 +141,15 @@ const CLIENT = { id: 1, name: 'Fixture Co', plan: 'radar', engines_enabled: null
   default_market_id: 'RO', default_region_id: null }
 
 const PROMPTS = [
-  { id: 101, client_id: 1, text: 'best catering bucharest', is_active: true,  position: 1 },
-  { id: 102, client_id: 1, text: 'top event caterers',      is_active: true,  position: 2 },
-  { id: 103, client_id: 1, text: 'retired prompt',          is_active: false, position: 3 },
+  { id: 101, client_id: 1, text: 'best catering bucharest', is_active: true,  position: 1, location_id: 501 },
+  { id: 102, client_id: 1, text: 'top event caterers',      is_active: true,  position: 2, location_id: 501 },
+  { id: 103, client_id: 1, text: 'retired prompt',          is_active: false, position: 3, location_id: 501 },
+]
+
+// The client's primary location, the row the 2026-11-13 backfill gives every
+// prompt of a client with default_market_id RO and no region.
+const DEFAULT_LOCATIONS = [
+  { id: 501, client_id: 1, market_id: 'RO', region_id: 'ALL', is_primary: true, position: 0, archived_at: null },
 ]
 
 // radar = gemini + claude, and neither is monthly-capped. Asserted, not assumed:
@@ -422,6 +431,21 @@ console.log('\n7. the scheduler call site is pinned in source')
   assert.match(guard.slice(-600), /if \(replace\)/,
     'the ai_results delete must be guarded by `replace`, not by `force`')
   ok('the ai_results delete is guarded by `replace`')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n8. every job carries the geo of its prompt\'s location (2026-11-13)')
+{
+  const db = makeDb({ clients: [CLIENT], prompts: PROMPTS, ai_results: [] })
+  await (enqueueClientCollection(db, { clientId: 1, force: true, replaceExisting: false, trigger: 'scheduled', createdBy: null }))
+  for (const j of db.state.collection_jobs) {
+    assert.strictEqual(j.location_id, 501)
+    assert.strictEqual(j.market_id, 'RO')
+    assert.strictEqual(j.market_label, 'Romania')
+    assert.strictEqual(j.region_label, null)
+    assert.strictEqual(j.region_id, 'ALL')
+  }
+  ok('both jobs: location 501, RO, Romania, country level')
 }
 
 console.log(`\nPASS: ${passed} assertions\n`)

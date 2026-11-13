@@ -22,6 +22,12 @@ import { formatDate } from '../lib/format'
 import type { LLMName, PromptCategory } from '../types'
 import { useI18n, fmt } from '../lib/i18nContext'
 import { promptCategoryLabel } from '../lib/promptCategories'
+import { useLocations } from '../lib/locationsContext'
+import { locationLabel, locationScopeLine } from '../lib/locations'
+
+// The feed also reads where each answer was asked from (null on older rows).
+type MentionsHistoryRowLoc = MentionsHistoryRow & { asked_market_id?: string | null; asked_region_id?: string | null }
+const MENTIONS_FEED_COLUMNS = `${MENTIONS_HISTORY_COLUMNS}, asked_market_id, asked_region_id`
 
 // Engine identity is ENGINE_META + EngineChip / Chip swatch (one source, one hex).
 
@@ -50,7 +56,8 @@ export default function Mentions() {
   const { lastCompletedAt } = useCollection()
   const { snapshot, status, loadError, reload } = useResults()
   const brandName = activeClient?.name ?? 'your brand'
-  const [historyState, setHistoryState] = useState<{ rows: MentionsHistoryRow[] | null; clientId: number }>({ rows: null, clientId: activeClientId })
+  const { locations, isMulti, selected } = useLocations()
+  const [historyState, setHistoryState] = useState<{ rows: MentionsHistoryRowLoc[] | null; clientId: number }>({ rows: null, clientId: activeClientId })
   // Rows of another client are never shown, not even for one render.
   const history = ownRows(historyState, activeClientId, null)
   const historySeq = useRef(0)
@@ -77,8 +84,8 @@ export default function Mentions() {
         .sort((a, b) => (a.brand_position ?? 99) - (b.brand_position ?? 99)) })
       return
     }
-    const res = await readResultHistory<MentionsHistoryRow>(supabase, {
-      clientId: activeClientId, sinceIso: null, columns: MENTIONS_HISTORY_COLUMNS, mentionedOnly: true,
+    const res = await readResultHistory<MentionsHistoryRowLoc>(supabase, {
+      clientId: activeClientId, sinceIso: null, columns: MENTIONS_FEED_COLUMNS, mentionedOnly: true,
     })
     if (isStale(historySeq, mine)) return
     if (res.error) { setHistoryFailed(true); return }
@@ -92,15 +99,30 @@ export default function Mentions() {
   // feed does not, so re-read it quietly.
   useCollectionLanded(lastCompletedAt, () => { void loadHistory(true) })
 
+  // The feed is client-wide history: the location filter applies by prompt id.
+  const locationPromptIds = snapshot?.locationPromptIds ?? null
+  const historyInScope = useMemo(
+    () => (history && locationPromptIds ? history.filter(r => locationPromptIds.has(r.prompt_id)) : history),
+    [history, locationPromptIds],
+  )
+  // Where each answer was asked from, by row id.
+  const askedFrom = useMemo(() => {
+    const m = new Map<number, string | null>()
+    for (const r of history ?? []) {
+      m.set(r.id, r.asked_market_id ? locationLabel({ market_id: r.asked_market_id, region_id: r.asked_region_id ?? 'ALL' }) : null)
+    }
+    return m
+  }, [history])
+
   const view = useMemo(() => snapshot
     ? buildMentionsView({
         rows: snapshot.rows,
         activePrompts: snapshot.activePrompts,
         prompts: snapshot.prompts,
         activeEngines,
-        history: history ?? [],
+        history: historyInScope ?? [],
       })
-    : null, [snapshot, activeEngines, history])
+    : null, [snapshot, activeEngines, historyInScope])
 
   if (!snapshot || !view) {
     if (status === 'error') {
@@ -164,7 +186,10 @@ export default function Mentions() {
 
   return (
     <Page>
-      <PageHeader title={t.men_title} />
+      <PageHeader
+        title={t.men_title}
+        subtitle={isMulti ? locationScopeLine(locations.length, selected.size) : undefined}
+      />
 
       {loadError && (
         <LoadErrorCard
@@ -268,6 +293,12 @@ export default function Mentions() {
                         <span className="inline-flex items-center gap-1 text-meta text-ink-2">
                           <StatusGlyph kind={sentimentKind(m.sentiment)} size={12} />{m.sentiment}
                         </span>
+                        {isMulti && (
+                          <span className="text-meta text-ink-3">
+                            {/* copy: pending bg-copy */}
+                            {askedFrom.get(m.id) ? `Asked from ${askedFrom.get(m.id)}` : 'Location not recorded'}
+                          </span>
+                        )}
                       </span>
                     </span>
                     <ChevronDown size={16} aria-hidden="true"

@@ -100,6 +100,15 @@ export const AI_VISIBILITY_CSV_HEADER = [
   'Sentiment', 'Competitors named', 'Checked at', 'Last answer at', 'Not answering since',
 ]
 
+/**
+ * The header for an export. A client with several locations (the caller passes
+ * `locationLabelOf` to the row builder) gets a last "Location" column; a
+ * one-location client keeps the 12-column file it always had.
+ */
+export function aiVisibilityCsvHeader(withLocation: boolean): string[] {
+  return withLocation ? [...AI_VISIBILITY_CSV_HEADER, 'Location'] : AI_VISIBILITY_CSV_HEADER.slice()
+}
+
 function resultLabel(c: CellView | undefined): string {
   switch (c?.state) {
     case 'mentioned': return 'Mentioned'
@@ -120,6 +129,8 @@ export function buildAiVisibilityCsvRows(input: {
   cellViews: Map<number, Map<string, CellView>>
   /** The snapshot's usable-row map (newest ok row per prompt and engine). */
   results: ReadonlyMap<number, ReadonlyMap<string, { checked_at: string }>>
+  /** Label of the location a prompt belongs to. Omitted: the row has no Location cell. */
+  locationLabelOf?: (p: Prompt) => string
 }): Array<Array<string | number | null>> {
   const out: Array<Array<string | number | null>> = []
   for (const p of input.prompts) {
@@ -151,6 +162,7 @@ export function buildAiVisibilityCsvRows(input: {
         cur?.checked_at ?? null,
         lastAnswer,
         state === 'error' ? (c?.errorSince ?? null) : null,
+        ...(input.locationLabelOf ? [input.locationLabelOf(p)] : []),
       ])
     }
   }

@@ -190,7 +190,9 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
   const runCollection = useCallback(async (
     clientId: number,
     force = false,
-    markets?: MarketSelection[],
+    // Kept so existing callers still compile. Geography is no longer sent: the
+    // server resolves it from each prompt's location_id (one country per prompt).
+    _markets?: MarketSelection[],
     activeEngines?: EngineId[],
   ): Promise<RunCollectionResult> => {
     if (runningRef.current) {
@@ -224,7 +226,6 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({
           client_id:      clientId,
           force,
-          markets,
           active_engines: activeEngines,
         }),
       }).catch(() => null)
@@ -332,7 +333,8 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
     clientId: number,
     promptId: number,
     promptText: string,
-    markets?: MarketSelection[],
+    // Tolerated and ignored: the server reads the prompt's own location.
+    _markets?: MarketSelection[],
     activeEngines?: EngineId[],
   ): Promise<RunSinglePromptResult> => {
     // Both lists come from planConfig, never inlined here. The inlined version
@@ -358,20 +360,12 @@ export function CollectionProvider({ children }: { children: React.ReactNode }) 
       known_competitors: clientRow?.known_competitors ?? [],
     }
 
-    const primaryMarket = markets?.[0]
-    const market_label  = primaryMarket?.market.label ?? null
-    const region_label  = primaryMarket?.region.label ?? null
-    const market_id     = primaryMarket?.market.id    ?? null
-
     const payload = {
       prompt_id:      promptId,
       prompt_text:    promptText,
       client_id:      clientId,
       client_config:  clientConfig,
       force:          true,
-      market_label,
-      region_label,
-      market_id,
       active_engines: promptEngines,
     }
 

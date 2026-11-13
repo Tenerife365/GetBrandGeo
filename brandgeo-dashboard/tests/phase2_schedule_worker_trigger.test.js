@@ -80,15 +80,21 @@ function client() {
 }
 installModule(require.resolve('@supabase/supabase-js', { paths: [FN] }), { createClient() { return client() } })
 
+// COUNTRY_NAMES lives in _country_names.js since 2026-11-13 (_enqueue.js
+// re-exports it); stubbed here as well as on the _enqueue.js stub below.
+installModule(require.resolve(path.join(FN, '_country_names.js')), { COUNTRY_NAMES: {} })
+
 const triggerCalls = { n: 0 }
 let triggerThrows = false
 let enqueueJobs = 0
+let enqueueResult = null   // when set, enqueueClientCollection answers exactly this
 installModule(require.resolve(path.join(FN, '_enqueue.js')), {
   async triggerWorker() {
     triggerCalls.n++
     if (triggerThrows) throw new Error('simulated trigger failure')
   },
   async enqueueClientCollection(_sb, { clientId }) {
+    if (enqueueResult) return { ...enqueueResult }
     if (!enqueueJobs) return { skipped: true, reason: 'no_active_prompts' }
     return { runId: 900 + clientId, totalJobs: enqueueJobs, skipped: false }
   },
@@ -116,6 +122,7 @@ function freshDb({ jobs = [], dueClient = false } = {}) {
   failJobsRead = false
   triggerThrows = false
   enqueueJobs = 0
+  enqueueResult = null
   triggerCalls.n = 0
   reads.length = 0
   db.seed('clients', dueClient
@@ -221,6 +228,44 @@ const lastJobRun = () => { const r = db.rows('job_runs'); return r[r.length - 1]
     enqueueJobs = 4
     await run()
     assert.strictEqual(triggerCalls.n, 1)
+  })
+
+  // L1 of docs/qa/multi-location-review-server-2026-11-13.md: a transient
+  // refusal (the client_locations read failed inside _enqueue.js) must NOT
+  // stamp last_refresh_at, so the next hourly run retries the client.
+  const stampOf42 = () => db.rows('clients').find(c => c.id === 42).last_refresh_at
+
+  await check('a transient refusal from enqueue: last_refresh_at not stamped, counted as skippedTransient', async () => {
+    freshDb({ dueClient: true })
+    enqueueResult = { runId: null, totalJobs: 0, skipped: true, reason: 'location read failed', transient: true }
+    const res = await run()
+    assert.strictEqual(res.statusCode, 200, res.body)
+    assert.strictEqual(stampOf42(), null, 'the client stays due, so the next hour retries it')
+    const body = JSON.parse(res.body)
+    assert.strictEqual(body.skippedTransient, 1); assert.strictEqual(body.skippedNoWork, 0)
+    const jr = lastJobRun()
+    assert.strictEqual(jr.ok, true)
+    assert.strictEqual(jr.detail.skippedTransient, 1); assert.strictEqual(jr.detail.skippedNoWork, 0)
+  })
+
+  await check('the client stays due: a second run after a transient refusal asks enqueue again', async () => {
+    freshDb({ dueClient: true })
+    enqueueResult = { runId: null, totalJobs: 0, skipped: true, reason: 'location read failed', transient: true }
+    await run()
+    enqueueResult = null
+    enqueueJobs = 2
+    const res = await run()
+    assert.strictEqual(JSON.parse(res.body).enqueued, 1)
+    assert.ok(stampOf42(), 'stamped once work was enqueued')
+  })
+
+  await check('a non-transient skip is still stamped (unchanged behaviour)', async () => {
+    freshDb({ dueClient: true })
+    enqueueResult = { runId: null, totalJobs: 0, skipped: true, reason: 'no active prompts' }
+    const res = await run()
+    assert.ok(stampOf42(), 'stamped as before')
+    const body = JSON.parse(res.body)
+    assert.strictEqual(body.skippedNoWork, 1); assert.strictEqual(body.skippedTransient, 0)
   })
 
   await check('cron gate first: no key is 401, no read, no trigger', async () => {

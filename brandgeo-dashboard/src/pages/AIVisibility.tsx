@@ -3,9 +3,13 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
-  Play, Loader2, Globe2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
-  CircleCheck, Undo2, EyeOff, Download, ChevronRight,
+  Play, Loader2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
+  CircleCheck, Undo2, EyeOff, Download, ChevronRight, Layers, Columns3, Check,
 } from 'lucide-react'
+import { useLocations, LocationFlag } from '../lib/locationsContext'
+import { locationLabel, promptLocationId, locationScopeLine } from '../lib/locations'
+import { mentionRate, buildSnapshotView } from '../lib/metrics'
+import { tableClasses } from '../components/ui/tableClasses'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { buildFixPrompt } from '../lib/fixPrompt'
@@ -31,7 +35,7 @@ import LoadErrorCard from '../components/LoadErrorCard'
 import { useResults } from '../lib/resultsContext'
 import { shouldReportReloadFailure } from '../lib/resultsGuards'
 import type { EngineBand } from '../lib/metrics'
-import { buildAiVisibilityData, buildAiVisibilityCsvRows, AI_VISIBILITY_CSV_HEADER } from '../lib/views/aiVisibilityView'
+import { buildAiVisibilityData, buildAiVisibilityCsvRows, aiVisibilityCsvHeader } from '../lib/views/aiVisibilityView'
 import { toCsv, csvFilename, downloadCsv } from '../lib/csv'
 import { promptCategoryLabel } from '../lib/promptCategories'
 import SharedEmptyState from '../components/EmptyState'
@@ -335,13 +339,44 @@ export default function AIVisibility() {
   // calls metrics.ts; this page no longer reads ai_results for any total or rate.
   const { snapshot, status, loadError: staleError, reload } = useResults()
   const activeEnginesKey = activeEngines.join(',')
+  // Locations (multi-location clients). While they load, or if they fail to
+  // load, the page behaves as one location: no scope line, no split control.
+  const {
+    locations, primary: primaryLocation, isMulti: locIsMulti, status: locStatus,
+    selected: locSelected, setSelected: setLocSelected,
+  } = useLocations()
+  const isMulti = locIsMulti && locStatus === 'ready'
+  const locationsLoading = locStatus === 'loading'
+  const filterKey = snapshot?.filterKey ?? ''
   const data = useMemo(
     () => snapshot
       ? buildAiVisibilityData({ rows: snapshot.rows, activePrompts: snapshot.activePrompts, activeEngines, clientId: snapshot.clientId })
       : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [snapshot, activeEnginesKey],
+    [snapshot, activeEnginesKey, filterKey],
   )
+  // The same read over every location: fix verdicts and baselines must not move
+  // when the filter does. Unfiltered, this is the same object as `data`.
+  const dataAll = useMemo(
+    () => !snapshot ? null
+      : filterKey === '' ? data
+      : buildAiVisibilityData({ rows: snapshot.allRows, activePrompts: snapshot.allActivePrompts, activeEngines, clientId: snapshot.clientId }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [snapshot, activeEnginesKey, filterKey, data],
+  )
+  const resultsAll: ResultMap = dataAll?.results ?? EMPTY_RESULTS
+  const fixPromptIdsAll = (snapshot?.allActivePrompts ?? NO_PROMPTS).map(p => p.id)
+  // Label of the location a prompt was asked from.
+  const locationOfPrompt = (p: Prompt): string => {
+    const id = promptLocationId(p, primaryLocation?.id ?? null)
+    const loc = locations.find(l => l.id === id)
+    return loc ? locationLabel(loc) : ''
+  }
+  const promptMarketId = (p: Prompt): string => {
+    const id = promptLocationId(p, primaryLocation?.id ?? null)
+    return locations.find(l => l.id === id)?.market_id ?? ''
+  }
+  const [splitByLocation, setSplitByLocation] = useState(false)
   const prompts: Prompt[] = snapshot?.activePrompts ?? NO_PROMPTS
   const results: ResultMap = data?.results ?? EMPTY_RESULTS
   // Engine is "unavailable" only when it has errors AND zero ok results.
@@ -605,6 +640,7 @@ export default function AIVisibility() {
   useEffect(() => {
     setSectionOpen({})
     setExpandedRow(null)
+    setSplitByLocation(false)
     frozenRef.current = null
     let saved: string | null = null
     try { saved = window.localStorage.getItem(sortStorageKey(activeClientId)) } catch { saved = null }
@@ -781,12 +817,33 @@ export default function AIVisibility() {
   const renderPlan = (() => {
     const promptById = new Map(prompts.map(p => [p.id, p]))
     let n = 0
+    // Split by location: inside each section, prompts are grouped by location
+    // (list order), then keep the current sort within a group.
+    const grouping = isMulti && splitByLocation
+    const locIndex = new Map(locations.map((l, i) => [l.id, i]))
+    const locIdOf = (p: Prompt) => promptLocationId(p, primaryLocation?.id ?? null)
     return order.sections.map(key => {
-      const rows = order.ids[key]
+      let list = order.ids[key]
         .map(id => promptById.get(id))
         .filter((p): p is Prompt => !!p)
         .filter(p => filterCats.size === 0 || filterCats.has(p.category ?? ''))
-        .map(p => ({ prompt: p, num: ++n }))
+      if (grouping) {
+        list = list
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => {
+            const la = locIndex.get(locIdOf(a.p) as number) ?? Number.MAX_SAFE_INTEGER
+            const lb = locIndex.get(locIdOf(b.p) as number) ?? Number.MAX_SAFE_INTEGER
+            return la !== lb ? la - lb : a.i - b.i
+          })
+          .map(x => x.p)
+      }
+      let prevLoc: number | null | undefined
+      const rows = list.map(p => {
+        const lid = locIdOf(p)
+        const groupLabel = grouping && lid !== prevLoc ? locationOfPrompt(p) : null
+        prevLoc = lid
+        return { prompt: p, num: ++n, groupLabel }
+      })
       return { key, rows }
     }).filter(sec => sec.rows.length > 0)
   })()
@@ -797,12 +854,13 @@ export default function AIVisibility() {
     if (visibleCount === 0 || !activeClientId) return
     const visiblePrompts = renderPlan.flatMap(sec => sec.rows.map(r => r.prompt))
     const csv = toCsv(
-      AI_VISIBILITY_CSV_HEADER,
+      aiVisibilityCsvHeader(isMulti),
       buildAiVisibilityCsvRows({
         prompts: visiblePrompts,
         engines: activeLLMs.map(l => ({ id: l.id as string, label: l.label })),
         cellViews,
         results,
+        locationLabelOf: isMulti ? locationOfPrompt : undefined,
       }),
     )
     downloadCsv(csvFilename('ai-visibility', activeClient?.slug, activeClientId, new Date()), csv)
@@ -826,23 +884,48 @@ export default function AIVisibility() {
   })
 
   // ── Fix states: open list, done list, mark, reopen, re-check ──────────────
-  const fixPromptIds = prompts.map(p => p.id)
   const fixEngineIds = activeLLMs.map(l => l.id as string)
   const engineLabelOf = (id: string) => ENGINE_META[id as EngineId]?.label ?? id
   // Clipboard payload for "Copy as AI prompt" (fix-states.md section 11). The
   // builder is shared with MCP; this page only supplies the context.
+  // Multi-location: the market line is the location the fixed prompt was asked
+  // from; a fix not tied to one prompt names the filtered locations instead.
+  // A fix tied to one prompt names that prompt's own location whether or not the
+  // client has several (same text as the MCP fix tools, mcp-server.js marketFor);
+  // the single-location case falls back to the default market in fixPromptFor.
+  const fixLocationLabel = (item: FixItem): string | null => {
+    const scope = parseMetricKey(item.metricKey)
+    const pid = scope && scope.kind === 'prompt' ? scope.promptId : null
+    const p = pid === null ? undefined : (snapshot?.allActivePrompts ?? prompts).find(x => x.id === pid)
+    if (p) return locationOfPrompt(p) || null
+    if (!isMulti) return null
+    const sel = locations.filter(l => locSelected.size === 0 || locSelected.has(l.id)).map(l => locationLabel(l))
+    return sel.length > 0 ? sel.join(', ') : null
+  }
+  // Two active prompts with the same text (one per location) would give two
+  // fixes with the same title: tell them apart by location.
+  const fixTitleOf = (item: FixItem): string => {
+    if (!isMulti) return item.title
+    const scope = parseMetricKey(item.metricKey)
+    if (!scope || scope.kind !== 'prompt') return item.title
+    const all = snapshot?.allActivePrompts ?? NO_PROMPTS
+    const p = all.find(x => x.id === scope.promptId)
+    if (!p || all.filter(x => x.text === p.text).length < 2) return item.title
+    const loc = locationOfPrompt(p)
+    return loc ? `${item.title} · ${loc}` : item.title // copy: pending bg-copy
+  }
   const fixPromptFor = (item: FixItem): string => buildFixPrompt(
     { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
     {
       brandName,
       website: activeClient?.brand_website ?? null,
-      market: MARKETS.find(m => m.id === activeClient?.default_market_id)?.label ?? null,
+      market: fixLocationLabel(item) ?? MARKETS.find(m => m.id === activeClient?.default_market_id)?.label ?? null,
       engines: activeLLMs.map(l => ({ id: l.id as string, label: l.label })),
       prompts: prompts.map(p => ({ id: p.id, text: p.text })),
       results,
     },
   ) ?? item.fix
-  const promptTextOf = (id: number) => prompts.find(p => p.id === id)?.text
+  const promptTextOf = (id: number) => (snapshot?.allActivePrompts ?? prompts).find(p => p.id === id)?.text
   const openFixItems = fixItems.filter(i => isOpenState(fixRows.get(i.id)?.status))
   // Closed-hub summary, for example "2 P0, 5 P1, 5 P2". Computed at render.
   const fixSummary = (['P0', 'P1', 'P2'] as const)
@@ -878,13 +961,14 @@ export default function AIVisibility() {
     // Never take a baseline from another client's answers mid-switch.
     if (!cid || fixBusy || resultsClientId !== cid) return
     const scope = status === 'done' ? parseMetricKey(item.metricKey) : null
-    const m = scope ? measureFix(scope, results, fixPromptIds, fixEngineIds) : { value: null, n: 0 }
+    // Baseline over every location, so it does not depend on the filter.
+    const m = scope ? measureFix(scope, resultsAll, fixPromptIdsAll, fixEngineIds) : { value: null, n: 0 }
     const measurable = scope !== null && m.value !== null
     const payload = {
       client_id: cid,
       fix_id: item.id,
       status: status as FixStatus,
-      title: item.title.slice(0, 500),
+      title: fixTitleOf(item).slice(0, 500),
       metric_key: measurable ? item.metricKey : null,
       baseline_value: measurable ? m.value : null,
       baseline_n: measurable ? m.n : null,
@@ -956,7 +1040,7 @@ export default function AIVisibility() {
     if (loading || !fixRowsLoaded || !activeClientId || resultsClientId !== activeClientId) return
     fixRows.forEach(row => {
       if (row.status !== 'done' || row.client_id !== activeClientId) return
-      const ev = evaluateFix(row, results, fixPromptIds, fixEngineIds)
+      const ev = evaluateFix(row, resultsAll, fixPromptIdsAll, fixEngineIds)
       if (ev.state !== 'verdict') {
         if (checkRequested === row.fix_id) {
           setFixNotice({
@@ -1000,7 +1084,7 @@ export default function AIVisibility() {
         })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, fixRowsLoaded, fixRows, resultsKey, resultsClientId, checkRequested, activeClientId])
+  }, [loading, fixRowsLoaded, fixRows, resultsKey, filterKey, resultsClientId, checkRequested, activeClientId])
 
   const [checkAwaiting, setCheckAwaiting] = useState<{ id: string; version: number } | null>(null)
   const checkFixNow = async (fixId: string) => {
@@ -1038,7 +1122,7 @@ export default function AIVisibility() {
     if (!scope || row.baseline_value === null || !row.marked_at) {
       return by && markedOn ? `${fixMarkedOn(markedOn, by)} ${FIX_COPY.manualTail}` : FIX_COPY.manual
     }
-    const ev = evaluateFix(row, results, fixPromptIds, fixEngineIds)
+    const ev = evaluateFix(row, resultsAll, fixPromptIdsAll, fixEngineIds)
     if (ev.state === 'untracked') return `${fixMarkedOn(markedOn, by)} ${FIX_COPY.untracked}`
     if (ev.state === 'waiting' && Date.now() >= Date.parse(ev.readyAfter)) {
       return fixDoneWaitingData(markedOn, ev.fresh, ev.needed, by)
@@ -1062,6 +1146,26 @@ export default function AIVisibility() {
   // jump from a bare text line to the full page (CLS), and only ever renders
   // on a true first mount or a client switch (see the `silent` load() param
   // above), never during an in-progress or completed collection run.
+  // A location filter that selects locations with no active prompt (not the
+  // same as a client with no prompts at all).
+  const locationEmpty = isMulti && locSelected.size > 0 && prompts.length === 0
+    && (snapshot?.allActivePrompts.length ?? 0) > 0
+  const locationEmptyBody = locationEmpty
+    ? `No prompts in ${locations.filter(l => locSelected.has(l.id)).map(l => locationLabel(l)).join(', ')} yet.` // copy: pending bg-copy
+    : ''
+
+  // Split table: one row per live location, read from ALL rows so it does not
+  // depend on the current filter.
+  const splitRows = (isMulti && splitByLocation && snapshot)
+    ? locations.map(l => {
+        const ids = snapshot.allActivePrompts
+          .filter(p => promptLocationId(p, primaryLocation?.id ?? null) === l.id)
+          .map(p => p.id)
+        const rate = mentionRate(buildSnapshotView(snapshot.allRows, ids, activeEngines).population)
+        return { loc: l, prompts: ids.length, rate }
+      })
+    : []
+
   if (!snapshot && status === 'error') return (
     <Page>
       <PageHeader title={t.aiv_title} />
@@ -1409,6 +1513,16 @@ export default function AIVisibility() {
     const hasError = cellsList.some(c => c.state === 'error')
     const onlyPending = !hasError && cellsList.every(c => c.state === 'pending')
 
+    // Where this prompt is asked from: shown unless the filter already says
+    // (exactly one location) or the rows are grouped under a location label.
+    const locLabel = isMulti && locSelected.size !== 1 && !splitByLocation ? locationOfPrompt(prompt) : ''
+    const locChip = locLabel ? (
+      <span className={`${NEUTRAL_CHIP} gap-1 max-w-[10rem] min-w-0`}>
+        <LocationFlag marketId={promptMarketId(prompt)} size={12} />
+        <span className="truncate" title={locLabel}>{locLabel}</span>
+      </span>
+    ) : null
+
     const reasonChip = kind === 'unchecked'
       ? hasError
         ? <span className={AMBER_CHIP}>{errorSinceChip(formatDate(sum?.oldestErrorSince ?? ''))}</span>
@@ -1437,6 +1551,7 @@ export default function AIVisibility() {
             </span>
             <span className="flex flex-wrap items-center gap-2 mt-1.5">
               {categoryChip(prompt)}
+              {locChip}
               {ratioChip}
               {reasonChip}
             </span>
@@ -1479,6 +1594,7 @@ export default function AIVisibility() {
               </span>
               <span className="flex items-center gap-1.5 mt-1 min-w-0 whitespace-nowrap">
                 {categoryChip(prompt)}
+                {locChip}
                 {ratioChip}
                 {isAdmin && (
                   <span className="min-w-0 truncate text-meta text-ink-3 hidden lg:inline" title="Expand this row to re-run a single engine">
@@ -1515,6 +1631,7 @@ export default function AIVisibility() {
           <span className="flex items-center gap-2 min-w-0">
             <span className="block truncate min-w-0 text-body text-ink" title={prompt.text}>{prompt.text}</span>
             {categoryChip(prompt)}
+            {locChip}
           </span>
           <span className="flex items-center gap-2 min-w-0">
             {ratioChip}
@@ -1603,21 +1720,50 @@ export default function AIVisibility() {
       {/* ── Block 1: page header ────────────────────────────────────────────── */}
       <PageHeader
         title={t.aiv_title}
-        badge={selections.length > 0 ? (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {selections.map(sel => (
-              <Badge key={sel.market.id} tone="neutral">
-                {sel.market.flagCode === 'un'
-                  ? <Globe2 size={11} aria-hidden="true" />
-                  : <img src={`https://flagcdn.com/w16/${sel.market.flagCode}.png`} alt="" className="w-3.5 h-auto rounded-sm" />
-                }
-                {sel.market.id}
-                {sel.region.id !== 'ALL' && <span className="text-ink-3">· {sel.region.label}</span>}
-              </Badge>
-            ))}
-          </span>
-        ) : undefined}
-        subtitle={t.aiv_subtitle}
+        badge={locationsLoading ? undefined : (() => {
+          if (!isMulti) {
+            const only = primaryLocation ?? locations[0]
+            if (!only) return undefined
+            return (
+              <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
+                <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+                <Badge tone="neutral" className="max-w-[14rem]">
+                  <LocationFlag marketId={only.market_id} size={12} />
+                  <span className="truncate">{locationLabel(only)}</span>
+                </Badge>
+              </span>
+            )
+          }
+          if (locSelected.size === 0) {
+            return (
+              <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
+                <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+                <Badge tone="neutral">
+                  <Layers size={11} aria-hidden="true" />
+                  All {locations.length} locations{/* copy: pending bg-copy */}
+                </Badge>
+              </span>
+            )
+          }
+          const shown = locations.filter(l => locSelected.has(l.id))
+          const first = shown.slice(0, 3)
+          const extra = shown.length - first.length
+          return (
+            <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
+              <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+              {first.map(l => (
+                <Badge key={l.id} tone="neutral" className="max-w-[14rem]">
+                  <LocationFlag marketId={l.market_id} size={12} />
+                  <span className="truncate">{locationLabel(l)}</span>
+                </Badge>
+              ))}
+              {extra > 0 && <Badge tone="neutral">+{extra}</Badge>}
+            </span>
+          )
+        })()}
+        subtitle={isMulti
+          ? <>{t.aiv_subtitle} {locationScopeLine(locations.length, locSelected.size)}</>
+          : t.aiv_subtitle}
         actions={
           <>
             {/* Engine configuration is an admin-only concern (sets what every client
@@ -1796,7 +1942,7 @@ export default function AIVisibility() {
             empty={{
               icon: Target,
               title: 'No prompts yet', // copy: pending bg-copy
-              body: t.aiv_noPrompts,
+              body: locationEmpty ? locationEmptyBody : t.aiv_noPrompts,
               actionLabel: 'Add prompts', // copy: pending bg-copy
               actionTo: '/prompts',
             }}
@@ -2089,7 +2235,7 @@ export default function AIVisibility() {
                         )}
                         {item && (
                           <div key={item.id} className="flex flex-col flex-1 min-w-0">
-                            <div className="text-heading text-ink line-clamp-2 break-words" title={item.title}>{item.title}</div>
+                            <div className="text-heading text-ink line-clamp-2 break-words" title={fixTitleOf(item)}>{fixTitleOf(item)}</div>
                             <div className="text-body text-ink-2 mt-1 line-clamp-4" title={item.description}>{item.description}</div>
                             {reopenedLine && (
                               <div className="mt-2 flex items-start gap-1.5 text-meta text-warn bg-warn-tint border border-warn rounded-control px-3 py-2">
@@ -2114,7 +2260,7 @@ export default function AIVisibility() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => copyFix(item.id, fixPromptFor(item))}
-                                aria-label={`${FIX_COPY.copyPrompt}: ${item.title}`}
+                                aria-label={`${FIX_COPY.copyPrompt}: ${fixTitleOf(item)}`}
                               >
                                 {copiedFix === item.id
                                   ? <><CheckCheck size={14} aria-hidden="true" className="text-pos-ink" /> Copied</>
@@ -2127,7 +2273,7 @@ export default function AIVisibility() {
                                 icon={CircleCheck}
                                 loading={busy}
                                 onClick={() => markFix(item, 'done')}
-                                aria-label={`${FIX_COPY.markDone}: ${item.title}`}
+                                aria-label={`${FIX_COPY.markDone}: ${fixTitleOf(item)}`}
                               >
                                 {FIX_COPY.markDone}
                               </Button>
@@ -2137,7 +2283,7 @@ export default function AIVisibility() {
                                 icon={EyeOff}
                                 disabled={busy}
                                 onClick={() => markFix(item, 'dismissed')}
-                                aria-label={`${FIX_COPY.dismiss}: ${item.title}`}
+                                aria-label={`${FIX_COPY.dismiss}: ${fixTitleOf(item)}`}
                               >
                                 {FIX_COPY.dismiss}
                               </Button>
@@ -2176,7 +2322,7 @@ export default function AIVisibility() {
                           ? 'text-pos-ink'
                           : row.status === 'dismissed' ? 'text-ink-3' : 'text-ink-2'
                         const measurable = row.status === 'done' && parseMetricKey(row.metric_key) !== null && row.baseline_value !== null
-                          && evaluateFix(row, results, fixPromptIds, fixEngineIds).state !== 'untracked'
+                          && evaluateFix(row, resultsAll, fixPromptIdsAll, fixEngineIds).state !== 'untracked'
                         return (
                           <li key={row.fix_id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                             <div className="min-w-0">
@@ -2292,6 +2438,19 @@ export default function AIVisibility() {
                     </div>
                   </>
                 )}
+                {isMulti && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Columns3}
+                    data-loc-split
+                    aria-pressed={splitByLocation}
+                    onClick={() => setSplitByLocation(v => !v)}
+                    className={`w-full sm:w-auto ${splitByLocation ? 'bg-accent-tint text-accent-ink border-accent-ink' : ''}`}
+                  >
+                    Split by location{/* copy: pending bg-copy */}
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -2308,6 +2467,69 @@ export default function AIVisibility() {
           )
         })()}
 
+        {isMulti && splitByLocation && splitRows.length > 0 && (
+          <div className="mb-4">
+            <h3 className="sr-only">Results by location{/* copy: pending bg-copy */}</h3>
+            <Card pad="none" className="overflow-hidden">
+              <div className={tableClasses.wrap}>
+                <table className={tableClasses.table}>
+                  <thead className={tableClasses.thead}>
+                    <tr>
+                      <th scope="col" className={tableClasses.th}>Location</th>
+                      <th scope="col" className={tableClasses.thRight}>Prompts</th>
+                      <th scope="col" className={tableClasses.thRight}>Mentioned</th>
+                      <th scope="col" className={`${tableClasses.th} hidden md:table-cell`}>
+                        <span className="sr-only">Mention rate bar</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {splitRows.map(({ loc, prompts: n, rate }, i) => {
+                      const inFilter = locSelected.size === 0 || locSelected.has(loc.id)
+                      const label = locationLabel(loc)
+                      return (
+                        <tr
+                          key={loc.id}
+                          className={`${tableClasses.tr} reveal-row ${inFilter && locSelected.size > 0 ? 'bg-accent-tint' : ''}`}
+                          style={{ '--i': i } as CSSProperties}
+                        >
+                          <td className={tableClasses.td}>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 text-left text-body text-ink hover:underline max-md:min-h-[44px]"
+                              aria-label={`Show only ${label}`}
+                              aria-current={inFilter && locSelected.size > 0 ? 'true' : undefined}
+                              onClick={() => setLocSelected(new Set([loc.id]))}
+                            >
+                              <LocationFlag marketId={loc.market_id} size={12} />
+                              <span className="truncate max-w-[16rem]">{label}</span>
+                              {loc.is_primary && <Badge tone="neutral">Primary</Badge>}
+                              {inFilter && locSelected.size > 0 && (
+                                <Check size={12} className="text-accent-ink" aria-hidden="true" />
+                              )}
+                            </button>
+                          </td>
+                          <td className={tableClasses.tdRight}>{n}</td>
+                          <td className={tableClasses.tdRight}>
+                            {rate.pct === null
+                              ? <span className="text-body text-ink-3">Not checked yet</span>
+                              : <span className="text-value text-ink">{Math.round(rate.pct)}%</span>}
+                          </td>
+                          <td className={`${tableClasses.td} hidden md:table-cell`}>
+                            <div style={{ width: 120 }}>
+                              <Meter value={rate.pct} ariaLabel={`Mention rate, ${label}`} />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {orderFrozen && prompts.length >= 2 && (
           <p className="text-meta text-ink-2 mb-3">{AIV_COPY.orderFrozenNote}</p>
         )}
@@ -2317,7 +2539,7 @@ export default function AIVisibility() {
             <SharedEmptyState
               icon={Target}
               title="No prompts yet"
-              body={t.aiv_noPrompts}
+              body={locationEmpty ? locationEmptyBody : t.aiv_noPrompts}
               actionLabel="Add prompts"
               actionTo="/prompts"
             />
@@ -2339,7 +2561,7 @@ export default function AIVisibility() {
           const uncheckedSec = renderPlan.find(s => s.key === 'unchecked')
           const rowsOf = (sec: (typeof renderPlan)[number]) => (
             <AnimatePresence initial={false}>
-              {sec.rows.map(({ prompt, num }) => (
+              {sec.rows.map(({ prompt, num, groupLabel }) => (
                 <motion.div
                   key={prompt.id}
                   layout="position"
@@ -2348,6 +2570,7 @@ export default function AIVisibility() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: MOTION_BASE, ease: EASE_OUT }}
                 >
+                  {groupLabel && <h4 className="label-caps px-3 pt-3 pb-1">{groupLabel}</h4>}
                   {renderRow(sec.key, prompt, num)}
                 </motion.div>
               ))}

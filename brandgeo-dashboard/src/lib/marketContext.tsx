@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useClient } from './clientContext'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { useLocations } from './locationsContext'
 
 import { MARKETS, type Region, type Market } from './markets'
 
@@ -12,150 +12,64 @@ export interface MarketSelection {
   region: Region
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Kept for compatibility. The sidebar no longer steers collection: one country
+// per prompt, and the server resolves geography from each prompt's location.
+// `selections` now mirrors the client's live locations (primary first), and the
+// write functions are no-ops (locations change only through useLocations()).
+// The old localStorage keys (brandgeo_markets_v2*) are no longer read or written.
 
 export interface MarketCtx {
   selections:      MarketSelection[]
   addSelection:    (market: Market, region?: Region) => void
   removeSelection: (marketId: string) => void
   updateRegion:    (marketId: string, region: Region) => void
-  /** First selection — used as geo context for collection */
+  /** Primary location's market */
   primaryMarket:   Market | null
   primaryRegion:   Region | null
 }
 
+const WW = MARKETS.find(m => m.id === 'WW') ?? MARKETS[0]
+
+const noop = () => {}
+
 const Ctx = createContext<MarketCtx>({
   selections:      [],
-  addSelection:    () => {},
-  removeSelection: () => {},
-  updateRegion:    () => {},
+  addSelection:    noop,
+  removeSelection: noop,
+  updateRegion:    noop,
   primaryMarket:   null,
   primaryRegion:   null,
 })
 
 /**
- * Load saved market selections for a specific client.
- * Storage key: brandgeo_markets_v2_${clientId}
- * Falls back (in order) to: the old global key for migration, then the
- * client's own `default_market_id` (set during onboarding, see
- * onboard-client.js), then the old v1 global keys, then a hardcoded RO
- * default as the last resort.
- *
- * `defaultMarketId` param added 2026-07-09: previously any client with no
- * saved localStorage entry — which is every brand-new client — silently
- * fell all the way to the hardcoded Romania default below, regardless of
- * where that client actually operates (#72 audit finding). Onboarding now
- * collects a real default market per client; this is what makes writing
- * `clients.default_market_id` actually do something instead of being a
- * column nobody reads.
- *
- * `defaultRegionId` param added same day: `default_market_id` alone can
- * only pick the country, not e.g. Bucharest specifically within Romania —
- * this narrows to that region when it's a valid region of the resolved
- * market, otherwise falls back to that market's first region as before.
- */
-function loadSaved(clientId: number, defaultMarketId?: string | null, defaultRegionId?: string | null): MarketSelection[] {
-  try {
-    // Per-client key (new) — explicit prior selection always wins
-    const clientKey = `brandgeo_markets_v2_${clientId}`
-    const perClient = localStorage.getItem(clientKey)
-    if (perClient) {
-      const parsed = JSON.parse(perClient) as { marketId: string; regionId: string }[]
-      const result = parsed.flatMap(({ marketId, regionId }) => {
-        const market = MARKETS.find(m => m.id === marketId)
-        if (!market) return []
-        const region = market.regions.find(r => r.id === regionId) ?? market.regions[0]
-        return [{ market, region }] as MarketSelection[]
-      })
-      if (result.length > 0) return result
-    }
-    // Migrate from old global key (one-time, first client that loads)
-    const legacy = localStorage.getItem('brandgeo_markets_v2')
-    if (legacy) {
-      const parsed = JSON.parse(legacy) as { marketId: string; regionId: string }[]
-      const result = parsed.flatMap(({ marketId, regionId }) => {
-        const market = MARKETS.find(m => m.id === marketId)
-        if (!market) return []
-        const region = market.regions.find(r => r.id === regionId) ?? market.regions[0]
-        return [{ market, region }] as MarketSelection[]
-      })
-      if (result.length > 0) return result
-    }
-  } catch {}
-
-  // This client's own configured default (set during onboarding) — before
-  // falling back to legacy global v1 keys or the hardcoded Romania default.
-  if (defaultMarketId) {
-    const mkt = MARKETS.find(m => m.id === defaultMarketId)
-    if (mkt) {
-      const reg = mkt.regions.find(r => r.id === defaultRegionId) ?? mkt.regions[0]
-      return [{ market: mkt, region: reg }]
-    }
-  }
-
-  // v1 migration / final default
-  const oldId  = localStorage.getItem('brandgeo_market')
-  const oldReg = localStorage.getItem('brandgeo_region') ?? 'ALL'
-  const mkt = MARKETS.find(m => m.id === oldId) ?? MARKETS[1] // default RO
-  const reg = mkt.regions.find(r => r.id === oldReg) ?? mkt.regions[0]
-  return [{ market: mkt, region: reg }]
-}
-
-/**
- * MarketProvider must be nested INSIDE ClientProvider so it can call useClient().
- * Each client gets its own market stored under brandgeo_markets_v2_${clientId}.
- * Switching clients reloads that client's saved market instantly.
+ * MarketProvider must be nested INSIDE LocationsProvider. Until the location
+ * list has loaded (or when it is empty) the selection is Worldwide.
  */
 export function MarketProvider({ children }: { children: ReactNode }) {
-  const { activeClientId, activeClient } = useClient()
-  const [selections, setSelections] = useState<MarketSelection[]>(
-    () => loadSaved(activeClientId, activeClient?.default_market_id, activeClient?.default_region_id)
-  )
+  const { locations } = useLocations()
 
-  // Reload market whenever the active client changes, or once its record
-  // (including default_market_id/default_region_id) finishes loading
-  // asynchronously.
-  useEffect(() => {
-    setSelections(loadSaved(activeClientId, activeClient?.default_market_id, activeClient?.default_region_id))
-  }, [activeClientId, activeClient?.default_market_id, activeClient?.default_region_id])
+  const selections = useMemo<MarketSelection[]>(() => {
+    const out: MarketSelection[] = []
+    for (const l of locations) {
+      const market = MARKETS.find(m => m.id === l.market_id)
+      if (!market) continue
+      const region = market.regions.find(r => r.id === l.region_id) ?? market.regions[0]
+      out.push({ market, region })
+    }
+    return out.length > 0 ? out : [{ market: WW, region: WW.regions[0] }]
+  }, [locations])
 
-  const storageKey = `brandgeo_markets_v2_${activeClientId}`
+  const value = useMemo<MarketCtx>(() => ({
+    selections,
+    addSelection: noop,
+    removeSelection: noop,
+    updateRegion: noop,
+    primaryMarket: selections[0]?.market ?? null,
+    primaryRegion: selections[0]?.region ?? null,
+  }), [selections])
 
-  const persist = (sels: MarketSelection[]) => {
-    localStorage.setItem(storageKey, JSON.stringify(
-      sels.map(s => ({ marketId: s.market.id, regionId: s.region.id }))
-    ))
-    setSelections(sels)
-  }
-
-  const addSelection = (market: Market, region?: Region) => {
-    if (selections.some(s => s.market.id === market.id)) return
-    persist([...selections, { market, region: region ?? market.regions[0] }])
-  }
-
-  const removeSelection = (marketId: string) => {
-    const next = selections.filter(s => s.market.id !== marketId)
-    if (next.length === 0) return // always keep at least one
-    persist(next)
-  }
-
-  const updateRegion = (marketId: string, region: Region) => {
-    persist(selections.map(s => s.market.id === marketId ? { ...s, region } : s))
-  }
-
-  return (
-    <Ctx.Provider value={{
-      selections,
-      addSelection,
-      removeSelection,
-      updateRegion,
-      primaryMarket: selections[0]?.market ?? null,
-      primaryRegion: selections[0]?.region ?? null,
-    }}>
-      {children}
-    </Ctx.Provider>
-  )
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useMarket() {

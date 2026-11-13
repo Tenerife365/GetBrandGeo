@@ -1,19 +1,62 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useClient } from '../lib/clientContext'
 import { useCollection } from '../lib/collectionContext'
-import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, type Plan } from '../lib/planConfig'
+import { getActiveEngines, PLAN_ORDER, PLAN_LABELS, PLAN_PROMPTS, PLAN_LOCATION_LIMIT, type Plan } from '../lib/planConfig'
 import { MARKETS } from '../lib/marketContext'
+import type { Market } from '../lib/markets'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail, Zap, MessageSquarePlus, X } from 'lucide-react'
 import { PageTitle } from '../components/Typography'
-import { Combobox } from '../components/ui'
+import { Combobox, MultiCombobox, Button, IconButton, type ComboboxOption } from '../components/ui'
 import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
+import { locationLabel } from '../lib/locations'
+import { LocationFlag } from '../lib/locationsContext'
 import PendingInvitesPanel from '../components/PendingInvitesPanel'
 
 const MARKET_OPTIONS = buildMarketOptions(MARKETS)
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
+
+// One chosen location besides the primary. The server key is 'MARKET:REGION'.
+type LocPair = { marketId: string; regionId: string }
+
+// askIn: null means "every location the wizard has now", so a location added later
+// is included without touching the prompts already typed. An array is an explicit
+// choice made on that row. Keys are 'primary' or 'MARKET:REGION'.
+type WizardPrompt = { text: string; askIn: string[] | null }
+
+const PRIMARY_KEY = 'primary'
+const pairKey = (marketId: string, regionId: string) => `${marketId}:${regionId}`
+
+// copy: pending bg-copy (every string in this block)
+const COPY = {
+  primaryLegend: 'Primary location',
+  country: 'Country',
+  region: 'Region',
+  primaryHelp: 'New prompts are asked from here unless you choose other locations.',
+  otherLegend: 'Other locations (optional)',
+  addAria: 'Add another location',
+  addPlaceholder: 'Add a country',
+  isPrimary: 'Primary',
+  alreadyAdded: 'Added',
+  otherEmpty: 'Only the primary location. Add more if this client sells in several places.',
+  askNew: 'Ask new prompts in',
+  askIn: 'Ask in',
+  askInAria: 'Ask this prompt in',
+  askEmpty: 'Pick at least one location',
+  overWhy: 'Each location of a question uses one prompt.',
+  override: 'Go over the plan limit for this client (admin, recorded)',
+  summaryTitle: 'What will be created',
+  errLocation: 'One of the locations is not valid. Check step 1.',
+  errCap: 'Too many prompts for this plan. Remove some or tick the override.',
+}
+
+function swapKey(arr: string[] | null, from: string, to: string): string[] | null {
+  if (arr === null || !arr.includes(from)) return arr
+  const rest = arr.filter(k => k !== from)
+  return rest.includes(to) ? rest : rest.concat(to)
+}
 
 export default function Onboard() {
   const { isAdmin, refreshClients } = useClient()
@@ -33,7 +76,15 @@ export default function Onboard() {
   const [competitorInput, setCompetitorInput] = useState('')
   const [competitors, setCompetitors]     = useState<string[]>([])
   const [promptInput, setPromptInput]     = useState('')
-  const [prompts, setPrompts]             = useState<string[]>([])
+  const [prompts, setPrompts]             = useState<WizardPrompt[]>([])
+  const [extras, setExtras]               = useState<LocPair[]>([])
+  const [adding, setAdding]               = useState<string | null>(null)
+  const [addRegions, setAddRegions]       = useState<string[]>([])
+  const [askNew, setAskNew]               = useState<string[] | null>(null)
+  const [overrideCap, setOverrideCap]     = useState(false)
+  const [live, setLive]                   = useState('')
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const refocus = useRef(false)
   const [email, setEmail]         = useState('')
   const [role, setRole]           = useState<'admin' | 'viewer'>('viewer')
   const [creating, setCreating]   = useState(false)
@@ -91,6 +142,56 @@ export default function Onboard() {
     if (collectionProgress) setLastTotal(collectionProgress.total)
   }, [collectionProgress])
 
+  // ── Locations and prompt rows (derived) ─────────────────────────────────
+
+  const primaryPairKey = pairKey(marketId, regionId)
+  const extraKeys = extras.map(p => pairKey(p.marketId, p.regionId))
+  const takenKeys = new Set<string>([primaryPairKey, ...extraKeys])
+  const isMultiWizard = extras.length > 0
+  const allKeys = [PRIMARY_KEY, ...extraKeys]
+  const locationCount = allKeys.length
+  const locationLimit = PLAN_LOCATION_LIMIT[plan]
+  const locationsOver = locationCount > locationLimit
+
+  const locationOptions: ComboboxOption[] = [
+    {
+      value: PRIMARY_KEY,
+      label: `${locationLabel({ market_id: marketId, region_id: regionId })} (primary)`,
+      icon: <LocationFlag marketId={marketId} size={16} />,
+    },
+    ...extras.map(p => ({
+      value: pairKey(p.marketId, p.regionId),
+      label: locationLabel({ market_id: p.marketId, region_id: p.regionId }),
+      icon: <LocationFlag marketId={p.marketId} size={16} />,
+    })),
+  ]
+  const keyLabel = (k: string): string => locationOptions.find(o => o.value === k)?.label ?? k
+
+  const askEffective = (p: WizardPrompt): string[] =>
+    p.askIn === null ? allKeys : p.askIn.filter(k => allKeys.includes(k))
+
+  const promptRows = isMultiWizard
+    ? prompts.reduce((n, p) => n + askEffective(p).length, 0)
+    : prompts.length
+  const promptCap = PLAN_PROMPTS[plan]
+  // The server counts rows for both prompt shapes, so the cap applies to both.
+  const overCap = promptRows > promptCap
+  const anyAskEmpty = isMultiWizard && prompts.some(p => askEffective(p).length === 0)
+  const askNewEffective: string[] = askNew === null ? allKeys : askNew.filter(k => allKeys.includes(k))
+
+  // Getting back under the cap clears the override, so it cannot stay ticked unseen.
+  useEffect(() => {
+    if (!overCap && overrideCap) setOverrideCap(false)
+  }, [overCap, overrideCap])
+
+  // After a submit error sends the admin back a step, put focus on that step's heading.
+  useEffect(() => {
+    if (refocus.current) {
+      refocus.current = false
+      headingRef.current?.focus()
+    }
+  }, [step])
+
   if (!isAdmin) return (
     <div className="p-8 text-slate-500 text-sm">
       Access restricted to admins.{' '}
@@ -114,7 +215,9 @@ export default function Onboard() {
 
   const addPrompt = () => {
     const v = promptInput.trim()
-    if (v && !prompts.includes(v)) setPrompts(prev => [...prev, v])
+    if (v && !prompts.some(p => p.text === v)) {
+      setPrompts(prev => [...prev, { text: v, askIn: askNew === null ? null : askNew.slice() }])
+    }
     setPromptInput('')
   }
 
@@ -122,11 +225,106 @@ export default function Onboard() {
 
   const selectedMarket = MARKETS.find(m => m.id === marketId) ?? MARKETS[0]
 
-  const handleMarketChange = (id: string) => {
-    setMarketId(id)
-    const mkt = MARKETS.find(m => m.id === id) ?? MARKETS[0]
-    setRegionId(mkt.regions[0]?.id ?? 'ALL')
+  // The primary changes. A listed pair equal to the new primary leaves the list
+  // (the server dedupes the same way), and prompts that named it now name 'primary'.
+  const applyPrimary = (nextMarketId: string, nextRegionId: string) => {
+    const nextKey = pairKey(nextMarketId, nextRegionId)
+    setMarketId(nextMarketId)
+    setRegionId(nextRegionId)
+    if (extras.some(p => pairKey(p.marketId, p.regionId) === nextKey)) {
+      setExtras(prev => prev.filter(p => pairKey(p.marketId, p.regionId) !== nextKey))
+      setPrompts(prev => prev.map(p => ({ ...p, askIn: swapKey(p.askIn, nextKey, PRIMARY_KEY) })))
+      setAskNew(prev => swapKey(prev, nextKey, PRIMARY_KEY))
+      setLive(`${locationLabel({ market_id: nextMarketId, region_id: nextRegionId })} is the primary now, so it left the other locations`)
+    }
   }
+
+  const handleMarketChange = (id: string) => {
+    const mkt = MARKETS.find(m => m.id === id) ?? MARKETS[0]
+    applyPrimary(id, mkt.regions[0]?.id ?? 'ALL')
+  }
+
+  // ── Other locations ──────────────────────────────────────────────────────
+
+  const addPairs = (mId: string, regionIds: string[]) => {
+    const fresh = regionIds.filter(r => !takenKeys.has(pairKey(mId, r)))
+    if (fresh.length === 0) return
+    setExtras(prev => prev.concat(fresh.map(r => ({ marketId: mId, regionId: r }))))
+    setLive(`Added ${fresh.map(r => locationLabel({ market_id: mId, region_id: r })).join(', ')}`)
+  }
+
+  const pickMarket = (id: string) => {
+    const mkt = MARKETS.find(m => m.id === id)
+    if (!mkt) return
+    if (mkt.regions.length <= 1) {
+      addPairs(id, [mkt.regions[0]?.id ?? 'ALL'])
+      return
+    }
+    setAdding(id)
+    setAddRegions(takenKeys.has(pairKey(id, 'ALL')) ? [] : ['ALL'])
+  }
+
+  const confirmAdd = () => {
+    if (adding) addPairs(adding, addRegions)
+    setAdding(null)
+    setAddRegions([])
+  }
+
+  const cancelAdd = () => {
+    setAdding(null)
+    setAddRegions([])
+  }
+
+  const removeExtra = (idx: number) => {
+    const gone = extras[idx]
+    if (!gone) return
+    const key = pairKey(gone.marketId, gone.regionId)
+    const label = locationLabel({ market_id: gone.marketId, region_id: gone.regionId })
+    // Prompts whose only location was this one fall back to the primary.
+    const moved = prompts.filter(p => p.askIn !== null && p.askIn.includes(key) && p.askIn.filter(k => k !== key).length === 0).length
+    setExtras(prev => prev.filter((_, i) => i !== idx))
+    setPrompts(prev => prev.map(p => {
+      if (p.askIn === null || !p.askIn.includes(key)) return p
+      const rest = p.askIn.filter(k => k !== key)
+      return { ...p, askIn: rest.length === 0 ? [PRIMARY_KEY] : rest }
+    }))
+    setAskNew(prev => {
+      if (prev === null || !prev.includes(key)) return prev
+      const rest = prev.filter(k => k !== key)
+      return rest.length === 0 ? [PRIMARY_KEY] : rest
+    })
+    setLive(moved > 0
+      ? `Removed ${label}. ${moved === 1 ? '1 prompt moved' : `${moved} prompts moved`} to the primary location`
+      : `Removed ${label}`)
+  }
+
+  // Extra locations grouped by market, in the order they were added.
+  const locationsPayload = (): { market_id: string; region_ids: string[] }[] => {
+    const out: { market_id: string; region_ids: string[] }[] = []
+    for (const p of extras) {
+      const found = out.find(o => o.market_id === p.marketId)
+      if (found) found.region_ids.push(p.regionId)
+      else out.push({ market_id: p.marketId, region_ids: [p.regionId] })
+    }
+    return out
+  }
+
+  const addingMarket: Market | undefined = adding ? MARKETS.find(m => m.id === adding) : undefined
+  const marketFullyTaken = (m: Market) => m.regions.length > 0 && m.regions.every(r => takenKeys.has(pairKey(m.id, r.id)))
+  const pickerOptions = buildMarketOptions(MARKETS.filter(m => !marketFullyTaken(m)))
+
+  // Regions of a market that cannot be picked again, with the reason shown in the option.
+  const regionReasons = (m: Market): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const r of m.regions) {
+      const k = pairKey(m.id, r.id)
+      if (k === primaryPairKey) out[r.id] = COPY.isPrimary
+      else if (extraKeys.includes(k)) out[r.id] = COPY.alreadyAdded
+    }
+    return out
+  }
+
+  const goBackTo =(s: Step) => { refocus.current = true; setStep(s) }
 
   // ── Step 5: Create client + user + initial prompts ───────────────────────
 
@@ -151,11 +349,21 @@ export default function Onboard() {
           default_region_id:  regionId,
           contact_email:      email,
           role,
-          prompts,
+          // One location: prompts stay a plain list of strings, as before. Several:
+          // each prompt names where it is asked, 'primary' or 'MARKET:REGION'.
+          prompts: isMultiWizard
+            ? prompts.map(p => ({ text: p.text, location_keys: askEffective(p) }))
+            : prompts.map(p => p.text),
+          ...(isMultiWizard ? { locations: locationsPayload() } : {}),
+          ...(overCap && overrideCap ? { allow_over_cap: true } : {}),
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Onboarding failed')
+      if (!res.ok) {
+        if (data.code === 'invalid_location') { setError(COPY.errLocation); goBackTo(1); return }
+        if (data.code === 'prompt_cap_exceeded') { setError(COPY.errCap); goBackTo(4); return }
+        throw new Error(data.error ?? 'Onboarding failed')
+      }
       setNewClientId(data.client_id)
       setStep(6)
 
@@ -236,7 +444,8 @@ export default function Onboard() {
         {/* ── Step 1: Company info ── */}
         {step === 1 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Building2 size={18} className="text-brand-400" /> Company Info</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-white flex items-center gap-2 focus:outline-none"><Building2 size={18} className="text-brand-400" /> Company Info</h2>
+            <p className="sr-only" aria-live="polite">{live}</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Company name *</label>
               <input value={name} onChange={e => { setName(e.target.value); setSlug(autoSlug(e.target.value)) }}
@@ -260,30 +469,77 @@ export default function Onboard() {
                 className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-brand-500/50"
                 placeholder="bucateperoate.ro" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Plan *</label>
-                <select value={plan} onChange={e => setPlan(e.target.value as Plan)}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
-                  {PLAN_ORDER.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="onboard-market" className="block text-xs text-slate-400 mb-1">Default market</label>
-                <Combobox id="onboard-market" options={MARKET_OPTIONS} value={marketId} onChange={handleMarketChange}
-                  ariaLabel="Default market" placeholder="Type to search markets" />
-              </div>
-            </div>
             <div>
-              <label htmlFor="onboard-region" className="block text-xs text-slate-400 mb-1">Default region</label>
-              <Combobox id="onboard-region" options={buildRegionOptions(selectedMarket)} value={regionId} onChange={setRegionId}
-                ariaLabel="Default region" placeholder="Type to search regions" />
+              <label className="block text-xs text-slate-400 mb-1">Plan *</label>
+              <select value={plan} onChange={e => setPlan(e.target.value as Plan)}
+                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500/50">
+                {PLAN_ORDER.map(p => <option key={p} value={p}>{PLAN_LABELS[p]}</option>)}
+              </select>
             </div>
-            <p className="text-xs text-slate-500 -mt-2">
-              Plan controls which AI engines collect for this client. Market and region set what
-              this client's dashboard defaults to before they pick their own. Without it, new
-              clients otherwise default to Romania regardless of who they are.
+
+            <fieldset className="min-w-0">
+              <legend className="text-meta text-ink-2 mb-1">{COPY.primaryLegend}</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="onboard-market" className="block text-meta text-ink-2 mb-1">{COPY.country}</label>
+                  <Combobox id="onboard-market" options={MARKET_OPTIONS} value={marketId} onChange={handleMarketChange}
+                    ariaLabel="Default market" placeholder="Type to search markets" />
+                </div>
+                <div>
+                  <label htmlFor="onboard-region" className="block text-meta text-ink-2 mb-1">{COPY.region}</label>
+                  <Combobox id="onboard-region" options={buildRegionOptions(selectedMarket)} value={regionId} onChange={id => applyPrimary(marketId, id)}
+                    ariaLabel="Default region" placeholder="Type to search regions" />
+                </div>
+              </div>
+              <p className="text-meta text-ink-3 mt-2">{COPY.primaryHelp}</p>
+            </fieldset>
+
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-meta text-ink-2 mb-1">{COPY.otherLegend}</legend>
+              <Combobox id="onboard-add-location" options={pickerOptions} value={null} onChange={pickMarket}
+                ariaLabel={COPY.addAria} placeholder={COPY.addPlaceholder} clearOnSelect />
+
+              {addingMarket && (
+                <div className="rounded-control border border-line p-3 space-y-2">
+                  <p className="text-meta text-ink-2">Regions of {addingMarket.label}</p>
+                  <MultiCombobox size="md" ariaLabel={`Regions of ${addingMarket.label}`}
+                    options={buildRegionOptions(addingMarket)} values={addRegions} onChange={setAddRegions}
+                    exclusiveValue="ALL" maxSelected={25} placeholder="Type to search regions"
+                    disabledReasons={regionReasons(addingMarket)} />
+                  <div className="flex items-center gap-2">
+                    <Button variant="primary" size="sm" disabled={addRegions.length === 0} onClick={confirmAdd}>Add</Button>
+                    <Button variant="ghost" size="sm" onClick={cancelAdd}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {extras.length > 0 ? (
+                <ul role="list" aria-label="Other locations" className="space-y-1.5">
+                  {extras.map((p, idx) => {
+                    const label = locationLabel({ market_id: p.marketId, region_id: p.regionId })
+                    return (
+                      <li key={pairKey(p.marketId, p.regionId)} className="flex items-center gap-2 h-10 px-3 rounded-control bg-surface-2 border border-line">
+                        <LocationFlag marketId={p.marketId} size={16} />
+                        <span className="flex-1 truncate text-body text-ink">{label}</span>
+                        <IconButton icon={X} label={`Remove ${label}`} onClick={() => removeExtra(idx)} />
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="text-meta text-ink-3">{COPY.otherEmpty}</p>
+              )}
+
+              <p className={`text-meta tabular-nums ${locationsOver ? 'text-warn' : 'text-ink-2'}`}>
+                {locationsOver
+                  ? `${locationCount} locations, above the ${locationLimit} on ${PLAN_LABELS[plan]}. Allowed because you are an admin; it is recorded.`
+                  : `${locationCount} of ${locationLimit} locations on ${PLAN_LABELS[plan]}`}
+              </p>
+            </fieldset>
+            <p className="text-xs text-slate-500">
+              Plan controls which AI engines collect for this client.
             </p>
+            {error && <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
             <button disabled={!name || !slug || slugStatus === 'taken' || slugStatus === 'checking'}
               onClick={() => setStep(2)}
               className="w-full py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
@@ -355,7 +611,8 @@ export default function Onboard() {
         {/* ── Step 4: Initial Prompts ── */}
         {step === 4 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2"><MessageSquarePlus size={18} className="text-brand-400" /> Initial Prompts</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-white flex items-center gap-2 focus:outline-none"><MessageSquarePlus size={18} className="text-brand-400" /> Initial Prompts</h2>
+            {error && <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
             <p className="text-xs text-slate-500">
               Real questions a customer might ask an AI assistant when looking for a business like this one.
               These are what get sent to each AI engine every month. At least one is required, since without
@@ -368,18 +625,72 @@ export default function Onboard() {
                 placeholder="e.g. Best catering companies in Bucharest" />
               <button onClick={addPrompt} className="px-4 py-2 rounded-lg bg-brand-500/20 text-brand-300 text-sm border border-brand-500/30 hover:bg-brand-500/30">Add</button>
             </div>
-            <div className="flex flex-col gap-2 max-h-56 overflow-y-auto min-h-[40px]">
-              {prompts.map(p => (
-                <span key={p} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-dark-700 border border-dark-600 rounded-lg text-xs text-slate-300">
-                  <span className="truncate">{p}</span>
-                  <button onClick={() => setPrompts(prev => prev.filter(x => x !== p))} className="text-slate-600 hover:text-red-400 shrink-0 ml-2">×</button>
-                </span>
-              ))}
-              {prompts.length === 0 && <span className="text-xs text-slate-600 italic">No prompts added yet. At least one is required.</span>}
-            </div>
+            {isMultiWizard && (
+              <div className="flex items-center gap-2">
+                <span className="text-meta text-ink-2 shrink-0">{COPY.askNew}</span>
+                <MultiCombobox size="sm" className="flex-1 min-w-0" ariaLabel={COPY.askNew}
+                  options={locationOptions} values={askNewEffective} onChange={setAskNew} />
+              </div>
+            )}
+            {isMultiWizard ? (
+              <ul role="list" className="space-y-2 max-h-96 overflow-y-auto min-h-[40px]">
+                {prompts.map((p, idx) => {
+                  const eff = askEffective(p)
+                  return (
+                    <li key={p.text} className="rounded-control border border-line bg-surface-2 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-meta text-ink-3 tabular-nums">{idx + 1}.</span>
+                        <span className="text-body text-ink flex-1 min-w-0 break-words">{p.text}</span>
+                        <IconButton icon={X} label={`Remove prompt: ${p.text.slice(0, 40)}`}
+                          onClick={() => setPrompts(prev => prev.filter(x => x.text !== p.text))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-meta text-ink-2 shrink-0">{COPY.askIn}</span>
+                        <MultiCombobox size="sm" className="flex-1 min-w-0" ariaLabel={COPY.askInAria}
+                          options={locationOptions} values={eff}
+                          invalid={eff.length === 0}
+                          describedBy={eff.length === 0 ? `onboard-ask-empty-${idx}` : undefined}
+                          onChange={v => setPrompts(prev => prev.map(x => x.text === p.text ? { ...x, askIn: v } : x))} />
+                      </div>
+                      {eff.length === 0 && <p id={`onboard-ask-empty-${idx}`} role="alert" className="text-meta text-neg">{COPY.askEmpty}</p>}
+                    </li>
+                  )
+                })}
+                {prompts.length === 0 && <li className="text-meta text-ink-3 italic">No prompts added yet. At least one is required.</li>}
+              </ul>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-56 overflow-y-auto min-h-[40px]">
+                {prompts.map(p => (
+                  <span key={p.text} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-dark-700 border border-dark-600 rounded-lg text-xs text-slate-300">
+                    <span className="truncate">{p.text}</span>
+                    <button onClick={() => setPrompts(prev => prev.filter(x => x.text !== p.text))} className="text-slate-600 hover:text-red-400 shrink-0 ml-2">×</button>
+                  </span>
+                ))}
+                {prompts.length === 0 && <span className="text-xs text-slate-600 italic">No prompts added yet. At least one is required.</span>}
+              </div>
+            )}
+            {(isMultiWizard || overCap) && (
+              <div className="space-y-2">
+                <p aria-live="polite" className={`text-meta tabular-nums ${overCap ? 'text-neg' : 'text-ink-2'}`}>
+                  {isMultiWizard
+                    ? `${promptRows} prompts of ${promptCap} on ${PLAN_LABELS[plan]}. ${Math.floor(promptCap / locationCount)} questions fit in all ${locationCount} locations.`
+                    : `${promptRows} prompts of ${promptCap} on ${PLAN_LABELS[plan]}.`}
+                </p>
+                {overCap && (
+                  <>
+                    {isMultiWizard && <p className="text-meta text-neg">{COPY.overWhy}</p>}
+                    <label className="flex items-start gap-2 text-meta text-ink-2 max-md:min-h-[44px]">
+                      <input type="checkbox" checked={overrideCap} onChange={e => setOverrideCap(e.target.checked)}
+                        className="h-4 w-4 mt-0.5 accent-[rgb(var(--accent-strong))]" />
+                      <span>{COPY.override}</span>
+                    </label>
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setStep(3)} className="flex-1 py-2 rounded-lg bg-dark-700 text-slate-400 text-sm hover:bg-dark-600 transition-colors">Back</button>
-              <button disabled={prompts.length === 0}
+              <button disabled={prompts.length === 0 || anyAskEmpty || (overCap && !overrideCap)}
                 onClick={() => setStep(5)}
                 className="flex-1 py-2 rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30 text-sm font-medium hover:bg-brand-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 Next <ChevronRight size={14} />
@@ -395,6 +706,25 @@ export default function Onboard() {
              sees or relays a password (task, 2026-07-09). */}
         {step === 5 && (
           <div className="space-y-4">
+            {isMultiWizard && (
+              <section aria-labelledby="onboard-summary-title" className="space-y-2">
+                <h3 id="onboard-summary-title" className="text-heading text-ink">{COPY.summaryTitle}</h3>
+                <ul role="list" className="max-h-48 overflow-y-auto space-y-1">
+                  {allKeys.map(k => {
+                    const mId = k === PRIMARY_KEY ? marketId : k.split(':')[0]
+                    const n = prompts.filter(p => askEffective(p).includes(k)).length
+                    return (
+                      <li key={k} className="flex items-center gap-2 text-body text-ink-2">
+                        <LocationFlag marketId={mId} size={16} />
+                        <span className="truncate">{keyLabel(k)}</span>
+                        <span className="ml-auto text-meta text-ink-3 tabular-nums">{n === 1 ? '1 prompt' : `${n} prompts`}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className="text-meta text-ink-3">{`${promptRows} prompt rows in total.`}</p>
+              </section>
+            )}
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Mail size={18} className="text-brand-400" /> Client Invite</h2>
             <p className="text-xs text-slate-500">
               We'll email this address an invite link to set their own password and log in
@@ -460,12 +790,12 @@ export default function Onboard() {
             {collectionRunning || collecting ? (
               <>
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                  <span>Prompt {(collectionProgress?.done ?? 0) + 1} of {collectionProgress?.total ?? prompts.length}</span>
-                  <span>{Math.round(((collectionProgress?.done ?? 0) / (collectionProgress?.total || prompts.length)) * 100)}%</span>
+                  <span>Prompt {(collectionProgress?.done ?? 0) + 1} of {collectionProgress?.total ?? promptRows}</span>
+                  <span>{Math.round(((collectionProgress?.done ?? 0) / (collectionProgress?.total || promptRows)) * 100)}%</span>
                 </div>
                 <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                    style={{ width: `${((collectionProgress?.done ?? 0) / (collectionProgress?.total || prompts.length)) * 100}%` }} />
+                    style={{ width: `${((collectionProgress?.done ?? 0) / (collectionProgress?.total || promptRows)) * 100}%` }} />
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Loader2 size={12} className="animate-spin text-brand-400" />
@@ -479,7 +809,7 @@ export default function Onboard() {
                   <div>
                     <div className="text-sm font-semibold text-emerald-300">Collection complete!</div>
                     <div className="text-xs text-slate-400 mt-0.5">
-                      {lastTotal ?? prompts.length} prompt{(lastTotal ?? prompts.length) === 1 ? '' : 's'} collected across this client's active engines.
+                      {lastTotal ?? promptRows} prompt{(lastTotal ?? promptRows) === 1 ? '' : 's'} collected across this client's active engines.
                     </div>
                   </div>
                 </div>

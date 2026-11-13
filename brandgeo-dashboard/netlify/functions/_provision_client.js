@@ -8,6 +8,9 @@
  *      stamped at creation)
  *   2. inviteUserByEmail to /reset-password
  *   3. user_profiles insert
+ *   3b. (2026-11-13) add_client_locations, only when the request names extra
+ *      locations (docs/arch/multi-location-collection.md 5.4); location
+ *      validation and the server prompt cap run before step 1
  *   4. prompts insert (one statement)
  *   5. client_events 'onboarded' audit row, last and non-fatal
  * A later failure rolls back the earlier steps.
@@ -42,6 +45,12 @@
  */
 const { refreshCadenceFor, DEFAULT_CLIENT_CATEGORY } = require('./_cost')
 const { slugify } = require('./_explee_rules')
+const { validatePair, locationKey } = require('./_locations')
+
+// Multi-location onboarding (docs/arch/multi-location-collection.md 5.4).
+// Matches the prompt cap trigger's last fallback (supabase-prompt-cap-bypass-fix-2026-11-09.sql:92-94).
+const HARD_PROMPT_CAP_FALLBACK = 5
+const PRIMARY_KEY = 'primary'
 
 const APP_URL = 'https://app.getbrandgeo.com'
 const REDIRECT_TO = `${APP_URL}/reset-password`
@@ -122,19 +131,116 @@ function isUniqueViolation(err) {
   return !!err && (err.code === '23505' || /duplicate key/i.test(err.message || ''))
 }
 
-function promptRowsFor(clientId, prompts) {
-  return Array.isArray(prompts)
-    ? prompts
-        .map((t) => (typeof t === 'string' ? t : t && t.text))
-        .filter((t) => typeof t === 'string' && t.trim().length > 0)
-        .map((text, idx) => ({
-          client_id: clientId,
-          text: text.trim(),
-          category: 'general',
-          is_active: true,
-          position: idx + 1,
-        }))
-    : []
+/**
+ * planLocations(input) -> { ok: true, primary, extras, prompts } | { ok: false, code, message }
+ *
+ * Pure. All location validation of section 5.4, run BEFORE the clients insert
+ * so nothing is refused after the invite has gone out:
+ *   1. the primary (default_market_id, default_region_id; null market reads
+ *      as WW and null or '' region as ALL, exactly as the database's
+ *      ensure_primary_client_location does) and every extra pair through
+ *      validatePair: invalid_location.
+ *   2. extras expanded to pairs, a pair equal to the primary or seen before
+ *      dropped, first-seen order kept (S7). 'ALL' mixed with specific regions
+ *      inside one entry: invalid_location.
+ *   3. every location_keys entry is 'primary' or a 'MARKET:REGION' key of the
+ *      deduplicated set or of the primary (the primary's own key maps to
+ *      'primary'); anything else: invalid_location.
+ * prompts: [{ text, keys: string[] }], one row per distinct key. A string
+ * prompt, or an object without location_keys (or with an empty list), is one
+ * row on the primary. Blank texts are dropped, as before.
+ */
+function planLocations(input) {
+  const bad = (message) => ({ ok: false, code: 'invalid_location', message })
+  const pm = input.default_market_id === undefined || input.default_market_id === null || input.default_market_id === '' ? 'WW' : input.default_market_id
+  const pr = input.default_region_id === undefined || input.default_region_id === null || input.default_region_id === '' ? 'ALL' : input.default_region_id
+  const pv = validatePair(pm, pr)
+  if (!pv.ok) return bad('the primary location is not in the market list')
+  const primary = { market_id: pv.market_id, region_id: pv.region_id }
+  const primaryKey = locationKey(primary.market_id, primary.region_id)
+
+  const extras = []
+  const seen = new Set([primaryKey])
+  if (input.locations !== undefined && input.locations !== null) {
+    if (!Array.isArray(input.locations)) return bad('locations must be a list')
+    for (const entry of input.locations) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return bad('a location entry is not an object')
+      const ids = entry.region_ids
+      if (!Array.isArray(ids) || ids.length === 0 || !ids.every((r) => typeof r === 'string' && r.length > 0)) return bad('region_ids must be a non-empty list')
+      if (ids.includes('ALL') && ids.some((r) => r !== 'ALL')) return bad('All regions cannot be combined with specific regions')
+      for (const r of ids) {
+        const v = validatePair(entry.market_id, r)
+        if (!v.ok) return bad('a location is not in the market list')
+        const key = locationKey(v.market_id, v.region_id)
+        if (seen.has(key)) continue
+        seen.add(key)
+        extras.push({ market_id: v.market_id, region_id: v.region_id })
+      }
+    }
+  }
+
+  const prompts = []
+  if (Array.isArray(input.prompts)) {
+    for (const p of input.prompts) {
+      const text = typeof p === 'string' ? p : (p && typeof p === 'object' ? p.text : undefined)
+      if (typeof text !== 'string' || text.trim().length === 0) continue
+      let keys = [PRIMARY_KEY]
+      if (p && typeof p === 'object' && p.location_keys !== undefined && p.location_keys !== null) {
+        if (!Array.isArray(p.location_keys)) return bad('location_keys must be a list')
+        if (p.location_keys.length > 0) {
+          const out = []
+          for (const k of p.location_keys) {
+            if (typeof k !== 'string') return bad('a location key is not a string')
+            const norm = k === PRIMARY_KEY || k === primaryKey ? PRIMARY_KEY : k
+            if (norm !== PRIMARY_KEY && !seen.has(norm)) return bad(`unknown location key ${k}`)
+            if (!out.includes(norm)) out.push(norm)
+          }
+          keys = out
+        }
+      }
+      prompts.push({ text: text.trim(), keys })
+    }
+  }
+  return { ok: true, primary, extras, prompts }
+}
+
+function countPromptRows(plan) {
+  return plan.prompts.reduce((n, p) => n + p.keys.length, 0)
+}
+
+/**
+ * The prompt rows, in request order. A row for the primary carries NO
+ * location_id key at all (the database trigger fills the primary), so a call
+ * with no extra locations sends exactly the row shape it always did.
+ */
+function promptRowsFor(clientId, plan, idByKey) {
+  const rows = []
+  for (const p of plan.prompts) {
+    for (const k of p.keys) {
+      const row = { client_id: clientId, text: p.text, category: 'general', is_active: true, position: rows.length + 1 }
+      if (k !== PRIMARY_KEY) row.location_id = idByKey.get(k)
+      rows.push(row)
+    }
+  }
+  return rows
+}
+
+/**
+ * The cap for the plan: plan_prompt_caps for the plan, else the 'free' row,
+ * else 5, the same order as the prompt cap trigger.
+ */
+async function promptCapFor(supabase, plan) {
+  const want = plan || 'free'
+  const { data, error } = await supabase.from('plan_prompt_caps').select('plan, prompt_cap').in('plan', [want, 'free'])
+  if (error) return { ok: false, error: error.message }
+  const rows = data || []
+  const own = rows.find((r) => r.plan === want)
+  const free = rows.find((r) => r.plan === 'free')
+  const usable = (r) => !!r && r.prompt_cap !== null && r.prompt_cap !== undefined && Number.isFinite(Number(r.prompt_cap))
+  const cap = usable(own) ? Number(own.prompt_cap)
+    : usable(free) ? Number(free.prompt_cap)
+    : HARD_PROMPT_CAP_FALLBACK
+  return { ok: true, cap }
 }
 
 async function provision(supabase, input, ctx, role) {
@@ -143,12 +249,39 @@ async function provision(supabase, input, ctx, role) {
   const contactKey = contact.toLowerCase()
   const fail = (stage, code, message, ids) => Object.assign({ ok: false, stage, code, message: String(message || code) }, ids || {})
 
+  // ── Locations and prompt mapping (2026-11-13), pure, before anything ─────
+  // Every refusal here and at the cap check below happens BEFORE the clients
+  // insert, so no invite has gone out (docs/arch/multi-location-collection.md 5.4).
+  const locPlan = planLocations(input)
+  if (!locPlan.ok) return fail('validate', locPlan.code, locPlan.message)
+
   // ── Rule U step 1, Check A: an early filter only (rev 4) ─────────────────
   // The importer passes its once-per-run snapshot; the wizard loads per call.
   // Check A never decides whether a user is "ours"; Check B does that below.
   const auth = ctx.authEmails || await loadAuthEmails(supabase)
   if (!auth || !auth.complete) return fail('precheck', 'auth_lookup_incomplete', 'auth user listing incomplete')
   if (auth.set.has(contactKey)) return fail('precheck', 'email_registered', 'an auth user already exists for this address')
+
+  // ── Server prompt cap (2026-11-13, S8), before the clients insert ────────
+  // A string prompt is one row, an object prompt one row per distinct key.
+  // Over the cap is refused unless the admin wizard sent allow_over_cap: true
+  // (owner question 4, default), which is then recorded in the audit meta.
+  // This is the one place that default lives.
+  const promptRowCount = countPromptRows(locPlan)
+  let overCap = null
+  if (promptRowCount > 0) {
+    const capRes = await promptCapFor(supabase, input.plan)
+    if (!capRes.ok) {
+      console.error(`[provision] prompt cap read failed: ${capRes.error}`)
+      return fail('validate', 'db_error', 'the prompt cap could not be read')
+    }
+    if (promptRowCount > capRes.cap) {
+      if (input.allow_over_cap !== true) {
+        return fail('validate', 'prompt_cap_exceeded', `${promptRowCount} prompts requested, the ${input.plan || 'free'} plan allows ${capRes.cap}`)
+      }
+      overCap = { prompt_cap: capRes.cap, prompts_requested: promptRowCount }
+    }
+  }
 
   const refreshCadence = refreshCadenceFor(input.plan, DEFAULT_CLIENT_CATEGORY)
 
@@ -284,9 +417,36 @@ async function provision(supabase, input, ctx, role) {
   }
   if (profileErr) return rollbackUserAndClient('profile', profileErr.message, false)
 
+  // ── 3b. extra locations (2026-11-13) ─────────────────────────────────────
+  // Only when the deduplicated set is not empty: one add_client_locations call
+  // with p_limit null (the admin wizard; the location limit is a packaging
+  // rule, the prompt cap above is the spend bound). It also creates the
+  // primary row from the clients defaults. No extra location (every Explee
+  // call, every string-only call): no RPC at all, and the prompt rows below
+  // keep their old shape. The client delete in the rollback cascades
+  // client_locations.
+  const idByKey = new Map()
+  if (locPlan.extras.length > 0) {
+    let addRes
+    try {
+      addRes = await supabase.rpc('add_client_locations', {
+        p_client_id: client.id,
+        p_pairs: locPlan.extras,
+        p_limit: null,
+        p_created_by: ctx.actor || null,
+      })
+    } catch (e) {
+      addRes = { data: null, error: { message: (e && e.message) || 'add_client_locations threw' } }
+    }
+    if (addRes.error) return rollbackUserAndClient('locations', addRes.error.message, true)
+    for (const r of addRes.data || []) idByKey.set(locationKey(r.market_id, r.region_id), Number(r.id))
+    const missing = locPlan.extras.filter((x) => !idByKey.has(locationKey(x.market_id, x.region_id)))
+    if (missing.length > 0) return rollbackUserAndClient('locations', 'not every extra location was created', true)
+  }
+
   // ── 4. prompts ───────────────────────────────────────────────────────────
   let promptsCreated = 0
-  const promptRows = promptRowsFor(client.id, input.prompts)
+  const promptRows = promptRowsFor(client.id, locPlan, idByKey)
   if (promptRows.length > 0) {
     const { error: promptsErr } = await supabase.from('prompts').insert(promptRows)
     if (promptsErr) return rollbackUserAndClient('prompts', promptsErr.message, true)
@@ -310,7 +470,11 @@ async function provision(supabase, input, ctx, role) {
         prompts_created:   promptsCreated,
         refresh_cadence:   refreshCadence,
         default_market_id: input.default_market_id || null,
-      }),
+      },
+      // Added 2026-11-13, only when they apply, so a call with no extra
+      // location and no cap override writes the same meta as before.
+      locPlan.extras.length > 0 ? { locations_created: locPlan.extras.length, locations: locPlan.extras } : {},
+      overCap ? { allow_over_cap: true, prompt_cap: overCap.prompt_cap, prompts_requested: overCap.prompts_requested } : {}),
     })
     if (eventErr) console.error(`[${ctx.source}] audit row failed for client ${client.id}: ${eventErr.message}`)
     else auditLogged = true
@@ -324,6 +488,7 @@ async function provision(supabase, input, ctx, role) {
     userId: user.id,
     role,
     promptsCreated,
+    locationsCreated: locPlan.extras.length,
     auditLogged,
     refreshCadence,
   }
@@ -338,4 +503,4 @@ function provisionAdminWizardClient(supabase, input, ctx) {
   return provision(supabase, input, ctx, role)
 }
 
-module.exports = { provisionViewerClient, provisionAdminWizardClient, loadAuthEmails, aliasesWithName, REDIRECT_TO, PAGING, OURS_SKEW_MS }
+module.exports = { provisionViewerClient, provisionAdminWizardClient, loadAuthEmails, aliasesWithName, planLocations, REDIRECT_TO, PAGING, OURS_SKEW_MS, HARD_PROMPT_CAP_FALLBACK }

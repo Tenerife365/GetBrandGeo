@@ -36,17 +36,35 @@ const { costForRow } = require('./_cost')
 // telling every LLM exactly where the end-user is searching from.
 //   1. market_label / region_label from the caller (explicit, always correct)
 //   2. TLD inference from brand_website (fallback only)
+//
+// Worldwide (docs/arch/multi-location-collection.md section 6.6, owner question
+// 2, unanswered on 2026-11-13, so the recommended default ships): a location
+// WW / ALL resolves to market label 'Worldwide' with no region. With
+// WORLDWIDE_NEUTRAL true the system text then names no place at all and keeps
+// only the language instruction, instead of "You are a user based in
+// Worldwide". With it false, such a location falls back to the website TLD,
+// as scheduled runs did before 2026-11-13. A WW continent region (label such as
+// Europe) is a specific region and keeps the "Europe, Worldwide" wording either
+// way. This constant is the one place to change that ruling.
+const WORLDWIDE_NEUTRAL = true
+const WORLDWIDE_MARKET_LABEL = 'Worldwide'
+const LANGUAGE_INSTRUCTION = 'Respond in the same language as the question.'
+
 function buildSystemContext(cfg, marketLabel, regionLabel) {
   let location = 'the relevant local market'
 
-  if (marketLabel) {
-    const hasSpecificRegion =
-      regionLabel &&
-      !regionLabel.startsWith('All ') &&
-      regionLabel !== 'All regions' &&
-      regionLabel !== 'All states' &&
-      regionLabel !== 'All provinces' &&
-      regionLabel !== 'All emirates'
+  const hasSpecificRegion = Boolean(
+    regionLabel &&
+    !regionLabel.startsWith('All ') &&
+    regionLabel !== 'All regions' &&
+    regionLabel !== 'All states' &&
+    regionLabel !== 'All provinces' &&
+    regionLabel !== 'All emirates'
+  )
+  const worldwideOnly = marketLabel === WORLDWIDE_MARKET_LABEL && !hasSpecificRegion
+  if (worldwideOnly && WORLDWIDE_NEUTRAL) return LANGUAGE_INSTRUCTION
+
+  if (marketLabel && !worldwideOnly) {
     location = hasSpecificRegion ? `${regionLabel}, ${marketLabel}` : marketLabel
   } else {
     const raw = (cfg.brand_website || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
@@ -64,7 +82,7 @@ function buildSystemContext(cfg, marketLabel, regionLabel) {
   return (
     `You are a user based in ${location}. ` +
     `Answer as if you are that local user — use local context and knowledge relevant to ${location}. ` +
-    `Respond in the same language as the question.`
+    LANGUAGE_INSTRUCTION
   )
 }
 
@@ -983,12 +1001,23 @@ const CLAUDE_BUDGET_WORKER_MS = 55000
 // and the three HTTP endpoints agree byte-for-byte. run_id is set only when the
 // caller passes one (the queue worker does; the manual endpoints leave it null,
 // keeping their rows out of the uq_ai_results_run_prompt_llm partial index).
-function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config, model = null }) {
+function buildResultRow({ engine, prompt_id, client_id, run_id = null, text, usage = null, citations = null, errorCode, detail, client_config, model = null, asked = null }) {
   // model: which model produced this row (ai_results.model, added 2026-10-30),
   // so a model change can be judged on rows that name their model instead of
   // on dates. Null when the engine did not report one.
   const base = { prompt_id, llm: engine, client_id, model: model || ENGINE_MODEL[engine] || null, checked_at: new Date().toISOString() }
   if (run_id != null) base.run_id = run_id
+  // asked: where this answer was asked from (docs/arch/multi-location-collection.md
+  // sections 4.1 and 6.1), stamped on ok AND error rows alike. Written only when
+  // the caller passes it (the worker and the three single cell collectors do), so
+  // every other caller builds rows exactly as before 2026-11-13. A null
+  // location_id means the prompt was asked at the client's default country
+  // (the fallback of _locations.js).
+  if (asked && typeof asked === 'object') {
+    base.location_id     = asked.location_id ?? null
+    base.asked_market_id = asked.market_id ?? null
+    base.asked_region_id = asked.region_id ?? null
+  }
 
   if (errorCode) {
     return {
@@ -1061,6 +1090,10 @@ async function collectEngines(engines, {
   // browser sends client_config, so a viewer claiming 'managed' would otherwise
   // buy themselves the expensive model on our account. Absent means cheap.
   plan = null,
+  // { location_id, market_id, region_id } of the place the prompt is asked
+  // from, resolved on the server. Stamped on every row when given; see
+  // buildResultRow. Absent means rows are built exactly as before 2026-11-13.
+  asked = null,
 }) {
   const ctx  = buildSystemContext(client_config, market_label, region_label)
   // Context-aware timeouts (CLAUDE.md §12.6): the worker gets generous budgets
@@ -1094,13 +1127,13 @@ async function collectEngines(engines, {
 
     if (s.status === 'rejected') {
       const detail = s.reason?.message || 'unknown'
-      rows.push(buildResultRow({ engine, prompt_id, client_id, run_id, text: null, errorCode: 'timeout', detail, client_config }))
+      rows.push(buildResultRow({ engine, prompt_id, client_id, run_id, text: null, errorCode: 'timeout', detail, client_config, asked }))
       summary[engine] = `timeout: ${detail}`
       continue
     }
 
     const { text, errorCode, detail, usage, citations, model } = s.value ?? { text: null, errorCode: null }
-    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config, model })
+    const row = buildResultRow({ engine, prompt_id, client_id, run_id, text, usage, citations, errorCode, detail, client_config, model, asked })
     rows.push(row)
     summary[engine] = row.status === 'error' ? row.error_code : (row.brand_mentioned ? 'mentioned' : 'not_mentioned')
   }
@@ -1128,6 +1161,7 @@ async function collectEngines(engines, {
 
 module.exports = {
   buildSystemContext,
+  WORLDWIDE_NEUTRAL,
   withTimeout,
   ENGINE_CALLERS,
   ENGINE_TIMEOUT_MS,

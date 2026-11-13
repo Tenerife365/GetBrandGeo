@@ -73,6 +73,9 @@ installModule('_auth.js', {
   },
 })
 
+// COUNTRY_NAMES lives in _country_names.js since 2026-11-13 (_enqueue.js
+// re-exports it); both are stubbed so nothing real is loaded for geo.
+installModule('_country_names.js', { COUNTRY_NAMES: {} })
 installModule('_enqueue.js', {
   COUNTRY_NAMES: {},
   async checkCollectionCooldown() { calls.cooldown++; return { blocked: false } },
@@ -175,6 +178,33 @@ function reset() {
     reset()
     const res = await post('tok-viewer', { client_id: 99, force: true })
     assert.strictEqual(res.statusCode, 403)
+    assert.strictEqual(calls.enqueue.length, 0)
+  })
+
+  console.log('handler, multi-location (2026-11-13)')
+
+  await check('body markets is accepted and ignored: enqueue gets market null', async () => {
+    reset()
+    const res = await post('tok-viewer', { client_id: 42, markets: [{ market: { id: 'US', label: 'USA' }, region: { id: 'NYC', label: 'New York' } }] })
+    assert.strictEqual(res.statusCode, 200)
+    assert.strictEqual(calls.enqueue[0].market, null)
+  })
+
+  await check('a non-object body is 400 before any enqueue', async () => {
+    reset()
+    for (const b of [null, [1], 7, 'x']) {
+      const res = await post('tok-admin', b)
+      assert.strictEqual(res.statusCode, 400)
+    }
+    assert.strictEqual(calls.enqueue.length, 0)
+  })
+
+  await check('a client_id that is not a positive int4 is 400', async () => {
+    reset()
+    for (const id of [0, -1, 1.5, '1e0', ' 1', 2147483648, true]) {
+      const res = await post('tok-admin', { client_id: id })
+      assert.strictEqual(res.statusCode, 400, `client_id ${JSON.stringify(id)}`)
+    }
     assert.strictEqual(calls.enqueue.length, 0)
   })
 

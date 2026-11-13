@@ -87,6 +87,17 @@ async function processJob(supabase, job, invId) {
       // Set by _enqueue.js from the clients row when the job was created.
       plan:          job.client_config?.plan ?? null,
       worker:        true,   // generous per-engine timeouts (15-min budget) — CLAUDE.md §12.6
+      // Where the answer is asked from, stamped on every row this job writes
+      // (ok and error). _enqueue.js resolved it on the server from the
+      // prompt's location_id (docs/arch/multi-location-collection.md 6.1). A
+      // null location_id with a market_id is the fallback: the client's
+      // default country, asked as before 2026-11-13. A job queued before the
+      // migration carries neither column and stamps nulls plus its market_id.
+      asked: {
+        location_id: job.location_id ?? null,
+        market_id:   job.market_id ?? null,
+        region_id:   job.region_id ?? null,
+      },
     })
 
     if (rows.length > 0) {

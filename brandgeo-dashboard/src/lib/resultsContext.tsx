@@ -16,11 +16,15 @@ import { useCollectionLanded } from './useCollectionLanded'
 import { readAllById } from './keysetRead'
 import { visibleSnapshot } from './resultsGuards'
 import { deriveLatestRows, type ResultRow } from './metrics'
+import { useLocations } from './locationsContext'
+import { applyLocationFilter, type LocationFiltered } from './locations'
 import {
   createResultsLoader, type ResultsLoader, type ResultsSnapshot, type ResultsState, type ResultsStatus,
 } from './resultsLoader'
 
-export interface ResultsContextValue extends ResultsState {
+export interface ResultsContextValue extends Omit<ResultsState, 'snapshot'> {
+  /** The snapshot with the location view filter applied once, here. Null until loaded. */
+  snapshot: LocationFiltered<ResultsSnapshot> | null
   reload: (opts?: { quiet?: boolean }) => Promise<boolean>
 }
 
@@ -52,6 +56,8 @@ function makeLoader(): ResultsLoader {
 export function ResultsProvider({ children }: { children: ReactNode }) {
   const { activeClientId, activeClient, loading } = useClient()
   const { lastCompletedAt } = useCollection()
+  const { selected, primary } = useLocations()
+  const primaryId = primary ? primary.id : null
   const loaderRef = useRef<ResultsLoader | null>(null)
   if (loaderRef.current === null) loaderRef.current = makeLoader()
   const loader = loaderRef.current
@@ -118,13 +124,13 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ResultsContextValue>(() => {
     const seen = visibleSnapshot(state, key)
     return {
-      snapshot: seen.snapshot,
+      snapshot: seen.snapshot ? applyLocationFilter(seen.snapshot, selected, primaryId) : null,
       status: seen.status,
       loadError: seen.loadError,
       reload,
       __retain: retainFor,
     } as ResultsContextValue
-  }, [state, key, reload, retainFor])
+  }, [state, key, reload, retainFor, selected, primaryId])
   return <ResultsContext.Provider value={value}>{children}</ResultsContext.Provider>
 }
 
@@ -132,7 +138,7 @@ export function ResultsProvider({ children }: { children: ReactNode }) {
  * The shared snapshot. Mounting a consumer registers interest, which starts
  * the load; unmounting releases it.
  */
-export function useResults(): ResultsContextValue & { snapshot: ResultsSnapshot | null; status: ResultsStatus } {
+export function useResults(): ResultsContextValue & { snapshot: LocationFiltered<ResultsSnapshot> | null; status: ResultsStatus } {
   const ctx = useContext(ResultsContext) as ResultsContextValue & { __retain?: () => () => void }
   const retain = ctx.__retain
   useEffect(() => (retain ? retain() : undefined), [retain])

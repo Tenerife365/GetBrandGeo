@@ -32,6 +32,8 @@ import {
   buildRecommendationsStats, buildEngineErrors, buildAiSnippets, type RecommendationsStats,
 } from '../lib/views/recommendationsView'
 import { ENGINE_META, type EngineId } from '../lib/planConfig'
+import { useLocations } from '../lib/locationsContext'
+import { locationScopeLine } from '../lib/locations'
 import EngineChip from '../components/EngineChip'
 import SharedEmptyState from '../components/EmptyState'
 import LoadErrorCard from '../components/LoadErrorCard'
@@ -527,6 +529,7 @@ function RecommendationsSkeleton() {
 export default function Recommendations() {
   const { activeClientId, activeClient, activeEngines, isAdmin } = useClient()
   const brandName = activeClient?.name ?? 'Your brand'
+  const { locations, isMulti, selected } = useLocations()
   const { snapshot, status, loadError: snapshotError, reload } = useResults()
 
   const [aiLoading, setAiLoading] = useState(false)
@@ -546,9 +549,16 @@ export default function Recommendations() {
     const activeIds = snapshot.activePrompts.map(pr => pr.id)
     const view = buildSnapshotView(snapshot.rows, activeIds, activeEngines)
     const stats = buildRecommendationsStats(view, snapshot.activePrompts, brandName)
+    // Generation always covers every location, so whether it can run is judged on
+    // the unfiltered population, never on the location filter.
+    const allIds = snapshot.allActivePrompts.map(pr => pr.id)
+    const allTotalChecks = buildRecommendationsStats(
+      buildSnapshotView(snapshot.allRows, allIds, activeEngines), snapshot.allActivePrompts, brandName,
+    ).totalChecks
     return {
       view,
       stats,
+      allTotalChecks,
       recs: generateRecs(stats),
       engineErrors: buildEngineErrors(snapshot.rows, activeEngines),
       snippets: buildAiSnippets(view, snapshot.activePrompts),
@@ -562,6 +572,7 @@ export default function Recommendations() {
   const loadFailedNoData = snapshot === null && status === 'error'
   const loadError = loadFailedNoData || !!snapshotError || historyError
   const hasResults = (stats?.totalChecks ?? 0) > 0
+  const canGenerate = (derived?.allTotalChecks ?? 0) > 0
 
   // ── Saved advice history ──────────────────────────────────────────────────
   // One read: runs with their items embedded, so there is no second round trip.
@@ -611,25 +622,32 @@ export default function Recommendations() {
 
   // ── Generate ──────────────────────────────────────────────────────────────
   const generateAiInsights = async () => {
-    if (!derived || !stats || stats.totalChecks === 0 || !activeClientId || !snapshot || snapshot.clientId !== activeClientId) return
+    if (!derived || derived.allTotalChecks === 0 || !activeClientId || !snapshot || snapshot.clientId !== activeClientId) return
+    // The advice is about the whole brand, so the payload is built from every
+    // location's rows and prompts, never from the location filter on the page.
+    const allIds   = snapshot.allActivePrompts.map(pr => pr.id)
+    const allView  = buildSnapshotView(snapshot.allRows, allIds, activeEngines)
+    const allStats = buildRecommendationsStats(allView, snapshot.allActivePrompts, brandName)
+    if (allStats.totalChecks === 0) return
     setAiLoading(true)
     setAiError(null)
     setUnsavedRecs([])
 
     const engineStats: Record<string, any> = {}
-    for (const s of stats.llmStats) {
+    for (const s of allStats.llmStats) {
       engineStats[s.llm] = { total: s.total, mentioned: s.mentioned, rate: s.rate, avgPos: s.avgPos }
     }
+    const allSnippets = buildAiSnippets(allView, snapshot.allActivePrompts)
 
     const payload = {
       client_id:           activeClientId,
       brand_name:          brandName,
       engine_stats:        engineStats,
-      engines_with_errors: engineErrors,
-      top_competitors:     stats.competitors,   // carries rankedMentions + proseOnly
-      mentioned_snippets:  derived.snippets.mentioned,
-      absent_snippets:     derived.snippets.absent,
-      prompts:             snapshot.activePrompts.map(p => ({ text: p.text, category: p.category })),
+      engines_with_errors: buildEngineErrors(snapshot.allRows, activeEngines),
+      top_competitors:     allStats.competitors,   // carries rankedMentions + proseOnly
+      mentioned_snippets:  allSnippets.mentioned,
+      absent_snippets:     allSnippets.absent,
+      prompts:             snapshot.allActivePrompts.map(p => ({ text: p.text, category: p.category })),
     }
 
     try {
@@ -714,7 +732,7 @@ export default function Recommendations() {
       icon={Sparkles}
       onClick={generateAiInsights}
       loading={aiLoading}
-      disabled={!hasResults}
+      disabled={!canGenerate}
       aria-label="Generate AI insights"
     >
       {aiLoading ? 'Analysing…' : runs.length > 0 ? 'Generate new analysis' : 'Generate insights'}
@@ -731,6 +749,9 @@ export default function Recommendations() {
           click is guarded instead. */}
       <PageHeader
         title="Recommendations"
+        subtitle={isMulti
+          ? `${locationScopeLine(locations.length, selected.size)}${selected.size > 0 && selected.size < locations.length ? ' New advice always covers every location.' : ''}` // copy: pending bg-copy
+          : undefined}
         badge={!loading && recs.length > 0 && !(showBody && stats && hasResults)
           ? <Badge tone="neutral">{recs.length} action{recs.length !== 1 ? 's' : ''}</Badge>
           : undefined}
@@ -864,7 +885,7 @@ export default function Recommendations() {
             {aiError && !aiLoading && (
               <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-card border border-line border-l-[3px] border-l-neg bg-surface p-4">
                 <p className="text-body text-ink-2">{aiError}</p>
-                <Button variant="secondary" size="sm" icon={RefreshCw} onClick={generateAiInsights} disabled={!hasResults}>
+                <Button variant="secondary" size="sm" icon={RefreshCw} onClick={generateAiInsights} disabled={!canGenerate}>
                   Retry
                 </Button>
               </div>

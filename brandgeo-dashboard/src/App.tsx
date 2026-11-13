@@ -8,6 +8,7 @@ import { ClientProvider, useClient } from './lib/clientContext'
 import { I18nProvider } from './lib/i18nContext'
 import { CollectionProvider } from './lib/collectionContext'
 import { ResultsProvider } from './lib/resultsContext'
+import { LocationsProvider } from './lib/locationsContext'
 import { TimeFilterProvider } from './lib/timeFilterContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -262,6 +263,7 @@ export default function App() {
     <ThemeProvider>
       <I18nProvider>
       <ClientProvider>
+        <LocationsProvider>
         <MarketProvider>
           <CollectionProvider>
           <ResultsProvider>
@@ -318,6 +320,7 @@ export default function App() {
           </ResultsProvider>
           </CollectionProvider>
         </MarketProvider>
+        </LocationsProvider>
       </ClientProvider>
       </I18nProvider>
     </ThemeProvider>

@@ -88,6 +88,80 @@ const DEFAULTS = {
 }
 
 function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)) }
+
+// ── client_locations SQL functions (opt-in, createFakeSupabase({ clientLocations: true })) ──
+// Mirrors db/supabase-client-locations-2026-11-13.sql step 2 and step 5 in
+// control flow. Errors carry the code and message prefix the SQL raises.
+function clLive(db, clientId) {
+  return (db.tables.client_locations || []).filter((r) => String(r.client_id) === String(clientId) && (r.archived_at === null || r.archived_at === undefined))
+}
+function clNextId(db) {
+  const rows = db.tables.client_locations || []
+  const max = rows.reduce((m, r) => Math.max(m, Number(r.id) || 0), Number(db.serial.client_locations) || 0)
+  db.serial.client_locations = max + 1
+  return max + 1
+}
+function clInsert(db, row, nowIso) {
+  const rows = db.tables.client_locations || (db.tables.client_locations = [])
+  const full = Object.assign({ id: clNextId(db), region_id: 'ALL', is_primary: false, position: 0, archived_at: null, created_at: nowIso, created_by: null }, row)
+  rows.push(full)
+  return full
+}
+function clEnsure(db, clientId, nowIso) {
+  const live = clLive(db, clientId)
+  const prim = live.find((r) => r.is_primary)
+  if (prim) return { data: Number(prim.id), error: null }
+  const client = (db.tables.clients || []).find((c) => String(c.id) === String(clientId))
+  if (!client) return { data: null, error: { code: '23503', message: `client_not_found: ${clientId}` } }
+  const m = client.default_market_id == null ? 'WW' : client.default_market_id
+  const r = client.default_region_id == null || client.default_region_id === '' ? 'ALL' : client.default_region_id
+  const same = live.find((x) => x.market_id === m && x.region_id === r)
+  if (same) { same.is_primary = true; return { data: Number(same.id), error: null } }
+  const row = clInsert(db, { client_id: Number(clientId), market_id: m, region_id: r, is_primary: true, position: 0 }, nowIso)
+  return { data: Number(row.id), error: null }
+}
+const CLIENT_LOCATION_RPCS = {
+  ensure_primary_client_location(db, a, nowIso) { return clEnsure(db, a.p_client_id, nowIso) },
+  add_client_locations(db, a, nowIso) {
+    const ens = clEnsure(db, a.p_client_id, nowIso)
+    if (ens.error) return ens
+    const used = clLive(db, a.p_client_id).length
+    const pairs = Array.isArray(a.p_pairs) ? a.p_pairs : []
+    if (a.p_limit !== null && a.p_limit !== undefined && used + pairs.length > a.p_limit) {
+      return { data: null, error: { code: '23514', message: `location_limit_reached: ${used} used, ${pairs.length} requested, limit ${a.p_limit}` } }
+    }
+    const seen = new Set(clLive(db, a.p_client_id).map((r) => `${r.market_id}:${r.region_id}`))
+    for (const p of pairs) {
+      const k = `${p.market_id}:${p.region_id == null ? 'ALL' : p.region_id}`
+      if (seen.has(k)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_client_locations_live"' } }
+      seen.add(k)
+    }
+    const out = pairs.map((p, i) => clone(clInsert(db, { client_id: Number(a.p_client_id), market_id: p.market_id, region_id: p.region_id == null ? 'ALL' : p.region_id, position: used + i + 1, created_by: a.p_created_by ?? null }, nowIso)))
+    return { data: out, error: null }
+  },
+  archive_client_location(db, a, nowIso) {
+    const row = (db.tables.client_locations || []).find((r) => String(r.id) === String(a.p_location_id) && String(r.client_id) === String(a.p_client_id))
+    if (!row) return { data: 'not_found', error: null }
+    if (row.archived_at !== null && row.archived_at !== undefined) return { data: 'already_archived', error: null }
+    if (row.is_primary) return { data: 'location_is_primary', error: null }
+    const inUse = (db.tables.prompts || []).some((p) => String(p.location_id) === String(a.p_location_id) && p.is_active)
+    if (inUse) return { data: 'location_in_use', error: null }
+    row.archived_at = nowIso
+    return { data: 'archived', error: null }
+  },
+  set_primary_client_location(db, a, nowIso) {
+    const ens = clEnsure(db, a.p_client_id, nowIso)
+    if (ens.error) return ens
+    const row = clLive(db, a.p_client_id).find((r) => String(r.id) === String(a.p_location_id))
+    if (!row) return { data: 'not_found', error: null }
+    if (row.is_primary) return { data: 'already_primary', error: null }
+    for (const r of clLive(db, a.p_client_id)) r.is_primary = false
+    row.is_primary = true
+    const client = (db.tables.clients || []).find((c) => String(c.id) === String(a.p_client_id))
+    if (client) { client.default_market_id = row.market_id; client.default_region_id = row.region_id }
+    return { data: 'primary_set', error: null }
+  },
+}
 function uuid() { return crypto.randomUUID() }
 function cmp(a, b) {
   if (a === b) return 0
@@ -280,11 +354,22 @@ class Query {
 //                         served, so a test can add a user between two passes.
 // A user_profiles insert for an id that already has a profile answers 23505
 // through the existing UNIQUE on user_profiles.id (no option needed).
-function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = null, sumCostEur = false, pagedListUsers = false, authBehaviour = null, failInsert = null, listUsersPageCap = null, listUsersNextPage = false, stampCreatedAt = false, inviteResendsPending = false } = {}) {
+// Multi-location (docs/arch/multi-location-collection.md, 2026-11-13) adds one
+// more, also off by default:
+//   clientLocations   true: the four SQL functions of
+//                     db/supabase-client-locations-2026-11-13.sql answer
+//                     through rpc() over the in-memory client_locations,
+//                     clients and prompts tables (ensure_primary_client_location,
+//                     add_client_locations, archive_client_location,
+//                     set_primary_client_location). Every rpc call is also
+//                     recorded with its arguments in db.rpcArgs. No lock, no
+//                     transaction: control flow only, as everything here.
+function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = null, sumCostEur = false, pagedListUsers = false, authBehaviour = null, failInsert = null, listUsersPageCap = null, listUsersNextPage = false, stampCreatedAt = false, inviteResendsPending = false, clientLocations = false } = {}) {
   const db = {
     tables: {},
     serial: {},
     calls: [],
+    rpcArgs: [],
     triggers: {},                // table -> (op, oldRow, newRow, nowIso) => row, upsert only
     extraUnique,
     failInsert: Array.isArray(failInsert) && failInsert.length ? new Set(failInsert) : null,
@@ -340,6 +425,10 @@ function createFakeSupabase({ now = () => new Date(), users = [], extraUnique = 
           sum += Number(r.cost_eur || 0)
         }
         return { data: sum, error: null }
+      }
+      if (clientLocations && CLIENT_LOCATION_RPCS[name]) {
+        db.rpcArgs.push({ name, args: clone(args) })
+        return CLIENT_LOCATION_RPCS[name](db, args, nowD.toISOString())
       }
       return { data: null, error: { message: `unknown rpc ${name}` } }
     },
