@@ -9,6 +9,7 @@ import { CheckCircle2, ChevronRight, Loader2, Building2, Globe, Tag, Users, Mail
 import { PageTitle } from '../components/Typography'
 import { Combobox } from '../components/ui'
 import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
+import PendingInvitesPanel from '../components/PendingInvitesPanel'
 
 const MARKET_OPTIONS = buildMarketOptions(MARKETS)
 
@@ -488,7 +489,7 @@ export default function Onboard() {
                   <div>Client ID: <span className="text-slate-300">#{newClientId}</span></div>
                 </div>
 
-                {/* Resend invite — invite links expire in 24h; covers a missed
+                {/* Resend invite: invite links expire after about an hour; covers a missed
                     or spam-filtered first email without needing the Supabase
                     Dashboard (task, 2026-07-09). */}
                 <div className="flex items-center justify-between gap-3 text-xs">
@@ -509,6 +510,11 @@ export default function Onboard() {
           </div>
         )}
       </div>
+
+      {/* Every invited account that has not accepted yet, across all clients.
+          Reloads when the wizard creates a client. Sits behind the isAdmin
+          early return above, so a viewer never reaches it. */}
+      <PendingInvitesPanel refreshKey={newClientId} />
     </div>
   )
 }

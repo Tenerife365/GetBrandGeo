@@ -169,7 +169,7 @@
   timeout = 15
 
 [functions."resend-invite"]
-  timeout = 15
+  timeout = 26
 
 # ── Stripe self-serve auto-provisioning webhook (STRIPE-WEBHOOK-SPEC.md) ──────
 # Fast DB writes + one Stripe API read; 15s is plenty. Must NOT call _auth.js —
