@@ -20,9 +20,206 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-11)
+## CURRENT STATE (newest entry 2026-11-13)
+
+### 2026-11-13 (second): several countries and regions per client LIVE (0ee54eb), one location per prompt, migration applied
+
+**Constantin's words: a potential client "is interested in multiple
+countries, so I can't select the multiple countries ... because I can select
+only one market. And then multiple regions ... We need to build it now."**
+Measured before any design: the sidebar kept a list of markets only in the
+browser, collection used the first entry, scheduled runs used
+`clients.default_market_id` at country level, and `ai_results` stored no
+location.
+
+**Ruling, Constantin, 2026-11-13: "One country per prompt".** Each prompt
+belongs to one location. The same question in four countries is four prompts
+created in one action, so cost per prompt is unchanged and the plan prompt
+cap stays the spend bound. The alternative (every prompt asked in every
+selected country) was offered and declined. Do not re-argue.
+
+**One commit, one push, one Netlify build.** `0ee54eb`, 63 files, pushed
+13:50:22Z with `BATCH_PUSH=1` on his "applied, commit and push". Spec
+`docs/arch/multi-location-collection.md`, UI design
+`docs/design/multi-location-ui-2026-11-13.md`, full record
+`docs/qa/multi-location-orchestrator-record-2026-11-13.md`.
+
+**Database, `db/supabase-client-locations-2026-11-13.sql`, APPLIED by
+Constantin in the SQL Editor before the push.** New table
+`public.client_locations` (one primary per client, mirrored to
+`clients.default_market_id` and `default_region_id`; RLS on, one SELECT
+policy, no write policy). `prompts.location_id` is NOT NULL, set once and
+never changed, with a composite FK `(location_id, client_id)` so a prompt can
+only point at a location of its own client. Trigger `trg_prompt_location`
+fills the primary when a prompt is inserted without a location, refuses a
+change of location, and refuses an active prompt in an archived location.
+Four functions run by the service role only: `ensure_primary_client_location`,
+`add_client_locations` (atomic limit under an advisory lock),
+`archive_client_location`, `set_primary_client_location`. Stamp columns
+`ai_results.location_id`, `asked_market_id`, `asked_region_id` and
+`collection_jobs.location_id`, `region_id`. `client_events_type_check` now
+holds eleven values, the last `location_change`. **Read back** through one
+query Constantin ran (the Supabase connector of the session was failing): 66
+locations, 66 primaries, 545 prompts all with a location, the FK, both
+triggers, one policy, five functions, no grant to anon, authenticated or
+PUBLIC. The same text had been run twice against production inside a block
+that always rolls back (95 ms and 73 ms, md5 of the executed text equal to
+the file).
+
+**Order rule for anything that touches these tables again: migration first,
+read back, then push.** A dashboard deploy before its migration makes the
+collectors answer 500 before any engine call, makes scheduled clients lose
+their cycle, and lets the worker bill pending jobs up to three times with
+nothing saved (spec 4.5).
+
+**Server.** `client-locations.js` (POST actions `list`, `add`, `archive`,
+`set_primary`, the last admin only; errors as `{error, code}`). Geography is
+resolved on the server from the prompt's location in `_enqueue.js`, the
+worker and the three collectors, and every answer is stamped with where it
+was asked. A failed locations read refuses the run before any engine call;
+in a scheduled run the refusal is marked `transient` and
+`schedule-collections.js` does not stamp `last_refresh_at`, so the next hour
+retries. `onboard-client.js` and `_provision_client.js` accept `locations`
+and prompts per location, check the prompt cap before any write and roll
+back on failure. `mcp-server.js` prompt and fix outputs carry the location.
+No engine caller, model id, token limit or cost constant changed.
+
+**Rule that binds any later edit: no file under `netlify/functions` may
+require a `.ts` file** (`tests/ts_require_bundler.test.js`). The first spec
+had `_locations.js` require `src/lib/markets.ts`, which would have failed in
+production in every function not bundled by esbuild. The server reads
+`netlify/functions/_market_regions.js`, a plain JavaScript mirror pinned to
+`markets.ts` by `tests/market_regions_mirror.test.js`. A market or region
+added to `markets.ts` without the mirror fails that test.
+
+**Dashboard.** `src/lib/locations.ts`, `src/lib/locationsContext.tsx`
+(mounted between `ClientProvider` and `MarketProvider`),
+`src/components/ui/MultiCombobox.tsx`. The location filter is applied ONCE,
+in `src/lib/resultsContext.tsx` (`rows` and `activePrompts` filtered,
+`allRows` and `allActivePrompts` unfiltered), so every page reads the same
+snapshot; never filter per page. The sidebar "Locations" block replaces the
+market block: it is a VIEW filter plus add and archive, and it steers nothing
+about collection. `marketContext.tsx` is kept for compatibility only: its
+selections mirror the live locations and its write functions are no-ops.
+Onboard wizard: several markets and regions, prompts per location, a cap
+counter and an admin override. Prompts page: "Ask in" multi-select. Account:
+Locations section with Make primary (admin only). AI Visibility: a location
+chip per prompt and "Split by location". Recommendations generation always
+covers every location. The stored filter key is per viewer and per client
+(`brandgeo_location_filter_v2_<user>_<client>`).
+
+**Defaults in use until Constantin rules (spec section 14, one constant
+each).** `PLAN_LOCATION_LIMIT` in `planConfig.ts`, mirrored in
+`_locations.js`: free 1, radar 3, essentials 5, growth 5, growth_pro 8,
+managed 25, pro 25, enterprise 100, unknown plan 1. Viewers may add and
+archive their own locations (`VIEWER_MAY_EDIT_LOCATIONS` in
+`client-locations.js`). An admin may onboard above the prompt cap
+(`allow_over_cap`). Nothing happens to locations on a downgrade. The default
+view is all locations. A Worldwide location with no region gets a neutral
+system text (`WORLDWIDE_NEUTRAL` in `_collect.js`).
+
+**Behaviour that changed on deploy day (spec 6.7).** Manual runs no longer
+follow the browser's sidebar selection. Two scheduled clients whose default
+is a city run at city level from their next scheduled run, was country
+level. Scheduled Worldwide clients get neutral or continent-level wording,
+was the website-country fallback. Old answers carry no stamp; "Location not recorded" shows only for a
+client with several locations.
+
+**Reviews, all `bg-verify`, read-only.** Pre-build review of the spec: BLOCK,
+two must-fix closed in the spec (the `.ts` require above, and the filter
+applied per page, which had skipped Recommendations). Final review in three
+lenses: server PASS WITH FINDINGS, regression PASS WITH FINDINGS, frontend
+FAIL on one onboarding dead end (a one-location wizard above the prompt cap
+got no override). After the fix round both re-reviews returned PASS WITH
+FINDINGS with every earlier finding closed. The four low items they left were
+fixed and re-checked from the orchestrator seat, not by a third review.
+Reports: `docs/qa/multi-location-*-2026-11-13.md`.
+
+**Before the commit:** `tsc` exit 0, 65 of 65 node test files (was 52 on
+2026-11-11), build exit 0, entry chunk 601.26 kB against 580.20 kB before
+(the locations layer sits in the entry because `Layout` imports it), 8,859
+added lines free of dashes, names, addresses and secrets with positive
+controls. Headless Chrome over CDP, demo mode, 1440 and 390 wide: for a
+client with one location every heading position on Overview and AI
+Visibility equals the 2026-11-10 baseline ("Your prompts" at 682 px and
+1,158 px); with five locations injected, choosing one country in the sidebar
+filters every page on desktop and through the phone drawer, with no sideways
+scroll.
+
+**LIVE, read from outside at 13:51Z:** `health` answers `commit` 0ee54eb,
+`built_at` 13:50:59Z, supabase ok, jobs ok, watchdog ok; `client-locations`,
+`enqueue-collection`, the three collectors and `onboard-client` answer 401
+unauthenticated; the live entry `index-DjTwZvpk.js` carries "All locations"
+and the lazy chunks carry "Split by location", "Ask in", "Make primary" and
+`allow_over_cap`; `dashboard-ci` run 43437208800 on `0ee54eb` is `success`.
+
+**Not checked by anyone.** The new screens signed in with a real account. The
+first real collection on the new build, and whether its rows carry the stamp
+(the Supabase connector was down after the push). A real phone, a screen
+reader, Firefox, light mode by measurement. Two sessions editing locations at
+once.
+
+**Three traps of this day, worth knowing.** (1) The PC ran out of commit
+charge (4.4 GB of 47.9 GB free, 26 Claude and 37 node processes): node
+crashed with segmentation faults and garbled reads, the build needed up to
+eight attempts, and every crashed run passed on a repeat. Read the files of a
+commit back from disk (valid UTF-8, no null byte) before trusting a tree
+built on such a day. (2) A headless Chrome profile kept between runs cached a
+corrupted copy of an immutable dependency chunk and failed every route with a
+syntax error; the file on disk and as served was valid. Delete the profile
+before judging. (3) `execute_sql` can fail for the whole connector while the
+database is healthy; the fallback is one query for Constantin to paste.
+
+**Open, none blocking.** Every new sentence is an English literal marked
+`copy: pending bg-copy`; `i18nContext.tsx` was not edited. The 500 credit
+monthly SerpApi pool is still not enforced in code, and more locations on
+Growth PRO and up use it faster. A failed clients or prompts read in
+`_enqueue.js` is still stamped as a skipped cycle (older than this work; the
+locations read is the only one marked transient). A transient refusal that
+repeats every hour is not visible to the watchdog. `client-locations.js` has
+no rate limit on add and archive and archived rows are never purged. The
+wizard reads the cap from `PLAN_PROMPTS` and the server from
+`plan_prompt_caps`; they are equal today.
+
+### 2026-11-13: pending invites list with resend LIVE (ec67a54)
+
+`ec67a54`, 7 files, pushed 11:44Z on Constantin's "Yes, push now", live with
+`built_at` 11:45:21Z. The work was written by the pending-invites session on
+2026-11-11, after ten invited leads did not complete their invite and the
+only way to see who had not accepted was the Supabase dashboard. It sat
+uncommitted until `bg-verify` reviewed it on 2026-11-13
+(`docs/qa/pending-invites-review-2026-11-13.md`, PASS WITH FINDINGS, 0
+blocker, 0 major, 0 medium, 2 low, 6 info).
+
+`netlify/functions/resend-invite.js` is admin only: action `list` (every
+viewer login and whether it accepted) and action `resend` by user id. The
+address is always the one stored on an auth user the function resolved
+itself, so a typo can no longer create an orphan login.
+`src/components/PendingInvitesPanel.tsx` is mounted below the Onboard wizard
+behind the page's admin gate. `netlify.toml` gives the function 26 s.
+`tests/resend_invite.test.js`, 39 checks.
+`db/supabase-client-events-invite-resent-2026-11-11.sql` was applied by
+Constantin the same hour: the type check then held ten values, the last
+`invite_resent`, and he resent every pending invite from the panel.
+
+**Open from the review, recorded and not fixed:** L1, the race guard in
+`sendInvite` can delete a login created in the ten minutes before the
+request (wants a tighter window and a no-profile condition); L2, the panel
+types `client_name` and `plan` as non-null.
+
+**Still owed as records, not written here:** the Explee lead import (dry run
+only, no cron) and the Netlify 4 KB environment incident that blocked its
+first deploy; the cause of the freed space was never established from this
+seat.
 
 ### 2026-11-11: market list 26 to 61, type-to-filter market and region selector LIVE (855952c)
+
+> STALE in part as of 2026-11-13: the sidebar market block this entry
+> describes was replaced by the "Locations" block (entry above). The sidebar
+> no longer selects the collection market; each prompt carries its own
+> location. The market list, the append-only rules for `markets.ts`, the
+> `Combobox` and the Onboard fields below still stand, and `markets.ts` now
+> also has a server mirror, `netlify/functions/_market_regions.js`.
 
 **Constantin's words: "I need south korea, singapore, australia on the list
 and more developed countries", the list being "the dashboard where we select

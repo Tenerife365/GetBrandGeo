@@ -419,3 +419,38 @@ database because the connector was down: the index list, the SECURITY DEFINER
 flags, the column privileges of authenticated on prompts and the table grants;
 all four were read in the rehearsal of the same text. The header of the SQL
 file now says APPLIED; its body is unchanged (same md5).
+
+## 10. Commit, push, live
+
+Commit `0ee54eb`, 63 files (8,935 insertions, 563 deletions), by pathspec from
+the list that was scanned; other sessions' files stayed out. Pushed at
+13:50:22 UTC with `BATCH_PUSH=1` on the owner's go, one Netlify build.
+
+Read from outside at 13:51 UTC:
+
+- `health`: commit `0ee54eb`, built 13:50:59 UTC, supabase ok, jobs ok,
+  watchdog ok.
+- Unauthenticated POST: `client-locations`, `enqueue-collection`,
+  `collect-prompt`, `collect-claude`, `collect-chatgpt` and `onboard-client`
+  answer 401 "Unauthorized: missing token"; `schedule-collections` answers 401;
+  `mcp-server` answers 400 Invalid Request; `collection-worker-background`
+  answers 202 (the platform's own acknowledgement of a background function).
+  A 401 from a function proves its module loaded, so no function ships a
+  require it cannot resolve.
+- Live entry chunk `index-DjTwZvpk.js`, 601,339 bytes, carries "All
+  locations", `client-locations` and the v2 filter key; the lazy chunks carry
+  "Split by location", "Ask in", `allow_over_cap`, "Make primary" and "New
+  advice always covers every location".
+- `dashboard-ci` run 43437208800 on `0ee54eb`: success.
+
+Not read after the push: the database. The Supabase connector of the session
+timed out again, so whether the first answers collected by the new build
+carry `location_id` and the asked market is unverified, as are the index list
+and the column privileges on the live database. Read them when the connector
+answers:
+
+    select count(*), count(location_id), count(asked_market_id)
+      from public.ai_results where checked_at > '2026-11-13 13:50:59+00';
+
+The `CLAUDE.md` entry for this work and for the invites commit `ec67a54` was
+written the same hour on the owner's "Yes, write it".
