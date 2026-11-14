@@ -22,6 +22,73 @@
 
 ## CURRENT STATE (newest entry 2026-11-14)
 
+### 2026-11-14 (second): admin Platform activity page LIVE (08cb738), polling, no migration
+
+**The ask, from the orchestrator seat: a read-only live view of platform
+usage for the admin.** New page `src/pages/PlatformActivity.tsx` at
+`/platform-activity`, lazy route in `App.tsx` behind the same admin gate as
+`/usage` and `/revenue`, sidebar entry "Platform activity" in the admin group
+of `Layout.tsx` (admin only). Spec `docs/arch/platform-activity.md`.
+
+**What it shows.** Four tiles: viewers signed in in the last 24 h, AI runs
+today (UTC, manual and scheduled), engine success over 24 h (red at a 10
+percent error rate, or one engine failing at least half of 5 or more calls),
+clients over 80 percent of their monthly API budget (red above 90). A live
+feed: sign ins, runs, failed jobs, engine errors, deleted accounts and the 11
+`client_events` types, new rows sliding in. A per-client table: plan, engine
+calls this month with a budget bar (amber at 80, red at 90), engines used of
+entitled, last active. Research clients are left out of the tiles and hidden
+in the feed and table by default, with a toggle.
+
+**Server: one new admin function, `netlify/functions/platform-activity.js`**,
+`requireAuth(event, { adminOnly: true })` first, service key inside, reads
+only, every query bounded by a time window and a row cap. Actions `feed`
+(polled every 15 s) and `summary` (every 60 s), both paused while the tab is
+hidden, backoff to 120 s, stop on 401 or 403. Spend: one paged month read of
+`ai_results` capped at 20,000 rows with a `truncated` flag (the page then
+says "at least"), cross checked with `sum_cost_eur`; budgets from `_cost.js`,
+no plan constant redefined. No email, address, website, note or user id
+leaves it; every `meta` field passes a per-type whitelist. Supabase keeps
+only the latest sign in per person, so the feed shows that one per person.
+`netlify.toml` gives it `timeout = 26` (reason in spec section 5).
+
+**Realtime was measured and not used.** The `supabase_realtime` publication
+holds zero tables (read 2026-11-14). Polling sits behind an `ActivitySource`
+interface so Realtime can replace it. **Owner ruling, not a migration:**
+`alter publication supabase_realtime add table public.client_events, public.collection_runs, public.collection_jobs;`
+Before running it, read spec section 10: Realtime would send the raw `meta`
+(emails included) to the browser, past the server side whitelist.
+
+**Bug found while closing the review, worth knowing.** `_cost.js`
+`activeEnginesFor(plan)` uses a truthy object lookup, so a plan literally
+named `toString` makes it throw. `platform-activity.js` now passes the
+checked key (falls back to essentials for an unknown plan), with a test.
+`_cost.js` itself is on the do-not-touch list and keeps the gap; no code
+writes such a plan today.
+
+**Review and checks.** `bg-verify` PASS WITH FINDINGS
+(`docs/qa/platform-activity-review-2026-11-14.md`: 0 blocker, 0 major, 2
+medium, 8 low, 6 info), all closed from the orchestrator seat and recorded in
+section 10 of the review, not by a second `bg-verify` run. Tests
+`tests/platform_activity.test.js` (67 checks) and
+`tests/platform_activity_source.test.js` (14); 70 of 70 node test files,
+`tsc` exit 0, build exit 0. Entry chunk 602,628 bytes against 601,640 before
+(+988, budget +1,000); motion lives only in the page chunk (21 kB). Headless
+Chrome over CDP, demo mode, 1440 and 390 wide, dark and light: no sideways
+scroll, sticky table header.
+
+**Commit `08cb738`, 11 files, by pathspec. LIVE**, read from outside at
+18:18Z: `health` answers `commit` 08cb738, `built_at` 12:53:54Z, supabase,
+jobs and watchdog ok; `platform-activity` answers 401 unauthenticated; the
+live entry `index-BrpN7Roh.js` carries "Platform activity" and the lazy chunk
+`PlatformActivity-Ciie2wjN.js` carries "Sign ins show the latest per person".
+It was already on `origin/main`, together with `db6b948`, when Constantin's
+"Push it" reached this seat, so no second push was made.
+
+**Not checked by anyone.** The page signed in as a real admin against
+production data, a real phone, a screen reader. New strings are marked
+`copy: pending bg-copy`.
+
 ### 2026-11-14: 7 day invite links LIVE (e622e14), owner live check passed, Invite and Reset password templates made scanner safe
 
 **Constantin's words: an invite showed "Link expired" two hours after a
@@ -98,7 +165,7 @@ affiliate magic link is also first opener spends. New strings are marked
 `copy: pending bg-copy`. Whether the Resend API key is Full access or
 Sending only was not looked at. A Platform Activity admin page (live usage
 telemetry) is being built in a separate session, not committed at the time
-of this entry.
+of this entry. (STALE: it shipped as `08cb738`, see the entry above.)
 
 ### 2026-11-13 (second): several countries and regions per client LIVE (0ee54eb), one location per prompt, migration applied
 
