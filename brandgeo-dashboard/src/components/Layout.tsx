@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
   ChevronDown, Moon, Sun, Globe2, Menu, X, UserPlus, Loader2,
   StopCircle, DollarSign, Smile, CreditCard, User, Share2, FlaskConical, Lock, FileSearch,
-  Eye, EyeOff, Layers, Star, Check, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis,
+  Eye, EyeOff, Layers, Star, Check, LifeBuoy, Target, Handshake, ArrowLeft, Receipt, Wallet, MousePointerClick, Ellipsis, Activity,
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { MARKETS, type Market } from '../lib/marketContext'
@@ -694,6 +694,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // Admin-only affiliate programs (docs/affiliates/ADMIN-GUIDE.md). Same
         // sidebar-only placement as Prospects, for the same reason.
         ...(isAdmin ? [{ to: '/affiliates', icon: Handshake, label: 'Affiliates' }] : []),
+        // Sidebar only, not on the mobile bottom bar. copy: pending bg-copy
+        ...(isAdmin ? [{ to: '/platform-activity', icon: Activity, label: 'Platform activity' }] : []),
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Revenue' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
       ],

@@ -232,6 +232,13 @@
 [functions."revenue-report"]
   timeout = 26
 
+# Admin Platform activity page (docs/arch/platform-activity.md section 5 row 2).
+# Read only. The summary pages this month's ai_results (up to 20 sequential
+# pages) plus up to 5 auth user pages; the 10s default would surface as an
+# opaque 502 well before the 20,000 row ceiling.
+[functions."platform-activity"]
+  timeout = 26
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26

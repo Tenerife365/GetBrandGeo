@@ -29,6 +29,7 @@ const Recommendations = lazy(() => import('./pages/Recommendations'))
 const Onboard = lazy(() => import('./pages/Onboard'))
 const Revenue = lazy(() => import('./pages/Revenue'))
 const Prospects = lazy(() => import('./pages/Prospects'))
+const PlatformActivity = lazy(() => import('./pages/PlatformActivity'))
 const Social = lazy(() => import('./pages/Social'))
 const SEO = lazy(() => import('./pages/SEO'))
 const Account = lazy(() => import('./pages/Account'))
@@ -311,6 +312,7 @@ export default function App() {
               <Route path="/seo" element={<PrivateRoute><OnboardGate><Layout><RouteView><SEO /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/usage" element={<PrivateRoute><OnboardGate><Layout><RouteView><Revenue /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/prospects" element={<PrivateRoute><OnboardGate><Layout><RouteView><Prospects /></RouteView></Layout></OnboardGate></PrivateRoute>} />
+              <Route path="/platform-activity" element={<PrivateRoute><OnboardGate><Layout><RouteView><PlatformActivity /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/affiliates/preview/:affiliateId" element={<PrivateRoute><OnboardGate><AffiliatePreviewRoute /></OnboardGate></PrivateRoute>} />
               <Route path="/affiliates" element={<PrivateRoute><OnboardGate><Layout><RouteView><AffiliatesAdmin /></RouteView></Layout></OnboardGate></PrivateRoute>} />
               <Route path="/account" element={<PrivateRoute><OnboardGate><Layout><RouteView><Account /></RouteView></Layout></OnboardGate></PrivateRoute>} />
