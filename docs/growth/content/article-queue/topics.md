@@ -153,7 +153,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 22 | closing-offers | dropped 2026-11-06: 116 answers end with an offer to help further, but perplexity alone is 70 and gemini and google_ai are 0, the ends of capped answers are cut, and the perplexity side overlaps BG-107 | How often answers end by offering more help |
 | 23 | legal-aid | dropped 2026-11-06: 22 immigration answers name legal aid or nonprofit options, partly reported in BG-109, too thin alone | How often immigration answers point to free or low cost legal help |
 | 24 | draft-city-austin | published bg-119 2026-11-12 | What ChatGPT, Claude and Gemini recommend in Austin, and which firms all three agree on |
-| 25 | draft-city-portland | ready from 2026-11-14 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Portland, Oregon, and where they agree |
+| 25 | draft-city-portland | published bg-121 2026-11-14 | What the three engines recommend in Portland, Oregon, and where they agree |
 | 26 | draft-city-lasvegas | ready from 2026-11-17 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Las Vegas, and where they agree |
 | 27 | draft-city-orlando | ready from 2026-11-20 (draft, rule 5; city study, written 2026-11-08) | What the three engines recommend in Orlando, and where they agree |
 | 28 | city-nashville | ready from 2026-11-24 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Nashville, and where they agree |

@@ -17,3 +17,4 @@ One line per published article, newest last.
 - 2026-11-11 BG-118 https://getbrandgeo.com/bg-118.html Which Case Types AI Engines Attach to Personal Injury Firms
 - 2026-11-12 BG-119 https://getbrandgeo.com/bg-119.html AI Visibility in Austin: Three Engines Agree on Home Builders, Not on Lawyers
 - 2026-11-13 BG-120 https://getbrandgeo.com/bg-120.html ChatGPT Says Its Search Is a Fifth of Google's. What That Means for a Local Business
+- 2026-11-14 BG-121 https://getbrandgeo.com/bg-121.html AI Visibility in Portland: Engines Agree on IP Lawyers and Breweries, Not on Agents
