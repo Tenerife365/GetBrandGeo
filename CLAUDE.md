@@ -85,9 +85,11 @@ live entry `index-BrpN7Roh.js` carries "Platform activity" and the lazy chunk
 It was already on `origin/main`, together with `db6b948`, when Constantin's
 "Push it" reached this seat, so no second push was made.
 
-**Not checked by anyone.** The page signed in as a real admin against
-production data, a real phone, a screen reader. New strings are marked
-`copy: pending bg-copy`.
+**Owner live check PASSED, 2026-11-14** (his words: "confirmed, page loads
+as admin"): the page opened signed in as a real admin against production.
+
+**Not checked by anyone.** A real phone, a screen reader. New strings are
+marked `copy: pending bg-copy`.
 
 ### 2026-11-14: 7 day invite links LIVE (e622e14), owner live check passed, Invite and Reset password templates made scanner safe
 
