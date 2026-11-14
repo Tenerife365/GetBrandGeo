@@ -20,7 +20,85 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-13)
+## CURRENT STATE (newest entry 2026-11-14)
+
+### 2026-11-14: 7 day invite links LIVE (e622e14), owner live check passed, Invite and Reset password templates made scanner safe
+
+**Constantin's words: an invite showed "Link expired" two hours after a
+resend, and he asked for links that last 7 days.** Two causes, measured:
+the Pending invites panel assumed 60 minutes while the project's Supabase
+"Email OTP expiration" is 86400 s (24 hours), and that one setting governs
+every Supabase email link, so 7 days cannot be a setting. **Keep Email OTP
+expiration at 86400 s; do not change it.**
+
+**Design, spec `docs/arch/invite-link-7-days.md`.** BrandGEO issues its own
+random 32 byte token for viewer logins, stores only its sha256 in
+`public.client_invite_links`, and emails
+`https://app.getbrandgeo.com/invite#t=<token>` (fragment only) through
+Resend from `noreply@mail.getbrandgeo.com`, subject "Your BrandGEO login is
+ready". `/invite` makes no request on load and strips the address bar;
+Continue calls the public `invite-redeem` function, which checks the row
+and mints a fresh Supabase invite token with `generateLink`, then hands it
+to `/reset-password`, where `verifyOtp` runs only on Save. A mail scanner
+opening the link spends nothing. At most one active link per user; Resend
+and the new Copy link action supersede the old link and rotate the
+Supabase token. **Scope:** viewer logins from `resend-invite.js` and
+`_provision_client.js` (Onboard wizard, lead import). Self serve signup,
+`stripe-webhook.js` (not edited) and admin logins keep the Supabase invite,
+24 hours. Every failure falls back to `inviteUserByEmail`. Kill switches:
+`INVITE_LINK_CHANNEL=supabase`, `INVITE_REDEEM_DISABLED=1` (each needs a
+redeploy), and the bulk revoke line in the migration header.
+
+**Database:** `db/supabase-client-invite-links-2026-11-13.sql`, applied by
+Constantin before the push and read back (13 columns, 2 cascading FKs, 6
+checks, 5 indexes with the partial one active per user, RLS on with no
+policy, nothing for anon or authenticated, service_role select, insert and
+update only, no delete or truncate). The file header holds the incident
+runbook and the rollback.
+
+**Commit `e622e14`, 24 files, pushed 2026-11-13 on his "Commit and push".**
+Before the commit: `tsc` exit 0, 68 of 68 node test files, build exit 0
+(entry 601.56 kB). Reviews, all `bg-verify`: two design reviews (BLOCK,
+closed in the spec), a design re read (BLOCK, closed), server PASS WITH
+FINDINGS and frontend PASS WITH FINDINGS, all closed and re checked from the
+orchestrator seat, not by a third review. Reports
+`docs/qa/invite-link-7-days-*-2026-11-13.md`. **LIVE, read from outside:**
+`health` answers `commit` e622e14, `built_at` 16:00:23Z, supabase, jobs and
+watchdog ok; `dashboard-ci` run 43458213931 `success`; `resend-invite` and
+`onboard-client` answer 401 unauthenticated; `invite-redeem` answers 400 to
+a malformed token and 404 `invalid` to an unknown one, with `no-store` and
+`no-referrer`; `/invite` answers 200 and its chunk carries the new strings.
+
+**Owner live check PASSED, 2026-11-14** (his words: "confirmed"): a test
+invite arrived from the new sender, Continue led to Set your password, and
+the password saved. He then pressed Resend on every pending invite except
+the two addresses that had bounced in Resend.
+
+**Resend:** click tracking turned OFF by Constantin on 2026-11-13 (open
+tracking was already off), so the emailed link is never rewritten.
+
+**Supabase email templates, edited from this seat in Chrome on his go:**
+"Invite user" (2026-11-13) and "Reset password" (2026-11-14) no longer use
+`{{ .ConfirmationURL }}`, a link the first opener spends, so a mail scanner
+could burn it. Invite now links
+`https://app.getbrandgeo.com/reset-password?token_hash={{ .TokenHash }}&type=invite`
+(three places; was 5,416 characters, now 5,596); Reset password links the
+same path with `type=recovery` (one place; was 254 characters, sha256
+prefix f452789e6dc74df5, now 316). Undo: replace the URL back with
+`{{ .ConfirmationURL }}`. Both read back after a reload.
+
+**Not checked by anyone.** A password reset end to end through the new
+Reset template. The other Supabase templates (Confirm signup, Magic link,
+Change email address, Reauthentication) were not read and may still use
+`{{ .ConfirmationURL }}`. A phone, a screen reader, the Pending invites
+panel with real rows by measurement.
+
+**Open, none blocking.** Bounced addresses are not shown in the panel. The
+affiliate magic link is also first opener spends. New strings are marked
+`copy: pending bg-copy`. Whether the Resend API key is Full access or
+Sending only was not looked at. A Platform Activity admin page (live usage
+telemetry) is being built in a separate session, not committed at the time
+of this entry.
 
 ### 2026-11-13 (second): several countries and regions per client LIVE (0ee54eb), one location per prompt, migration applied
 
