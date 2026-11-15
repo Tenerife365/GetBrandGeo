@@ -20,7 +20,85 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-14)
+## CURRENT STATE (newest entry 2026-11-15)
+
+### 2026-11-15: glass layer on AI Visibility and the sidebar LIVE (5984dc9), visual only
+
+**The ask, Constantin's brief: a premium AI SaaS look on AI Visibility**
+(score card, engines, Fix this, prompt matrix) and on the sidebar: frosted
+glass cards, gradient fills, 1px highlight borders, soft glow, hover lifts.
+Visual only. The Phase 3 to 5 guardrails bind, and where the brief and a
+rule disagreed the rule won. Spec and record:
+`docs/design/phase3-visual/glass-layer-2026-11-15.md`.
+
+**What changed, 7 dashboard files.** `src/index.css`: glass, gradient and
+glow tokens declared in BOTH themes (`--grad-start`, `--grad-mid`,
+`--grad-end`, `--glow`, `--glow-strength`, the `--glass-*` set, `--aura-a`,
+`--aura-b`, `--row-hover`) and the classes `.glass-card`, `.glass-lite`,
+`.glass-card-interactive` (for links), `.glass-card-lift` (for a card that is
+not a link), `.glass-callout`, `.matrix-head`, `.matrix-row`, `.glass-input`,
+`.cell-top`, `.cell-soft`, `.sidebar-glass`, `.sidebar-well` and others, with
+an `@supports not (backdrop-filter)` fallback and a reduced motion block.
+`tailwind.config.js` maps the four gradient and glow colours;
+`tests/tokens_sync.test.js` checks every glass token exists in both themes
+and that the brief's raw hex values appear nowhere else in `src/`. New
+`src/components/GlowScoreDial.tsx` (gradient ring with glow), used ONLY on AI
+Visibility; the shared `ui/ScoreDial` (Overview) is unchanged because its
+spec says no gradient or glow. `AIVisibility.tsx`: dimension tiles with
+gradient bars, engine glass cards in one sideways scrolling row (the
+2026-11-10 density ruling holds, never a grid), Fix this as a glass callout
+with a top fix preview, a client side prompt search ("Search N prompts"),
+a sticky blurred matrix header, a row hover tint. `PromptResultCell.tsx`: a
+#1 cell glows, other mentions are a softer pill. `Layout.tsx`: CSS classes
+only, no `motion`, the Client and Locations blocks as recessed wells.
+
+**Rulings inside the work, worth keeping.** Blur is paid ONLY on the sticky
+matrix header, the one surface content scrolls under; every other glass use
+carries `.glass-lite`, and the sidebar is opaque on purpose (as the phone
+drawer it covers the page, and text on a see-through panel has no fixed
+contrast). The #1 badge fill is the strong accent pair, not the brief's
+lighter violet, because white on #6366f1 or #8b5cf6 is under 4.5:1. The
+euro budget pill stays admin only and is never shown in demo; it now sits in
+the score card header. The engine refresh button stays admin only and shows
+on hover or keyboard focus, always on touch screens and while it runs. The
+dimension bars no longer print "n/a" under an unmeasured row.
+
+**Measured from the builder seat, headless Chrome over CDP, demo mode.**
+"Your prompts" now starts at 757 px at 1440 (was 682) and 1,241 px at 390
+(was 1,158); with Fix this open 1,200 px and 2,308 px. Every move is under
+the 100 px allowance, but the prompts are reached a little later than after
+the 2026-11-10 density pass; keep that in mind before adding more above
+them. No sideways scroll of the window or of `<main>` at 1024, 1180, 1280,
+1366, 1440 and 390, dark and light. Text contrast: 0 boxes below AA at 1440
+and 390, both themes, Fix this closed and open. Entry chunk 602,542 bytes
+(602,628 before).
+
+**Reviews, two read-only `bg-verify` lenses, both PASS WITH FINDINGS.**
+Rules lens (`docs/qa/glass-layer-review-rules-2026-11-15.md`): 0 blocker,
+0 major, 1 medium, 3 low, 7 info. Accessibility lens
+(`docs/qa/glass-layer-review-a11y-2026-11-15.md`): 0 blocker, 1 major,
+0 medium, 3 low, 9 info; the major was the toolbar row overflowing between
+1024 and 1366 once the search field was added, fixed by letting it wrap. All
+major, medium and low items were closed by the builder and re-measured from
+the orchestrator seat, not by a second review; each report carries an
+amendment saying so. Neither reviewer ran a browser.
+
+**Commit `5984dc9`, 10 files, pushed 2026-11-15 with `BATCH_PUSH=1` on
+Constantin's "Push it now and deploy it live", one Netlify build. LIVE,** read
+from outside: `health` answers `commit` 5984dc9, `built_at` 15:27:00Z,
+supabase, jobs and watchdog ok; `dashboard-ci` passed; the live entry is
+`index-CG9buRdR.js`, the stylesheet `index-DUC8ajwS.css` carries the glass
+classes, and the lazy chunk `AIVisibility-CPy_1fAB.js` carries the prompt
+search. Screenshots in `docs/design/phase3-visual/after-glass/`, untracked on
+purpose like the earlier folders.
+
+**Not checked by anyone.** The page signed in with a real account, so the
+admin only budget pill and engine refresh button have never been seen live
+(hard reload, Ctrl+Shift+R, first). A real phone, a screen reader, Firefox.
+A client with seven active engines in the new engine row.
+
+**Open, none blocking.** The prompt matrix legend has no row for the new #1
+cell (bg-design or bg-copy). New strings are marked `copy: pending bg-copy`.
 
 ### 2026-11-14 (second): admin Platform activity page LIVE (08cb738), polling, no migration
 
