@@ -2732,6 +2732,13 @@ export default function AIVisibility() {
           const legend = prompts.length > 0 ? (
             <Disclosure key={`legend-${activeClientId ?? ''}`} title="What the symbols mean">{/* copy: pending bg-copy */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-meta text-ink-2">
+                {/* Key for the glowing rank one cell (.cell-top), drawn by the
+                    same component with position 1 so it matches the matrix. */}
+                <span className="inline-flex items-center gap-1.5" data-aiv-legend-top>
+                  <PromptResultCell state="mentioned" position={1} engineId={activeLLMs[0]?.id ?? 'chatgpt'} variant="legend" />
+                  {/* copy: pending bg-copy */}
+                  Ranked #1, named first
+                </span>
                 {([
                   ['mentioned', AIV_COPY.legendMentioned],
                   ['absent', AIV_COPY.legendAbsent],

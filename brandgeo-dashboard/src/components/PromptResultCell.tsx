@@ -73,13 +73,17 @@ export default function PromptResultCell({
   const meta = ENGINE_META[engineId]
   const label = meta?.label ?? engineId
 
+  const top = state === 'mentioned' && position === 1
+
   if (variant === 'legend') {
+    // A legend swatch with position 1 is the key for the glowing #1 cell, drawn
+    // with the same .cell-top class so the key and the cell can never drift.
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex h-5 w-5 items-center justify-center rounded-badge ${STATE_CLASS[state]}`}
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-badge ${top ? 'cell-top' : STATE_CLASS[state]}`}
       >
-        <Glyph state={state} size={12} />
+        <Glyph state={state} size={12} top={top} />
       </span>
     )
   }
@@ -125,8 +129,6 @@ export default function PromptResultCell({
   const box = variant === 'tile'
     ? 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[56px] py-1.5'
     : 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[40px] py-1.5'
-
-  const top = state === 'mentioned' && position === 1
 
   return (
     <span className={`${box} ${top ? 'cell-top' : STATE_CLASS[state]}`} title={spoken}>
