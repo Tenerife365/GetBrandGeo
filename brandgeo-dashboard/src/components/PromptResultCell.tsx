@@ -43,8 +43,11 @@ interface Props {
   variant?: PromptResultCellVariant
 }
 
+// Glass layer 2026-11-15: mentioned is a softer pill (.cell-soft), and rank #1
+// gets the strongest cell on the page (.cell-top, index.css). Absent and error
+// keep their own glyph, word and colour, so every state stays distinct.
 const STATE_CLASS: Record<CellState, string> = {
-  mentioned: 'bg-pos-tint text-pos-ink',
+  mentioned: 'cell-soft text-pos-ink',
   absent: 'bg-surface-2 text-neg',
   no_answer: 'bg-surface-2 text-ink-3',
   error: 'bg-surface-2 text-warn',
@@ -52,10 +55,10 @@ const STATE_CLASS: Record<CellState, string> = {
   locked: 'bg-transparent text-ink-3',
 }
 
-function Glyph({ state, size }: { state: CellState; size: number }) {
+function Glyph({ state, size, top = false }: { state: CellState; size: number; top?: boolean }) {
   const common = { size, 'aria-hidden': true as const }
   switch (state) {
-    case 'mentioned': return <Check {...common} className="text-pos-ink" />
+    case 'mentioned': return <Check {...common} className={top ? 'text-on-accent' : 'text-pos-ink'} />
     case 'absent': return <X {...common} className="text-neg" />
     case 'no_answer': return <Minus {...common} />
     case 'error': return <TriangleAlert {...common} className="text-warn" />
@@ -123,13 +126,15 @@ export default function PromptResultCell({
     ? 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[56px] py-1.5'
     : 'flex flex-col items-center justify-center gap-0.5 rounded-badge w-full min-h-[40px] py-1.5'
 
+  const top = state === 'mentioned' && position === 1
+
   return (
-    <span className={`${box} ${STATE_CLASS[state]}`} title={spoken}>
+    <span className={`${box} ${top ? 'cell-top' : STATE_CLASS[state]}`} title={spoken}>
       {variant === 'tile' && (
         <img src={meta?.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
       )}
-      <Glyph state={state} size={14} />
-      <span aria-hidden="true" className={`text-meta leading-none font-semibold${state === 'mentioned' ? ' text-ink' : ''}`}>{word}</span>
+      <Glyph state={state} size={14} top={top} />
+      <span aria-hidden="true" className={`text-meta leading-none font-semibold${top ? ' text-on-accent' : state === 'mentioned' ? ' text-ink' : ''}`}>{word}</span>
       {state === 'error' && since && (
         <span aria-hidden="true" className="text-meta leading-none text-warn">{cellSinceLine(since)}</span>
       )}

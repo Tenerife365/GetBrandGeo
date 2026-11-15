@@ -77,6 +77,34 @@
   --card-pad-standard: 20px;
   --card-pad-feature:  24px;
 
+  /* Glass layer (docs/design/phase3-visual/glass-layer-2026-11-15.md). The
+     owner's brief named raw hex values; they live here as tokens, once per
+     theme, and nothing else in src/ may spell them out. Gradient stops and the
+     glow are triplets so Tailwind can compose alpha (grad-start, grad-mid,
+     grad-end, glow in tailwind.config.js). Fills, borders and shadows are whole
+     values because their alpha differs by theme.
+     tests/tokens_sync.test.js checks each one is declared in both themes. */
+  --grad-start: 99 102 241;   /* #6366f1 */
+  --grad-mid: 139 92 246;   /* #8b5cf6 */
+  --grad-end: 168 85 247;   /* #a855f7 */
+  --glow: 192 132 252;   /* #c084fc */
+  --glow-strength: 0.42;
+  --glass-fill-top: rgb(30 31 40 / 0.74);
+  --glass-fill-bottom: rgb(16 17 22 / 0.64);
+  --glass-solid: 22 23 30;
+  --glass-border: rgb(255 255 255 / 0.08);
+  --glass-border-strong: rgb(255 255 255 / 0.14);
+  --glass-highlight: rgb(255 255 255 / 0.07);
+  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 16px 40px -18px rgb(0 0 0 / 0.7);
+  --glass-tile: rgb(255 255 255 / 0.025);
+  --glass-well: rgb(0 0 0 / 0.22);
+  --glass-well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.05);
+  --glass-nav-top: rgb(22 23 30 / 0.86);
+  --glass-nav-bottom: rgb(10 11 14 / 0.92);
+  --aura-a: 0.20;
+  --aura-b: 0.12;
+  --row-hover: 26 23 40;
+
   /* Legacy colour-utility bridge (spec 4.6). One variable per remapped utility,
      declared in both themes, read by tailwind.config.js (textColor,
      backgroundColor, borderColor). Dark value = what the class computes without
@@ -226,6 +254,29 @@ html.light {
 
   --shadow-card: 0 1px 2px rgb(9 9 15 / 0.04), 0 4px 12px rgb(9 9 15 / 0.05);
   --shadow-raised: 0 8px 24px -8px rgb(9 9 15 / 0.14);
+
+  /* Glass layer, light values (see the :root block). Light stops sit one step
+     darker so a gradient fill still clears 3:1 against the light track. */
+  --grad-start: 79 70 229;   /* #4f46e5 */
+  --grad-mid: 124 58 237;   /* #7c3aed */
+  --grad-end: 147 51 234;   /* #9333ea */
+  --glow: 139 92 246;   /* #8b5cf6 */
+  --glow-strength: 0.28;
+  --glass-fill-top: rgb(255 255 255 / 0.86);
+  --glass-fill-bottom: rgb(250 250 255 / 0.74);
+  --glass-solid: 255 255 255;
+  --glass-border: rgb(9 9 15 / 0.08);
+  --glass-border-strong: rgb(9 9 15 / 0.14);
+  --glass-highlight: rgb(255 255 255 / 0.95);
+  --glass-shadow: 0 1px 2px rgb(9 9 15 / 0.05), 0 14px 36px -18px rgb(76 29 149 / 0.22);
+  --glass-tile: rgb(244 244 251 / 0.7);
+  --glass-well: rgb(236 236 244 / 0.6);
+  --glass-well-shadow: inset 0 1px 2px rgb(9 9 15 / 0.06), inset 0 0 0 1px rgb(9 9 15 / 0.06);
+  --glass-nav-top: rgb(255 255 255 / 0.88);
+  --glass-nav-bottom: rgb(247 247 252 / 0.94);
+  --aura-a: 0.16;
+  --aura-b: 0.08;
+  --row-hover: 247 243 254;
 
   --br-text-white: 15 23 42;
   --br-text-slate-100: 15 23 42;
@@ -737,4 +788,213 @@ select:focus-visible:focus-visible {
    no semantic token; kept here so no component carries a raw colour. */
 @layer components {
   .scrim { background-color: rgb(0 0 0 / 0.6); }
+}
+
+/* ---------------------------------------------------------------------------
+   Glass layer (docs/design/phase3-visual/glass-layer-2026-11-15.md).
+   Every colour reads a token declared in both themes above, so each class
+   below is written once and is correct in dark and light by construction.
+   backdrop-filter is paid by .glass-card (a large surface that has moving
+   content behind it) and by the sticky matrix header, the one surface rows
+   scroll under. Cards over a flat canvas or a static aura add .glass-lite or
+   carry no blur at all, because there a blur costs GPU time and shows nothing;
+   the score card and the sidebar are in that group (review L3, 2026-11-15). Where backdrop-filter is not supported the fill turns
+   solid (the @supports block at the end), so text contrast never depends on a
+   blur. */
+@layer components {
+  .glass-card {
+    position: relative;
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    background-color: transparent;
+    background-image: linear-gradient(160deg, var(--glass-fill-top) 0%, var(--glass-fill-bottom) 100%);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
+  }
+  .glass-card.glass-lite { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass-card-interactive {
+    transition: transform var(--motion-fast) var(--ease-out),
+                border-color var(--motion-fast) var(--ease-out),
+                box-shadow var(--motion-fast) var(--ease-out);
+  }
+  .glass-card-interactive:hover,
+  .glass-card-interactive:focus-within {
+    transform: translateY(-2px);
+    border-color: rgb(var(--accent-ink) / 0.45);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow),
+                0 8px 28px -10px rgb(var(--glow) / var(--glow-strength));
+  }
+  /* Lift without the accent glow, for a card that is not itself a link (an
+     engine status card): a glow reads as "click me". */
+  .glass-card-lift {
+    transition: transform var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+  }
+  .glass-card-lift:hover,
+  .glass-card-lift:focus-within {
+    transform: translateY(-2px);
+    border-color: var(--glass-border-strong);
+  }
+
+  /* Radial accent aura behind the score card. It bleeds 8px sideways at most,
+     inside the page gutter, so it cannot add a horizontal scroll. */
+  .hero-ambient-mesh { position: relative; isolation: isolate; }
+  .hero-ambient-mesh::before {
+    content: '';
+    position: absolute;
+    inset: -12px -8px -12px -8px;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(42% 70% at 16% 44%, rgb(var(--grad-mid) / var(--aura-a)) 0%, transparent 70%),
+      radial-gradient(38% 60% at 88% 8%, rgb(var(--grad-start) / var(--aura-b)) 0%, transparent 72%);
+  }
+  /* The score card itself is HeroAnswer's Card; it takes the glass surface
+     from its wrapper, so no shared component props change. */
+  .hero-ambient-mesh > .rounded-card {
+    border-radius: 16px;
+    border-color: var(--glass-border);
+    background-color: transparent;
+    background-image: linear-gradient(160deg, var(--glass-fill-top) 0%, var(--glass-fill-bottom) 100%);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  }
+  .hero-ambient-mesh > .rounded-card:hover { border-color: var(--glass-border-strong); }
+
+  /* Gradient progress fill. The track stays --surface-3. */
+  .glow-bar-track { position: relative; overflow: hidden; border-radius: 9999px; background-color: rgb(var(--surface-3)); }
+  .glow-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background-image: linear-gradient(90deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-mid)) 55%, rgb(var(--grad-end)) 100%);
+    box-shadow: 0 0 10px 0 rgb(var(--glow) / var(--glow-strength));
+    transition: width var(--motion-base) var(--ease-out);
+  }
+  /* The 1px mention-rate line on an engine card: no track clip, so its glow shows. */
+  .glow-line { position: relative; height: 1px; border-radius: 9999px; background-color: rgb(var(--line-2)); }
+  .glow-line > span {
+    position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px;
+    background-image: linear-gradient(90deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
+    box-shadow: 0 0 6px 0.5px rgb(var(--glow) / var(--glow-strength));
+  }
+
+  /* Mini panel: one score dimension. No blur (six of them). */
+  .glass-tile {
+    border-radius: var(--radius-control);
+    border: 1px solid var(--glass-border);
+    background-color: var(--glass-tile);
+    transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+  }
+  .glass-tile:hover { border-color: rgb(var(--accent-ink) / 0.4); background-color: rgb(var(--accent) / 0.06); }
+
+  /* Small glass pill (the admin budget meter in the score card header). */
+  .glass-pill {
+    border-radius: 9999px;
+    border: 1px solid var(--glass-border-strong);
+    background-color: var(--glass-tile);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Engine favicon squircle. */
+  .glass-squircle {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    border-radius: 9px;
+    border: 1px solid var(--glass-border-strong);
+    background-color: rgb(var(--surface-2));
+    background-image: linear-gradient(160deg, var(--glass-highlight) 0%, var(--glass-tile) 100%);
+  }
+
+  /* Fix this collapsed callout: glass with a glowing accent on the left. */
+  .glass-callout::before {
+    content: ''; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px;
+    border-radius: 0 3px 3px 0; pointer-events: none;
+    background-image: linear-gradient(180deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
+    box-shadow: 0 0 10px 0 rgb(var(--glow) / var(--glow-strength));
+  }
+
+  /* Prompt matrix: sticky header with blur, row hover tint with a left accent. */
+  .matrix-head {
+    position: sticky; top: 0; z-index: 3;
+    background-color: rgb(var(--surface-2) / 0.9);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    box-shadow: inset 0 -1px 0 rgb(var(--line));
+  }
+  .matrix-row > button { position: relative; }
+  .matrix-row > button::before {
+    content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; z-index: 2;
+    border-radius: 0 2px 2px 0; pointer-events: none; background-color: transparent;
+    transition: box-shadow var(--motion-fast) var(--ease-out);
+  }
+  .matrix-row > button:hover::before,
+  .matrix-row > button[aria-expanded="true"]::before {
+    background-image: linear-gradient(180deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
+    box-shadow: 0 0 8px 0 rgb(var(--glow) / var(--glow-strength));
+  }
+  .matrix-row > button:hover,
+  .matrix-row > button:hover > .sticky { background-color: rgb(var(--row-hover)); }
+
+  /* Prompt search field. */
+  .glass-input {
+    border-radius: var(--radius-control);
+    border: 1px solid rgb(var(--edge));
+    background-color: rgb(var(--surface-2));
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+    transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+  }
+  .glass-input:focus { border-color: rgb(var(--accent-ink)); box-shadow: 0 0 0 3px rgb(var(--glow) / 0.18); }
+
+  /* Rank #1 in the prompt matrix: the strongest cell on the page. The fill is
+     the strong accent pair (white text clears 5.7:1 on it in both themes); the
+     glow carries the brief's lighter violet. */
+  .cell-top {
+    background-image: linear-gradient(135deg, rgb(var(--accent-strong)) 0%, rgb(var(--accent-strong-hover)) 100%);
+    color: rgb(var(--on-accent));
+    box-shadow: inset 0 1px 0 rgb(var(--on-accent) / 0.18), 0 0 14px -2px rgb(var(--glow) / var(--glow-strength));
+  }
+  /* Mentioned at any other rank: a softer pill than before. */
+  .cell-soft {
+    background-color: rgb(var(--pos) / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(var(--pos) / 0.28);
+  }
+
+}
+
+/* Sidebar (Layout.tsx, CSS only: nothing Layout imports may pull in motion).
+   The divider stays the solid --edge border on <aside>. Deliberately OUTSIDE
+   @layer: Tailwind hoists layered rules to the top of the sheet, so a layered
+   .nav-item.is-active would lose to the unlayered shell rule of the same
+   specificity further up this file. Unlayered and later, these win. */
+  .sidebar-glass {
+    background-color: rgb(var(--canvas));
+    background-image:
+      radial-gradient(120% 40% at 0% 0%, rgb(var(--grad-mid) / var(--aura-b)) 0%, transparent 60%),
+      linear-gradient(180deg, var(--glass-nav-top) 0%, var(--glass-nav-bottom) 100%);
+  }
+  .sidebar-well {
+    border-radius: 12px;
+    background-color: var(--glass-well);
+    box-shadow: var(--glass-well-shadow);
+  }
+  .nav-item.is-active {
+    background-color: transparent;
+    background-image: linear-gradient(90deg, rgb(var(--accent) / 0.22) 0%, rgb(var(--accent) / 0.05) 100%);
+    box-shadow: inset 0 0 0 1px rgb(var(--accent-ink) / 0.28);
+  }
+  .nav-item.is-active::before {
+    background-color: transparent;
+    background-image: linear-gradient(180deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
+    box-shadow: 0 0 10px 1px rgb(var(--glow) / var(--glow-strength));
+  }
+  .nav-item.is-active svg { filter: drop-shadow(0 0 5px rgb(var(--glow) / var(--glow-strength))); }
+
+/* Glass in browsers that cannot blur: a solid surface, same border and shadow. */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-card { background-image: none; background-color: rgb(var(--glass-solid)); }
+  .matrix-head { background-color: rgb(var(--surface-2)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-card-interactive, .glass-card-interactive:hover, .glass-card-interactive:focus-within,
+  .glass-card-lift, .glass-card-lift:hover, .glass-card-lift:focus-within { transform: none; transition: none; }
+  .glow-bar-fill, .glass-tile, .glass-input, .matrix-row > button::before { transition: none; }
 }

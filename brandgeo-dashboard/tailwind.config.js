@@ -54,6 +54,14 @@ export default {
           DEFAULT: 'rgb(var(--warn) / <alpha-value>)',
           tint: 'rgb(var(--warn-tint) / <alpha-value>)',
         },
+        // Glass layer (docs/design/phase3-visual/glass-layer-2026-11-15.md):
+        // gradient stops and the glow, declared per theme in src/index.css.
+        grad: {
+          start: 'rgb(var(--grad-start) / <alpha-value>)',
+          mid: 'rgb(var(--grad-mid) / <alpha-value>)',
+          end: 'rgb(var(--grad-end) / <alpha-value>)',
+        },
+        glow: 'rgb(var(--glow) / <alpha-value>)',
         // Legacy scales stay until commit B retires every caller.
         brand: {
           50:  '#f5f3ff',

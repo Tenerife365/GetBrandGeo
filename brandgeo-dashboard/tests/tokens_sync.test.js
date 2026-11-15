@@ -114,5 +114,47 @@ check('ENGINE_META ai_overview is #1c7b5a', () => {
   if (!m || m[1].toLowerCase() !== '#1c7b5a') throw new Error('got ' + (m && m[1]))
 })
 
+// --- glass layer tokens (glass-layer-2026-11-15.md) -----------------------------
+// Each one is declared in both themes, the triplets are three 0..255 integers,
+// and the brief's raw hex values appear nowhere in src/ outside index.css.
+const GLASS_TOKENS = [
+  'grad-start', 'grad-mid', 'grad-end', 'glow', 'glow-strength',
+  'glass-fill-top', 'glass-fill-bottom', 'glass-solid', 'glass-border', 'glass-border-strong',
+  'glass-highlight', 'glass-shadow', 'glass-tile', 'glass-well', 'glass-well-shadow',
+  'glass-nav-top', 'glass-nav-bottom', 'aura-a', 'aura-b', 'row-hover',
+]
+const TRIPLETS = ['grad-start', 'grad-mid', 'grad-end', 'glow', 'glass-solid', 'row-hover']
+for (const theme of ['dark', 'light']) {
+  for (const name of GLASS_TOKENS) {
+    check('glass token --' + name + ' declared in ' + theme, () => {
+      if (!cssTheme[theme][name]) throw new Error('missing')
+    })
+  }
+  for (const name of TRIPLETS) {
+    check('glass token --' + name + ' is a triplet in ' + theme, () => {
+      const v = cssTheme[theme][name]
+      if (!/^\d{1,3} \d{1,3} \d{1,3}$/.test(v) || v.split(' ').some(n => +n > 255)) throw new Error('got ' + v)
+    })
+  }
+}
+check('tailwind maps grad-start, grad-mid, grad-end and glow', () => {
+  const tw = read('tailwind.config.js')
+  for (const t of ['--grad-start', '--grad-mid', '--grad-end', '--glow']) {
+    if (!tw.includes('rgb(var(' + t + ') / <alpha-value>)')) throw new Error(t + ' not mapped')
+  }
+})
+check('brief hex values live only in index.css', () => {
+  const brief = /#(6366f1|a855f7|c084fc)\b/i
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d =>
+    d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)])
+  // Older than the glass layer and not about it: the logo gradient and the
+  // DeepSeek engine chart colour, which only happen to share a hex.
+  const allowed = ['BrandGeoLogo.tsx', 'planConfig.ts']
+  const hits = walk(path.join(__dirname, '..', 'src'))
+    .filter(f => /\.(tsx?|css)$/.test(f) && !f.endsWith('index.css') && !allowed.includes(path.basename(f)))
+    .filter(f => brief.test(fs.readFileSync(f, 'utf8')))
+  if (hits.length) throw new Error(hits.map(f => path.relative(path.join(__dirname, '..'), f)).join(', '))
+})
+
 console.log(passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

@@ -122,6 +122,10 @@ function describeRun(n: { kind: 'completed' | 'stopped'; done: number; total: nu
     : `Collection stopped: ${checked} of ${n.total} prompts checked${tail}`
 }
 
+// Recessed glass module for the sidebar Locations block (glass layer
+// 2026-11-15, index.css .sidebar-well). Same footprint as the old bordered row.
+const LOCATIONS_WELL = 'mx-2 my-1.5 px-2 py-2.5 flex-shrink-0 sidebar-well'
+
 // The sidebar Locations block (multi-location design section 5). One country per
 // prompt: this block lists the client's locations and FILTERS what the dashboard
 // shows. It steers nothing about collection. Copy: pending bg-copy.
@@ -244,7 +248,7 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
 
   if (status === 'loading') {
     return (
-      <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0" aria-busy="true">
+      <div className={`${LOCATIONS_WELL} space-y-2`} aria-busy="true">
         {header}
         <div className="h-8 px-2 flex items-center"><SkeletonBlock className="h-3.5 w-full" /></div>
         <div className="h-8 px-2 flex items-center"><SkeletonBlock className="h-3.5 w-2/3" /></div>
@@ -254,7 +258,7 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
 
   if (status === 'error' || locations.length === 0) {
     return (
-      <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
+      <div className={`${LOCATIONS_WELL} space-y-2`}>
         {header}
         {staticLine(activeClient?.default_market_id ?? 'WW', fallbackLabel)}
         <div className="flex items-center gap-2 px-1">
@@ -280,7 +284,7 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
   const rowBase = 'relative flex items-center gap-2 w-full min-w-0 px-2 h-8 max-md:min-h-[44px] rounded-control text-sm text-left transition-colors'
 
   return (
-    <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
+    <div className={`${LOCATIONS_WELL} space-y-2`}>
       {header}
       {liveRegion}
 
@@ -870,7 +874,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // At 768 and up this is undefined: the sidebar is the real shell there.
         inert={isMobile && !sidebarOpen ? '' : undefined}
         className={[
-        'fixed inset-y-0 left-0 z-50 w-60 bg-canvas border-r border-edge flex flex-col',
+        // sidebar-glass (index.css): opaque canvas under a gradient and a
+        // faint aura, CSS only. Opaque on purpose: as the phone drawer it sits
+        // over the page, and text over a see-through panel has no fixed contrast.
+        'fixed inset-y-0 left-0 z-50 w-60 sidebar-glass border-r border-edge flex flex-col',
         'transition-transform duration-200 ease-in-out',
         'md:relative md:w-60 md:flex-shrink-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
@@ -913,7 +920,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             edge; the ended states show what the run did. Same data and handlers
             as before. Visible from any tab except the affiliate admin. */}
         {!affiliateMode && collecting && progress && (
-          <div className="relative px-4 py-2.5 border-b border-line bg-canvas flex-shrink-0" role="status" aria-live="polite">
+          <div className="relative px-4 py-2.5 border-b border-line flex-shrink-0" role="status" aria-live="polite">
             <div className="flex items-center gap-2">
               <span className="status-dot text-accent is-live" aria-hidden="true" />
               {/* copy: pending bg-copy */}
@@ -945,7 +952,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             stopped run says stopped, with what was actually checked.
             Dismissible, and cleared the moment another run starts. */}
         {!affiliateMode && !collecting && runNotice && (
-          <div className="relative px-4 py-2.5 border-b border-line bg-canvas flex-shrink-0" role="status" aria-live="polite">
+          <div className="relative px-4 py-2.5 border-b border-line flex-shrink-0" role="status" aria-live="polite">
             <div className="flex items-center gap-2">
               <span
                 className={`status-dot ${runNotice.kind === 'stopped' ? 'text-ink-3' : runNotice.failed > 0 ? 'text-warn' : 'text-pos'}`}
@@ -1055,7 +1062,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Client switcher: admin only, not in affiliate mode */}
         {!affiliateMode && isAdmin && clients.length > 0 && (
-          <div className="px-3 py-3 border-t border-line flex-shrink-0">
+          <div className="mx-2 my-1.5 px-2 py-2.5 flex-shrink-0 sidebar-well">
             <div className="label-caps px-1 mb-1.5">{t.sidebar_client}</div>
             <div className="relative" ref={clientMenuRef}>
               <button
@@ -1195,7 +1202,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             is the single "My Profile" entry in the bottom actions, so this no
             longer duplicates it. (Ownership; de-duped 2026-07-19) */}
         {!affiliateMode && !isAdmin && activeClient && (
-          <div className="px-3 py-3 border-t border-line flex-shrink-0">
+          <div className="mx-2 my-1.5 px-2 py-2 flex-shrink-0 sidebar-well">
             <div className="flex items-center gap-2.5 px-1 py-1">
               <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
               <span className="min-w-0 text-left">

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import {
   RefreshCw, RotateCcw, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp,
   Play, Loader2, Copy, CheckCheck, Zap, Settings, X, Lock, Clock, Info,
-  CircleCheck, Undo2, EyeOff, Download, ChevronRight, Layers, Columns3, Check,
+  CircleCheck, Undo2, EyeOff, Download, ChevronRight, Layers, Columns3, Check, Search,
 } from 'lucide-react'
 import { useLocations, LocationFlag } from '../lib/locationsContext'
 import { locationLabel, promptLocationId, locationScopeLine } from '../lib/locations'
@@ -14,6 +14,7 @@ import { supabase, isDemoMode } from '../lib/supabase'
 import { useMarket, MARKETS } from '../lib/marketContext'
 import { buildFixPrompt } from '../lib/fixPrompt'
 import { buildFixItems, type FixItem } from '../lib/fixItems'
+import { normalizeForSearch } from '../lib/comboboxFilter'
 import { readAllById } from '../lib/keysetRead'
 import { useClient } from '../lib/clientContext'
 import type { Prompt, AIResult, LLMName, PromptCategory } from '../types'
@@ -28,6 +29,7 @@ import { computeAiVisibilityScore } from '../lib/aiVisibilityScore'
 import { MOTION_BASE, MOTION_FAST, EASE_OUT } from '../lib/motion'
 import Collapse from '../components/Collapse'
 import AllowanceMeter from '../components/AllowanceMeter'
+import GlowScoreDial from '../components/GlowScoreDial'
 import CooldownCountdown from '../components/CooldownCountdown'
 import Skeleton from '../components/Skeleton'
 import { PageTitle, SectionHeading } from '../components/Typography'
@@ -42,7 +44,7 @@ import SharedEmptyState from '../components/EmptyState'
 import { formatDate, formatRelativeOrDate, formatRatio } from '../lib/format'
 import PromptResultCell from '../components/PromptResultCell'
 import {
-  Card, ScoreDial, Meter, Badge, StatusGlyph, Page, PageHeader, HeroAnswer, SectionHeader,
+  Card, Meter, Badge, StatusGlyph, Page, PageHeader, HeroAnswer, SectionHeader,
   Button, Chip, ChipGroup, SegmentedControl, Disclosure,
   SkeletonBlock, SkeletonHero, SkeletonDial, SkeletonTable,
 } from '../components/ui'
@@ -399,6 +401,28 @@ export default function AIVisibility() {
   // Fix This hub columns: which item each priority column is showing (clamped at render).
   const [fixCursor, setFixCursor] = useState<{ P0: number; P1: number; P2: number }>({ P0: 0, P1: 0, P2: 0 })
   const [filterCats, setFilterCats]     = useState<Set<string>>(new Set())
+  // Prompt search (glass layer 2026-11-15): a client-side filter on the rows
+  // already loaded, applied in renderPlan next to the category filter.
+  const [promptQuery, setPromptQuery]   = useState('')
+  useEffect(() => { setPromptQuery('') }, [activeClientId])
+  // Sticky matrix header (glass layer 2026-11-15). position: sticky needs every
+  // ancestor up to <main> to be a non-scrolling box, so the matrix wrapper only
+  // turns into a sideways scroller when the table is wider than its column;
+  // when it fits, the header sticks to the top of <main> while rows scroll.
+  const [matrixWrapEl, setMatrixWrapEl] = useState<HTMLDivElement | null>(null)
+  const [matrixFits, setMatrixFits] = useState(true)
+  useEffect(() => {
+    const el = matrixWrapEl
+    const inner = el?.firstElementChild as HTMLElement | null | undefined
+    if (!el || !inner || typeof ResizeObserver === 'undefined') return
+    // inner carries min-width: tableMinWidth, so it is wider than el exactly
+    // when the table does not fit.
+    const check = () => setMatrixFits(inner.offsetWidth <= el.clientWidth + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el); ro.observe(inner)
+    return () => ro.disconnect()
+  }, [matrixWrapEl])
   const [expandedRow, setExpandedRow]   = useState<number | null>(null)
   const [showInsights, setShowInsights] = useState(true)
   // Click-toggle state for the score-weighting help popup. Hover and keyboard focus
@@ -814,6 +838,7 @@ export default function AIVisibility() {
 
   // Rendered plan: sections in order, filtered by category, with one continuous
   // 1..N numbering across everything visible (collapsed sections still count).
+  const queryNorm = normalizeForSearch(promptQuery)
   const renderPlan = (() => {
     const promptById = new Map(prompts.map(p => [p.id, p]))
     let n = 0
@@ -827,6 +852,7 @@ export default function AIVisibility() {
         .map(id => promptById.get(id))
         .filter((p): p is Prompt => !!p)
         .filter(p => filterCats.size === 0 || filterCats.has(p.category ?? ''))
+        .filter(p => queryNorm === '' || normalizeForSearch(p.text).includes(queryNorm))
       if (grouping) {
         list = list
           .map((p, i) => ({ p, i }))
@@ -848,7 +874,8 @@ export default function AIVisibility() {
     }).filter(sec => sec.rows.length > 0)
   })()
   const visibleCount = renderPlan.reduce((a, s) => a + s.rows.length, 0)
-  // Export: one row per visible prompt (rendered order, category filter applied)
+  // Export: one row per visible prompt (rendered order, category filter and
+  // prompt search applied)
   // and active engine. Built from the same cell views the table reads.
   const exportCsv = () => {
     if (visibleCount === 0 || !activeClientId) return
@@ -1542,7 +1569,7 @@ export default function AIVisibility() {
             aria-expanded={isExpanded}
             aria-controls={`aiv-row-${prompt.id}`}
             onClick={() => toggleRow(prompt.id)}
-            className="block w-full text-left rounded-lg border border-line bg-surface p-3 min-h-[44px]"
+            className="block w-full text-left rounded-lg border border-line bg-surface p-3 min-h-[44px] transition-colors motion-reduce:transition-none hover:border-accent-ink/40"
           >
             <span className="flex items-start gap-2">
               <span className="text-meta text-ink-2 tabular-nums shrink-0 pt-0.5">{num}</span>
@@ -1571,13 +1598,13 @@ export default function AIVisibility() {
 
     if (kind === 'appear') {
       return (
-        <div className={`border-b border-line last:border-0 ${num % 2 === 0 ? 'bg-surface-2' : ''}${revealCls}`} style={revealSty}>
+        <div className={`matrix-row border-b border-line last:border-0 ${num % 2 === 0 ? 'bg-surface-2' : ''}${revealCls}`} style={revealSty}>
           <button
             type="button"
             aria-expanded={isExpanded}
             aria-controls={`aiv-row-${prompt.id}`}
             onClick={() => toggleRow(prompt.id)}
-            className="group grid w-full text-left transition-colors motion-reduce:transition-none hover:bg-surface-2"
+            className="group grid w-full text-left transition-colors motion-reduce:transition-none"
             style={{ gridTemplateColumns: tableColsTemplate }}
           >
             <span className={`block px-2 py-2.5 self-center sticky left-0 z-[1] ${stickyBg}`}>
@@ -1619,13 +1646,13 @@ export default function AIVisibility() {
 
     // CalmRow (notYet) and UncheckedRow (unchecked): same four-column grid.
     return (
-      <div className={revealCls.trim() || undefined} style={revealSty}>
+      <div className={`matrix-row${revealCls}`} style={revealSty}>
         <button
           type="button"
           aria-expanded={isExpanded}
           aria-controls={`aiv-row-${prompt.id}`}
           onClick={() => toggleRow(prompt.id)}
-          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] hover:bg-surface-2 transition-colors motion-reduce:transition-none rounded-lg"
+          className="grid w-full items-center gap-3 px-3 min-h-[44px] py-2 text-left grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] transition-colors motion-reduce:transition-none rounded-lg"
         >
           <span className="text-meta text-ink-2 tabular-nums">{num}</span>
           <span className="flex items-center gap-2 min-w-0">
@@ -1883,10 +1910,25 @@ export default function AIVisibility() {
           SPLIT BY AUDIENCE 2026-07-29, owner's call. Customers see what they
           bought (how often collection runs, how many prompts are in use);
           admins keep the euro meter, because for them it IS the operative
-          number, and it is the one that actually blocks a run in _auth.js. */}
-      {!isDemoMode && (
+          number, and it is the one that actually blocks a run in _auth.js.
+          Glass layer 2026-11-15: the admin euro meter now sits in the score card
+          header as a pill (same gate), so for an admin this row is empty and is
+          not rendered at all. The one exception is a client with no prompts,
+          where the hero is an empty state with no header: the admin meter keeps
+          its old place there. */}
+      {!isDemoMode && isAdmin && prompts.length === 0 && collectionAllowance.budgetCapEur > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          {!isAdmin && collectionAllowance.nextAvailableAt && (
+          <AllowanceMeter
+            label="Monthly API budget"
+            used={collectionAllowance.budgetSpentEur}
+            cap={collectionAllowance.budgetCapEur}
+            format={n => `€${n.toFixed(2)}`}
+          />
+        </div>
+      )}
+      {!isDemoMode && !isAdmin && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {collectionAllowance.nextAvailableAt && (
             <div className="flex items-center gap-2">
               <CooldownCountdown nextAvailableAt={collectionAllowance.nextAvailableAt} label="Next run available in" />
               {/* Only true for a plan whose cadence is slower than weekly (today,
@@ -1903,39 +1945,28 @@ export default function AIVisibility() {
             </div>
           )}
 
-          {!isAdmin && (
-            <>
-              <div className="min-w-[140px]">
-                <div className="text-meta text-ink-3 uppercase tracking-wide font-medium mb-1">
-                  Included runs
-                </div>
-                <div className="text-meta tabular-nums font-medium text-ink-2">
-                  {planCadence.label}
-                </div>
-              </div>
-              <AllowanceMeter
-                label="Prompts in use"
-                used={prompts.length}
-                cap={planPromptCap}
-                hideWhenUnlimited={planPromptCap >= 100000}
-              />
-            </>
-          )}
-
-          {isAdmin && collectionAllowance.budgetCapEur > 0 && (
-            <AllowanceMeter
-              label="Monthly API budget"
-              used={collectionAllowance.budgetSpentEur}
-              cap={collectionAllowance.budgetCapEur}
-              format={n => `€${n.toFixed(2)}`}
-            />
-          )}
+          <div className="min-w-[140px]">
+            <div className="text-meta text-ink-3 uppercase tracking-wide font-medium mb-1">
+              Included runs
+            </div>
+            <div className="text-meta tabular-nums font-medium text-ink-2">
+              {planCadence.label}
+            </div>
+          </div>
+          <AllowanceMeter
+            label="Prompts in use"
+            used={prompts.length}
+            cap={planPromptCap}
+            hideWhenUnlimited={planPromptCap >= 100000}
+          />
         </div>
       )}
 
       {/* ── Block 2: hero answer (the "recommended in N of M" sentence lives here) ── */}
       <SectionHeading className="sr-only">AI Visibility Score</SectionHeading>
-      <motion.div className="mb-4" {...reveal(0)}>
+      {/* hero-ambient-mesh paints the aura behind the card and gives
+          HeroAnswer's Card the glass surface (index.css), without a prop. */}
+      <motion.div className="mb-4 hero-ambient-mesh" data-aiv-hero {...reveal(0)}>
         {prompts.length === 0 ? (
           <HeroAnswer
             answer=""
@@ -1953,7 +1984,7 @@ export default function AIVisibility() {
             answer={heroAnswer}
             context={heroContext}
             action={heroAction}
-            visual={<ScoreDial score={totalChecked === 0 ? null : aiScore} size="lg" />}
+            visual={<GlowScoreDial score={totalChecked === 0 ? null : aiScore} size="lg" />}
           >
             {/* Empty state (§11): a null score draws the dial empty and its centre
                 reads "Not measured yet", never a 0% ring (F-03). */}
@@ -1962,7 +1993,7 @@ export default function AIVisibility() {
                 {headline.chips.map(name => <Badge key={name} tone="neutral">{name}</Badge>)}
               </div>
             )}
-            <div className="mb-3 flex items-center gap-1">
+            <div className="mb-3 flex flex-wrap items-center gap-x-1 gap-y-2">
               <span className="text-meta text-ink-3">AI Visibility Score</span>
               <span className="relative group inline-flex">
                 <button
@@ -1989,12 +2020,27 @@ export default function AIVisibility() {
                   </span>
                 </span>
               </span>
+              {/* The euro budget is our cost of goods: admins only, never in
+                  demo, exactly the gate the allowance row used before it moved
+                  here (2026-07-29 split by audience). AllowanceMeter itself is
+                  unchanged; the pill is only its frame. */}
+              {isAdmin && !isDemoMode && collectionAllowance.budgetCapEur > 0 && (
+                <div className="glass-pill ml-auto px-3 py-1.5 tabular-nums" data-aiv-budget>
+                  <AllowanceMeter
+                    label="Monthly API budget"
+                    used={collectionAllowance.budgetSpentEur}
+                    cap={collectionAllowance.budgetCapEur}
+                    format={n => `€${n.toFixed(2)}`}
+                  />
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
               {dimConfig.map(d => {
                 const notApplicable = zeroMention && NEEDS_MENTION_DIMS.includes(d.key)
+                const barValue = totalChecked === 0 || notApplicable ? null : Math.max(0, Math.min(100, d.value))
                 return (
-                  <div key={d.key}>
+                  <div key={d.key} className="glass-tile px-3 py-1.5">
                     <div className="flex justify-between items-center gap-2 mb-1">
                       <div className="min-w-0">
                         <span className="text-body font-medium text-ink">{d.label}</span>
@@ -2012,7 +2058,18 @@ export default function AIVisibility() {
                         <span className="shrink-0 text-body font-semibold text-ink tabular-nums">{d.value}%</span>
                       )}
                     </div>
-                    <Meter thick ariaLabel={d.label} value={totalChecked === 0 || notApplicable ? null : d.value} />
+                    {/* Same semantics as Meter (progressbar only when there is a
+                        value), drawn with the gradient fill. */}
+                    <div
+                      className="glow-bar-track h-1.5"
+                      role={barValue === null ? undefined : 'progressbar'}
+                      aria-valuemin={barValue === null ? undefined : 0}
+                      aria-valuemax={barValue === null ? undefined : 100}
+                      aria-valuenow={barValue === null ? undefined : Math.round(barValue)}
+                      aria-label={d.label}
+                    >
+                      {barValue !== null && <div className="glow-bar-fill" style={{ width: `${barValue}%` }} />}
+                    </div>
                   </div>
                 )
               })}
@@ -2023,7 +2080,7 @@ export default function AIVisibility() {
 
       {/* ── Block 3: engines (status cards, coming soon and locked in one card) ── */}
       {(engineStatusCards.length > 0 || comingSoonEngines.length > 0 || lockedStripEngines.length > 0) && (
-        <motion.div className="mb-4" {...reveal(1)}>
+        <motion.div className="mb-4" data-aiv-engines {...reveal(1)}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
             <h2 className="label-caps">Engines</h2>{/* copy: pending bg-copy */}
             {comingSoonEngines.length > 0 && (
@@ -2034,9 +2091,13 @@ export default function AIVisibility() {
             )}
           </div>
           {(engineStatusCards.length > 0 || lockedStripEngines.length > 0) && (
-            <Card pad="none" className="overflow-hidden">
-              <div className="flex divide-x divide-line overflow-x-auto snap-x snap-mandatory lg:snap-none">
-                {engineStatusCards.map(e => {
+            // One row of glass cards on every viewport, scrolling sideways when
+            // it does not fit (density ruling 2026-11-10: a two-column grid on a
+            // phone is four rows of engines above the prompts). The vertical
+            // padding gives the hover lift and glow room inside the scroller;
+            // the negative margins give that room back to the layout.
+            <div className="-mx-1 -my-2 px-1 py-2 flex gap-3 overflow-x-auto snap-x snap-mandatory lg:snap-none" data-engine-rail>
+                {engineStatusCards.map((e, cardIndex) => {
                   const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
                     ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
                     : e.status === 'KNOW' ? { label: 'Known', tone: 'pos' } // copy: pending bg-copy
@@ -2069,20 +2130,36 @@ export default function AIVisibility() {
                     : e.status === 'NOT_MEASURED'
                       ? 'Not measured yet · run a collection to check this engine'
                       : `${e.mentioned} of ${e.checked} prompts${e.bestPos !== null ? `, best #${e.bestPos}` : ''}`
+                  const ratePct = isMeasured ? Math.max(0, Math.min(100, e.pct)) : null
                   return (
-                    <div key={e.id} className="relative flex flex-col gap-1 min-w-[46%] sm:min-w-[164px] lg:min-w-[132px] lg:max-w-[280px] flex-[2_1_0%] p-3 snap-start">
+                    <motion.div
+                      key={e.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: MOTION_BASE, ease: EASE_OUT, delay: 0.08 + cardIndex * 0.04 }}
+                      className="flex min-w-[46%] sm:min-w-[172px] lg:min-w-[140px] lg:max-w-[280px] flex-[2_1_0%] snap-start"
+                    >
+                      {/* The glass sits on an inner box: motion writes an inline
+                          transform on its own element, which would cancel the CSS
+                          hover lift. A status card is not a link, so it lifts
+                          without the accent glow (glass-card-lift). */}
+                      <div className="glass-card glass-lite glass-card-lift group flex flex-col gap-1.5 w-full p-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-5 h-5 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        <span className="glass-squircle w-7 h-7">
+                          <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-4 h-4 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        </span>
                         <span className="text-body font-semibold text-ink truncate" title={e.label}>{e.label}</span>
                         {isAdmin && (
+                          // Shows on hover or keyboard focus; always shown where
+                          // there is no hover (touch) and while it is running.
                           <button
                             onClick={() => handleRefreshEngine(e.id)}
                             disabled={collecting || refreshingEngine !== null}
-                            className="ml-auto relative p-1 rounded-md text-ink-2 hover:text-ink hover:bg-surface-3 transition-colors disabled:opacity-25 disabled:cursor-not-allowed after:content-[''] after:absolute after:-inset-[8px]"
+                            className={`ml-auto relative p-1 rounded-md text-ink-2 hover:text-ink hover:bg-surface-3 transition-[opacity,color,background-color] duration-[180ms] disabled:cursor-not-allowed after:content-[''] after:absolute after:-inset-[8px] ${refreshingEngine === e.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 disabled:group-hover:opacity-25 [@media(hover:none)]:disabled:opacity-25'}`}
                             title={`Re-run every prompt on ${e.label} only. Charges for this engine alone.`}
                             aria-label={`Re-run all prompts on ${e.label}`}
                           >
-                            <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin' : ''} />
+                            <RefreshCw size={12} className={refreshingEngine === e.id ? 'animate-spin motion-reduce:animate-none' : ''} />
                           </button>
                         )}
                       </div>
@@ -2098,6 +2175,12 @@ export default function AIVisibility() {
                         >
                           {statusBadge.label}
                         </Badge>
+                      </div>
+
+                      {/* Mention rate as a 1px line: the number above is the
+                          reading, this is its trace, so it carries no role. */}
+                      <div className="glow-line" aria-hidden="true">
+                        {ratePct !== null && ratePct > 0 && <span style={{ width: `${ratePct}%` }} />}
                       </div>
 
                       <div className="text-meta text-ink-2 line-clamp-2 sm:line-clamp-none sm:truncate" title={metaText}>{metaText}</div>
@@ -2133,35 +2216,44 @@ export default function AIVisibility() {
                           {formatRelativeOrDate(e.lastOkAt)}
                         </div>
                       )}
-                    </div>
+                      </div>
+                    </motion.div>
                   )
                 })}
-                {/* Locked engines: compact columns on the same row, each one a
-                    link to the plan page. */}
-                {lockedStripEngines.map(id => {
+                {/* Locked engines: compact glass cards on the same row, each one
+                    a link to the plan page. */}
+                {lockedStripEngines.map((id, lockedIndex) => {
                   const meta      = ENGINE_META[id]
                   const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
                   return (
-                    <Link
+                    <motion.div
                       key={id}
-                      to="/account"
-                      aria-label={`${meta.label}: unlock on ${planLabel}`}
-                      title={`${meta.label} is available on the ${planLabel} plan and above`}
-                      className="group flex flex-col gap-1 min-w-[124px] lg:min-w-[96px] lg:max-w-[168px] flex-1 basis-0 p-3 lg:px-2 xl:px-3 snap-start hover:bg-surface-2 transition-colors focus-visible:-outline-offset-2"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: MOTION_BASE, ease: EASE_OUT, delay: 0.08 + (engineStatusCards.length + lockedIndex) * 0.04 }}
+                      className="flex min-w-[124px] lg:min-w-[96px] lg:max-w-[168px] flex-1 basis-0 snap-start"
                     >
-                      <span className="flex items-center gap-2 min-w-0 lg:flex-col lg:items-start lg:gap-1 xl:flex-row xl:items-center xl:gap-2">
-                        <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 shrink-0 object-contain grayscale opacity-70" />
-                        <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
-                      </span>
-                      <span className="flex items-center gap-1 min-w-0 text-meta text-ink-3">
-                        <Lock size={11} aria-hidden="true" className="shrink-0" />
-                        <span className="truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{planLabel}</span>
-                      </span>
-                    </Link>
+                      <Link
+                        to="/account"
+                        aria-label={`${meta.label}: unlock on ${planLabel}`}
+                        title={`${meta.label} is available on the ${planLabel} plan and above`}
+                        className="glass-card glass-lite glass-card-interactive group flex flex-col justify-center gap-1 w-full p-3 lg:px-2 xl:px-3"
+                      >
+                        <span className="flex items-center gap-2 min-w-0 lg:flex-col lg:items-start lg:gap-1 xl:flex-row xl:items-center xl:gap-2">
+                          <span className="glass-squircle w-6 h-6">
+                            <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-3.5 h-3.5 object-contain grayscale opacity-70" />
+                          </span>
+                          <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
+                        </span>
+                        <span className="flex items-center gap-1 min-w-0 text-meta text-ink-3">
+                          <Lock size={11} aria-hidden="true" className="shrink-0" />
+                          <span className="truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{planLabel}</span>
+                        </span>
+                      </Link>
+                    </motion.div>
                   )
                 })}
-              </div>
-            </Card>
+            </div>
           )}
         </motion.div>
       )}
@@ -2171,28 +2263,50 @@ export default function AIVisibility() {
       <div className="sr-only" role="status" aria-live="polite">{fixAnnounce}</div>
       {(openFixItems.length > 0 || doneFixRows.length > 0) && (
         <motion.section className="mb-6" aria-label="Fix this" {...reveal(2)}>
-          <SectionHeader
-            title="Fix this"/* copy: pending bg-copy */
-            count={openFixItems.length}
-            description={showFixHub
+          {/* Glass callout: the same heading, count, summary and toggle the
+              SectionHeader carried, plus, while closed, a one-line preview of
+              the fix the hub would open on (first open P0, else P1, else P2). */}
+          {(() => {
+            const topFix = (['P0', 'P1', 'P2'] as const)
+              .map(p => openFixItems.find(i => i.priority === p))
+              .find((i): i is FixItem => !!i)
+            const summaryLine = showFixHub
               ? `${openFixItems.length} action${openFixItems.length !== 1 ? 's' : ''} to improve your score`
-              : (openFixItems.length === 0 ? FIX_COPY.allDone : fixSummary)}
-            actions={
-              <Button
-                ref={fixHubToggleRef}
-                variant={showFixHub ? 'ghost' : 'secondary'}
-                size="sm"
-                icon={showFixHub ? ChevronUp : ChevronDown}
-                onClick={() => setShowFixHub(v => !v)}
-                aria-expanded={showFixHub}
-                aria-label={showFixHub ? 'Hide fixes' : 'Show fixes'}/* copy: pending bg-copy */
-              >
-                {showFixHub ? 'Hide' : 'Show'}{/* copy: pending bg-copy */}
-              </Button>
-            }
-          />
+              : (openFixItems.length === 0 ? FIX_COPY.allDone : fixSummary)
+            return (
+              <div className="glass-card glass-lite glass-callout pl-4 pr-3 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-heading text-ink flex items-center gap-2">
+                    <span>Fix this</span>{/* copy: pending bg-copy */}
+                    <Badge tone="neutral">{openFixItems.length}</Badge>
+                  </h2>
+                  <p className="mt-0.5 m-0 text-meta text-ink-2 truncate" title={!showFixHub && topFix ? `${summaryLine}. Top fix: ${fixTitleOf(topFix)}` : summaryLine}>
+                    {summaryLine}
+                    {!showFixHub && topFix && (
+                      <>
+                        <span aria-hidden="true" className="text-ink-3">{' · '}</span>
+                        <span className="text-ink-3">Top fix:</span>{' '}{/* copy: pending bg-copy */}
+                        <span className="text-ink">{fixTitleOf(topFix)}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  ref={fixHubToggleRef}
+                  variant={showFixHub ? 'ghost' : 'secondary'}
+                  size="sm"
+                  icon={showFixHub ? ChevronUp : ChevronDown}
+                  onClick={() => setShowFixHub(v => !v)}
+                  aria-expanded={showFixHub}
+                  aria-label={showFixHub ? 'Hide fixes' : 'Show fixes'}/* copy: pending bg-copy */
+                >
+                  {showFixHub ? 'Hide' : 'Show'}{/* copy: pending bg-copy */}
+                </Button>
+              </div>
+            )
+          })()}
           <Collapse open={showFixHub}>
-            <Card pad="none" className="overflow-hidden">
+            <Card pad="none" className="overflow-hidden mt-3">
               {openFixItems.length === 0 && (
                 <div className="px-4 py-4 text-meta text-ink-2 flex items-center gap-2">
                   <CircleCheck size={14} className="text-pos-ink shrink-0" aria-hidden="true" />
@@ -2414,7 +2528,26 @@ export default function AIVisibility() {
                 </ChipGroup>
               ) : <span />}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                {(prompts.length >= 2 || promptQuery !== '') && (
+                  // Wraps and shrinks (10 to 14 rem) so the toolbar never runs
+                  // sideways at laptop widths.
+                  <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[10rem] sm:max-w-[14rem]">
+                    <label htmlFor="aiv-prompt-search" className="sr-only">Search prompts</label>{/* copy: pending bg-copy */}
+                    <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
+                    <input
+                      id="aiv-prompt-search"
+                      type="search"
+                      value={promptQuery}
+                      onChange={e => setPromptQuery(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Escape' && promptQuery) { e.preventDefault(); setPromptQuery('') } }}
+                      placeholder={`Search ${prompts.length} prompts`}/* copy: pending bg-copy */
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="glass-input w-full h-9 max-sm:min-h-[44px] pl-8 pr-2 text-body text-ink placeholder:text-ink-3"
+                    />
+                  </div>
+                )}
                 {prompts.length >= 2 && (
                   <>
                     <div className="hidden sm:block">
@@ -2530,6 +2663,11 @@ export default function AIVisibility() {
           </div>
         )}
 
+        {/* Always mounted so a screen reader hears the search result count. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {queryNorm !== '' ? `${visibleCount} of ${prompts.length} prompts shown` : ''}{/* copy: pending bg-copy */}
+        </p>
+
         {orderFrozen && prompts.length >= 2 && (
           <p className="text-meta text-ink-2 mb-3">{AIV_COPY.orderFrozenNote}</p>
         )}
@@ -2548,10 +2686,22 @@ export default function AIVisibility() {
 
         {prompts.length > 0 && visibleCount === 0 && (
           <div className="rounded-card border border-dashed border-line p-6 text-center">
-            <p className="text-body text-ink-2">{AIV_COPY.categoryEmpty}</p>
-            <Button variant="secondary" size="sm" className="mt-3" onClick={() => setFilterCats(new Set())}>
-              {AIV_COPY.categoryEmptyAction}
-            </Button>
+            {queryNorm !== '' ? (
+              <>
+                {/* copy: pending bg-copy */}
+                <p className="text-body text-ink-2">{`No prompts match "${promptQuery.trim()}"${filterCats.size > 0 ? ' in the chosen categories' : ''}.`}</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={() => setPromptQuery('')}>
+                  Clear search{/* copy: pending bg-copy */}
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-body text-ink-2">{AIV_COPY.categoryEmpty}</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={() => setFilterCats(new Set())}>
+                  {AIV_COPY.categoryEmptyAction}
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -2607,13 +2757,15 @@ export default function AIVisibility() {
           return (
             <>
               {showCard && appearSec && (
-                <Card pad="none" className="overflow-hidden">
+                // overflow-clip, not overflow-hidden: it rounds the corners
+                // without making the card a scroll box, so the header can stick.
+                <Card pad="none" className="overflow-clip">
                   <div id="aiv-section-appear">
-                    <div className={isWide ? 'overflow-x-auto' : 'p-3 space-y-2'}>
+                    <div ref={isWide ? setMatrixWrapEl : undefined} className={isWide ? (matrixFits ? '' : 'overflow-x-auto') : 'p-3 space-y-2'}>
                       <div style={isWide ? { minWidth: tableMinWidth } : undefined}>
                         {isWide && (
                           <div
-                            className="grid border-b border-line bg-surface-2"
+                            className="matrix-head grid"
                             style={{ gridTemplateColumns: tableColsTemplate }}
                           >
                             <div className="px-2 py-2.5 label-caps self-center sticky left-0 z-[1] bg-surface-2">#</div>
@@ -2659,8 +2811,10 @@ export default function AIVisibility() {
                     title={SECTION_TITLE.notYet}
                     count={notYetSec.rows.length}
                     summary={`${promptCount(notYetSec.rows.length)}, no engine named your brand`}/* copy: pending bg-copy */
-                    defaultOpen={sectionIsOpen('notYet')}
-                    key={`notYet-${activeClientId ?? ''}`}
+                    defaultOpen={queryNorm !== '' || sectionIsOpen('notYet')}
+                    // Remounts open while a search is active, so a match inside
+                    // a closed section is never hidden behind its header.
+                    key={`notYet-${activeClientId ?? ''}${queryNorm !== '' ? '-q' : ''}`}
                   >
                     <div className={isWide ? 'pt-2' : 'pt-2 space-y-2'}>{rowsOf(notYetSec)}</div>
                   </Disclosure>
@@ -2673,8 +2827,10 @@ export default function AIVisibility() {
                     title={SECTION_TITLE.unchecked}
                     count={uncheckedSec.rows.length}
                     summary={failureDates.length > 0 ? sectionUncheckedExtra(formatDate(failureDates[0])) : promptCount(uncheckedSec.rows.length)}
-                    defaultOpen={sectionIsOpen('unchecked')}
-                    key={`unchecked-${activeClientId ?? ''}`}
+                    defaultOpen={queryNorm !== '' || sectionIsOpen('unchecked')}
+                    // Remounts open while a search is active, so a match inside
+                    // a closed section is never hidden behind its header.
+                    key={`unchecked-${activeClientId ?? ''}${queryNorm !== '' ? '-q' : ''}`}
                   >
                     <div className={isWide ? 'pt-2' : 'pt-2 space-y-2'}>{rowsOf(uncheckedSec)}</div>
                   </Disclosure>
