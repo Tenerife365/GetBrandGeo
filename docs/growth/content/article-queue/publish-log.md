@@ -19,3 +19,4 @@ One line per published article, newest last.
 - 2026-11-13 BG-120 https://getbrandgeo.com/bg-120.html ChatGPT Says Its Search Is a Fifth of Google's. What That Means for a Local Business
 - 2026-11-14 BG-121 https://getbrandgeo.com/bg-121.html AI Visibility in Portland: Engines Agree on IP Lawyers and Breweries, Not on Agents
 - 2026-11-15 BG-122 https://getbrandgeo.com/bg-122.html Google Must Show AI Clicks to UK Publishers by December 3. What Search Console Shows You Today
+- 2026-11-16 BG-123 https://getbrandgeo.com/bg-123.html What Each AI Engine Tells a Buyer About a Local Firm: A Scorecard From Our Eight Studies

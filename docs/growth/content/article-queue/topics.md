@@ -163,7 +163,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 32 | la-four-months | dropped 2026-11-06: same 6 Los Angeles questions in July and November, but bold markup differs between months (Gemini bolds no names on 2 July prompts and 2 November ones) and Claude's answers changed character, so a churn count would measure the instrument; ChatGPT's July rows were deleted | How much an engine's recommendations change in four months |
 | 33 | draft-chatgpt-search-share | published bg-120 2026-11-13 | What OpenAI's "a fifth of Google" claim does and does not tell a local business |
 | 34 | draft-search-console-ai | published bg-122 2026-11-15 | What Search Console's AI report shows today, before the UK deadline of 3 December |
-| 35 | draft-engine-scorecard | ready from 2026-11-16 (draft, rule 5) | What each engine tells a buyer about a local firm, from BG-106 to BG-113 |
+| 35 | draft-engine-scorecard | published bg-123 2026-11-16 | What each engine tells a buyer about a local firm, from BG-106 to BG-113 |
 | 36 | draft-safegeo | ready from 2026-11-18 (draft, rule 5) | What the SafeGEO paper at EMNLP 2026 measured about gaming AI recommendations |
 | 37 | draft-consumers-ask-ai | ready from 2026-11-19 (draft, rule 5) | 45% of US consumers ask AI for a local business, and almost all double check |
 | 38 | draft-soci-index | dropped 2026-11-06: SOCi's own release gives only ChatGPT 1.2% and the 35.9% local 3-pack figure, with no definition of a recommendation; the Gemini 11% and Perplexity 7.4% rates could not be read at source (report PDF unreadable, Search Engine Land refused the request) | SOCi's 2026 Local Visibility Index next to our city data |
