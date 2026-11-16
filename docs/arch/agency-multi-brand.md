@@ -1249,8 +1249,12 @@ Q11 is a product decision on a ruled matter, so it goes to Constantin through
 **RULED 2026-11-16, Constantin: "Yes, defaults and commit".** Q11: No, P2
 (account-level limits) ships before step 5 (attaching agency brands). Q12:
 Ban the removed login; deletion stays a separate admin action. Do not
-re-argue. Q1 to Q10 were not asked in that ruling; their defaults stand until
-he rules them.
+re-argue. Q1 to Q10 are ruled in the paragraph below.
+
+**RULED 2026-11-16, Constantin, in the spec session: "Q11 no, Q12 ban, go with
+the defaults".** This confirms Q11 and Q12 as above and adopts the default of
+every other question, Q1 to Q10, as the ruling. Every row of the table above
+is now decided as its right-hand column states.
 
 ---
 
