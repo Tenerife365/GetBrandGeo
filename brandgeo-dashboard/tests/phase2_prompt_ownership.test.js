@@ -160,7 +160,12 @@ const PROFILES = {
 // the stub answers it (the shape _auth.js checkCollectionLimits returns).
 const limitCalls = { n: 0, args: [] }
 let limitBlocked = null
+// The real assertClientAccess (docs/arch/agency-multi-brand.md 5.3, ledger
+// rows 2 to 4), which the collectors call after the body parse. A viewer
+// asking for another client reads user_clients through serviceClient().
+const realAssertClientAccess = require(path.join(FN, '_auth.js')).assertClientAccess
 installModule(require.resolve(path.join(FN, '_auth.js')), {
+  assertClientAccess: realAssertClientAccess,
   async requireAuth(event) {
     const h = (event.headers && (event.headers.authorization || event.headers.Authorization)) || ''
     const token = h.startsWith('Bearer ') ? h.slice(7) : ''
@@ -725,9 +730,14 @@ async function suite(mod, label, report) {
     ['noinactive', [["if (!isAdmin && data.is_active !== true) return { skip: 'prompt_inactive', ...ids }", '']],
       ['inactive prompt, viewer: 200 skipped prompt_inactive, no limits check, no engine']],
     // N1: the exact code the re-review reproduced (no guard, body ids downstream).
-    ['prefixn1', [...NO_ID_GUARD, ...BODY_IDS_DOWNSTREAM], [N1_ARRAY_20, N1_CLIENT_ARRAY, N1_MALFORMED]],
+    // N1_CLIENT_ARRAY is not in these two lists since 2026-11-16: the client
+    // access check (assertClientAccess, docs/arch/agency-multi-brand.md 5.3)
+    // parses the client id as a positive int4 on its own, so a viewer's [42]
+    // is still 400 with the collector's guard removed. That check stays in the
+    // plain run above, where it must pass.
+    ['prefixn1', [...NO_ID_GUARD, ...BODY_IDS_DOWNSTREAM], [N1_ARRAY_20, N1_MALFORMED]],
     // N1: only the guard removed; the canonical row ids alone do not satisfy the contract.
-    ['noidguard', NO_ID_GUARD, [N1_ARRAY_20, N1_CLIENT_ARRAY, N1_MALFORMED]],
+    ['noidguard', NO_ID_GUARD, [N1_ARRAY_20, N1_MALFORMED]],
     // N1 belt and braces: loadPromptForCollect hands back the ids it was given.
     ['loadbodyids', [['const ids = { promptId: data.id, clientId: data.client_id }', 'const ids = { promptId, clientId }']],
       ['N1: loadPromptForCollect returns the ids of the row, not the ids it was given']],

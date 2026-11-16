@@ -13,7 +13,7 @@
 // with a Haiku fallback so a Sonnet outage never dead-ends the user. Reuses
 // ANTHROPIC_API_KEY (already set for social-generate / assistant).
 // ============================================================================
-const { requireAuth } = require('./_auth');
+const { requireAuth, assertClientAccess } = require('./_auth');
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-5';
@@ -145,9 +145,10 @@ exports.handler = async (event) => {
   const { client_id, brief_id, premium } = body;
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
   if (!brief_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'brief_id required' }) };
-  if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) };
-  }
+  // Client access check (ledger row 9, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id);
+  if (!access.ok) return access.response;
   if (!process.env.ANTHROPIC_API_KEY) {
     return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI drafting is not configured (ANTHROPIC_API_KEY missing).' }) };
   }

@@ -42,7 +42,7 @@
  * was no reason for the paying path to be laxer than the free one.
  */
 const { createClient } = require('@supabase/supabase-js')
-const { requireAuth } = require('./_auth')
+const { requireAuth, assertClientAccess, parseClientId } = require('./_auth')
 
 const MODEL           = 'gpt-4o-mini'
 const MAX_TOKENS_CAP  = 1200      // hard ceiling, whatever the caller asks for
@@ -100,9 +100,18 @@ exports.handler = async (event) => {
   const json = (statusCode, obj) =>
     ({ statusCode, headers: auth.headers, body: JSON.stringify(obj) })
 
-  // Scoped to the caller's OWN client from their verified profile, never from
-  // the request body.
-  const clientId = auth.profile ? auth.profile.client_id : null
+  // Ledger row 21 (docs/arch/agency-multi-brand.md 5.3): a client_id in the
+  // body is the brand the caller is working on, and is used only after
+  // assertClientAccess passes (admin, the default brand, or a user_clients
+  // row). With no client_id in the body, the caller's default brand from the
+  // verified profile, as before, so the current frontend keeps working.
+  let clientId = auth.profile ? auth.profile.client_id : null
+  if (body && typeof body === 'object' && !Array.isArray(body)
+      && body.client_id !== undefined && body.client_id !== null && body.client_id !== '') {
+    const access = await assertClientAccess(auth, body.client_id)
+    if (!access.ok) return access.response
+    clientId = parseClientId(body.client_id)
+  }
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
   // assistant_events.ip_hash is NOT NULL and is the column its existing

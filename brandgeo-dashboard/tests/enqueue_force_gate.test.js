@@ -60,7 +60,12 @@ const PROFILES = {
 const calls = { enqueue: [], trigger: 0, cooldown: 0 }
 let enqueueResult = { runId: 7, totalJobs: 3 }
 
+// The real assertClientAccess (docs/arch/agency-multi-brand.md 5.3, ledger
+// row 5): the handler calls it after the body parse. Every caller here is an
+// admin or the viewer on its own default brand, so it never reads a table.
+const realAssertClientAccess = require(path.join(FN, '_auth.js')).assertClientAccess
 installModule('_auth.js', {
+  assertClientAccess: realAssertClientAccess,
   ALLOWED_ORIGINS: ['https://app.getbrandgeo.com'],
   corsHeaders: () => ({ 'Content-Type': 'application/json' }),
   checkCollectionLimits: async () => ({ blocked: false }),

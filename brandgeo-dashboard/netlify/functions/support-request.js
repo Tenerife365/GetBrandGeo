@@ -42,8 +42,12 @@
  *   pre-ticket behaviour. Same pattern as promotions-admin.js.
  *
  * TENANCY
- *   client_id is never taken from the request body for a non-admin. It comes
- *   from the caller's own user_profiles row, which requireAuth has already
+ *   For a non-admin, a client_id in the request body is used only after
+ *   assertClientAccess passes (docs/arch/agency-multi-brand.md 5.3: the
+ *   caller's default brand or a user_clients row), so an agency member files
+ *   against the brand they are working on and nobody files against a brand
+ *   they cannot reach. With none in the body it comes from the caller's own
+ *   user_profiles row, which requireAuth has already
  *   loaded. An admin may pass a client_id (the widget sends the currently
  *   active client); an admin with no active client raises an INTERNAL ticket,
  *   which is the correct reading of BrandGEO staff filing something from
@@ -74,7 +78,7 @@
  *               priority: string|null, triaged: boolean }
  * 503 ->      { error } only when nothing was persisted AND email is unconfigured.
  */
-const { requireAuth } = require('./_auth')
+const { requireAuth, assertClientAccess, parseClientId } = require('./_auth')
 const { triageTicket } = require('./_triage')
 const { recordAdminEvent } = require('./_admin_notify')
 
@@ -110,12 +114,20 @@ exports.handler = async (event) => {
 
   const isAdmin = auth.profile && auth.profile.role === 'admin'
 
-  // Non-admin: the caller's own tenant, full stop. Admin: whatever client the
-  // dashboard had active, or none (an internal ticket).
+  // Admin: whatever client the dashboard had active, or none (an internal
+  // ticket), unchanged. Non-admin (ledger row 22, docs/arch/agency-multi-brand.md
+  // 5.3): the client_id in the body when given, only after assertClientAccess
+  // passes (the default brand or a user_clients row); with none in the body,
+  // the caller's default brand, as before.
   let clientId = null
   if (isAdmin) {
     const asked = Number(body.client_id)
     clientId = Number.isInteger(asked) && asked > 0 ? asked : null
+  } else if (body && typeof body === 'object' && !Array.isArray(body)
+      && body.client_id !== undefined && body.client_id !== null && body.client_id !== '') {
+    const access = await assertClientAccess(auth, body.client_id)
+    if (!access.ok) return access.response
+    clientId = parseClientId(body.client_id)
   } else {
     clientId = auth.profile && auth.profile.client_id != null ? auth.profile.client_id : null
   }
@@ -127,7 +139,7 @@ exports.handler = async (event) => {
   // ---- 1. Persist -----------------------------------------------------------
   // auth.supabase is the service-key client requireAuth already built. It
   // bypasses RLS, which is why every tenancy field above is derived from the
-  // verified profile rather than from the request body.
+  // verified profile, or from a body client_id that assertClientAccess passed.
   let ticketId = null
   let persistError = null
   try {

@@ -9,6 +9,9 @@
  *  3. Supabase JWT verification (blocks unauthenticated / bot callers)
  *  4. Role check — adminOnly flag for privileged functions
  *  5. Client ownership check — viewers can only trigger collection for their own client
+ *  6. assertClientAccess(auth, targetClientId): INVARIANT M of
+ *     docs/arch/agency-multi-brand.md 5.1 (admin, default brand until P4, or
+ *     a user_clients row), and the banned_until refusal of 4.6
  *
  * Rate/cost limiting for collection calls is NOT part of requireAuth() itself
  * (see checkCollectionLimits() below) — see SCALE-SPEC.md §2 and the comment
@@ -95,6 +98,15 @@ async function requireAuth(event, { adminOnly = false, clientId = null } = {}) {
     return { response: err(401, 'Unauthorized: invalid or expired token', origin) }
   }
 
+  // ── 3b. Banned login (docs/arch/agency-multi-brand.md 4.6) ──
+  // agency-admin.js bans a removed staff member or guest for 876000h. Until
+  // P4 the default-brand disjunct still grants their old brand, so every
+  // authenticated Netlify path refuses a user whose ban has not lapsed,
+  // whether or not Supabase itself still accepts the token.
+  if (isBannedUser(user)) {
+    return { response: err(401, 'Unauthorized: login disabled', origin) }
+  }
+
   // ── 4. Role check ──
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -110,15 +122,107 @@ async function requireAuth(event, { adminOnly = false, clientId = null } = {}) {
     return { response: err(403, 'Forbidden: admin access required', origin) }
   }
 
-  // ── 5. Client ownership check ──
-  // Admins may act on any client. Viewers may only act on their own.
-  if (clientId !== null && profile.role !== 'admin') {
-    if (String(profile.client_id) !== String(clientId)) {
-      return { response: err(403, 'Forbidden: client mismatch', origin) }
-    }
+  const auth = { user, profile, supabase, headers: corsHeaders(origin) }
+
+  // ── 5. Client access check (ledger row 1, docs/arch/agency-multi-brand.md 5.3) ──
+  // Admins may act on any client. Anyone else needs INVARIANT M for the
+  // target: the default brand (until P4) or a user_clients row.
+  if (clientId !== null && clientId !== undefined) {
+    const access = await assertClientAccess(auth, clientId)
+    if (!access.ok) return { response: access.response }
   }
 
-  return { user, profile, supabase, headers: corsHeaders(origin) }
+  return auth
+}
+
+// ── Brand access (docs/arch/agency-multi-brand.md 5.1 and 5.3) ─────────────────
+
+const PG_INT4_MAX = 2147483647
+
+/** A positive int4 from a number or its canonical digit string, else null. */
+function parseClientId(v) {
+  let n = null
+  if (typeof v === 'number') n = v
+  else if (typeof v === 'string' && /^[1-9][0-9]*$/.test(v)) n = Number(v)
+  return Number.isSafeInteger(n) && n > 0 && n <= PG_INT4_MAX ? n : null
+}
+
+/**
+ * true when the auth user carries a ban that has not lapsed. GoTrue writes
+ * banned_until as an ISO timestamp and clears it (null) when a ban is lifted.
+ * A non-empty value that does not parse is read as banned: this field only
+ * ever narrows access, so an unreadable value fails closed.
+ */
+function isBannedUser(user) {
+  if (!user) return false
+  const v = user.banned_until
+  if (v === null || v === undefined || v === '') return false
+  const t = Date.parse(String(v))
+  if (!Number.isFinite(t)) return true
+  return t > Date.now()
+}
+
+/**
+ * INVARIANT M for one target brand, after requireAuth passed.
+ *
+ * -> { ok: true } | { ok: false, response }
+ *
+ * 400 for a target that is not a positive int4. Admin: ok. Disjunct (c), the
+ * caller's default brand (user_profiles.client_id), until P4. Otherwise one
+ * service-key read of user_clients for (user, target). A read error is a 403,
+ * never a fallback; no row is a 403. The 403 body is the one every caller
+ * answered before this helper existed: { error: 'Forbidden: client mismatch' }.
+ */
+async function assertClientAccess(auth, targetClientId) {
+  const headers = (auth && auth.headers) || corsHeaders('')
+  const deny = (statusCode, message) => {
+    console.warn(`[Auth] ${statusCode}: ${message}`)
+    return { ok: false, response: { statusCode, headers, body: JSON.stringify({ error: message }) } }
+  }
+  const target = parseClientId(targetClientId)
+  if (target === null) return deny(400, 'Invalid client_id')
+  const profile = auth && auth.profile
+  const user = auth && auth.user
+  if (!profile || !user || !user.id) return deny(403, 'Forbidden: client mismatch')
+  if (profile.role === 'admin') return { ok: true }
+  if (profile.client_id !== null && profile.client_id !== undefined && String(profile.client_id) === String(target)) {
+    return { ok: true }
+  }
+  const sb = auth.supabase
+  if (!sb || typeof sb.from !== 'function') return deny(403, 'Forbidden: client mismatch')
+  let res
+  try {
+    res = await sb.from('user_clients').select('client_id').eq('user_id', user.id).eq('client_id', target).maybeSingle()
+  } catch (e) {
+    console.error(`[Auth] user_clients read threw for user ${user.id} client ${target}: ${e && e.message ? e.message : e}`)
+    return deny(403, 'Forbidden: client mismatch')
+  }
+  if (!res || res.error) {
+    console.error(`[Auth] user_clients read failed for user ${user.id} client ${target}: ${res && res.error ? (res.error.code || res.error.message) : 'no result'}`)
+    return deny(403, 'Forbidden: client mismatch')
+  }
+  if (!res.data) return deny(403, 'Forbidden: client mismatch')
+  return { ok: true }
+}
+
+/**
+ * The account behind one brand: clients.account_id, then accounts.kind.
+ * -> { ok: true, accountId, kind } | { ok: false }
+ * kind is 'direct' or 'agency'. A brand with no account_id, an account row
+ * that is missing, a read error or a throw is { ok: false }: the callers
+ * treat an unknown kind as the case that discloses less.
+ */
+async function readBrandAccount(supabase, clientId) {
+  try {
+    const c = await supabase.from('clients').select('id, account_id').eq('id', clientId).maybeSingle()
+    if (!c || c.error || !c.data || c.data.account_id === null || c.data.account_id === undefined) return { ok: false }
+    const a = await supabase.from('accounts').select('id, kind, home_client_id').eq('id', c.data.account_id).maybeSingle()
+    if (!a || a.error || !a.data) return { ok: false }
+    if (a.data.kind !== 'direct' && a.data.kind !== 'agency') return { ok: false }
+    return { ok: true, accountId: a.data.id, kind: a.data.kind, homeClientId: a.data.home_client_id ?? null }
+  } catch (e) {
+    return { ok: false }
+  }
 }
 
 // ── Collection rate/cost limiting (SCALE-SPEC.md §2) ────────────────────────────
@@ -351,4 +455,7 @@ async function checkCollectionLimits(supabase, clientId, { platformSpent: suppli
   return { blocked: false, detail: { plan, hourlyCeiling, hourlyCount: hourlyCount || 0, clientSpent, clientBudget, platformSpent } }
 }
 
-module.exports = { requireAuth, corsHeaders, ALLOWED_ORIGINS, checkCollectionLimits, sumCostEur, monthStartIso }
+module.exports = {
+  requireAuth, corsHeaders, ALLOWED_ORIGINS, checkCollectionLimits, sumCostEur, monthStartIso,
+  assertClientAccess, isBannedUser, parseClientId, readBrandAccount,
+}

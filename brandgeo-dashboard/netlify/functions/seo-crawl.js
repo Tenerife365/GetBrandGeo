@@ -9,7 +9,7 @@
 // POST { client_id }
 //   -> { crawl_id, status:'running', max_pages } | { error } (HTTP 200)
 // ============================================================================
-const { requireAuth } = require('./_auth');
+const { requireAuth, assertClientAccess } = require('./_auth');
 
 // Pages per crawl by plan (PRICING-STRATEGY-2026-07 §3). AI SEO is Radar+
 // (free = 0 → locked). Keep in sync with planConfig.ts PLAN_SEO_PAGE_CAP.
@@ -50,9 +50,10 @@ exports.handler = async (event) => {
 
   const { client_id } = body;
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
-  if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) };
-  }
+  // Client access check (ledger row 8, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id);
+  if (!access.ok) return access.response;
 
   try {
     const { data: client } = await supabase

@@ -33,7 +33,7 @@
  *   { recommendations: [...], run_id, persisted: bool, persist_error?: string }
  */
 
-const { requireAuth } = require('./_auth')
+const { requireAuth, assertClientAccess } = require('./_auth')
 
 const MODEL = 'claude-haiku-4-5-20251001'
 const VALID_PRIORITIES = ['critical', 'high', 'medium']
@@ -90,10 +90,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) }
   }
 
-  // ── Ownership check ─────────────────────────────────────────────────────────
-  if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
-    console.warn(`[GenRec] 403: user ${user.id} (client ${profile.client_id}) tried client ${client_id}`)
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
+  // ── Client access check (ledger row 6, docs/arch/agency-multi-brand.md 5.3) ──
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id)
+  if (!access.ok) {
+    console.warn(`[GenRec] ${access.response.statusCode}: user ${user.id} (client ${profile.client_id}) tried client ${client_id}`)
+    return access.response
   }
 
   // Personal-brand awareness: the function looks these up itself, so the caller (dashboard)

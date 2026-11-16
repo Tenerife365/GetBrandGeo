@@ -16,7 +16,13 @@
  */
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
-const { requireAuth } = require('./_auth')
+const { requireAuth, readBrandAccount } = require('./_auth')
+
+// docs/arch/agency-multi-brand.md 8 and review F1: a brand inside an agency
+// account is billed to the agency, never through the brand's own portal. A
+// non-admin caller gets the portal only when the brand's account reads exactly
+// 'direct'; an agency kind, a missing account or a read error refuses.
+const AGENCY_BILLING = { error: 'Billing for this brand is handled by the agency that manages it. Contact the agency or BrandGEO support.', code: 'agency_billing' }
 
 const APP_URL = 'https://app.getbrandgeo.com'
 
@@ -37,6 +43,14 @@ exports.handler = async (event) => {
   const targetClientId = clientId ?? auth.profile.client_id
   if (!targetClientId) {
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'No client associated with this login.' }) }
+  }
+
+  if (auth.profile.role !== 'admin') {
+    const brandAccount = await readBrandAccount(auth.supabase, targetClientId)
+    if (!brandAccount.ok || brandAccount.kind !== 'direct') {
+      console.warn(`[create-portal-session] refused client=${targetClientId} kind=${brandAccount.ok ? brandAccount.kind : 'unreadable'}`)
+      return { statusCode: 409, headers: auth.headers, body: JSON.stringify(AGENCY_BILLING) }
+    }
   }
 
   const { data: client, error } = await auth.supabase

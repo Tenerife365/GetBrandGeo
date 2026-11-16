@@ -45,7 +45,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-const { ALLOWED_ORIGINS } = require('./_auth')
+const { ALLOWED_ORIGINS, isBannedUser } = require('./_auth')
 const { activeEnginesFor, RESEARCH_CATEGORY } = require('./_cost')
 const { PLAN_LABELS, ENGINE_LABELS, MCP_MIN_PLAN, mcpAllowedFor } = require('./_plans')
 const { CLIENT_API_KEY_RE, hashClientApiKey, clientIdFromKey } = require('./_client_api_key')
@@ -1100,7 +1100,33 @@ async function readClient(sb, clientId) {
 }
 
 /**
- * The stage 1 and 2 key path, unchanged in behaviour. Returns { cred } or
+ * The 9.3 creator re-check (docs/arch/agency-multi-brand.md): true only when
+ * the key's creator still exists, is not banned, and is a platform admin or
+ * passes INVARIANT M for the key's client (the default brand until P4, or a
+ * user_clients row). One auth admin read, one user_profiles read, and one
+ * user_clients read when the first two do not decide it, the same shape as
+ * oauth-token.js userStillMapped. Any read error or throw is false: a dead
+ * key, never a live one.
+ */
+async function creatorStillHasAccess(sb, createdBy, clientId) {
+  try {
+    const u = await sb.auth.admin.getUserById(createdBy)
+    if (!u || u.error || !u.data || !u.data.user) return false
+    if (isBannedUser(u.data.user)) return false
+    const p = await sb.from('user_profiles').select('role, client_id').eq('id', createdBy).maybeSingle()
+    if (!p || p.error) return false
+    if (p.data && p.data.role === 'admin') return true
+    if (p.data && p.data.client_id !== null && p.data.client_id !== undefined && String(p.data.client_id) === String(clientId)) return true
+    const m = await sb.from('user_clients').select('client_id').eq('user_id', createdBy).eq('client_id', clientId).maybeSingle()
+    if (!m || m.error) return false
+    return !!m.data
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * The stage 1 and 2 key path, plus the 9.3 creator re-check. Returns { cred } or
  * { cred: null } for a 401 (no invalid_token: a key is not an OAuth token).
  * cred = { kind, id, client, scope, actor, lastUsedAt, rateKey, stamp, actorIsAdmin }.
  */
@@ -1124,6 +1150,15 @@ async function resolveKey(sb, key, invId) {
   }
   const client = await readClient(sb, row.client_id)
   if (!client) return { cred: null }
+  // Ledger row 30 (docs/arch/agency-multi-brand.md 9.3): a key lives only as
+  // long as its creator could still reach the brand. created_by null keeps
+  // the earlier behaviour, so no existing key breaks on deploy day.
+  if (row.created_by !== null && row.created_by !== undefined) {
+    if (!(await creatorStillHasAccess(sb, row.created_by, row.client_id))) {
+      console.warn(`[mcp-server/${invId}] key row ${row.id}: creator no longer has access to the client`)
+      return { cred: null }
+    }
+  }
   return {
     cred: {
       kind: 'key',

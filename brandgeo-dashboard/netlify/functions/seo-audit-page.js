@@ -6,7 +6,7 @@
 //   -> { geo_score, audit: { summary, issues:[{severity,text}], suggestions:[text] }, status:'audited' }
 //   -> { error } (HTTP 200) on any failure -- the row stays 'crawled'.
 // ============================================================================
-const { requireAuth } = require('./_auth');
+const { requireAuth, assertClientAccess } = require('./_auth');
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const TIMEOUT_MS = 20000;
@@ -101,9 +101,10 @@ exports.handler = async (event) => {
   const { client_id, page_id } = body;
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
   if (!page_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'page_id required' }) };
-  if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) };
-  }
+  // Client access check (ledger row 7, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id);
+  if (!access.ok) return access.response;
   if (!process.env.ANTHROPIC_API_KEY) {
     return { statusCode: 200, headers, body: JSON.stringify({ error: 'AI audit is not configured (ANTHROPIC_API_KEY missing).' }) };
   }

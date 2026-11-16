@@ -15,7 +15,7 @@
 //   -> { briefs: [SeoBrief], brand, has_data, hint }
 //   -> { briefs: [], has_data:false, hint } when there is nothing to work from.
 // ============================================================================
-const { requireAuth } = require('./_auth');
+const { requireAuth, assertClientAccess } = require('./_auth');
 const { gatherGeoSignals } = require('./_geo_signals');
 
 const MAX_GAP_BRIEFS = 6;
@@ -33,9 +33,10 @@ exports.handler = async (event) => {
 
   const { client_id } = body;
   if (!client_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'client_id required' }) };
-  if (profile.role !== 'admin' && String(profile.client_id) !== String(client_id)) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) };
-  }
+  // Client access check (ledger row 10, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id);
+  if (!access.ok) return access.response;
 
   try {
     const { brand, competitors, gaps, recommendations } = await gatherGeoSignals(supabase, client_id);

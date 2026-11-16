@@ -34,7 +34,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-const { requireAuth, checkCollectionLimits } = require('./_auth')
+const { requireAuth, checkCollectionLimits, assertClientAccess } = require('./_auth')
 const { collectEngines } = require('./_collect')
 const { withObservability, captureException } = require('./_observability')
 const { activeEnginesFor } = require('./_cost')
@@ -170,10 +170,10 @@ exports.handler = withObservability('collect-claude', async (event) => {
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid id' }) }
   }
 
-  // Client ownership check
-  if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(bodyClientId)) {
-    return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
-  }
+  // Client access check (ledger row 3, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, bodyClientId)
+  if (!access.ok) return access.response
 
   const force = effectiveForce(auth.profile.role, body.force)
   const forceIgnored = !!body.force && !force

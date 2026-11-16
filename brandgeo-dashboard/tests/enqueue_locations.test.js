@@ -36,7 +36,11 @@ function installModule(resolved, exportsObj) {
 
 let db = null
 installModule(require.resolve('@supabase/supabase-js', { paths: [FN] }), { createClient: () => db })
+// The real assertClientAccess (docs/arch/agency-multi-brand.md 5.3, ledger
+// row 5), which enqueue-collection.js calls after the body parse.
+const realAssertClientAccess = require(path.join(FN, '_auth.js')).assertClientAccess
 installModule(path.join(FN, '_auth.js'), {
+  assertClientAccess: realAssertClientAccess,
   async requireAuth(event) {
     const h = (event.headers && event.headers.authorization) || ''
     if (h === 'Bearer tok-admin') return { user: { id: 'u-admin' }, profile: { role: 'admin', client_id: null }, supabase: db, headers: { 'Content-Type': 'application/json' } }

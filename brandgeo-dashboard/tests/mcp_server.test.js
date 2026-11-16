@@ -50,6 +50,15 @@ const daysAgo = (d) => new Date(T0.getTime() - d * 86400_000).toISOString()
 const ADMIN = 'aaaaaaaa-0000-4000-8000-000000000001'
 const VIEWER = 'aaaaaaaa-0000-4000-8000-000000000002'
 db.seed('user_profiles', [{ id: ADMIN, role: 'admin', client_id: null }, { id: VIEWER, role: 'viewer', client_id: 4 }])
+// Since 2026-11-16 resolveKey re-checks a key's creator (docs/arch/
+// agency-multi-brand.md 9.3, ledger row 30): the creator must exist in auth,
+// not be banned, and be an admin or reach the key's client (default brand or
+// a user_clients row). The keys below are created by VIEWER on clients 1, 2,
+// 3 and 5, so VIEWER is given a membership row on each, and both logins exist
+// in auth. tests/agency_lifecycle_server.test.js covers the refusals.
+db.usersById.set(ADMIN, { id: ADMIN, email: 'admin@example.com' })
+db.usersById.set(VIEWER, { id: VIEWER, email: 'viewer@example.com' })
+db.seed('user_clients', [1, 2, 3, 5].map((cid) => ({ user_id: VIEWER, client_id: cid, role: 'member', grant_source: 'direct' })))
 db.seed('clients', [
   { id: 1, name: 'Alpha', brand_aliases: ['Alpha', 'AlphaCo'], brand_website: 'alpha.example', plan: 'growth', category: 'active', engines_enabled: null, known_competitors: [] },
   { id: 2, name: 'Bravo', brand_aliases: ['Bravo'], brand_website: 'bravo.example', plan: 'radar', category: 'active', engines_enabled: null, known_competitors: [] },
@@ -538,6 +547,7 @@ async function main() {
       return q
     },
     rpc(...a) { return db.rpc(...a) },
+    auth: db.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   res = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: KA.secret }), { supabase: flaky })
   assert.strictEqual(res.status, 500, `clients read error must be 500, got ${res.status} ${res.rawBody}`)
@@ -667,6 +677,10 @@ async function main() {
 
   const OWNER = 'aaaaaaaa-0000-4000-8000-000000000061'
   fdb.seed('user_profiles', [{ id: OWNER, role: 'viewer', client_id: 61 }])
+  // The 9.3 creator re-check (see the top of this file): OWNER exists in auth
+  // and reaches 62 and 63, where it also created keys.
+  fdb.usersById.set(OWNER, { id: OWNER, email: 'owner@example.com' })
+  fdb.seed('user_clients', [62, 63].map((cid) => ({ user_id: OWNER, client_id: cid, role: 'member', grant_source: 'direct' })))
   fdb.seed('clients', [
     { id: 61, name: 'Lumora Studio', brand_aliases: ['Lumora'], brand_website: 'lumora.example', default_market_id: 'RO', plan: 'growth', category: 'active', engines_enabled: null, known_competitors: [] },
     { id: 62, name: 'Quillfeather Labs', brand_aliases: [], brand_website: null, default_market_id: null, plan: 'growth', category: 'active', engines_enabled: null, known_competitors: [] },
@@ -898,6 +912,7 @@ async function main() {
       return q
     },
     rpc(...a) { return fdb.rpc(...a) },
+    auth: fdb.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   const callPre = (method, params) => send(ev({ jsonrpc: '2.0', id: 3, method, params }, { key: KS_RW.secret, headers: V }), { supabase: premig, config: CFG2 })
   let pre = await callPre('tools/list', {})
@@ -1044,6 +1059,7 @@ async function main() {
   const auditFail = {
     from(t) { const q = fdb.from(t); if (t === 'client_events') q._run = async () => ({ data: null, error: { code: '23514', message: 'new row violates check constraint "client_events_type_check"' } }); return q },
     rpc(...a) { return fdb.rpc(...a) },
+    auth: fdb.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   o = oracle(61)
   const nextOpen = o.open.find((i) => i.id.startsWith('outranked:'))
@@ -1154,6 +1170,7 @@ async function main() {
   const noTables = {
     from(t) { const q = fdb.from(t); if (t.startsWith('oauth_')) q._run = async () => ({ data: null, error: { code: '42P01', message: 'relation "public.oauth_tokens" does not exist' } }); return q },
     rpc(...a) { return fdb.rpc(...a) },
+    auth: fdb.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: G_READ.at }), { supabase: noTables })
   assert.strictEqual(r17.status, 401); assert.strictEqual(r17.headers['WWW-Authenticate'], WWW_401_INVALID)
@@ -1230,6 +1247,7 @@ async function main() {
       return q
     },
     rpc(...a) { return fdb.rpc(...a) },
+    auth: fdb.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   reopenTarget()
   const preTarget = oauthTarget
@@ -1282,6 +1300,7 @@ async function main() {
   const boom17 = {
     from(t) { const q = fdb.from(t); if (t === 'oauth_grants') q._run = async () => ({ data: null, error: { code: '08006', message: `reset near ${G_RW.at} and ${G_RW.at.toUpperCase()} hash ${oauthLib.sha256Hex(G_RW.at)} and bgmrt_${'d'.repeat(64)}` } }); return q },
     rpc(...a) { return fdb.rpc(...a) },
+    auth: fdb.auth, // the 9.3 creator re-check reads auth admin, as a real client would
   }
   r17 = await send(ev({ jsonrpc: '2.0', id: 42, method: 'initialize', params: {} }, { key: G_RW.at }), { supabase: boom17 })
   assert.strictEqual(r17.status, 500)

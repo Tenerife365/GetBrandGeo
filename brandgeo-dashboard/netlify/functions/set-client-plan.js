@@ -21,7 +21,7 @@
 //      notified, email }
 // ============================================================================
 const { createClient } = require('@supabase/supabase-js');
-const { requireAuth } = require('./_auth');
+const { requireAuth, readBrandAccount } = require('./_auth');
 const { isValidPlan, planRank, planUnlocks, PLAN_LABELS, PLAN_ORDER } = require('./_plans');
 const { refreshCadenceFor } = require('./_cost');
 const { sendBrandedEmail, APP_URL } = require('./_email');
@@ -197,24 +197,46 @@ exports.handler = async (event) => {
   let emailResult = { sent: false };
 
   if (notify) {
-    await supabase.from('client_notifications').insert({
-      client_id, kind: notice.kind, title: notice.title, body: notice.body,
-      meta: notice.meta, cta_label: 'Open your dashboard', cta_url: APP_URL,
-    });
+    // Notice routing (docs/arch/agency-multi-brand.md 9.6). On a brand in an
+    // agency account the brand's logins are the agency's end customer (a
+    // guest), so no client_notifications row is written and the plan email
+    // goes to the account's owners instead. When the account kind cannot be
+    // read, nothing goes to the customer side at all: no banner, no email
+    // (fail toward less disclosure, as expire-plan-grants.js does).
+    const brandAccount = await readBrandAccount(supabase, client_id);
+    const route = !brandAccount.ok ? 'unknown' : brandAccount.kind === 'agency' ? 'agency' : 'direct';
 
-    // Resolve the client's login email(s) via user_profiles -> auth.users.
+    if (route === 'direct') {
+      await supabase.from('client_notifications').insert({
+        client_id, kind: notice.kind, title: notice.title, body: notice.body,
+        meta: notice.meta, cta_label: 'Open your dashboard', cta_url: APP_URL,
+      });
+    }
+
+    // Recipients: the brand's logins (direct) or the account owners (agency),
+    // each resolved through auth.users.
     const emails = [];
-    try {
-      const { data: profs } = await supabase.from('user_profiles').select('id').eq('client_id', client_id);
-      for (const p of profs || []) {
-        try {
-          const { data } = await supabase.auth.admin.getUserById(p.id);
-          if (data?.user?.email) emails.push(data.user.email);
-        } catch { /* skip a user we can't resolve */ }
-      }
-    } catch (e) { console.warn('[set-client-plan] email lookup failed:', e.message); }
+    if (route !== 'unknown') {
+      try {
+        const { data: rows, error: re } = route === 'agency'
+          ? await supabase.from('account_members').select('user_id').eq('account_id', brandAccount.accountId).eq('role', 'owner')
+          : await supabase.from('user_profiles').select('id').eq('client_id', client_id);
+        if (re) console.warn('[set-client-plan] recipient lookup failed:', re.code || re.message);
+        for (const r of rows || []) {
+          const uid = route === 'agency' ? r.user_id : r.id;
+          try {
+            const { data } = await supabase.auth.admin.getUserById(uid);
+            if (data?.user?.email) emails.push(data.user.email);
+          } catch { /* skip a user we can't resolve */ }
+        }
+      } catch (e) { console.warn('[set-client-plan] email lookup failed:', e.message); }
+    } else {
+      console.warn(`[set-client-plan] client ${client_id}: account kind unreadable; customer notice and email skipped`);
+    }
 
-    if (emails.length) {
+    if (route === 'unknown') {
+      emailResult = { sent: false, skipped: true, error: 'account kind unreadable; customer notice skipped' };
+    } else if (emails.length) {
       const r = await sendBrandedEmail({ to: emails, ...notice.email });
       emailResult = { sent: r.ok, skipped: r.skipped, error: r.error, recipients: emails.length };
     } else {

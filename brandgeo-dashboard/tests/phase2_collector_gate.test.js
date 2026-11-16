@@ -113,7 +113,11 @@ const PROFILES = {
   'tok-viewer': { user: { id: 'user-viewer' }, profile: { role: 'viewer', client_id: 42 } },
 }
 const limitCalls = { n: 0 }
+// The real assertClientAccess (docs/arch/agency-multi-brand.md 5.3, ledger
+// rows 2 to 4), which the collectors call after the body parse.
+const realAssertClientAccess = require(path.join(FN, '_auth.js')).assertClientAccess
 installModule(require.resolve(path.join(FN, '_auth.js')), {
+  assertClientAccess: realAssertClientAccess,
   async requireAuth(event) {
     const h = (event.headers && (event.headers.authorization || event.headers.Authorization)) || ''
     const token = h.startsWith('Bearer ') ? h.slice(7) : ''

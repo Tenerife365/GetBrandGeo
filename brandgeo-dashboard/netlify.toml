@@ -244,6 +244,13 @@
 [functions."platform-activity"]
   timeout = 26
 
+# Admin agency tooling (docs/arch/agency-multi-brand.md 9.1). A staff or guest
+# login runs a paged auth user listing, an invite, one SQL call and the invite
+# email in sequence; a removal runs one SQL call and the ban. The 10s default
+# could cut a login off between its SQL commit and its email.
+[functions."agency-admin"]
+  timeout = 26
+
 # ── Instant Audit Engine (SALES-ENGINE.md §2, CLAUDE.md §10 Component A) ──────
 [functions."audit-domain"]
   timeout = 26

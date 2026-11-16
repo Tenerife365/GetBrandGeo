@@ -33,6 +33,7 @@ const { refreshCadenceFor } = require('./_cost');
 const { sendBrandedEmail, APP_URL } = require('./_email');
 const { recordAdminEvent } = require('./_admin_notify');
 const { requireCronAuth } = require('./_cron_auth');
+const { readBrandAccount } = require('./_auth');
 
 // Second copy of the default that lives in _admin_notify.js. Kept in sync by
 // hand, which is exactly how it drifted: the first copy moved to support@ and
@@ -216,7 +217,18 @@ exports.handler = async (event) => {
     // source. Everything else, including kind, is identical.
     const wasPaid = c.plan_source === 'package';
     const planLabel = PLAN_LABELS[fromPlan] || fromPlan;
-    await supabase.from('client_notifications').insert({
+    // Notice routing (docs/arch/agency-multi-brand.md 9.6). A brand in an
+    // agency account belongs to the agency's end customer: renewing it is a
+    // conversation with the agency, so the customer notice is skipped. When
+    // the account kind cannot be read it is skipped too (fail toward less
+    // disclosure). The admin bell row below and the admin summary stay in
+    // every case, so BrandGEO still sees the lapse.
+    const brandAccount = await readBrandAccount(supabase, c.id);
+    const customerNotice = brandAccount.ok && brandAccount.kind === 'direct';
+    if (!customerNotice) {
+      console.log(`[expire-plan-grants] client ${c.id}: customer notice skipped (${brandAccount.ok ? 'agency brand' : 'account kind unreadable'})`);
+    }
+    if (customerNotice) await supabase.from('client_notifications').insert({
       client_id: c.id, kind: 'trial_expired',
       title: wasPaid
         ? `Your ${planLabel} package has ended`
@@ -235,7 +247,7 @@ exports.handler = async (event) => {
       type: 'trial_expired', client_id: c.id, email: false,
       title: `${wasPaid ? 'Package' : 'Trial'} expired: ${c.name || `client ${c.id}`}`,
       body: `Reverted from ${planLabel} to Free.`,
-      meta: { from_plan: fromPlan, was: c.plan_source },
+      meta: { from_plan: fromPlan, was: c.plan_source, customer_notified: customerNotice },
     });
 
     expired.push({ id: c.id, name: c.name || `client ${c.id}`, fromPlan, source: c.plan_source });

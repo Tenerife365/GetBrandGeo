@@ -20,7 +20,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-const { requireAuth, checkCollectionLimits } = require('./_auth')
+const { requireAuth, checkCollectionLimits, assertClientAccess } = require('./_auth')
 const { enqueueClientCollection, triggerWorker, checkCollectionCooldown } = require('./_enqueue')
 
 // Only an admin may run the destructive force path (delete, then recollect).
@@ -65,10 +65,10 @@ exports.handler = async (event) => {
   if (client_id === null)
     return { statusCode: 400, headers: auth.headers, body: JSON.stringify({ error: 'Invalid client_id' }) }
 
-  // Ownership — viewers may only enqueue for their own client
-  if (auth.profile.role !== 'admin' && String(auth.profile.client_id) !== String(client_id)) {
-    return { statusCode: 403, headers: auth.headers, body: JSON.stringify({ error: 'Forbidden: client mismatch' }) }
-  }
+  // Client access check (ledger row 5, docs/arch/agency-multi-brand.md 5.3):
+  // admin, the default brand, or a user_clients row for the body client.
+  const access = await assertClientAccess(auth, client_id)
+  if (!access.ok) return access.response
 
   const effectiveForce = effectiveForceFor(auth.profile.role, force)
   const forceIgnored = !!force && !effectiveForce

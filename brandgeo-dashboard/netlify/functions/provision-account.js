@@ -83,6 +83,14 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   const { data: { user }, error: userErr } = await supabase.auth.getUser(token)
   if (userErr || !user) return fail(401, 'Unauthorized: invalid or expired token')
+  // Ledger row 31 (docs/arch/agency-multi-brand.md 4.6): a login banned by
+  // agency-admin.js must not rewrite its default brand here. Same rule as
+  // isBannedUser in _auth.js: a ban that has not lapsed, or a value that does
+  // not parse, refuses.
+  if (user.banned_until) {
+    const bannedUntil = Date.parse(String(user.banned_until))
+    if (!Number.isFinite(bannedUntil) || bannedUntil > Date.now()) return fail(401, 'Unauthorized: login disabled')
+  }
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return fail(400, 'Invalid request body') }
