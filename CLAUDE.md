@@ -22,6 +22,208 @@
 
 ## CURRENT STATE (newest entry 2026-11-16)
 
+### 2026-11-16 (fourth): agency accounts release P1 LIVE (33bb181), all three migration files applied and read back
+
+**What it is.** Release P1 of `docs/arch/agency-multi-brand.md` revision 4:
+one agency login can reach several client brands. P1 is access only and
+invoice billed; `stripe-webhook.js` is not edited. Spec Q1 to Q12 are ruled
+(Q11: account-level limits ship before agency brands are attached; Q12: a
+removed login is banned, not deleted). Do not re-argue them.
+
+**Database, three files, applied in order and read back.**
+- `db/supabase-agency-accounts-2026-11-16.sql` (spec steps 1 and 2):
+  `accounts`, `account_members`, `clients.account_id`, new columns on
+  `user_clients`, triggers, backfills and the account write functions
+  (convert, attach, detach, staff, guest, remove, revert, repoint). Applied by
+  the P1 session on Constantin's "Apply migration steps 1 and 2" as
+  `20261116155901 agency_accounts_steps_1_2_2026_11_16`. R1 read back as
+  expected; R2 passed 34 of 34.
+- `db/supabase-agency-rls-group-b-2026-11-16.sql` (step 3): the 36 Group B
+  policies moved from `get_my_client_id()` and `my_client_id()` to
+  `has_client_access()`, with `oauth_grants_select` also tied to the user.
+  `ticket_client_id` gets `search_path = ''`. `client_events_type_check`
+  gains `account_change`, and `client_invite_links_source_check` gains
+  `agency-admin`. Applied from the master seat on Constantin's "Yes, apply
+  steps 1 to 3" as `20261116195700 agency_rls_group_b_step_3_2026_11_16`.
+  Pre-checks P1 to P4 matched (36 policies, md5 0c462086...). RB read back:
+  0 old-helper policies, 51 on `has_client_access`, 144 in total, 0
+  mismatches. R3 passed 58 of 58.
+- `db/supabase-agency-watchdog-2026-11-16.sql`: four new findings in
+  `ops.watchdog_findings()`, namely `agency_stripe_id` and the three fan-out
+  checks (`account_fanout_missing`, `_stale`, `_stray`). Applied as
+  `20261116195945 agency_watchdog_2026_11_16`. W0 matched (md5 0fc8dea6...,
+  7,637 characters). W1: the old body is unchanged byte for byte. W2: grants
+  unchanged. W3: 0 findings. R4 passed 3 of 3.
+- After all three: 73 clients and 73 accounts, 0 agency accounts, no scratch
+  rows. `db/supabase-agency-readback-2026-11-16.sql` holds R2 to R4. Each
+  section ends in a deliberate error, so nothing it writes commits.
+- **Applying through the connector:** `apply_migration` takes the file body
+  without its own `begin` and `commit`.
+
+**Server, `afc8b22`.**
+- `_auth.js`: `assertClientAccess` (admin, a `user_clients` row, or the
+  default brand) and `isBannedUser`. A banned login gets 401.
+- The collectors, enqueue, recommendations and the SEO functions check access
+  through `assertClientAccess`.
+- New admin-only `agency-admin.js`. Each write is one RPC, and a failed ban
+  returns a retry.
+- `create-portal-session.js` answers a non-admin with 409 `agency_billing`
+  unless the brand kind reads direct.
+- `delete-client.js` refuses an agency home brand and any brand with agency
+  logins.
+- `mcp-server.js` drops a key whose creator lost access.
+- `set-client-plan.js` and `expire-plan-grants.js` route notices for agency
+  brands.
+
+**Dashboard, `0893d1f`.**
+- `clientContext.tsx` adds `canSwitchClient`, `activeMembershipRole`,
+  `accountAccess` and `activeBrandAccountKind`.
+- New lazy `BrandSwitcher.tsx` in `Layout.tsx`, behind its own error boundary.
+- Billing, plan cards and upgrades show only on a direct brand; other brands
+  get a contact line.
+- The member client select no longer reads `plan_grant_note`.
+- Entry chunk +972 bytes on a clean export.
+
+**Order rule, binding for any later change here.** Migration first, read
+back, then push. If code that reads these tables deploys before them, the
+billing portal refuses every non-admin.
+
+**Reviews.** `docs/qa/agency-p1-build-review-2026-11-16.md` returned FAIL on:
+- F1: agency brands could still reach Stripe checkout and the portal.
+- F2: a failed ban had no retry.
+
+Both are closed. `docs/qa/agency-p1-build-rereview-2026-11-16.md` returned
+PASS WITH FINDINGS; N1 to N3 were closed afterwards and were not
+re-reviewed.
+
+Before the push: `tsc` exit 0, 74 of 74 node test files, build exit 0. The
+combined dry run of all four SQL files passed 98 of 98 and rolled back.
+
+**LIVE.** Pushed on Constantin's "Yes, push" as `e828e3c..33bb181` with
+`BATCH_PUSH=1`: 8 commits, the tactile sidebar and two docs commits included,
+one Netlify build. Read from outside: `health` answers `commit` 33bb181,
+`built_at` 20:10:47Z, with supabase, jobs and watchdog ok. `agency-admin`
+answers 401 unauthenticated. The cPanel deploy of the same push moved 0 files.
+
+**What changed for users: nothing yet.** No agency account exists, so each
+login still reaches only its own brand.
+
+**Not checked by anyone:**
+- The brand switcher or the new billing gates signed in.
+- A real agency (spec step 5).
+- A phone, a screen reader.
+
+**Owed before the first real agency:**
+- Read the Supabase JWT expiry (R1.13). A removed or banned login keeps its
+  token until it expires.
+- Runbook rows in `docs/ops/alerting-runbook.md` for the four new alert keys.
+  The file header says what to do when each one fires.
+- An admin UI for `agency-admin`; P1 has none.
+
+**Open, need a ruling:**
+- F6: `McpAccessSection`'s `onUpgrade` became optional, which is a props
+  change to a shared component. The fallback is to keep it required and pass
+  a mailto handler.
+- F8: `plan_grant_note` is readable through clients RLS.
+- I3: `ticket_client_id` is executable by PUBLIC; this predates the agency
+  work.
+- `remove_guest` always bans the login (a P3 ruling).
+
+**Other open items:**
+- New strings are marked `copy: pending bg-copy`.
+- Pre-existing: an sr-only live region on AI Visibility adds a 27 px window
+  scroll on taller content.
+
+### 2026-11-16 (third): tactile layer on AI Visibility and the sidebar LIVE (455cb01, 0d42308), visual only
+
+**The brief, Constantin's words: "80% frosted glass, 20% tactile instrument
+panel".** It is held to the Phase 3 to 5 guardrails: visuals only, no props or
+data change. Record: `docs/design/phase3-visual/tactile-layer-2026-11-16.md`.
+
+**`455cb01`, AI Visibility.**
+- `index.css`: tactile tokens declared in both themes, plus unlayered classes
+  (`.tactile-btn-primary`, `.tactile-btn-secondary`, `.recessed-well`,
+  `.recessed-pill-active`, `.seg-well`, `.recessed-input`,
+  `.recessed-channel`, `.recessed-squircle`, `.led-dot`, `.dial-face`). Five
+  glass classes they replace are removed.
+- `GlowScoreDial` gets a recessed bezel and a 60-tick ring; it is still
+  160 px. `ui/ScoreDial` is untouched.
+- Keycap header buttons and engine cards with an LED lamp and a groove filled
+  to the mention rate (still one sideways row). The #1 cell is a raised jewel.
+- Overview's Refresh is a keycap.
+- `tests/tokens_sync.test.js` checks that:
+  - every tactile token is declared in both themes;
+  - white keycap text clears 4.5:1;
+  - the brief's raw values stay out of `src/`.
+- "Your prompts" moved +15 px at 1440 and 1024, and +21 px at 390. The entry
+  chunk is unchanged.
+- Two `bg-verify` lenses returned PASS WITH FINDINGS
+  (`docs/qa/tactile-layer-review-{rules,a11y}-2026-11-16.md`), and every
+  medium and low item is closed.
+
+**`0d42308`, the sidebar.** CSS classes only. The active route is a raised
+pill with a 2 px accent bar, the `.sidebar-well` blocks are a recessed
+console, and the dropdown triggers inside them are keycaps through one rule,
+so `BrandSwitcher.tsx` is untouched. The sidebar stays opaque, and `Layout`
+imports nothing new. No figure changed, the entry chunk is 48 bytes smaller,
+and the stylesheet grew 654 bytes. It was checked from the builder seat only,
+with no `bg-verify` lens.
+
+**How it went live.** `455cb01` was never pushed by its own session: the
+Klibon push (`e828e3c`, below) carried it, and the live stylesheet
+`index-DScQnPZr.css` carried the tactile classes at 15:36Z. `0d42308` waited
+behind the agency P1 order rule and went live with `33bb181` (entry above).
+
+**Not checked by anyone:** signed in, a real phone, a screen reader, Firefox,
+a client with seven active engines.
+
+### 2026-11-16 (second): Klibon affiliate tracking LIVE (e828e3c), live signup test PASSED
+
+**Klibon is an outside affiliate network that runs beside the in-house
+program.** They share no parameter, cookie or Stripe field. Full record:
+`docs/affiliates/KLIBON.md`.
+
+**How it is installed.**
+- **getbrandgeo.com:** `ga4-init.js` injects the tag from `go.klibon.com`
+  (never self-hosted), with `data-cookie-domain=".getbrandgeo.com"`, only
+  after Accept on the cookie banner.
+  - Consent moved to version 2, so every earlier visitor is asked once more.
+  - Reject deletes `_klb`.
+  - `cookies.html` is now version 1.1 and lists `_klb`.
+- **app.getbrandgeo.com:** `src/lib/klibon.ts` loads the tag only when `_klb`
+  already exists. `Welcome.tsx` calls `Klibon.signup(email)` once
+  `provision-account` succeeds.
+- **CSP:** `go.klibon.com` is in `script-src` and `connect-src` in both
+  `.htaccess` and `netlify.toml`.
+- **Rule:** Klibon partner links must point at getbrandgeo.com, never straight
+  at the app, or the `?via=` lands where no banner can ask for consent.
+
+**Checkout is deliberately not wired.** Payment Links already carry the terms
+acceptance UUID in `client_reference_id`, which the in-house program reads,
+and a Payment Link cannot carry metadata. Wiring it would mean editing
+protected billing files.
+
+Ruling, Constantin 2026-11-16: "Not now, keep A". Credit by email match at
+signup. A Klibon visitor who pays without an account first is not credited on
+that payment.
+
+Open question for Klibon: does our UUID in `client_reference_id` override
+their email match?
+
+**LIVE.** Pushed by Constantin from the Klibon session. Read from outside:
+- `health` answered `commit` e828e3c, `built_at` 15:12:03Z.
+- On 2026-11-16 at 20:12Z the live `ga4-init.js` carries `go.klibon.com`, and
+  so does the getbrandgeo.com CSP header.
+
+**Live signup test PASSED 2026-11-16 (`c275f21`).** Constantin used the test
+link in a private window, pressed Accept, created a new account and submitted
+the Welcome form. Klibon's "Pass the referral code on" step turned green. The
+step stays grey until the Welcome form is submitted. The test left a real
+account in production; delete it from the admin Account page if it is not
+wanted.
+
+**Not checked:** a Klibon-referred visitor who later pays.
+
 ### 2026-11-16: dashboard copy pass LIVE (2a5af74), every lower case `copy: pending bg-copy` marker cleared
 
 **The ask, Constantin's words: "Send the new strings to bg-copy", then "Use
