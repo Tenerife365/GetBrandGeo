@@ -156,5 +156,92 @@ check('brief hex values live only in index.css', () => {
   if (hits.length) throw new Error(hits.map(f => path.relative(path.join(__dirname, '..'), f)).join(', '))
 })
 
+// --- tactile layer tokens (tactile-layer-2026-11-16.md) ---------------------------
+// Same contract as the glass tokens: declared in both themes, triplets are
+// triplets, and the 2026-11-16 brief's raw values live only in index.css.
+const TACTILE_TOKENS = [
+  'key-top', 'key-shade', 'key-highlight', 'keycap-top', 'keycap-bottom', 'keycap-highlight',
+  'keycap-shade', 'keycap-drop', 'well-fill', 'well-border', 'well-shadow', 'pill-top',
+  'pill-bottom', 'pill-shadow', 'led-highlight', 'dial-track', 'pressed-shadow',
+]
+const TACTILE_TRIPLETS = ['key-top', 'keycap-top', 'keycap-bottom', 'well-fill', 'pill-top', 'pill-bottom', 'dial-track']
+for (const theme of ['dark', 'light']) {
+  for (const name of TACTILE_TOKENS) {
+    check('tactile token --' + name + ' declared in ' + theme, () => {
+      if (!cssTheme[theme][name]) throw new Error('missing')
+    })
+  }
+  for (const name of TACTILE_TRIPLETS) {
+    check('tactile token --' + name + ' is a triplet in ' + theme, () => {
+      const v = cssTheme[theme][name]
+      if (!/^\d{1,3} \d{1,3} \d{1,3}$/.test(v) || v.split(' ').some(n => +n > 255)) throw new Error('got ' + v)
+    })
+  }
+}
+// White keycap text must clear 4.5:1 at the keycap's lightest stop.
+const lum = trip => {
+  const [r, g, b] = trip.split(' ').map(n => {
+    const c = +n / 255
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+for (const theme of ['dark', 'light']) {
+  for (const stop of ['key-top', 'accent-strong', 'accent-strong-hover']) {
+    check('white on --' + stop + ' >= 4.5:1 (' + theme + ')', () => {
+      const ratio = 1.05 / (lum(cssTheme[theme][stop]) + 0.05)
+      if (ratio < 4.5) throw new Error(ratio.toFixed(2) + ':1')
+    })
+  }
+}
+check('tactile brief raw values live only in index.css', () => {
+  // The brief's hex and rgb literals: the light keycap and well greys, the
+  // dark well, the lighter indigo keycap stop, the slate shadow base and the
+  // emerald glow of its #1 badge.
+  // Comma or space separated, so rgb(79 70 229) and rgba(246, 246, 251, ..)
+  // are caught as well as the hex spellings (review F2).
+  const trip = t => t.split(' ').join('[,\\s]+')
+  const brief = new RegExp('#(818cf8|ebeaf2|f1f2f7|4f46e5)\\b|\\brgba?\\(\\s*(' +
+    ['6 8 15', '129 140 248', '79 70 229', '235 234 242', '241 242 247', '246 246 251',
+     '15 23 42', '30 27 75', '16 185 129', '99 102 241'].map(trip).join('|') +
+    ')\\b|\\b(6 8 15|129 140 248|235 234 242|241 242 247|246 246 251)\\b', 'i')
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(d =>
+    d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)])
+  const hits = walk(path.join(__dirname, '..', 'src'))
+    .filter(f => /\.(tsx?|css)$/.test(f) && !f.endsWith('index.css'))
+    .filter(f => brief.test(fs.readFileSync(f, 'utf8')))
+  if (hits.length) throw new Error(hits.map(f => path.relative(path.join(__dirname, '..'), f)).join(', '))
+})
+// Button's utilities would win over a layered keycap class; see index.css.
+// Every tactile class must open at depth 0, outside any @layer (review F3).
+const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+const TACTILE_CLASSES = ['.tactile-btn-primary', '.tactile-btn-secondary', '.recessed-well', '.recessed-pill-active',
+  '.seg-well[role="radiogroup"]', '.recessed-input', '.recessed-channel', '.recessed-squircle', '.led-dot', '.dial-face']
+for (const cls of TACTILE_CLASSES) {
+  check('tactile class ' + cls + ' is unlayered', () => {
+    const at = cssNoComments.split('\n').map(l => l.startsWith(cls) && /^[ ,{]/.test(l.slice(cls.length))).indexOf(true)
+    if (at < 0) throw new Error('not found at the start of a line')
+    const before = cssNoComments.split('\n').slice(0, at).join('\n')
+    const depth = [...before].reduce((d, ch) => d + (ch === '{' ? 1 : ch === '}' ? -1 : 0), 0)
+    if (depth !== 0) throw new Error('nested at depth ' + depth)
+  })
+}
+// The brief's Tailwind palette classes stay out of the files this layer
+// touched (other pages already use palette classes, so the ban is scoped).
+check('no brief palette classes in the tactile files', () => {
+  const files = ['src/pages/AIVisibility.tsx', 'src/pages/Dashboard.tsx', 'src/components/GlowScoreDial.tsx', 'src/components/PromptResultCell.tsx']
+  const hits = files.filter(f => /\b(from-indigo-500|via-violet-500|to-purple-400)\b|ring-pos-ink\/40/.test(read(f)))
+  if (hits.length) throw new Error(hits.join(', '))
+})
+// The selected segment and the search field are told apart from the well by
+// their --edge border alone, so that pair must clear 3:1 (a11y review).
+for (const theme of ['dark', 'light']) {
+  check('--edge on --well-fill >= 3:1 (' + theme + ')', () => {
+    const a = lum(cssTheme[theme]['edge']), b = lum(cssTheme[theme]['well-fill'])
+    const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    if (r < 3) throw new Error(r.toFixed(2) + ':1')
+  })
+}
+
 console.log(passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

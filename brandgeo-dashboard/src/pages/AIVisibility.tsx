@@ -116,6 +116,14 @@ const FIX_PRIORITY_LABEL: Record<'P0' | 'P1' | 'P2', string> = {
 // chip for every category; the label text still identifies which one it is.
 const getCatColor = (_cat: string) => 'bg-surface-2 text-ink-2'
 
+// Engine card LED lamp colour per status badge tone (tactile layer, 2026-11-16).
+const LED_TONE: Record<'pos' | 'warn' | 'neg' | 'neutral', string> = {
+  pos: 'text-pos',
+  warn: 'text-warn',
+  neg: 'text-neg',
+  neutral: 'text-neu',
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ResultMap = Map<number, Map<LLMName, AIResult>>
@@ -1809,6 +1817,7 @@ export default function AIVisibility() {
               <Button
                 variant="secondary"
                 icon={Settings}
+                className="tactile-btn-secondary"
                 onClick={() => setShowEngineModal(true)}
                 title="Configure engines for this client"
                 aria-label="Configure engines for this client"
@@ -1823,6 +1832,7 @@ export default function AIVisibility() {
               <Button
                 variant="danger"
                 icon={RotateCcw}
+                className="tactile-btn-secondary"
                 onClick={forceCollection}
                 disabled={collecting || loading}
                 title="Force Refresh: wipes existing results and re-runs all engines"
@@ -1834,6 +1844,7 @@ export default function AIVisibility() {
             <Button
               variant="secondary"
               icon={RefreshCw}
+              className="tactile-btn-secondary"
               onClick={onReloadClick}
               disabled={loading || reloading}
             >
@@ -1846,6 +1857,7 @@ export default function AIVisibility() {
             <Button
               variant="primary"
               icon={collecting ? Loader2 : Play}
+              className="tactile-btn-primary"
               onClick={runCollection}
               disabled={collecting || loading || (!isAdmin && !!collectionAllowance.nextAvailableAt)}
             >
@@ -2035,7 +2047,7 @@ export default function AIVisibility() {
                   here (2026-07-29 split by audience). AllowanceMeter itself is
                   unchanged; the pill is only its frame. */}
               {isAdmin && !isDemoMode && collectionAllowance.budgetCapEur > 0 && (
-                <div className="glass-pill ml-auto px-3 py-1.5 tabular-nums" data-aiv-budget>
+                <div className="recessed-well rounded-full ml-auto px-3 py-1.5 tabular-nums" data-aiv-budget>
                   <AllowanceMeter
                     label="Monthly API budget"
                     used={collectionAllowance.budgetSpentEur}
@@ -2069,9 +2081,9 @@ export default function AIVisibility() {
                       )}
                     </div>
                     {/* Same semantics as Meter (progressbar only when there is a
-                        value), drawn with the gradient fill. */}
+                        value), drawn as a luminous fill in a recessed channel. */}
                     <div
-                      className="glow-bar-track h-1.5"
+                      className="recessed-channel h-2"
                       role={barValue === null ? undefined : 'progressbar'}
                       aria-valuemin={barValue === null ? undefined : 0}
                       aria-valuemax={barValue === null ? undefined : 100}
@@ -2158,7 +2170,7 @@ export default function AIVisibility() {
                           without the accent glow (glass-card-lift). */}
                       <div className="glass-card glass-lite glass-card-lift group flex flex-col gap-1.5 w-full p-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="glass-squircle w-7 h-7">
+                        <span className="recessed-squircle w-8 h-8">
                           <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-4 h-4 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
                         </span>
                         <span className="text-body font-semibold text-ink truncate" title={e.label}>{e.label}</span>
@@ -2180,6 +2192,9 @@ export default function AIVisibility() {
                       {/* Wraps on a narrow card: the badge drops under the
                           percentage instead of spilling past the card edge. */}
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-[28px]">
+                        {/* Optical lamp beside the reading. Decoration only: the
+                            badge carries the words and the glyph. */}
+                        <span aria-hidden="true" className={`led-dot ${LED_TONE[statusBadge.tone]}`} />
                         {isMeasured && (
                           <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
                         )}
@@ -2190,12 +2205,6 @@ export default function AIVisibility() {
                         >
                           {statusBadge.label}
                         </Badge>
-                      </div>
-
-                      {/* Mention rate as a 1px line: the number above is the
-                          reading, this is its trace, so it carries no role. */}
-                      <div className="glow-line" aria-hidden="true">
-                        {ratePct !== null && ratePct > 0 && <span style={{ width: `${ratePct}%` }} />}
                       </div>
 
                       <div className="text-meta text-ink-2 line-clamp-2 sm:line-clamp-none sm:truncate" title={metaText}>{metaText}</div>
@@ -2223,14 +2232,22 @@ export default function AIVisibility() {
                         )
                       })()}
 
-                      {e.lastOkAt && !e.isUnavailable && (
-                        <div
-                          className="mt-auto text-meta text-ink-3 tabular-nums truncate"
-                          title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
-                        >
-                          {formatRelativeOrDate(e.lastOkAt)}
+                      <div className="mt-auto flex flex-col gap-1.5">
+                        {e.lastOkAt && !e.isUnavailable && (
+                          <div
+                            className="text-meta text-ink-3 tabular-nums truncate"
+                            title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
+                          >
+                            {formatRelativeOrDate(e.lastOkAt)}
+                          </div>
+                        )}
+                        {/* Mention rate as a sunken groove across the foot of the
+                            card: the number above is the reading, this is its
+                            trace, so it carries no role. */}
+                        <div className="recessed-channel h-1.5" aria-hidden="true">
+                          {ratePct !== null && ratePct > 0 && <div className="glow-bar-fill" style={{ width: `${ratePct}%` }} />}
                         </div>
-                      )}
+                      </div>
                       </div>
                     </motion.div>
                   )
@@ -2255,7 +2272,7 @@ export default function AIVisibility() {
                         className="glass-card glass-lite glass-card-interactive group flex flex-col justify-center gap-1 w-full p-3 lg:px-2 xl:px-3"
                       >
                         <span className="flex items-center gap-2 min-w-0 lg:flex-col lg:items-start lg:gap-1 xl:flex-row xl:items-center xl:gap-2">
-                          <span className="glass-squircle w-6 h-6">
+                          <span className="recessed-squircle w-6 h-6">
                             <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-3.5 h-3.5 object-contain grayscale opacity-70" />
                           </span>
                           <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
@@ -2312,6 +2329,7 @@ export default function AIVisibility() {
                   ref={fixHubToggleRef}
                   variant={showFixHub ? 'ghost' : 'secondary'}
                   size="sm"
+                  className={showFixHub ? undefined : 'tactile-btn-secondary'}
                   icon={showFixHub ? ChevronUp : ChevronDown}
                   onClick={() => setShowFixHub(v => !v)}
                   aria-expanded={showFixHub}
@@ -2561,7 +2579,7 @@ export default function AIVisibility() {
                       placeholder={`Search ${promptCount(prompts.length)}`}
                       autoComplete="off"
                       spellCheck={false}
-                      className="glass-input w-full h-9 max-sm:min-h-[44px] pl-8 pr-2 text-body text-ink placeholder:text-ink-3"
+                      className="recessed-input rounded-control w-full h-9 max-sm:min-h-[44px] pl-8 pr-2 text-body text-ink placeholder:text-ink-3"
                     />
                   </div>
                 )}
@@ -2569,6 +2587,7 @@ export default function AIVisibility() {
                   <>
                     <div className="hidden sm:block">
                       <SegmentedControl
+                        className="seg-well"
                         ariaLabel={AIV_COPY.sortGroupLabel}
                         value={sortMode}
                         onChange={(m: SortMode) => changeSort(m)}
@@ -2581,7 +2600,7 @@ export default function AIVisibility() {
                         id="aiv-sort"
                         value={sortMode}
                         onChange={e => changeSort(parseSortMode(e.target.value))}
-                        className="w-full min-h-[44px] rounded-control border border-line bg-surface px-3 text-body text-ink"
+                        className="tactile-btn-secondary w-full min-h-[44px] rounded-control px-3 text-body text-ink"
                       >
                         {SORT_MODES.map(mode => <option key={mode} value={mode}>{SORT_LABEL[mode]}</option>)}
                       </select>

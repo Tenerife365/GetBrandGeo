@@ -105,6 +105,30 @@
   --aura-b: 0.12;
   --row-hover: 26 23 40;
 
+  /* Tactile layer (docs/design/phase3-visual/tactile-layer-2026-11-16.md):
+     keycaps, recessed wells, raised pills and LED lamps. The brief's raw hex
+     and rgba values live here, once per theme; tests/tokens_sync.test.js
+     checks both themes declare each one and that the brief's values appear
+     nowhere else in src/. Dark reads as anodized obsidian: wells sink below
+     the canvas, keycaps carry a top highlight and a bottom shade. */
+  --key-top: 131 75 241;   /* #834bf1, white text 4.95:1 */
+  --key-shade: rgb(30 27 75 / 0.45);
+  --key-highlight: rgb(255 255 255 / 0.30);
+  --keycap-top: 22 23 30;
+  --keycap-bottom: 16 17 22;
+  --keycap-highlight: rgb(255 255 255 / 0.07);
+  --keycap-shade: rgb(0 0 0 / 0.4);
+  --keycap-drop: 0 2px 4px rgb(0 0 0 / 0.3);
+  --well-fill: 6 8 15;
+  --well-border: rgb(255 255 255 / 0.05);
+  --well-shadow: inset 0 2px 5px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.4);
+  --pill-top: 29 30 39;
+  --pill-bottom: 22 23 30;
+  --pill-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 2px 6px rgb(0 0 0 / 0.45);
+  --led-highlight: rgb(255 255 255 / 0.55);
+  --dial-track: 29 30 39;
+  --pressed-shadow: inset 0 2px 4px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.2);
+
   /* Legacy colour-utility bridge (spec 4.6). One variable per remapped utility,
      declared in both themes, read by tailwind.config.js (textColor,
      backgroundColor, borderColor). Dark value = what the class computes without
@@ -277,6 +301,26 @@ html.light {
   --aura-a: 0.16;
   --aura-b: 0.08;
   --row-hover: 247 243 254;
+
+  /* Tactile layer, light values: matte ceramic. Wells are a cool grey groove
+     with a white lip below, keycaps are white to pale grey. */
+  --key-top: 124 58 237;   /* #7c3aed, white text 5.7:1 */
+  --key-shade: rgb(46 16 101 / 0.35);
+  --key-highlight: rgb(255 255 255 / 0.30);
+  --keycap-top: 255 255 255;
+  --keycap-bottom: 241 242 247;   /* #f1f2f7 */
+  --keycap-highlight: rgb(255 255 255 / 1);
+  --keycap-shade: rgb(9 9 15 / 0.04);
+  --keycap-drop: 0 1px 3px rgb(9 9 15 / 0.08);
+  --well-fill: 235 234 242;   /* #ebeaf2 */
+  --well-border: rgb(9 9 15 / 0.08);
+  --well-shadow: inset 0 2px 4px rgb(9 9 15 / 0.08), 0 1px 0 rgb(255 255 255 / 1);
+  --pill-top: 255 255 255;
+  --pill-bottom: 255 255 255;
+  --pill-shadow: 0 1px 3px rgb(9 9 15 / 0.12), inset 0 1px 0 rgb(255 255 255 / 1);
+  --led-highlight: rgb(255 255 255 / 0.7);
+  --dial-track: 207 207 218;
+  --pressed-shadow: inset 0 2px 4px rgb(9 9 15 / 0.18), 0 1px 1px rgb(9 9 15 / 0.06);
 
   --br-text-white: 15 23 42;
   --br-text-slate-100: 15 23 42;
@@ -860,8 +904,7 @@ select:focus-visible:focus-visible {
   }
   .hero-ambient-mesh > .rounded-card:hover { border-color: var(--glass-border-strong); }
 
-  /* Gradient progress fill. The track stays --surface-3. */
-  .glow-bar-track { position: relative; overflow: hidden; border-radius: 9999px; background-color: rgb(var(--surface-3)); }
+  /* Gradient progress fill, drawn inside a .recessed-channel (tactile layer). */
   .glow-bar-fill {
     height: 100%;
     border-radius: 9999px;
@@ -869,14 +912,6 @@ select:focus-visible:focus-visible {
     box-shadow: 0 0 10px 0 rgb(var(--glow) / var(--glow-strength));
     transition: width var(--motion-base) var(--ease-out);
   }
-  /* The 1px mention-rate line on an engine card: no track clip, so its glow shows. */
-  .glow-line { position: relative; height: 1px; border-radius: 9999px; background-color: rgb(var(--line-2)); }
-  .glow-line > span {
-    position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px;
-    background-image: linear-gradient(90deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
-    box-shadow: 0 0 6px 0.5px rgb(var(--glow) / var(--glow-strength));
-  }
-
   /* Mini panel: one score dimension. No blur (six of them). */
   .glass-tile {
     border-radius: var(--radius-control);
@@ -885,23 +920,6 @@ select:focus-visible:focus-visible {
     transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
   }
   .glass-tile:hover { border-color: rgb(var(--accent-ink) / 0.4); background-color: rgb(var(--accent) / 0.06); }
-
-  /* Small glass pill (the admin budget meter in the score card header). */
-  .glass-pill {
-    border-radius: 9999px;
-    border: 1px solid var(--glass-border-strong);
-    background-color: var(--glass-tile);
-    box-shadow: inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Engine favicon squircle. */
-  .glass-squircle {
-    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-    border-radius: 9px;
-    border: 1px solid var(--glass-border-strong);
-    background-color: rgb(var(--surface-2));
-    background-image: linear-gradient(160deg, var(--glass-highlight) 0%, var(--glass-tile) 100%);
-  }
 
   /* Fix this collapsed callout: glass with a glowing accent on the left. */
   .glass-callout::before {
@@ -933,23 +951,15 @@ select:focus-visible:focus-visible {
   .matrix-row > button:hover,
   .matrix-row > button:hover > .sticky { background-color: rgb(var(--row-hover)); }
 
-  /* Prompt search field. */
-  .glass-input {
-    border-radius: var(--radius-control);
-    border: 1px solid rgb(var(--edge));
-    background-color: rgb(var(--surface-2));
-    box-shadow: inset 0 1px 0 var(--glass-highlight);
-    transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
-  }
-  .glass-input:focus { border-color: rgb(var(--accent-ink)); box-shadow: 0 0 0 3px rgb(var(--glow) / 0.18); }
-
   /* Rank #1 in the prompt matrix: the strongest cell on the page. The fill is
      the strong accent pair (white text clears 5.7:1 on it in both themes); the
      glow carries the brief's lighter violet. */
   .cell-top {
     background-image: linear-gradient(135deg, rgb(var(--accent-strong)) 0%, rgb(var(--accent-strong-hover)) 100%);
     color: rgb(var(--on-accent));
-    box-shadow: inset 0 1px 0 rgb(var(--on-accent) / 0.18), 0 0 14px -2px rgb(var(--glow) / var(--glow-strength));
+    /* Tactile layer: a raised jewel, lit top edge and a shaded lower lip. */
+    box-shadow: inset 0 1px 0 rgb(var(--on-accent) / 0.28), inset 0 -2px 0 var(--key-shade),
+                0 2px 6px -2px rgb(var(--accent-strong) / 0.5), 0 0 14px -2px rgb(var(--glow) / var(--glow-strength));
   }
   /* Mentioned at any other rank: a softer pill than before. */
   .cell-soft {
@@ -996,5 +1006,131 @@ select:focus-visible:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .glass-card-interactive, .glass-card-interactive:hover, .glass-card-interactive:focus-within,
   .glass-card-lift, .glass-card-lift:hover, .glass-card-lift:focus-within { transform: none; transition: none; }
-  .glow-bar-fill, .glass-tile, .glass-input, .matrix-row > button::before { transition: none; }
+  .glow-bar-fill, .glass-tile, .matrix-row > button::before { transition: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Tactile layer (docs/design/phase3-visual/tactile-layer-2026-11-16.md).
+   80 percent glass, 20 percent instrument panel: keycaps for buttons, recessed
+   wells for tracks, grooves and inputs, a raised pill for the chosen segment,
+   LED lamps for engine status. Data rows stay flat. Every colour reads a
+   token declared in both themes. Unlayered on purpose: Button's utilities
+   (bg-accent-strong, active:scale) are in the utilities layer, and these
+   rules come after it, so a keycap class on a Button wins without a props
+   change. None of these classes set size, padding or radius; the markup does.
+   Pure CSS: nothing here needs motion, so Layout may use them. */
+
+/* Backlit keycap: the one primary action. The top stop is chosen so white
+   text stays at 4.95:1 (dark) and 5.7:1 (light) at the lightest point. */
+.tactile-btn-primary {
+  border: 1px solid rgb(var(--accent-strong-hover));
+  background-image: linear-gradient(180deg, rgb(var(--key-top)) 0%, rgb(var(--accent-strong)) 45%, rgb(var(--accent-strong-hover)) 100%);
+  color: rgb(var(--on-accent));
+  box-shadow: inset 0 1px 0 0 var(--key-highlight), inset 0 -2px 0 0 var(--key-shade),
+              0 3px 10px -2px rgb(var(--accent) / 0.45), 0 0 20px -4px rgb(var(--accent) / 0.35);
+  transition: transform 120ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+.tactile-btn-primary:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.tactile-btn-primary:active { transform: translateY(1px); box-shadow: var(--pressed-shadow); filter: none; }
+/* Disabled: the backlight goes out, so it never reads as live (review L2). */
+.tactile-btn-primary:disabled { box-shadow: none; filter: none; transform: none; }
+
+/* Machined keycap: secondary controls. Keeps the 1px --edge border, the
+   boundary that clears 3:1 against the page. */
+.tactile-btn-secondary {
+  border: 1px solid rgb(var(--edge));
+  background-color: rgb(var(--keycap-bottom));
+  background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-bottom)) 100%);
+  box-shadow: inset 0 1px 0 0 var(--keycap-highlight), inset 0 -1px 0 0 var(--keycap-shade), var(--keycap-drop);
+  transition: transform 120ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.tactile-btn-secondary:hover { background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-top)) 100%); }
+.tactile-btn-secondary:active { transform: translateY(1px); box-shadow: var(--pressed-shadow); }
+
+/* Sunken slot: grooves, segment tracks, the dial bezel. Decorative edge only;
+   a control inside it carries its own 3:1 boundary. */
+.recessed-well {
+  border: 1px solid var(--well-border);
+  background-color: rgb(var(--well-fill));
+  box-shadow: var(--well-shadow);
+}
+
+/* A raised switch inside a well: the chosen segment. The --edge border is
+   the state cue that clears 3:1 against the well (pinned in tokens_sync).
+   The sort SegmentedControl takes the same look through .seg-well below. */
+.recessed-pill-active,
+.seg-well[role="radiogroup"] > [aria-checked="true"] {
+  border-color: rgb(var(--edge));
+  background-color: rgb(var(--pill-bottom));
+  background-image: linear-gradient(180deg, rgb(var(--pill-top)) 0%, rgb(var(--pill-bottom)) 100%);
+  color: rgb(var(--ink));
+  box-shadow: var(--pill-shadow);
+}
+
+/* SegmentedControl in a well, styled through its existing className prop.
+   Selectors are two classes deep so they beat the component's utilities. */
+.seg-well[role="radiogroup"] {
+  border-color: var(--well-border);
+  border-radius: 12px;
+  background-color: rgb(var(--well-fill));
+  box-shadow: var(--well-shadow);
+  padding: 3px;
+}
+.seg-well[role="radiogroup"] > [role="radio"] { border-radius: 9px; }
+
+/* Recessed text field: the well's fill and inset shade, with the --edge
+   border kept so the field boundary clears 3:1. */
+.recessed-input {
+  border: 1px solid rgb(var(--edge));
+  background-color: rgb(var(--well-fill));
+  box-shadow: var(--well-shadow);
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+/* The global :focus-visible outline still draws on top of this (review L1). */
+.recessed-input:focus { border-color: rgb(var(--accent-ink)); box-shadow: var(--well-shadow), 0 0 0 3px rgb(var(--glow) / 0.22); }
+
+/* Groove with a luminous fill (.glow-bar-fill inside). 1px of well shows
+   around the fill, the fill's glow spills a little past the lip. */
+.recessed-channel {
+  position: relative;
+  padding: 1px;
+  border-radius: 9999px;
+  border: 1px solid var(--well-border);
+  background-color: rgb(var(--well-fill));
+  box-shadow: var(--well-shadow);
+}
+
+/* Engine favicon squircle, sunk into the card. */
+.recessed-squircle {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border-radius: 9px;
+  border: 1px solid var(--well-border);
+  background-color: rgb(var(--well-fill));
+  box-shadow: var(--well-shadow);
+}
+
+/* Optical status lamp. Colour comes from the text colour class beside it
+   (text-pos, text-warn, text-neg, text-neu); it is always aria-hidden,
+   because the badge next to it carries the words and the glyph. */
+.led-dot {
+  display: inline-block; flex-shrink: 0;
+  width: 7px; height: 7px; border-radius: 9999px;
+  background-color: currentColor;
+  background-image: radial-gradient(circle at 35% 30%, var(--led-highlight) 0%, transparent 55%);
+  box-shadow: 0 0 8px 0 currentColor;
+}
+
+/* The score dial's face: a sunk bezel with a faint accent aura in it. */
+.dial-face {
+  border-radius: 9999px;
+  border: 1px solid var(--well-border);
+  background-color: rgb(var(--well-fill));
+  background-image: radial-gradient(circle, rgb(var(--accent) / 0.16) 0%, transparent 70%);
+  box-shadow: var(--well-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactile-btn-primary, .tactile-btn-primary:hover, .tactile-btn-primary:active,
+  .tactile-btn-secondary, .tactile-btn-secondary:active { transform: none; transition: none; }
+  .recessed-input { transition: none; }
 }

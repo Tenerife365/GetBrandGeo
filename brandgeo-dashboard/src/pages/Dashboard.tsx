@@ -186,7 +186,7 @@ export default function Dashboard() {
   const checkedCount = view?.mention.checked ?? 0
 
   const refreshButton = (
-    <Button variant="secondary" icon={RefreshCw}
+    <Button variant="secondary" icon={RefreshCw} className="tactile-btn-secondary"
       onClick={() => { void reload({ quiet: true }); void loadHistory(true) }}>
       {t.dash_refresh}
     </Button>

@@ -41,7 +41,10 @@ glass surface for HeroAnswer's own Card through a descendant rule),
 `.glow-bar-track` and `.glow-bar-fill`, `.glow-line`, `.glass-tile`,
 `.glass-pill`, `.glass-squircle`, `.glass-callout`, `.matrix-head`,
 `.matrix-row`, `.glass-input`, `.cell-top`, `.cell-soft`, `.sidebar-glass`,
-`.sidebar-well`, and an unlayered override of `.nav-item.is-active`. A
+`.sidebar-well`, and an unlayered override of `.nav-item.is-active`.
+(2026-11-16: `.glow-bar-track`, `.glow-line`, `.glass-squircle`,
+`.glass-input` and `.glass-pill` were removed when the tactile layer replaced
+them with recessed equivalents; see `tactile-layer-2026-11-16.md`.) A
 `@supports not (backdrop-filter)` block makes glass solid; a reduced-motion
 block stops the lift and the transitions.
 
