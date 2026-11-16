@@ -20,7 +20,85 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-15)
+## CURRENT STATE (newest entry 2026-11-16)
+
+### 2026-11-16: dashboard copy pass LIVE (2a5af74), every lower case `copy: pending bg-copy` marker cleared
+
+**The ask, Constantin's words: "Send the new strings to bg-copy", then "Use
+the defaults" on the six flags, then "Yes, fix then push".** Copy deck:
+`docs/copy/pending-strings-2026-11-16.md` (178 string rows across 19
+files: 31 changed, 142 kept, 5 flagged). Sections 13 and 14 of the deck
+record the rulings and the measurements; read them before changing any of
+these strings.
+
+**Rulings, do not re-argue.** F1: the Fix this hub says Urgent, Important
+and Later wherever a viewer meets a priority (summary, badges, column and
+Next labels, and the hub explainer in `lib/aiVisibilityCopy.ts`); the P0 to
+P2 keys stay in the data and in the fix prompt text. F2: the locked engine
+card shows "Upgrade to {plan}", the matrix header shows "Upgrade" with the
+title "{engine}: available on {plan}". F3: engine badges read Often named,
+Sometimes named, Rarely named (the 50 and 25 percent bands in `metrics.ts`).
+F4 and F5: the deck's text as written ("Location not recorded" stays). F6:
+the admin re-run control is named "Re-run all prompts on {engine}" and copy
+refers to it that way, never as a refresh button. Label in name (WCAG 2.5.3,
+a MAJOR from the accessibility lens): both locked engine controls take their
+accessible name from `lockedHeaderLabel` in `lib/aiVisibilityCopy.ts`,
+"Upgrade to {plan} for {engine}"; Constantin's go was "Yes, fix then push"
+on that exact proposal. The banned word in the old locked aria-label at
+`AIVisibility.tsx` is gone with it. "Ranked #1, named first" in the legend
+now reads "Named first (#1)".
+
+**Layout changed to fit the longer words, AI Visibility page classes only.**
+"Sometimes named" (136 px, never wraps) spilled 55 px past the engine card at
+390 and 80 px at 1024. The status card minimum is now 164 px (172 px from
+640 px up, was 140 px from 1024 up), the percentage and badge may wrap, and
+the locked card label wraps instead of truncating. Measured in headless
+Chrome, demo mode, dark and light: the badge stays inside the card at 1440,
+1280, 1024, 390, 375, 360 and 320; the matrix header column is 88 px and
+"Upgrade" takes 64 px. "Your prompts" starts at 757 px at 1440 (unchanged),
+867 px at 1024 and 1,259 px at 390 (was 1,241); with Fix this open 1,200 px
+and 2,326 px. No sideways scroll of the window or of `<main>`, no text box
+below AA. Entry chunk 602,546 bytes (602,542 before).
+
+**Open, for bg-design: the engine row may now scroll sideways on desktop.**
+By arithmetic from the class values, a seven engine plan (Growth PRO,
+Managed) needs about 1,276 px at 1440 against about 1,136 px of content,
+where seven 140 px cards used to fit. Not rendered: demo mode has one active
+engine. The choices are the scrolling row as shipped, a badge whose text
+wraps, or a shorter band word.
+
+**Commits.** `7ff22b8` (21 files: the deck applied, plus the deck), and
+`b624fb3` (the label in name fix, 3 files), both by the glass session. That
+session's own safety check refused the push because the go reached it
+through another session, so the master pushed on Constantin's own words. An
+article session had pushed `90bb919` (article queue drafts) meanwhile while
+its files were still untracked or modified in this checkout, so a merge or
+rebase would have refused or touched them; the master built the merge with
+`git merge-tree --write-tree` and `git commit-tree`, moved `main` with
+`update-ref` and refreshed the index with `read-tree HEAD` (working files
+untouched, they matched the pushed commit byte for byte). Pushed as
+`2a5af74` with `BATCH_PUSH=1`, one Netlify build. **LIVE, read from
+outside:** `health` answers `commit` 2a5af74, `built_at` 07:31:03Z,
+supabase, jobs and watchdog ok; the live entry is `index-yKwYM1gN.js` and the
+lazy chunk `AIVisibility-Bsy_esN9.js` carries "Often named", "Upgrade to"
+and "Named first (#1)".
+
+**Checks before the push:** `tsc` exit 0, 70 of 70 node test files, build
+exit 0, dash scan on added lines and on the deck clean with a positive
+control, staged files free of names and secrets. Two read-only `bg-verify`
+lenses returned PASS WITH FINDINGS; the phone overflow below 640 px, a stale
+comment in `Invite.tsx` and the deck's marker count were fixed by the
+builder, the label in name item by `b624fb3`, all re-checked by the builder,
+not by a second review.
+
+**Not checked by anyone.** The pages signed in with a real account, a real
+phone, a screen reader, Firefox, a client with seven active engines.
+
+**Still open.** Six markers written with a capital (`Copy:` or `COPY:`) were
+never deck rows: `components/Layout.tsx` (sidebar Locations block),
+`lib/locations.ts` (two), `components/McpAccessSection.tsx` (two),
+`lib/planConfig.ts` (one). `i18nContext.tsx` was not edited, so the new
+strings are English only.
 
 ### 2026-11-15: glass layer on AI Visibility and the sidebar LIVE (5984dc9), visual only
 
@@ -99,6 +177,8 @@ A client with seven active engines in the new engine row.
 
 **Open, none blocking.** The prompt matrix legend has no row for the new #1
 cell (bg-design or bg-copy). New strings are marked `copy: pending bg-copy`.
+(STALE: the legend row shipped as `cbdfe76` on 2026-11-15, and the copy
+pass shipped as `2a5af74` on 2026-11-16, see the entry above.)
 
 ### 2026-11-14 (second): admin Platform activity page LIVE (08cb738), polling, no migration
 
