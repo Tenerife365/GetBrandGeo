@@ -60,9 +60,21 @@ Open question for Klibon: every sale reaches them with our UUID in
 the payment override the email match? Their docs say a code on the payment
 wins over a signup.
 
+## Live test, passed 2026-11-16
+
+Constantin ran Klibon's own setup test against production after `e828e3c`
+went live: the Klibon test link in a private window, Accept on the banner, a
+new account in the same window, the Welcome form submitted. Klibon's "Pass
+the referral code on" step turned green. That proves, on the live hosts, that
+`_klb` is written on `.getbrandgeo.com`, is read on app.getbrandgeo.com, that
+the dashboard loads the tag from it, and that `Welcome.tsx` reports the
+signup. Klibon showed the step grey until the Welcome form was submitted: a
+click alone, or a signup finished in another window, does not count.
+
+The test created a real account in production. Delete it from the admin
+Account page if it is not wanted.
+
 ## Not checked
 
-- The shared cookie across subdomains on the live hosts. It was only tested on
-  localhost, where the domain attribute is left off on purpose.
-- The Welcome call with a real referred signup. That is the first live test:
-  open the Klibon test link in a private window, accept cookies, sign up once.
+- A Klibon referred visitor who later pays, so whether the sale is credited by
+  the email match (and the UUID question above) is still open.
