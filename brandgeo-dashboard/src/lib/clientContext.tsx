@@ -34,7 +34,7 @@ interface ClientCtx {
   activeClientId:    number
   activeClient:      Client | null
   setActiveClientId: (id: number) => void
-  clients:           Client[]           // populated for admin only
+  clients:           Client[]           // admin: every client; member: the brands they can reach
   // EFFECTIVE admin, not the real one. When an admin turns on "View as user"
   // this reads false, so every existing `isAdmin` consumer hides its admin
   // affordances with no change at the call site. This is PRESENTATION ONLY:
@@ -42,7 +42,19 @@ interface ClientCtx {
   // decides on the real JWT via requireAuth({ adminOnly: true }). A viewer
   // gains nothing from this flag existing — it can only ever take away.
   isAdmin:           boolean
-  isRealAdmin:       boolean            // the true role; only the toggle + banner may read this
+  // The true role; the toggle + banner read it, and this provider also reads it
+  // to derive canSwitchClient (a real admin in "View as user" gets no switcher).
+  isRealAdmin:       boolean
+  // Member with more than one reachable brand (agency spec 6.1).
+  canSwitchClient:   boolean
+  // Caller's role on the active brand: 'admin' for a real admin, else the
+  // user_clients role; null when none or on a read error.
+  activeMembershipRole: 'owner' | 'member' | 'admin' | null
+  // Caller's own account_members row joined to accounts; null for guests and on error.
+  accountAccess:     { account_id: number; role: 'owner' | 'manager'; kind: 'direct' | 'agency' } | null
+  // accounts.kind of the active brand. 'unknown' while loading or on error,
+  // null for a real admin. Demo mode reads 'direct'.
+  activeBrandAccountKind: 'direct' | 'agency' | 'unknown' | null
   viewingAsUser:     boolean
   setViewingAsUser:  (v: boolean) => void
   loading:           boolean
@@ -68,6 +80,10 @@ const Ctx = createContext<ClientCtx>({
   clients:                 [],
   isAdmin:                 false,
   isRealAdmin:             false,
+  canSwitchClient:         false,
+  activeMembershipRole:    null,
+  accountAccess:           null,
+  activeBrandAccountKind:  null,
   viewingAsUser:           false,
   setViewingAsUser:        () => {},
   loading:                 true,
@@ -81,6 +97,8 @@ const Ctx = createContext<ClientCtx>({
 })
 
 const CLIENT_SELECT = 'id, name, slug, plan, engines_enabled, default_market_id, default_region_id, stripe_customer_id, category, brand_website, created_at, subscription_started_at, paid_until, plan_source, plan_grant_until, plan_grant_note, social_channel_limit'
+// Members never read the internal grant label (agency spec 6.1).
+const MEMBER_CLIENT_SELECT = CLIENT_SELECT.replace(' plan_grant_note,', '')
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const saved = parseInt(localStorage.getItem('brandgeo_client') ?? '1', 10)
@@ -93,6 +111,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [viewingAsUser, setViewingAsUserState] = useState(false)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [memberRoles, setMemberRoles] = useState<Record<number, 'owner' | 'member'>>({})
+  const [accountAccess, setAccountAccess] = useState<ClientCtx['accountAccess']>(null)
+  const [kindRead, setKindRead] = useState<{ id: number; kind: 'direct' | 'agency' | 'unknown' } | null>(null)
 
   // Always holds the LIVE active client id. init() (below) is re-run by the
   // onAuthStateChange listener, which Supabase fires on tab-focus/token-refresh
@@ -176,6 +197,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       setIsAdmin(admin)
 
       if (admin) {
+        setMemberRoles({})
+        setAccountAccess(null)
         const { data: allClients, error: clientsErr } = await supabase
           .from('clients')
           .select(CLIENT_SELECT)
@@ -207,13 +230,34 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         // brands an admin has attached via user_clients. That table is
         // RLS-scoped to the user's own rows; missing/empty just means one brand.
         let ids: number[] = [cid]
+        const roles: Record<number, 'owner' | 'member'> = {}
         try {
-          const { data: links } = await supabase.from('user_clients').select('client_id')
-          if (links && links.length) ids = Array.from(new Set([cid, ...links.map(l => l.client_id as number)]))
+          const { data: links, error: linkErr } = await supabase.from('user_clients').select('client_id, role')
+          // On error: default brand only, nothing surfaced.
+          if (!linkErr && links && links.length) {
+            ids = Array.from(new Set([cid, ...links.map(l => l.client_id as number)]))
+            for (const l of links) {
+              if (l.role === 'owner' || l.role === 'member') roles[l.client_id as number] = l.role
+            }
+          }
         } catch { /* table missing / not linked — single brand */ }
+        setMemberRoles(roles)
+
+        // The caller's own account_members row joined to accounts; null on any error.
+        let access: ClientCtx['accountAccess'] = null
+        try {
+          const { data: am, error: amErr } = await supabase
+            .from('account_members').select('account_id, role, accounts(kind)').eq('user_id', user.id).limit(1)
+          const row = !amErr && am && am[0] ? am[0] as unknown as { account_id: number; role: string; accounts: { kind: string } | { kind: string }[] | null } : null
+          const kind = row ? (Array.isArray(row.accounts) ? row.accounts[0]?.kind : row.accounts?.kind) : null
+          if (row && (row.role === 'owner' || row.role === 'manager') && (kind === 'direct' || kind === 'agency')) {
+            access = { account_id: row.account_id, role: row.role, kind }
+          }
+        } catch { /* tables missing / not linked */ }
+        setAccountAccess(access)
 
         const { data: myClients, error: myErr } = await supabase
-          .from('clients').select(CLIENT_SELECT).in('id', ids).order('id')
+          .from('clients').select(MEMBER_CLIENT_SELECT).in('id', ids).order('id')
         if (myErr || !myClients) {
           console.warn('[ClientCtx] client select failed (run DB migration):', myErr?.message)
           const { data: fb } = await supabase.from('clients').select('id, name, slug').eq('id', cid).single()
@@ -222,8 +266,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           setActiveClientIdState(cid)
           setActiveClient(one[0] ?? null)
         } else {
-          const list = myClients as Client[]
-          setClients(list)   // members now get their accessible brands (for the switcher + Compare)
+          // Non-admin select omits plan_grant_note; keep the Client type whole.
+          const list = (myClients as unknown as Client[]).map(c => ({ ...c, plan_grant_note: null }))
+          setClients(list)  // members now get their accessible brands (for the switcher + Compare)
           const validId = list.find(c => c.id === desired)?.id ?? list.find(c => c.id === cid)?.id ?? list[0]?.id ?? cid
           setActiveClientIdState(validId)
           setActiveClient(list.find(c => c.id === validId) ?? list[0] ?? null)
@@ -254,6 +299,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         setClients([])
         setActiveClient(null)
         setNeedsOnboarding(false)
+        setMemberRoles({})
+        setAccountAccess(null)
         setLoading(false)
       }
     })
@@ -262,6 +309,23 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     // refreshClients is useCallback([]) and therefore stable, so this still
     // runs exactly once per mount, as it did when init() was inlined here.
   }, [refreshClients])
+
+  // accounts.kind of the active brand, re-read on every switch. A fast switch
+  // can land an old answer late: `live` drops it, and the derived value below
+  // only trusts an answer whose brand id is still the active one.
+  useEffect(() => {
+    if (isDemoMode || isAdmin || loading || clients.length === 0) return
+    let live = true
+    const id = activeClientId
+    const done = (kind: 'direct' | 'agency' | 'unknown') => { if (live) setKindRead({ id, kind }) }
+    supabase.rpc('brand_account_kind', { p_client_id: id }).then(
+      ({ data, error }) => done(!error && (data === 'direct' || data === 'agency') ? data : 'unknown'),
+      () => done('unknown'),
+    )
+    return () => { live = false }
+  }, [activeClientId, isAdmin, loading, clients.length])
+  const activeBrandAccountKind: ClientCtx['activeBrandAccountKind'] =
+    isDemoMode ? 'direct' : isAdmin ? null : kindRead?.id === activeClientId ? kindRead.kind : 'unknown'
 
   /**
    * Switch the active client.
@@ -357,6 +421,10 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       // anything meaningful, so this expression can only ever remove access.
       isAdmin: isAdmin && !viewingAsUser,
       isRealAdmin: isAdmin,
+      canSwitchClient: !isAdmin && clients.length > 1,
+      activeMembershipRole: isAdmin ? 'admin' : (memberRoles[activeClientId] ?? null),
+      accountAccess,
+      activeBrandAccountKind,
       viewingAsUser,
       setViewingAsUser: (v: boolean) => setViewingAsUserState(isAdmin ? v : false),
       loading,

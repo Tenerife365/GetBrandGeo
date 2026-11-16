@@ -416,7 +416,7 @@ export default function McpAccessSection({
   plan: string
   isAdmin: boolean
   /** Reuses Account.tsx's own upgradeTo() logic (Stripe portal, pricing page, or mailto). */
-  onUpgrade: () => void
+  onUpgrade?: () => void
 }) {
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
@@ -728,9 +728,11 @@ export default function McpAccessSection({
           <p className="text-xs text-ink-2 mt-2">
             MCP access is included from the {PLAN_LABELS[unlockPlan ?? 'radar']} plan.
           </p>
-          <button onClick={onUpgrade} className={`${primaryBtn} mt-3`}>
-            <Sparkles size={15} /> Upgrade to Radar
-          </button>
+          {onUpgrade && (
+            <button onClick={onUpgrade} className={`${primaryBtn} mt-3`}>
+              <Sparkles size={15} /> Upgrade to Radar
+            </button>
+          )}
           {keys.length > 0 && (
             <>
               <p className="text-meta text-ink-3 mt-4">

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, lazy, Suspense, Component, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, MessageSquare, Users, LogOut, BookText, Bot, Lightbulb,
@@ -21,6 +21,8 @@ import Badge from './ui/Badge'
 import SegmentedControl from './ui/SegmentedControl'
 import Combobox from './ui/Combobox'
 import MultiCombobox from './ui/MultiCombobox'
+// Non-admin brand switcher, lazy so its code stays out of the entry chunk.
+const BrandSwitcher = lazy(() => import('./BrandSwitcher'))
 import Button from './ui/Button'
 import { SkeletonBlock } from './ui/skeletons'
 import { buildMarketOptions, buildRegionOptions } from '../lib/marketOptions'
@@ -130,7 +132,7 @@ const LOCATIONS_WELL = 'mx-2 my-1.5 px-2 py-2.5 flex-shrink-0 sidebar-well'
 // prompt: this block lists the client's locations and FILTERS what the dashboard
 // shows. It steers nothing about collection. Copy: pending bg-copy.
 function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
-  const { activeClient, isAdmin } = useClient()
+  const { activeClient, isAdmin, activeBrandAccountKind } = useClient()
   const {
     locations, limit, used, isMulti, status, refresh, selected, setSelected, canEdit, add, archive,
   } = useLocations()
@@ -408,11 +410,14 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
               {viewerAtLimit ? (
                 <p className="px-1 text-meta text-ink-3">
                   Location limit reached{' '}
-                  <NavLink
-                    to="/account"
-                    onClick={onNavigate}
-                    className="relative text-accent-ink hover:underline underline-offset-2 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-14px_-6px]"
-                  >See plans</NavLink>
+                  {/* Plans live on the Account page, which only a direct brand may use for billing. */}
+                  {activeBrandAccountKind === 'direct' && (
+                    <NavLink
+                      to="/account"
+                      onClick={onNavigate}
+                      className="relative text-accent-ink hover:underline underline-offset-2 max-md:after:absolute max-md:after:content-[''] max-md:after:[inset:-14px_-6px]"
+                    >See plans</NavLink>
+                  )}
                 </p>
               ) : pickMarket ? (
                 <div className="space-y-2">
@@ -477,9 +482,35 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
   )
 }
 
+// Static brand identity (logo + name). Rendered for a single-brand member, and as
+// the Suspense fallback while the lazy BrandSwitcher chunk loads, so the sidebar
+// does not jump.
+function staticIdentity(client: NonNullable<ReturnType<typeof useClient>['activeClient']>) {
+  return (
+    <div className="mx-2 my-1.5 px-2 py-2 flex-shrink-0 sidebar-well">
+      <div className="flex items-center gap-2.5 px-1 py-1">
+        <BrandLogo name={client.name} website={client.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
+        <span className="min-w-0 text-left">
+          <span className="block text-sm font-medium text-ink truncate">{client.name}</span>
+          <span className="block text-meta text-ink-3">Your dashboard</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// If the lazy BrandSwitcher chunk fails to load, keep the shell and show the
+// static identity instead of letting the app-level RouteBoundary replace the
+// whole page.
+class SwitcherBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory } = useClient()
+  const { activeClientId, activeClient, setActiveClientId, clients, isAdmin, isRealAdmin, viewingAsUser, setViewingAsUser, updateClientCategory, canSwitchClient, activeBrandAccountKind } = useClient()
   const { theme, toggle } = useTheme()
   const { lang, setLang, t } = useI18n()
   const { collecting, progress, stopCollection, lastRunOutcome } = useCollection()
@@ -1193,22 +1224,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Brand identity for non-admins (viewers) — the client switcher above is
-            admin-only, so this is where a signed-in member sees whose dashboard
-            this is. STATIC identity only (logo + name): the actual profile link
-            is the single "My Profile" entry in the bottom actions, so this no
-            longer duplicates it. (Ownership; de-duped 2026-07-19) */}
-        {!affiliateMode && !isAdmin && activeClient && (
-          <div className="mx-2 my-1.5 px-2 py-2 flex-shrink-0 sidebar-well">
-            <div className="flex items-center gap-2.5 px-1 py-1">
-              <BrandLogo name={activeClient.name} website={activeClient.brand_website} sizeClass="w-9 h-9" roundedClass="rounded-lg" textClass="text-xs" />
-              <span className="min-w-0 text-left">
-                <span className="block text-sm font-medium text-ink truncate">{activeClient.name}</span>
-                <span className="block text-meta text-ink-3">Your dashboard</span>
-              </span>
-            </div>
-          </div>
+        {/* Brand identity for non-admins. A member with several brands gets the
+            lazy BrandSwitcher (agency spec 6.2); a single-brand member gets the
+            static identity (logo + name). The profile link stays the single
+            "My Profile" entry in the bottom actions. */}
+        {!affiliateMode && canSwitchClient && (
+          <SwitcherBoundary fallback={activeClient ? staticIdentity(activeClient) : null}>
+            <Suspense fallback={activeClient ? staticIdentity(activeClient) : null}>
+              <BrandSwitcher />
+            </Suspense>
+          </SwitcherBoundary>
         )}
+
+        {!affiliateMode && !isAdmin && !canSwitchClient && activeClient && staticIdentity(activeClient)}
 
         {/* Locations: lists the client's locations and filters what the dashboard shows; client data, so not in affiliate mode */}
         {!affiliateMode && <LocationsBlock onNavigate={closeSidebar} />}
@@ -1221,7 +1249,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             My Profile
           </NavLink>
           {/* Billing (only when the client has a Stripe subscription) stays its own row */}
-          {!affiliateMode && activeClient?.stripe_customer_id && (
+          {!affiliateMode && activeClient?.stripe_customer_id && activeBrandAccountKind === 'direct' && (
             <button
               onClick={openBilling}
               disabled={billingLoading}

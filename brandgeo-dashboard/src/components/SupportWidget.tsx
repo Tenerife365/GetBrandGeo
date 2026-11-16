@@ -43,9 +43,9 @@ export default function SupportWidget() {
           message: message.trim(),
           email,
           brand: activeClient?.name ?? '',
-          // Advisory only. support-request.js takes the tenant from the
-          // caller's own profile for anyone who is not an admin, so this
-          // cannot be used to file a ticket against another client.
+          // The brand the member is working on. support-request.js checks
+          // the caller's membership of this brand on the server, so it cannot
+          // be used to file a ticket against a brand the caller does not belong to.
           client_id: activeClientId,
           page: window.location.pathname,
         }),

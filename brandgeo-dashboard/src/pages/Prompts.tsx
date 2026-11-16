@@ -56,7 +56,7 @@ interface ChatMessage {
 }
 
 export default function Prompts() {
-  const { activeClientId, activeClient, isAdmin } = useClient()
+  const { activeClientId, activeClient, isAdmin, activeBrandAccountKind } = useClient()
   const brandName = activeClient?.name
   const { t } = useI18n()
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -138,6 +138,7 @@ export default function Prompts() {
             { role: 'system', content: buildSystemPrompt(name, website) },
             ...messages.map(m => ({ role: m.role, content: m.content })),
           ],
+          client_id: activeClientId,
           max_tokens: 1500,
         }),
       })
@@ -425,6 +426,7 @@ export default function Prompts() {
             { role: 'system', content: buildSystemPrompt(clientConfig?.name, clientConfig?.brand_website) },
             ...newMessages.map(m => ({ role: m.role, content: m.content })),
           ],
+          client_id: activeClientId,
           max_tokens: 1500,
         }),
       })
@@ -545,7 +547,7 @@ export default function Prompts() {
           <Notice
             tone={capBlocks ? 'warn' : 'accent'}
             title={capBlocks ? `You have used all ${cap} prompts on ${planLabel}. Archive one or upgrade to add more.` : `This client is at its plan limit (${used} of ${cap}).`}
-            action={capBlocks ? <Button variant="tertiary" onClick={() => { window.location.assign('/account') }}>Upgrade</Button> : undefined}
+            action={capBlocks && activeBrandAccountKind === 'direct' ? <Button variant="tertiary" onClick={() => { window.location.assign('/account') }}>Upgrade</Button> : undefined}
           >
             {capBlocks
               ? `${verb} a prompt you no longer track to add a new one, or upgrade for more.`

@@ -303,7 +303,7 @@ function CustomerTickets() {
     // One code path in, one behaviour out.
     const { status, data } = await authedPost<{ ticket_id?: number | null; error?: string }>(
       'support-request',
-      { subject: subject.trim().slice(0, 200), message: body.trim(), page: '/tickets' }
+      { subject: subject.trim().slice(0, 200), message: body.trim(), page: '/tickets', client_id: activeClientId }
     )
     setSaving(false)
 

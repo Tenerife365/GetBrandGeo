@@ -362,7 +362,10 @@ function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin:
 }
 
 export default function Account() {
-  const { activeClient, activeClientId, isAdmin, patchClient } = useClient()
+  const { activeClient, activeClientId, isAdmin, patchClient, activeBrandAccountKind } = useClient()
+  // Agency spec section 8, guard 1: self-serve billing only on a direct account.
+  // 'agency', 'unknown' (loading or read error) and null (admin) all hide it.
+  const selfServeBilling = activeBrandAccountKind === 'direct'
   const brandName = activeClient?.name ?? 'Your brand'
   const website = activeClient?.brand_website ?? null
   const domain = domainOf(website)
@@ -630,6 +633,12 @@ export default function Account() {
   const SELF_SERVE_UPGRADE_TARGETS: string[] = ['radar', 'essentials', 'growth', 'growth_pro']
 
   const upgradeTo = (tier: { id: string; label: string }) => {
+    // Never reach checkout or the billing portal off a direct account. The callers
+    // are already gated on selfServeBilling; this guard is the last line behind them.
+    if (!selfServeBilling) {
+      window.location.href = `mailto:support@getbrandgeo.com?subject=${encodeURIComponent(`Plan change: ${tier.label}`)}`
+      return
+    }
     if (hasStripe) { openBilling(); return }
     if (SELF_SERVE_UPGRADE_TARGETS.includes(tier.id)) {
       window.open('https://getbrandgeo.com/#pricing', '_blank', 'noopener,noreferrer')
@@ -737,7 +746,7 @@ export default function Account() {
               ? <span className="text-slate-500">You&apos;re on the <span className="text-slate-300 font-medium">{planLabel}</span> plan.</span>
               : <span className="text-slate-500">No plan is set on this account yet.</span>
           )}
-          {hasStripe && (
+          {hasStripe && selfServeBilling && (
             <button onClick={openBilling} disabled={billingLoading}
               className="ml-auto inline-flex items-center gap-1.5 text-brand-400 hover:text-brand-300 font-medium">
               {billingLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
@@ -812,10 +821,12 @@ export default function Account() {
                 {isCurrent ? (
                   <span className="mt-3 text-[10px] font-bold uppercase tracking-wide text-brand-300">Your plan</span>
                 ) : isUpgrade ? (
-                  <button onClick={() => upgradeTo(tier)}
-                    className="mt-3 text-xs font-medium text-brand-400 hover:text-brand-300 text-left">
-                    Upgrade →
-                  </button>
+                  selfServeBilling ? (
+                    <button onClick={() => upgradeTo(tier)}
+                      className="mt-3 text-xs font-medium text-brand-400 hover:text-brand-300 text-left">
+                      Upgrade →
+                    </button>
+                  ) : null
                 ) : (
                   <span className="mt-3 text-[10px] text-slate-600">Included below</span>
                 )}
@@ -823,10 +834,17 @@ export default function Account() {
             )
           })}
         </div>
-        {!hasStripe && (
+        {selfServeBilling && !hasStripe && (
           <p className="text-[11px] text-slate-600 mt-3">
             Upgrading to Radar, Essentials, Growth or Growth PRO opens our pricing page to complete checkout.
             Managed and Enterprise are handled by our team, so upgrading those opens an email to us instead.
+          </p>
+        )}
+        {/* copy: pending bg-copy */}
+        {!selfServeBilling && (
+          <p className="text-meta text-ink-3 mt-3">
+            To change this plan, contact us at{' '}
+            <a href="mailto:support@getbrandgeo.com" className="text-accent-ink hover:underline underline-offset-2">support@getbrandgeo.com</a>.
           </p>
         )}
       </div>
@@ -835,7 +853,7 @@ export default function Account() {
       <LocationsSection
         plan={activeClient?.plan ?? 'free'}
         isAdmin={isAdmin}
-        onUpgrade={currentIdx >= 0 && displayedTiers[currentIdx + 1] ? () => upgradeTo(displayedTiers[currentIdx + 1]) : undefined}
+        onUpgrade={selfServeBilling && currentIdx >= 0 && displayedTiers[currentIdx + 1] ? () => upgradeTo(displayedTiers[currentIdx + 1]) : undefined}
       />
 
       {/* MCP access (docs/arch/mcp-access.md section 7.2). Placed after the plan
@@ -845,7 +863,7 @@ export default function Account() {
         clientId={activeClientId}
         plan={activeClient?.plan ?? 'free'}
         isAdmin={isAdmin}
-        onUpgrade={() => upgradeTo({ id: featureUnlockPlan('mcp_access') ?? 'radar', label: PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar'] })}
+        onUpgrade={selfServeBilling ? () => upgradeTo({ id: featureUnlockPlan('mcp_access') ?? 'radar', label: PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar'] }) : undefined}
       />
 
       {/* Manage plan (admin) */}
