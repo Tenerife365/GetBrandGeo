@@ -1403,8 +1403,10 @@ F1 and F2 held the step 4 push) and `docs/qa/agency-p1-build-rereview-2026-11-16
 `db/supabase-agency-accounts-2026-11-16.sql` (steps 1 and 2),
 `db/supabase-agency-rls-group-b-2026-11-16.sql` (step 3),
 `db/supabase-agency-watchdog-2026-11-16.sql` (section 8 guard 3 and the three
-4.4 checks), `db/supabase-agency-readback-2026-11-16.sql` (R2 to R4). None is
-applied. A combined dry run of all four inside one transaction that ends in a
+4.4 checks), `db/supabase-agency-readback-2026-11-16.sql` (R2 to R4). **Steps 1
+and 2 APPLIED 2026-11-16** on Constantin's go, as migration
+`20261116155901 agency_accounts_steps_1_2_2026_11_16`; R1 read back as expected
+and R2 passed 34 of 34. Step 3, the watchdog file and the push are not done. A combined dry run of all four inside one transaction that ends in a
 deliberate error passed 98 of 98 checks against production (step 1 and 2 in
 324 ms, step 3 in 90 ms, the watchdog in 22 ms) and production read back
 unchanged afterwards.

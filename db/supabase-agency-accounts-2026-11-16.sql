@@ -1,6 +1,15 @@
 -- supabase-agency-accounts-2026-11-16.sql
 --
--- NOT APPLIED. Written 2026-11-16 by bg-backend (Opus) for release P1 of
+-- APPLIED 2026-11-16 on Constantin's go ("Apply migration steps 1 and 2") as
+-- migration 20261116155901 agency_accounts_steps_1_2_2026_11_16 (the body
+-- between begin and commit, comments stripped). Pre-checks P1 to P4 matched
+-- (72 clients, 36 profiles, 0 user_clients, 0 user triggers, 0 running jobs).
+-- Read back the same day: R1.1 to R1.12 all as expected (72 accounts, 36 owner
+-- members, 36 backfill owner rows, 0 ACL or function mismatches, 4 triggers,
+-- 2 policies); section R2 of the read-back file 34 pass, 0 fail, rolled back.
+-- Step 3 is NOT applied. R1.13 (JWT expiry) is still owed.
+--
+-- Written 2026-11-16 by bg-backend (Opus) for release P1 of
 -- docs/arch/agency-multi-brand.md, revision 4. This file is steps 1 AND 2 of
 -- section 13 of that spec, in ONE transaction (re-review N-L2), so no signup
 -- can land between the account backfill and the membership trigger.
