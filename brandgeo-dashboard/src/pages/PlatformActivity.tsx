@@ -3,7 +3,8 @@
  * (docs/arch/platform-activity.md, sections 5.1 to 5.4). Reads only through the
  * platform-activity function; in demo mode it renders the fixture instead.
  * This is the only file of the feature that imports motion/react.
- * Every user visible string is an English literal, copy: pending bg-copy.
+ * Every user visible string is an English literal, reviewed in
+ * docs/copy/pending-strings-2026-11-16.md (rows PA01 to PA09).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -29,10 +30,10 @@ const TONE_TO_BADGE: Record<FeedTone, BadgeTone> = {
 }
 
 const STATUS_WORD: Record<SourceStatus, string> = {
-  live: 'Live', // copy: pending bg-copy
-  paused: 'Paused', // copy: pending bg-copy
-  retrying: 'Retrying', // copy: pending bg-copy
-  stopped: 'Stopped', // copy: pending bg-copy
+  live: 'Live',
+  paused: 'Paused',
+  retrying: 'Retrying',
+  stopped: 'Stopped',
 }
 
 const fixtureFetchSummary = async () => ({ status: 200, data: fixtureSummary() as SummaryResponse | null })
@@ -62,7 +63,7 @@ function FeedLine({ row }: { row: FeedRow }) {
 }
 
 // Short labels below the sm breakpoint so the qualifiers ("UTC", "80%") are
-// not cut by Stat's single line label (review L4). copy: pending bg-copy
+// not cut by Stat's single line label (review L4).
 function TileLabel({ short, full }: { short: string; full: string }) {
   return (
     <>
@@ -186,7 +187,7 @@ export default function PlatformActivity() {
           const n = batch.rows.filter((r) => showResearchFeedRef.current || !r.is_research).length
           if (n > 0) {
             // A trailing zero width toggle makes two equal messages differ, so
-            // screen readers announce both. copy: pending bg-copy
+            // screen readers announce both.
             announceSeq.current += 1
             setAnnounce(`${n} new ${n === 1 ? 'event' : 'events'}${announceSeq.current % 2 ? '' : '​'}`)
           }

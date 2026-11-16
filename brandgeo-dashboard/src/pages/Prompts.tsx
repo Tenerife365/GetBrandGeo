@@ -316,7 +316,7 @@ export default function Prompts() {
     // enforce_prompt_cap() trigger, which is why the insert error below is
     // handled rather than assumed away.
     if (!isAdmin && cap !== null && remaining < k) {
-      showNotice(`Your plan allows ${cap} active prompts. ${verb} one to add another, or upgrade.`)   // copy: pending bg-copy
+      showNotice(`Your plan allows ${cap} active prompts and you have ${remaining} left. ${verb} a prompt to make room, or upgrade.`)
       return false
     }
     // Category is auto-assigned from the prompt text (general taxonomy), not
@@ -340,8 +340,8 @@ export default function Prompts() {
       if (error) {
         if (error.message.includes('location_archived') || error.message.includes('location_invalid')) {
           showNotice(error.message.includes('location_archived')
-            ? 'One of those locations was archived. Pick again.'            // copy: pending bg-copy
-            : 'That location is not on this account. Pick again.')          // copy: pending bg-copy
+            ? 'One of those locations was archived, so nothing was added. Choose the locations again.'
+            : 'One of those locations is not on this account, so nothing was added. Choose the locations again.')
           void refresh()
           setSaving(false)
           return false
@@ -370,7 +370,7 @@ export default function Prompts() {
       setPrompts(prev => [...prev, { id: Date.now(), text: promptText, category: cat, is_active: true, position, created_at: new Date().toISOString() }])
     }
     clearNotice()
-    if (k > 1) setAnnounce(`Added in ${k} locations`)   // copy: pending bg-copy
+    if (k > 1) setAnnounce(`Prompt added in ${k} locations`)
     if (!text) { setNewText(''); setShowAdd(false) }
     setSaving(false)
     return true
@@ -478,7 +478,7 @@ export default function Prompts() {
   const showLocBadge = isMulti && selected.size !== 1
   const locationLabelOf = (p: Prompt) => {
     const l = locationById.get(promptLocationId(p, primaryId) ?? -1)
-    return l ? locationLabel(l) : 'an archived location'   // copy: pending bg-copy
+    return l ? locationLabel(l) : 'an archived location'
   }
   const locBadge = (p: Prompt, cls: string) => {
     const l = locationById.get(promptLocationId(p, primaryId) ?? -1)
@@ -491,8 +491,8 @@ export default function Prompts() {
     )
   }
   const locSubtitle = selected.size === 1
-    ? `${promptCountLabel(locFiltered.length)} in ${selectedLocations.map(locationLabel).join('')}`   // copy: pending bg-copy
-    : `${promptCountLabel(locFiltered.length)} in ${selected.size} locations`                           // copy: pending bg-copy
+    ? `${promptCountLabel(locFiltered.length)} in ${selectedLocations.map(locationLabel).join('')}`
+    : `${promptCountLabel(locFiltered.length)} in ${selected.size} locations`
 
   return (
     <Page>
@@ -538,15 +538,13 @@ export default function Prompts() {
         {capError ? (
           <Notice
             tone="neg"
-            // copy: pending bg-copy
             title={capError}
             action={<Button variant="tertiary" onClick={clearNotice}>Dismiss</Button>}
           />
         ) : atCap && (
           <Notice
             tone={capBlocks ? 'warn' : 'accent'}
-            // copy: pending bg-copy
-            title={capBlocks ? `You have used all ${cap} prompts on ${planLabel}.` : `This client is at its plan limit (${used} of ${cap}).`}
+            title={capBlocks ? `You have used all ${cap} prompts on ${planLabel}. Archive one or upgrade to add more.` : `This client is at its plan limit (${used} of ${cap}).`}
             action={capBlocks ? <Button variant="tertiary" onClick={() => { window.location.assign('/account') }}>Upgrade</Button> : undefined}
           >
             {capBlocks
@@ -643,7 +641,7 @@ export default function Prompts() {
                   </div>
                 </div>
                 {discoverNeedsLocation && (
-                  <p id="prompts-discover-ask-empty" role="alert" className="m-0 mb-2 text-meta text-neg">Pick at least one location to add these prompts</p>/* copy: pending bg-copy */
+                  <p id="prompts-discover-ask-empty" role="alert" className="m-0 mb-2 text-meta text-neg">Pick at least one location to add these prompts</p>
                 )}
                 {suggestions.map((s, i) => (
                   <div key={i} className={`flex items-start gap-2 p-2 rounded-control border ${
@@ -693,12 +691,12 @@ export default function Prompts() {
                 onKeyDown={e => e.key === 'Enter' && addPrompt()}
                 placeholder={t.pr_searchPlaceholder}
                 aria-label="New prompt text"
-                title="The category is auto-detected from your prompt text, so there is no need to pick one."   // copy: pending bg-copy
+                title="BrandGEO sorts each prompt into a category from its wording, so you do not need to choose one."
                 className={inputClass}
               />
               {isMulti ? (
                 <>
-                  <label htmlFor="prompts-ask-in" className="block text-meta text-ink-2">Ask in</label>{/* copy: pending bg-copy */}
+                  <label htmlFor="prompts-ask-in" className="block text-meta text-ink-2">Ask in</label>
                   <MultiCombobox
                     id="prompts-ask-in"
                     size="md"
@@ -742,7 +740,6 @@ export default function Prompts() {
           <Card pad="feature" className="flex flex-col items-center gap-4 text-center">
             <EmptyState
               icon={MessageSquare}
-              // copy: pending bg-copy
               title="No prompts yet"
               body={t.pr_noPrompts}
               minHeight={0}
@@ -784,7 +781,6 @@ export default function Prompts() {
                           </div>
                           {isMulti && (
                             <p className="m-0 text-meta text-ink-3">
-                              {/* copy: pending bg-copy */}
                               {`Asked in ${locationLabelOf(p)}. To move it, archive it and add it again.`}
                             </p>
                           )}
@@ -826,7 +822,6 @@ export default function Prompts() {
               <Card pad="feature" className="flex flex-col items-center gap-4 text-center">
                 <EmptyState
                   icon={MessageSquare}
-                  // copy: pending bg-copy
                   title={`No prompts in ${selectedLocations.map(locationLabel).join(', ')} yet`}
                   body="Add a question to see how AI answers it from this location."
                   minHeight={0}

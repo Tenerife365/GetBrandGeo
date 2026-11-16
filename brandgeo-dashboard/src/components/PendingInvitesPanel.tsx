@@ -18,8 +18,8 @@
  * state only (never storage, never a log line, never a URL) and is cleared on
  * close, on reload and when the panel unmounts.
  *
- * Every English literal added for the 7 day invite link is marked
- * "copy: pending bg-copy".
+ * Every English literal added for the 7 day invite link was reviewed in
+ * docs/copy/pending-strings-2026-11-16.md (rows PI01 to PI27).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
@@ -121,7 +121,6 @@ const IDLE_ROW: RowActionState = { busy: false, locked: false, message: null, er
 
 const SENT_LOCK_MS = 60_000
 
-// copy: pending bg-copy
 const UNNAMED_CLIENT = 'Unnamed client'
 const COPY_LINK_LABEL = 'Copy link' // C-P4
 const COPY_CONFIRM = 'This creates a new link. The link in the last invite email stops working. Continue?' // C-P5
@@ -129,8 +128,8 @@ const SENT_BRANDGEO = 'Invite sent. The link works for 7 days.' // C-P7
 const SENT_SUPABASE = 'Invite sent. The link works for 24 hours.' // C-P7
 const PREVIOUS_MAY_WORK = 'The previous email link may still work for up to 24 hours.' // C-P8
 const MSG_SEND_FAILED = 'Could not send the invite. Please try again.'
-const MSG_LINK_FAILED = 'Could not create the link. Please try again.' // copy: pending bg-copy
-const MSG_LINK_MISSING = 'The link could not be shown. Use Resend invite to email it instead.' // copy: pending bg-copy
+const MSG_LINK_FAILED = 'Could not create the link. Please try again.'
+const MSG_LINK_MISSING = 'The link could not be shown. Use Resend invite to email it instead.'
 const MSG_UNREACHABLE = 'Could not reach the server. Please try again.'
 
 // ── Pure helpers ───────────────────────────────────────────────────────────
@@ -184,7 +183,7 @@ function LinkBadge({ row }: { row: InviteRow }) {
   if (state === 'expired') return <Badge tone="warn">Link expired</Badge>
   if (state === 'valid') {
     const left = formatTimeLeft(row.link_expires_at)
-    // C-P1 (copy: pending bg-copy)
+    // C-P1
     return <Badge tone="neutral">{left ? `Link valid, ${left}` : 'Link valid'}</Badge>
   }
   return <Badge tone="neutral">Link state unknown</Badge>
@@ -195,8 +194,8 @@ function LinkCell({ row }: { row: InviteRow }) {
   return (
     <div className="space-y-1">
       <LinkBadge row={row} />
-      {/* C-P3 (copy: pending bg-copy) */}
-      {age && <div className="text-meta text-ink-2">Continue pressed {age}</div>}
+      {/* C-P3 */}
+      {age && <div className="text-meta text-ink-2">Pressed Continue {age}</div>}
     </div>
   )
 }
@@ -265,7 +264,7 @@ function CopyLinkField({
           value={url}
           autoComplete="off"
           spellCheck={false}
-          aria-label={`Invite link for ${name}`} /* copy: pending bg-copy */
+          aria-label={`Invite link for ${name}`}
           onFocus={e => e.currentTarget.select()}
           className="min-w-0 flex-1 basis-40 h-7 max-md:min-h-[44px] rounded-control border border-edge bg-surface-2 px-2 text-meta text-ink font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
         />
@@ -273,25 +272,21 @@ function CopyLinkField({
           variant="secondary"
           size="sm"
           onClick={() => { void doCopy() }}
-          aria-label={`Copy invite link for ${name}`} /* copy: pending bg-copy */
+          aria-label={`Copy invite link for ${name}`}
         >
-          {/* copy: pending bg-copy */}
           {copied ? 'Copied' : 'Copy'}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label={`Close link for ${name}`} /* copy: pending bg-copy */>
-          {/* copy: pending bg-copy */}
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label={`Close link for ${name}`}>
           Close
         </Button>
       </div>
-      {/* C-P6 (copy: pending bg-copy). Without a known expiry the sentence names no date. */}
+      {/* C-P6. Without a known expiry the sentence names no date. */}
       <p className="text-meta text-warn break-words">
         {until
           ? `Anyone with this link can set up this login until ${until}. Send it only to this person.`
           : 'Anyone with this link can set up this login until it expires. Send it only to this person.'}
       </p>
-      {/* copy: pending bg-copy */}
       <span role="status" className="sr-only">{copied ? 'Link copied' : copyFailed ? 'Could not copy. The link is selected.' : ''}</span>
-      {/* copy: pending bg-copy */}
       {copyFailed && <p className="text-meta text-neg">Could not copy. The link is selected, press Ctrl+C or Cmd+C.</p>}
     </div>
   )
@@ -374,7 +369,6 @@ function RowActions({
           aria-label={`Resend invite to ${name}`}
           className={full ? 'w-full max-md:min-h-[44px]' : undefined}
         >
-          {/* copy: pending bg-copy */}
           {state.locked ? (state.lastKind === 'copy' ? 'Link created' : 'Sent') : 'Resend invite'}
         </Button>
         <Button
@@ -385,7 +379,7 @@ function RowActions({
           loading={copyBusy}
           disabled={state.locked || state.busy || confirming}
           onClick={() => onCopyLinkRequest(row)}
-          aria-label={`${COPY_LINK_LABEL} for ${name}`} /* copy: pending bg-copy */
+          aria-label={`${COPY_LINK_LABEL} for ${name}`}
           aria-expanded={confirming}
           className={full ? 'w-full max-md:min-h-[44px]' : undefined}
         >
@@ -396,7 +390,7 @@ function RowActions({
       {confirming && (
         <div
           role="group"
-          aria-label={`Confirm a new link for ${name}`} /* copy: pending bg-copy */
+          aria-label={`Confirm a new link for ${name}`}
           onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); cancel() } }}
           className="rounded-control border border-line bg-surface p-3 space-y-2"
         >
@@ -407,13 +401,11 @@ function RowActions({
               variant="primary"
               size="sm"
               onClick={confirmCopy}
-              aria-label={`Continue and create a link for ${name}`} /* copy: pending bg-copy */
+              aria-label={`Continue and create a link for ${name}`}
             >
-              {/* copy: pending bg-copy */}
               Continue
             </Button>
-            <Button variant="ghost" size="sm" onClick={cancel} aria-label={`Cancel creating a link for ${name}`} /* copy: pending bg-copy */>
-              {/* copy: pending bg-copy */}
+            <Button variant="ghost" size="sm" onClick={cancel} aria-label={`Cancel creating a link for ${name}`}>
               Cancel
             </Button>
           </div>

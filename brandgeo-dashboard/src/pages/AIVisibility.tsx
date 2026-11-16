@@ -103,6 +103,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 }
 
 const getCatLabel = (cat: string) => CATEGORY_LABEL[cat] ?? promptCategoryLabel(cat)
+
+// Fix priority words a viewer reads (copy deck 2026-11-16, ruling F1). The
+// keys P0 to P2 stay as the data model and the fix prompt text use them.
+const FIX_PRIORITY_LABEL: Record<'P0' | 'P1' | 'P2', string> = {
+  P0: 'Urgent',
+  P1: 'Important',
+  P2: 'Later',
+}
 // A category is a grouping, not an alert — so its badge stays neutral (Gestalt
 // Focal-Point Law: color is reserved for meaning, not decoration). One quiet
 // chip for every category; the label text still identifies which one it is.
@@ -939,7 +947,7 @@ export default function AIVisibility() {
     const p = all.find(x => x.id === scope.promptId)
     if (!p || all.filter(x => x.text === p.text).length < 2) return item.title
     const loc = locationOfPrompt(p)
-    return loc ? `${item.title} · ${loc}` : item.title // copy: pending bg-copy
+    return loc ? `${item.title} · ${loc}` : item.title
   }
   const fixPromptFor = (item: FixItem): string => buildFixPrompt(
     { id: item.id, title: item.title, competitor: item.competitor ?? null, competitorAvgRank: item.competitorAvgRank },
@@ -954,12 +962,14 @@ export default function AIVisibility() {
   ) ?? item.fix
   const promptTextOf = (id: number) => (snapshot?.allActivePrompts ?? prompts).find(p => p.id === id)?.text
   const openFixItems = fixItems.filter(i => isOpenState(fixRows.get(i.id)?.status))
-  // Closed-hub summary, for example "2 P0, 5 P1, 5 P2". Computed at render.
+  // Closed-hub summary, for example "2 urgent, 5 important, 5 later". Computed
+  // at render. The P0 to P2 keys stay internal; viewers read the words
+  // (copy deck 2026-11-16, ruling F1).
   const fixSummary = (['P0', 'P1', 'P2'] as const)
     .map(p => ({ p, n: openFixItems.filter(i => i.priority === p).length }))
     .filter(x => x.n > 0)
-    .map(x => `${x.n} ${x.p}`)
-    .join(', ') // copy: pending bg-copy
+    .map(x => `${x.n} ${FIX_PRIORITY_LABEL[x.p].toLowerCase()}`)
+    .join(', ')
   const doneFixRows = Array.from(fixRows.values())
     .filter(r => r.status === 'done' || r.status === 'verified' || r.status === 'dismissed')
     .sort((a, b) => (b.checked_at ?? b.marked_at ?? '').localeCompare(a.checked_at ?? a.marked_at ?? ''))
@@ -1178,7 +1188,7 @@ export default function AIVisibility() {
   const locationEmpty = isMulti && locSelected.size > 0 && prompts.length === 0
     && (snapshot?.allActivePrompts.length ?? 0) > 0
   const locationEmptyBody = locationEmpty
-    ? `No prompts in ${locations.filter(l => locSelected.has(l.id)).map(l => locationLabel(l)).join(', ')} yet.` // copy: pending bg-copy
+    ? `No prompts in ${locations.filter(l => locSelected.has(l.id)).map(l => locationLabel(l)).join(', ')} yet.`
     : ''
 
   // Split table: one row per live location, read from ALL rows so it does not
@@ -1689,7 +1699,7 @@ export default function AIVisibility() {
 
   const firstRun = prompts.length > 0 && totalChecked === 0 && headline.variant === 'unchecked' && headline.errorEngines.length === 0
   const heroBadge: { label: string; tone: 'neutral' | 'pos' | 'warn' | 'neg' } =
-    totalChecked === 0 ? { label: 'Not measured yet', tone: 'neutral' } // copy: pending bg-copy
+    totalChecked === 0 ? { label: 'Not measured yet', tone: 'neutral' }
     : zeroMention ? { label: AIV_COPY.bandNotRecommended, tone: 'neutral' }
     : aiScore >= 60 ? { label: 'Strong', tone: 'pos' }
     : aiScore >= 35 ? { label: 'Developing', tone: 'warn' }
@@ -1753,7 +1763,7 @@ export default function AIVisibility() {
             if (!only) return undefined
             return (
               <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
-                <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+                <span className="sr-only">Showing</span>
                 <Badge tone="neutral" className="max-w-[14rem]">
                   <LocationFlag marketId={only.market_id} size={12} />
                   <span className="truncate">{locationLabel(only)}</span>
@@ -1764,10 +1774,10 @@ export default function AIVisibility() {
           if (locSelected.size === 0) {
             return (
               <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
-                <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+                <span className="sr-only">Showing</span>
                 <Badge tone="neutral">
                   <Layers size={11} aria-hidden="true" />
-                  All {locations.length} locations{/* copy: pending bg-copy */}
+                  All {locations.length} locations
                 </Badge>
               </span>
             )
@@ -1777,7 +1787,7 @@ export default function AIVisibility() {
           const extra = shown.length - first.length
           return (
             <span className="inline-flex flex-wrap items-center gap-2" data-loc-filter>
-              <span className="sr-only">Showing</span>{/* copy: pending bg-copy */}
+              <span className="sr-only">Showing</span>
               {first.map(l => (
                 <Badge key={l.id} tone="neutral" className="max-w-[14rem]">
                   <LocationFlag marketId={l.market_id} size={12} />
@@ -1972,9 +1982,9 @@ export default function AIVisibility() {
             answer=""
             empty={{
               icon: Target,
-              title: 'No prompts yet', // copy: pending bg-copy
+              title: 'No prompts yet',
               body: locationEmpty ? locationEmptyBody : t.aiv_noPrompts,
-              actionLabel: 'Add prompts', // copy: pending bg-copy
+              actionLabel: 'Add prompts',
               actionTo: '/prompts',
             }}
           />
@@ -2082,11 +2092,11 @@ export default function AIVisibility() {
       {(engineStatusCards.length > 0 || comingSoonEngines.length > 0 || lockedStripEngines.length > 0) && (
         <motion.div className="mb-4" data-aiv-engines {...reveal(1)}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
-            <h2 className="label-caps">Engines</h2>{/* copy: pending bg-copy */}
+            <h2 className="label-caps">AI engines</h2>
             {comingSoonEngines.length > 0 && (
               <span className="inline-flex items-center gap-1 text-meta text-ink-3">
                 <Clock size={11} aria-hidden="true" />
-                {`Coming soon: ${joinEngineLabels(comingSoonEngines.map(id => ENGINE_META[id].label))}`}{/* copy: pending bg-copy */}
+                {`Coming soon: ${joinEngineLabels(comingSoonEngines.map(id => ENGINE_META[id].label))}`}
               </span>
             )}
           </div>
@@ -2100,10 +2110,10 @@ export default function AIVisibility() {
                 {engineStatusCards.map((e, cardIndex) => {
                   const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
                     ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
-                    : e.status === 'KNOW' ? { label: 'Known', tone: 'pos' } // copy: pending bg-copy
-                    : e.status === 'PARTIAL' ? { label: 'Partial', tone: 'warn' } // copy: pending bg-copy
-                    : e.status === 'MISSING' ? { label: 'Missing', tone: 'neg' } // copy: pending bg-copy
-                    : { label: 'Not checked yet', tone: 'neutral' } // copy: pending bg-copy
+                    : e.status === 'KNOW' ? { label: 'Often named', tone: 'pos' }
+                    : e.status === 'PARTIAL' ? { label: 'Sometimes named', tone: 'warn' }
+                    : e.status === 'MISSING' ? { label: 'Rarely named', tone: 'neg' }
+                    : { label: 'Not checked yet', tone: 'neutral' }
                   const statusKind = statusBadge.tone === 'neutral' ? null : statusBadge.tone
                   const isMeasured = !e.isUnavailable && e.status !== 'NOT_MEASURED'
                   const sinceText = formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? '')
@@ -2116,8 +2126,8 @@ export default function AIVisibility() {
                       : null
                   const warnTitle = isPartialWarn
                     ? (isAdmin
-                        ? 'Some checks failed to sync, so this percentage is partial. Use the refresh icon on this card to retry the engine.'
-                        : 'Some checks failed to sync, so this percentage is partial.')
+                        ? `Some checks failed, so this percentage is partial. Use "Re-run all prompts on ${e.label}" on this card to check the engine again.`
+                        : 'Some checks failed, so this percentage is partial.')
                     : (warnSentence !== null && isAdmin && e.lastErrorCode ? `${warnSentence} (${e.lastErrorCode})` : warnSentence ?? undefined)
                   const metaText = e.isUnavailable
                     ? (isAdmin
@@ -2137,7 +2147,10 @@ export default function AIVisibility() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: MOTION_BASE, ease: EASE_OUT, delay: 0.08 + cardIndex * 0.04 }}
-                      className="flex min-w-[46%] sm:min-w-[172px] lg:min-w-[140px] lg:max-w-[280px] flex-[2_1_0%] snap-start"
+                      // Never under 164px (172px from sm): the longest status
+                      // badge ("Sometimes named", 136px) needs that inner width,
+                      // including on 320 to 375px phones where 46% is too narrow.
+                      className="flex min-w-[max(46%,164px)] sm:min-w-[172px] lg:max-w-[280px] flex-[2_1_0%] snap-start"
                     >
                       {/* The glass sits on an inner box: motion writes an inline
                           transform on its own element, which would cancel the CSS
@@ -2164,7 +2177,9 @@ export default function AIVisibility() {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 min-h-[28px]">
+                      {/* Wraps on a narrow card: the badge drops under the
+                          percentage instead of spilling past the card edge. */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-[28px]">
                         {isMeasured && (
                           <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
                         )}
@@ -2235,7 +2250,7 @@ export default function AIVisibility() {
                     >
                       <Link
                         to="/account"
-                        aria-label={`${meta.label}: unlock on ${planLabel}`}
+                        aria-label={`${meta.label}: available on ${planLabel}, see plans`}
                         title={`${meta.label} is available on the ${planLabel} plan and above`}
                         className="glass-card glass-lite glass-card-interactive group flex flex-col justify-center gap-1 w-full p-3 lg:px-2 xl:px-3"
                       >
@@ -2245,9 +2260,11 @@ export default function AIVisibility() {
                           </span>
                           <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
                         </span>
-                        <span className="flex items-center gap-1 min-w-0 text-meta text-ink-3">
-                          <Lock size={11} aria-hidden="true" className="shrink-0" />
-                          <span className="truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{planLabel}</span>
+                        {/* Wraps at every width so the plan name is never cut off;
+                            the row of cards is as tall as the status cards anyway. */}
+                        <span className="flex items-start gap-1 min-w-0 text-meta text-ink-3">
+                          <Lock size={11} aria-hidden="true" className="shrink-0 mt-[3px]" />
+                          <span className="min-w-0 leading-tight break-words">{`Upgrade to ${planLabel}`}</span>
                         </span>
                       </Link>
                     </motion.div>
@@ -2277,7 +2294,7 @@ export default function AIVisibility() {
               <div className="glass-card glass-lite glass-callout pl-4 pr-3 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-heading text-ink flex items-center gap-2">
-                    <span>Fix this</span>{/* copy: pending bg-copy */}
+                    <span>Fix this</span>
                     <Badge tone="neutral">{openFixItems.length}</Badge>
                   </h2>
                   <p className="mt-0.5 m-0 text-meta text-ink-2 truncate" title={!showFixHub && topFix ? `${summaryLine}. Top fix: ${fixTitleOf(topFix)}` : summaryLine}>
@@ -2285,7 +2302,7 @@ export default function AIVisibility() {
                     {!showFixHub && topFix && (
                       <>
                         <span aria-hidden="true" className="text-ink-3">{' · '}</span>
-                        <span className="text-ink-3">Top fix:</span>{' '}{/* copy: pending bg-copy */}
+                        <span className="text-ink-3">Top fix:</span>{' '}
                         <span className="text-ink">{fixTitleOf(topFix)}</span>
                       </>
                     )}
@@ -2298,9 +2315,9 @@ export default function AIVisibility() {
                   icon={showFixHub ? ChevronUp : ChevronDown}
                   onClick={() => setShowFixHub(v => !v)}
                   aria-expanded={showFixHub}
-                  aria-label={showFixHub ? 'Hide fixes' : 'Show fixes'}/* copy: pending bg-copy */
+                  aria-label={showFixHub ? 'Hide fixes' : 'Show fixes'}
                 >
-                  {showFixHub ? 'Hide' : 'Show'}{/* copy: pending bg-copy */}
+                  {showFixHub ? 'Hide' : 'Show'}
                 </Button>
               </div>
             )
@@ -2325,11 +2342,11 @@ export default function AIVisibility() {
                     const reopenedLine = reopenedFixLine(row)
                     const busy = item ? fixBusy === item.id : false
                     return (
-                      <section key={p} aria-label={`${p} fixes`/* copy: pending bg-copy */} className="flex flex-col min-w-0 p-4">
+                      <section key={p} aria-label={`${FIX_PRIORITY_LABEL[p]} fixes`} className="flex flex-col min-w-0 p-4">
                         <div className="flex items-center gap-2 mb-3 min-h-[28px]">
-                          <Badge tone={prioTone}>{p}</Badge>
+                          <Badge tone={prioTone}>{FIX_PRIORITY_LABEL[p]}</Badge>
                           {list.length > 0 && (
-                            <span className="text-meta text-ink-3 tabular-nums" aria-live="polite" aria-atomic="true">{`${idx + 1} of ${list.length}`/* copy: pending bg-copy */}</span>
+                            <span className="text-meta text-ink-3 tabular-nums" aria-live="polite" aria-atomic="true">{`${idx + 1} of ${list.length}`}</span>
                           )}
                           {list.length > 1 && (
                             <Button
@@ -2337,15 +2354,15 @@ export default function AIVisibility() {
                               size="sm"
                               icon={ChevronRight}
                               className="ml-auto"
-                              aria-label={`Next ${p} fix`/* copy: pending bg-copy */}
+                              aria-label={`Next ${FIX_PRIORITY_LABEL[p].toLowerCase()} fix`}
                               onClick={() => setFixCursor(c => ({ ...c, [p]: (idx + 1) % list.length }))}
                             >
-                              Next{/* copy: pending bg-copy */}
+                              Next
                             </Button>
                           )}
                         </div>
                         {!item && (
-                          <p className="m-0 text-meta text-ink-3">Nothing open at this priority{/* copy: pending bg-copy */}</p>
+                          <p className="m-0 text-meta text-ink-3">No open fixes at this priority</p>
                         )}
                         {item && (
                           <div key={item.id} className="flex flex-col flex-1 min-w-0">
@@ -2505,7 +2522,7 @@ export default function AIVisibility() {
           return (
             <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               {activeCats.length > 0 ? (
-                <ChipGroup label="Category">{/* copy: pending bg-copy */}
+                <ChipGroup label="Category">
                   <Chip selected={filterCats.size === 0} onClick={() => setFilterCats(new Set())}>
                     {t.aiv_allCategories}
                   </Chip>
@@ -2533,7 +2550,7 @@ export default function AIVisibility() {
                   // Wraps and shrinks (10 to 14 rem) so the toolbar never runs
                   // sideways at laptop widths.
                   <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[10rem] sm:max-w-[14rem]">
-                    <label htmlFor="aiv-prompt-search" className="sr-only">Search prompts</label>{/* copy: pending bg-copy */}
+                    <label htmlFor="aiv-prompt-search" className="sr-only">Search prompts</label>
                     <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
                     <input
                       id="aiv-prompt-search"
@@ -2541,7 +2558,7 @@ export default function AIVisibility() {
                       value={promptQuery}
                       onChange={e => setPromptQuery(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Escape' && promptQuery) { e.preventDefault(); setPromptQuery('') } }}
-                      placeholder={`Search ${prompts.length} prompts`}/* copy: pending bg-copy */
+                      placeholder={`Search ${promptCount(prompts.length)}`}
                       autoComplete="off"
                       spellCheck={false}
                       className="glass-input w-full h-9 max-sm:min-h-[44px] pl-8 pr-2 text-body text-ink placeholder:text-ink-3"
@@ -2581,7 +2598,7 @@ export default function AIVisibility() {
                     onClick={() => setSplitByLocation(v => !v)}
                     className={`w-full sm:w-auto ${splitByLocation ? 'bg-accent-tint text-accent-ink border-accent-ink' : ''}`}
                   >
-                    Split by location{/* copy: pending bg-copy */}
+                    Split by location
                   </Button>
                 )}
                 <Button
@@ -2602,7 +2619,7 @@ export default function AIVisibility() {
 
         {isMulti && splitByLocation && splitRows.length > 0 && (
           <div className="mb-4">
-            <h3 className="sr-only">Results by location{/* copy: pending bg-copy */}</h3>
+            <h3 className="sr-only">Results by location</h3>
             <Card pad="none" className="overflow-hidden">
               <div className={tableClasses.wrap}>
                 <table className={tableClasses.table}>
@@ -2665,7 +2682,7 @@ export default function AIVisibility() {
 
         {/* Always mounted so a screen reader hears the search result count. */}
         <p className="sr-only" role="status" aria-live="polite">
-          {queryNorm !== '' ? `${visibleCount} of ${prompts.length} prompts shown` : ''}{/* copy: pending bg-copy */}
+          {queryNorm !== '' ? `${visibleCount} of ${promptCount(prompts.length)} shown` : ''}
         </p>
 
         {orderFrozen && prompts.length >= 2 && (
@@ -2688,10 +2705,9 @@ export default function AIVisibility() {
           <div className="rounded-card border border-dashed border-line p-6 text-center">
             {queryNorm !== '' ? (
               <>
-                {/* copy: pending bg-copy */}
                 <p className="text-body text-ink-2">{`No prompts match "${promptQuery.trim()}"${filterCats.size > 0 ? ' in the chosen categories' : ''}.`}</p>
                 <Button variant="secondary" size="sm" className="mt-3" onClick={() => setPromptQuery('')}>
-                  Clear search{/* copy: pending bg-copy */}
+                  Clear search
                 </Button>
               </>
             ) : (
@@ -2730,14 +2746,13 @@ export default function AIVisibility() {
             ? uncheckedSec.rows.map(r => summaries.get(r.prompt.id)?.oldestErrorSince).filter((d): d is string => !!d).sort()
             : []
           const legend = prompts.length > 0 ? (
-            <Disclosure key={`legend-${activeClientId ?? ''}`} title="What the symbols mean">{/* copy: pending bg-copy */}
+            <Disclosure key={`legend-${activeClientId ?? ''}`} title="What the symbols mean">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-meta text-ink-2">
                 {/* Key for the glowing rank one cell (.cell-top), drawn by the
                     same component with position 1 so it matches the matrix. */}
                 <span className="inline-flex items-center gap-1.5" data-aiv-legend-top>
                   <PromptResultCell state="mentioned" position={1} engineId={activeLLMs[0]?.id ?? 'chatgpt'} variant="legend" />
-                  {/* copy: pending bg-copy */}
-                  Ranked #1, named first
+                  Named first (#1)
                 </span>
                 {([
                   ['mentioned', AIV_COPY.legendMentioned],
@@ -2790,7 +2805,7 @@ export default function AIVisibility() {
                                 key={id}
                                 to="/account"
                                 aria-label={lockedHeaderLabel(ENGINE_META[id].label, PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]])}
-                                title={ENGINE_META[id].label}
+                                title={`${ENGINE_META[id].label}: available on ${PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}`}
                                 className="flex flex-col items-center justify-center gap-1 min-h-[44px] px-1 py-1.5 rounded-md hover:bg-surface-3 min-w-0"
                               >
                                 <span className="w-6 h-6 rounded-badge bg-surface ring-1 ring-inset ring-line flex items-center justify-center">
@@ -2799,7 +2814,8 @@ export default function AIVisibility() {
                                 <span className="max-w-full text-meta leading-tight text-ink-2 text-center break-words line-clamp-2">{ENGINE_META[id].label}</span>
                                 <span className="inline-flex max-w-full items-center justify-center gap-1 text-meta leading-tight text-ink-3">
                                   <Lock size={10} aria-hidden="true" className="shrink-0" />
-                                  <span className="min-w-0 text-center">{PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]}</span>
+                                  {/* Column is 5.5rem at most, so only the verb is shown; the plan sits in the title (ruling F2). */}
+                                  <span className="min-w-0 text-center">Upgrade</span>
                                 </span>
                               </Link>
                             ))}
@@ -2817,7 +2833,7 @@ export default function AIVisibility() {
                   <Disclosure
                     title={SECTION_TITLE.notYet}
                     count={notYetSec.rows.length}
-                    summary={`${promptCount(notYetSec.rows.length)}, no engine named your brand`}/* copy: pending bg-copy */
+                    summary={`${promptCount(notYetSec.rows.length)}, no engine named your brand`}
                     defaultOpen={queryNorm !== '' || sectionIsOpen('notYet')}
                     // Remounts open while a search is active, so a match inside
                     // a closed section is never hidden behind its header.
@@ -2869,14 +2885,14 @@ export default function AIVisibility() {
         if (competitorFreq.length === 0 && !showCats) return null
         const weakest = showCats ? catStats[catStats.length - 1] : null
         const summaryParts = [
-          competitorFreq.length > 0 ? `${competitorFreq.length} competitors named` : null,
+          competitorFreq.length > 0 ? `${competitorFreq.length} competitor${competitorFreq.length === 1 ? '' : 's'} named` : null,
           weakest ? `weakest category ${weakest.label} at ${weakest.pct}%` : null,
         ].filter((s): s is string => !!s)
         return (
           <Disclosure
             key={`cats-${activeClientId ?? ''}`}
-            title="Competitors and categories"/* copy: pending bg-copy */
-            summary={summaryParts.join(', ')}/* copy: pending bg-copy */
+            title="Competitors and categories"
+            summary={summaryParts.join(', ')}
           >
             {competitorFreq.length > 0 && (
               <div className="pt-3">

@@ -42,7 +42,7 @@ export function formatAge(iso: string | null, now: number = Date.now()): string 
   const t = Date.parse(iso)
   if (Number.isNaN(t)) return ''
   const minutes = Math.floor(Math.max(0, now - t) / 60_000)
-  if (minutes < 1) return 'just now' // copy: pending bg-copy
+  if (minutes < 1) return 'just now'
   if (minutes < 60) return `${plural(minutes, 'minute')} ago`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${plural(hours, 'hour')} ago`
@@ -61,7 +61,7 @@ export function formatTimeLeft(expiresAt: string | null, now: number = Date.now(
   const ms = t - now
   if (ms <= 0) return ''
   const hours = Math.floor(ms / 3_600_000)
-  if (hours < 1) return 'less than an hour left' // copy: pending bg-copy
+  if (hours < 1) return 'less than an hour left'
   if (hours < 24) return `${plural(hours, 'hour')} left`
   const days = Math.max(1, Math.floor((ms + 3_600_000) / 86_400_000))
   return `${plural(days, 'day')} left`

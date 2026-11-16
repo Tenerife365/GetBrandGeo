@@ -6,7 +6,8 @@
  *
  * Imports nothing from `motion`: Layout never imports this file, but keeping it
  * motion free keeps the page chunk the only place the feature touches it.
- * All user visible strings below are English literals, copy: pending bg-copy.
+ * All user visible strings below are English literals; the one reviewed
+ * string is row PA10 of docs/copy/pending-strings-2026-11-16.md.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ENGINE_META, PLAN_LABELS } from './planConfig'
@@ -465,7 +466,7 @@ export function formatDetail(row: Pick<FeedRow, 'badge' | 'detail' | 'client_id'
   const d = row.detail
   switch (d.kind) {
     case 'login':
-      return 'Viewer signed in' // copy: pending bg-copy
+      return 'Viewer signed in'
     case 'run': {
       const base = `${d.trigger === 'manual' ? 'Manual' : 'Scheduled'} run${d.total_jobs !== null ? `, ${d.total_jobs} jobs` : ''}`
       return d.force ? `${base}, forced` : base

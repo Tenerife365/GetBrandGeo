@@ -16,7 +16,6 @@ export interface SplitBarProps {
 }
 
 const ORDER: SplitSegment['key'][] = ['pos', 'neu', 'neg']
-// copy: pending bg-copy
 const WORD: Record<SplitSegment['key'], string> = { pos: 'Positive', neu: 'Neutral', neg: 'Negative' }
 const FILL: Record<SplitSegment['key'], string> = { pos: 'bg-pos', neu: 'bg-neu', neg: 'bg-neg' }
 

@@ -29,7 +29,7 @@ type WizardPrompt = { text: string; askIn: string[] | null }
 const PRIMARY_KEY = 'primary'
 const pairKey = (marketId: string, regionId: string) => `${marketId}:${regionId}`
 
-// copy: pending bg-copy (every string in this block)
+// Copy reviewed in docs/copy/pending-strings-2026-11-16.md (rows OB01 to OB19).
 const COPY = {
   primaryLegend: 'Primary location',
   country: 'Country',
@@ -726,7 +726,7 @@ export default function Onboard() {
               </section>
             )}
             <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Mail size={18} className="text-brand-400" /> Client Invite</h2>
-            {/* copy: pending bg-copy. C-O1: a viewer gets the 7 day BrandGEO link, an
+            {/* C-O1: a viewer gets the 7 day BrandGEO link, an
                 admin login stays on the Supabase invite (24 hours). */}
             <p className="text-xs text-slate-500">
               {`We will email this address an invite link, valid for ${role === 'viewer' ? '7 days' : '24 hours'}, to set their own password and log in.`}

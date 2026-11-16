@@ -632,7 +632,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Sentiment" read "AI" and "Brand", so English gets explicit one-word labels.
   // Other languages keep their own first word; sidebar labels and i18n keys are
   // untouched.
-  // copy: pending bg-copy
   const MOBILE_SHORT: Record<string, string> = lang === 'en'
     ? { '/ai-visibility': 'Visibility', '/sentiment': 'Sentiment', '/mentions': 'Mentions' }
     : {}
@@ -698,7 +697,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         // Admin-only affiliate programs (docs/affiliates/ADMIN-GUIDE.md). Same
         // sidebar-only placement as Prospects, for the same reason.
         ...(isAdmin ? [{ to: '/affiliates', icon: Handshake, label: 'Affiliates' }] : []),
-        // Sidebar only, not on the mobile bottom bar. copy: pending bg-copy
+        // Sidebar only, not on the mobile bottom bar.
         ...(isAdmin ? [{ to: '/platform-activity', icon: Activity, label: 'Platform activity' }] : []),
         ...(isAdmin ? [{ to: '/usage', icon: DollarSign, label: 'Revenue' }] : []),
         ...(isAdmin ? [{ to: '/onboard', icon: UserPlus, label: 'Onboard Client' }] : []),
@@ -923,7 +922,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="relative px-4 py-2.5 border-b border-line flex-shrink-0" role="status" aria-live="polite">
             <div className="flex items-center gap-2">
               <span className="status-dot text-accent is-live" aria-hidden="true" />
-              {/* copy: pending bg-copy */}
               <span className="label-caps text-ink-2">Collecting</span>
               <span className="text-meta text-ink-2 truncate min-w-0">{progress.clientName}</span>
               <button
@@ -958,7 +956,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className={`status-dot ${runNotice.kind === 'stopped' ? 'text-ink-3' : runNotice.failed > 0 ? 'text-warn' : 'text-pos'}`}
                 aria-hidden="true"
               />
-              {/* copy: pending bg-copy */}
               <span className="label-caps text-ink-2">{runNotice.kind === 'stopped' ? 'Stopped' : 'Done'}</span>
               <button
                 onClick={dismissRunNotice}
@@ -1351,7 +1348,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             3:1 divider requirement belongs to the sidebar. */}
         {!hideTimeFilter && (
         <div className="flex-shrink-0 h-12 border-b border-line bg-canvas px-4 sm:px-6 flex items-center gap-3">
-          {/* copy: pending bg-copy. The caption is visible from 768 up; below that it
+          {/* The caption is visible from 768 up; below that it
               is kept as the control's accessible name only. */}
           <span className="hidden md:inline label-caps">{TIME_FILTER_LABEL[pathname]}</span>
           <SegmentedControl
@@ -1416,7 +1413,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             className={`mobile-nav-item${MORE_PATHS.some(pth => pathname.startsWith(pth)) ? ' is-active' : ''}`}
           >
             <Ellipsis size={19} />
-            {/* copy: pending bg-copy */}
             <span className="mobile-nav-label">More</span>
           </button>
         )}

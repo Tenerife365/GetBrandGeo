@@ -721,10 +721,10 @@ export default function Recommendations() {
   // Hero engine status (spec 11.6): one badge, warn when anything needs attention.
   const heroBadge: { label: string; tone: BadgeTone } | undefined = !stats ? undefined
     : engineErrors.length > 0
-      ? { label: `${engineErrors.length} engine${engineErrors.length !== 1 ? 's' : ''} unavailable`, tone: 'warn' } // copy: pending bg-copy
+      ? { label: `${engineErrors.length} engine${engineErrors.length !== 1 ? 's' : ''} unavailable`, tone: 'warn' }
       : gapLLMCount > 0
-        ? { label: `${gapLLMCount} engine${gapLLMCount !== 1 ? 's' : ''} below 50%`, tone: 'warn' } // copy: pending bg-copy
-        : { label: 'All engines above 50%', tone: 'pos' } // copy: pending bg-copy
+        ? { label: `${gapLLMCount} engine${gapLLMCount !== 1 ? 's' : ''} under 50%`, tone: 'warn' }
+        : { label: 'All engines at 50% or more', tone: 'pos' }
 
   const generateButton = (
     <Button
@@ -750,7 +750,7 @@ export default function Recommendations() {
       <PageHeader
         title="Recommendations"
         subtitle={isMulti
-          ? `${locationScopeLine(locations.length, selected.size)}${selected.size > 0 && selected.size < locations.length ? ' New advice always covers every location.' : ''}` // copy: pending bg-copy
+          ? `${locationScopeLine(locations.length, selected.size)}${selected.size > 0 && selected.size < locations.length ? ' New advice always covers every location.' : ''}`
           : undefined}
         badge={!loading && recs.length > 0 && !(showBody && stats && hasResults)
           ? <Badge tone="neutral">{recs.length} action{recs.length !== 1 ? 's' : ''}</Badge>
@@ -775,10 +775,9 @@ export default function Recommendations() {
             The route's one Notice (C7). */}
         {!loading && engineErrors.length > 0 && (
           <Notice tone="warn" title={`No usable data from ${engineErrors.map(e => LLM_LABEL[e.engine] ?? e.engine).join(', ')}`}>
-            {/* copy: pending bg-copy */}
-            These engines returned only API errors ({engineErrors.map(e => `${e.count}`).join(', ')} failed prompt checks),
-            so they are excluded from every score and from the AI analysis below. This is a collection
-            failure, not a visibility failure. It does not mean these engines ignore your brand.
+            These engines returned errors instead of answers ({engineErrors.map(e => `${e.count}`).join(', ')} failed prompt checks).
+            They are left out of every score and out of the analysis below. This is a checking problem,
+            not a sign that these engines ignore your brand. Run Collection again later to retry.
           </Notice>
         )}
 
@@ -797,7 +796,7 @@ export default function Recommendations() {
             empty={{
               icon: Target,
               title: 'Not measured yet',
-              body: 'Actions are generated after your first collection.', // copy: pending bg-copy
+              body: 'Recommended actions appear after your first collection.',
               actionLabel: 'Run first collection',
               actionTo: '/ai-visibility',
               minHeight: 220,
@@ -812,8 +811,8 @@ export default function Recommendations() {
             value={recs.length}
             unit="actions"
             badge={heroBadge ? { ...heroBadge, glyph: heroBadge.tone === 'pos' || heroBadge.tone === 'warn' ? <StatusGlyph kind={heroBadge.tone} size={12} /> : undefined } : undefined}
-            answer={recs.length > 0 ? `Start with: ${recs[0].title.replace(/[.!?]+$/, '')}.` : 'No priority actions right now.'} // copy: pending bg-copy
-            context={`Generated from ${stats.totalChecks} successful AI checks`} // copy: pending bg-copy
+            answer={recs.length > 0 ? `Start with: ${recs[0].title.replace(/[.!?]+$/, '')}.` : 'No priority actions right now.'}
+            context={`Generated from ${stats.totalChecks} successful AI check${stats.totalChecks === 1 ? '' : 's'}`}
           >
             <h2 className="sr-only">Visibility by engine</h2>
             <ul className="m-0 list-none p-0">
@@ -848,7 +847,7 @@ export default function Recommendations() {
                 <SharedEmptyState
                   variant="inline"
                   icon={Target}
-                  body="No priority actions right now. Keep running monthly collections to track trends." // copy: pending bg-copy
+                  body="No priority actions right now. Run a collection again later to see what changes."
                 />
               </Card>
             ) : (
@@ -915,7 +914,7 @@ export default function Recommendations() {
                 <SharedEmptyState
                   variant="inline"
                   icon={Sparkles}
-                  body={'Click "Generate insights". Claude reads your actual response snippets and ranked competitors and produces specific, evidence-based advice. Every run is saved, so you keep a record of what was advised and when.'} // copy: pending bg-copy
+                  body={'Select "Generate insights". Claude reads the answer snippets and competitor rankings collected for your brand and writes specific advice from them. Each run is saved, so you can see what was advised and when.'}
                 />
               </Card>
             )}
@@ -989,9 +988,8 @@ export default function Recommendations() {
             </div>
             {stats.competitors.some(c => c.proseOnly) && (
               <p className="text-meta text-ink-3 mt-3 leading-relaxed">
-                {/* copy: pending bg-copy */}
-                "Prose only" names were never ranked by any engine. They appear because they are on your
-                own competitor list and an engine happened to mention them. They are not counted as losses.
+                Names marked "Prose only" were never ranked in an answer. They are listed because they are on
+                your competitor list and an engine mentioned them in passing. They are not counted as losses.
               </p>
             )}
           </Disclosure>

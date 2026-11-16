@@ -205,7 +205,6 @@ export default function Mentions() {
             loading={historyLoading}
             empty={{
               icon: Bot,
-              // copy: pending bg-copy
               title: 'No AI answer has named your brand yet.',
               body: t.men_noMentions,
               actionLabel: 'See the prompts',
@@ -219,9 +218,7 @@ export default function Mentions() {
           <HeroAnswer
             value={totalMentions}
             unit={totalMentions === 1 ? 'mention' : 'mentions'}
-            // copy: pending bg-copy
             answer={`AI engines named ${brandName} ${totalMentions} ${totalMentions === 1 ? 'time' : 'times'}${avgPositionLabel !== null ? `, at an average position of ${avgPositionLabel}` : ''}.`}
-            // copy: pending bg-copy
             context={`${positiveSentiment} of them positive. Latest answer per prompt and engine.`}
           />
           </div>
@@ -295,7 +292,6 @@ export default function Mentions() {
                         </span>
                         {isMulti && (
                           <span className="text-meta text-ink-3">
-                            {/* copy: pending bg-copy */}
                             {askedFrom.get(m.id) ? `Asked from ${askedFrom.get(m.id)}` : 'Location not recorded'}
                           </span>
                         )}

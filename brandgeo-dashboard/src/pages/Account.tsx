@@ -130,7 +130,7 @@ function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin:
         const r = await add(m.id, ['ALL'])
         setBusy(false)
         if (!r.ok) setError(r.message)
-        else setLive(`${m.label} added`)   // copy: pending bg-copy
+        else setLive(`${m.label} added`)
       })()
       return
     }
@@ -144,7 +144,7 @@ function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin:
     const r = await add(pickedMarket.id, pickRegions)
     setBusy(false)
     if (!r.ok) { setError(r.message); return }
-    setLive(`${pickRegions.length === 1 ? '1 location' : `${pickRegions.length} locations`} added`)   // copy: pending bg-copy
+    setLive(`${pickRegions.length === 1 ? '1 location' : `${pickRegions.length} locations`} added`)
     setPickMarket(null)
     setPickRegions([])
   }
@@ -161,7 +161,7 @@ function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin:
     const r = await archive(id)
     setBusy(false)
     if (!r.ok) { setError(r.message); return }
-    setLive(`${label} archived`)   // copy: pending bg-copy
+    setLive(`${label} archived`)
     requestAnimationFrame(() => {
       const next = nextId !== undefined
         ? rowRefs.current[nextId]?.querySelector<HTMLButtonElement>('button[aria-label^="Archive "]')
@@ -180,7 +180,7 @@ function LocationsSection({ plan, isAdmin, onUpgrade }: { plan: string; isAdmin:
     // re-read the client so the sidebar and the other pages show the new primary.
     await refreshClients(activeClientId)
     setConfirmId(null)
-    setLive(`${label} is now the primary location`)   // copy: pending bg-copy
+    setLive(`${label} is now the primary location`)
     requestAnimationFrame(() => rowRefs.current[id]?.focus())
   }
 

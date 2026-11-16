@@ -279,7 +279,7 @@ export default function Competitors() {
     return loc ? locationLabel(loc) : ''
   }
   const scopeLabel = selected.size === 0
-    ? 'All locations' // copy: pending bg-copy
+    ? 'All locations'
     : locations.filter(l => selected.has(l.id)).map(locationLabel).join('; ')
   const onExport = () => {
     downloadCsv(
@@ -344,8 +344,8 @@ export default function Competitors() {
       <PageHeader
         title="Competitors"
         subtitle={`${totalResponses === 0
-          ? 'No responses measured yet.' // copy: pending bg-copy
-          : `Top competitors mentioned across ${responseWord(totalResponses)} for ${brandName}.`}${isMulti ? ` ${locationScopeLine(locations.length, selected.size)}` : ''}`} // copy: pending bg-copy
+          ? 'No responses measured yet.'
+          : `Top competitors mentioned across ${responseWord(totalResponses)} for ${brandName}.`}${isMulti ? ` ${locationScopeLine(locations.length, selected.size)}` : ''}`}
         actions={
           <Button variant="secondary" icon={Plus} onClick={() => setShowAdd(v => !v)} aria-expanded={showAdd}>
             Add manually
@@ -375,7 +375,7 @@ export default function Competitors() {
             empty={{
               icon: Tag,
               title: 'Not measured yet',
-              body: 'Competitors appear when AI answers name other companies for your prompts.', // copy: pending bg-copy
+              body: 'Competitors appear when AI answers name other companies for your prompts.',
               actionLabel: 'Add a competitor',
               onAction: () => setShowAdd(true),
               variant: 'inline',
@@ -390,9 +390,9 @@ export default function Competitors() {
               answer={top
                 ? (tiedAtTop > 1
                   ? `AI engines named ${brandName} ${timesWord(brandMentions)}; ${tiedAtTop} competitors were each named ${timesWord(top.totalMentions)}.`
-                  : `AI engines named ${brandName} ${timesWord(brandMentions)}; the most named competitor, ${top.name}, ${timesWord(top.totalMentions)}.`) // copy: pending bg-copy
-                : `AI engines named ${brandName} ${timesWord(brandMentions)}.`} // copy: pending bg-copy
-              context={`across ${engineWord}`} // copy: pending bg-copy
+                  : `AI engines named ${brandName} ${timesWord(brandMentions)}; the most named competitor, ${top.name}, ${timesWord(top.totalMentions)}.`)
+                : `AI engines named ${brandName} ${timesWord(brandMentions)}.`}
+              context={`across ${engineWord}`}
             />
           </div>
         )}
@@ -526,7 +526,7 @@ export default function Competitors() {
                 <div>
                   <SectionHeader level={3} title="Visibility by engine" description="% of prompts where each brand appears, per AI engine" />
                   {engineGroupData.length === 0 ? (
-                    <EmptyState variant="inline" icon={Tag} title="Not enough data yet" body="Engine results appear after a collection runs." minHeight={200} /> // copy: pending bg-copy
+                    <EmptyState variant="inline" icon={Tag} title="Not enough data yet" body="Engine results appear after a collection runs." minHeight={200} />
                   ) : singleEngineRow ? (
                     <BarList
                       rows={groupKeys.map((k, i) => ({ label: k, value: Number(singleEngineRow[k] ?? 0), isYou: i === 0 }))}
@@ -571,7 +571,7 @@ export default function Competitors() {
                   ) : trendFailed && trendRows.length === 0 ? (
                     <LoadErrorCard message="Couldn't load the trend." onRetry={() => { void loadTrend(false) }} />
                   ) : trendData.length < 2 ? (
-                    <EmptyState variant="inline" minHeight={240} title="Not enough data yet" body="Trend fills in as collections accumulate" /> // copy: pending bg-copy
+                    <EmptyState variant="inline" minHeight={240} title="Not enough data yet" body="The trend needs results from at least two periods. It fills in as you run more collections." />
                   ) : (
                     <ResponsiveContainer width="100%" height={240}>
                       <LineChart data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>

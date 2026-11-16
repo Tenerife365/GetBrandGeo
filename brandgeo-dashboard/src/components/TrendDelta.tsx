@@ -29,7 +29,6 @@ interface TrendDeltaProps {
 
 export default function TrendDelta({ delta, period, unit = 'pts', higherIsBetter = true, className = '' }: TrendDeltaProps) {
   if (delta === null || delta === undefined) {
-    // copy: pending bg-copy
     return <span className={`text-meta text-ink-3 ${className}`}>First measurement</span>
   }
 

@@ -46,7 +46,6 @@ export default function ScoreDial({ score, size = 'lg' }: ScoreDialProps) {
       </svg>
       <div className="absolute inset-0 flex items-center justify-center text-center px-4">
         {score === null ? (
-          // copy: pending bg-copy
           <span className="text-body text-ink-2">Not measured yet</span>
         ) : (
           <span className="flex items-baseline gap-0.5 tabular-nums">

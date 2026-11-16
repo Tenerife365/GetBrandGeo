@@ -11,7 +11,8 @@
  * The token is held in component state only: never storage, never a log line,
  * never an analytics or error-report call.
  *
- * Every English literal below is marked "copy: pending bg-copy".
+ * Every English literal below was reviewed in docs/copy/pending-strings-2026-11-16.md
+ * (rows IN01 to IN15).
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
@@ -31,7 +32,6 @@ function BrandGeoLogo() {
 type Stage = 'ready' | 'working' | 'invalid' | 'expired' | 'replaced' | 'used' | 'error'
 
 // Dead-end copy per stage: heading and body (C-I2 to C-I5).
-// copy: pending bg-copy
 const DEAD_END: Record<'invalid' | 'expired' | 'replaced' | 'used' | 'error', { heading: string; body: string }> = {
   invalid: {
     heading: 'We could not open this invite',
@@ -50,15 +50,15 @@ const DEAD_END: Record<'invalid' | 'expired' | 'replaced' | 'used' | 'error', { 
     body: 'Sign in with your email and password. If you never chose a password, use Forgot your password.',
   },
   // The spec gives no copy for the one case that lands here (the server answered
-  // with a token type the page refuses), so it reuses the C-I2 heading and the C-I6 sentence.
+  // with a token type the page refuses), so it reuses the C-I2 heading with its own body (deck row IN05).
   error: {
     heading: 'We could not open this invite',
-    body: 'Something went wrong. Please try again.',
+    body: 'This invite did not open. Try again. If it still fails, ask the person who invited you to send a new one.',
   },
 }
 
-const MSG_RATE_LIMITED = 'Too many attempts. Please wait a few minutes and try again.' // copy: pending bg-copy
-const MSG_GENERIC = 'Something went wrong. Please try again.' // copy: pending bg-copy
+const MSG_RATE_LIMITED = 'Too many attempts. Please wait a few minutes and try again.'
+const MSG_GENERIC = 'This did not work. Try again. If it still fails, ask the person who invited you to send a new invite.'
 
 // Removes the query and fragment so a reload or a shared screenshot never
 // carries the token again.
@@ -92,7 +92,7 @@ export default function Invite() {
   const focusedStageRef = useRef<Stage>(stage)
 
   useEffect(() => {
-    document.title = 'Set up your login · BrandGEO' // copy: pending bg-copy
+    document.title = 'Set up your login · BrandGEO'
     return () => { document.title = 'BrandGEO Dashboard' }
   }, [])
 
@@ -211,9 +211,7 @@ export default function Invite() {
   // button, so its link row carries only the second link.
   const deadEndLinks = (withSignIn: boolean) => (
     <p className="text-center text-xs text-slate-400 mt-4 flex flex-wrap items-center justify-center gap-x-4">
-      {/* copy: pending bg-copy */}
       {withSignIn && <Link to="/login" className={textLink}>Sign in</Link>}
-      {/* copy: pending bg-copy */}
       <Link to="/reset-password" className={textLink}>Forgot your password?</Link>
     </p>
   )
@@ -223,20 +221,16 @@ export default function Invite() {
     const working = stage === 'working'
     body = (
       <div>
-        {/* copy: pending bg-copy */}
         <h1 ref={headingRef} tabIndex={-1} className={h1Class}>Set up your BrandGEO login</h1>
-        {/* copy: pending bg-copy */}
         <p className="text-sm text-slate-400 mb-6">Continue to choose your password.</p>
         {error && (
           <div role="alert" className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
             <AlertCircle size={14} aria-hidden="true" /> {error}
           </div>
         )}
-        {/* copy: pending bg-copy */}
         <span role="status" className="sr-only">{working ? 'Opening...' : ''}</span>
         <button type="button" onClick={() => { void handleContinue() }} disabled={working} aria-busy={working || undefined} className={primaryBtn}>
           {working && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
-          {/* copy: pending bg-copy */}
           {working ? 'Opening...' : 'Continue'}
         </button>
       </div>
@@ -248,7 +242,6 @@ export default function Invite() {
         <h1 ref={headingRef} tabIndex={-1} className={h1Class}>{copy.heading}</h1>
         <p className="text-sm text-slate-400 mb-6">{copy.body}</p>
         {stage === 'used' && (
-          // copy: pending bg-copy
           <Link to="/login" className={primaryBtn}>Sign in</Link>
         )}
         {deadEndLinks(stage !== 'used')}

@@ -254,12 +254,10 @@ export default function Dashboard() {
           <HeroAnswer
             visual={<ScoreDial score={scoreData.aiScore} size="lg" />}
             badge={{ label: band.label, tone: band.tone, glyph: <StatusGlyph kind={band.tone} size={12} /> }}
-            // copy: pending bg-copy
             answer={view.mention.pct === null
               ? 'Your brand has not been checked yet.'
               : `Your brand is named in ${view.mention.pct}% of the AI answers checked.`}
-            // copy: pending bg-copy
-            context={`Score from the latest answer for ${checkedCount} prompt and engine result${checkedCount === 1 ? '' : 's'}, all time.`}
+            context={`Based on the latest answer to each prompt on each engine: ${checkedCount} checked, all time.`}
             action={<Link to="/ai-visibility" className={buttonClasses('tertiary')}>View full breakdown</Link>}
           >
             {/* The Meter header carries the name and the value once; no second dt/dd copy. */}

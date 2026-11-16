@@ -228,7 +228,6 @@ export default function BrandSentiment() {
             empty={{
               icon: Meh,
               title: 'Not measured yet',
-              // copy: pending bg-copy
               body: 'Sentiment appears once an AI answer mentions your brand.',
               actionLabel: 'See where you appear',
               actionTo: '/ai-visibility',
@@ -253,9 +252,7 @@ export default function BrandSentiment() {
                     : undefined
                 })(),
               }}
-              // copy: pending bg-copy
               answer={`${pct.positive}% of the ${total} AI answer${total !== 1 ? 's' : ''} that mention${total !== 1 ? '' : 's'} your brand ${total !== 1 ? 'are' : 'is'} positive.`}
-              // copy: pending bg-copy
               context={`Score from the latest answer per prompt and engine, across all time: ${total} AI answer${total !== 1 ? 's' : ''} that mention your brand.`}
             >
               <SplitBar
@@ -360,7 +357,6 @@ export default function BrandSentiment() {
             <section aria-labelledby="sent-recent" className="reveal" style={rv(3)}>
               <SectionHeader
                 title={<span id="sent-recent">Recent signals</span>}
-                // copy: pending bg-copy
                 description={`Answers that mention your brand ${windowPhrase}.`}
               />
 
@@ -401,7 +397,6 @@ export default function BrandSentiment() {
 
                   {widenHint && (
                     <div className="mb-3 flex flex-wrap items-center gap-2 text-meta text-ink-3">
-                      {/* copy: pending bg-copy */}
                       <span>No signals {windowPhrase}. The score above covers all time.</span>
                       <Button variant="tertiary" size="sm" onClick={() => setTimeRange('all')}>Show all time</Button>
                     </div>
@@ -448,7 +443,6 @@ export default function BrandSentiment() {
                                 <span className="block text-body text-ink truncate">{promptText.get(e.prompt_id) ?? ''}</span>
                                 {isMulti && (
                                   <span className="block text-meta text-ink-3 truncate">
-                                    {/* copy: pending bg-copy */}
                                     {(e as SentimentRow).asked_market_id
                                       ? `Asked from ${locationLabel({ market_id: (e as SentimentRow).asked_market_id as string, region_id: (e as SentimentRow).asked_region_id ?? 'ALL' })}`
                                       : 'Location not recorded'}
