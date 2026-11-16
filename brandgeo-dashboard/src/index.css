@@ -980,20 +980,47 @@ select:focus-visible:focus-visible {
       radial-gradient(120% 40% at 0% 0%, rgb(var(--grad-mid) / var(--aura-b)) 0%, transparent 60%),
       linear-gradient(180deg, var(--glass-nav-top) 0%, var(--glass-nav-bottom) 100%);
   }
+  /* Tactile layer (tactile-layer-2026-11-16.md): the Client, Brand and
+     Locations blocks are a recessed console, sunk below the sidebar. The
+     same class reaches BrandSwitcher.tsx, so its block matches. */
   .sidebar-well {
     border-radius: 12px;
-    background-color: var(--glass-well);
-    box-shadow: var(--glass-well-shadow);
+    border: 1px solid var(--well-border);
+    background-color: rgb(var(--well-fill));
+    box-shadow: var(--well-shadow);
   }
+  /* Every dropdown trigger inside a console (client picker, Internal and
+     Research, the BrandSwitcher trigger) is a machined keycap; while its list
+     is open it sits pressed in. Keyed on attributes the triggers already
+     carry, so no component's markup changes. */
+  .sidebar-well .side-row[aria-haspopup] {
+    border: 1px solid rgb(var(--edge));
+    background-color: rgb(var(--keycap-bottom));
+    background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-bottom)) 100%);
+    box-shadow: inset 0 1px 0 0 var(--keycap-highlight), inset 0 -1px 0 0 var(--keycap-shade), var(--keycap-drop);
+  }
+  .sidebar-well .side-row[aria-haspopup]:hover {
+    background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-top)) 100%);
+  }
+  .sidebar-well .side-row[aria-haspopup][aria-expanded="true"] {
+    background-image: none;
+    background-color: rgb(var(--keycap-bottom));
+    box-shadow: var(--pressed-shadow);
+  }
+  /* The active route: a raised pill with a faint accent wash and a glowing
+     2px bar. The bar (accent, 3.9:1 on the dark pill, 5.7:1 on the light one)
+     and the accent ring carry the state, not the shading. */
   .nav-item.is-active {
-    background-color: transparent;
-    background-image: linear-gradient(90deg, rgb(var(--accent) / 0.22) 0%, rgb(var(--accent) / 0.05) 100%);
-    box-shadow: inset 0 0 0 1px rgb(var(--accent-ink) / 0.28);
+    background-color: rgb(var(--pill-bottom));
+    background-image:
+      linear-gradient(90deg, rgb(var(--accent) / 0.16) 0%, rgb(var(--accent) / 0.03) 100%),
+      linear-gradient(180deg, rgb(var(--pill-top)) 0%, rgb(var(--pill-bottom)) 100%);
+    box-shadow: inset 0 0 0 1px rgb(var(--accent-ink) / 0.28), var(--pill-shadow);
   }
   .nav-item.is-active::before {
-    background-color: transparent;
-    background-image: linear-gradient(180deg, rgb(var(--grad-start)) 0%, rgb(var(--grad-end)) 100%);
-    box-shadow: 0 0 10px 1px rgb(var(--glow) / var(--glow-strength));
+    background-color: rgb(var(--accent));
+    background-image: none;
+    box-shadow: 0 0 8px 0 rgb(var(--accent));
   }
   .nav-item.is-active svg { filter: drop-shadow(0 0 5px rgb(var(--glow) / var(--glow-strength))); }
 

@@ -229,7 +229,7 @@ for (const cls of TACTILE_CLASSES) {
 // The brief's Tailwind palette classes stay out of the files this layer
 // touched (other pages already use palette classes, so the ban is scoped).
 check('no brief palette classes in the tactile files', () => {
-  const files = ['src/pages/AIVisibility.tsx', 'src/pages/Dashboard.tsx', 'src/components/GlowScoreDial.tsx', 'src/components/PromptResultCell.tsx']
+  const files = ['src/pages/AIVisibility.tsx', 'src/pages/Dashboard.tsx', 'src/components/GlowScoreDial.tsx', 'src/components/PromptResultCell.tsx', 'src/components/Layout.tsx']
   const hits = files.filter(f => /\b(from-indigo-500|via-violet-500|to-purple-400)\b|ring-pos-ink\/40/.test(read(f)))
   if (hits.length) throw new Error(hits.join(', '))
 })

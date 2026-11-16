@@ -108,7 +108,8 @@ Removed because nothing uses them any more: `.glow-bar-track`, `.glow-line`,
 10. The light LED for "Sometimes named" uses the light `--warn` (a dark amber,
     chosen for text contrast), so it glows less than in dark. Decorative, the
     badge carries the words and the glyph.
-11. The sidebar (brief step 5) is not in this commit; see below.
+11. The sidebar shipped in a second commit, after the agency P1 commit
+    `0893d1f` on `Layout.tsx`; see "Sidebar" below for its own deviations.
 
 ## Measured (headless Chrome over CDP, demo mode, prefers-reduced-motion)
 
@@ -155,13 +156,52 @@ goes dark, the pill rule is shared). Each report ends with an amendment
 listing the fixes; they were re-checked from the builder seat, not by a
 second review.
 
-## Sidebar (brief step 5), pending
+## Sidebar (brief step 5), second commit
 
-Waits for the agency P1 commit on `Layout.tsx`. Plan, CSS classes only: the
-active nav item becomes a raised pill with a glowing 2 px left bar; the
-Client and Locations blocks sit in a recessed console (`.recessed-well`);
-their selects and the bottom buttons use `.tactile-btn-secondary`. The
-sidebar stays opaque and imports nothing from `motion`.
+Done after the agency P1 commit `0893d1f` landed on `Layout.tsx`. CSS classes
+only; the sidebar stays opaque and `Layout.tsx` imports nothing new.
+
+- **Active route:** `.nav-item.is-active` is a raised pill (the `--pill-*`
+  gradient and shadow) with a faint accent wash, the accent ring kept, and a
+  2 px bar in `--accent` with an 8 px glow. The bar carries the state: 3.9:1
+  on the dark pill, 5.7:1 on the light one.
+- **Console:** `.sidebar-well` (the Client block, the Locations block, the
+  static brand identity and P1's `BrandSwitcher`, which uses the same class)
+  is a recessed well. Text in it is ink-3 or brighter, 6.0:1 dark and 5.05:1
+  light at worst.
+- **Dropdown triggers inside a console** (the admin client picker,
+  Internal and Research, and the BrandSwitcher trigger) are machined
+  keycaps through one CSS rule keyed on `.sidebar-well .side-row[aria-haspopup]`,
+  so `BrandSwitcher.tsx` is untouched. While a list is open
+  (`aria-expanded="true"`) the trigger sits pressed in.
+- **Keycaps in `Layout.tsx`:** the admin "Group" select, the language
+  button, the theme switch, Sign out and the admin "View as user" eye.
+- **Kept as they were**, because they are navigation rows, not controls:
+  My Profile, Billing and the Locations filter rows. The Billing row and the
+  "See plans" link keep their `activeBrandAccountKind === 'direct'` gates,
+  and the `SwitcherBoundary > Suspense > lazy BrandSwitcher` structure with
+  `staticIdentity` as the fallback is unchanged.
+- `--glass-well` and `--glass-well-shadow` are no longer used by any class;
+  they stay declared because `tokens_sync` lists them.
+
+Measured the same way as above, HEAD (with `0893d1f`) against the working
+tree, both served from the same script: every figure identical. "Your
+prompts" 772, 882 and 1,336 px; no sideways scroll; the same text boxes
+sampled (166, 173, 140; 162 with the phone drawer open) and no new failure in
+either theme. The drawer pass flags page text under the modal scrim and the
+logo, identically on HEAD; that is the method, not the change. The admin
+Client block cannot render in demo, so its markup was injected into the live
+sidebar (same classes) for a dark and light screenshot; its colours are the
+same well and keycap pairs measured above. Bundle (HEAD worktree, only
+`index.css`, `Layout.tsx` and the test changed): entry chunk 48 bytes
+smaller (two transition utilities removed), stylesheet +654 bytes. The shared
+checkout, which now carries P1's brand switcher, builds a 605,005 byte entry
+chunk. `tsc` exit 0, 74 of 74 node test files pass, `Layout.tsx` added to the
+test's palette class guard, added lines free of em and en dashes.
+
+Not reviewed by a bg-verify lens: this second commit is CSS classes on
+existing elements plus one rule keyed on existing attributes, checked from
+the builder seat only.
 
 ## Not checked by anyone
 

@@ -125,7 +125,8 @@ function describeRun(n: { kind: 'completed' | 'stopped'; done: number; total: nu
 }
 
 // Recessed glass module for the sidebar Locations block (glass layer
-// 2026-11-15, index.css .sidebar-well). Same footprint as the old bordered row.
+// 2026-11-15, index.css .sidebar-well; a recessed console since the tactile
+// layer, 2026-11-16). Same footprint as the old bordered row.
 const LOCATIONS_WELL = 'mx-2 my-1.5 px-2 py-2.5 flex-shrink-0 sidebar-well'
 
 // The sidebar Locations block (multi-location design section 5). One country per
@@ -926,7 +927,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setViewingAsUser(true)}
                 title="View this client as one of its users"
                 aria-label="View as user"
-                className="text-ink-2 hover:text-ink transition-colors p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink"
+                className="tactile-btn-secondary text-ink-2 hover:text-ink p-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink"
               >
                 <Eye size={16} />
               </button>
@@ -1169,7 +1170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     }
                     finally { setCatSaving(false) }
                   }}
-                  className="flex-1 h-8 bg-surface-2 border border-edge rounded-control px-2 text-meta text-ink-2 focus:border-accent-ink disabled:opacity-50"
+                  className="tactile-btn-secondary flex-1 h-8 rounded-control px-2 text-meta text-ink-2 focus:border-accent-ink disabled:opacity-50"
                   aria-label="Client group category"
                 >
                   <option value="active">Active</option>
@@ -1270,7 +1271,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 ref={langBtnRef}
                 onClick={() => { setShowLangs(v => !v); setShowClients(false) }}
-                className="side-row"
+                className="side-row tactile-btn-secondary"
                 aria-haspopup="listbox"
                 aria-expanded={showLangs}
                 title="Language"
@@ -1303,7 +1304,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               aria-checked={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={t.sidebar_darkMode}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors duration-[180ms]"
+              className="tactile-btn-secondary flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-ink"
             >
               {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -1312,7 +1313,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               aria-label={t.sidebar_signOut}
               title={t.sidebar_signOut}
-              className="flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-neg hover:bg-surface-2 transition-colors duration-[180ms]"
+              className="tactile-btn-secondary flex-shrink-0 flex items-center justify-center w-9 h-9 max-md:w-11 max-md:h-11 rounded-control text-ink-3 hover:text-neg"
             >
               <LogOut size={16} />
             </button>
