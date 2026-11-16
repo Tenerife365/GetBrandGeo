@@ -272,11 +272,11 @@ Constantin ruled the six flags with "Use the defaults". Applied by bg-app the sa
 - F3: `Often named`, `Sometimes named`, `Rarely named` applied. Measurement in section 14.
 - F4 (RC05) and F5 (MN04): Final text as written (MN04 stays `Location not recorded`).
 - F6: answered from the code, see AV17.
-- AV21: applied.
+- AV21: applied, then superseded the same day by the label in name ruling below.
 
 Layout, to fit the longer words (measured in section 14): the engine status card is never narrower than 164px (172px from 640px up, was 140px from 1024px up), and its percentage and badge may wrap onto two lines; the locked card's `Upgrade to {plan}` wraps instead of truncating.
 
-Open, for bg-copy, rated MAJOR by the bg-verify accessibility lens and to be ruled before the push: WCAG 2.5.3 (label in name, level A). The visible word `Upgrade` on the two locked controls is not inside their accessible names (`{engine}: available on {plan}, see plans` on the card, `lockedHeaderLabel` on the header). Speech input users saying "click Upgrade" will not reach them. The names were left as the deck wrote them; a wording that starts with the visible text (for example `Upgrade to {plan} for {engine}` on both controls) needs a copy ruling. The same ruling should give both controls one form: today the card reads `{engine}: available on {plan}, see plans` and the header `{engine}, available on {plan}. See plans`, so AV21's "Matches `lockedHeaderLabel`" holds only in meaning, not in punctuation.
+Closed, WCAG 2.5.3 (label in name, level A), rated MAJOR by the bg-verify accessibility lens. As first applied, the visible word `Upgrade` on the two locked controls was not inside their accessible names (`{engine}: available on {plan}, see plans` on the card, `{engine}, available on {plan}. See plans` on the header), so a speech input user saying "click Upgrade" could not reach them. Ruling, Constantin, 2026-11-16: "Use Upgrade to {plan} for {engine} on both". Both controls now take their name from one helper, `lockedHeaderLabel` in `lib/aiVisibilityCopy.ts`, which returns `Upgrade to {plan} for {engine}`. This supersedes the Final of AV21 and the old header label. The header's `title` stays `{engine}: available on {plan}` (F2).
 
 Open, for bg-design: the 172px card minimum at 1024px and up means a plan with seven engines (Growth PRO, Managed) needs 1,276px of rail at 1440, against about 1,136px of content, so the rail scrolls sideways where it used to fit (7 cards at 140px took 1,052px). Arithmetic from the class values, not rendered: demo mode has one active engine. A 140px card cannot hold the 136px badge with its padding. The choices are a scrolling rail (as shipped), a badge whose text wraps inside it, or a shorter band word.
 

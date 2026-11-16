@@ -2250,7 +2250,7 @@ export default function AIVisibility() {
                     >
                       <Link
                         to="/account"
-                        aria-label={`${meta.label}: available on ${planLabel}, see plans`}
+                        aria-label={lockedHeaderLabel(meta.label, planLabel)}
                         title={`${meta.label} is available on the ${planLabel} plan and above`}
                         className="glass-card glass-lite glass-card-interactive group flex flex-col justify-center gap-1 w-full p-3 lg:px-2 xl:px-3"
                       >

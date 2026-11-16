@@ -145,9 +145,11 @@ export function cellErrorLabel(engine: string, since: string | null, previousOk:
 export function cellPendingLabel(engine: string): string { return `${engine}: not checked yet` }
 export function cellSinceLine(since: string): string { return `since ${since}` }
 
-// Locked header
+// Locked engine controls (matrix header and engine strip card). The name starts
+// with the visible "Upgrade" so speech input reaches it (WCAG 2.5.3); ruled by
+// Constantin 2026-11-16, copy deck pending-strings-2026-11-16.md section 13.
 export function lockedHeaderLabel(engine: string, plan: string): string {
-  return `${engine}, available on ${plan}. See plans`
+  return `Upgrade to ${plan} for ${engine}`
 }
 
 // Engine card failure lines (R4)
