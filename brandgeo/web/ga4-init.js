@@ -48,7 +48,11 @@
   // Bump when the categories change. A stored value with an older version is
   // treated as no answer, so the banner asks again rather than assuming consent
   // for something the visitor was never shown.
-  var VERSION = 1;
+  // Version 2 (2026-11-16) added the Klibon affiliate cookie to what Accept
+  // covers, so every answer given under version 1 is asked again once. The
+  // stored field is still called `analytics` because affiliate-track.js reads
+  // it by that name; it now means "accepted the optional cookies".
+  var VERSION = 2;
   // Consent is not open-ended. The published Cookie Policy states we ask again
   // at least every 12 months, so the stored answer expires here to match. A
   // policy that promises re-consent while the code never re-asks is a false
@@ -108,6 +112,57 @@
     gtag('consent', 'update', { analytics_storage: 'granted' });
     gtag('config', GA_ID, { anonymize_ip: true });
   }
+
+  // KLIBON, the affiliate network (added 2026-11-16). Its tag turns ?via=<code>
+  // on a partner's link into the first-party cookie _klb, so Klibon can credit
+  // that partner on a later signup or payment. It stores something on the
+  // device that is not strictly necessary, so it sits behind the same Accept as
+  // Google Analytics and is never in the HTML. Klibon's install guide allows a
+  // site to insert the tag from its own code. It is injected here, not copied,
+  // because Klibon compiles the program terms into the hosted file.
+  //
+  // Loaded only after Accept, it still captures the visit that brought the
+  // visitor: the script reads the code from the landing URL, and falls back to
+  // the navigation entry when the address bar was already rewritten.
+  //
+  // data-cookie-domain shares _klb with app.getbrandgeo.com, where signup
+  // happens (src/lib/klibon.ts there). Set only on our own hosts, because a
+  // browser refuses a cookie for a domain the page is not on.
+  //
+  // It is a different system from BrandGEO's own affiliate program
+  // (affiliate-track.js, ?ref= and the bg_ref cookie). The two read different
+  // parameters and different cookies, and neither touches the other.
+  //
+  // CSP: .htaccess must allow https://go.klibon.com in script-src (this file)
+  // and connect-src (Klibon.signup posts there). Its pixels are images, which
+  // img-src https: already allows.
+  var KLIBON_SRC = 'https://go.klibon.com/klibon.js?p=a6a42293-3165-4107-b986-e923c3b71598';
+  var KLIBON_COOKIE_DOMAIN = '.getbrandgeo.com';
+  var klibonLoaded = false;
+  function onOwnHost() {
+    var h = location.hostname;
+    return h === 'getbrandgeo.com' || /\.getbrandgeo\.com$/.test(h);
+  }
+  function loadKlibon() {
+    if (klibonLoaded) return;
+    klibonLoaded = true;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = KLIBON_SRC;
+    if (onOwnHost()) s.setAttribute('data-cookie-domain', KLIBON_COOKIE_DOMAIN);
+    document.head.appendChild(s);
+  }
+  // Reject, including a later change of mind, removes the cookie Accept may
+  // have let Klibon set. Both the shared and the host-only form are expired.
+  function clearKlibon() {
+    var gone = '_klb=; path=/; max-age=0; SameSite=Lax';
+    try {
+      document.cookie = gone;
+      if (onOwnHost()) document.cookie = gone + '; domain=' + KLIBON_COOKIE_DOMAIN;
+    } catch (e) { /* nothing to clear */ }
+  }
+
+  function loadOptional() { loadGa(); loadKlibon(); }
 
   var CSS =
     // SIZE, second pass, 2026-07-29. Measured on this page at a 1265x800 usable
@@ -250,9 +305,13 @@
 
     var p = document.createElement('p');
     p.appendChild(document.createTextNode(
-      'We use Google Analytics to see which pages are useful. It sets cookies, ' +
-      'so we only load it if you agree. Our privacy-friendly analytics runs ' +
-      'either way and sets no cookies. '));
+      // Version 2 copy. The old last sentence promised cookieless analytics
+      // that "runs either way"; that was Plausible, removed 2026-08-02, so it
+      // was false and has gone. The length stays near the 196 characters the
+      // sizing note above was measured on.
+      'We use Google Analytics to see which pages are useful, and a cookie from ' +
+      'our affiliate network to credit a partner who sent you. Both set cookies, ' +
+      'so we only load them if you agree. '));
     var a = document.createElement('a');
     a.href = '/cookies.html';
     a.textContent = 'Read the cookie policy';
@@ -276,8 +335,8 @@
     row.appendChild(accept);
 
     function close() { if (el.parentNode) el.parentNode.removeChild(el); }
-    reject.addEventListener('click', function () { write(false); close(); });
-    accept.addEventListener('click', function () { write(true); loadGa(); close(); });
+    reject.addEventListener('click', function () { write(false); clearKlibon(); close(); });
+    accept.addEventListener('click', function () { write(true); loadOptional(); close(); });
 
     el.appendChild(h); el.appendChild(p); el.appendChild(row);
     document.body.appendChild(el);
@@ -329,9 +388,11 @@
 
   function start() {
     var choice = read();
-    if (choice && choice.analytics) loadGa();
+    if (choice && choice.analytics) loadOptional();
     else if (!choice) showBanner();
-    // choice present and analytics false: nothing loads, nothing is re-asked.
+    // choice present and analytics false: nothing loads, nothing is re-asked,
+    // and a leftover Klibon cookie from an earlier Accept is removed.
+    else clearKlibon();
     addFooterLink();
     bindExplicitTriggers();
   }

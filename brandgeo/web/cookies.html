@@ -123,8 +123,8 @@
   <h1>Cookie Policy</h1>
   <p class="meta">
     <strong>Effective date:</strong> 29 July 2026 &nbsp;&middot;&nbsp;
-    <strong>Last updated:</strong> 29 July 2026 &nbsp;&middot;&nbsp;
-    <strong>Version:</strong> 1.0
+    <strong>Last updated:</strong> 16 November 2026 &nbsp;&middot;&nbsp;
+    <strong>Version:</strong> 1.1
   </p>
 
   <h2>1. Who we are and what this policy covers</h2>
@@ -201,14 +201,21 @@
           <td>First-party cookie &middot; Functional (consent-gated)</td>
           <td>The program's attribution window, 30 days by default, at most 365</td>
         </tr>
+        <tr>
+          <td><code>_klb</code></td>
+          <td>Klibon, our affiliate network (set as a first-party cookie by Klibon's script)</td>
+          <td>Affiliate attribution. Set only if you arrived through a partner's Klibon link (a link carrying <code>?via=</code>) and accepted cookies. Holds the partner's code and the time of the visit, so that partner can be credited if you later sign up or buy. Shared with app.getbrandgeo.com, where accounts are created. Klibon's script is not loaded at all until you accept.</td>
+          <td>First-party cookie &middot; Affiliate attribution (consent-gated)</td>
+          <td>60 days</td>
+        </tr>
       </tbody>
     </table>
   </div>
   <div class="note">
-    <p><strong>Google Analytics is not loaded until you accept it.</strong> If you decline, or have not yet chosen, no request is made to Google at all and neither <code>_ga</code> cookie exists. This is enforced by blocking the script itself, not merely by signalling a preference to Google.</p>
+    <p><strong>Google Analytics is not loaded until you accept it.</strong> If you decline, or have not yet chosen, no request is made to Google at all and neither <code>_ga</code> cookie exists. This is enforced by blocking the script itself, not merely by signalling a preference to Google. The same Accept covers the Klibon referral cookie, and the same rule applies: until you accept, no request is made to Klibon and no <code>_klb</code> cookie exists. If you reject or later withdraw consent, we delete <code>_klb</code>.</p>
   </div>
   <h3>4.2 app.getbrandgeo.com (customer dashboard)</h3>
-  <p>The dashboard is available only to registered customers who have signed in. It uses the following, all strictly necessary or functional, and all first party. No analytics or advertising technology runs on the dashboard.</p>
+  <p>The dashboard is available only to registered customers who have signed in. It uses the following, all strictly necessary or functional, and all first party. No analytics or advertising technology runs on the dashboard. The one addition is the Klibon referral cookie <code>_klb</code> described above: the dashboard loads Klibon's script only when that cookie is already present, which means you accepted it on getbrandgeo.com, and when you then create an account it tells Klibon your email address so the partner who sent you can be credited.</p>
   <div class="tablewrap">
     <table>
       <thead>
@@ -257,9 +264,10 @@
   <h2>5. International transfers</h2>
   <p>Where you consent to Google Analytics, Google Ireland Limited acts as our processor and may transfer data outside the European Economic Area, including to the United States. Such transfers rely on the European Commission's adequacy decision for the EU-US Data Privacy Framework and, where applicable, on Standard Contractual Clauses together with supplementary measures. We enable IP anonymisation and we do not enable Google Signals, advertising personalisation, or data sharing for advertising purposes.</p>
   <p>If you do not consent to analytics, no data reaches Google at all and no transfer takes place.</p>
+  <p>Where you arrived through a Klibon partner link and accepted cookies, Klibon receives the partner's code, and, if you create an account, the email address you created it with, which Klibon states it stores hashed. It uses them only to credit that partner. If you do not accept, nothing is sent to Klibon.</p>
 
   <h2>6. Your consent, and how to withdraw it</h2>
-  <p>When you first visit getbrandgeo.com you are shown a banner asking whether to load analytics. Accept and Reject are presented with equal prominence, identical size and weight; declining is never made harder than accepting; nothing is pre-selected; and continuing to browse is <strong>not</strong> treated as consent.</p>
+  <p>When you first visit getbrandgeo.com you are shown a banner asking whether to load analytics and the affiliate referral cookie. Accept and Reject are presented with equal prominence, identical size and weight; declining is never made harder than accepting; nothing is pre-selected; and continuing to browse is <strong>not</strong> treated as consent.</p>
   <p><strong>You may withdraw or change your consent at any time, and it is as easy to withdraw as it was to give.</strong> Withdrawal does not affect the lawfulness of processing carried out before you withdrew.</p>
   <p>Use the button below, or the <strong>Cookie settings</strong> link in the footer of any page on getbrandgeo.com:</p>
   <p><button type="button" class="btn-consent" data-cookie-settings>Change my cookie settings</button></p>

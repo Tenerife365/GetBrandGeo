@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import BrandGeoMark from '../components/BrandGeoLogo'
 import { readSignupDomain, clearSignupDomain } from '../lib/signupDomain'
 import { readAffiliateRef, clearAffiliateRef } from '../lib/affiliateRef'
+import { reportKlibonSignup } from '../lib/klibon'
 import { humanizeError, isCustomerFacingStatus, serverError } from '../lib/errors'
 
 // Authenticated shell (wrapped in PrivateRoute in App.tsx), so unlike Login/
@@ -121,6 +122,12 @@ export default function Welcome() {
       // shared machine (signupDomain.ts explains why it is in localStorage at
       // all). Only on success: a failed provision returns the user to this form,
       // which still needs the prefill.
+      // The account exists now, so this is the moment Klibon asks to be told
+      // (src/lib/klibon.ts). Both signup paths, email invite and Google, end
+      // here, and the email is the one the account was created with. Not
+      // awaited: it uses sendBeacon, which survives the reload below, and it
+      // does nothing for a visitor no Klibon partner sent.
+      reportKlibonSignup(session?.user?.email)
       clearSignupDomain()
       clearAffiliateRef()
 

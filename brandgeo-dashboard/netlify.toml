@@ -53,7 +53,12 @@
     # appears only as a target=_blank footer link, which is navigation and
     # needs no CSP allowance. Note a CSP wildcard does NOT match the apex, so
     # if the vendor ever moves the API there it must be listed explicitly.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com https://*.ingest.de.sentry.io"
+    #
+    # Klibon affiliate network (2026-11-16): src/lib/klibon.ts injects its tag
+    # from go.klibon.com, only for a visitor who already holds the _klb cookie
+    # accepted on getbrandgeo.com, and Klibon.signup() posts back to that host.
+    # Its pixels are images, already allowed by img-src https:.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.askmywebsiteai.com https://go.klibon.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://app.askmywebsiteai.com; font-src 'self' https://fonts.gstatic.com https://app.askmywebsiteai.com; img-src 'self' data: https:; frame-src 'self' https://app.askmywebsiteai.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.together.xyz https://api.perplexity.ai https://app.askmywebsiteai.com https://*.askmywebsiteai.com https://*.ingest.de.sentry.io https://go.klibon.com"
 
 # ── Affiliate module (2026-09-12) ─────────────────────────────────────────────
 # Referral links are https://app.getbrandgeo.com/r/<program>/<code>. They MUST
