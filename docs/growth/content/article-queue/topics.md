@@ -185,6 +185,13 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 54 | draft-answers-log | ready from 2026-12-05 (draft, rule 5) | How to keep a before-and-after log of AI answers that still means something in January |
 | 55 | draft-stale-facts | ready from 2026-12-06 (draft, rule 5) | Which seasonal facts go stale in AI answers, and a five-step audit for the first week of December |
 | 56 | draft-fund-questions | ready from 2026-12-07 (draft, rule 5) | Seven questions to ask before funding AI visibility work in 2027, whether by hand, with help or with a tool |
+| 57 | draft-gift-question-set | ready from 2026-12-08 (draft, rule 5) | How to build a fixed set of gift-season questions around recipient, budget and occasion, and keep it repeatable |
+| 58 | draft-gift-category | ready from 2026-12-09 (draft, rule 5) | How to test which product category an AI assistant files a brand under when asked for gift ideas |
+| 59 | draft-gift-list-reading | ready from 2026-12-10 (draft, rule 5) | How to read a numbered best-gifts list from an AI assistant without mistaking it for a ranking |
+| 60 | draft-gift-prices | ready from 2026-12-11 (draft, rule 5) | How to audit price and availability statements in AI answers about gift products, product by product |
+| 61 | draft-gift-comparisons | ready from 2026-12-12 (draft, rule 5) | How to test head-to-head gift comparison questions in AI answers without flattering yourself |
+| 62 | draft-gift-guide-page | ready from 2026-12-13 (draft, rule 5) | How to write a gift guide page plainly, with a visible date, so it can be quoted accurately |
+| 63 | draft-gift-reporting | ready from 2026-12-14 (draft, rule 5) | How to report gift-season AI answer tests on one page without promising results |
 
 ## Briefs
 
@@ -538,3 +545,11 @@ promises a per-engine answer view. These are practical guides with no new data, 
 the research series (about 650 to 800 words) by design. Publish by rule 5; do not rewrite.
 Overlaps noted, not blocking: 50 with 45 (draft-year-end-checks, 30 Nov), 52 with BG-081,
 56 with BG-093 and BG-094 (not reopened).
+
+### 57 to 63 drafts (8 to 14 December, gift-season testing series)
+Written 2026-11-14 by the laptop content session as lot 2 for December, second-verified the
+same day (CST Ops, _runs, 2026-11-14_lot2_decembrie, brandgeo, VERIFICARE.md), then converted
+to the draft format on the desktop on 2026-11-16. These are practical guides with no new data,
+about 650 to 740 words. Publish by rule 5; do not rewrite. Overlaps noted, not blocking: 63 with
+54 (before-and-after log), 60 with 55 (stale facts); the commercial closing paragraph is similar
+on all seven (button text differs).
