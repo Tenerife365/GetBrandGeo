@@ -1,6 +1,15 @@
 -- supabase-agency-watchdog-2026-11-16.sql
 --
--- NOT APPLIED. Written 2026-11-16 by bg-backend (Opus) for release P1 of
+-- APPLIED 2026-11-16 from the master seat on Constantin's words "Yes, apply
+-- steps 1 to 3", as migration 20261116195945 agency_watchdog_2026_11_16 (the
+-- file body verbatim, without begin and commit). Pre-check W0: md5
+-- 0fc8dea647437615df5472c2952d29e6, length 7637, 0 findings before. Read back
+-- the same day: W1 t,t; W2 {postgres=X/postgres}, f, search_path "", s; W3 0
+-- rows of the new kinds, 0 findings in total; section R4 of the read-back file
+-- 3 pass, 0 fail, rolled back. After: 73 clients, 73 accounts, 0 agency
+-- accounts, 0 scratch clients or logins.
+--
+-- Written 2026-11-16 by bg-backend (Opus) for release P1 of
 -- docs/arch/agency-multi-brand.md, revision 4: section 8 guard 3 (an agency
 -- brand must never carry a Stripe id) and the three standing checks of
 -- section 4.4 (missing, stale, stray membership rows), added to the hourly

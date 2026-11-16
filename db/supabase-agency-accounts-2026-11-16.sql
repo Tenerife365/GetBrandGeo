@@ -7,7 +7,8 @@
 -- Read back the same day: R1.1 to R1.12 all as expected (72 accounts, 36 owner
 -- members, 36 backfill owner rows, 0 ACL or function mismatches, 4 triggers,
 -- 2 policies); section R2 of the read-back file 34 pass, 0 fail, rolled back.
--- Step 3 is NOT applied. R1.13 (JWT expiry) is still owed.
+-- Step 3 and the watchdog file were applied the same day (20261116195700,
+-- 20261116195945, see their headers). R1.13 (JWT expiry) is still owed.
 --
 -- Written 2026-11-16 by bg-backend (Opus) for release P1 of
 -- docs/arch/agency-multi-brand.md, revision 4. This file is steps 1 AND 2 of

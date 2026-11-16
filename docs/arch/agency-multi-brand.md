@@ -1406,7 +1406,14 @@ F1 and F2 held the step 4 push) and `docs/qa/agency-p1-build-rereview-2026-11-16
 4.4 checks), `db/supabase-agency-readback-2026-11-16.sql` (R2 to R4). **Steps 1
 and 2 APPLIED 2026-11-16** on Constantin's go, as migration
 `20261116155901 agency_accounts_steps_1_2_2026_11_16`; R1 read back as expected
-and R2 passed 34 of 34. Step 3, the watchdog file and the push are not done. A combined dry run of all four inside one transaction that ends in a
+and R2 passed 34 of 34. **Step 3 and the watchdog file APPLIED 2026-11-16** from
+the master seat on Constantin's words "Yes, apply steps 1 to 3", as migrations
+`20261116195700 agency_rls_group_b_step_3_2026_11_16` and
+`20261116195945 agency_watchdog_2026_11_16`; RB read back as expected (RB2 51
+policies, RB3 144, RB4 0 mismatches), R3 passed 58 of 58, W read back as
+expected with 0 findings, R4 passed 3 of 3. After: 73 clients, 73 accounts, 0
+agency accounts. The step 4 push is not done and waits on Constantin's own go.
+R1.13 (JWT expiry) is still owed. A combined dry run of all four inside one transaction that ends in a
 deliberate error passed 98 of 98 checks against production (step 1 and 2 in
 324 ms, step 3 in 90 ms, the watchdog in 22 ms) and production read back
 unchanged afterwards.

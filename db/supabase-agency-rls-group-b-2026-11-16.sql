@@ -1,6 +1,15 @@
 -- supabase-agency-rls-group-b-2026-11-16.sql
 --
--- NOT APPLIED. Written 2026-11-16 by bg-backend (Opus) for release P1 of
+-- APPLIED 2026-11-16 from the master seat on Constantin's words "Yes, apply
+-- steps 1 to 3", as migration 20261116195700
+-- agency_rls_group_b_step_3_2026_11_16 (the file body verbatim, without begin
+-- and commit). Pre-checks: P1 n 36, md5 0c462086f2a2b55a1739398e12957e3c;
+-- P2 15; P3 both constraints as expected; P4 0. Read back the same day: RB1 0,
+-- RB2 51, RB3 144, RB4 0 mismatches, RB5 and RB6 as expected; section R3 of
+-- the read-back file 58 pass, 0 fail, rolled back. Re-checked from the builder
+-- seat: client_events_type_check holds 'account_change'.
+--
+-- Written 2026-11-16 by bg-backend (Opus) for release P1 of
 -- docs/arch/agency-multi-brand.md, revision 4. This file is step 3 of
 -- section 13 of that spec.
 --
