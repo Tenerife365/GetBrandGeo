@@ -551,9 +551,10 @@ user ids and no email.
 | Function | Refuses (raises a coded error) | Does |
 |---|---|---|
 | `convert_to_agency(p_account_id, p_confirm_user_ids uuid[], p_actor)` | account already agency; account holds more than one brand; any login with a profile or row on the brand not named in `p_confirm_user_ids` (re-review N-L6; live, one brand already has two logins) | sets `kind = 'agency'`; its only brand is the home brand; existing members keep their account roles; every `backfill` row on the home brand becomes `primary`, role `member` (account owners manage the account through `account_members`, not through a brand role) |
-| `account_attach_brand(p_account_id, p_client_id, p_confirm_user_ids uuid[], p_actor)` | target not `kind='agency'`; brand `category in ('research','archived','test')`; brand already in an account with more than one brand; **brand is the home brand of an agency account** (every direct brand is its own account's home, so the plain wording would refuse every attach; re-review 3 N3-L1); any `user_profiles` or `user_clients` row on the brand whose user is not in `p_confirm_user_ids` | locks source and target accounts (4.4); moves the brand into the account; **sets every confirmed user's row on the brand to role `member`, and a `backfill` row to `primary`** (the former customer becomes a guest, re-review N-Md3); deletes the confirmed users' `account_members` rows on the brand's old direct account and the now empty direct account; reconciles. Returns the brand name for the admin UI to echo (review B, Md3) |
+| `account_attach_brand(p_account_id, p_client_id, p_confirm_user_ids uuid[], p_actor)` | target not `kind='agency'`; brand `category in ('research','archived','test')`; **brand carries a `stripe_customer_id` or `stripe_subscription_id` (`brand_has_stripe`, build review F1)**; brand already in an account with more than one brand; **brand is the home brand of an agency account** (every direct brand is its own account's home, so the plain wording would refuse every attach; re-review 3 N3-L1); any `user_profiles` or `user_clients` row on the brand whose user is not in `p_confirm_user_ids` | locks source and target accounts (4.4); moves the brand into the account; **sets every confirmed user's row on the brand to role `member`, and a `backfill` row to `primary`** (the former customer becomes a guest, re-review N-Md3); deletes the confirmed users' `account_members` rows on the brand's old direct account and the now empty direct account; reconciles. Returns the brand name for the admin UI to echo (review B, Md3) |
 | `account_detach_brand(p_account_id, p_client_id, p_actor)` | brand is the home brand | locks both accounts; creates a direct account for the brand (home = it); moves it; makes every login whose default brand is this brand an `owner` of the new account and of the brand again (the reverse of attach); reconciles (removes every `account` row on it) |
 | `account_create_staff_profile(p_account_id, p_user_id, p_role, p_actor)` | the auth user already has a profile; user already in an account | inserts `user_profiles(p_user_id, client_id = home_client_id, 'viewer')` (the 4.5 trigger writes the `primary` row as `member`) and `account_members(p_role)` in one transaction, reconciles (re-review N-L3) |
+| `account_create_guest_profile(p_client_id, p_user_id, p_actor)` (added at build, review F4) | brand not in an agency account; brand is the agency's home brand; the auth user already has a profile; user already in an account | under the brand lock, inserts `user_profiles(p_user_id, p_client_id, 'viewer')` (the 4.5 trigger writes the `primary` row as `member`), reconciles, so a guest creation cannot race an attach or detach |
 | `account_add_staff(p_account_id, p_user_id, p_role, p_actor)` | the user's `user_profiles.client_id` is not this account's home brand; user already in an account | inserts `account_members`, reconciles |
 | `account_remove_member(p_account_id, p_user_id, p_actor)` | it would remove the last owner (422) | deletes the `account_members` row; **deletes every `user_clients` row the user holds on every brand of the account, whatever its `grant_source`** (re-review N-Md1, N-L5); reconciles; sets `revoked_at` on every `client_api_keys` row with `created_by = p_user_id` on those brands; revokes every `oauth_grants` row of the user on those brands; sets `used_at = now()` on every unused `oauth_codes` row of the user (all of them, not only these brands), so a code issued before the removal cannot mint a fresh grant at `oauth-token.js:97-100` afterwards (re-review 3 N3-Md1); sets `revoked_at = now(), revoked_reason = 'revoked'` on every open `client_invite_links` row of the user, so a pending invite cannot be redeemed (N3-L3; `'revoked'` is an existing allowed value). Returns `ban_login: true` |
 | `account_remove_guest(p_client_id, p_user_id, p_actor)` | the user is an account member; the brand is not in an agency account | deletes every row the user holds on the brand, whatever its source; revokes their keys and grants on it; marks every unused `oauth_codes` row of the user used and revokes their open `client_invite_links`, as `account_remove_member` does. Returns `ban_login: true` |
@@ -603,6 +604,7 @@ revoke execute on function
   public.convert_to_agency(integer, uuid[], uuid), public.account_attach_brand(integer, integer, uuid[], uuid),
   public.account_detach_brand(integer, integer, uuid), public.account_add_staff(integer, uuid, text, uuid),
   public.account_create_staff_profile(integer, uuid, text, uuid),
+  public.account_create_guest_profile(integer, uuid, uuid),
   public.revert_agency_to_direct(integer, uuid),
   public.account_remove_member(integer, uuid, uuid), public.account_remove_guest(integer, uuid, uuid),
   public.repoint_default_brand(uuid, integer, uuid)
@@ -908,6 +910,12 @@ F-Md1), so P1 ships three guards:
    Upgrade or Billing portal on any brand. Intended: admins change plans with
    `set-client-plan.js`, never through the customer checkout (re-review 3
    N3-I6).
+   **Server side, added at build (review F1):** `create-portal-session.js`
+   answers a non-admin 409 `{ code: 'agency_billing' }` unless
+   `brand_account_kind` reads exactly `direct` (a read error refuses too); the
+   sidebar Billing row and the Locations and Prompts upgrade links are gated on
+   the same kind; and `account_attach_brand` refuses a brand that carries a
+   Stripe id, so an agency brand cannot start with one.
 2. **Bound packages.** No tool creates them today (1.6); runbook rule and a
    check in any future offer builder: never bind a package to a brand whose
    account is an agency.
@@ -943,8 +951,9 @@ function, then (for removals) the ban.
 | `attach_brand` / `detach_brand` | `account_attach_brand` / `account_detach_brand`; `attach_brand` first returns a preview (brand name, users that would need confirming) and needs a second call with `confirm: true` |
 | `create_staff_login` | creates an auth user by invite (the BrandGEO invite channel already used by `resend-invite.js`), then ONE call to `account_create_staff_profile` (profile on the home brand and `account_members` in one transaction). If that call fails, the function deletes the auth user it just created, only when it passes the ownership test `_provision_client.js` already applies (id not seen before the call, fresh `created_at`, no profile), so an existing login is never deleted; the invite email is sent only after the SQL call commits (re-review 3 N3-I3). Invite links it issues need a new `client_invite_links.source` value, `agency-admin` (step 3) |
 | `add_staff` | `account_add_staff` for an existing login whose default is already the home brand |
-| `create_guest_login` | invite and profile on one client brand of the account; no account row |
-| `remove_member` / `remove_guest` | the SQL function, then the ban |
+| `create_guest_login` | invite, then ONE call to `account_create_guest_profile` (build review F4); profile on one client brand of the account; no account row |
+| `remove_member` / `remove_guest` | the SQL function, then the ban. A failed ban returns a `retry` object naming `ban_removed` |
+| `ban_removed` (added at build, review F2) | bans a login that was really removed from the named account: never the caller or an admin, no `account_members` row, no `user_clients` row on any brand of the account, default brand inside the account; retries a ban that failed after its SQL call committed |
 | `list` | account, members (email via auth admin), brands with plan and prompt count, rows by `grant_source`, the three 4.4 checks |
 
 **How the first agency is built** (closes review A, F-Md3): the lead's login and
@@ -1384,3 +1393,74 @@ PARTIAL items of the earlier reviews, now:
 | N3-I4: notice fail direction | INFO | 9.6 skip the customer notice on a kind read error, keep the admin bell |
 | N3-I5: read-back placement; re-run safety of DDL | INFO | 13: read-back after commit; `if not exists`, `create or replace`, `drop trigger if exists` |
 | N3-I6: admins see no Upgrade | INFO | 8 guard 1: stated as intended |
+
+### 20.3 Build of P1 (steps 1 to 4), deviations and review closures
+
+Built 2026-11-16 by `bg-backend` (SQL, server) and `bg-app` (dashboard), reviewed
+by `bg-verify`: `docs/qa/agency-p1-build-review-2026-11-16.md` (FAIL, scoped:
+F1 and F2 held the step 4 push) and `docs/qa/agency-p1-build-rereview-2026-11-16.md`
+(PASS WITH FINDINGS, nothing blocks the push). Files:
+`db/supabase-agency-accounts-2026-11-16.sql` (steps 1 and 2),
+`db/supabase-agency-rls-group-b-2026-11-16.sql` (step 3),
+`db/supabase-agency-watchdog-2026-11-16.sql` (section 8 guard 3 and the three
+4.4 checks), `db/supabase-agency-readback-2026-11-16.sql` (R2 to R4). None is
+applied. A combined dry run of all four inside one transaction that ends in a
+deliberate error passed 98 of 98 checks against production (step 1 and 2 in
+324 ms, step 3 in 90 ms, the watchdog in 22 ms) and production read back
+unchanged afterwards.
+
+| Change from the text above | Why |
+|---|---|
+| Advisory lock key is `hashtextextended('account:' \|\| id, 0)`, not `hashtext` | 64-bit key, fewer collisions with other locks |
+| Step 2 backfills and owner rows are filtered to `kind = 'direct'` accounts | the file is re-runnable after an agency exists; a re-run must not write owner rows onto agency brands |
+| `convert_to_agency` also sets the home brand's `primary` rows to `member` | the account owner manages through `account_members`; a brand role `owner` would contradict 4.6's own convert text |
+| `account_detach_brand` makes owners only of logins whose default is the brand and who still hold a row on it | a guest removed before the detach stays removed |
+| `brand_account_kind` returns the kind to an admin too; the frontend sets `activeBrandAccountKind` to null for an admin | one function for both; section 8 guard 1 unchanged |
+| `account_lock_brand`, `account_log_event`, `account_revoke_credentials` are internal helpers executable by no role but the owner | they are called only from the 4.6 functions |
+| Group B is rewritten with `alter policy`, not drop and create | keeps policy names, roles and commands; the step 3 file saves every old text for rollback |
+| The remove functions also revoke `oauth_tokens` of the revoked grants | a grant revoked with live tokens would still answer until the tokens expire |
+| `assertClientAccess` parses the client id before the admin check | an admin call with a malformed id gets 400, not a pass |
+| `set-client-plan.js` skips the customer notice when the kind is unknown | same fail direction as 9.6 for `expire-plan-grants.js` |
+| `delete-client.js` names the blocking logins' emails in its 409 (admin only) | the admin needs to know whom to remove first |
+| `agency-admin.js` refuses to act on an admin login (`target_is_admin`) | an admin is never a staff member or guest |
+| F1: attach refuses `brand_has_stripe`; portal gate; Billing row and upgrade links gated (section 8) | closes the webhook path left open by guard 1 alone |
+| F2: new action `ban_removed`; every failed ban returns `retry` | a ban that failed after its SQL committed had no way to be retried |
+| F4: new SQL function `account_create_guest_profile` | guest creation ran outside the brand lock |
+| F5: `suggest-prompts.js` and `support-request.js` take `client_id` from the body; Prompts, Tickets and SupportWidget send it | a staffer acting on a non-default brand was checked against the default |
+| F6: `McpAccessSection` `onUpgrade` is optional and passed only when billing is self-serve | removes an upgrade path on agency brands. This IS a change to a shared component's props (required to optional, backwards compatible, the one caller unchanged in shape), which the Phase 3 guardrail forbids without a ruling; Constantin's ruling is owed, and the fallback is to keep the prop required and pass a mailto handler instead |
+| The non-admin switcher is a lazy `BrandSwitcher` chunk with the static identity as Suspense fallback and a local error boundary (re-review N2) | keeps the Combobox out of the entry chunk; a failed chunk no longer replaces the whole shell |
+| `BrandSwitcher` handles Escape on its own wrapper and stops it (re-review N1) | Escape on the open list closed the mobile drawer too |
+
+Measured from the orchestrator seat: `tsc` exit 0, 74 of 74 node test files,
+build exit 0. Entry chunk on a clean `git archive HEAD` export: 580,404 bytes
+at HEAD, 581,376 with P1 (+972); the real checkout build reads 604.97 kB, the
+dependency set resolved there differs, so compare deltas, not totals.
+Headless Chrome over CDP, demo mode, dark and light, 1440 and 390: no sideways
+scroll of the window or `<main>`; with one brand "Your prompts" at 757 px and
+1,315 px (the 2026-11-16 baseline); with 5 and 12 injected brands the switcher
+shows and the sidebar does not overflow, and with 5 injected brands "Your
+prompts" starts at 801 px at 1440 and 1,315 px at 390. The 44 px is the AI
+engines card (237 px against 193 px): the injected brands are on `growth`, so
+demo mode renders more active engines and other scores. Every block above it
+measures the same height as with one brand, so the switcher moves nothing. At 390 the first Escape closes the
+brand list and leaves the drawer open, the second closes the drawer. With the
+switcher chunk blocked the shell renders the static identity.
+
+**Open, recorded, not fixed.**
+- `account_remove_guest` always returns `ban_login: true`; a guest who is also a
+  customer elsewhere would lose that login. Ruling owed at P3.
+- F8: `plan_grant_note` stays readable through `clients` RLS by any member of
+  the brand; the dashboard no longer selects it. A column grant is the fix.
+- I3: `ticket_client_id` is executable by PUBLIC (pre-existing; step 3 only sets
+  its `search_path`).
+- The Supabase JWT expiry must be read in the dashboard before step 5: a banned
+  login keeps a valid access token until it expires (V13 live half).
+- If a guest's brand is detached before a ban retry, `ban_removed` refuses and
+  the ban is done by hand; `ban_removed` reads then bans without a lock.
+- An admin's prompt suggestions now count against the active client's daily cap.
+- Runbook rows for the four new alert keys in `docs/ops/alerting-runbook.md`.
+- Every new string is marked `copy: pending bg-copy`; no admin UI calls
+  `agency-admin.js` in P1.
+- Pushing the dashboard before steps 1 and 2 refuses the billing portal to every
+  non-admin (0 clients carry a Stripe id today). Order stays: steps 1+2, step 3,
+  then push.
