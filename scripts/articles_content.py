@@ -716,7 +716,7 @@ _R_034 = ("/bg-034.html", "BG-034", "The Multilingual AI Visibility Checklist",
 
 # ---------------------------------------------------------------- BG-036
 ARTICLES.append(dict(
-    slug="bg-036", bid="BG-036", date="2026-08-13", date_label="August 13, 2026", read=11,
+    slug="bg-036", bid="BG-036", date="2026-08-13", modified="2026-11-17", date_label="August 13, 2026", read=11,
     tags=["Competitive Landscape", "Buyer Guide", "Original Research"],
     title="The Real GEO Tool Buyer's Guide: 13 Vendors, Actual Pricing, and the Costs Nobody Puts in the Headline",
     h1="The Real GEO Tool Buyer's Guide. <em>13 Vendors</em>, Real Pricing, and the Costs Nobody Puts in the Headline",
@@ -755,7 +755,7 @@ ARTICLES.append(dict(
   <table class="compare-table">
     <thead><tr><th>Vendor</th><th>Engines</th><th>Entry price</th><th>Funding / founded</th><th>Best for</th></tr></thead>
     <tbody>
-      <tr><td>Profound</td><td>10 engines claimed</td><td>$99/mo Starter</td><td>$155M total, $1B valuation Feb 2026</td><td>Enterprise, the category's default pick</td></tr>
+      <tr><td>Profound</td><td>10 engines claimed</td><td>$99/mo Starter, retired Sep 2026</td><td>$155M total, $1B valuation Feb 2026</td><td>Enterprise, the category's default pick</td></tr>
       <tr><td>Peec AI</td><td>6 engines, all tiers</td><td>$95/mo Starter</td><td>$29.1M total, founded 2025</td><td>Mid-market marketing/SEO teams</td></tr>
       <tr><td>AthenaHQ</td><td>8 engines, no paywall</td><td>$295/mo ($95 intro)</td><td>$2.7M total, founded 2025</td><td>SMB wanting full coverage without upsells</td></tr>
       <tr><td>Otterly.AI</td><td>4 core, 3 paid add-ons</td><td>$29/mo Lite</td><td>Bootstrapped, founded 2024</td><td>Cheapest true entry point, unlimited seats</td></tr>
@@ -4353,7 +4353,7 @@ ARTICLES.append(dict(
 
 # ---------------------------------------------------------------- BG-088
 ARTICLES.append(dict(
-    slug="bg-088", bid="BG-088", date="2026-08-14", date_label="August 14, 2026", read=8,
+    slug="bg-088", bid="BG-088", date="2026-08-14", modified="2026-11-17", date_label="August 14, 2026", read=8,
     tags=["Competitive Landscape", "Buyer Guide", "Comparison"],
     title="Profound vs Peec vs Otterly: Which AI Visibility Tool Fits Your Budget",
     h1="Profound vs Peec vs Otterly. <em>Which AI Visibility Tool Fits Your Budget</em>",
@@ -4364,7 +4364,7 @@ ARTICLES.append(dict(
     ld_desc="A three-way roundup comparison of Profound, Peec AI, and Otterly.AI covering pricing, engine coverage, funding, and buyer fit, sourced from public vendor pricing pages and funding announcements.",
     keywords="profound vs peec vs otterly, best ai visibility tool 2026 comparison, geo tool comparison 2026, ai visibility monitoring vendors compared, profound alternative, peec ai alternative, otterly ai alternative",
     about=["Competitive Analysis", "AI Visibility Monitoring", "SaaS Buying Guide", "Generative Engine Optimization"],
-    findings=[("$99", "Profound's published Starter monthly price, vendor-disclosed"),
+    findings=[("$99", "Profound's Starter monthly price as published in August 2026; Profound retired the plan in September 2026"),
               ("$95", "Peec AI's published Starter monthly price, vendor-disclosed"),
               ("$29", "Otterly.AI's published Lite monthly price, vendor-disclosed, before any engine add-ons"),
               ("$1B", "Profound's valuation at its reported February 2026 Series C, per funding announcements")],
@@ -4399,8 +4399,8 @@ ARTICLES.append(dict(
     <tbody>
       <tr><td>Positioning</td><td>Enterprise default, widest claimed coverage</td><td>Mid-market challenger, fastest reported growth</td><td>Cheapest true self-serve entry point</td></tr>
       <tr><td>Engines</td><td>10 claimed by vendor</td><td>6 models, included on every tier</td><td>4 core included, 3 sold as add-ons</td></tr>
-      <tr><td>Entry price</td><td>$99/mo Starter</td><td>$95/mo Starter</td><td>$29/mo Lite (15 prompts)</td></tr>
-      <tr><td>Mid tier</td><td>$399/mo Growth, capped at 3 engines and 100 prompts</td><td>$245/mo Pro</td><td>$189/mo Standard (100 prompts)</td></tr>
+      <tr><td>Entry price</td><td>$99/mo Starter, retired Sep 2026</td><td>$95/mo Starter</td><td>$29/mo Lite (15 prompts)</td></tr>
+      <tr><td>Mid tier</td><td>$399/mo Growth, capped at 3 engines and 100 prompts, retired Sep 2026</td><td>$245/mo Pro</td><td>$189/mo Standard (100 prompts)</td></tr>
       <tr><td>Funding / founded</td><td>$155M total, $1B valuation Feb 2026</td><td>$29.1M total, founded 2025</td><td>Bootstrapped, founded 2024</td></tr>
       <tr><td>Best for</td><td>Large teams wanting the broadest named coverage backed by a well-funded vendor</td><td>Mid-market marketing or SEO teams weighing coverage against price</td><td>Budget-conscious solo operators and agencies, unlimited seats on every plan</td></tr>
     </tbody>
@@ -4409,7 +4409,7 @@ ARTICLES.append(dict(
 
   <h2>Profound: the funded enterprise default</h2>
 
-  <p>Profound is the only unicorn in the GEO category as of this pass, raising a reported $96 million Series C at a $1 billion valuation in February 2026. Its own pricing page lists a $99/month Starter tier and a $399/month Growth tier capped at 3 engines and 100 prompts, with Enterprise pricing reported by third-party reviews, not published by Profound, in the $2,000 to $5,000-plus a month range. Its differentiator is showing the literal AI answer text with a brand highlighted inside it, across the widest engine count any vendor in this comparison claims. For the deeper one-on-one breakdown, see <a href="/brandgeo-vs-profound.html">BrandGEO vs Profound</a>.</p>
+  <p>Profound is the only unicorn in the GEO category as of this pass, raising a reported $96 million Series C at a $1 billion valuation in February 2026. In August 2026 its own pricing page listed a $99/month Starter tier and a $399/month Growth tier capped at 3 engines and 100 prompts. Update, November 17, 2026: Profound retired both plans in September 2026, and its pricing page now shows a free 7-day Trial and an Enterprise plan marked Custom, with Enterprise pricing reported by third-party reviews, not published by Profound, in the $2,000 to $5,000-plus a month range. Its differentiator is showing the literal AI answer text with a brand highlighted inside it, across the widest engine count any vendor in this comparison claims. For the deeper one-on-one breakdown, see <a href="/brandgeo-vs-profound.html">BrandGEO vs Profound</a>.</p>
 
   <h2>Peec AI: the fastest-reported growth</h2>
 
@@ -4620,7 +4620,7 @@ ARTICLES.append(dict(
 
 # ---------------------------------------------------------------- BG-092
 ARTICLES.append(dict(
-    slug="bg-092", bid="BG-092", date="2026-08-14", date_label="August 14, 2026", read=7,
+    slug="bg-092", bid="BG-092", date="2026-08-14", modified="2026-11-17", date_label="August 14, 2026", read=7,
     tags=["Enterprise", "Buyer Guide", "Competitive Landscape"],
     title="What a Six-Figure Enterprise GEO Contract Actually Includes",
     h1="What a Six-Figure <em>Enterprise GEO Contract</em> Actually Includes",
@@ -4633,7 +4633,7 @@ ARTICLES.append(dict(
     about=["Enterprise", "GEO Tools", "Buyer Guide", "Competitive Landscape"],
     findings=[("$100,000 to $500,000+", "the estimated annual range independent reviews put on Bluefish AI's Fortune-500-only enterprise contracts; the vendor publishes no price at all"),
               ("$36,000", "the annual contract minimum one independent review reported for Evertune, against the roughly $9,600-a-year figure implied by its own published $800-a-month Pro tier"),
-              ("$2,000 to $5,000+", "a month third-party reviews estimate for Profound's Enterprise tier, which removes the engine and prompt caps carried by its published $99 and $399 plans"),
+              ("$2,000 to $5,000+", "a month third-party reviews estimate for Profound's Enterprise tier, the only paid plan Profound has sold since it retired its $99 and $399 self-serve plans in September 2026"),
               ("0", "of the three vendors examined here that publish a flat enterprise price on their own site; all three route that buyer to a sales conversation instead")],
     faq=[("What actually makes a contract 'enterprise' instead of just a bigger self-serve plan?",
           "In this category it typically means dedicated strategy or consulting hours rather than a self-serve dashboard alone, custom prompt sets built around the client's actual buyer journeys instead of a generic template, reporting shared across teams like SEO, PR and product rather than siloed to one function, and often a done-for-you remediation motion where the vendor's team acts on findings rather than only surfacing them."),
@@ -4642,7 +4642,7 @@ ARTICLES.append(dict(
          ("When does a company not need this tier?",
           "If a company has one brand, one core market, and a marketing team able to act on a dashboard directly, self-serve tiers priced from roughly $99 to $800 a month in this category already query the same engines an enterprise contract does. The enterprise premium buys people and process on top of that data, not access to different underlying measurement."),
          ("Which vendors in this category sell at the six-figure tier?",
-          "Bluefish AI and Evertune are both explicitly enterprise-focused with limited or no self-serve path and no published enterprise price. Profound offers a self-serve entry tier but its Enterprise pricing surfaces only through third-party reviews, in the $2,000 to $5,000-plus-a-month range, not its own site.")],
+          "Bluefish AI and Evertune are both explicitly enterprise-focused with limited or no self-serve path and no published enterprise price. Profound retired its self-serve Starter and Growth plans in September 2026, and its Enterprise pricing surfaces only through third-party reviews, in the $2,000 to $5,000-plus-a-month range, not its own site.")],
     related=[("/bg-036.html", "BG-036", "The Real GEO Tool Buyer's Guide: 13 Vendors, Actual Pricing, and the Costs Nobody Puts in the Headline",
               "Where the self-serve tiers this piece contrasts against enterprise pricing are laid out in full."),
              ("/bg-090.html", "BG-090", "Six GEO Startups You Have Not Heard of Yet",
@@ -4660,7 +4660,7 @@ ARTICLES.append(dict(
 
   <h2>The self-serve tiers already cover the same engines</h2>
 
-  <p>The starting point worth being honest about: an enterprise contract in this category rarely buys access to a fundamentally different measurement. Profound's self-serve Growth plan already covers the same category of AI engines its Enterprise tier does, just capped at 3 engines and 100 prompts a month rather than uncapped. Evertune's own published Pro tier, at $800 a month, already runs 100,000 prompts a month across up to 11 models. The gap between that and a $36,000-a-year minimum one independent review reports for Evertune's actual enterprise deals is not explained by better underlying data. It is explained by everything wrapped around that data.</p>
+  <p>The starting point worth being honest about: an enterprise contract in this category rarely buys access to a fundamentally different measurement. Until Profound retired it in September 2026, its self-serve Growth plan already covered the same category of AI engines its Enterprise tier does, just capped at 3 engines and 100 prompts a month rather than uncapped. Evertune's own published Pro tier, at $800 a month, already runs 100,000 prompts a month across up to 11 models. The gap between that and a $36,000-a-year minimum one independent review reports for Evertune's actual enterprise deals is not explained by better underlying data. It is explained by everything wrapped around that data.</p>
 
   <h2>What the premium is documented to actually include</h2>
 

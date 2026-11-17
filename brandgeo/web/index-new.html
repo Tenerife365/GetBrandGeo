@@ -2147,17 +2147,24 @@
       <span>Free audit first</span>
     </div>
 
-    <!-- Engines-per-euro comparison (spec 2.8, research move 10). Build gate
-         passed: Profound's public pricing page re-verified first-party on
-         2026-08-07 (Starter USD 99/mo billed yearly, "ChatGPT tracking only").
-         If their page changes, update or drop this block; never approximate. -->
+    <!-- What the entry price buys (spec 2.8, research move 10).
+         PROFOUND ROW DROPPED 2026-11-17: their first-party pricing page
+         (tryprofound.com/pricing, read 2026-11-17) says the Starter and Growth
+         plans were retired in September 2026 and are no longer sold, so the
+         "USD 99/mo, ChatGPT only" row verified on 2026-08-07 had become false.
+         Only re-add a vendor row after a fresh first-party read; never
+         approximate. BrandGEO rows: PLAN_ENGINES and PLAN_PROMPTS in
+         planConfig.ts (radar gemini+claude, 7; essentials chatgpt+gemini+claude,
+         18). The last row describes a category, names no company and claims
+         only what the category is by definition. -->
     <div class="frame price-compare">
       <div class="frame-head">
-        <span class="frame-label">Entry price per engine &middot; checked 2026-08-07</span>
+        <span class="frame-label">What the entry price buys</span>
       </div>
-      <div class="pcr"><span class="pc-vendor">BrandGEO Essentials</span><span>EUR 99/mo &middot; 3 engines</span></div>
-      <div class="pcr"><span class="pc-vendor">Profound entry</span><span>USD 99/mo &middot; 1 engine (ChatGPT only)</span></div>
-      <p class="pc-note">Profound public pricing as of 2026-08-07, USD 99/mo on yearly billing. Currencies as published by each vendor, not converted.</p>
+      <div class="pcr"><span class="pc-vendor">BrandGEO Radar</span><span>EUR 29/mo &middot; 2 engines &middot; 7 prompts</span></div>
+      <div class="pcr"><span class="pc-vendor">BrandGEO Essentials</span><span>EUR 99/mo &middot; 3 engines &middot; 18 prompts</span></div>
+      <div class="pcr"><span class="pc-vendor">Static AI crawler tools</span><span>HTML and schema check only &middot; 0 engines asked</span></div>
+      <p class="pc-note">Every paid BrandGEO plan asks the AI engines your buyers use, live, every week. A static checker reads your HTML and never asks an engine anything.</p>
     </div>
 
     <div class="fallback">

@@ -184,7 +184,7 @@ def render(a):
         "headline": a["h1_plain"],
         "description": a["ld_desc"],
         "datePublished": a["date"],
-        "dateModified": a["date"],
+        "dateModified": a.get("modified", a["date"]),
         "inLanguage": "en",
         "isAccessibleForFree": True,
         "mainEntityOfPage": {"@type": "WebPage", "@id": url},
