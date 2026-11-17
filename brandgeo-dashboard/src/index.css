@@ -285,21 +285,23 @@ html.light {
   --grad-mid: 124 58 237;   /* #7c3aed */
   --grad-end: 147 51 234;   /* #9333ea */
   --glow: 139 92 246;   /* #8b5cf6 */
-  --glow-strength: 0.28;
-  --glass-fill-top: rgb(255 255 255 / 0.86);
-  --glass-fill-bottom: rgb(250 250 255 / 0.74);
+  /* Clean-up pass 2026-11-17: light cards are flat white with a hairline
+     border and a whisper of shadow; no glow, no aura, no inset highlight. */
+  --glow-strength: 0;
+  --glass-fill-top: rgb(255 255 255);
+  --glass-fill-bottom: rgb(255 255 255);
   --glass-solid: 255 255 255;
-  --glass-border: rgb(9 9 15 / 0.08);
-  --glass-border-strong: rgb(9 9 15 / 0.14);
-  --glass-highlight: rgb(255 255 255 / 0.95);
-  --glass-shadow: 0 1px 2px rgb(9 9 15 / 0.05), 0 14px 36px -18px rgb(76 29 149 / 0.22);
+  --glass-border: rgb(226 228 236);   /* #e2e4ec */
+  --glass-border-strong: rgb(203 206 218);   /* #cbceda */
+  --glass-highlight: transparent;
+  --glass-shadow: 0 1px 3px rgb(15 23 42 / 0.03);
   --glass-tile: rgb(244 244 251 / 0.7);
   --glass-well: rgb(236 236 244 / 0.6);
   --glass-well-shadow: inset 0 1px 2px rgb(9 9 15 / 0.06), inset 0 0 0 1px rgb(9 9 15 / 0.06);
   --glass-nav-top: rgb(255 255 255 / 0.88);
   --glass-nav-bottom: rgb(247 247 252 / 0.94);
-  --aura-a: 0.16;
-  --aura-b: 0.08;
+  --aura-a: 0;
+  --aura-b: 0;
   --row-hover: 247 243 254;
 
   /* Tactile layer, light values: matte ceramic. Wells are a cool grey groove
@@ -314,7 +316,7 @@ html.light {
   --keycap-drop: 0 1px 3px rgb(9 9 15 / 0.08);
   --well-fill: 235 234 242;   /* #ebeaf2 */
   --well-border: rgb(9 9 15 / 0.08);
-  --well-shadow: inset 0 2px 4px rgb(9 9 15 / 0.08), 0 1px 0 rgb(255 255 255 / 1);
+  --well-shadow: none;   /* flat in light (clean-up pass 2026-11-17) */
   --pill-top: 255 255 255;
   --pill-bottom: 255 255 255;
   --pill-shadow: 0 1px 3px rgb(9 9 15 / 0.12), inset 0 1px 0 rgb(255 255 255 / 1);
@@ -848,7 +850,7 @@ select:focus-visible:focus-visible {
 @layer components {
   .glass-card {
     position: relative;
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid var(--glass-border);
     background-color: transparent;
     background-image: linear-gradient(160deg, var(--glass-fill-top) 0%, var(--glass-fill-bottom) 100%);
@@ -896,7 +898,7 @@ select:focus-visible:focus-visible {
   /* The score card itself is HeroAnswer's Card; it takes the glass surface
      from its wrapper, so no shared component props change. */
   .hero-ambient-mesh > .rounded-card {
-    border-radius: 16px;
+    border-radius: 12px;
     border-color: var(--glass-border);
     background-color: transparent;
     background-image: linear-gradient(160deg, var(--glass-fill-top) 0%, var(--glass-fill-bottom) 100%);
@@ -974,38 +976,35 @@ select:focus-visible:focus-visible {
    @layer: Tailwind hoists layered rules to the top of the sheet, so a layered
    .nav-item.is-active would lose to the unlayered shell rule of the same
    specificity further up this file. Unlayered and later, these win. */
+  /* Clean-up pass 2026-11-17: one uniform canvas, no aura or gradient. */
   .sidebar-glass {
     background-color: rgb(var(--canvas));
-    background-image:
-      radial-gradient(120% 40% at 0% 0%, rgb(var(--grad-mid) / var(--aura-b)) 0%, transparent 60%),
-      linear-gradient(180deg, var(--glass-nav-top) 0%, var(--glass-nav-bottom) 100%);
-  }
-  /* Tactile layer (tactile-layer-2026-11-16.md): the Client, Brand and
-     Locations blocks are a recessed console, sunk below the sidebar. The
-     same class reaches BrandSwitcher.tsx, so its block matches. */
-  .sidebar-well {
-    border-radius: 12px;
-    border: 1px solid var(--well-border);
-    background-color: rgb(var(--well-fill));
-    box-shadow: var(--well-shadow);
-  }
-  /* Every dropdown trigger inside a console (client picker, Internal and
-     Research, the BrandSwitcher trigger) is a machined keycap; while its list
-     is open it sits pressed in. Keyed on attributes the triggers already
-     carry, so no component's markup changes. */
-  .sidebar-well .side-row[aria-haspopup] {
-    border: 1px solid rgb(var(--edge));
-    background-color: rgb(var(--keycap-bottom));
-    background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-bottom)) 100%);
-    box-shadow: inset 0 1px 0 0 var(--keycap-highlight), inset 0 -1px 0 0 var(--keycap-shade), var(--keycap-drop);
-  }
-  .sidebar-well .side-row[aria-haspopup]:hover {
-    background-image: linear-gradient(180deg, rgb(var(--keycap-top)) 0%, rgb(var(--keycap-top)) 100%);
-  }
-  .sidebar-well .side-row[aria-haspopup][aria-expanded="true"] {
     background-image: none;
-    background-color: rgb(var(--keycap-bottom));
-    box-shadow: var(--pressed-shadow);
+  }
+  /* The Client, Brand and Locations blocks sit directly on the sidebar,
+     separated by a hairline above, never boxed (clean-up pass 2026-11-17,
+     was a recessed console). The same class reaches BrandSwitcher.tsx, so
+     its block matches. */
+  .sidebar-well {
+    border-radius: 0;
+    border: 0;
+    border-top: 1px solid rgb(var(--line));
+    background-color: transparent;
+    box-shadow: none;
+  }
+  /* Every dropdown trigger inside these blocks (client picker, Internal and
+     Research, the BrandSwitcher trigger) is a plain bordered control. Keyed
+     on attributes the triggers already carry, so no markup changes. */
+  .sidebar-well .side-row[aria-haspopup] {
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--surface));
+    background-image: none;
+    box-shadow: none;
+  }
+  .sidebar-well .side-row[aria-haspopup]:hover,
+  .sidebar-well .side-row[aria-haspopup][aria-expanded="true"] {
+    border-color: rgb(var(--edge));
+    background-color: rgb(var(--surface-2));
   }
   /* The active route: a raised pill with a faint accent wash and a glowing
      2px bar. The bar (accent, 3.9:1 on the dark pill, 5.7:1 on the light one)

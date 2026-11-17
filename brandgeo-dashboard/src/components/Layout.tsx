@@ -135,7 +135,7 @@ const LOCATIONS_WELL = 'mx-2 my-1.5 px-2 py-2.5 flex-shrink-0 sidebar-well'
 function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
   const { activeClient, isAdmin, activeBrandAccountKind } = useClient()
   const {
-    locations, limit, used, isMulti, status, refresh, selected, setSelected, canEdit, add, archive,
+    locations, limit, used, isMulti, status, selected, setSelected, canEdit, add, archive,
   } = useLocations()
   const [editing, setEditing] = useState(false)
   const [showAll, setShowAll] = useState(false)
@@ -259,15 +259,14 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
     )
   }
 
+  // A failed read falls back to the client's default location without an
+  // error line (clean-up pass 2026-11-17): the block is a view filter, and the
+  // default is what every page shows anyway.
   if (status === 'error' || locations.length === 0) {
     return (
       <div className={`${LOCATIONS_WELL} space-y-2`}>
         {header}
         {staticLine(activeClient?.default_market_id ?? 'WW', fallbackLabel)}
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-meta text-ink-3">Could not load locations.</span>
-          <button onClick={() => { void refresh() }} className="relative text-meta text-accent-ink hover:underline underline-offset-2 after:absolute after:content-[''] after:[inset:-14px_-6px] max-md:min-h-[44px]">Retry</button>
-        </div>
       </div>
     )
   }
@@ -1025,7 +1024,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Affiliate mode: the program's sections and its headline numbers */}
         {affiliateMode && (
-          <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto" aria-label="Affiliate program">
+          <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Affiliate program">
             <div>
               <div className="label-caps px-3 mb-1.5">Affiliate program</div>
               <div className="space-y-0.5">
@@ -1065,7 +1064,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Nav links — grouped into sections (Master-Redesign Phase 2) */}
         {!affiliateMode && (
-        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto" aria-label="Primary">
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Primary">
           {navGroups.map(group => (
             <div key={group.label}>
               <div className="label-caps px-3 mb-1.5">

@@ -116,12 +116,12 @@ const FIX_PRIORITY_LABEL: Record<'P0' | 'P1' | 'P2', string> = {
 // chip for every category; the label text still identifies which one it is.
 const getCatColor = (_cat: string) => 'bg-surface-2 text-ink-2'
 
-// Engine card LED lamp colour per status badge tone (tactile layer, 2026-11-16).
-const LED_TONE: Record<'pos' | 'warn' | 'neg' | 'neutral', string> = {
-  pos: 'text-pos',
-  warn: 'text-warn',
-  neg: 'text-neg',
-  neutral: 'text-neu',
+// Short names for the compact engine cards, so a seven-column row never cuts
+// a name to "Google A...". The full name stays in the title and for screen
+// readers. Every other engine shows its ENGINE_META label.
+const ENGINE_SHORT_LABEL: Partial<Record<EngineId, string>> = {
+  google_ai: 'AI Mode',
+  ai_overview: 'AI Overviews',
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1933,21 +1933,26 @@ export default function AIVisibility() {
           bought (how often collection runs, how many prompts are in use);
           admins keep the euro meter, because for them it IS the operative
           number, and it is the one that actually blocks a run in _auth.js.
-          Glass layer 2026-11-15: the admin euro meter now sits in the score card
-          header as a pill (same gate), so for an admin this row is empty and is
-          not rendered at all. The one exception is a client with no prompts,
-          where the hero is an empty state with no header: the admin meter keeps
-          its old place there. */}
-      {!isDemoMode && isAdmin && prompts.length === 0 && collectionAllowance.budgetCapEur > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <AllowanceMeter
-            label="Monthly API budget"
-            used={collectionAllowance.budgetSpentEur}
-            cap={collectionAllowance.budgetCapEur}
-            format={n => `€${n.toFixed(2)}`}
-          />
-        </div>
-      )}
+          Clean-up pass 2026-11-17: the admin euro meter is one compact line
+          under the page header again (it had moved into the score card as a
+          pill, where label and value ran together). Same gate: admins only,
+          never in demo. */}
+      {!isDemoMode && isAdmin && collectionAllowance.budgetCapEur > 0 && (() => {
+        const used = collectionAllowance.budgetSpentEur
+        const cap = collectionAllowance.budgetCapEur
+        const pct = Math.min(100, Math.round((used / cap) * 100))
+        const barColor = pct >= 100 ? 'bg-neg' : pct >= 85 ? 'bg-warn' : 'bg-accent'
+        const valueColor = pct >= 100 ? 'text-neg' : pct >= 85 ? 'text-warn' : 'text-ink-2'
+        return (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-meta text-ink-3" data-aiv-budget>
+            <span>Monthly API budget:</span>
+            <span className={`font-mono font-medium tabular-nums ${valueColor}`}>{`€${used.toFixed(2)} of €${cap.toFixed(2)}`}</span>
+            <span className="w-24 h-1.5 rounded-full bg-surface-3 overflow-hidden" aria-hidden="true">
+              <span className={`block h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+            </span>
+          </div>
+        )
+      })()}
       {!isDemoMode && !isAdmin && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {collectionAllowance.nextAvailableAt && (
@@ -2042,33 +2047,21 @@ export default function AIVisibility() {
                   </span>
                 </span>
               </span>
-              {/* The euro budget is our cost of goods: admins only, never in
-                  demo, exactly the gate the allowance row used before it moved
-                  here (2026-07-29 split by audience). AllowanceMeter itself is
-                  unchanged; the pill is only its frame. */}
-              {isAdmin && !isDemoMode && collectionAllowance.budgetCapEur > 0 && (
-                <div className="recessed-well rounded-full ml-auto px-3 py-1.5 tabular-nums" data-aiv-budget>
-                  <AllowanceMeter
-                    label="Monthly API budget"
-                    used={collectionAllowance.budgetSpentEur}
-                    cap={collectionAllowance.budgetCapEur}
-                    format={n => `€${n.toFixed(2)}`}
-                  />
-                </div>
-              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+            {/* Flat on the card surface: no tile, border or inset around a row
+                (clean-up pass 2026-11-17). */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4">
               {dimConfig.map(d => {
                 const notApplicable = zeroMention && NEEDS_MENTION_DIMS.includes(d.key)
                 const barValue = totalChecked === 0 || notApplicable ? null : Math.max(0, Math.min(100, d.value))
                 return (
-                  <div key={d.key} className="glass-tile px-3 py-1.5">
-                    <div className="flex justify-between items-center gap-2 mb-1">
+                  <div key={d.key}>
+                    <div className="flex justify-between items-baseline gap-2 mb-1.5">
                       <div className="min-w-0">
                         <span className="text-body font-medium text-ink">{d.label}</span>
                         {notApplicable
-                          ? <span className="ml-2 text-meta text-ink-2">{AIV_COPY.dimNeedsMention}</span>
-                          : <span className="ml-2 text-meta text-ink-3">{d.desc}</span>}
+                          ? <span className="ml-1.5 text-meta text-ink-2">{AIV_COPY.dimNeedsMention}</span>
+                          : <span className="ml-1.5 text-meta text-ink-3">{d.desc}</span>}
                       </div>
                       {/* No 0% when nothing has been checked: a zero would read as a
                           measured failing grade, not "we have not looked" (§11 rule 1). */}
@@ -2077,20 +2070,20 @@ export default function AIVisibility() {
                       ) : notApplicable ? (
                         <span className="shrink-0 text-body text-ink-2">{AIV_COPY.dimNotApplicable}</span>
                       ) : (
-                        <span className="shrink-0 text-body font-semibold text-ink tabular-nums">{d.value}%</span>
+                        <span className="shrink-0 text-body font-mono font-semibold text-ink tabular-nums">{d.value}%</span>
                       )}
                     </div>
                     {/* Same semantics as Meter (progressbar only when there is a
-                        value), drawn as a luminous fill in a recessed channel. */}
+                        value): a thin track and a flat accent fill. */}
                     <div
-                      className="recessed-channel h-2"
+                      className="h-1.5 rounded-full bg-surface-3 overflow-hidden"
                       role={barValue === null ? undefined : 'progressbar'}
                       aria-valuemin={barValue === null ? undefined : 0}
                       aria-valuemax={barValue === null ? undefined : 100}
                       aria-valuenow={barValue === null ? undefined : Math.round(barValue)}
                       aria-label={d.label}
                     >
-                      {barValue !== null && <div className="glow-bar-fill" style={{ width: `${barValue}%` }} />}
+                      {barValue !== null && <div className="h-full rounded-full bg-accent transition-[width] duration-[260ms] ease-out motion-reduce:transition-none" style={{ width: `${barValue}%` }} />}
                     </div>
                   </div>
                 )
@@ -2113,12 +2106,11 @@ export default function AIVisibility() {
             )}
           </div>
           {(engineStatusCards.length > 0 || lockedStripEngines.length > 0) && (
-            // One row of glass cards on every viewport, scrolling sideways when
-            // it does not fit (density ruling 2026-11-10: a two-column grid on a
-            // phone is four rows of engines above the prompts). The vertical
-            // padding gives the hover lift and glow room inside the scroller;
-            // the negative margins give that room back to the layout.
-            <div className="-mx-1 -my-2 px-1 py-2 flex gap-3 overflow-x-auto snap-x snap-mandatory lg:snap-none" data-engine-rail>
+            // A grid, never a sideways scroller (clean-up pass 2026-11-17, the
+            // owner's brief, replacing the 2026-11-10 one-row ruling): two
+            // columns on a phone, four from sm, all seven in one row from xl
+            // (1280), where each card is about 130 px wide.
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5" data-engine-rail>
                 {engineStatusCards.map((e, cardIndex) => {
                   const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
                     ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
@@ -2153,27 +2145,25 @@ export default function AIVisibility() {
                       ? 'Not measured yet · run a collection to check this engine'
                       : `${e.mentioned} of ${e.checked} prompts${e.bestPos !== null ? `, best #${e.bestPos}` : ''}`
                   const ratePct = isMeasured ? Math.max(0, Math.min(100, e.pct)) : null
+                  const shortLabel = ENGINE_SHORT_LABEL[e.id as EngineId] ?? e.label
+                  const lastOkTitle = e.lastOkAt && !e.isUnavailable
+                    ? `. Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`
+                    : ''
                   return (
                     <motion.div
                       key={e.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: MOTION_BASE, ease: EASE_OUT, delay: 0.08 + cardIndex * 0.04 }}
-                      // Never under 164px (172px from sm): the longest status
-                      // badge ("Sometimes named", 136px) needs that inner width,
-                      // including on 320 to 375px phones where 46% is too narrow.
-                      className="flex min-w-[max(46%,164px)] sm:min-w-[172px] lg:max-w-[280px] flex-[2_1_0%] snap-start"
+                      className="min-w-0 flex"
                     >
-                      {/* The glass sits on an inner box: motion writes an inline
-                          transform on its own element, which would cancel the CSS
-                          hover lift. A status card is not a link, so it lifts
-                          without the accent glow (glass-card-lift). */}
-                      <div className="glass-card glass-lite glass-card-lift group flex flex-col gap-1.5 w-full p-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="recessed-squircle w-8 h-8">
-                          <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-4 h-4 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                      <div className="group w-full min-w-0 min-h-[148px] p-3.5 xl:px-3 rounded-xl bg-surface border border-line hover:border-edge transition-colors flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-4 h-4 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        <span className="text-meta font-semibold text-ink truncate" title={e.label}>
+                          <span aria-hidden="true">{shortLabel}</span>
+                          <span className="sr-only">{e.label}</span>
                         </span>
-                        <span className="text-body font-semibold text-ink truncate" title={e.label}>{e.label}</span>
                         {isAdmin && (
                           // Shows on hover or keyboard focus; always shown where
                           // there is no hover (touch) and while it is running.
@@ -2189,30 +2179,32 @@ export default function AIVisibility() {
                         )}
                       </div>
 
-                      {/* Wraps on a narrow card: the badge drops under the
-                          percentage instead of spilling past the card edge. */}
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-[28px]">
-                        {/* Optical lamp beside the reading. Decoration only: the
-                            badge carries the words and the glyph. */}
-                        <span aria-hidden="true" className={`led-dot ${LED_TONE[statusBadge.tone]}`} />
+                      {/* The reading, then its status badge underneath. The badge
+                          may wrap to two lines inside a narrow seven-column card
+                          ("Sometimes named" is wider than the card at 1280). */}
+                      <div className="mt-2 flex flex-col items-start gap-1.5">
                         {isMeasured && (
-                          <span className="text-title-sm text-ink tabular-nums leading-none">{e.pct}%</span>
+                          <span className="text-title font-mono text-ink tabular-nums leading-none">{e.pct}%</span>
                         )}
                         <Badge
                           tone={statusBadge.tone}
                           glyph={statusKind ? <StatusGlyph kind={statusKind} size={12} /> : undefined}
-                          className="ml-auto shrink-0"
+                          className="max-w-full !h-auto min-h-[20px] py-0.5 !whitespace-normal leading-tight"
                         >
                           {statusBadge.label}
                         </Badge>
                       </div>
 
-                      <div className="text-meta text-ink-2 line-clamp-2 sm:line-clamp-none sm:truncate" title={metaText}>{metaText}</div>
+                      <div className="mt-2 h-1 w-full rounded-full bg-surface-3 overflow-hidden" aria-hidden="true">
+                        {ratePct !== null && ratePct > 0 && <div className="h-full rounded-full bg-accent" style={{ width: `${ratePct}%` }} />}
+                      </div>
+
+                      <div className="mt-2 text-meta text-ink-3 truncate" title={`${metaText}${lastOkTitle}`}>{metaText}</div>
 
                       {warnSentence !== null && (
-                        <div className="flex items-start gap-1 text-meta text-warn" title={warnTitle}>
-                          <AlertTriangle size={12} aria-hidden="true" className="shrink-0 mt-0.5" />
-                          <span className="line-clamp-2 min-w-0">{warnSentence}</span>
+                        <div className="flex items-center gap-1 text-meta text-warn min-w-0" title={warnTitle}>
+                          <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
+                          <span className="truncate min-w-0">{warnSentence}</span>
                         </div>
                       )}
 
@@ -2231,29 +2223,12 @@ export default function AIVisibility() {
                           </div>
                         )
                       })()}
-
-                      <div className="mt-auto flex flex-col gap-1.5">
-                        {e.lastOkAt && !e.isUnavailable && (
-                          <div
-                            className="text-meta text-ink-3 tabular-nums truncate"
-                            title={`Last successful check: ${new Date(e.lastOkAt).toLocaleString()}`}
-                          >
-                            {formatRelativeOrDate(e.lastOkAt)}
-                          </div>
-                        )}
-                        {/* Mention rate as a sunken groove across the foot of the
-                            card: the number above is the reading, this is its
-                            trace, so it carries no role. */}
-                        <div className="recessed-channel h-1.5" aria-hidden="true">
-                          {ratePct !== null && ratePct > 0 && <div className="glow-bar-fill" style={{ width: `${ratePct}%` }} />}
-                        </div>
-                      </div>
                       </div>
                     </motion.div>
                   )
                 })}
-                {/* Locked engines: compact glass cards on the same row, each one
-                    a link to the plan page. */}
+                {/* Locked engines: cells of the same grid, each one a link to
+                    the plan page. */}
                 {lockedStripEngines.map((id, lockedIndex) => {
                   const meta      = ENGINE_META[id]
                   const planLabel = PLAN_LABELS[ENGINE_UNLOCK_PLAN[id]]
@@ -2263,19 +2238,17 @@ export default function AIVisibility() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: MOTION_BASE, ease: EASE_OUT, delay: 0.08 + (engineStatusCards.length + lockedIndex) * 0.04 }}
-                      className="flex min-w-[124px] lg:min-w-[96px] lg:max-w-[168px] flex-1 basis-0 snap-start"
+                      className="min-w-0 flex"
                     >
                       <Link
                         to="/account"
                         aria-label={lockedHeaderLabel(meta.label, planLabel)}
                         title={`${meta.label} is available on the ${planLabel} plan and above`}
-                        className="glass-card glass-lite glass-card-interactive group flex flex-col justify-center gap-1 w-full p-3 lg:px-2 xl:px-3"
+                        className="group w-full min-w-0 min-h-[148px] p-3.5 xl:px-3 rounded-xl bg-surface-2 border border-line hover:border-edge transition-colors flex flex-col justify-between gap-2"
                       >
-                        <span className="flex items-center gap-2 min-w-0 lg:flex-col lg:items-start lg:gap-1 xl:flex-row xl:items-center xl:gap-2">
-                          <span className="recessed-squircle w-6 h-6">
-                            <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-3.5 h-3.5 object-contain grayscale opacity-70" />
-                          </span>
-                          <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate lg:whitespace-normal lg:leading-tight xl:whitespace-nowrap">{meta.label}</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <img src={meta.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 shrink-0 object-contain grayscale opacity-70" />
+                          <span className="text-meta font-semibold text-ink-2 group-hover:text-ink truncate">{ENGINE_SHORT_LABEL[id] ?? meta.label}</span>
                         </span>
                         {/* Wraps at every width so the plan name is never cut off;
                             the row of cards is as tall as the status cards anyway. */}
