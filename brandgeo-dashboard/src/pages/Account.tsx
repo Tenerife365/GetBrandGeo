@@ -863,7 +863,10 @@ export default function Account() {
         clientId={activeClientId}
         plan={activeClient?.plan ?? 'free'}
         isAdmin={isAdmin}
-        onUpgrade={selfServeBilling ? () => upgradeTo({ id: featureUnlockPlan('mcp_access') ?? 'radar', label: PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar'] }) : undefined}
+        onUpgrade={selfServeBilling
+          ? () => upgradeTo({ id: featureUnlockPlan('mcp_access') ?? 'radar', label: PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar'] })
+          // Agency and other non-direct brands never reach checkout: email us instead.
+          : () => { window.location.href = `mailto:support@getbrandgeo.com?subject=${encodeURIComponent(`Plan change: ${PLAN_LABELS[featureUnlockPlan('mcp_access') ?? 'radar']}`)}` }}
       />
 
       {/* Manage plan (admin) */}
