@@ -528,6 +528,7 @@
       color: var(--t);
     }
     .hero-sub { font-size: var(--l); color: var(--t2); line-height: 1.6; max-width: 44ch; margin-bottom: 24px; }
+    .hero-cap { margin-top: 10px; font-family: var(--mono); font-size: var(--m); color: var(--t2); line-height: 1.5; }
     .hero-trust { margin-top: 14px; display: flex; gap: 6px 10px; flex-wrap: wrap; font-size: var(--da); color: var(--t2); align-items: center; }
     .hero-trust .ht-item { display: inline-flex; align-items: center; gap: 10px; }
     .hero-trust .ht-item:not(:last-child)::after { content: '\2022'; color: var(--t3); }
@@ -1553,6 +1554,14 @@
           <button class="search-btn" id="auditBtn">Check my visibility &rarr;</button>
         </div>
       </div>
+      <!-- Capability line, verified against code 2026-11-17. The free check is
+           SCREENING_ENGINES (gemini, perplexity) in _prospect_engines.js, forced
+           for public callers at audit-domain.js:74. ChatGPT, Claude, Grok and
+           Google AI come from PLAN_ENGINES in planConfig.ts (Grok and AI
+           Overviews Growth PRO up). The JSON-LD audit is _seo_crawl.js signals
+           (parse check, schema types, FAQPage), Radar up per FEATURE_MIN_PLAN.
+           Nothing in the product reads or writes llms.txt; do not claim it. -->
+      <p class="hero-cap">Asks live AI engines, not just your HTML. Free check: Gemini and Perplexity. Plans add ChatGPT, Claude, Grok, Google AI and a JSON-LD schema audit.</p>
       <div class="audit-status" id="auditStatus" aria-live="polite"></div>
       <div class="hero-trust">
         <span class="ht-item">Free instant check</span>
@@ -1904,7 +1913,12 @@
           <span class="frame-label">Gap</span>
         </div>
         <h3>Your gaps, ranked by impact</h3>
-        <p class="cs-p">P0, P1 and P2 actions, ordered by what moves the score most, each with a copy-paste implementation.</p>
+        <!-- Verified 2026-11-17 in src/lib/fixItems.ts: the P0 engine fixes name
+             schema.org/Organization structured data, the P1 engine fixes name FAQ
+             schema markup, and every fix copies out through buildFixPrompt
+             (fixPrompt.ts), on every plan. The product writes no code blocks
+             and no llms.txt; do not promise either. -->
+        <p class="cs-p">P0, P1 and P2 actions, ordered by what moves the score most. Engine fixes name the structured data to add, Organization and FAQPage JSON-LD, and every fix copies out as a ready prompt for your AI tool.</p>
         <div class="fix-row p0">
           <span class="fix-badge p0">P0</span>
           <div>
@@ -2030,6 +2044,7 @@
           <li>1 project &middot; 5 buyer prompts</li>
           <li>Gemini visibility</li>
           <li>Monthly refresh + dashboard</li>
+          <li>Ranked fixes &middot; each copies as an AI prompt</li>
         </ul>
       </div>
 
@@ -2048,9 +2063,9 @@
         <div class="plan-features-label">Everything in Free, plus</div>
         <ul class="pricing-features">
           <li>1 project &middot; 7 buyer prompts</li>
-          <li>Gemini &amp; Claude</li>
+          <li>Gemini &amp; Claude, live answers</li>
           <li>Weekly refresh + dashboard</li>
-          <li>Site audit &middot; homepage, up to weekly</li>
+          <li>Homepage audit, up to weekly &middot; JSON-LD schema + AI citability score</li>
         </ul>
         <a href="/news/radar-plan-launch/" class="plan-news-link">Read the launch announcement &rarr;</a>
       </div>
@@ -2185,17 +2200,24 @@
       <span>Free audit first</span>
     </div>
 
-    <!-- Engines-per-euro comparison (spec 2.8, research move 10). Build gate
-         passed: Profound's public pricing page re-verified first-party on
-         2026-08-07 (Starter USD 99/mo billed yearly, "ChatGPT tracking only").
-         If their page changes, update or drop this block; never approximate. -->
+    <!-- What the entry price buys (spec 2.8, research move 10).
+         PROFOUND ROW DROPPED 2026-11-17: their first-party pricing page
+         (tryprofound.com/pricing, read 2026-11-17) says the Starter and Growth
+         plans were retired in September 2026 and are no longer sold, so the
+         "USD 99/mo, ChatGPT only" row verified on 2026-08-07 had become false.
+         Only re-add a vendor row after a fresh first-party read; never
+         approximate. BrandGEO rows: PLAN_ENGINES and PLAN_PROMPTS in
+         planConfig.ts (radar gemini+claude, 7; essentials chatgpt+gemini+claude,
+         18). The last row describes a category, names no company and claims
+         only what the category is by definition. -->
     <div class="frame price-compare">
       <div class="frame-head">
-        <span class="frame-label">Entry price per engine &middot; checked 2026-08-07</span>
+        <span class="frame-label">What the entry price buys</span>
       </div>
-      <div class="pcr"><span class="pc-vendor">BrandGEO Essentials</span><span>EUR 99/mo &middot; 3 engines</span></div>
-      <div class="pcr"><span class="pc-vendor">Profound entry</span><span>USD 99/mo &middot; 1 engine (ChatGPT only)</span></div>
-      <p class="pc-note">Profound public pricing as of 2026-08-07, USD 99/mo on yearly billing. Currencies as published by each vendor, not converted.</p>
+      <div class="pcr"><span class="pc-vendor">BrandGEO Radar</span><span>EUR 29/mo &middot; 2 engines &middot; 7 prompts</span></div>
+      <div class="pcr"><span class="pc-vendor">BrandGEO Essentials</span><span>EUR 99/mo &middot; 3 engines &middot; 18 prompts</span></div>
+      <div class="pcr"><span class="pc-vendor">Static AI crawler tools</span><span>HTML and schema check only &middot; 0 engines asked</span></div>
+      <p class="pc-note">Every paid BrandGEO plan asks the AI engines your buyers use, live, every week. A static checker reads your HTML and never asks an engine anything.</p>
     </div>
 
     <div class="fallback">
