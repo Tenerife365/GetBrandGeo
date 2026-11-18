@@ -21,3 +21,4 @@ One line per published article, newest last.
 - 2026-11-15 BG-122 https://getbrandgeo.com/bg-122.html Google Must Show AI Clicks to UK Publishers by December 3. What Search Console Shows You Today
 - 2026-11-16 BG-123 https://getbrandgeo.com/bg-123.html What Each AI Engine Tells a Buyer About a Local Firm: A Scorecard From Our Eight Studies
 - 2026-11-17 BG-124 https://getbrandgeo.com/bg-124.html AI Visibility in Las Vegas: Engines Agree on Gaming Lawyers, Not on Event Planners
+- 2026-11-18 BG-125 https://getbrandgeo.com/bg-125.html Can a Business Game an AI Recommendation? What an EMNLP 2026 Study Measured
