@@ -165,7 +165,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 34 | draft-search-console-ai | published bg-122 2026-11-15 | What Search Console's AI report shows today, before the UK deadline of 3 December |
 | 35 | draft-engine-scorecard | published bg-123 2026-11-16 | What each engine tells a buyer about a local firm, from BG-106 to BG-113 |
 | 36 | draft-safegeo | published bg-125 2026-11-18 | What the SafeGEO paper at EMNLP 2026 measured about gaming AI recommendations |
-| 37 | draft-consumers-ask-ai | ready from 2026-11-19 (draft, rule 5) | 45% of US consumers ask AI for a local business, and almost all double check |
+| 37 | draft-consumers-ask-ai | published bg-126 2026-11-19 | 45% of US consumers ask AI for a local business, and almost all double check |
 | 38 | draft-soci-index | dropped 2026-11-06: SOCi's own release gives only ChatGPT 1.2% and the 35.9% local 3-pack figure, with no definition of a recommendation; the Gemini 11% and Perplexity 7.4% rates could not be read at source (report PDF unreadable, Search Engine Land refused the request) | SOCi's 2026 Local Visibility Index next to our city data |
 | 39 | draft-tool-agents | ready from 2026-11-22 (draft, rule 5) | What the agent features in Peec, Scrunch and Profound say they do |
 | 40 | draft-geo-survey | ready from 2026-11-23 (draft, rule 5) | What a 2026 survey of 45 GEO studies finds well supported, and what thin |
