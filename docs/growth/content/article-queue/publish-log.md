@@ -23,3 +23,4 @@ One line per published article, newest last.
 - 2026-11-17 BG-124 https://getbrandgeo.com/bg-124.html AI Visibility in Las Vegas: Engines Agree on Gaming Lawyers, Not on Event Planners
 - 2026-11-18 BG-125 https://getbrandgeo.com/bg-125.html Can a Business Game an AI Recommendation? What an EMNLP 2026 Study Measured
 - 2026-11-19 BG-126 https://getbrandgeo.com/bg-126.html 45% of US Consumers Ask AI for a Local Business. Almost All of Them Double Check
+- 2026-11-20 BG-127 https://getbrandgeo.com/bg-127.html AI Visibility in Orlando: Six Questions, Three Engines, Six Firms in Common
