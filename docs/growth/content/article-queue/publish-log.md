@@ -25,3 +25,4 @@ One line per published article, newest last.
 - 2026-11-19 BG-126 https://getbrandgeo.com/bg-126.html 45% of US Consumers Ask AI for a Local Business. Almost All of Them Double Check
 - 2026-11-20 BG-127 https://getbrandgeo.com/bg-127.html AI Visibility in Orlando: Six Questions, Three Engines, Six Firms in Common
 - 2026-11-21 BG-128 https://getbrandgeo.com/bg-128.html Which Languages a Firm Speaks: How Often AI Engines Say It in Immigration Answers
+- 2026-11-22 BG-129 https://getbrandgeo.com/bg-129.html From Tracking to Acting: What the Agent Features in AI Visibility Tools Say They Do
