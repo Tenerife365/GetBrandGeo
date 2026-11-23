@@ -26,3 +26,4 @@ One line per published article, newest last.
 - 2026-11-20 BG-127 https://getbrandgeo.com/bg-127.html AI Visibility in Orlando: Six Questions, Three Engines, Six Firms in Common
 - 2026-11-21 BG-128 https://getbrandgeo.com/bg-128.html Which Languages a Firm Speaks: How Often AI Engines Say It in Immigration Answers
 - 2026-11-22 BG-129 https://getbrandgeo.com/bg-129.html From Tracking to Acting: What the Agent Features in AI Visibility Tools Say They Do
+- 2026-11-23 BG-130 https://getbrandgeo.com/bg-130.html What 45 GEO Studies Agree On, and Where the Evidence Is Thin
