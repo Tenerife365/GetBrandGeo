@@ -10,14 +10,14 @@
 export const AIV_COPY = {
   // Headline
   headlineChecking: 'Checking your prompts now.',
-  headlineUncheckedTitle: 'No engine has a current answer to show.',
+  headlineUncheckedTitle: 'No results to show yet.',
   headlineFirstCheckPending: 'Your first check has not run yet.',
   orderFrozenNote: 'Prompts keep this order until the check finishes.',
 
   // Sections
   sectionAppear: 'Where you appear',
   sectionNotYet: 'Where you do not appear yet',
-  sectionUnchecked: 'Could not be checked',
+  sectionUnchecked: 'No result yet',
 
   // Sort
   sortLabel: 'Sort',
@@ -29,7 +29,8 @@ export const AIV_COPY = {
 
   // Row chips
   chipNoAnswer: 'no answer',
-  chipPending: 'not checked yet',
+  chipPending: 'no result yet',
+  chipStale: 'pending update',
 
   // Competitor block
   competitorHeading: 'Brands the engines named for this question',
@@ -44,19 +45,24 @@ export const AIV_COPY = {
   cellAbsent: 'absent',
   cellNoAnswer: 'no answer',
   cellError: 'error',
-  cellPending: 'pending',
+  cellPending: 'no result',
 
   // Legend
   legendMentioned: 'Mentioned, with rank',
   legendAbsent: 'Answered, not mentioned',
   legendNoAnswer: 'No answer',
-  legendError: 'Could not check',
-  legendPending: 'Not checked yet',
+  legendPending: 'No result yet',
+  legendStale: 'Pending update, last result shown',
   legendLocked: 'Locked on your plan',
   viewerHint: 'Run Collection checks the prompts and engines that have no result yet this month.',
 
-  // Engine card
-  engineNotAnswering: 'NOT ANSWERING',
+  // Engine card. An engine whose last check failed is never shown as an
+  // error to a viewer: the card keeps its last results and carries a quiet
+  // "Pending update" control, or reads "No result yet" when there is none.
+  // Never name credits, quota, billing or costs here.
+  engineNoResult: 'No result yet',
+  stalePill: 'Pending update',
+  staleRetry: 'We will retry automatically.',
 
   // Fix This
   fixAllMissingTitle: 'Not yet recommended on any engine',
@@ -99,25 +105,16 @@ export function headlineNotYet(n: number, k: number): string {
   return `${first} The engines named ${k} other ${plural(k, 'brand', 'brands')} in their answers.`
 }
 
-/** H3 reason line */
-export function headlineUncheckedReason(engineList: string | null, since: string | null, engineCount: number): string {
+/** H3 reason line. Neutral on purpose: a failed engine run is never shown to a viewer as an error. */
+export function headlineUncheckedReason(engineList: string | null): string {
   if (!engineList) return AIV_COPY.headlineFirstCheckPending
-  const verb = engineCount === 1 ? 'has' : 'have'
-  return since ? `${engineList} ${verb} not answered since ${since}.` : `${engineList} ${verb} not answered.`
+  return `${engineList} did not respond on the last check. ${AIV_COPY.staleRetry}`
 }
 
 /** "ChatGPT", "ChatGPT and Gemini", "ChatGPT, Gemini and Claude" */
 export function joinEngineLabels(labels: string[]): string {
   if (labels.length <= 1) return labels[0] ?? ''
   return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
-}
-
-export function sectionUncheckedExtra(oldestFailure: string): string {
-  return `first failed ${oldestFailure}`
-}
-
-export function errorSinceChip(since: string): string {
-  return `not answering since ${since}`
 }
 
 export function ratioNoneChip(answered: number): string {
@@ -142,7 +139,7 @@ export function cellErrorLabel(engine: string, since: string | null, previousOk:
   const base = since ? `${engine} has not answered since ${since}` : `${engine} has not answered`
   return previousOk ? `${base}, last result ${previousOk}` : base
 }
-export function cellPendingLabel(engine: string): string { return `${engine}: not checked yet` }
+export function cellPendingLabel(engine: string): string { return `${engine}: no result yet` }
 export function cellSinceLine(since: string): string { return `since ${since}` }
 
 // Locked engine controls (matrix header and engine strip card). The name starts
@@ -152,14 +149,28 @@ export function lockedHeaderLabel(engine: string, plan: string): string {
   return `Upgrade to ${plan} for ${engine}`
 }
 
-// Engine card failure lines (R4)
-export function engineNotAnsweringLine(code: string | null | undefined, since: string): string {
-  if (code === 'quota_exceeded') return `Not answering since ${since} (provider limit reached)`
-  if (code === 'auth_error') return `Not answering since ${since} (access problem)`
-  return `Last check failed on ${since}`
+// Pending update explainers (engine card popover, matrix cell, expanded panel).
+// The viewer never sees why a run failed; an admin sees the raw code separately.
+export function staleExplainer(date: string): string {
+  return `Showing the result from ${date}. This engine did not respond on the last check; we will retry automatically.`
 }
-export function enginePartialLine(date: string): string {
-  return `Some checks failed on ${date}`
+export function staleNoResultExplainer(): string {
+  return `This engine did not respond on the last check, so there is no result to show yet. ${AIV_COPY.staleRetry}`
+}
+/** Engine card popover when only some prompts missed the last check. */
+export function stalePartialExplainer(count: number, date: string | null): string {
+  const what = `${count} ${plural(count, 'prompt shows its', 'prompts show their')} last result`
+  return date
+    ? `${what} because this engine did not respond on the check of ${date}. ${AIV_COPY.staleRetry}`
+    : `${what} because this engine did not respond on the last check. ${AIV_COPY.staleRetry}`
+}
+/** Screen reader suffix on a matrix cell that shows an earlier result. */
+export function staleCellLabel(date: string): string {
+  return `result from ${date}, pending update`
+}
+/** Admin only, never in demo. */
+export function staleAdminCode(code: string): string {
+  return `Admin: last error code ${code}`
 }
 
 // Fix This
@@ -182,10 +193,6 @@ export function fixAllMissingLine(brand: string, checked: number, engines: numbe
 export function fixAllLowLine(brand: string, mentioned: number, checked: number, engines: number): string {
   return `${brand} appears in ${mentioned} of ${checked} ${plural(checked, 'answer', 'answers')} across ${engines} ${plural(engines, 'engine', 'engines')}`
 }
-
-// Expanded panel, error cell
-export function panelNotAnswering(since: string): string { return `Not answering since ${since}` }
-export function panelLastResult(date: string): string { return `Last result, ${date}:` }
 
 // Fix This: done, re-check and next fixes (docs/arch/fix-states.md)
 export const FIX_COPY = {

@@ -37,23 +37,40 @@ export interface PerfRow {
   error_code?: string | null
 }
 
-/** `locked` is never produced from data; it exists for the UI to render. */
+/**
+ * `locked` is never produced from data; it exists for the UI to render.
+ * `error` is kept for type compatibility but is no longer produced either: a
+ * failed newest attempt shows the last good result instead (see `stale`).
+ */
 export type CellState = 'mentioned' | 'absent' | 'no_answer' | 'error' | 'pending' | 'locked'
 
 export interface CellView {
   state: CellState
   /** Rank in the engine's list when the brand was mentioned, else null. */
   position: number | null
-  /** The newest row for this prompt and engine, whatever its status. */
+  /**
+   * The row the cell shows: the newest ok row. When the newest attempt failed
+   * this is the last good row before the failures, or null when none exists.
+   */
   current: PerfRow | null
   /**
-   * For an error cell: checked_at of the OLDEST row in the unbroken run of
+   * For a stale cell: checked_at of the OLDEST row in the unbroken run of
    * error rows that starts at the newest row. That is when it stopped working,
    * not when we last tried.
    */
   errorSince: string | null
-  /** For an error cell: the first ok row after that run, or null. */
+  /** For a stale cell: the first ok row after that run, or null. */
   previousOk: PerfRow | null
+  /**
+   * True when the newest attempt for this prompt and engine failed. The cell
+   * then shows `previousOk` (or a neutral pending state when there is none),
+   * never the failure as if it were the answer.
+   */
+  stale?: boolean
+  /** For a stale cell: checked_at of the newest failed attempt. */
+  failedAt?: string | null
+  /** For a stale cell: error_code of the newest failed attempt. Admin only. */
+  errorCode?: string | null
 }
 
 export type SectionKey = 'appear' | 'notYet' | 'unchecked'
@@ -145,10 +162,11 @@ function errorRun(newestFirst: PerfRow[]): { since: string | null; previousOk: P
 /**
  * One CellView per prompt and active engine.
  *
- * `current` is the newest row whatever its status, which is what the user
- * should see: an engine that stopped answering last week must not keep showing
- * last month's green tick. The page's existing newest-OK `resultMap` is
- * untouched and still feeds the score, so the score does not swing in an outage.
+ * When the newest attempt failed, the cell shows the last good result for that
+ * prompt and engine, marked `stale` with the failure date, so a failed run never
+ * reads as the answer and never lowers the client's numbers. With no good result
+ * at all the cell is a neutral `pending`, also marked `stale`. The score keeps
+ * reading the newest ok rows through `resultMap`, the same rows shown here.
  *
  * `promptIds`, when given, guarantees an entry (all pending) for prompts that
  * have no rows at all.
@@ -184,13 +202,27 @@ export function buildCellViews(
         cells.set(engine, { state: 'pending', position: null, current: null, errorSince: null, previousOk: null })
         continue
       }
-      const current = list[0]
-      if (isError(current)) {
+      const newest = list[0]
+      if (isError(newest)) {
         const run = errorRun(list)
-        cells.set(engine, {
-          state: 'error', position: null, current, errorSince: run.since, previousOk: run.previousOk,
-        })
-      } else if (isNoAnswerRow(current)) {
+        const shown = run.previousOk
+        const staleFields = {
+          errorSince: run.since, previousOk: shown, stale: true as const,
+          failedAt: newest.checked_at ?? null, errorCode: newest.error_code ?? null,
+        }
+        if (!shown) {
+          cells.set(engine, { state: 'pending', position: null, current: null, ...staleFields })
+        } else if (isNoAnswerRow(shown)) {
+          cells.set(engine, { state: 'no_answer', position: null, current: shown, ...staleFields })
+        } else if (shown.brand_mentioned) {
+          cells.set(engine, { state: 'mentioned', position: shown.brand_position ?? null, current: shown, ...staleFields })
+        } else {
+          cells.set(engine, { state: 'absent', position: null, current: shown, ...staleFields })
+        }
+        continue
+      }
+      const current = newest
+      if (isNoAnswerRow(current)) {
         cells.set(engine, { state: 'no_answer', position: null, current, errorSince: null, previousOk: null })
       } else if (current.brand_mentioned) {
         cells.set(engine, {
@@ -230,6 +262,10 @@ export function summarisePrompt(cells: Map<string, CellView>): PromptSummary {
   let oldestErrorSince: string | null = null
 
   cells.forEach(c => {
+    if (c.stale || c.state === 'error') {
+      errors++
+      if (c.errorSince && (oldestErrorSince == null || c.errorSince < oldestErrorSince)) oldestErrorSince = c.errorSince
+    }
     switch (c.state) {
       case 'mentioned':
         mentions++
@@ -237,14 +273,14 @@ export function summarisePrompt(cells: Map<string, CellView>): PromptSummary {
         break
       case 'absent': absent++; break
       case 'no_answer': noAnswers++; break
-      case 'error':
-        errors++
-        if (c.errorSince && (oldestErrorSince == null || c.errorSince < oldestErrorSince)) oldestErrorSince = c.errorSince
-        break
       case 'pending': pendings++; break
       default: break
     }
-    const at = c.current?.checked_at ?? null
+    // "Recently checked" follows the last attempt: a stale cell was checked at
+    // failedAt even though it still shows an earlier result.
+    const shownAt = c.current?.checked_at ?? null
+    const triedAt = c.stale ? (c.failedAt ?? null) : null
+    const at = triedAt && (!shownAt || triedAt > shownAt) ? triedAt : shownAt
     if (at && (lastCheckedAt == null || at > lastCheckedAt)) lastCheckedAt = at
   })
 
@@ -435,7 +471,7 @@ export function buildHeadline(
 
   cells.forEach(perPrompt => {
     perPrompt.forEach((c, engine) => {
-      if (c.state === 'error') {
+      if (c.stale || c.state === 'error') {
         errorEngineSet.add(engine)
         if (c.errorSince && (since == null || c.errorSince < since)) since = c.errorSince
       }

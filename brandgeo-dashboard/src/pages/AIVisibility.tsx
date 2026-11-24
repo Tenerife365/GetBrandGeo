@@ -56,9 +56,8 @@ import {
 } from '../lib/promptPerformance'
 import {
   AIV_COPY, promptCount, headlineRecommended, headlineNotYet, headlineUncheckedReason,
-  joinEngineLabels, sectionUncheckedExtra, errorSinceChip, ratioNoneChip, enginesNamed, namedByEngines,
-  lockedHeaderLabel, engineNotAnsweringLine, enginePartialLine,  
-  panelNotAnswering, panelLastResult,
+  joinEngineLabels, ratioNoneChip, enginesNamed, namedByEngines, lockedHeaderLabel,
+  staleExplainer, staleNoResultExplainer, stalePartialExplainer, staleCellLabel, staleAdminCode,
   FIX_COPY, fixDoneWaiting, fixDoneWaitingData, fixVerifiedLine, fixReopenedLine, fixDismissedLine,
   fixCheckNowWaiting, fixMarkedOn, fixMovedAnnouncement, fixByAgent, fixByApp,
 } from '../lib/aiVisibilityCopy'
@@ -327,7 +326,6 @@ const EMPTY_RESULTS: ResultMap = new Map()
 const EMPTY_ENGINE_SET = new Set<LLMName>()
 const EMPTY_HEALTH = new Map<LLMName, { lastAttemptAt: string | null; lastAttemptFailed: boolean; lastErrorCode: string | null; lastOkAt: string | null }>()
 const EMPTY_BY_ENGINE: Record<string, string> = {}
-const EMPTY_SINCE: Record<string, string | null> = {}
 const ZERO_SCORE = computeAiVisibilityScore([], new Map(), [])
 
 export default function AIVisibility() {
@@ -399,8 +397,6 @@ export default function AIVisibility() {
   const results: ResultMap = data?.results ?? EMPTY_RESULTS
   // Engine is "unavailable" only when it has errors AND zero ok results.
   const errorEngines = data?.errorEngines ?? EMPTY_ENGINE_SET
-  // Engines that had SOME failed checks but also some OK results (mixed case).
-  const partialErrorEngines = data?.partialErrorEngines ?? EMPTY_ENGINE_SET
   // Per-engine health: the most recent attempt whatever its outcome, and the
   // most recent success (see metrics.engineHealth).
   const engineHealth = data?.engineHealth ?? EMPTY_HEALTH
@@ -489,6 +485,33 @@ export default function AIVisibility() {
   // page. Cleared at the start of the next attempt on that same target.
   const [engineRefreshFailed, setEngineRefreshFailed] = useState<EngineId | null>(null)
   const [cellRefreshFailed, setCellRefreshFailed]     = useState<string | null>(null)  // `${promptId}:${engineId}`
+  // The engine card's quiet "Pending update" note: which card has its
+  // explainer open. Escape or a press outside closes it; Escape returns focus
+  // to the button that opened it.
+  const [stalePopover, setStalePopover] = useState<string | null>(null)
+  // Which edge of its card the explainer hangs from: a card in the right
+  // half of the window opens it leftwards, so it never adds a sideways scroll.
+  const [staleAlign, setStaleAlign] = useState<'left' | 'right'>('left')
+  useEffect(() => {
+    if (stalePopover === null) return
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      const btn = document.querySelector<HTMLButtonElement>(`[data-stale-btn="${stalePopover}"]`)
+      setStalePopover(null)
+      btn?.focus()
+    }
+    const onDown = (ev: PointerEvent) => {
+      const target = ev.target as Element | null
+      if (target?.closest(`[data-stale-pop="${stalePopover}"]`)) return
+      setStalePopover(null)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [stalePopover])
 
   // Active engines as a LLM-typed array (only engines with state === 'active')
   const activeLLMs = activeEngines.map(id => ({ id, ...ENGINE_META[id] }))
@@ -844,7 +867,15 @@ export default function AIVisibility() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [summaries, cellViews, results],
   )
-  const errorSinceByEngine = data?.errorSinceByEngine ?? EMPTY_SINCE
+  // Per engine, how many prompts show an earlier result because the newest
+  // check on that engine failed. Drives the engine card's "Pending update".
+  const staleCountByEngine = useMemo(() => {
+    const m = new Map<string, number>()
+    cellViews.forEach(cells => cells.forEach((c, engine) => {
+      if (c.stale) m.set(engine, (m.get(engine) ?? 0) + 1)
+    }))
+    return m
+  }, [cellViews])
   const newestErrorAtByEngine = data?.newestErrorAtByEngine ?? EMPTY_BY_ENGINE
 
   const lockedColumns = pickLockedColumns(engineStates)
@@ -1279,7 +1310,6 @@ export default function AIVisibility() {
   // Spec: docs/design/ai-visibility-prompt-focus-spec-2026-10-28.md section 5.
 
   const NEUTRAL_CHIP = 'inline-flex shrink-0 items-center rounded-full bg-surface-2 px-2 py-0.5 text-meta text-ink tabular-nums'
-  const AMBER_CHIP = 'inline-flex shrink-0 items-center rounded-full border border-warn bg-warn-tint px-2 py-0.5 text-meta text-warn'
   const SORT_LABEL: Record<SortMode, string> = {
     best: AIV_COPY.sortBest,
     needs_work: AIV_COPY.sortNeedsWork,
@@ -1311,7 +1341,7 @@ export default function AIVisibility() {
 
   const cellOf = (promptId: number, engineId: EngineId, variant: 'grid' | 'tile') => {
     const cv = cellViews.get(promptId)?.get(engineId)
-    return (
+    const cell = (
       <PromptResultCell
         state={cv?.state ?? 'pending'}
         engineId={engineId}
@@ -1320,6 +1350,19 @@ export default function AIVisibility() {
         previousOkAt={cv?.previousOk?.checked_at ?? null}
         variant={variant}
       />
+    )
+    // The engine missed its last check but an earlier result exists: the cell
+    // shows that earlier result with a small dot, never the failure. This
+    // cell sits inside the row's own button, so the dot is decorative and the
+    // date goes to screen readers as text (the row button stays the one
+    // control). The engine card holds the interactive explainer.
+    if (!cv?.stale || !cv.current) return cell
+    return (
+      <span className="relative block" data-aiv-stale>
+        {cell}
+        <span aria-hidden="true" className="pointer-events-none absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-warn" />
+        <span className="sr-only">{staleCellLabel(formatDate(cv.current.checked_at))}</span>
+      </span>
     )
   }
 
@@ -1423,12 +1466,23 @@ export default function AIVisibility() {
           style={{ ['--aiv-cols' as string]: `repeat(${cols}, 1fr)` }}
         >
           {activeLLMs.map(llm => {
-            const r = rowResults?.get(llm.id)
             const cv = cellViews.get(prompt.id)?.get(llm.id)
-            const isErrorCell = cv?.state === 'error'
-            const tone = isErrorCell
-              ? 'bg-surface border-line'
-              : r?.brand_mentioned ? 'bg-pos-tint border-pos'
+            // A stale cell shows its last ok row (the same row the score uses);
+            // a cell with no ok row at all reads "No result yet".
+            // rowResults already holds the newest ok row, so no fallback is needed.
+            const r = rowResults?.get(llm.id)
+            const staleNote = cv?.stale ? (
+              <div className="mt-2 text-meta text-ink-3 flex items-start gap-1.5">
+                <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />
+                <span>
+                  {cv.current ? staleExplainer(formatDate(cv.current.checked_at)) : staleNoResultExplainer()}
+                  {isAdmin && !isDemoMode && cv.errorCode && (
+                    <span className="block font-mono text-ink-3 mt-0.5">{staleAdminCode(cv.errorCode)}</span>
+                  )}
+                </span>
+              </div>
+            ) : null
+            const tone = r?.brand_mentioned ? 'bg-pos-tint border-pos'
               : r ? 'bg-neg-tint border-neg'
               : 'bg-surface border-line'
             return (
@@ -1467,24 +1521,7 @@ export default function AIVisibility() {
                     <AlertTriangle size={9} /> Refresh failed, try again
                   </div>
                 )}
-                {isErrorCell && cv ? (
-                  <>
-                    <div className="text-meta text-warn mb-1">
-                      {panelNotAnswering(formatDate(cv.errorSince ?? cv.current?.checked_at ?? ''))}
-                    </div>
-                    {cv.previousOk && (
-                      <>
-                        <div className="text-meta text-ink-2 mb-2">{panelLastResult(formatDate(cv.previousOk.checked_at))}</div>
-                        {topResultsOf(cv.previousOk)}
-                        {cv.previousOk.response_snippet && (
-                          <p className="text-meta text-ink-3 mt-1 line-clamp-3 italic leading-relaxed">
-                            {cv.previousOk.response_snippet}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : r ? (
+                {r ? (
                   <>
                     <div className={`text-meta font-semibold mb-2 ${r.brand_mentioned ? 'text-pos-ink' : 'text-neg'}`}>
                       {r.brand_mentioned ? t.aiv_mentioned : t.aiv_absent}
@@ -1508,9 +1545,12 @@ export default function AIVisibility() {
                   </>
                 ) : cv?.state === 'no_answer' ? (
                   <div className="text-meta text-ink-2">{AIV_COPY.legendNoAnswer}</div>
+                ) : cv?.stale ? (
+                  <div className="text-meta text-ink-2">{AIV_COPY.engineNoResult}</div>
                 ) : (
                   <div className="text-meta text-ink-3">{t.aiv_notChecked}</div>
                 )}
+                {staleNote}
               </div>
             )
           })}
@@ -1555,8 +1595,8 @@ export default function AIVisibility() {
     const topComp = kind === 'notYet' ? topCompetitorOf(prompt.id) : null
     const cv = cellViews.get(prompt.id)
     const cellsList = cv ? Array.from(cv.values()) : []
-    const hasError = cellsList.some(c => c.state === 'error')
-    const onlyPending = !hasError && cellsList.every(c => c.state === 'pending')
+    const hasStale = cellsList.some(c => c.stale)
+    const onlyPending = !hasStale && cellsList.every(c => c.state === 'pending')
 
     // Where this prompt is asked from: shown unless the filter already says
     // (exactly one location) or the rows are grouped under a location label.
@@ -1569,9 +1609,7 @@ export default function AIVisibility() {
     ) : null
 
     const reasonChip = kind === 'unchecked'
-      ? hasError
-        ? <span className={AMBER_CHIP}>{errorSinceChip(formatDate(sum?.oldestErrorSince ?? ''))}</span>
-        : <span className={NEUTRAL_CHIP}>{onlyPending ? AIV_COPY.chipPending : AIV_COPY.chipNoAnswer}</span>
+      ? <span className={NEUTRAL_CHIP}>{hasStale ? AIV_COPY.chipStale : onlyPending ? AIV_COPY.chipPending : AIV_COPY.chipNoAnswer}</span>
       : null
     const ratioChip = kind === 'appear'
       ? <span className={NEUTRAL_CHIP}>{formatRatio(mentions, answered, answered === 1 ? 'engine' : 'engines')}</span>
@@ -1724,11 +1762,7 @@ export default function AIVisibility() {
     : AIV_COPY.headlineUncheckedTitle
   const heroContext =
     headline.variant === 'unchecked' && !collecting && !firstRun
-      ? headlineUncheckedReason(
-          headline.errorEngines.length > 0 ? uncheckedEngineList : null,
-          headline.since ? formatDate(headline.since) : null,
-          headline.errorEngines.length,
-        )
+      ? headlineUncheckedReason(headline.errorEngines.length > 0 ? uncheckedEngineList : null)
       : lastChecked ? fmt(t.aiv_lastChecked, { date: formatDate(lastChecked) }) : undefined
   const heroAction = headline.variant === 'unchecked' && !collecting ? (
     <>
@@ -2113,34 +2147,34 @@ export default function AIVisibility() {
             <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5" data-engine-rail>
                 {engineStatusCards.map((e, cardIndex) => {
                   const statusBadge: { label: string; tone: 'pos' | 'warn' | 'neg' | 'neutral' } = e.isUnavailable
-                    ? { label: AIV_COPY.engineNotAnswering, tone: 'warn' }
+                    ? { label: AIV_COPY.engineNoResult, tone: 'neutral' }
                     : e.status === 'KNOW' ? { label: 'Often named', tone: 'pos' }
                     : e.status === 'PARTIAL' ? { label: 'Sometimes named', tone: 'warn' }
                     : e.status === 'MISSING' ? { label: 'Rarely named', tone: 'neg' }
                     : { label: 'Not checked yet', tone: 'neutral' }
                   const statusKind = statusBadge.tone === 'neutral' ? null : statusBadge.tone
                   const isMeasured = !e.isUnavailable && e.status !== 'NOT_MEASURED'
-                  const sinceText = formatDate(errorSinceByEngine[e.id] ?? newestErrorAtByEngine[e.id] ?? '')
-                  const isPartialWarn = isMeasured && !e.lastAttemptFailed && partialErrorEngines.has(e.id)
-                  // One warn line at most: unavailable, then last attempt failed, then partial.
-                  const warnSentence = e.isUnavailable || (isMeasured && e.lastAttemptFailed)
-                    ? engineNotAnsweringLine(e.lastErrorCode, sinceText)
-                    : isPartialWarn
-                      ? enginePartialLine(formatDate(newestErrorAtByEngine[e.id] ?? ''))
-                      : null
-                  const warnTitle = isPartialWarn
-                    ? (isAdmin
-                        ? `Some checks failed, so this percentage is partial. Use "Re-run all prompts on ${e.label}" on this card to check the engine again.`
-                        : 'Some checks failed, so this percentage is partial.')
-                    : (warnSentence !== null && isAdmin && e.lastErrorCode ? `${warnSentence} (${e.lastErrorCode})` : warnSentence ?? undefined)
+                  // A failed engine run is never shown to a viewer as an error.
+                  // The card keeps its last results (the score already reads
+                  // only ok rows) and carries one quiet "Pending update"
+                  // control whose explainer says what is shown and that we
+                  // retry. An admin also sees the raw code, never in demo.
+                  const isPartialStale = isMeasured && !e.lastAttemptFailed && (staleCountByEngine.get(e.id) ?? 0) > 0
+                  const staleText = e.isUnavailable
+                    ? staleNoResultExplainer()
+                    : isMeasured && e.lastAttemptFailed
+                      ? (e.lastOkAt ? staleExplainer(formatDate(e.lastOkAt)) : staleNoResultExplainer())
+                      : isPartialStale
+                        ? stalePartialExplainer(
+                            staleCountByEngine.get(e.id) ?? 0,
+                            newestErrorAtByEngine[e.id] ? formatDate(newestErrorAtByEngine[e.id]) : null,
+                          )
+                        : null
+                  const staleCode = staleText !== null && isAdmin && !isDemoMode && e.lastErrorCode ? e.lastErrorCode : null
+                  const staleOpen = stalePopover === e.id
+                  const stalePopId = `aiv-stale-${e.id}`
                   const metaText = e.isUnavailable
-                    ? (isAdmin
-                        ? 'Force Refresh to retry'
-                        : collectionAllowance.nextAvailableAt
-                          // A non-admin in cooldown can't press Run Collection to
-                          // retry, so do not tell them to.
-                          ? `Next run available ${formatDate(collectionAllowance.nextAvailableAt)}`
-                          : 'Run Collection to retry')
+                    ? 'No result to show yet'
                     : e.status === 'NOT_MEASURED'
                       ? 'Not measured yet · run a collection to check this engine'
                       : `${e.mentioned} of ${e.checked} prompts${e.bestPos !== null ? `, best #${e.bestPos}` : ''}`
@@ -2159,7 +2193,7 @@ export default function AIVisibility() {
                     >
                       <div className="group w-full min-w-0 min-h-[148px] p-3.5 xl:px-3 rounded-xl bg-surface border border-line hover:border-edge transition-colors flex flex-col justify-between">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <img src={e.logoUrl} alt="" aria-hidden="true" className={`w-4 h-4 shrink-0 object-contain ${e.isUnavailable ? 'grayscale opacity-60' : ''}`} />
+                        <img src={e.logoUrl} alt="" aria-hidden="true" className="w-4 h-4 shrink-0 object-contain" />
                         <span className="text-meta font-semibold text-ink truncate" title={e.label}>
                           <span aria-hidden="true">{shortLabel}</span>
                           <span className="sr-only">{e.label}</span>
@@ -2201,10 +2235,36 @@ export default function AIVisibility() {
 
                       <div className="mt-2 text-meta text-ink-3 truncate" title={`${metaText}${lastOkTitle}`}>{metaText}</div>
 
-                      {warnSentence !== null && (
-                        <div className="flex items-center gap-1 text-meta text-warn min-w-0" title={warnTitle}>
-                          <AlertTriangle size={12} aria-hidden="true" className="shrink-0" />
-                          <span className="truncate min-w-0">{warnSentence}</span>
+                      {staleText !== null && (
+                        <div className="relative mt-1 min-w-0" data-stale-pop={e.id}>
+                          <button
+                            type="button"
+                            data-stale-btn={e.id}
+                            onClick={ev => {
+                              if (!staleOpen) {
+                                const r = ev.currentTarget.getBoundingClientRect()
+                                setStaleAlign(r.left + r.width / 2 > window.innerWidth / 2 ? 'right' : 'left')
+                              }
+                              setStalePopover(staleOpen ? null : e.id)
+                            }}
+                            aria-expanded={staleOpen}
+                            aria-controls={stalePopId}
+                            aria-label={`${AIV_COPY.stalePill}: ${e.label}`}
+                            className="inline-flex items-center gap-1.5 max-w-full min-h-[24px] -ml-1 px-1 rounded-md text-meta text-ink-2 hover:text-ink hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent transition-colors"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-warn shrink-0" aria-hidden="true" />
+                            <span className="truncate">{AIV_COPY.stalePill}</span>
+                          </button>
+                          <div
+                            id={stalePopId}
+                            role="region"
+                            aria-label={`${AIV_COPY.stalePill}: ${e.label}`}
+                            hidden={!staleOpen}
+                            className={`absolute ${staleAlign === 'right' ? 'right-0' : 'left-0'} top-full z-20 mt-1 w-56 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-surface-2 border border-edge shadow-raised text-meta text-ink-2 leading-snug`}
+                          >
+                            <p>{staleText}</p>
+                            {staleCode && <p className="mt-1.5 font-mono text-ink-3">{staleAdminCode(staleCode)}</p>}
+                          </div>
                         </div>
                       )}
 
@@ -2734,9 +2794,6 @@ export default function AIVisibility() {
               ))}
             </AnimatePresence>
           )
-          const failureDates = uncheckedSec
-            ? uncheckedSec.rows.map(r => summaries.get(r.prompt.id)?.oldestErrorSince).filter((d): d is string => !!d).sort()
-            : []
           const legend = prompts.length > 0 ? (
             <Disclosure key={`legend-${activeClientId ?? ''}`} title="What the symbols mean">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-meta text-ink-2">
@@ -2750,7 +2807,6 @@ export default function AIVisibility() {
                   ['mentioned', AIV_COPY.legendMentioned],
                   ['absent', AIV_COPY.legendAbsent],
                   ['no_answer', AIV_COPY.legendNoAnswer],
-                  ['error', AIV_COPY.legendError],
                   ['pending', AIV_COPY.legendPending],
                 ] as [CellState, string][]).map(([state, label]) => (
                   <span key={state} className="inline-flex items-center gap-1.5">
@@ -2758,6 +2814,12 @@ export default function AIVisibility() {
                     {label}
                   </span>
                 ))}
+                {/* The same quiet dot the matrix puts on a cell that shows an
+                    earlier result because the newest check did not answer. */}
+                <span className="inline-flex items-center gap-1.5" data-aiv-legend-stale>
+                  <span className="w-1.5 h-1.5 rounded-full bg-warn shrink-0" aria-hidden="true" />
+                  {AIV_COPY.legendStale}
+                </span>
                 {lockedColumns.length > 0 && isWide && (
                   <span className="inline-flex items-center gap-1.5">
                     <PromptResultCell state="locked" engineId={lockedColumns[0]} variant="legend" />
@@ -2841,7 +2903,7 @@ export default function AIVisibility() {
                   <Disclosure
                     title={SECTION_TITLE.unchecked}
                     count={uncheckedSec.rows.length}
-                    summary={failureDates.length > 0 ? sectionUncheckedExtra(formatDate(failureDates[0])) : promptCount(uncheckedSec.rows.length)}
+                    summary={promptCount(uncheckedSec.rows.length)}
                     defaultOpen={queryNorm !== '' || sectionIsOpen('unchecked')}
                     // Remounts open while a search is active, so a match inside
                     // a closed section is never hidden behind its header.

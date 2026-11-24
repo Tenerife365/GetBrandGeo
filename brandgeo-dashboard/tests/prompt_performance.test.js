@@ -102,8 +102,12 @@ test('mentioned, absent, no_answer, error and pending are told apart', () => {
   assert.strictEqual(views.get(1).get('chatgpt').position, 2)
   assert.strictEqual(views.get(1).get('gemini').state, 'absent')
   assert.strictEqual(views.get(1).get('claude').state, 'no_answer')
-  assert.strictEqual(views.get(2).get('chatgpt').state, 'error')
+  // A failed run with no earlier result is a neutral pending cell, marked stale.
+  assert.strictEqual(views.get(2).get('chatgpt').state, 'pending')
+  assert.strictEqual(views.get(2).get('chatgpt').stale, true)
+  assert.strictEqual(views.get(2).get('chatgpt').failedAt, D(10))
   assert.strictEqual(views.get(2).get('gemini').state, 'pending')
+  assert.strictEqual(views.get(2).get('gemini').stale, undefined)
   // A prompt with no rows at all still gets an all-pending entry.
   assert.strictEqual(views.get(3).get('chatgpt').state, 'pending')
   assert.strictEqual(views.get(3).get('chatgpt').current, null)
@@ -122,10 +126,20 @@ test('engines outside the active list are ignored', () => {
   assert.strictEqual(c.get('chatgpt').state, 'absent')
 })
 
-test('the current cell is the newest row, whatever its status', () => {
+test('a failed newest row shows the last good result, marked stale', () => {
   const rows = [ok(1, 'gemini', true, 1, 5), err(1, 'gemini', 12)]
   const g = cellsFor(rows, 1).get('gemini')
-  assert.strictEqual(g.state, 'error')
+  assert.strictEqual(g.state, 'mentioned', 'the error is never presented as the answer')
+  assert.strictEqual(g.position, 1)
+  assert.strictEqual(g.current.checked_at, D(5))
+  assert.strictEqual(g.stale, true)
+  assert.strictEqual(g.failedAt, D(12))
+  assert.strictEqual(g.errorCode, 'quota_exceeded')
+})
+
+test('a fresh ok cell is not stale', () => {
+  const g = cellsFor([err(1, 'gemini', 5), ok(1, 'gemini', true, 1, 12)], 1).get('gemini')
+  assert.strictEqual(g.stale, undefined)
   assert.strictEqual(g.current.checked_at, D(12))
 })
 
@@ -146,7 +160,9 @@ test('errorSince is the oldest error of the unbroken run, not the last attempt',
   // ok on 20 June style day 3, then errors on 8, 10 and 12.
   const rows = [ok(1, 'gemini', true, 3, 3), err(1, 'gemini', 8), err(1, 'gemini', 10), err(1, 'gemini', 12)]
   const g = cellsFor(rows, 1).get('gemini')
-  assert.strictEqual(g.state, 'error')
+  assert.strictEqual(g.state, 'mentioned')
+  assert.strictEqual(g.stale, true)
+  assert.strictEqual(g.failedAt, D(12))
   assert.strictEqual(g.errorSince, D(8))
   assert.notStrictEqual(g.errorSince, g.current.checked_at)
   assert.strictEqual(g.previousOk.checked_at, D(3))
@@ -219,7 +235,7 @@ test('engineErrorSince works across prompts and is null when the newest row is o
 
 console.log('score during an outage')
 
-test('the score map keeps the newest ok row while the cell view shows the error', () => {
+test('the score map and the cell view both keep the newest ok row during an outage', () => {
   const rows = [
     ok(1, 'gemini', true, 2, 3),
     err(1, 'gemini', 8),
@@ -231,7 +247,8 @@ test('the score map keeps the newest ok row while the cell view shows the error'
   assert.strictEqual(scoreRow.brand_mentioned, true, 'score input must stay on the last good row')
   assert.strictEqual(scoreRow.brand_position, 2)
   const cell = cellsFor(rows, 1).get('gemini')
-  assert.strictEqual(cell.state, 'error', 'the list must show the outage')
+  assert.strictEqual(cell.state, 'mentioned', 'the list shows the last good result')
+  assert.strictEqual(cell.stale, true, 'and marks it as pending an update')
   assert.strictEqual(cell.previousOk.brand_mentioned, true)
 })
 
@@ -277,7 +294,7 @@ test('a mention on one engine and an error on another stays in "appear" and coun
   assert.strictEqual(s.errors, 1)
   assert.strictEqual(s.answered, 1)
   assert.strictEqual(s.oldestErrorSince, D(4))
-  assert.strictEqual(s.pendings, 1) // claude never ran
+  assert.strictEqual(s.pendings, 2) // gemini has no result yet, claude never ran
 })
 
 test('a mention in a position-less answer counts as a mention but not as a best position', () => {
@@ -286,7 +303,7 @@ test('a mention in a position-less answer counts as a mention but not as a best 
   assert.strictEqual(s.bestPosition, 4)
 })
 
-test('lastCheckedAt is the newest current cell, errors included', () => {
+test('lastCheckedAt follows the last attempt, failed attempts included', () => {
   const s = summaryOf([ok(1, 'chatgpt', true, 1, 6), err(1, 'gemini', 12)], 1)
   assert.strictEqual(s.lastCheckedAt, D(12))
 })
@@ -560,10 +577,11 @@ test('no engine qualifies when nothing is mentioned, and engines with zero answe
   assert.strictEqual(h.pos, null)
 })
 
-test('an outage engine is not credited from its stale good row', () => {
+test('an outage engine keeps the credit of its last good row, as the score does', () => {
   const rows = [ok(1, 'gemini', true, 1, 3), err(1, 'gemini', 11), ok(1, 'chatgpt', true, 4, 11)]
   const h = headlineFor(rows, [1])
-  assert.strictEqual(h.engine, 'chatgpt')
+  assert.strictEqual(h.engine, 'gemini')
+  assert.deepStrictEqual(h.errorEngines, ['gemini'])
 })
 
 // ── Locked columns ────────────────────────────────────────────────────────────

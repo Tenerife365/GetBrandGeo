@@ -146,7 +146,7 @@ export function buildAiVisibilityCsvRows(input: {
             .map(x => toDisplayName(x.name))
             .join('; ')
         : ''
-      // The usable row's own date, for every state (an error or no-answer cell
+      // The usable row's own date, for every state (a stale or no-answer cell
       // shows when the engine last gave a usable answer).
       const lastAnswer: string | null = input.results.get(p.id)?.get(e.id)?.checked_at ?? null
       out.push([
@@ -161,7 +161,7 @@ export function buildAiVisibilityCsvRows(input: {
         names,
         cur?.checked_at ?? null,
         lastAnswer,
-        state === 'error' ? (c?.errorSince ?? null) : null,
+        c?.stale || state === 'error' ? (c?.errorSince ?? null) : null,
         ...(input.locationLabelOf ? [input.locationLabelOf(p)] : []),
       ])
     }

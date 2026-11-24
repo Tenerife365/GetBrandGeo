@@ -105,17 +105,20 @@ check('csv result labels come from the fixed set', () => {
   const ok = new Set(['Mentioned', 'Not mentioned', 'No answer', 'Error', 'Not checked'])
   csvRows.forEach(r => { if (!ok.has(r[4])) throw new Error('label ' + r[4]) })
 })
-check('csv covers the error and no-answer states of the fixture', () => {
+check('csv never prints Error: a failed run shows the last result, or Not checked', () => {
   const labels = new Set(csvRows.map(r => r[4]))
-  if (!labels.has('Error') || !labels.has('No answer')) throw new Error(Array.from(labels).join(','))
+  if (labels.has('Error') || !labels.has('No answer')) throw new Error(Array.from(labels).join(','))
 })
-check('csv error rows carry the not-answering-since date, others do not', () => {
-  csvRows.forEach(r => { if ((r[4] === 'Error') !== (r[11] != null)) throw new Error('row ' + r[0] + r[3]) })
+check('csv rows whose last run failed carry the not-answering-since date, others do not', () => {
+  const sinceRows = csvRows.filter(r => r[11] != null).map(r => r[0] + ':' + r[3])
+  eq(sinceRows.includes('1:gemini') && sinceRows.includes('2:claude'), true)
+  eq(sinceRows.includes('1:chatgpt') || sinceRows.includes('3:chatgpt'), false)
 })
 check('csv Brand mentioned is lowercase yes/no for answered cells, empty otherwise', () => {
   eq(csvCell(1, 'chatgpt')[COL.mentioned], 'yes')            // mentioned
   eq(csvCell(2, 'chatgpt')[COL.mentioned], 'no')             // absent
-  eq(csvCell(1, 'gemini')[COL.mentioned], '')                // error
+  eq(csvCell(1, 'gemini')[COL.mentioned], 'no')              // failed run: the last result, absent
+  eq(csvCell(2, 'claude')[COL.mentioned], '')                // failed run, never a result
   eq(csvCell(3, 'chatgpt')[COL.mentioned], '')               // no answer
   eq(csvCell(3, 'chatgpt')[COL.result], 'No answer')
 })
@@ -138,15 +141,18 @@ check('csv Competitors named go through toDisplayName', () => {
   const want = raw.filter(isLikelyCompanyName).map(toDisplayName).join('; ')
   eq(csvCell(1, 'chatgpt')[COL.comps], want)
   eq(csvCell(1, 'chatgpt')[COL.comps] === '', false)
-  eq(csvCell(1, 'gemini')[COL.comps], '')                    // error cell names nothing
+  eq(csvCell(1, 'gemini')[COL.comps] === '', false)          // the last result's names
+  eq(csvCell(2, 'claude')[COL.comps], '')                    // no result names nothing
 })
 check('csv Checked at is the current row as stored, empty for a pending cell', () => {
   eq(csvCell(1, 'chatgpt')[COL.checked], '2026-11-05T10:00:00')
-  eq(csvCell(2, 'claude')[COL.result], 'Error')
+  eq(csvCell(1, 'gemini')[COL.checked], '2026-11-01T10:00:00') // the result shown, not the failed run
+  eq(csvCell(2, 'claude')[COL.result], 'Not checked')
+  eq(csvCell(2, 'claude')[COL.checked], null)
 })
 check('csv Last answer at is the usable row in results, for error and no-answer cells', () => {
   eq(csvCell(1, 'chatgpt')[COL.lastAnswer], '2026-11-05T10:00:00')
-  eq(csvCell(1, 'gemini')[COL.result], 'Error')
+  eq(csvCell(1, 'gemini')[COL.result], 'Not mentioned')
   eq(csvCell(1, 'gemini')[COL.lastAnswer], '2026-11-01T10:00:00')   // the older ok row
   eq(csvCell(3, 'chatgpt')[COL.lastAnswer], '2026-11-02T11:00:00')  // under the no-answer row
   eq(csvCell(2, 'claude')[COL.lastAnswer], null)                    // error and never an ok row
