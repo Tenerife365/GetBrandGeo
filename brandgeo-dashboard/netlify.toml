@@ -79,6 +79,14 @@
   status = 200
   force = true
 
+# Admin MCP server (docs/arch/mcp-admin-tools.md). Above /mcp and the /*
+# fallback; a separate function, key shape and table from the client server.
+[[redirects]]
+  from = "/mcp/admin"
+  to = "/.netlify/functions/mcp-admin"
+  status = 200
+  force = true
+
 # Remote MCP server (docs/arch/mcp-access.md). Must sit above the /* fallback,
 # or POST /mcp is served index.html and every MCP client reports a parse error.
 [[redirects]]
@@ -443,6 +451,11 @@
 [functions."mcp-server"]
   timeout = 26
   node_bundler = "esbuild"
+
+# Admin MCP server (docs/arch/mcp-admin-tools.md). Default bundler: it requires
+# no .ts file. Its list scans stop at 5 batches of 200 rows.
+[functions."mcp-admin"]
+  timeout = 26
 
 # MCP key management for the Account page: list / issue / revoke, a couple of
 # DB ops per call, same shape as promotions-admin.
