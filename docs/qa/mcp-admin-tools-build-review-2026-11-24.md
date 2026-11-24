@@ -209,3 +209,28 @@ wording in L1.
 - I1 to I8 recorded, not changed.
 - Re-checked from the builder seat only: `tests/mcp_admin.test.js` 68 of 68,
   dash scan clean with a positive control.
+
+## 8. Migration applied, 2026-11-24
+
+Applied on Constantin's "Yes, apply it" through the Supabase connector as
+`20261124110523 admin_mcp_2026_11_24` (file body without its own begin and
+commit). Pre-check before applying: the type check held the expected twelve
+values, `admin_api_keys` and the three functions did not exist.
+
+Read back after applying:
+
+- R1: rls true, policies 0, service_role grants INSERT,SELECT,UPDATE, other
+  grants 0, columns 10.
+- R2: three functions; add and archive SECURITY DEFINER, counts not; all
+  three `search_path=""`; execute for service_role only, not anon or
+  authenticated.
+- R3: `client_events_type_check` lists thirteen values, the last
+  `admin_prompt_change`.
+- R4 dry run: cases 1 to 10 passed and rolled back (the final raise was
+  made strict, so a skip of cases 8 to 10 would have failed it). Case 11
+  skipped: no archived location exists.
+- After R4: 575 prompts, 89 client events, 0 `admin_prompt_change` events,
+  0 keys, no row left by the dry run.
+
+Not yet done: the push (needs its own go), creating the first key, and any
+real prompt write.
