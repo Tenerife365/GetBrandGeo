@@ -23,8 +23,12 @@ Code read: `src/lib/planConfig.ts`, `netlify/functions/_cost.js`,
   figures below are modelled from the per-row costs measured on Growth PRO.
 - Error rows, prompt caching across clients and the Gemini line give
   little or no cash back (section 4).
-- **The SerpApi pool is the nearer limit, not euros.** By 24 November the
-  platform has used 420 of its 500 monthly credits (section 2.6).
+- **The SerpApi pool is 1,000 credits for USD 25 a month** (Constantin,
+  2026-11-24), not the 500 that `_cost.js` assumes. By 24 November the
+  platform has used 420 of them (section 2.6), so the pool is not the
+  near limit it first looked like.
+- Rulings of 2026-11-24 and the re-costing proposal for `_cost.js` are in
+  section 8.
 - Recommended, in order:
   1. Grok monthly instead of weekly: EUR 13.74 a month per Growth PRO
      client.
@@ -72,11 +76,16 @@ for the engines they share.
 Two metering notes:
 - ai_overview averages 1.94 SerpApi credits a row (0.0893 / 0.046). The
   cost table in `_cost.js` assumes 1.5.
-- The gpt-4o-mini row cost (EUR 0.0027) is below the USD 0.01 web search fee
-  that `_cost.js` adds (EUR 0.0092). The `_cost.js` comment says the search
-  fee for that model was never verified. The real gpt-4o-mini cost may
-  therefore be up to EUR 0.0119 a row. Check this against the OpenAI
-  dashboard before relying on it (Open decision 4).
+- The gpt-4o-mini row cost is low because gpt-4o-mini rarely searches.
+  `_collect.js` counts each `web_search_call` item in the answer, and
+  `_cost.js` adds the USD 0.01 fee once per counted search, so a row with
+  no search pays no fee. Measured over 90 days on non-research ok rows:
+  gpt-4o-mini searched on 5 of 24 rows (21 percent), average EUR 0.0021 a
+  row; gpt-5.5 searched on all 367, average EUR 0.0874. Constantin's view
+  (2026-11-24) that no fee applies to gpt-4o-mini therefore holds for most
+  rows. The quality question it raises is that gpt-4o-mini mostly answers
+  from training data, while gpt-5.5 always reads the web. The paired test
+  in R2 records searches per row, so it measures this directly.
 
 ### 2.3 Cost per client per month (metered EUR)
 
@@ -130,17 +139,19 @@ nothing but lose the answer.
 
 Credits are cost_eur / 0.046:
 
-| Month | google_ai | ai_overview | Total of 500 |
+| Month | google_ai | ai_overview | Total of 1,000 |
 |---|---|---|---|
 | 2026-08 | 50 | 84 | 134 |
 | 2026-09 | 73 | 120 | 193 |
 | 2026-10 | 118 | 207 | 325 |
 | 2026-11 (to 24th) | 149 | 271 | 420 |
 
-At the November pace the month ends near 525 credits (420 / 24 x 30), which
-is over the pool. Each new Growth PRO client at full use adds about 165
-credits a month: 56 for google_ai plus 56 x 1.94 = 109 for ai_overview. Each
-Growth client adds 35.
+At the November pace the month ends near 525 credits (420 / 24 x 30), 52.5
+percent of the 1,000 credit pool Constantin confirmed on 2026-11-24. Each
+new Growth PRO client at full use adds about 165 credits a month: 56 for
+google_ai plus 56 x 1.94 = 109 for ai_overview. Each Growth client adds 35.
+The headroom of about 475 credits fits two more Growth PRO clients; a third
+would pass 1,000.
 
 ### 2.7 How often answers change between consecutive runs
 
@@ -204,8 +215,11 @@ SerpApi engine.
 
 Gemini and SerpApi count in the metered total and in the budget gate. Their
 marginal cash cost is about zero today: Gemini runs inside its free daily
-quota, and SerpApi is a fixed EUR 23 a month commitment while the pool
-lasts.
+quota, and SerpApi is a fixed USD 25 (about EUR 23) a month for 1,000
+credits while the pool lasts. That is EUR 0.023 a credit, half the 0.046
+`_cost.js` meters, so the cash value of the SerpApi lines is half the
+metered value: Growth PRO google_ai EUR 1.29 (metered 2.58), ai_overview
+EUR 2.50 (metered 5.00); Growth google_ai EUR 0.81 (metered 1.61).
 
 ## 4. Levers
 
@@ -271,8 +285,8 @@ All amounts are EUR per client per month at full use.
 - `src/pages/AIVisibility.tsx` and `src/lib/planConfig.ts`: the copy that
   explains cadence per engine. The SerpApi engines already show a monthly
   note, so follow it.
-- Pricing copy in `brandgeo/web/index.html` and `faq.html`, if they promise
-  weekly for every engine.
+- Not the pricing copy. Ruled 2026-11-24: the plan page does not say which
+  engines refresh less often.
 
 **Test proving value held:**
 - New `tests/engine_cadence.test.js`, modelled on
@@ -295,8 +309,10 @@ EUR 9.61 and 6.01.
 active prompts of clients 1, 2 and 54 (126 prompts) on gpt-4o-mini as well
 as gpt-5.5, with the same prompt, geography and day.
 
-- **Cost:** about EUR 0.34 at 126 x 0.0027, or EUR 1.50 at the 0.0119
-  worst case.
+- **Cost (corrected 2026-11-24):** about EUR 11 to 12 in all. The
+  gpt-5.5 arm is 126 x 0.0858 = EUR 10.81; the gpt-4o-mini arm is about
+  EUR 0.26 to 0.34. The EUR 0.34 first written here counted only the mini
+  arm.
 - **Where the rows go:** a separate store or a dry-run flag, so the
   customer's dashboard is unchanged.
 
@@ -347,6 +363,9 @@ The model stays claude-sonnet-4-6, per the ruling.
 
 ## 6. Open decisions for Constantin
 
+Decisions 1, 2, 4, 5 and 6 were answered on 2026-11-24; see section 8.
+Decision 3 is still open. The text below is the question as first asked.
+
 1. **Grok cadence.** Monthly (EUR 13.74) or every two weeks (EUR 9.16) on
    Growth PRO, and whether the public plan copy says so per engine.
 2. **The ChatGPT paired test.** Run it on clients 1, 2 and 54, and accept
@@ -382,7 +401,105 @@ with `category <> 'research'`, except 2.6, which counts all clients:
 - **2.4:** count ok rows per (prompt_id, llm) between 2026-10-25 and
   2026-11-23.
 - **2.6:** `sum(cost_eur) / 0.046` per month for `google_ai` and
-  `ai_overview`.
+  `ai_overview`. 0.046 is the metered rate per credit, which is why it
+  recovers the credit count; the cash rate is 0.023 (section 8).
 - **2.7:** use a `lag()` window over (client_id, prompt_id, llm) ordered by
   `checked_at`, on ok rows since 2026-09-01.
 - **2.8:** `lower(trim(text))` over active prompts.
+
+## 8. Rulings, re-costing proposal and test status (2026-11-24)
+
+### 8.1 Rulings from Constantin
+
+| Decision | Ruling |
+|---|---|
+| 1. Grok cadence | Monthly (R1 as written, EUR 13.74 per Growth PRO client). |
+| 1 and 3. Disclosure | The plan page does not say which engines refresh less often. |
+| 2. ChatGPT paired test | Run it (confirmed). Status in 8.4. |
+| 3. Claude every two weeks | Not ruled. Still open. |
+| 4. gpt-4o-mini search fee | His view: no fee applies. Measured: none on 19 of 24 rows, because the fee is charged only when the model searches (section 2.2). No `_cost.js` change is needed for it. |
+| 5. Re-costing `_cost.js` | Asked for a proposal: 8.2. |
+| 6. SerpApi pool | 1,000 credits for USD 25 a month, not 500. |
+
+### 8.2 Proposal: re-costing `_cost.js`
+
+Text only. `_cost.js` was not edited. Each item needs Constantin's go and a
+`bg-backend` build on Opus, because the file meters every client's spend and
+enforces every plan budget.
+
+- **P1. SerpApi rate and pool.** `SERPAPI_COST_PER_SEARCH_EUR` 0.046 to
+  0.023 (USD 25 / 1,000 x 0.92) and `SERPAPI_MONTHLY_CREDITS` 500 to 1000.
+  Replace the two comments that disagree ($25 per 1,000 against $25 per
+  500) and the comment that calls the pool 500 platform-wide. Effect:
+  Growth PRO metered drops by EUR 3.79 a month (google_ai 2.58 to 1.29,
+  ai_overview 5.00 to 2.50), Growth by EUR 0.80. Old rows keep the cost
+  they were metered at.
+- **P2. ai_overview credits.** `SERPAPI_CREDITS_PER_CHECK.ai_overview` 1.5
+  to 1.94, measured over 134 rows. With P1 the forecast per row becomes EUR
+  0.045 (1.94 x 0.023).
+- **P3. Gemini stays at EUR 0.032 a row.** That is the price after the free
+  tier. The budget gate is a ceiling, and the peak is 81 calls a day against
+  a free quota of 1,500, so lowering it only lowers a safety margin.
+  Constantin's call.
+- **P4. ChatGPT search fee unchanged.** It is already charged per counted
+  `web_search_call`, so gpt-4o-mini rows that do not search pay nothing.
+  Change it only if one day of the OpenAI usage dashboard disagrees.
+- **P5. Forecast reads the engine cadence.** Once R1 ships, the plan
+  forecast should read the per-engine interval from the new `_cadence.js`
+  (Grok one run a month), so the forecast and the metered spend agree.
+- **Plan budgets stay as they are** (EUR 67.35 Growth PRO, 44.85 Growth).
+  Only the headroom under them grows.
+
+Metered EUR per client per month at full use, after each step:
+
+| Step | Growth PRO | Growth |
+|---|---|---|
+| Today | 60.56 | 23.26 |
+| P1 (SerpApi re-cost) | 56.77 | 22.46 |
+| P1 and R1 (Grok monthly) | 43.03 | 22.46 |
+| P1, R1 and R2 swap, if the test passes | 24.42 | 10.83 |
+| P1, R1 and L2 (ChatGPT two-weekly), if it fails | 33.42 | 16.45 |
+| R3 (Claude two-weekly), if ruled | a further 3.54 off | a further 2.21 off |
+
+Grok is not on Growth, so R1 does not move the Growth column.
+
+### 8.3 The SerpApi pool, re-read
+
+The November pace ends near 525 of 1,000 credits. About 475 credits are
+left, so two more Growth PRO clients fit and a third would pass the pool. The
+pool is still not enforced in code; a count before each SerpApi call is
+worth adding before the third Growth PRO client signs.
+
+### 8.4 ChatGPT paired test: NOT RUN, blocked on the API key
+
+The harness was built and started on 2026-11-24. All 252 calls (126 prompts
+x 2 models) failed with `invalid_api_key`: the only OpenAI key on this
+machine, in the dashboard's `.env.local`, is revoked. Nothing was spent and
+nothing was written to `ai_results` or any other table.
+
+The harness uses the production `callChatGPT`, `buildSystemContext` and
+`buildResultRow` from `_collect.js` unchanged, with `OPENAI_COLLECT_MODEL`
+cleared. Plan `essentials` gives gpt-4o-mini and `growth_pro` gives gpt-5.5.
+It writes one JSON line per call to a local file, resumes where it stopped,
+and runs four calls at a time. `score.js` pairs the two arms by prompt,
+drops a mini row that fell back to gpt-5.5, scores the three rules of R2
+overall and per client, and prints the searches per arm. The kit is outside
+the repo, because the prompts are client data:
+`C:\Users\const\AppData\Roaming\Claude\side-session-notes\local_3fa72013-04fd-4d86-a195-4bf5ec3261a8\chatgpt-paired-test\`
+(`run.js`, `score.js`, `input.json` with the 126 active prompts of clients 1,
+2 and 54 and their brand configs).
+
+To run it, with the production OpenAI key, in PowerShell (about 10 to 20 minutes,
+about EUR 11 to 12):
+
+1. `cd "C:\Users\const\AppData\Roaming\Claude\side-session-notes\local_3fa72013-04fd-4d86-a195-4bf5ec3261a8\chatgpt-paired-test"`
+2. `$k = Read-Host "OpenAI key" -AsSecureString; $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k))`
+3. `node run.js "C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-dashboard\netlify\functions\_collect.js" input.json out.jsonl`
+4. `node score.js out.jsonl`
+
+The key is read without echo and lives only in that PowerShell window. Paste
+the output of step 4 into a session to record it here.
+
+A cheaper variant, if wanted: run only the gpt-4o-mini arm (about EUR 0.30)
+and pair it with the stored weekly gpt-5.5 row of the same day. It is weaker,
+because the two answers are not taken at the same minute.
