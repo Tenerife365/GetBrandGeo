@@ -2989,3 +2989,149 @@ ARTICLES_DAILY.append(dict(
     <p>Put your effort where the evidence is strongest: be clearly relevant to the questions your buyers actually ask, and make sure the facts about you are accurate wherever engines read them. Then measure what engines say, engine by engine and more than once, because a single answer is one draw from a variable process.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-131", bid="BG-131", date="2026-11-24", date_label="November 24, 2026", read=6,
+    tags=["Original Research", "US Cities", "Nashville"],
+    title="AI Visibility in Nashville: Three Engines Agree on Music Lawyers, Not on Real Estate Agents",
+    h1="AI Visibility in Nashville: Engines Agree on <em>Music Lawyers</em>, Not on Real Estate Agents",
+    h1_plain="AI Visibility in Nashville: Engines Agree on Music Lawyers, Not on Real Estate Agents",
+    subtitle="We asked ChatGPT, Claude and Gemini six local buyer questions about Nashville. Between them they named 110 firms, and 9 were on all three lists: 3 of them music law firms, none of them a real estate agent.",
+    meta_desc="What ChatGPT, Claude and Gemini recommend in Nashville: 18 answers to six local buyer questions, 110 firms named, and the 9 that all three engines named.",
+    og_desc="Six Nashville buyer questions, three AI engines, 18 answers: 110 firms named, 9 on all three lists, 0 real estate agents among them.",
+    ld_desc="BrandGEO study of 18 answers from ChatGPT, Claude and Gemini to six Nashville buyer questions (personal injury, real estate agents, property management, immigration, music and entertainment law, healthcare law), collected November 6, 2026, counting the firms all three engines named.",
+    keywords="ai visibility nashville, chatgpt nashville law firms, nashville property management ai, nashville music lawyers ai search, local business ai recommendations nashville",
+    about=["AI Visibility Research", "Nashville", "Local Search", "Engine Comparison"],
+    findings=[("9 of 110", "firms named by any engine were named by all three"),
+              ("3", "music and entertainment law firms on all three lists"),
+              ("0 of 21", "real estate agents or teams were named by all three"),
+              ("75", "firms were named by one engine only")],
+    faq=[("Which Nashville businesses do AI engines agree on?",
+          "In our November 6, 2026 answers, all three engines named 9 firms: 3 music and entertainment law firms, 2 personal injury firms, 2 immigration firms, 1 healthcare law firm and 1 property manager, Evernest. No real estate agent or team appeared in all three answers."),
+         ("How many firms did the engines name in total?",
+          "110 different firms across the six questions. 9 were on all three lists, 26 on two and 75 on one engine only."),
+         ("How were the firms counted?",
+          "We took every name an engine put in bold, then read each of the three answers to the same question to see whether it named that firm anywhere, in bold or in running text. Ratings, directory names and advice were removed. Firms named after a person are reported as a count, not by name."),
+         ("Is this a ranking of Nashville firms?",
+          "No. It counts what three engines wrote on one day. It does not say which firm is better, and it does not say why an engine named one firm and not another.")],
+    related=[("/bg-016.html", "BG-016", "Cross-Engine Consensus: When AI Engines Agree, and When They Don't",
+              "The wider study of when engines name the same firm."),
+             ("/bg-113.html", "BG-113", "How Often AI Engines Put a National Brand Next to Local Property Managers",
+              "What happens in property management answers across 20 cities."),
+             ("/bg-127.html", "BG-127", "AI Visibility in Orlando: Six Questions, Three Engines, Six Firms in Common",
+              "The same kind of city read, for Orlando.")],
+    cta_h="See what each engine says about your Nashville business",
+    cta_p="Run the free audit on your own domain and read every engine's answer side by side. No signup and no card.",
+    og=dict(
+        fname="og-bg-131.png",
+        kicker="BG-131 · Original Research",
+        lines=[[("AI Visibility", "w")], [("in ", "w"), ("Nashville", "g")]],
+        sub=["Six buyer questions, three engines,",
+             "18 answers, November 2026."],
+        stats=[("9 of 110", "firms named by all three engines", "Nashville"),
+               ("3", "music law firms on all three", "Nashville"),
+               ("0 of 21", "real estate agents on all three", "Nashville"),
+               ("75", "firms named by one engine only", "Nashville")],
+        footer="Three Engines, Three Lists",
+    ),
+    body="""  <p>Ask three AI engines the same question about Nashville and you get three lists. We wanted to know how much those lists overlap, because a business that appears on only one of them is invisible to buyers who use the other two.</p>
+
+  <p>On November 6, 2026 we put six local buyer questions about Nashville to ChatGPT, Claude and Gemini: a personal injury law firm, real estate agents, a property management company, an immigration lawyer, and two questions written for this city, music industry and entertainment lawyers and healthcare law firms. Then we counted the firms each engine named and the ones all three had in common.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>18 answers: six questions, three engines (ChatGPT on gpt-5.5, Claude on claude-sonnet-4-6, Gemini on gemini-2.5-flash), all collected on November 6, 2026. We took every name an engine put in bold, then read each of the three answers to the same question to see whether it named that firm anywhere, in bold or in running text. Ratings, directory names and advice were removed. Firms named after a person are reported as a count, not by name, and that covers nearly every law firm here.</p>
+    <p>Claude's stored answers stop at about 3,000 characters and five of its six were cut mid-list, so its counts are a lower bound. This is one day of answers. It does not rank anyone and it does not say why an engine chose a firm.</p>
+  </div>
+
+  <h2>110 firms named, 9 on all three lists</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Firms named by any engine</th><th>By all three</th><th>By two</th><th>By one only</th></tr></thead>
+    <tbody>
+      <tr><td>Best music industry and entertainment lawyers in Nashville</td><td>17</td><td>3</td><td>2</td><td>12</td></tr>
+      <tr><td>Best personal injury law firms in Nashville</td><td>16</td><td>2</td><td>5</td><td>9</td></tr>
+      <tr><td>Best immigration lawyers in Nashville</td><td>13</td><td>2</td><td>4</td><td>7</td></tr>
+      <tr><td>Best healthcare law firms in Nashville</td><td>18</td><td>1</td><td>6</td><td>11</td></tr>
+      <tr><td>Top-rated property management companies in Nashville</td><td>25</td><td>1</td><td>6</td><td>18</td></tr>
+      <tr><td>Best real estate agents for buying a home in Nashville</td><td>21</td><td>0</td><td>3</td><td>18</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>110</strong></td><td><strong>9</strong></td><td><strong>26</strong></td><td><strong>75</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Of the 110 firms, 9 were on all three lists (8%), 26 on two (24%) and 75 on one engine only (68%). Eight of the nine shared names are law firms. The ninth is a property manager.</p>
+
+  <h2>Music and entertainment law: three firms on every list</h2>
+
+  <p>This is the question written for Nashville, and it produced the most agreement: three firms were named in all three answers. All three are large firms with a Nashville office, and all carry founders' names, so we count them and do not print them. Two more firms were named by two engines and 12 by one only.</p>
+
+  <p>The engines also answered in different units. ChatGPT listed 8 firms and put notable lawyers under each. Claude led with individual lawyers and attached a firm to some of them. Gemini gave two lists, one of people and one of firms. Three individual lawyers were named in all three answers, which is as many as the firms. A firm that checks only for its own name would miss how often an engine recommends the person instead.</p>
+
+  <h2>Real estate agents: 21 names, none in common</h2>
+
+  <p>ChatGPT named 7 agents or teams, Claude 7 agents in 6 teams, Gemini 11. Not one agent or team was in all three answers. Three were named by two engines, among them <strong>Oak Street Real Estate Group</strong>, which ChatGPT listed as a team and Claude listed twice through two of its agents. The other 18 were named once.</p>
+
+  <p>One local brokerage did appear in all three answers, but only as the affiliation of three different agents. The engines agreed on where good agents work more than on who they are.</p>
+
+  <h2>Property management: the one shared name is a national brand</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th></th><th>ChatGPT</th><th>Claude</th><th>Gemini</th><th>All three answers together</th></tr></thead>
+    <tbody>
+      <tr><td>Property managers named</td><td>12</td><td>10</td><td>11</td><td>25 different companies</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>All three engines named <strong>Evernest</strong>, one of the national brands we counted in BG-113. Six more companies were named by two engines: <strong>HomeRiver Group</strong>, <strong>Mynd</strong>, <strong>Prime Rentals &amp; Real Estate</strong> and <strong>Gemstone Solutions</strong> by Claude and Gemini, plus two firms named after people. Eighteen companies were named by one engine only, 10 of them by ChatGPT, which was the only engine to add commercial property managers to its list.</p>
+
+  <h2>Personal injury, immigration and healthcare law</h2>
+
+  <p>Personal injury: 16 firms, 2 on all three lists and 5 on two. Immigration: 13 firms, 2 on all three and 4 on two. ChatGPT named only 5 immigration firms and gave the rest of its answer to nonprofit help and questions to ask; Claude and Gemini named 8 each.</p>
+
+  <p>Healthcare law: 18 firms, 1 on all three lists and 6 on two. Five of those six were shared by ChatGPT and Claude, whose lists were close to each other, while Gemini's list was mostly its own: 6 of its 8 firms appeared in no other answer. One of them is a firm that ChatGPT's answer to the same question describes as absorbed into another firm on its list. We did not check which is current. A buyer who read only one answer would not know there was anything to check.</p>
+
+  <h2>Exact match against the hand read</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Exact bold match</th><th>After the hand read</th></tr></thead>
+    <tbody>
+      <tr><td>Personal injury</td><td>1</td><td>2</td></tr>
+      <tr><td>Real estate agents</td><td>0</td><td>0</td></tr>
+      <tr><td>Property management</td><td>1</td><td>1</td></tr>
+      <tr><td>Immigration</td><td>0</td><td>2</td></tr>
+      <tr><td>Music and entertainment law</td><td>1</td><td>3</td></tr>
+      <tr><td>Healthcare law</td><td>0</td><td>1</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>3</strong></td><td><strong>9</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>An exact match on bold text finds 3 firms on all three lists; reading the answers finds 9. The six it missed were all written differently from one answer to the next: a short name in one and the long legal name in another, a lawyer's name in bold with the firm in brackets after it, a firm attached to a person with a dash. For a business owner checking their own visibility, search the full answer for your name and its variants, not only the highlighted list.</p>
+
+  <h2>How each engine answered</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th></th><th>ChatGPT</th><th>Claude</th><th>Gemini</th></tr></thead>
+    <tbody>
+      <tr><td>Firms named across the six answers</td><td>50</td><td>47</td><td>57</td></tr>
+      <tr><td>Average stored answer length, characters</td><td>4,476</td><td>2,872</td><td>3,575</td></tr>
+      <tr><td>Bold spans across the six answers</td><td>170</td><td>79</td><td>80</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>ChatGPT bolded twice as much as the others and named fewer firms than Gemini: many of its bold spans are ratings, rankings and questions to ask. A bold span is not always a firm.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What a Nashville business should do</div>
+    <p>Ask each engine your own buyer question, by name of your trade and "Nashville", and note which list you are on. Treat the three as separate channels: 101 of the 110 firms named here were missing from at least one engine, and 75 were on one list only.</p>
+    <p>If you are an agent or a lawyer, search for your own name as well as the firm's. The engines recommended people in some answers and firms in others, and in real estate they agreed on neither.</p>
+    <p>Pick one form of your firm's name and use it everywhere: your site, your Google Business Profile, your directory listings. Six of the nine firms all three engines named were written in different forms across the answers. Read the answers for what they say about you too, not only whether you are in them.</p>
+  </div>""",
+))

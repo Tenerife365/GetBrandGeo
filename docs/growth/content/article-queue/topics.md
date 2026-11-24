@@ -156,7 +156,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 25 | draft-city-portland | published bg-121 2026-11-14 | What the three engines recommend in Portland, Oregon, and where they agree |
 | 26 | draft-city-lasvegas | published bg-124 2026-11-17 | What the three engines recommend in Las Vegas, and where they agree |
 | 27 | draft-city-orlando | published bg-127 2026-11-20 | What the three engines recommend in Orlando, and where they agree |
-| 28 | city-nashville | ready from 2026-11-24 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Nashville, and where they agree |
+| 28 | city-nashville | published bg-131 2026-11-24 | What the three engines recommend in Nashville, and where they agree |
 | 29 | city-sacramento | ready from 2026-11-27 (pre-checked 2026-11-06, third basis) | What the three engines recommend in Sacramento, and where they agree |
 | 30 | city-later | held 2026-11-06 for December: Indianapolis, Columbus, Jacksonville, San Jose (fewest firms named by all three engines: 1, 1, 1 and 2), at the same cadence | City studies after November |
 | 31 | agreement-by-trade | dropped 2026-11-06: on the November basis the 28 firms named by all three engines are 9 property managers, 6 home builders, 4 breweries and 3 lobbying firms against 6 law firms, but BG-016 already reports when engines agree and when they do not | Which kinds of business all three engines agree on |
