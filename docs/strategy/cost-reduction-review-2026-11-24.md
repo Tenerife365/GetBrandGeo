@@ -489,8 +489,9 @@ the repo, because the prompts are client data:
 (`run.js`, `score.js`, `input.json` with the 126 active prompts of clients 1,
 2 and 54 and their brand configs).
 
-To run it, with the production OpenAI key, in PowerShell (about 10 to 20 minutes,
-about EUR 11 to 12):
+The full same-day version, superseded by the ruling in 8.5, kept for the
+record. With the production OpenAI key, in PowerShell (about 10 to 20
+minutes, about EUR 11 to 12):
 
 1. `cd "C:\Users\const\AppData\Roaming\Claude\side-session-notes\local_3fa72013-04fd-4d86-a195-4bf5ec3261a8\chatgpt-paired-test"`
 2. `$k = Read-Host "OpenAI key" -AsSecureString; $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k))`
@@ -500,6 +501,47 @@ about EUR 11 to 12):
 The key is read without echo and lives only in that PowerShell window. Paste
 the output of step 4 into a session to record it here.
 
-A cheaper variant, if wanted: run only the gpt-4o-mini arm (about EUR 0.30)
-and pair it with the stored weekly gpt-5.5 row of the same day. It is weaker,
-because the two answers are not taken at the same minute.
+### 8.5 Ruling: the mini arm only, paired with stored gpt-5.5 rows
+
+Constantin ruled on 2026-11-24 to run only the gpt-4o-mini arm (about
+EUR 0.30) and pair each answer with the latest stored gpt-5.5 row for the
+same prompt, instead of buying 126 fresh gpt-5.5 answers (about EUR 11).
+
+The stored arm is ready. For every one of the 126 prompts the latest ok
+`chatgpt` row in `ai_results` is gpt-5.5 (126 of 126, no other model). Those
+rows were read once and written to `out-mini.jsonl` in the kit folder, as arm
+`full` with `source: stored`:
+
+| Client | Stored rows | Brand mentioned | Metered EUR | Checked on |
+|---|---|---|---|---|
+| 1 | 56 | 39 | 5.30 | 2026-11-14 |
+| 2 | 15 | 1 | 1.47 | 2026-11-15 |
+| 54 | 55 | 7 | 4.36 | 2026-11-12 (26) and 2026-11-19 (29) |
+| All | 126 | 47 | 11.13 | |
+
+`run.js` skips every prompt and arm already in its output file, so on this
+file it queues exactly the 126 mini calls and no gpt-5.5 call. `score.js`
+scores it unchanged.
+
+Limits of this variant, to weigh when reading the result:
+
+1. The two answers of a pair are 5 to 12 days apart, not taken in the same
+   minute. Some disagreement is the web changing, not the model, so a FAIL
+   here is weaker evidence against mini than a FAIL in the same-day test.
+   A PASS is still a fair PASS.
+2. The stored rows keep no search count, so `score.js` reports 0 searches
+   for the `full` arm. Only the mini arm's search rate is measured.
+3. 26 client 54 rows, the ones from 2026-11-12, carry no location stamp
+   (`asked_market_id` null). They predate the stamp, and the client's only
+   location is Worldwide, which is what `input.json` uses.
+
+To run it, in PowerShell with the production OpenAI key (a few minutes):
+
+1. `cd "C:\Users\const\AppData\Roaming\Claude\side-session-notes\local_3fa72013-04fd-4d86-a195-4bf5ec3261a8\chatgpt-paired-test"`
+2. `$k = Read-Host "OpenAI key" -AsSecureString; $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($k))`
+3. `node run.js "C:\Users\const\Constantin Daniel Goane\BrandGEO\brandgeo-dashboard\netlify\functions\_collect.js" input.json out-mini.jsonl`
+4. `node score.js out-mini.jsonl`
+
+Step 3 should print `jobs to run: 126`. If it prints 252, the file is
+missing and it would buy the gpt-5.5 arm too: stop it with Ctrl+C. Paste the
+output of step 4 into a session to record the verdict here.
