@@ -58,6 +58,9 @@ export interface SummaryResponse {
       outage_llms: string[]
     }
     budget_watch: { customers_measured: number; over_80: number; over_90: number; over_100: number }
+    /** Clients vs internal research (plan source 'internal_research' or category
+     *  'research'), with this month's API cost split the same way. */
+    census: { clients: number; internal_research: number; client_cost_eur: number; internal_research_cost_eur: number }
   }
   clients: ClientActivityRow[]
   spend_check: {

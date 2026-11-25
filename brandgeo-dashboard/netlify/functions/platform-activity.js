@@ -40,7 +40,10 @@
 const crypto = require('crypto')
 const { createClient } = require('@supabase/supabase-js')
 const authMod = require('./_auth')
-const { PLAN_MONTHLY_API_BUDGET_EUR, PLAN_LIVE_ENGINES, activeEnginesFor, RESEARCH_CATEGORY } = require('./_cost')
+const { PLAN_MONTHLY_API_BUDGET_EUR, PLAN_LIVE_ENGINES, activeEnginesFor } = require('./_cost')
+// Internal research = plan source 'internal_research' or category 'research'
+// (ruling 2026-11-25). Never a client in any tile, count or budget figure.
+const { isInternalResearch, splitCensus } = require('./_internal_research')
 
 // ── constants (spec 3.1), exported for the test ─────────────────────────────
 const FEED_DEFAULT_LOOKBACK_MS = 24 * 3600 * 1000
@@ -172,7 +175,7 @@ async function buildSummary(supabase, invId) {
 
   // S1, S2, S3, S5 in parallel.
   const [clients, profiles, signIns, runs] = await Promise.all([
-    loadClients(supabase, 'id, name, plan, category, engines_enabled'),
+    loadClients(supabase, 'id, name, plan, category, plan_source, engines_enabled'),
     loadProfiles(supabase),
     loadSignIns(supabase),
     read('collection_runs', supabase.from('collection_runs')
@@ -185,8 +188,8 @@ async function buildSummary(supabase, invId) {
 
   const clientById = new Map()
   for (const c of clients) clientById.set(String(c.id), c)
-  const isResearchId = (id) => { const c = clientById.get(String(id)); return !!c && c.category === RESEARCH_CATEGORY }
-  const isCustomerId = (id) => { const c = clientById.get(String(id)); return !!c && c.category !== RESEARCH_CATEGORY }
+  const isResearchId = (id) => { const c = clientById.get(String(id)); return !!c && isInternalResearch(c) }
+  const isCustomerId = (id) => { const c = clientById.get(String(id)); return !!c && !isInternalResearch(c) }
 
   const profileById = new Map()
   for (const p of profiles) if (p && p.id) profileById.set(p.id, p)
@@ -329,7 +332,7 @@ async function buildSummary(supabase, invId) {
     const spent = round(a.spent, 4)
     const pct = budgetEur > 0 ? round((a.spent / budgetEur) * 100, 1) : null
     const level = pct === null ? 'ok' : pct >= BUDGET_BAD_PCT ? 'bad' : pct >= BUDGET_WARN_PCT ? 'warn' : 'ok'
-    const isResearch = c.category === RESEARCH_CATEGORY
+    const isResearch = isInternalResearch(c)
     if (!isResearch && pct !== null) {
       budget.customers_measured += 1
       if (pct >= BUDGET_WARN_PCT) budget.over_80 += 1
@@ -376,6 +379,11 @@ async function buildSummary(supabase, invId) {
     return x.name < y.name ? -1 : x.name > y.name ? 1 : 0
   })
 
+  // Census: clients on one side, internal research on the other, with this
+  // month's API cost split the same way. Internal research cost is our own
+  // cost, never client cost.
+  const census = splitCensus(clients, Object.fromEntries(rows.map((r) => [r.client_id, r.spent_eur])))
+
   // Tile 3.
   const errorRate = health.calls > 0 ? round(health.errors / health.calls, 4) : null
   const byLlmArr = Array.from(byLlm.values()).sort((x, y) => (y.errors - x.errors) || (x.llm < y.llm ? -1 : x.llm > y.llm ? 1 : 0))
@@ -415,6 +423,7 @@ async function buildSummary(supabase, invId) {
         outage_llms: outage.map(scrubDetail).filter(Boolean),
       },
       budget_watch: budget,
+      census,
     },
     clients: rows,
     spend_check: { paged_total_eur: pagedTotalR, rpc_total_eur: rpcTotal, delta_eur: delta, null_cost_rows: nullCostRows },
@@ -513,7 +522,7 @@ async function buildFeed(supabase, sinceMs, untilMs, limit) {
     read('collection_jobs', windowed(supabase.from('collection_jobs').select('id, client_id, attempts, engines, error, finished_at').eq('status', 'failed'), 'finished_at', since, until)),
     read('engine_errors', windowed(supabase.from('ai_results').select('id, client_id, llm, error_code, checked_at').eq('status', 'error'), 'checked_at', since, until)),
     read('account_deleted', windowed(supabase.from('admin_notifications').select('id, client_id, created_at').eq('type', 'account_deleted'), 'created_at', since, until)),
-    loadClients(supabase, 'id, name, category'),
+    loadClients(supabase, 'id, name, category, plan_source'),
     loadProfiles(supabase),
     loadSignIns(supabase),
   ])
@@ -536,7 +545,7 @@ async function buildFeed(supabase, sinceMs, untilMs, limit) {
       tone,
       client_id: Number.isFinite(cid) ? cid : null,
       client_name: c ? scrubClientName(c.name, c.id) : null,
-      is_research: !!c && c.category === RESEARCH_CATEGORY,
+      is_research: !!c && isInternalResearch(c),
       actor_role: actorRole,
       detail,
     })

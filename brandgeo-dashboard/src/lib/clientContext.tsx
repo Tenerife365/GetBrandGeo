@@ -21,7 +21,7 @@ export interface Client {
   created_at:        string | null   // fallback for "client since" on the profile
   subscription_started_at: string | null  // manual billing date (Managed/Pro, non-Stripe)
   paid_until:        string | null   // manual "paid until" date (Managed/Pro, non-Stripe)
-  plan_source:       string | null   // stripe | manual | trial | comp | signup | expired
+  plan_source:       string | null   // a PlanSource (planConfig.ts): stripe | manual | package | trial | comp | signup | expired | internal_research
   plan_grant_until:  string | null   // trial/comp expiry date (auto-reverts to free)
   plan_grant_note:   string | null   // internal label for a grant
   // Per-client AI Social channel allowance. NULL = no override, use the plan

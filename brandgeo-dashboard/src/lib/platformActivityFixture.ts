@@ -82,6 +82,7 @@ export function fixtureSummary(base: number = Date.now()): SummaryResponse {
         level: 'warn', reason: 'rate', outage_llms: [],
       },
       budget_watch: { customers_measured: 5, over_80: 2, over_90: 1, over_100: 0 },
+      census: { clients: 6, internal_research: 1, client_cost_eur: 12.4, internal_research_cost_eur: 0.97 },
     },
     clients,
     spend_check: { paged_total_eur: 74.9, rpc_total_eur: 74.9, delta_eur: 0, null_cost_rows: 0 },

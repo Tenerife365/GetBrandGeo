@@ -25,6 +25,7 @@ const { requireAuth, readBrandAccount } = require('./_auth');
 const { isValidPlan, planRank, planUnlocks, PLAN_LABELS, PLAN_ORDER } = require('./_plans');
 const { refreshCadenceFor } = require('./_cost');
 const { sendBrandedEmail, APP_URL } = require('./_email');
+const { INTERNAL_RESEARCH_PLAN_SOURCE, RESEARCH_CATEGORY } = require('./_internal_research');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const GRANT_TYPES = new Set(['manual', 'trial', 'comp']);
@@ -99,6 +100,15 @@ function buildNotice({ brandName, fromPlan, toPlan, grantType, grantUntil, messa
   };
 }
 
+// True when the plan must not be changed from here: plan source
+// 'internal_research' AND category still 'research'. Moving the category is the
+// explicit act that unlocks it.
+function isInternalResearchLocked(client) {
+  return !!client
+    && client.plan_source === INTERNAL_RESEARCH_PLAN_SOURCE
+    && client.category === RESEARCH_CATEGORY;
+}
+
 exports.handler = async (event) => {
   const auth = await requireAuth(event, { adminOnly: true });
   if (auth.response) return auth.response;
@@ -146,6 +156,24 @@ exports.handler = async (event) => {
   const { data: client, error: ce } = await supabase
     .from('clients').select('id, name, plan, category, plan_source, stripe_subscription_id').eq('id', client_id).single();
   if (ce || !client) return { statusCode: 404, headers, body: JSON.stringify({ error: 'client not found' }) };
+
+  // Internal research guard (2026-11-25). A row whose plan source is
+  // 'internal_research' is one of BrandGEO's own city research workspaces; its
+  // plan exists only to pick research engines. This endpoint would overwrite
+  // plan_source with manual, trial or comp, which turns an internal workspace
+  // into what every report reads as a client grant. So it is refused while the
+  // row is still in the Research category. To make it a real client, the admin
+  // first moves the category (set-client-category.js, the Category control in
+  // the client switcher), and then sets the plan here.
+  if (isInternalResearchLocked(client)) {
+    return {
+      statusCode: 409, headers,
+      body: JSON.stringify({
+        error: 'This is an internal research workspace. Move it out of the Research category first, then change its plan.',
+        code: 'internal_research_locked',
+      }),
+    };
+  }
 
   const fromPlan = client.plan || 'free';
 
@@ -254,3 +282,5 @@ exports.handler = async (event) => {
     }),
   };
 };
+
+exports.isInternalResearchLocked = isInternalResearchLocked;

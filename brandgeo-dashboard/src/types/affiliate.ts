@@ -1,3 +1,4 @@
+import type { PlanSource } from '../lib/planConfig'
 /**
  * Affiliate module types. Mirrors the JSON shapes returned by
  * netlify/functions/affiliate-admin.js and affiliate-portal.js. Money arrives
@@ -535,7 +536,7 @@ export interface AdminAccount {
   name: string
   slug: string | null
   plan: string | null
-  plan_source: string | null
+  plan_source: PlanSource | null
   plan_grant_until: string | null
   plan_grant_note: string | null
   paid_until: string | null
