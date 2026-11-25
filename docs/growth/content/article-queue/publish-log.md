@@ -28,3 +28,4 @@ One line per published article, newest last.
 - 2026-11-22 BG-129 https://getbrandgeo.com/bg-129.html From Tracking to Acting: What the Agent Features in AI Visibility Tools Say They Do
 - 2026-11-23 BG-130 https://getbrandgeo.com/bg-130.html What 45 GEO Studies Agree On, and Where the Evidence Is Thin
 - 2026-11-24 BG-131 https://getbrandgeo.com/bg-131.html AI Visibility in Nashville: Three Engines Agree on Music Lawyers, Not on Real Estate Agents
+- 2026-11-25 BG-132 https://getbrandgeo.com/bg-132.html Do AI Overviews Show Up on 68% or 40% of Local Searches? Why Two Studies Disagree
