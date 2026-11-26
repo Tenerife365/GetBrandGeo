@@ -1,9 +1,12 @@
 -- supabase-internal-research-plan-source-2026-11-25.sql
 --
--- NOT YET APPLIED. Written 2026-11-25 on branch
--- feat/internal-research-plan-source. Apply only on Constantin's go, in the
--- Supabase dashboard, SQL Editor, project duiyifepitvugyulobqm, or through
--- the connector's apply_migration (paste the body WITHOUT begin and commit).
+-- APPLIED 2026-11-26 through the connector's apply_migration on Constantin's
+-- "run the migration now on your own", as
+-- internal_research_plan_source_2026_11_25. Pre-checks P1 to P3 matched
+-- before it ran; R1 to R3 read back as expected (37 internal_research rows,
+-- all research and pro, 0 outside research, census clients 37 and
+-- internal research 37 out of 74 rows). Written 2026-11-25 on branch
+-- feat/internal-research-plan-source.
 --
 -- What it does: gives BrandGEO's 37 internal city research workspaces their
 -- own plan source, 'internal_research', so no report counts them as clients
