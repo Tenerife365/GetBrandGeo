@@ -170,7 +170,7 @@ dropped. 21 November has no row, so it takes any eligible topic left over (rule 
 | 39 | draft-tool-agents | published bg-129 2026-11-22 | What the agent features in Peec, Scrunch and Profound say they do |
 | 40 | draft-geo-survey | published bg-130 2026-11-23 | What a 2026 survey of 45 GEO studies finds well supported, and what thin |
 | 41 | draft-aio-local-studies | published bg-132 2026-11-25 | Why two studies put AI Overviews on 68% and 40% of local searches |
-| 42 | draft-ai-mode-booking | ready from 2026-11-26 (draft, rule 5) | What a local business needs for Google AI Mode to book it |
+| 42 | draft-ai-mode-booking | published bg-133 2026-11-26 | What a local business needs for Google AI Mode to book it |
 | 43 | draft-tool-ownership | ready from 2026-11-28 (draft, rule 5) | Who owns the main AI visibility tools after the past year's deals |
 | 44 | draft-roundup-oct-nov | ready from 2026-11-29 (draft, rule 5) | What changed in AI search from 1 October to 6 November 2026 |
 | 45 | draft-year-end-checks | ready from 2026-11-30 (draft, rule 5) | Five things a local firm should check in AI answers before the new year |
