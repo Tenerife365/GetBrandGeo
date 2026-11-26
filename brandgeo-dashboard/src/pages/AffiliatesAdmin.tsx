@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState'
 import { PageTitle, SectionHeading, StatLabel, StatValue } from '../components/Typography'
 import { affiliatePost, downloadCsv, fmtDate, money, copyText, StatusPill } from '../lib/affiliateApi'
 import { AFFILIATE_TABS, affiliateTabOf, owedLabel, publishAffiliateOverview } from '../lib/affiliateNavStore'
+import { isInternalResearch } from '../lib/planConfig'
 import {
   CONVERSION_TYPES, COMMISSION_STATUSES, PAYOUT_METHODS, PAYOUT_METHOD_LABELS,
   type AdminOverview, type AffiliateProgram, type ProgramInput, type AdminAffiliate, type AdminMembership, type AffiliateApplication,
@@ -893,6 +894,7 @@ function ConversionsTab({ programs, onChanged }: { programs: AffiliateProgram[];
 
 const PLAN_SOURCE_LABELS: Record<string, string> = {
   manual: 'assigned by hand', package: 'package', trial: 'free trial', comp: 'complimentary', stripe: 'Stripe subscription', signup: 'signup', expired: 'expired',
+  internal_research: 'internal research',
 }
 
 const DEMO_ACCOUNTS: AdminAccount[] = [
@@ -1203,7 +1205,7 @@ function AttachAccountModal({ programs, onClose, onDone }: { programs: Affiliate
   useEffect(() => {
     if (isDemoMode) { setAccounts(DEMO_ACCOUNTS); setLoadingAccounts(false); return }
     api<{ accounts: AdminAccount[] }>({ action: 'accounts.list', limit: 1000 }).then((r) => {
-      if (r.data) setAccounts(r.data.accounts.filter((a) => a.category !== 'research'))
+      if (r.data) setAccounts(r.data.accounts.filter((a) => !isInternalResearch(a)))
       setLoadingAccounts(false)
     })
   }, [])

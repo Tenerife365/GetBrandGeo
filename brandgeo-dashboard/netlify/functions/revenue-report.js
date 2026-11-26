@@ -91,7 +91,7 @@ const PRICE_TO_PLAN = {
 const PIPELINE_WINDOW_DAYS = 60
 const PIPELINE_ENGAGED_WEEKS = 3
 const PIPELINE_PLANS = ['free']
-const RESEARCH_CATEGORY = 'research'
+const { isInternalResearch } = require('./_internal_research')
 
 /**
  * Hard ceiling per Stripe collection. Reaching it produces a warning ON THE PAGE
@@ -202,7 +202,7 @@ exports.handler = async (event) => {
     // can skip or repeat rows across pages. Not reachable at today's row
     // counts, but ai_results already holds more rows than one page.
     const clients = await selectAll('clients', () =>
-      supabase.from('clients').select('id, name, plan, category, stripe_customer_id').order('id'), warn)
+      supabase.from('clients').select('id, name, plan, category, plan_source, stripe_customer_id').order('id'), warn)
 
     // ── Stripe ──────────────────────────────────────────────────────────────
     // Constructed HERE, not at module load, so a missing key produces a
@@ -291,7 +291,7 @@ exports.handler = async (event) => {
 
     // ── Engagement pipeline (contract §9) ───────────────────────────────────
     const pipelineClients = clients.filter((c) =>
-      c && PIPELINE_PLANS.includes(c.plan) && c.category !== RESEARCH_CATEGORY)
+      c && PIPELINE_PLANS.includes(c.plan) && !isInternalResearch(c))
 
     const windowStartIso = new Date(Date.now() - PIPELINE_WINDOW_DAYS * 86400000).toISOString()
     const pipelineRows = pipelineClients.length === 0 ? [] : await selectAll('ai_results (pipeline)', () =>

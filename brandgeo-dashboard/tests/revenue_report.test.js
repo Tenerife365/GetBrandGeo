@@ -608,12 +608,15 @@ section('9. full aggregation for August 2026 (contract §5, §6b)')
   assert.strictEqual(plan('essentials').netRevenueEur, 79.20)
   ok('byPlan essentials: EUR 99.00 paid less EUR 19.80 commission = net EUR 79.20')
 
-  // pro: the research study. No invoices at all, EUR 45.00 of cost.
+  // internal_research: the research study (plan 'pro', category 'research').
+  // Since 2026-11-25 its cost is internal cost, its own line, never the 'pro'
+  // plan row. No invoices at all, EUR 45.00 of cost.
   //   net = 0 - 0 - 0 - 45.00 = EUR -45.00
-  assert.strictEqual(plan('pro').grossInvoicedEur, 0)
-  assert.strictEqual(plan('pro').invoiceCount, 0)
-  assert.strictEqual(plan('pro').netRevenueEur, -45.00)
-  ok('byPlan pro: no revenue, EUR 45.00 of research cost, net EUR -45.00')
+  assert.strictEqual(plan('pro'), undefined)
+  assert.strictEqual(plan('internal_research').grossInvoicedEur, 0)
+  assert.strictEqual(plan('internal_research').invoiceCount, 0)
+  assert.strictEqual(plan('internal_research').netRevenueEur, -45.00)
+  ok('byPlan internal_research: no revenue, EUR 45.00 of internal cost, net EUR -45.00; no pro row')
 
   // byPlan MUST sum to global, or the page contradicts itself on screen.
   const sumBy = (rows, key) => round2(rows.reduce((s, r) => s + r[key], 0))

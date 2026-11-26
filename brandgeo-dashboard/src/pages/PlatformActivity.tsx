@@ -24,6 +24,7 @@ import {
   type SummaryResponse,
 } from '../lib/platformActivity'
 import { createFixtureActivitySource, fixtureSummary } from '../lib/platformActivityFixture'
+import { INTERNAL_RESEARCH_LABEL, internalResearchLine } from '../lib/planConfig'
 
 const TONE_TO_BADGE: Record<FeedTone, BadgeTone> = {
   neutral: 'neutral', info: 'accent', ok: 'pos', warn: 'warn', bad: 'neg',
@@ -93,7 +94,7 @@ function ClientsTable({ clients, now, partial }: { clients: ClientActivityRow[];
               <td className={tableClasses.td}>
                 <span className="block max-w-[220px] truncate">{c.name}</span>
               </td>
-              <td className={tableClasses.tdMuted}>{c.plan_known ? planText(c.plan) : `${c.plan || 'none'} (unknown)`}</td>
+              <td className={tableClasses.tdMuted}>{c.is_research ? INTERNAL_RESEARCH_LABEL : c.plan_known ? planText(c.plan) : `${c.plan || 'none'} (unknown)`}</td>
               <td className={tableClasses.td}>
                 <div className="flex items-center gap-3 min-w-[180px]">
                   <span className="tabular-nums w-14 text-right shrink-0">{c.requests_month}</span>
@@ -223,6 +224,7 @@ export default function PlatformActivity() {
   const tableClients = showResearchTable ? allClients : allClients.filter((c) => !c.is_research)
   const health = data?.tiles.engine_health_24h
   const watch = data?.tiles.budget_watch
+  const census = data?.tiles.census
   const monthTruncated = !!data?.truncated.ai_results_month
   const headStatus: SourceStatus = stopped ? 'stopped' : feedStatus
   // Server warnings (failed gate RPC, spend delta, any capped read) are shown
@@ -381,9 +383,10 @@ export default function PlatformActivity() {
         <SectionHeader
           title={<span id="pa-clients">Clients</span>}
           count={tableClients.length}
+          description={census ? `${census.clients} clients, EUR ${census.client_cost_eur.toFixed(2)} client cost this month. ${internalResearchLine(census.internal_research)}, EUR ${census.internal_research_cost_eur.toFixed(2)} internal cost.` : undefined}
           actions={researchCount > 0 ? (
             <Chip selected={showResearchTable} onClick={() => setShowResearchTable((v) => !v)}>
-              {`Show research (${researchCount})`}
+              {`Show ${internalResearchLine(researchCount).toLowerCase()}`}
             </Chip>
           ) : undefined}
         />

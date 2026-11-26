@@ -620,6 +620,52 @@ export type RefreshCadence = 'manual' | 'weekly' | 'biweekly' | 'monthly'
 /** The category that is NEVER given an automatic cadence. See refreshCadenceFor. */
 export const RESEARCH_CATEGORY = 'research'
 
+/** Every value clients.plan_source can hold. There is no CHECK on the column;
+ *  this union is the list the code knows how to show.
+ *  'internal_research' (2026-11-25, Constantin's ruling): BrandGEO's own city
+ *  research workspaces. Not a client, not compensated, never counted as one.
+ *  Server mirror: netlify/functions/_internal_research.js, pinned to this file
+ *  by tests/internal_research.test.js. */
+export type PlanSource =
+  | 'stripe' | 'manual' | 'package' | 'trial' | 'comp' | 'signup' | 'expired'
+  | 'internal_research'
+
+export const INTERNAL_RESEARCH_PLAN_SOURCE = 'internal_research'
+export const INTERNAL_RESEARCH_LABEL = 'Internal research'
+
+/** Display label per plan source, for admin surfaces. */
+export const PLAN_SOURCE_LABELS: Record<PlanSource, string> = {
+  stripe: 'Stripe subscription',
+  manual: 'Assigned by hand',
+  package: 'Package',
+  trial: 'Free trial',
+  comp: 'Complimentary',
+  signup: 'Signup',
+  expired: 'Expired',
+  internal_research: INTERNAL_RESEARCH_LABEL,
+}
+
+/** One rule for "this row is internal research, not a client", used by every
+ *  count, census and report. The plan source is the new marker; category
+ *  'research' is kept as a second signal so a row reads the same before and
+ *  after the 2026-11-25 migration, and so a research row can never fall back
+ *  into the client count through a missing plan source. */
+export function isInternalResearch(c: { plan_source?: string | null; category?: string | null } | null | undefined): boolean {
+  if (!c) return false
+  return c.plan_source === INTERNAL_RESEARCH_PLAN_SOURCE || c.category === RESEARCH_CATEGORY
+}
+
+/** "Internal research (37)": the one line these rows get in any count. */
+export function internalResearchLine(n: number): string {
+  return `${INTERNAL_RESEARCH_LABEL} (${n})`
+}
+
+/** Plan source label, falling back to the raw value for one this file does not know. */
+export function planSourceLabel(source: string | null | undefined): string | null {
+  if (!source) return null
+  return (PLAN_SOURCE_LABELS as Record<string, string>)[source] ?? source
+}
+
 /** The category a brand-new clients row lands in. This is the DB default from
  *  db/supabase-clients-category-migration.sql (`category text NOT NULL DEFAULT
  *  'active'`), stated as a constant because three provisioning paths insert a

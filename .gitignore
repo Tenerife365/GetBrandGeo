@@ -133,3 +133,6 @@ docs/growth/outbound/**
 # 2026-09-03: the GTM verify reports quote the exact To addresses and profile
 # URLs they check, so they carry the same live contact data as the packs.
 docs/growth/qa/**
+
+# Local run outputs (read-only lists, may name real accounts). Repo is public.
+_runs/

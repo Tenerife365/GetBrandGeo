@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { supabase, isDemoMode } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
-import { PLAN_LABELS, PLAN_ORDER, featureUnlockPlan, type Plan } from '../lib/planConfig'
+import { PLAN_LABELS, PLAN_ORDER, featureUnlockPlan, type Plan, isInternalResearch, INTERNAL_RESEARCH_LABEL, INTERNAL_RESEARCH_PLAN_SOURCE, RESEARCH_CATEGORY } from '../lib/planConfig'
 import { PageTitle } from '../components/Typography'
 import {
   buttonClasses, Card, SectionHeader, Badge, Button, IconButton, Combobox, MultiCombobox, SkeletonBlock,
@@ -37,6 +37,7 @@ interface ClientEvent {
 
 const GRANT_TYPE_LABELS: Record<string, string> = {
   manual: 'Assign plan', trial: 'Free trial', comp: 'Complimentary', stripe: 'Stripe', signup: 'Signup', expired: 'Expired',
+  package: 'Package', internal_research: INTERNAL_RESEARCH_LABEL,
 }
 
 /** Plan ladder for the "plans as blocks" section — display prices only (source
@@ -613,9 +614,18 @@ export default function Account() {
    * broken string "— plan" rather than as an absence (UI/UX audit 2026-07-30, F4).
    * Every consumer below now words its own empty case.
    */
+  // An internal research workspace shows as that, never as the 'pro' plan it
+  // carries only to pick research engines (ruling 2026-11-25).
   const planLabel: string | null = activeClient
-    ? (PLAN_LABELS[activeClient.plan as keyof typeof PLAN_LABELS] ?? activeClient.plan)
+    ? (isInternalResearch(activeClient)
+        ? INTERNAL_RESEARCH_LABEL
+        : (PLAN_LABELS[activeClient.plan as keyof typeof PLAN_LABELS] ?? activeClient.plan))
     : null
+  // Mirrors set-client-plan.js isInternalResearchLocked: the server refuses a
+  // plan change on such a row until its category leaves Research.
+  const internalResearchLocked = !!activeClient
+    && activeClient.plan_source === INTERNAL_RESEARCH_PLAN_SOURCE
+    && activeClient.category === RESEARCH_CATEGORY
   const hasStripe = !!activeClient?.stripe_customer_id
   // Show the legacy Pro block only for a client still on it (see PLAN_TIERS comment
   // above). Insert it where planConfig.ts's PLAN_ORDER puts it, before Enterprise,
@@ -913,6 +923,14 @@ export default function Account() {
             )}
           </div>
 
+          {internalResearchLocked && (
+            <p className="text-xs text-amber-300 mb-4 max-w-xl">
+              {/* copy: pending bg-copy */}
+              Internal research workspace: not a client, no compensation. Its plan only picks the research engines.
+              To make it a client, move it out of the Research category first, then change the plan here.
+            </p>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-4 max-w-xl">
             <label className="block">
               <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Plan</span>
@@ -963,7 +981,7 @@ export default function Account() {
           )}
 
           <div className="flex items-center gap-3 mt-5 flex-wrap">
-            <button onClick={savePlan} disabled={planSaving} className={primaryBtn}>
+            <button onClick={savePlan} disabled={planSaving || internalResearchLocked} className={primaryBtn}>
               {planSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
               {grantType === 'manual' ? 'Apply plan' : grantType === 'trial' ? 'Grant trial' : 'Grant complimentary'}
             </button>

@@ -25,7 +25,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useClient } from '../lib/clientContext'
 import { useTimeFilter } from '../lib/timeFilterContext'
-import { ENGINE_META, ENGINE_COST_EUR, PLAN_LABELS, type EngineId, type Plan } from '../lib/planConfig'
+import { ENGINE_META, ENGINE_COST_EUR, PLAN_LABELS, type EngineId, type Plan, isInternalResearch, internalResearchLine, INTERNAL_RESEARCH_LABEL, INTERNAL_RESEARCH_PLAN_SOURCE } from '../lib/planConfig'
 import { PageTitle, SectionHeading } from '../components/Typography'
 import { useChartTheme } from '../lib/chartTheme'
 
@@ -104,7 +104,9 @@ interface ClientUsage {
 const RESEARCH_ROW_ID = -1
 
 /**
- * Collapse every `category = 'research'` client into one row.
+ * Collapse every internal research client into one row: plan source
+ * 'internal_research' or category 'research' (planConfig.ts isInternalResearch).
+ * The row reads "Internal research (N)" and is our own cost, not a client's.
  *
  * There are 27 of these, one per city study, and they drowned the eight real
  * customers in the table. They are also not customers: we trigger every one of
@@ -122,8 +124,8 @@ const RESEARCH_ROW_ID = -1
  * Cost is untouched: the collapsed row sums its members exactly, so the table
  * total is the same number before and after grouping.
  */
-function collapseResearch(rows: ClientUsage[], clients: { id: number; category?: string | null }[]): ClientUsage[] {
-  const researchIds = new Set(clients.filter(c => c.category === 'research').map(c => c.id))
+function collapseResearch(rows: ClientUsage[], clients: { id: number; category?: string | null; plan_source?: string | null }[]): ClientUsage[] {
+  const researchIds = new Set(clients.filter(c => isInternalResearch(c)).map(c => c.id))
   if (researchIds.size === 0) return rows
 
   const research = rows.filter(r => researchIds.has(r.clientId))
@@ -131,7 +133,7 @@ function collapseResearch(rows: ClientUsage[], clients: { id: number; category?:
 
   const merged: ClientUsage = {
     clientId: RESEARCH_ROW_ID,
-    clientName: `Research (${research.length} ${research.length === 1 ? 'city' : 'cities'})`,
+    clientName: internalResearchLine(research.length),
     byEngine: {},
     totalResponses: 0,
     totalCost: 0,
@@ -252,7 +254,10 @@ async function authedPost<T>(fn: string, body: unknown): Promise<{ status: numbe
 }
 
 const eur = (n: number) => `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const planLabel = (p: string | null) => (p && p in PLAN_LABELS ? PLAN_LABELS[p as Plan] : (p ?? 'Unknown'))
+// 'internal_research' is the byPlan line _revenue.js gives internal research
+// cost (ruling 2026-11-25); it is not a plan and has no PLAN_LABELS entry.
+const planLabel = (p: string | null) => (p === INTERNAL_RESEARCH_PLAN_SOURCE ? INTERNAL_RESEARCH_LABEL
+  : p && p in PLAN_LABELS ? PLAN_LABELS[p as Plan] : (p ?? 'Unknown'))
 
 /** Function, not an object keyed by Attribution, `null` is a real member of
  *  that union and cannot be an object key, so a lookup table would render a
@@ -668,7 +673,7 @@ function CostSection({ displayRows, customerRows, customerTotal, researchTotal, 
           <p className="text-xs text-slate-500 mt-1">
             {customerRows.length} client{customerRows.length !== 1 ? 's' : ''}
             {researchTotal > 0 && (
-              <>, plus €{researchTotal.toFixed(2)} research</>
+              <>, plus €{researchTotal.toFixed(2)} internal research cost</>
             )}
           </p>
         </div>
@@ -1009,7 +1014,7 @@ export default function Revenue() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'clients', label: 'Clients' },
-    { id: 'research', label: 'Research' },
+    { id: 'research', label: 'Internal research' },
     { id: 'usage', label: 'Usage' },
     { id: 'cost', label: 'Cost' },
     { id: 'revenue', label: 'Revenue' },

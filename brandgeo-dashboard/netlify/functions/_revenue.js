@@ -56,6 +56,8 @@
  * months" is ambiguous at the boundary and a report that silently includes one
  * extra month overstates what is owed to a partner.
  */
+const { isInternalResearch, INTERNAL_RESEARCH_PLAN_SOURCE } = require('./_internal_research')
+
 const COMMISSION_RATE = 0.20
 const COMMISSION_WINDOW_MONTHS = 12
 
@@ -1018,10 +1020,15 @@ function aggregateRevenue({
     let bucket = bucketByClientId.get(clientId)
     if (!bucket) {
       const client = lookup(clientsById, clientId)
+      // Internal research (ruling 2026-11-25): BrandGEO's own city studies carry
+      // plan 'pro' only to pick their engines. Their cost is internal cost, so
+      // it lands in its own 'internal_research' line, never in the 'pro' plan
+      // row where it read as the cost of serving a client.
+      const internal = !!client && isInternalResearch(client)
       bucket = emptyBucket({
         clientId,
         clientName: client ? (client.name || `Client ${clientId}`) : `Client ${clientId}`,
-        plan: client ? (client.plan || null) : null,
+        plan: internal ? INTERNAL_RESEARCH_PLAN_SOURCE : (client ? (client.plan || null) : null),
         // NOT 'unattributed'. Contract §6b defines that value as "no client
         // resolved, clientId: null", and this row HAS a client; it simply has
         // no Stripe customer for the attribution question to be asked about.
@@ -1169,7 +1176,7 @@ function computeEngagementPipeline({
     // the handler filters them out. Repeated here so the function is correct on
     // any input, a research study appearing as an "upgrade opportunity" would
     // be a campaign aimed at ourselves.
-    if (client.category === 'research') continue
+    if (isInternalResearch(client)) continue
 
     const stat = activity.get(Number(client.id))
     const distinctActiveWeeks = stat ? stat.weeks.size : 0

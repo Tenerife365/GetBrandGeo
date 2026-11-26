@@ -269,7 +269,7 @@ async function main() {
   const S = sum.body
   sameKeys(S, ['generated_at', 'windows', 'tiles', 'clients', 'spend_check', 'truncated', 'warnings'], 'summary')
   sameKeys(S.windows, ['day_start_utc', 'month_start', 'last_24h_start', 'read_since'], 'windows')
-  sameKeys(S.tiles, ['active_users_24h', 'runs_today', 'engine_health_24h', 'budget_watch'], 'tiles')
+  sameKeys(S.tiles, ['active_users_24h', 'runs_today', 'engine_health_24h', 'budget_watch', 'census'], 'tiles')
   sameKeys(S.tiles.active_users_24h, ['viewers', 'clients'], 'active_users_24h')
   sameKeys(S.tiles.runs_today, ['customer', 'research', 'manual', 'scheduled', 'engine_calls'], 'runs_today')
   sameKeys(S.tiles.engine_health_24h, ['calls', 'ok', 'errors', 'error_rate', 'by_llm', 'level', 'reason', 'outage_llms'], 'engine_health_24h')

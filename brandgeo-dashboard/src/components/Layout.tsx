@@ -11,7 +11,7 @@ import { MARKETS, type Market } from '../lib/marketContext'
 import { useLocations, LocationFlag, SIDEBAR_VISIBLE_LOCATIONS, LOCATION_CHIP_MAX } from '../lib/locationsContext'
 import { locationLabel, promptCountLabel } from '../lib/locations'
 import { useClient } from '../lib/clientContext'
-import { hasFeature, PLAN_LABELS, type Plan } from '../lib/planConfig'
+import { hasFeature, PLAN_LABELS, type Plan, isInternalResearch, INTERNAL_RESEARCH_LABEL } from '../lib/planConfig'
 import { Building2 } from 'lucide-react'
 import SupportWidget from './SupportWidget'
 import BrandLogo from './BrandLogo'
@@ -90,9 +90,11 @@ const TIME_LABELS: Record<TimeRange, string> = {
 // explicit category='free' OR the actual plan='free', so real free-plan signups
 // land there automatically without needing to be categorised. (Master-DashboardDesign)
 type ClientGroupKey = 'active' | 'free' | 'test' | 'research' | 'archived'
-function clientBucket(c: { category?: string | null; plan?: string | null }): ClientGroupKey {
+// 'research' is the internal research bucket: plan source 'internal_research'
+// or category 'research', the one rule in planConfig.ts isInternalResearch.
+function clientBucket(c: { category?: string | null; plan?: string | null; plan_source?: string | null }): ClientGroupKey {
   if (c.category === 'test')     return 'test'
-  if (c.category === 'research') return 'research'
+  if (isInternalResearch(c))     return 'research'
   if (c.category === 'archived') return 'archived'
   if (c.category === 'free' || c.plan === 'free') return 'free'
   return 'active'
@@ -101,7 +103,7 @@ const CLIENT_GROUPS: { key: ClientGroupKey; label: string }[] = [
   { key: 'active',   label: 'Active' },
   { key: 'free',     label: 'Free' },
   { key: 'test',     label: 'Test' },
-  { key: 'research', label: 'Research' },
+  { key: 'research', label: INTERNAL_RESEARCH_LABEL },
   { key: 'archived', label: 'Archived' },
 ]
 // Customer-facing subscribers vs internal-use workspaces. Research (and archived)
@@ -166,7 +168,7 @@ function LocationsBlock({ onNavigate }: { onNavigate: () => void }) {
     </div>
   )
 
-  const planLabel = PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan] ?? 'your plan'
+  const planLabel = isInternalResearch(activeClient) ? INTERNAL_RESEARCH_LABEL : (PLAN_LABELS[(activeClient?.plan ?? 'free') as Plan] ?? 'your plan')
   const atLimit = used >= limit
   const viewerAtLimit = atLimit && !isAdmin
   const totalPrompts = locations.reduce((n, l) => n + l.active_prompts, 0)
