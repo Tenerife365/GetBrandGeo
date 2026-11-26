@@ -20,7 +20,45 @@
 
 ---
 
-## CURRENT STATE (newest entry 2026-11-16)
+## CURRENT STATE (newest entry 2026-11-26)
+
+### 2026-11-26: internal_research plan source, migration APPLIED, branch not pushed
+
+**Ruling, Constantin 2026-11-25: "Build new plan source".** BrandGEO's 37
+city research workspaces (ids 10 to 16, 28 to 47, 58 to 67) get
+`plan_source = 'internal_research'`, so no report counts them as clients
+or reads their Pro plan as a grant. `plan` stays `pro` (it decides which
+engines research collection runs on) and `category` stays `research`.
+`plan_source` has no CHECK constraint, and `expire-plan-grants.js` acts
+only on trial, comp and package, so it ignores the new value.
+
+**Database, APPLIED 2026-11-26** on Constantin's "run the migration now on
+your own", as `internal_research_plan_source_2026_11_25`
+(`db/supabase-internal-research-plan-source-2026-11-25.sql`, on the
+branch). The pre-checks matched first: 37 research rows, all pro, no
+plan_source, no Stripe ids, no grants, no logins, no research row outside
+the list, no constraint on the column. Read back: exactly 37
+`internal_research` rows, all research and pro, 0 outside research; census
+37 clients and 37 internal research out of 74 rows. The rollback is in the
+file footer. Until the branch is pushed, the live Account and Affiliates
+pages show the raw value `internal_research` as the source; nothing acts on
+it.
+
+**Code, branch `feat/internal-research-plan-source`, NOT pushed or
+merged.** `5a6316f` plus a header note on the migration file, 20 files: new
+`_internal_research.js` and its test; the revenue report, platform activity,
+`set-client-plan.js`, Account, Affiliates admin, Platform activity, Revenue,
+sidebar and client context treat `internal_research` (or category research)
+as internal research. `tsc` and build passed in the worktree. No file on
+the do-not-touch list was edited. Owed: merge, then push with
+`BATCH_PUSH=1` (one Netlify build), on Constantin's go. Not checked: the
+screens signed in.
+
+**Also 2026-11-25, recorded here:** client 134 was
+onboarded on Essentials with a 60 day trial ending 2027-01-24, no card.
+ChatGPT has failed with `quota_exceeded` on every call platform-wide since
+2026-11-19 20:14Z, most likely an empty OpenAI credit balance; Constantin is
+topping it up, then ChatGPT is re-run on client 134.
 
 ### 2026-11-16 (fourth): agency accounts release P1 LIVE (33bb181), all three migration files applied and read back
 
