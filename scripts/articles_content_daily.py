@@ -3377,3 +3377,142 @@ ARTICLES_DAILY.append(dict(
     <p>If you are in another category, ask AI Mode the question your customers ask and read what it says about you today. The booking step may reach your category later; the description already has.</p>
   </div>""",
 ))
+
+ARTICLES_DAILY.append(dict(
+    slug="bg-134", bid="BG-134", date="2026-11-27", date_label="November 27, 2026", read=6,
+    tags=["Original Research", "US Cities", "Sacramento"],
+    title="AI Visibility in Sacramento: Three Engines Agree on Property Managers, Not on Agents or Immigration Lawyers",
+    h1="AI Visibility in Sacramento: Engines Agree on <em>Property Managers</em>, Not on Agents",
+    h1_plain="AI Visibility in Sacramento: Engines Agree on Property Managers, Not on Agents",
+    subtitle="We asked ChatGPT, Claude and Gemini six local buyer questions about Sacramento. Between them they named 116 firms, and 14 were on all three lists: 5 property managers, and not one real estate agent or immigration firm.",
+    meta_desc="What ChatGPT, Claude and Gemini recommend in Sacramento: 18 answers to six local buyer questions, 116 firms named, and the 14 that all three engines named.",
+    og_desc="Six Sacramento buyer questions, three AI engines, 18 answers: 116 firms named, 14 on all three lists, 0 agents or immigration firms among them.",
+    ld_desc="BrandGEO study of 18 answers from ChatGPT, Claude and Gemini to six Sacramento buyer questions (personal injury, real estate agents, property management, immigration, lobbying and government relations, agricultural and water rights law), collected November 6, 2026, counting the firms all three engines named.",
+    keywords="ai visibility sacramento, chatgpt sacramento property management, sacramento lobbying firms ai, sacramento water law firms ai search, local business ai recommendations sacramento",
+    about=["AI Visibility Research", "Sacramento", "Local Search", "Engine Comparison"],
+    findings=[("14 of 116", "firms named by any engine were named by all three"),
+              ("5 of 17", "property managers were on all three lists"),
+              ("0 of 38", "real estate agents and immigration firms were on all three lists"),
+              ("3 vs 14", "firms on all three lists by exact bold match, and after reading the answers")],
+    faq=[("Which Sacramento businesses do AI engines agree on?",
+          "In our November 6, 2026 answers, all three engines named 14 firms: 5 property management companies, 3 personal injury firms, 3 lobbying and government relations firms and 3 water law firms. No real estate agent and no immigration firm appeared in all three answers."),
+         ("How many firms did the engines name in total?",
+          "116 different firms across the six questions. 14 were on all three lists, 25 on two and 77 on one engine only."),
+         ("How were the firms counted?",
+          "We took every name an engine put in bold, then read each of the three answers to the same question to see whether it named that firm anywhere, in bold or in running text. Ratings, directory names and advice were removed, and an individual named without a firm was not counted as a firm. Firms named after a person are reported as a count, not by name."),
+         ("Is this a ranking of Sacramento firms?",
+          "No. It counts what three engines wrote on one day. It does not say which firm is better, and it does not say why an engine named one firm and not another.")],
+    related=[("/bg-016.html", "BG-016", "Cross-Engine Consensus: When AI Engines Agree, and When They Don't",
+              "The wider study of when engines name the same firm."),
+             ("/bg-113.html", "BG-113", "How Often AI Engines Put a National Brand Next to Local Property Managers",
+              "What happens in property management answers across 20 cities."),
+             ("/bg-131.html", "BG-131", "AI Visibility in Nashville: Three Engines Agree on Music Lawyers, Not on Real Estate Agents",
+              "The same kind of city read, for Nashville.")],
+    cta_h="See what each engine says about your Sacramento business",
+    cta_p="Run the free audit on your own domain and read every engine's answer side by side. No signup and no card.",
+    og=dict(
+        fname="og-bg-134.png",
+        kicker="BG-134 · Original Research",
+        lines=[[("AI Visibility", "w")], [("in ", "w"), ("Sacramento", "g")]],
+        sub=["Six buyer questions, three engines,",
+             "18 answers, November 2026."],
+        stats=[("14 of 116", "firms named by all three engines", "Sacramento"),
+               ("5 of 17", "property managers on all three", "Sacramento"),
+               ("0 of 38", "agents and immigration firms on all three", "Sacramento"),
+               ("77", "firms named by one engine only", "Sacramento")],
+        footer="Three Engines, Three Lists",
+    ),
+    body="""  <p>Ask three AI engines the same question about Sacramento and you get three lists. We wanted to know how much those lists overlap, because a business that appears on only one of them is missing for buyers who use the other two.</p>
+
+  <p>On November 6, 2026 we put six local buyer questions about Sacramento to ChatGPT, Claude and Gemini: a personal injury law firm, real estate agents, a property management company, an immigration lawyer, and two questions written for the state capital, lobbying and government relations firms, and agricultural and water rights law firms. Then we counted the firms each engine named and the ones all three had in common.</p>
+
+  <div class="callout">
+    <div class="callout-label">How this was measured, and what it cannot tell you</div>
+    <p>18 answers: six questions, three engines (ChatGPT on gpt-5.5, Claude on claude-sonnet-4-6, Gemini on gemini-2.5-flash), all collected on November 6, 2026. We took every name an engine put in bold, then read each of the three answers to the same question to see whether it named that firm anywhere, in bold or in running text. Ratings, directory names and advice were removed, and a lawyer or agent named without a firm was not counted as a firm. Firms named after a person are reported as a count, not by name, and that covers most of the law firms here.</p>
+    <p>Claude's stored answers stop at about 3,000 characters and two of its six (personal injury and immigration) were cut mid-list, so its counts there are a lower bound. This is one day of answers. It does not rank anyone and it does not say why an engine chose a firm.</p>
+  </div>
+
+  <h2>116 firms named, 14 on all three lists</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Firms named by any engine</th><th>By all three</th><th>By two</th><th>By one only</th></tr></thead>
+    <tbody>
+      <tr><td>Top-rated property management companies in Sacramento</td><td>17</td><td>5</td><td>6</td><td>6</td></tr>
+      <tr><td>Best personal injury law firms in Sacramento</td><td>20</td><td>3</td><td>4</td><td>13</td></tr>
+      <tr><td>Best agricultural and water rights law firms in Sacramento</td><td>14</td><td>3</td><td>3</td><td>8</td></tr>
+      <tr><td>Best lobbying and government relations firms in Sacramento</td><td>27</td><td>3</td><td>2</td><td>22</td></tr>
+      <tr><td>Best immigration lawyers in Sacramento</td><td>16</td><td>0</td><td>5</td><td>11</td></tr>
+      <tr><td>Best real estate agents for buying a home in Sacramento</td><td>22</td><td>0</td><td>5</td><td>17</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>116</strong></td><td><strong>14</strong></td><td><strong>25</strong></td><td><strong>77</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Of the 116 firms, 14 were on all three lists (12%), 25 on two (22%) and 77 on one engine only (66%). Two of the six questions produced no name on all three lists.</p>
+
+  <h2>Property management: 5 of 17 companies on every list</h2>
+
+  <p>This is where the three engines agreed most. ChatGPT named 8 property managers, Claude 10 and Gemini 15, and between them only 17 different companies. Five were in all three answers: <strong>Utopia Management</strong>, <strong>Keyrenter Sacramento</strong>, <strong>Real Property Management Select</strong>, <strong>Sacramento Delta Property Management</strong> and <strong>River Valley Property Management</strong>. Real Property Management is one of the national brands we counted in BG-113.</p>
+
+  <p>Six more were named by two engines: <strong>Tower Bridge Property Management</strong>, <strong>Cornerstone Property Management</strong>, <strong>Titan Property Management</strong>, <strong>Peak Residential</strong>, <strong>M&amp;M Property Services &amp; Management</strong> and <strong>Ziprent</strong>. Every company on ChatGPT's list was on at least one other list. Gemini's list was the longest, and 5 of its 15 companies were its own.</p>
+
+  <h2>Lobbying: 27 firms, three in common</h2>
+
+  <p>The question written for the capital produced the longest combined list. Gemini named 19 firms, ChatGPT 10 and Claude 6. All three named <strong>Capitol Advocacy</strong>, <strong>Governmental Advocates</strong> and one boutique firm carrying its founders' names. Two more were named by two engines, and 22 by one only, 14 of them by Gemini.</p>
+
+  <p>One pair shows how close a near miss can be. ChatGPT named a lobbying firm called Axiom Advisors; Gemini named "Axiom Strategies". We counted them as two names, because that is what a buyer reading the two answers would see.</p>
+
+  <h2>Water law and personal injury: three each</h2>
+
+  <p>Agricultural and water rights law: 14 firms, 3 on all three lists and 3 on two. All six carry founders' names, so we count them and do not print them. ChatGPT named 10 firms here, Claude 5, Gemini 8.</p>
+
+  <p>Personal injury: 20 firms, 3 on all three lists and 4 on two, all named after people. One of the three was written under two different names: ChatGPT and Gemini used one, Claude used a form in which one of the three names is different. We counted it as one firm, because the two forms share two names; a business owner checking only one form of the name would have found it on two lists, not three. Gemini named 13 firms here and 7 of them were its own.</p>
+
+  <h2>Real estate agents and immigration: 38 names, none in common</h2>
+
+  <p>Real estate: ChatGPT named 5 agents, Claude 10 agents or teams, Gemini 12. No agent or team was in all three answers. Five were named by two engines, and four of those five were shared by Claude and Gemini. ChatGPT's list overlapped with the others on one agent only.</p>
+
+  <p>Immigration: ChatGPT named 5 firms, Claude 9, Gemini 7, and none was in all three answers. Five were named by two engines. One came close: Claude and Gemini named a firm, and ChatGPT named the lawyer who leads it without naming the firm. Under our rule a person is not a firm, so it counts as two engines, not three.</p>
+
+  <h2>Exact match against the hand read</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th>Question</th><th>Exact bold match</th><th>After the hand read</th></tr></thead>
+    <tbody>
+      <tr><td>Personal injury</td><td>0</td><td>3</td></tr>
+      <tr><td>Real estate agents</td><td>0</td><td>0</td></tr>
+      <tr><td>Property management</td><td>0</td><td>5</td></tr>
+      <tr><td>Immigration</td><td>0</td><td>0</td></tr>
+      <tr><td>Lobbying and government relations</td><td>3</td><td>3</td></tr>
+      <tr><td>Agricultural and water rights law</td><td>0</td><td>3</td></tr>
+      <tr><td><strong>Total</strong></td><td><strong>3</strong></td><td><strong>14</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>An exact match on bold text finds 3 firms on all three lists; reading the answers finds 14. The property managers show why. Gemini put a colon inside the bold after every company name, so a simple text match treats each one as a heading. Elsewhere the same firm appeared with and without "LLP", "P.C." or a city name. For a business owner checking their own visibility, search the full answer for your name and its variants, not only the highlighted list.</p>
+
+  <h2>How each engine answered</h2>
+
+  <div class="compare-table-wrap">
+  <table class="compare-table">
+    <thead><tr><th></th><th>ChatGPT</th><th>Claude</th><th>Gemini</th></tr></thead>
+    <tbody>
+      <tr><td>Firms, agents or teams named across the six answers</td><td>45</td><td>50</td><td>74</td></tr>
+      <tr><td>Average stored answer length, characters</td><td>4,880</td><td>2,995</td><td>3,927</td></tr>
+      <tr><td>Bold spans across the six answers</td><td>135</td><td>87</td><td>96</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Gemini named the most, 74, and gave the longest lists on lobbying and property management. ChatGPT wrote the longest answers and named the fewest, 45: much of its space went to questions to ask, ranking sites and what to check before signing. A bold span is not always a firm.</p>
+
+  <div class="callout teal">
+    <div class="callout-label">What a Sacramento business should do</div>
+    <p>Ask each engine your own buyer question, with your trade and "Sacramento", and note which list you are on. Treat the three as separate channels: 102 of the 116 firms named here were missing from at least one engine, and 77 were on one list only.</p>
+    <p>If you are an agent or an immigration lawyer, search for your own name as well as the firm's. In both trades the engines agreed on nobody, and in immigration one engine named the person where the others named the firm.</p>
+    <p>Pick one form of your firm's name and use it everywhere: your site, your Google Business Profile, your directory listings. Several of the 14 shared firms were written in more than one form across the answers. Read the answers for what they say about you too, not only whether you are in them.</p>
+  </div>""",
+))
