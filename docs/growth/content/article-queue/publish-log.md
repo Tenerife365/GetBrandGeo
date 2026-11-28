@@ -31,3 +31,4 @@ One line per published article, newest last.
 - 2026-11-25 BG-132 https://getbrandgeo.com/bg-132.html Do AI Overviews Show Up on 68% or 40% of Local Searches? Why Two Studies Disagree
 - 2026-11-26 BG-133 https://getbrandgeo.com/bg-133.html Google AI Mode Can Book Tables, Tickets and Beauty Appointments. What a Business Needs
 - 2026-11-27 BG-134 https://getbrandgeo.com/bg-134.html AI Visibility in Sacramento: Three Engines Agree on Property Managers, Not on Agents or Immigration Lawyers
+- 2026-11-28 BG-135 https://getbrandgeo.com/bg-135.html Who Owns Your AI Visibility Tool Now? The Deals Since Late 2025 in One Table
